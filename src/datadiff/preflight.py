@@ -77,6 +77,7 @@ def _repair_case(case: Case) -> tuple[Case, bool]:
             seed=case.program.seed,
             operations=operations,
         ),
+        metadata=dict(case.metadata),
     ), fallback_used
 
 
@@ -90,6 +91,7 @@ def _fallback_case(case: Case) -> Case:
             seed=case.program.seed,
             operations=_fallback_operations(case),
         ),
+        metadata=dict(case.metadata),
     )
 
 

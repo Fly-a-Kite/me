@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import platform
-import sqlite3
 import sys
 from functools import lru_cache
 from importlib import metadata
+
+from datadiff.sqlite_runtime import SQLITE_RUNTIME, SQLITE_VERSION
 
 
 def package_version(name: str) -> str:
@@ -22,7 +23,9 @@ def _collect_environment_cached() -> tuple[tuple[str, str], ...]:
         "pandas": package_version("pandas"),
         "polars": package_version("polars"),
         "duckdb": package_version("duckdb"),
-        "sqlite": sqlite3.sqlite_version,
+        "sqlite": SQLITE_VERSION,
+        "sqlite_runtime": SQLITE_RUNTIME,
+        "pysqlite3_binary": package_version("pysqlite3-binary"),
         "datadiff_fuzz_lab": package_version("datadiff-fuzz-lab"),
     }
     return tuple(data.items())

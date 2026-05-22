@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from datadiff.dsl import Case
-from datadiff.mutator import mutate_case
+from datadiff.mutator import mutate_case_with_metadata
+from datadiff.scheduler import LocalSourceScheduler
 from datadiff.util import CORPUS_DIR, dump_json
 
 
@@ -16,12 +18,29 @@ class FeedbackState:
     interesting_cases: list[Case] = field(default_factory=list)
     persisted_count: int = 0
     last_persisted_to_disk: bool = False
+    source_scheduler: LocalSourceScheduler | None = None
+    last_candidate_source: str = "generated"
+    last_candidate_metadata: dict[str, Any] = field(default_factory=dict)
+    last_source_reward: float | None = None
 
     def choose_case(self, seed: int, generated: Case) -> Case:
-        if not self.interesting_cases or seed % 3 != 0:
+        self.last_candidate_source = "generated"
+        self.last_candidate_metadata = _generated_candidate_metadata(generated)
+        if not self.interesting_cases:
             return generated
+        if self.source_scheduler is None:
+            if seed % 3 != 0:
+                return generated
+        else:
+            source = self.source_scheduler.choose_source(feedback_available=bool(self.interesting_cases))
+            self.last_candidate_source = source
+            if source != "feedback_mutation":
+                return generated
+        self.last_candidate_source = "feedback_mutation"
         base = self.interesting_cases[seed % len(self.interesting_cases)]
-        return mutate_case(base, seed)
+        result = mutate_case_with_metadata(base, seed)
+        self.last_candidate_metadata = result.metadata
+        return result.case
 
     def record(self, case: Case, behavior_signature: str, has_finding: bool) -> bool:
         self.last_persisted_to_disk = False
@@ -39,6 +58,33 @@ class FeedbackState:
             self.last_persisted_to_disk = True
         return True
 
+    def record_candidate_result(
+        self,
+        candidate_source: str,
+        *,
+        has_finding: bool,
+        is_new_behavior: bool,
+        preflight: dict[str, Any],
+        candidate_bug: bool = False,
+        semantic_divergence: bool = False,
+        false_positive: bool = False,
+    ) -> float | None:
+        if self.source_scheduler is None:
+            self.last_source_reward = None
+            return None
+        reward = self.source_scheduler.record_result(
+            "feedback_mutation" if candidate_source == "feedback_mutation" else "generated",
+            has_finding=has_finding,
+            is_new_behavior=is_new_behavior,
+            preflight_valid=bool(preflight.get("valid", True)),
+            fallback_used=bool(preflight.get("fallback_used", False)),
+            candidate_bug=candidate_bug,
+            semantic_divergence=semantic_divergence,
+            false_positive=false_positive,
+        )
+        self.last_source_reward = reward
+        return reward
+
     def _write_interesting_case(self, case: Case, behavior_signature: str, has_finding: bool) -> None:
         path = CORPUS_DIR / "interesting" / f"{behavior_signature}.json"
         dump_json(
@@ -49,3 +95,20 @@ class FeedbackState:
             },
             path,
         )
+
+
+def _generated_candidate_metadata(case: Case) -> dict[str, Any]:
+    return {
+        "seed_lineage": {
+            "root_seed": case.seed,
+            "parent_seed": None,
+            "parent_case_id": "",
+            "mutation_seed": None,
+            "depth": 0,
+        },
+        "mutation": {
+            "operator": "generated",
+            "detail": "generated",
+            "changed": False,
+        },
+    }

@@ -4,7 +4,7 @@ import time
 from typing import Any
 
 from datadiff.backends.base import Backend, BackendResult
-from datadiff.dsl import Program, TableData
+from datadiff.dsl import Program, TableData, normalize_sort_keys
 
 
 class PandasBackend(Backend):
@@ -24,6 +24,7 @@ class PandasBackend(Backend):
                 kind = op["op"]
                 if kind == "join":
                     right = frames[op["table"]]
+                    before_cols = set(df.columns)
                     df = df.merge(
                         right,
                         how=op["how"],
@@ -33,6 +34,12 @@ class PandasBackend(Backend):
                         sort=False,
                     )
                     drop_cols = [c for c in df.columns if str(c).endswith("_r")]
+                    if (
+                        op["right_on"] != op["left_on"]
+                        and op["right_on"] not in before_cols
+                        and op["right_on"] in df.columns
+                    ):
+                        drop_cols.append(op["right_on"])
                     if drop_cols:
                         df = df.drop(columns=drop_cols)
                 elif kind == "filter":
@@ -53,9 +60,17 @@ class PandasBackend(Backend):
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":
-                    df = df.sort_values(list(op["columns"]), ascending=bool(op["ascending"]), na_position="last", kind="mergesort")
+                    for key in reversed(normalize_sort_keys(op)):
+                        df = df.sort_values(
+                            key.column,
+                            ascending=key.ascending,
+                            na_position=key.nulls,
+                            kind="mergesort",
+                        )
                 elif kind == "limit":
                     df = df.head(int(op["n"]))
+                elif kind == "offset":
+                    df = df.iloc[int(op["n"]):]
                 elif kind == "mutate":
                     expr = op["expr"]
                     df = df.copy()
@@ -94,6 +109,17 @@ class PandasBackend(Backend):
                             series = getattr(group[col], func)().rename(alias)
                         pieces.append(series)
                     df = pd.concat(pieces, axis=1).reset_index()
+                elif kind == "aggregate":
+                    values = {}
+                    for agg in op["aggs"]:
+                        col, func, alias = agg["column"], agg["func"], agg["as"]
+                        if func == "count":
+                            values[alias] = int(df[col].count())
+                        elif func == "sum":
+                            values[alias] = df[col].sum(min_count=1)
+                        else:
+                            values[alias] = getattr(df[col], func)()
+                    df = pd.DataFrame([values], columns=[agg["as"] for agg in op["aggs"]])
                 else:
                     raise ValueError(kind)
             return BackendResult(self.name, "ok", data=df, duration_ms=(time.perf_counter()-start)*1000)

@@ -29,8 +29,9 @@
 
 - Issue: https://github.com/apache/datafusion/issues/22190
 - Submitted: 2026-05-15
+- Project member response: `xiedeyantu` replied `take` on 2026-05-17 UTC and is assigned to the issue.
 - Current paper-facing status: `submitted_upstream_needs_external_confirmation`
-- Interpretation: keep counting this as one high-confidence submitted candidate bug family until upstream confirms, rejects, or documents the behavior.
+- Interpretation: this is now under upstream member triage. Keep counting it as one high-confidence submitted candidate bug family until upstream confirms, rejects, or documents the behavior.
 
 ## Main Matrix
 
@@ -157,7 +158,7 @@
 - Expected comparison engines: pandas and DuckDB return the grouped row.
 - Observed suspicious backend: DataFusion returns an empty result.
 - Triage verdict: `candidate_implementation_bug`.
-- Paper status: `submitted_upstream_needs_external_confirmation`.
+- Paper status: `submitted_upstream_needs_external_confirmation`; upstream member `xiedeyantu` has taken the issue.
 - Additional test: `tests/test_regression_findings.py::test_datafusion_grouped_topk_null_max_sort_key_is_candidate_bug`
 - Additional minimal case: one group with `MAX(x) = NULL`, followed by `ORDER BY max_x DESC LIMIT 20`.
 

@@ -1,0 +1,57 @@
+from __future__ import annotations
+
+from typing import Any
+
+CANDIDATE_BUG_VERDICT = "candidate_implementation_bug"
+SEMANTIC_DIVERGENCE_VERDICTS = {
+    "documented_semantic_divergence",
+    "expected_semantic_divergence",
+    "semantic_divergence_needs_confirmation",
+}
+FALSE_POSITIVE_VERDICTS = {
+    "generator_false_positive",
+    "normalizer_false_positive",
+}
+
+
+def is_candidate_bug_finding(finding: dict[str, Any]) -> bool:
+    return finding.get("triage_verdict") == CANDIDATE_BUG_VERDICT and not finding.get("false_positive")
+
+
+def is_semantic_divergence_finding(finding: dict[str, Any]) -> bool:
+    return str(finding.get("triage_verdict", "unclassified")) in SEMANTIC_DIVERGENCE_VERDICTS
+
+
+def is_false_positive_finding(finding: dict[str, Any]) -> bool:
+    return bool(finding.get("false_positive")) or str(finding.get("triage_verdict", "unclassified")) in FALSE_POSITIVE_VERDICTS
+
+
+def row_reward_signals(row: dict[str, Any]) -> dict[str, Any]:
+    findings = row.get("findings") or []
+    candidate_bug_count = sum(1 for finding in findings if is_candidate_bug_finding(finding))
+    semantic_divergence_count = sum(1 for finding in findings if is_semantic_divergence_finding(finding))
+    false_positive_count = sum(1 for finding in findings if is_false_positive_finding(finding))
+    return {
+        "candidate_bug": candidate_bug_count > 0,
+        "candidate_bug_count": candidate_bug_count,
+        "semantic_divergence": semantic_divergence_count > 0,
+        "semantic_divergence_count": semantic_divergence_count,
+        "false_positive": false_positive_count > 0,
+        "false_positive_count": false_positive_count,
+    }
+
+
+def online_case_reward(row: dict[str, Any]) -> float:
+    signals = row_reward_signals(row)
+    preflight = row.get("preflight") or {}
+    reward = (
+        3.0 * signals["candidate_bug_count"]
+        + 0.35 * signals["semantic_divergence_count"]
+        + (0.5 if row.get("is_new_behavior") else 0.0)
+        - 1.5 * signals["false_positive_count"]
+    )
+    if not bool(preflight.get("valid", True)) or bool(preflight.get("fallback_used", False)):
+        reward -= 0.5
+    if reward == 0.0:
+        reward -= 0.1
+    return reward

@@ -5,7 +5,7 @@ import random
 import string
 from typing import Any, Literal
 
-from .dsl import Case, ColumnSpec, Program, TableData
+from .dsl import Case, ColumnSpec, Program, SortKey, TableData, normalize_sort_keys
 from .util import unique_preserve_order
 
 GeneratorProfile = Literal[
@@ -16,7 +16,16 @@ GeneratorProfile = Literal[
     "bughunt_no_groupby",
     "null_groupby_topk",
     "null_agg_topk",
+    "filter_null_agg_topk",
+    "join_null_agg_topk",
+    "join_filter_groupby",
+    "join_groupby_stress",
+    "storage_offset",
     "float_group_key",
+    "join_null_sort",
+    "ordered_groupby_sort",
+    "topk_resort",
+    "join_ordered_agg_topk",
 ]
 
 
@@ -163,7 +172,7 @@ def generate_program(
     string_cols = [c.name for c in table.columns if c.type == "str"]
     comparable_cols = table.comparable_columns()
 
-    op_pool = ["filter", "select", "sort", "limit", "mutate", "groupby"]
+    op_pool = ["filter", "select", "sort", "limit", "offset", "mutate", "groupby"]
     bughunt_profile = _is_bughunt_profile(profile)
     if bughunt_profile:
         op_pool = [
@@ -173,6 +182,7 @@ def generate_program(
             "mutate",
             "sort",
             "limit",
+            "offset",
             "select",
         ]
         if profile == "bughunt":
@@ -202,7 +212,7 @@ def generate_program(
         before_len = len(ops)
         possible = list(op_pool)
         if grouped:
-            possible = ["sort", "limit", "select"]
+            possible = ["sort", "limit", "offset", "select"]
         if joined_tables:
             possible = [p for p in possible if p != "join"]
         remaining = nops - index
@@ -271,10 +281,13 @@ def generate_program(
         elif op == "sort" and available_cols:
             first = rnd.choice(available_cols)
             cols = [first] + sorted(c for c in available_cols if c != first)
-            ops.append({"op": "sort", "columns": cols, "ascending": rnd.choice([True, False])})
+            ops.append(_random_sort_op(rnd, cols, allow_mixed=_is_bughunt_profile(profile)))
 
         elif op == "limit":
             ops.append({"op": "limit", "n": rnd.randint(0, max(1, len(table.rows) + 2))})
+
+        elif op == "offset":
+            ops.append({"op": "offset", "n": rnd.randint(0, max(1, len(table.rows) + 2))})
 
         elif op == "mutate" and (numeric_cols or string_cols) and not grouped:
             new_col = f"m_{len([o for o in ops if o.get('op') == 'mutate'])}"
@@ -364,7 +377,7 @@ def _generate_type_oblivious_operation(
     allow_groupby: bool = True,
 ) -> dict[str, Any]:
     col = rnd.choice(available_cols)
-    kinds = ["filter", "select", "sort", "limit", "mutate"]
+    kinds = ["filter", "select", "sort", "limit", "offset", "mutate"]
     if allow_groupby:
         kinds.append("groupby")
     kind = rnd.choice(kinds)
@@ -382,6 +395,8 @@ def _generate_type_oblivious_operation(
         return {"op": "sort", "columns": cols, "ascending": rnd.choice([True, False])}
     if kind == "limit":
         return {"op": "limit", "n": rnd.randint(0, max(1, len(table.rows) + 2))}
+    if kind == "offset":
+        return {"op": "offset", "n": rnd.randint(0, max(1, len(table.rows) + 2))}
     if kind == "mutate":
         return {
             "op": "mutate",
@@ -412,7 +427,6 @@ def repair_operations(
     col_types = {c.name: c.type for c in table.columns}
     numeric = {c.name for c in table.columns if c.type in {"int", "float"}}
     strings = {c.name for c in table.columns if c.type == "str"}
-    grouped = False
     for op in ops:
         kind = op["op"]
         if kind == "join":
@@ -420,8 +434,7 @@ def repair_operations(
             left_on = op.get("left_on")
             right_on = op.get("right_on")
             if (
-                grouped
-                or right is None
+                right is None
                 or left_on not in available
                 or right_on not in {c.name for c in right.columns}
                 or op.get("how") not in {"inner", "left"}
@@ -438,7 +451,7 @@ def repair_operations(
                 if col.type == "str":
                     strings.add(col.name)
         elif kind == "filter":
-            if grouped or op["column"] not in available:
+            if op["column"] not in available:
                 continue
             column_type = col_types.get(op["column"], "")
             if not _filter_literal_is_valid(column_type, op.get("cmp"), op.get("value")):
@@ -453,17 +466,27 @@ def repair_operations(
             numeric &= available
             strings &= available
         elif kind == "sort":
-            cols = unique_preserve_order([c for c in op["columns"] if c in available])
-            if cols:
-                full_cols = cols + sorted(c for c in available if c not in cols)
-                repaired.append({**op, "columns": full_cols})
+            try:
+                keys = normalize_sort_keys(op)
+            except ValueError:
+                continue
+            keys = _dedupe_sort_keys([key for key in keys if key.column in available])
+            if keys:
+                existing = {key.column for key in keys}
+                tail = [SortKey(column=c) for c in sorted(c for c in available if c not in existing)]
+                full_keys = keys + tail
+                if "keys" in op:
+                    repaired.append({"op": "sort", "keys": [key.to_dict() for key in full_keys]})
+                else:
+                    repaired.append({**op, "columns": [key.column for key in full_keys]})
         elif kind == "limit":
             if repaired and repaired[-1].get("op") == "sort":
                 repaired.append(op)
             break
+        elif kind == "offset":
+            if repaired and repaired[-1].get("op") == "sort":
+                repaired.append({"op": "offset", "n": max(0, int(op.get("n", 0)))})
         elif kind == "mutate":
-            if grouped:
-                continue
             expr = op["expr"]
             out_type = _mutate_output_type(expr, available, numeric, strings, col_types)
             if out_type is None:
@@ -476,8 +499,6 @@ def repair_operations(
             if out_type == "str":
                 strings.add(op["column"])
         elif kind == "groupby":
-            if grouped:
-                continue
             keys = unique_preserve_order([k for k in op["keys"] if k in available])
             aggs = [a for a in op["aggs"] if a["column"] in available and a["column"] in numeric]
             unique_aggs: list[dict[str, Any]] = []
@@ -493,12 +514,57 @@ def repair_operations(
                 continue
             repaired.append({**op, "keys": keys, "aggs": aggs})
             available = set(keys) | {a["as"] for a in aggs}
-            numeric = {a["as"] for a in aggs}
+            numeric = {k for k in keys if col_types.get(k) in {"int", "float"}}
+            numeric |= {a["as"] for a in aggs}
             strings = {k for k in keys if col_types.get(k) == "str"}
             for agg in aggs:
                 col_types[agg["as"]] = "int" if agg["func"] == "count" else col_types.get(agg["column"], "float")
-            grouped = True
+        elif kind == "aggregate":
+            aggs = [a for a in op["aggs"] if a["column"] in available and a["column"] in numeric]
+            unique_aggs = []
+            seen_aliases: set[str] = set()
+            for agg in aggs:
+                alias = str(agg.get("as", ""))
+                if not alias or alias in seen_aliases:
+                    continue
+                seen_aliases.add(alias)
+                unique_aggs.append(agg)
+            if not unique_aggs:
+                continue
+            repaired.append({**op, "aggs": unique_aggs})
+            available = {a["as"] for a in unique_aggs}
+            numeric = set(available)
+            strings = set()
+            for agg in unique_aggs:
+                col_types[agg["as"]] = "int" if agg["func"] == "count" else col_types.get(agg["column"], "float")
     return repaired
+
+
+def _random_sort_op(rnd: random.Random, columns: list[str], *, allow_mixed: bool = False) -> dict[str, Any]:
+    if allow_mixed and len(columns) > 1 and rnd.random() < 0.35:
+        return {
+            "op": "sort",
+            "keys": [
+                {
+                    "column": column,
+                    "ascending": rnd.choice([True, False]),
+                    "nulls": rnd.choice(["first", "last"]),
+                }
+                for column in columns
+            ],
+        }
+    return {"op": "sort", "columns": columns, "ascending": rnd.choice([True, False])}
+
+
+def _dedupe_sort_keys(keys: list[SortKey]) -> list[SortKey]:
+    seen = set()
+    out = []
+    for key in keys:
+        if key.column in seen:
+            continue
+        seen.add(key.column)
+        out.append(key)
+    return out
 
 
 def _mutate_output_type(
@@ -548,8 +614,26 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_null_groupby_topk_case(seed)
     if profile == "null_agg_topk" and type_aware:
         return generate_null_agg_topk_case(seed)
+    if profile == "filter_null_agg_topk" and type_aware:
+        return generate_filter_null_agg_topk_case(seed)
+    if profile == "join_null_agg_topk" and type_aware:
+        return generate_join_null_agg_topk_case(seed)
+    if profile == "join_filter_groupby" and type_aware:
+        return generate_join_filter_groupby_case(seed)
+    if profile == "join_groupby_stress" and type_aware:
+        return generate_join_groupby_stress_case(seed)
+    if profile == "storage_offset" and type_aware:
+        return generate_storage_offset_case(seed)
     if profile == "float_group_key" and type_aware:
         return generate_float_group_key_case(seed)
+    if profile == "join_null_sort" and type_aware:
+        return generate_join_null_sort_case(seed)
+    if profile == "ordered_groupby_sort" and type_aware:
+        return generate_ordered_groupby_sort_case(seed)
+    if profile == "topk_resort" and type_aware:
+        return generate_topk_resort_case(seed)
+    if profile == "join_ordered_agg_topk" and type_aware:
+        return generate_join_ordered_agg_topk_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -625,11 +709,36 @@ def generate_null_groupby_topk_case(seed: int) -> Case:
     )
 
 
+def generate_storage_offset_case(seed: int) -> Case:
+    row_count = 300_000
+    offset = 0 if seed % 2 == 0 else 200_000
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int", nullable=False)],
+        [{"id": idx} for idx in range(row_count)],
+    )
+    program = Program(
+        f"prog-{seed:08d}-storage-offset",
+        seed,
+        [
+            {"op": "sort", "columns": ["id"], "ascending": True},
+            {"op": "offset", "n": offset},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-storage-offset",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={"generator_profile": "storage_offset", "row_count": row_count, "offset": offset},
+    )
+
+
 def generate_null_agg_topk_case(seed: int) -> Case:
     rnd = random.Random(seed * 67867967 + 23)
     row_count = rnd.randint(1, 8)
     rows = []
-    group_values = ["a", "b", "c", "d"]
+    group_values = ["b", "c", "d", "e"]
     for idx in range(row_count):
         if idx == 0:
             rows.append({"g": "a", "x": None})
@@ -668,6 +777,287 @@ def generate_null_agg_topk_case(seed: int) -> Case:
         tables=[table],
         program=program,
     )
+
+
+def generate_filter_null_agg_topk_case(seed: int) -> Case:
+    rnd = random.Random(seed * 701408733 + 29)
+    rows = [
+        {"id": 0, "g": "a", "x": None, "lane": "keep"},
+        {"id": 1, "g": "a", "x": None, "lane": "keep"},
+        {"id": 2, "g": "b", "x": rnd.choice([1, 2, 5]), "lane": "keep"},
+        {"id": 3, "g": "b", "x": rnd.choice([None, 0, 3]), "lane": "keep"},
+        {"id": 4, "g": "c", "x": rnd.choice([-1, 0, 7]), "lane": "keep"},
+        {"id": 5, "g": "drop", "x": rnd.choice([None, 9]), "lane": "skip"},
+    ]
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=False),
+            ColumnSpec("x", "int", nullable=True),
+            ColumnSpec("lane", "str", nullable=False),
+        ],
+        rows,
+    )
+    agg_func = rnd.choice(["min", "max"])
+    agg_alias = f"{agg_func}_x"
+    ascending = agg_func == "min"
+    program = Program(
+        f"prog-{seed:08d}-filter-null-agg-topk",
+        seed,
+        [
+            {"op": "filter", "column": "lane", "cmp": "!=", "value": "skip"},
+            {"op": "mutate", "column": "m_0", "expr": {"kind": "add_const", "source": "x", "value": 0}},
+            {"op": "select", "columns": ["g", "m_0"]},
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [{"column": "m_0", "func": agg_func, "as": agg_alias}],
+            },
+            {"op": "select", "columns": [agg_alias]},
+            {"op": "sort", "columns": [agg_alias], "ascending": ascending},
+            {"op": "limit", "n": 6},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-filter-null-agg-topk",
+        seed=seed,
+        tables=[table],
+        program=program,
+    )
+
+
+def generate_join_null_agg_topk_case(seed: int) -> Case:
+    rnd = random.Random(seed * 74649677 + 27)
+    left = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=False),
+            ColumnSpec("x", "int", nullable=True),
+        ],
+        [
+            {"id": 0, "g": "a", "x": 1},
+            {"id": 1, "g": "a", "x": None},
+            {"id": 2, "g": "b", "x": 2},
+            {"id": 3, "g": "c", "x": -1},
+            {"id": 4, "g": "d", "x": 0},
+        ],
+    )
+    right = TableData(
+        "t1",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("j", "int", nullable=True),
+            ColumnSpec("tag", "str", nullable=True),
+        ],
+        [
+            {"id": 0, "j": 10, "tag": "alpha"},
+            {"id": 0, "j": None, "tag": "beta"},
+            {"id": 2, "j": 5, "tag": "gamma"},
+            {"id": 2, "j": 7, "tag": "delta"},
+            {"id": 5, "j": 9, "tag": "orphan"},
+        ],
+    )
+    agg_func = rnd.choice(["min", "max"])
+    agg_alias = f"{agg_func}_j"
+    ascending = agg_func == "min"
+    program = Program(
+        f"prog-{seed:08d}-join-null-agg-topk",
+        seed,
+        [
+            {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+            {"op": "mutate", "column": "m_0", "expr": {"kind": "cast", "source": "j", "to": "float"}},
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [{"column": "m_0", "func": agg_func, "as": agg_alias}],
+            },
+            {"op": "select", "columns": [agg_alias]},
+            {"op": "sort", "columns": [agg_alias], "ascending": ascending},
+            {"op": "limit", "n": 8},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-join-null-agg-topk",
+        seed=seed,
+        tables=[left, right],
+        program=program,
+    )
+
+
+def generate_join_filter_groupby_case(seed: int) -> Case:
+    rnd = random.Random(seed * 91815541 + 33)
+    left = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=False),
+            ColumnSpec("x", "int", nullable=True),
+            ColumnSpec("y", "float", nullable=True),
+        ],
+        [
+            {"id": 0, "g": "a", "x": 1, "y": 0.5},
+            {"id": 1, "g": "a", "x": 0, "y": -0.5},
+            {"id": 1, "g": "b", "x": 2, "y": 1.0},
+            {"id": 2, "g": "b", "x": -1, "y": 0.0},
+            {"id": 3, "g": "c", "x": 3, "y": None},
+        ],
+    )
+    right = TableData(
+        "t1",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("j", "int", nullable=True),
+            ColumnSpec("z", "float", nullable=True),
+            ColumnSpec("tag", "str", nullable=True),
+        ],
+        [
+            {"id": 0, "j": 5, "z": 0.5, "tag": "alpha"},
+            {"id": 1, "j": 7, "z": 1.0, "tag": "beta"},
+            {"id": 1, "j": -2, "z": -0.5, "tag": "gamma"},
+            {"id": 3, "j": 1, "z": 2.0, "tag": "delta"},
+        ],
+    )
+    ascending = rnd.choice([True, False])
+    program = Program(
+        f"prog-{seed:08d}-join-filter-groupby",
+        seed,
+        [
+            {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+            {"op": "filter", "column": "j", "cmp": ">=", "value": 0},
+            {"op": "mutate", "column": "m_0", "expr": {"kind": "add_const", "source": "x", "value": 1}},
+            {"op": "mutate", "column": "m_1", "expr": {"kind": "arith_const", "source": "m_0", "op": "mul", "value": 2}},
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [
+                    {"column": "m_1", "func": "sum", "as": "sum_m_1"},
+                    {"column": "j", "func": "count", "as": "count_j"},
+                    {"column": "z", "func": "max", "as": "max_z"},
+                ],
+            },
+            {"op": "select", "columns": ["g", "sum_m_1", "count_j", "max_z"]},
+            {"op": "sort", "columns": ["sum_m_1", "count_j", "g"], "ascending": ascending},
+            {"op": "limit", "n": 6},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-join-filter-groupby",
+        seed=seed,
+        tables=[left, right],
+        program=program,
+    )
+
+
+def generate_join_groupby_stress_case(seed: int) -> Case:
+    row_count = 100_000
+    edges = _stable_graph_edges(row_count)
+    left_rows = [{"fromnode": source, "tonode": target} for source, target in edges]
+    path_rows = [{"p6_fromnode": source, "p6_tonode": target} for source, target in edges]
+    probe_rows = [
+        {
+            "p4_fromnode": source,
+            "p4_tonode_join": target,
+            "p4_tonode": target,
+        }
+        for source, target in edges
+    ]
+    left = TableData(
+        "t0",
+        [
+            ColumnSpec("fromnode", "int", nullable=False),
+            ColumnSpec("tonode", "int", nullable=False),
+        ],
+        left_rows,
+    )
+    path = TableData(
+        "t1",
+        [
+            ColumnSpec("p6_fromnode", "int", nullable=False),
+            ColumnSpec("p6_tonode", "int", nullable=False),
+        ],
+        path_rows,
+    )
+    probe = TableData(
+        "t2",
+        [
+            ColumnSpec("p4_fromnode", "int", nullable=False),
+            ColumnSpec("p4_tonode_join", "int", nullable=False),
+            ColumnSpec("p4_tonode", "int", nullable=False),
+        ],
+        probe_rows,
+    )
+    program = Program(
+        f"prog-{seed:08d}-join-groupby-stress",
+        seed,
+        [
+            {
+                "op": "join",
+                "table": "t1",
+                "left_on": "tonode",
+                "right_on": "p6_fromnode",
+                "how": "inner",
+            },
+            {
+                "op": "groupby",
+                "keys": ["fromnode", "tonode"],
+                "aggs": [{"column": "p6_tonode", "func": "count", "as": "path2_count"}],
+            },
+            {
+                "op": "join",
+                "table": "t2",
+                "left_on": "fromnode",
+                "right_on": "p4_tonode_join",
+                "how": "inner",
+            },
+            {
+                "op": "groupby",
+                "keys": ["p4_fromnode", "p4_tonode"],
+                "aggs": [{"column": "path2_count", "func": "sum", "as": "path3_count"}],
+            },
+            {
+                "op": "aggregate",
+                "aggs": [
+                    {"column": "path3_count", "func": "sum", "as": "total_path3_count"},
+                    {"column": "path3_count", "func": "count", "as": "path3_group_count"},
+                ],
+            },
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-join-groupby-stress",
+        seed=seed,
+        tables=[left, path, probe],
+        program=program,
+        metadata={"generator_profile": "join_groupby_stress", "row_count": row_count},
+    )
+
+
+def _stable_graph_edges(row_count: int) -> list[tuple[int, int]]:
+    left_span = row_count // 2 + row_count // 4
+    right_span = row_count // 2 + row_count
+    edges: list[tuple[int, int]] = []
+    for idx in range(row_count):
+        left_seed = idx * 1_000_003
+        right_seed = idx * 9_176
+        if _stable_hash64(left_seed) == _stable_hash64(right_seed):
+            continue
+        source = min(_stable_hash64(left_seed) % left_span, _stable_hash64(left_seed + 7) % left_span)
+        target = min(_stable_hash64(right_seed) % right_span, _stable_hash64(right_seed + 11) % right_span)
+        edges.append((int(source), int(target)))
+    return edges
+
+
+def _stable_hash64(value: int) -> int:
+    mask = (1 << 64) - 1
+    value &= mask
+    value ^= value >> 32
+    value = (value * 0xD6E8FEB86659FD93) & mask
+    value ^= value >> 32
+    value = (value * 0xD6E8FEB86659FD93) & mask
+    value ^= value >> 32
+    return value & mask
 
 
 def generate_float_group_key_case(seed: int) -> Case:
@@ -731,6 +1121,272 @@ def generate_float_group_key_case(seed: int) -> Case:
         seed=seed,
         tables=[table, join_table],
         program=program,
+    )
+
+
+def generate_join_null_sort_case(seed: int) -> Case:
+    rnd = random.Random(seed * 9999991 + 41)
+    left = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("x", "int", nullable=True),
+            ColumnSpec("y", "float", nullable=True),
+            ColumnSpec("s", "str", nullable=True),
+        ],
+        [
+            {"id": 0, "x": 2, "y": 0.5, "s": "alpha"},
+            {"id": 1, "x": -1, "y": None, "s": "Beta"},
+            {"id": 1, "x": 0, "y": -0.5, "s": "space value"},
+            {"id": 2, "x": 3, "y": 1.0, "s": "gamma"},
+            {"id": 4, "x": None, "y": 0.0, "s": ""},
+        ],
+    )
+    right = TableData(
+        "t1",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("j", "int", nullable=True),
+            ColumnSpec("z", "float", nullable=True),
+            ColumnSpec("tag", "str", nullable=True),
+        ],
+        [
+            {"id": 1, "j": None, "z": 1.0, "tag": "Alpha"},
+            {"id": 1, "j": 2, "z": None, "tag": "beta"},
+            {"id": 2, "j": -2, "z": -0.5, "tag": "MIXED"},
+            {"id": 3, "j": 7, "z": 0.5, "tag": "orphan"},
+        ],
+    )
+    ascending = rnd.choice([True, False])
+    program = Program(
+        f"prog-{seed:08d}-join-null-sort",
+        seed,
+        [
+            {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+            {"op": "mutate", "column": "m_0", "expr": {"kind": "cast", "source": "j", "to": "float"}},
+            {"op": "mutate", "column": "m_1", "expr": {"kind": "string_length", "source": "tag"}},
+            {"op": "select", "columns": ["id", "x", "y", "s", "tag", "m_0", "m_1"]},
+            {"op": "sort", "columns": ["m_0", "m_1", "id", "s"], "ascending": ascending},
+            {"op": "limit", "n": 6},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-join-null-sort",
+        seed=seed,
+        tables=[left, right],
+        program=program,
+    )
+
+
+def generate_ordered_groupby_sort_case(seed: int) -> Case:
+    rnd = random.Random(seed * 1_000_003 + 59)
+    groups = ["a", "b", "c", "d"]
+    rows: list[dict[str, Any]] = []
+    for idx in range(8):
+        group = groups[idx % len(groups)]
+        if idx == 0:
+            group = "a"
+        value_choices = [None, -2, -1, 0, 1, 2, 5, 10]
+        rows.append(
+            {
+                "id": idx,
+                "g": group,
+                "x": rnd.choice(value_choices),
+                "z": rnd.choice([None, -1, 0, 1, 2, 4, 8]),
+            }
+        )
+    # Ensure two non-null aggregate outputs whose input-order and value-order
+    # disagree. This exercises stale sortedness/ordering metadata generally,
+    # without hard-coding a backend-specific oracle.
+    rows[0] = {"id": 0, "g": "a", "x": 1, "z": 1}
+    rows[1] = {"id": 1, "g": "b", "x": 2, "z": 2}
+    rows[2] = {"id": 2, "g": "b", "x": 0, "z": 0}
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=False),
+            ColumnSpec("x", "int", nullable=True),
+            ColumnSpec("z", "int", nullable=True),
+        ],
+        rows,
+    )
+    value_col = rnd.choice(["x", "z"])
+    agg_func = rnd.choice(["max", "min"])
+    alias = f"{agg_func}_{value_col}"
+    pre_sort_ascending = rnd.choice([True, False])
+    post_sort_ascending = rnd.choice([True, False])
+    program = Program(
+        f"prog-{seed:08d}-ordered-groupby-sort",
+        seed,
+        [
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": value_col, "ascending": pre_sort_ascending, "nulls": "last"},
+                    {"column": "g", "ascending": True, "nulls": "last"},
+                    {"column": "id", "ascending": True, "nulls": "last"},
+                ],
+            },
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [{"column": value_col, "func": agg_func, "as": alias}],
+            },
+            {"op": "select", "columns": ["g", alias]},
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": alias, "ascending": post_sort_ascending, "nulls": "last"},
+                    {"column": "g", "ascending": True, "nulls": "last"},
+                ],
+            },
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-ordered-groupby-sort",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={"generator_profile": "ordered_groupby_sort"},
+    )
+
+
+def generate_topk_resort_case(seed: int) -> Case:
+    rnd = random.Random(seed * 1_618_033 + 61)
+    rows = []
+    for idx in range(14):
+        rows.append(
+            {
+                "id": idx,
+                "g": rnd.choice(["a", "b", "c", None]),
+                "x": rnd.choice([None, -10, -2, -1, 0, 1, 2, 10]),
+                "z": rnd.choice([None, -3, 0, 1, 3, 8]),
+                "s": rnd.choice(["", "A", "a", "space value", None]),
+            }
+        )
+    rows[0] = {"id": 0, "g": "a", "x": None, "z": 8, "s": "A"}
+    rows[1] = {"id": 1, "g": "b", "x": 10, "z": None, "s": "space value"}
+    rows[2] = {"id": 2, "g": "c", "x": -10, "z": -3, "s": ""}
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("x", "int", nullable=True),
+            ColumnSpec("z", "int", nullable=True),
+            ColumnSpec("s", "str", nullable=True),
+        ],
+        rows,
+    )
+    first_col = rnd.choice(["x", "z", "g", "s"])
+    second_col = rnd.choice([col for col in ["x", "z", "g", "s", "id"] if col != first_col])
+    limit_n = rnd.randint(1, 6)
+    offset_n = rnd.randint(0, 2)
+    program = Program(
+        f"prog-{seed:08d}-topk-resort",
+        seed,
+        [
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": first_col, "ascending": rnd.choice([True, False]), "nulls": rnd.choice(["first", "last"])},
+                    {"column": "id", "ascending": True, "nulls": "last"},
+                ],
+            },
+            {"op": "limit", "n": limit_n},
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": second_col, "ascending": rnd.choice([True, False]), "nulls": rnd.choice(["first", "last"])},
+                    {"column": "id", "ascending": True, "nulls": "last"},
+                ],
+            },
+            {"op": "offset", "n": offset_n},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-topk-resort",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={"generator_profile": "topk_resort", "limit": limit_n, "offset": offset_n},
+    )
+
+
+def generate_join_ordered_agg_topk_case(seed: int) -> Case:
+    rnd = random.Random(seed * 2_147_483 + 67)
+    left = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("x", "int", nullable=True),
+        ],
+        [
+            {"id": 0, "g": "a", "x": 1},
+            {"id": 1, "g": "b", "x": 2},
+            {"id": 1, "g": "b", "x": 0},
+            {"id": 2, "g": "c", "x": None},
+            {"id": 3, "g": "d", "x": -1},
+            {"id": 4, "g": None, "x": 5},
+        ],
+    )
+    right = TableData(
+        "t1",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("j", "int", nullable=True),
+            ColumnSpec("z", "int", nullable=True),
+            ColumnSpec("tag", "str", nullable=True),
+        ],
+        [
+            {"id": 0, "j": 10, "z": 1, "tag": "alpha"},
+            {"id": 1, "j": 2, "z": None, "tag": "beta"},
+            {"id": 1, "j": 7, "z": 3, "tag": "Beta"},
+            {"id": 2, "j": None, "z": 8, "tag": "space value"},
+            {"id": 5, "j": 9, "z": -1, "tag": "orphan"},
+        ],
+    )
+    agg_col = rnd.choice(["j", "z", "x"])
+    agg_func = rnd.choice(["min", "max", "sum", "count"])
+    alias = f"{agg_func}_{agg_col}"
+    sort_ascending = rnd.choice([True, False])
+    program = Program(
+        f"prog-{seed:08d}-join-ordered-agg-topk",
+        seed,
+        [
+            {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "j", "ascending": rnd.choice([True, False]), "nulls": rnd.choice(["first", "last"])},
+                    {"column": "g", "ascending": True, "nulls": "last"},
+                    {"column": "id", "ascending": True, "nulls": "last"},
+                ],
+            },
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [{"column": agg_col, "func": agg_func, "as": alias}],
+            },
+            {"op": "select", "columns": ["g", alias]},
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": alias, "ascending": sort_ascending, "nulls": "last"},
+                    {"column": "g", "ascending": True, "nulls": "last"},
+                ],
+            },
+            {"op": "limit", "n": rnd.randint(1, 6)},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-join-ordered-agg-topk",
+        seed=seed,
+        tables=[left, right],
+        program=program,
+        metadata={"generator_profile": "join_ordered_agg_topk"},
     )
 
 

@@ -4,7 +4,7 @@ import time
 import warnings
 
 from datadiff.backends.base import Backend, BackendResult
-from datadiff.dsl import Program, TableData
+from datadiff.dsl import Program, TableData, normalize_sort_keys
 
 
 class PolarsBackend(Backend):
@@ -26,6 +26,7 @@ class PolarsBackend(Backend):
             for op in program.operations:
                 kind = op["op"]
                 if kind == "join":
+                    before_cols = set(df.columns)
                     df = df.join(
                         frames[op["table"]],
                         left_on=op["left_on"],
@@ -35,6 +36,12 @@ class PolarsBackend(Backend):
                         maintain_order="left",
                     )
                     drop_cols = [c for c in df.columns if c.endswith("_r")]
+                    if (
+                        op["right_on"] != op["left_on"]
+                        and op["right_on"] not in before_cols
+                        and op["right_on"] in df.columns
+                    ):
+                        drop_cols.append(op["right_on"])
                     if drop_cols:
                         df = df.drop(drop_cols)
                 elif kind == "filter":
@@ -58,9 +65,16 @@ class PolarsBackend(Backend):
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
-                    df = df.sort(list(op["columns"]), descending=not bool(op["ascending"]), nulls_last=True)
+                    keys = normalize_sort_keys(op)
+                    df = df.sort(
+                        [key.column for key in keys],
+                        descending=[not key.ascending for key in keys],
+                        nulls_last=[key.nulls == "last" for key in keys],
+                    )
                 elif kind == "limit":
                     df = df.head(int(op["n"]))
+                elif kind == "offset":
+                    df = df.slice(int(op["n"]))
                 elif kind == "mutate":
                     expr = op["expr"]
                     if expr["kind"] == "add_const":
@@ -108,6 +122,22 @@ class PolarsBackend(Backend):
                         else:
                             aggs.append(getattr(pl.col(col), func)().alias(alias))
                     df = df.group_by(keys, maintain_order=True).agg(aggs)
+                elif kind == "aggregate":
+                    aggs = []
+                    for agg in op["aggs"]:
+                        col, func, alias = agg["column"], agg["func"], agg["as"]
+                        if func == "count":
+                            aggs.append(pl.col(col).count().alias(alias))
+                        elif func == "sum":
+                            aggs.append(
+                                pl.when(pl.col(col).count() == 0)
+                                .then(None)
+                                .otherwise(pl.col(col).sum())
+                                .alias(alias)
+                            )
+                        else:
+                            aggs.append(getattr(pl.col(col), func)().alias(alias))
+                    df = df.select(aggs)
                 else:
                     raise ValueError(kind)
             return BackendResult(self.name, "ok", data=df, duration_ms=(time.perf_counter()-start)*1000)
@@ -128,6 +158,7 @@ class PolarsLazyBackend(PolarsBackend):
             for op in program.operations:
                 kind = op["op"]
                 if kind == "join":
+                    before_cols = set(lf.collect_schema().names())
                     lf = lf.join(
                         frames[op["table"]],
                         left_on=op["left_on"],
@@ -136,6 +167,12 @@ class PolarsLazyBackend(PolarsBackend):
                         suffix="_r",
                     )
                     drop_cols = [c for c in lf.collect_schema().names() if c.endswith("_r")]
+                    if (
+                        op["right_on"] != op["left_on"]
+                        and op["right_on"] not in before_cols
+                        and op["right_on"] in lf.collect_schema().names()
+                    ):
+                        drop_cols.append(op["right_on"])
                     if drop_cols:
                         lf = lf.drop(drop_cols)
                 elif kind == "filter":
@@ -159,9 +196,16 @@ class PolarsLazyBackend(PolarsBackend):
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))
                 elif kind == "sort":
-                    lf = lf.sort(list(op["columns"]), descending=not bool(op["ascending"]), nulls_last=True)
+                    keys = normalize_sort_keys(op)
+                    lf = lf.sort(
+                        [key.column for key in keys],
+                        descending=[not key.ascending for key in keys],
+                        nulls_last=[key.nulls == "last" for key in keys],
+                    )
                 elif kind == "limit":
                     lf = lf.head(int(op["n"]))
+                elif kind == "offset":
+                    lf = lf.slice(int(op["n"]))
                 elif kind == "mutate":
                     expr = op["expr"]
                     if expr["kind"] == "add_const":
@@ -206,6 +250,22 @@ class PolarsLazyBackend(PolarsBackend):
                         else:
                             aggs.append(getattr(pl.col(col), func)().alias(alias))
                     lf = lf.group_by(keys).agg(aggs)
+                elif kind == "aggregate":
+                    aggs = []
+                    for agg in op["aggs"]:
+                        col, func, alias = agg["column"], agg["func"], agg["as"]
+                        if func == "count":
+                            aggs.append(pl.col(col).count().alias(alias))
+                        elif func == "sum":
+                            aggs.append(
+                                pl.when(pl.col(col).count() == 0)
+                                .then(None)
+                                .otherwise(pl.col(col).sum())
+                                .alias(alias)
+                            )
+                        else:
+                            aggs.append(getattr(pl.col(col), func)().alias(alias))
+                    lf = lf.select(aggs)
                 else:
                     raise ValueError(kind)
             return BackendResult(self.name, "ok", data=lf.collect(), duration_ms=(time.perf_counter()-start)*1000)

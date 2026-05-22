@@ -6,13 +6,16 @@ import pytest
 from datadiff.config import ExperimentConfig
 from datadiff.datagen import generate_case
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
+from datadiff import runner as runner_module
 from datadiff.runner import run_fuzz, run_loaded_case
+from datadiff.targets import resolve_target_backends
 from datadiff.util import load_json, read_jsonl, run_meta_path
 
 
 REQUIRED_BACKENDS = ["pandas", "polars", "duckdb", "sqlite"]
 DATAFUSION_BACKENDS = ["pandas", "duckdb", "datafusion"]
 PYARROW_BACKENDS = ["pandas", "duckdb", "pyarrow"]
+LATEST_ALL_ENGINE_PACKAGES = ["pandas", "pyarrow", "polars", "duckdb", "datafusion"]
 
 
 @pytest.mark.skipif(
@@ -87,6 +90,200 @@ def test_run_loaded_case_supports_join_expressions_and_multi_agg():
     row = run_loaded_case(case, REQUIRED_BACKENDS, save_artifact=False)
     assert row["status"] == "ok"
     assert set(row["normalized"]) == set(REQUIRED_BACKENDS)
+
+
+@pytest.mark.skipif(
+    any(name != "sqlite" and importlib.util.find_spec(name) is None for name in REQUIRED_BACKENDS),
+    reason="data backends are not installed",
+)
+def test_run_loaded_case_drops_right_join_keys_for_mismatched_key_names():
+    case = Case(
+        "case-mismatched-join-key-schema",
+        221,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("fromnode", "int", nullable=False),
+                    ColumnSpec("tonode", "int", nullable=False),
+                ],
+                [{"fromnode": 1, "tonode": 10}, {"fromnode": 2, "tonode": 20}],
+            ),
+            TableData(
+                "t1",
+                [
+                    ColumnSpec("p6_fromnode", "int", nullable=False),
+                    ColumnSpec("p6_tonode", "int", nullable=False),
+                ],
+                [{"p6_fromnode": 10, "p6_tonode": 100}, {"p6_fromnode": 20, "p6_tonode": 200}],
+            ),
+            TableData(
+                "t2",
+                [
+                    ColumnSpec("p4_fromnode", "int", nullable=False),
+                    ColumnSpec("p4_tonode_join", "int", nullable=False),
+                    ColumnSpec("p4_tonode", "int", nullable=False),
+                ],
+                [
+                    {"p4_fromnode": 9, "p4_tonode_join": 1, "p4_tonode": 900},
+                    {"p4_fromnode": 8, "p4_tonode_join": 2, "p4_tonode": 800},
+                ],
+            ),
+        ],
+        Program(
+            "prog-mismatched-join-key-schema",
+            221,
+            [
+                {
+                    "op": "join",
+                    "table": "t1",
+                    "left_on": "tonode",
+                    "right_on": "p6_fromnode",
+                    "how": "inner",
+                },
+                {
+                    "op": "join",
+                    "table": "t2",
+                    "left_on": "fromnode",
+                    "right_on": "p4_tonode_join",
+                    "how": "inner",
+                },
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, REQUIRED_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert set(row["normalized"]) == set(REQUIRED_BACKENDS)
+    for result in row["normalized"].values():
+        assert result["columns"] == ["fromnode", "p4_fromnode", "p4_tonode", "p6_tonode", "tonode"]
+        assert "p6_fromnode" not in result["columns"]
+        assert "p4_tonode_join" not in result["columns"]
+    assert {tuple(tuple(item) for item in result["rows"]) for result in row["normalized"].values()} == {
+        ((1, 9, 900, 100, 10), (2, 8, 800, 200, 20))
+    }
+
+
+@pytest.mark.skipif(
+    any(name != "sqlite" and importlib.util.find_spec(name) is None for name in REQUIRED_BACKENDS),
+    reason="data backends are not installed",
+)
+def test_run_loaded_case_supports_post_groupby_join_and_global_aggregate():
+    case = Case(
+        "case-post-groupby-join-aggregate",
+        220,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("x", "int")],
+                [{"id": 1, "x": 2}, {"id": 1, "x": 3}, {"id": 2, "x": 5}],
+            ),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("z", "int")],
+                [{"id": 1, "z": 10}, {"id": 2, "z": 20}],
+            ),
+        ],
+        Program(
+            "prog-post-groupby-join-aggregate",
+            220,
+            [
+                {"op": "groupby", "keys": ["id"], "aggs": [{"column": "x", "func": "sum", "as": "sum_x"}]},
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+                {
+                    "op": "aggregate",
+                    "aggs": [
+                        {"column": "sum_x", "func": "sum", "as": "total_x"},
+                        {"column": "z", "func": "count", "as": "matched_groups"},
+                    ],
+                },
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, REQUIRED_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert set(row["normalized"]) == set(REQUIRED_BACKENDS)
+    assert {tuple(tuple(item) for item in result["rows"]) for result in row["normalized"].values()} == {
+        ((2, 10),)
+    }
+
+
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in LATEST_ALL_ENGINE_PACKAGES),
+    reason="latest all-engine methodology backends are not installed",
+)
+def test_latest_all_engines_methodology_case_uses_common_semantics():
+    backends = resolve_target_backends(target_suite="latest_all_engines")
+    case = Case(
+        "case-latest-all-engines-methodology",
+        9101,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("g", "str", nullable=False),
+                    ColumnSpec("x", "int", nullable=False),
+                ],
+                [
+                    {"id": 1, "g": "Alpha", "x": 2},
+                    {"id": 2, "g": "Beta", "x": 4},
+                    {"id": 3, "g": "Gamma", "x": 5},
+                    {"id": 4, "g": "Beta", "x": 1},
+                ],
+            ),
+            TableData(
+                "t1",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("j", "int", nullable=False),
+                    ColumnSpec("tag", "str", nullable=False),
+                ],
+                [
+                    {"id": 1, "j": 10, "tag": "One"},
+                    {"id": 2, "j": 20, "tag": "Two"},
+                    {"id": 3, "j": -1, "tag": "Drop"},
+                    {"id": 4, "j": 0, "tag": "Two"},
+                ],
+            ),
+        ],
+        Program(
+            "prog-latest-all-engines-methodology",
+            9101,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+                {"op": "filter", "column": "j", "cmp": ">=", "value": 0},
+                {"op": "mutate", "column": "x_plus", "expr": {"kind": "add_const", "source": "x", "value": 1}},
+                {"op": "mutate", "column": "tag_norm", "expr": {"kind": "string_lower", "source": "tag"}},
+                {
+                    "op": "groupby",
+                    "keys": ["tag_norm"],
+                    "aggs": [
+                        {"column": "x_plus", "func": "sum", "as": "sum_x_plus"},
+                        {"column": "j", "func": "count", "as": "count_j"},
+                    ],
+                },
+                {"op": "select", "columns": ["tag_norm", "sum_x_plus", "count_j"]},
+                {"op": "sort", "columns": ["tag_norm", "sum_x_plus", "count_j"], "ascending": True},
+                {"op": "limit", "n": 10},
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, backends, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    assert set(row["normalized"]) == set(backends)
+    assert {tuple(result["columns"]) for result in row["normalized"].values()} == {
+        ("count_j", "sum_x_plus", "tag_norm")
+    }
+    assert {tuple(tuple(item) for item in result["rows"]) for result in row["normalized"].values()} == {
+        ((1, 3, "one"), (2, 7, "two"))
+    }
 
 
 @pytest.mark.skipif(
@@ -183,7 +380,109 @@ def test_datafusion_backend_applies_limit_to_sorted_rows():
 
     assert row["status"] == "ok"
     assert {tuple(tuple(r) for r in result["rows"]) for result in row["normalized"].values()} == {
-        ((3,), (5,))
+        ((5,), (3,))
+    }
+
+
+@pytest.mark.skipif(
+    any(name != "sqlite" and importlib.util.find_spec(name) is None for name in REQUIRED_BACKENDS),
+    reason="data backends are not installed",
+)
+def test_run_loaded_case_supports_per_column_sort_null_order():
+    case = Case(
+        "case-per-column-sort-null-order",
+        3015,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("a", "int"),
+                    ColumnSpec("b", "int"),
+                    ColumnSpec("label", "str", nullable=False),
+                ],
+                [
+                    {"a": None, "b": 1, "label": "n1"},
+                    {"a": None, "b": None, "label": "nnull"},
+                    {"a": None, "b": 5, "label": "n5"},
+                    {"a": 1, "b": 7, "label": "a1b7"},
+                    {"a": 1, "b": None, "label": "a1null"},
+                    {"a": 0, "b": 2, "label": "a0b2"},
+                ],
+            )
+        ],
+        Program(
+            "prog-per-column-sort-null-order",
+            3015,
+            [
+                {
+                    "op": "sort",
+                    "keys": [
+                        {"column": "a", "ascending": True, "nulls": "first"},
+                        {"column": "b", "ascending": False, "nulls": "last"},
+                        {"column": "label", "ascending": True, "nulls": "last"},
+                    ],
+                },
+                {"op": "limit", "n": 4},
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, REQUIRED_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert set(row["normalized"]) == set(REQUIRED_BACKENDS)
+    assert {frozenset(tuple(item) for item in result["rows"]) for result in row["normalized"].values()} == {
+        frozenset(
+            {
+                (None, None, "nnull"),
+                (None, 1, "n1"),
+                (None, 5, "n5"),
+                (0, 2, "a0b2"),
+            }
+        )
+    }
+
+
+@pytest.mark.skipif(
+    any(name != "sqlite" and importlib.util.find_spec(name) is None for name in REQUIRED_BACKENDS),
+    reason="data backends are not installed",
+)
+def test_run_loaded_case_supports_sort_offset_limit():
+    case = Case(
+        "case-sort-offset-limit",
+        22656,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("x", "int"),
+                    ColumnSpec("label", "str", nullable=False),
+                ],
+                [
+                    {"x": 4, "label": "d"},
+                    {"x": 1, "label": "a"},
+                    {"x": 3, "label": "c"},
+                    {"x": 2, "label": "b"},
+                    {"x": 5, "label": "e"},
+                ],
+            )
+        ],
+        Program(
+            "prog-sort-offset-limit",
+            22656,
+            [
+                {"op": "sort", "columns": ["x"], "ascending": True},
+                {"op": "offset", "n": 2},
+                {"op": "limit", "n": 2},
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, REQUIRED_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert {tuple(tuple(r) for r in result["rows"]) for result in row["normalized"].values()} == {
+        (("c", 3), ("d", 4))
     }
 
 
@@ -415,6 +714,13 @@ def test_run_fuzz_can_persist_generated_cases_and_checkpoint(tmp_path):
     rows = read_jsonl(run_file)
     assert all("quality_oracles" in row for row in rows)
     assert all("preflight" in row for row in rows)
+    assert generated[0]["seed_lineage"]["depth"] == 0
+    assert generated[0]["mutation"]["operator"] == "generated"
+    assert generated[0]["operation_combo"]["operation_count"] == len(generated[0]["case"]["program"]["operations"])
+    assert rows[0]["seed_lineage"]["depth"] == 0
+    assert rows[0]["mutation"]["operator"] == "generated"
+    assert "operation_combo" in rows[0]
+    assert "source_reward" in rows[0]
     assert checkpoint["status"] == "completed"
     assert checkpoint["next_seed"] == 33
 
@@ -438,9 +744,69 @@ def test_run_fuzz_records_guidance_metadata(tmp_path):
     assert "frontier_conformance" in row["guidance"]
     assert "data_sensitivity" in row["guidance"]
     assert "path_coverage_proxy" in row["guidance"]
+    assert "combo_priority" in row["guidance"]
+    assert "online_weight_mean" in row["guidance"]
     assert case_log_row["candidate_pool_size"] == 4
     assert meta["guidance"]["strategy"] == "guided"
     assert meta["next_seed"] == 45
+
+
+def test_run_fuzz_uses_feedback_source_marker_for_candidate_source(tmp_path, monkeypatch):
+    instances = []
+
+    class FakeFeedbackState:
+        def __init__(self, **kwargs):
+            self.last_persisted_to_disk = False
+            self.last_candidate_source = "generated"
+            self.last_candidate_metadata = {}
+            self.source_scheduler = None
+            self.recorded_sources = []
+            instances.append(self)
+
+        def choose_case(self, seed, generated):
+            self.last_candidate_source = "feedback_mutation"
+            self.last_candidate_metadata = {
+                "seed_lineage": {
+                    "root_seed": generated.seed,
+                    "parent_seed": 1,
+                    "parent_case_id": "case-parent",
+                    "mutation_seed": seed,
+                    "depth": 1,
+                },
+                "mutation": {
+                    "operator": "value",
+                    "detail": "value:int:x",
+                    "changed": True,
+                },
+            }
+            return generated
+
+        def record(self, case, behavior_signature, has_finding):
+            return True
+
+        def record_candidate_result(self, candidate_source, *, has_finding, is_new_behavior, preflight, **reward_signals):
+            self.recorded_sources.append(candidate_source)
+            return 1.25
+
+    monkeypatch.setattr(runner_module, "FeedbackState", FakeFeedbackState)
+
+    case_log = tmp_path / "feedback.cases.jsonl"
+    config = ExperimentConfig(enable_local_source_scheduler=True)
+
+    run_file = run_fuzz(cases=1, seed=47, backends=[], config=config, case_log_file=case_log)
+
+    row = read_jsonl(run_file)[0]
+    case_log_row = read_jsonl(case_log)[0]
+    assert row["candidate_source"] == "feedback_mutation"
+    assert case_log_row["candidate_source"] == "feedback_mutation"
+    assert row["seed_lineage"]["parent_case_id"] == "case-parent"
+    assert row["mutation"]["operator"] == "value"
+    assert row["operation_combo"]["operation_count"] == len(row["case"]["program"]["operations"])
+    assert row["source_reward"] == 1.25
+    assert case_log_row["seed_lineage"]["parent_case_id"] == "case-parent"
+    assert case_log_row["mutation"]["operator"] == "value"
+    assert "operation_combo" in case_log_row
+    assert instances[0].recorded_sources == ["feedback_mutation"]
 
 
 def test_run_fuzz_compact_log_omits_repeated_run_metadata():
@@ -455,6 +821,9 @@ def test_run_fuzz_compact_log_omits_repeated_run_metadata():
     assert "config" not in row
     assert "tables" not in row["case"]
     assert "normalized" in row
+    assert "seed_lineage" in row
+    assert "mutation" in row
+    assert "operation_combo" in row
 
 
 def test_run_fuzz_minimal_log_keeps_only_backend_status():

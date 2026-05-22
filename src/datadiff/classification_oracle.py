@@ -5,7 +5,7 @@ from functools import cmp_to_key
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from datadiff.dsl import Case
+from datadiff.dsl import Case, SortKey, normalize_sort_keys
 from datadiff.normalizer import NormalizedResult, _norm_value
 from datadiff.oracle import Finding
 from datadiff.util import unique_preserve_order
@@ -21,6 +21,7 @@ class Classification:
     evidence: str = ""
     recommendation: list[str] = field(default_factory=list)
     documentation_refs: list[dict[str, str]] = field(default_factory=list)
+    implicated_backends: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -44,6 +45,8 @@ def annotate_findings(
         finding.triage_evidence = classification.evidence
         finding.recommendation = classification.recommendation
         finding.documentation_refs = classification.documentation_refs
+        if classification.implicated_backends:
+            finding.suspicious_backends = classification.implicated_backends
 
 
 def classify_finding(
@@ -130,7 +133,7 @@ def classify_finding(
         return metamorphic_classification
 
     semantic_boundary_reasons = _semantic_boundary_reasons(case, finding, config)
-    if semantic_boundary_reasons:
+    if semantic_boundary_reasons and str(_get(finding, "root_cause", "")) != "ordering_or_limit":
         return Classification(
             verdict="expected_semantic_divergence",
             paper_status="valid_finding_not_bug",
@@ -146,6 +149,19 @@ def classify_finding(
     reference_classification = _reference_classification(case, finding, normalized, backends)
     if reference_classification is not None:
         return reference_classification
+
+    if semantic_boundary_reasons:
+        return Classification(
+            verdict="expected_semantic_divergence",
+            paper_status="valid_finding_not_bug",
+            confidence="medium",
+            evidence="; ".join(semantic_boundary_reasons),
+            recommendation=[
+                "Keep as a valid semantic-divergence finding.",
+                "Do not count as an implementation bug unless a backend-specific specification is contradicted.",
+                "Use a separate boundary-semantics experiment for this class.",
+            ],
+        )
 
     if _has_clear_minority_backend(finding, backends):
         return Classification(
@@ -179,15 +195,11 @@ def validate_case_program(case: Case) -> list[str]:
     col_types = {column.name: column.type for column in case.tables[0].columns}
     numeric = {column.name for column in case.tables[0].columns if column.type in {"int", "float"}}
     strings = {column.name for column in case.tables[0].columns if column.type == "str"}
-    grouped = False
 
     for idx, op in enumerate(case.program.operations):
         kind = op.get("op")
         if kind == "join":
             right = tables.get(str(op.get("table", "")))
-            if grouped:
-                errors.append(f"op {idx}: join after groupby is invalid")
-                continue
             if right is None:
                 errors.append(f"op {idx}: unknown join table {op.get('table')!r}")
                 continue
@@ -208,8 +220,6 @@ def validate_case_program(case: Case) -> list[str]:
                 if column.type == "str":
                     strings.add(column.name)
         elif kind == "filter":
-            if grouped:
-                errors.append(f"op {idx}: filter after groupby is invalid")
             if op.get("column") not in available:
                 errors.append(f"op {idx}: filter column {op.get('column')!r} is unavailable")
             if op.get("cmp") not in {">", ">=", "<", "<=", "==", "!="}:
@@ -233,10 +243,17 @@ def validate_case_program(case: Case) -> list[str]:
             numeric &= available
             strings &= available
         elif kind == "sort":
-            cols = list(op.get("columns", []))
+            try:
+                keys = normalize_sort_keys(op)
+            except ValueError as exc:
+                errors.append(f"op {idx}: invalid sort keys: {exc}")
+                continue
+            cols = [key.column for key in keys]
             missing = [col for col in cols if col not in available]
             if missing:
                 errors.append(f"op {idx}: sort columns unavailable: {missing}")
+            if not cols:
+                errors.append(f"op {idx}: sort has no columns")
             if len(unique_preserve_order(cols)) != len(cols):
                 errors.append(f"op {idx}: sort contains duplicate columns")
         elif kind == "limit":
@@ -245,10 +262,13 @@ def validate_case_program(case: Case) -> list[str]:
                     errors.append(f"op {idx}: negative limit")
             except (TypeError, ValueError):
                 errors.append(f"op {idx}: non-integer limit {op.get('n')!r}")
+        elif kind == "offset":
+            try:
+                if int(op.get("n", -1)) < 0:
+                    errors.append(f"op {idx}: negative offset")
+            except (TypeError, ValueError):
+                errors.append(f"op {idx}: non-integer offset {op.get('n')!r}")
         elif kind == "mutate":
-            if grouped:
-                errors.append(f"op {idx}: mutate after groupby is invalid")
-                continue
             out_type = _mutate_output_type(op.get("expr", {}), available, numeric, strings, col_types)
             if out_type is None:
                 errors.append(f"op {idx}: invalid mutate expression {op.get('expr')!r}")
@@ -264,9 +284,6 @@ def validate_case_program(case: Case) -> list[str]:
             if out_type == "str":
                 strings.add(column)
         elif kind == "groupby":
-            if grouped:
-                errors.append(f"op {idx}: repeated groupby is invalid")
-                continue
             keys = list(op.get("keys", []))
             aggs = list(op.get("aggs", []))
             missing_keys = [key for key in keys if key not in available]
@@ -290,12 +307,33 @@ def validate_case_program(case: Case) -> list[str]:
                 if agg.get("func") not in {"sum", "min", "max", "count"}:
                     errors.append(f"op {idx}: unsupported aggregation {agg.get('func')!r}")
             available = set(keys) | {str(agg.get("as")) for agg in aggs if agg.get("as")}
-            numeric = {str(agg.get("as")) for agg in aggs if agg.get("as")}
+            numeric = {key for key in keys if col_types.get(key) in {"int", "float"}}
+            numeric |= {str(agg.get("as")) for agg in aggs if agg.get("as")}
             strings = {key for key in keys if col_types.get(key) == "str"}
             for agg in aggs:
                 if agg.get("as"):
                     col_types[str(agg["as"])] = "int" if agg.get("func") == "count" else col_types.get(str(agg.get("column")), "float")
-            grouped = True
+        elif kind == "aggregate":
+            aggs = list(op.get("aggs", []))
+            if not aggs:
+                errors.append(f"op {idx}: aggregate has no aggregations")
+            aliases = [str(agg.get("as")) for agg in aggs if agg.get("as")]
+            if len(unique_preserve_order(aliases)) != len(aliases):
+                errors.append(f"op {idx}: aggregate contains duplicate aggregation aliases")
+            for agg in aggs:
+                col = agg.get("column")
+                if col not in available:
+                    errors.append(f"op {idx}: aggregation column {col!r} is unavailable")
+                if col not in numeric:
+                    errors.append(f"op {idx}: aggregation column {col!r} is not numeric")
+                if agg.get("func") not in {"sum", "min", "max", "count"}:
+                    errors.append(f"op {idx}: unsupported aggregation {agg.get('func')!r}")
+            available = {str(agg.get("as")) for agg in aggs if agg.get("as")}
+            numeric = set(available)
+            strings = set()
+            for agg in aggs:
+                if agg.get("as"):
+                    col_types[str(agg["as"])] = "int" if agg.get("func") == "count" else col_types.get(str(agg.get("column")), "float")
         else:
             errors.append(f"op {idx}: unknown operation {kind!r}")
     return errors
@@ -369,6 +407,7 @@ def _reference_classification(
                 "Independent DSL reference agrees with "
                 f"{sorted(matching)} and disagrees with {implicated}."
             ),
+            implicated_backends=implicated,
             recommendation=[
                 "Minimize the case and include the DSL reference output in the artifact.",
                 "Treat as confirmed only after backend documentation or maintainers establish the expected behavior.",
@@ -479,14 +518,15 @@ def _reference_result(case: Case) -> NormalizedResult | None:
                 columns = list(op["columns"])
                 rows = [{column: row.get(column) for column in columns} for row in rows]
             elif kind == "sort":
-                sort_columns = list(op["columns"])
-                ascending = bool(op["ascending"])
+                sort_keys = normalize_sort_keys(op)
                 rows = sorted(
                     rows,
-                    key=cmp_to_key(lambda left, right: _compare_rows(left, right, sort_columns, ascending)),
+                    key=cmp_to_key(lambda left, right: _compare_rows(left, right, sort_keys)),
                 )
             elif kind == "limit":
                 rows = rows[: int(op["n"])]
+            elif kind == "offset":
+                rows = rows[int(op["n"]):]
             elif kind == "mutate":
                 column = str(op["column"])
                 rows = [{**row, column: _reference_eval_expr(row, op["expr"])} for row in rows]
@@ -511,6 +551,12 @@ def _reference_result(case: Case) -> NormalizedResult | None:
                     out_rows.append(out)
                 columns = keys + [agg["as"] for agg in op["aggs"]]
                 rows = out_rows
+            elif kind == "aggregate":
+                out = {}
+                for agg in op["aggs"]:
+                    out[agg["as"]] = _reference_aggregate(rows, agg["column"], agg["func"])
+                columns = [agg["as"] for agg in op["aggs"]]
+                rows = [out]
             else:
                 return None
         return _normalize_reference_rows(columns, rows)
@@ -594,19 +640,19 @@ def _reference_aggregate(rows: list[dict[str, Any]], column: str, func: str) -> 
     raise ValueError(func)
 
 
-def _compare_rows(left: dict[str, Any], right: dict[str, Any], columns: list[str], ascending: bool) -> int:
-    for column in columns:
-        left_value = left.get(column)
-        right_value = right.get(column)
+def _compare_rows(left: dict[str, Any], right: dict[str, Any], sort_keys: list[SortKey]) -> int:
+    for key in sort_keys:
+        left_value = left.get(key.column)
+        right_value = right.get(key.column)
         if left_value is None and right_value is None:
             continue
         if left_value is None:
-            return 1
+            return -1 if key.nulls == "first" else 1
         if right_value is None:
-            return -1
+            return 1 if key.nulls == "first" else -1
         cmp = _compare_values(left_value, right_value)
         if cmp:
-            return cmp if ascending else -cmp
+            return cmp if key.ascending else -cmp
     return 0
 
 

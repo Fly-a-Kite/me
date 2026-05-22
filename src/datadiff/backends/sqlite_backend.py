@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import sqlite3
 import time
 from typing import Any
 
 from datadiff.backends.base import Backend, BackendResult
-from datadiff.dsl import Program, TableData
+from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
+from datadiff.sqlite_runtime import sqlite3
 
 
 def _quote(name: str) -> str:
@@ -47,14 +47,15 @@ def _replace_projection(cols: list[str], column: str, expr_sql: str) -> tuple[st
     return ", ".join(select_parts), kept_cols + [column]
 
 
-def _order_clause(columns: list[str], ascending: bool) -> str:
-    # SQLite sorts NULLs first for ASC. Use an explicit null discriminator to
-    # match the common subset used by the other backends: NULLS LAST.
+def _order_clause(sort_keys: list[SortKey]) -> str:
+    # Use an explicit discriminator so SQLite follows the common DSL null
+    # placement independently of its default ORDER BY behavior.
     order_parts = []
-    for c in columns:
-        q = _quote(c)
-        order_parts.append(f"({q} IS NULL) ASC")
-        order_parts.append(f"{q} {'ASC' if ascending else 'DESC'}")
+    for key in sort_keys:
+        q = _quote(key.column)
+        null_direction = "DESC" if key.nulls == "first" else "ASC"
+        order_parts.append(f"({q} IS NULL) {null_direction}")
+        order_parts.append(f"{q} {'ASC' if key.ascending else 'DESC'}")
     return ", ".join(order_parts)
 
 
@@ -81,7 +82,7 @@ class SQLiteBackend(Backend):
                         [[row.get(c) for c in cols] for row in table.rows],
                     )
             query = "SELECT * FROM t0"
-            pending_order: tuple[list[str], bool] | None = None
+            pending_order: list[SortKey] | None = None
             for op in program.operations:
                 kind = op["op"]
                 if kind == "join":
@@ -113,18 +114,26 @@ class SQLiteBackend(Backend):
                     query = f"SELECT {cols} FROM ({query}) q"
                     current_cols = list(op["columns"])
                     if pending_order is not None:
-                        order_cols, ascending = pending_order
-                        pending_order = (order_cols, ascending) if set(order_cols).issubset(current_cols) else None
+                        pending_order = pending_order if {key.column for key in pending_order}.issubset(current_cols) else None
                 elif kind == "sort":
-                    pending_order = (list(op["columns"]), bool(op["ascending"]))
+                    pending_order = normalize_sort_keys(op)
                 elif kind == "limit":
                     if pending_order is not None:
                         query = (
                             f"SELECT * FROM ({query}) q "
-                            f"ORDER BY {_order_clause(*pending_order)} LIMIT {int(op['n'])}"
+                            f"ORDER BY {_order_clause(pending_order)} LIMIT {int(op['n'])}"
                         )
                     else:
                         query = f"SELECT * FROM ({query}) q LIMIT {int(op['n'])}"
+                    pending_order = None
+                elif kind == "offset":
+                    if pending_order is not None:
+                        query = (
+                            f"SELECT * FROM ({query}) q "
+                            f"ORDER BY {_order_clause(pending_order)} LIMIT -1 OFFSET {int(op['n'])}"
+                        )
+                    else:
+                        query = f"SELECT * FROM ({query}) q LIMIT -1 OFFSET {int(op['n'])}"
                     pending_order = None
                 elif kind == "mutate":
                     expr = op["expr"]
@@ -146,7 +155,7 @@ class SQLiteBackend(Backend):
                         raise ValueError(expr["kind"])
                     projection, current_cols = _replace_projection(current_cols, op["column"], expr_sql)
                     query = f"SELECT {projection} FROM ({query}) q"
-                    if pending_order is not None and op["column"] in pending_order[0]:
+                    if pending_order is not None and op["column"] in {key.column for key in pending_order}:
                         pending_order = None
                 elif kind == "groupby":
                     keys = list(op["keys"])
@@ -161,10 +170,18 @@ class SQLiteBackend(Backend):
                     )
                     current_cols = keys + [agg["as"] for agg in op["aggs"]]
                     pending_order = None
+                elif kind == "aggregate":
+                    agg_sql = []
+                    for agg in op["aggs"]:
+                        func = "COUNT" if agg["func"] == "count" else agg["func"].upper()
+                        agg_sql.append(f"{func}({_quote(agg['column'])}) AS {_quote(agg['as'])}")
+                    query = f"SELECT {', '.join(agg_sql)} FROM ({query}) q"
+                    current_cols = [agg["as"] for agg in op["aggs"]]
+                    pending_order = None
                 else:
                     raise ValueError(kind)
             if pending_order is not None:
-                query = f"SELECT * FROM ({query}) q ORDER BY {_order_clause(*pending_order)}"
+                query = f"SELECT * FROM ({query}) q ORDER BY {_order_clause(pending_order)}"
             cur = con.execute(query)
             columns = [desc[0] for desc in cur.description]
             out = pd.DataFrame(cur.fetchall(), columns=columns)

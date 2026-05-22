@@ -1,5 +1,7 @@
 import pytest
 
+from datadiff.env import collect_environment
+from datadiff.sqlite_runtime import SQLITE_RUNTIME, SQLITE_VERSION
 from datadiff.targets import (
     common_capabilities,
     describe_targets,
@@ -13,11 +15,21 @@ def test_resolve_target_suite_to_backends():
     assert resolve_target_backends(target_suite="dataframe") == ["pandas", "polars"]
     assert resolve_target_backends(target_suite="dataframe_lazy") == ["polars", "polars_lazy"]
     assert resolve_target_backends(target_suite="embedded_sql") == ["duckdb", "sqlite"]
+    assert resolve_target_backends(target_suite="duckdb_storage_cross") == ["pandas", "duckdb_persistent"]
     assert resolve_target_backends(target_suite="cross_family") == ["pandas", "duckdb"]
     assert resolve_target_backends(target_suite="lazy_cross_family") == ["pandas", "polars_lazy", "duckdb"]
     assert resolve_target_backends(target_suite="core_lazy") == ["pandas", "polars", "polars_lazy", "duckdb", "sqlite"]
     assert resolve_target_backends(target_suite="datafusion_cross") == ["pandas", "duckdb", "datafusion"]
     assert resolve_target_backends(target_suite="arrow_cross") == ["pandas", "duckdb", "pyarrow"]
+    assert resolve_target_backends(target_suite="latest_all_engines") == [
+        "pandas",
+        "pyarrow",
+        "polars",
+        "polars_lazy",
+        "duckdb",
+        "sqlite",
+        "datafusion",
+    ]
     assert resolve_target_backends(target_suite="seeded_filter") == ["pandas", "buggy_filter"]
 
 
@@ -42,7 +54,9 @@ def test_list_target_suites_includes_core():
     assert suites["core"]["backends"] == ["pandas", "polars", "duckdb", "sqlite"]
     assert suites["core_lazy"]["families"] == ["dataframe", "embedded_sql"]
     assert suites["datafusion_cross"]["families"] == ["dataframe", "embedded_sql", "query_engine"]
+    assert suites["latest_all_engines"]["families"] == ["arrow", "dataframe", "embedded_sql", "query_engine"]
     assert suites["cross_family"]["families"] == ["dataframe", "embedded_sql"]
+    assert suites["duckdb_storage_cross"]["families"] == ["dataframe", "embedded_sql"]
     assert suites["dataframe_lazy"]["families"] == ["dataframe"]
     assert suites["seeded_groupby"]["families"] == ["dataframe", "seeded_fault"]
     assert "op:groupby" in suites["core"]["common_capabilities"]
@@ -53,6 +67,14 @@ def test_target_capability_matrix_and_intersection():
     assert set(matrix) == {"pandas", "sqlite"}
     assert "expr:string_lower" in matrix["pandas"]
     assert "op:join" in common_capabilities(["pandas", "sqlite"])
+
+
+def test_sqlite_target_records_runtime_version():
+    env = collect_environment()
+
+    assert SQLITE_RUNTIME in {"pysqlite3", "stdlib"}
+    assert env["sqlite"] == SQLITE_VERSION
+    assert env["sqlite_runtime"] == SQLITE_RUNTIME
 
 
 def test_seeded_fault_targets_are_described():
@@ -77,3 +99,10 @@ def test_pyarrow_target_is_described():
     spec = describe_targets(["pyarrow"])[0]
     assert spec["family"] == "arrow"
     assert spec["layer"] == "arrow_compute"
+
+
+def test_duckdb_persistent_target_is_described():
+    spec = describe_targets(["duckdb_persistent"])[0]
+    assert spec["family"] == "embedded_sql"
+    assert spec["layer"] == "embedded_analytical_engine_storage"
+    assert "op:offset" in spec["capabilities"]

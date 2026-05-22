@@ -5,7 +5,7 @@ import json
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from datadiff.dsl import Case
+from datadiff.dsl import Case, normalize_sort_keys
 from datadiff.normalizer import NormalizedResult
 
 
@@ -64,7 +64,7 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "grouped_topk_null_sort_key"
     if _case_has_float_group_key_instability(case, normalized):
         return "float_group_key_instability"
-    if any(op == "groupby" for op in ops):
+    if any(op in {"groupby", "aggregate"} for op in ops):
         return "groupby_aggregation"
     if any(op == "join" for op in ops):
         return "join_semantics"
@@ -81,7 +81,7 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         if "cast" in kinds:
             return "type_cast"
         return "arithmetic_expression"
-    if any(op in {"sort", "limit"} for op in ops):
+    if any(op in {"sort", "limit", "offset"} for op in ops):
         return "ordering_or_limit"
     ok_results = [r for r in normalized.values() if r.status == "ok"]
     if ok_results and len({tuple(r.columns) for r in ok_results}) > 1:
@@ -150,9 +150,12 @@ def _case_has_grouped_topk_null_sort_key(case: Case) -> bool:
             samples = _groupby_output_samples(samples, op)
             grouped = True
         elif kind == "sort" and grouped:
-            sort_columns = [str(column) for column in op.get("columns", []) if str(column) in samples]
+            try:
+                sort_columns = [key.column for key in normalize_sort_keys(op) if key.column in samples]
+            except ValueError:
+                sort_columns = []
             if any(any(value is None for value in samples[column]) for column in sort_columns):
-                if any(later.get("op") == "limit" for later in ops[idx + 1 :]):
+                if any(later.get("op") in {"limit", "offset"} for later in ops[idx + 1 :]):
                     return True
     return False
 

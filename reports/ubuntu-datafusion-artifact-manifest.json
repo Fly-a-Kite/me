@@ -3,6 +3,16 @@
   "status": "submitted_upstream_needs_external_confirmation",
   "upstream_issue": "https://github.com/apache/datafusion/issues/22190",
   "upstream_submitted": "2026-05-15",
+  "upstream_workflow": {
+    "state": "open",
+    "label": "bug",
+    "member_reply": "take",
+    "member_reply_by": "xiedeyantu",
+    "member_reply_at": "2026-05-17T23:06:18Z",
+    "assignee": "xiedeyantu",
+    "assigned_at": "2026-05-17T23:06:27Z",
+    "paper_interpretation": "under_upstream_member_triage_not_yet_confirmed"
+  },
   "environment": {
     "pip_freeze": "reports/pip-freeze-ubuntu.txt",
     "uname": "reports/uname-ubuntu.txt",

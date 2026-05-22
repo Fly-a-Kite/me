@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import json
 import tarfile
@@ -20,6 +21,7 @@ def main() -> int:
     output_path = Path(args.output)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     paths = collect_manifest_paths(manifest)
+    members = bundle_members(paths, root=PROJECT_ROOT)
     validate_paths(paths, root=PROJECT_ROOT)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     write_bundle(paths, output_path, root=PROJECT_ROOT)
@@ -28,7 +30,7 @@ def main() -> int:
     digest_path.write_text(f"{digest}  {output_path.name}\n", encoding="utf-8")
     print(f"bundle={output_path}")
     print(f"sha256={digest_path}")
-    print(f"files={len(paths)}")
+    print(f"files={len(members)}")
     return 0
 
 
@@ -80,9 +82,16 @@ def validate_paths(paths: list[str], *, root: Path) -> None:
 
 def write_bundle(paths: list[str], output_path: Path, *, root: Path) -> None:
     members = bundle_members(paths, root=root)
-    with tarfile.open(output_path, "w:gz") as tar:
-        for rel_path in members:
-            tar.add(root / rel_path, arcname=rel_path, recursive=True)
+    with output_path.open("wb") as handle:
+        with gzip.GzipFile(filename="", mode="wb", fileobj=handle, mtime=0) as gz_handle:
+            with tarfile.open(fileobj=gz_handle, mode="w") as tar:
+                for rel_path in members:
+                    tar.add(
+                        root / rel_path,
+                        arcname=rel_path,
+                        recursive=False,
+                        filter=normalize_tarinfo,
+                    )
 
 
 def bundle_members(paths: list[str], *, root: Path) -> list[str]:
@@ -98,6 +107,16 @@ def bundle_members(paths: list[str], *, root: Path) -> list[str]:
         else:
             members.add(rel_path)
     return sorted(members)
+
+
+def normalize_tarinfo(tarinfo: tarfile.TarInfo) -> tarfile.TarInfo:
+    tarinfo.uid = 0
+    tarinfo.gid = 0
+    tarinfo.uname = ""
+    tarinfo.gname = ""
+    tarinfo.mtime = 0
+    tarinfo.mode = 0o755 if tarinfo.mode & 0o111 else 0o644
+    return tarinfo
 
 
 def sha256_file(path: Path) -> str:

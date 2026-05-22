@@ -44,3 +44,27 @@ def test_normalizer_uses_stable_json_row_order_for_mixed_null_and_float_rows():
     result = normalize_result(BackendResult("pandas", "ok", data=df), Program("prog", 1, []))
 
     assert result.rows == [[None, 3, -0.5], [None, 3, None]]
+
+
+def test_normalizer_preserves_explicit_sort_order_for_order_sensitive_programs():
+    df = pd.DataFrame([[2], [1]], columns=["x"])
+    program = Program("prog", 1, [{"op": "sort", "columns": ["x"], "ascending": False}])
+
+    result = normalize_result(BackendResult("pandas", "ok", data=df), program)
+
+    assert program.order_sensitive is True
+    assert result.rows == [[2], [1]]
+
+
+def test_order_sensitive_survives_limit_and_offset_after_sort():
+    program = Program(
+        "prog",
+        1,
+        [
+            {"op": "sort", "columns": ["x"], "ascending": False},
+            {"op": "limit", "n": 2},
+            {"op": "offset", "n": 1},
+        ],
+    )
+
+    assert program.order_sensitive is True

@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from datadiff.dsl import Case, Program, TableData
+from datadiff.dsl import Case, Program, TableData, sort_columns
 from datadiff.normalizer import NormalizedResult
 from datadiff.oracle import Finding
 
@@ -78,7 +78,7 @@ def evaluate_metamorphic_variants(
 
 def _row_permutation_variants(case: Case) -> list[MetamorphicVariant]:
     ops = case.program.op_sequence()
-    if "limit" in ops:
+    if "limit" in ops or "offset" in ops:
         return []
     table = case.tables[0]
     if len(table.rows) < 2:
@@ -101,7 +101,7 @@ def _filter_rejecting_row_injection_variants(case: Case) -> list[MetamorphicVari
     columns = {col.name: col for col in primary.columns}
     for idx, op in enumerate(case.program.operations):
         kind = op.get("op")
-        if kind in {"limit", "groupby"}:
+        if kind in {"limit", "offset", "groupby"}:
             return []
         if kind != "filter":
             continue
@@ -235,7 +235,7 @@ def _join_filter_pushdown_variants(case: Case) -> list[MetamorphicVariant]:
         between_mutated: set[str] = set()
         for filter_idx in range(idx + 1, len(ops)):
             candidate = ops[filter_idx]
-            if candidate.get("op") in {"groupby", "limit", "join"}:
+            if candidate.get("op") in {"groupby", "limit", "offset", "join"}:
                 break
             if candidate.get("op") == "mutate":
                 between_mutated.add(str(candidate.get("column", "")))
@@ -495,7 +495,7 @@ def _groupby_aggregation_permutation_variants(case: Case) -> list[MetamorphicVar
 
 def _join_table_permutation_variants(case: Case) -> list[MetamorphicVariant]:
     ops = case.program.op_sequence()
-    if "limit" in ops or len(case.tables) < 2:
+    if "limit" in ops or "offset" in ops or len(case.tables) < 2:
         return []
     for index, table in enumerate(case.tables[1:], start=1):
         if len(table.rows) < 2:
@@ -546,8 +546,8 @@ def _sort_select_commutation_variants(case: Case) -> list[MetamorphicVariant]:
         second = ops[idx + 1]
         if first.get("op") == "select" and second.get("op") == "sort":
             selected = set(first.get("columns", []))
-            sort_columns = list(second.get("columns", []))
-            if sort_columns and set(sort_columns).issubset(selected):
+            columns = sort_columns(second)
+            if columns and set(columns).issubset(selected):
                 swapped = list(ops)
                 swapped[idx], swapped[idx + 1] = swapped[idx + 1], swapped[idx]
                 program = Program(
@@ -564,8 +564,8 @@ def _sort_select_commutation_variants(case: Case) -> list[MetamorphicVariant]:
                 ]
         if first.get("op") == "sort" and second.get("op") == "select":
             selected = set(second.get("columns", []))
-            sort_columns = list(first.get("columns", []))
-            if sort_columns and set(sort_columns).issubset(selected):
+            columns = sort_columns(first)
+            if columns and set(columns).issubset(selected):
                 swapped = list(ops)
                 swapped[idx], swapped[idx + 1] = swapped[idx + 1], swapped[idx]
                 program = Program(

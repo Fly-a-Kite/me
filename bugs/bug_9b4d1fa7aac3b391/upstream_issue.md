@@ -2,6 +2,8 @@
 
 Submitted upstream as https://github.com/apache/datafusion/issues/22190 on 2026-05-15.
 
+Post-submission status: DataFusion member `xiedeyantu` replied `take` on 2026-05-17 UTC and is assigned to the issue. This is an upstream triage signal, not yet a confirmation of the bug.
+
 ## Version
 
 - Python: `3.12.3`

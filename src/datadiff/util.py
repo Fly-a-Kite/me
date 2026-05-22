@@ -47,10 +47,11 @@ def append_jsonl(row: dict[str, Any], path: Path) -> None:
 
 
 class JsonlWriter:
-    def __init__(self, path: Path, *, mode: str = "at", compresslevel: int = 1):
+    def __init__(self, path: Path, *, mode: str = "at", compresslevel: int = 1, sort_keys: bool = False):
         self.path = path
         self.mode = mode
         self.compresslevel = compresslevel
+        self.sort_keys = sort_keys
         self._file = None
 
     def __enter__(self) -> "JsonlWriter":
@@ -74,7 +75,7 @@ class JsonlWriter:
     def write(self, row: dict[str, Any]) -> None:
         if self._file is None:
             raise RuntimeError("JsonlWriter is not open")
-        self._file.write(json.dumps(row, ensure_ascii=False, sort_keys=True, default=json_default) + "\n")
+        self._file.write(json.dumps(row, ensure_ascii=False, sort_keys=self.sort_keys, default=json_default) + "\n")
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:

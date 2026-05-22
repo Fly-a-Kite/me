@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datadiff.backends.base import Backend
 from datadiff.backends.datafusion_backend import DataFusionBackend
-from datadiff.backends.duckdb_backend import DuckDBBackend
+from datadiff.backends.duckdb_backend import DuckDBBackend, DuckDBPersistentBackend
 from datadiff.backends.faulty_backend import FaultyPandasBackend
 from datadiff.backends.pandas_backend import PandasBackend
 from datadiff.backends.polars_backend import PolarsBackend, PolarsLazyBackend
@@ -21,6 +21,8 @@ def make_backend(name: str) -> Backend:
         return PyArrowBackend()
     if name == "duckdb":
         return DuckDBBackend()
+    if name == "duckdb_persistent":
+        return DuckDBPersistentBackend()
     if name == "datafusion":
         return DataFusionBackend()
     if name == "sqlite":

@@ -29,8 +29,10 @@ DataFusion grouped top-k NULL sort-key bug:
 .venv/bin/python bugs/bug_9b4d1fa7aac3b391/standalone_datafusion_groupby_null_sortkey_limit.py
 ```
 
-Upstream issue: https://github.com/apache/datafusion/issues/22190. Treat the paper-facing status as
-`submitted_upstream_needs_external_confirmation` until the DataFusion maintainers confirm, reject, or document the behavior.
+Upstream issue: https://github.com/apache/datafusion/issues/22190. DataFusion member
+`xiedeyantu` replied `take` on 2026-05-17 UTC and is assigned to the issue. Treat the
+paper-facing status as `submitted_upstream_needs_external_confirmation` until the DataFusion
+maintainers confirm, reject, or document the behavior.
 
 Polars lazy float group-key instability candidate:
 
@@ -66,6 +68,20 @@ After completion:
 ```bash
 .venv/bin/datadiff experiment-summary --manifest runs/<manifest>.json --refresh
 .venv/bin/datadiff analyze-experiment --manifest runs/<manifest>.json --refresh
+```
+
+Optional follow-up for scheduler experiments outside the paper tables:
+
+```bash
+.venv/bin/datadiff experiment \
+  --cases 1000 \
+  --seeds 1,1001,2001 \
+  --presets baseline \
+  --target-suites core,datafusion_cross \
+  --schedule adaptive \
+  --batch-cases 100 \
+  --local-source-exploration-weight 0.25 \
+  --skip-run-reports
 ```
 
 ## 4. Bug-Hunting Matrix

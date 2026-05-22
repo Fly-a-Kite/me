@@ -28,6 +28,37 @@ def test_reducer_preserves_extra_join_tables_when_minimizing(monkeypatch):
     assert all(count == 2 for count in seen_table_counts)
 
 
+def test_reducer_minimizes_rows_in_referenced_join_tables(monkeypatch):
+    def fake_run_loaded_case(candidate, backends, config=None, save_artifact=False):
+        if len(candidate.tables) != 2:
+            return {"findings": []}
+        t1 = candidate.tables[1]
+        column_names = {column.name for column in t1.columns}
+        if column_names == {"id", "j"} and any(row.get("j") == 99 for row in t1.rows):
+            return {"findings": [{"kind": "semantic_output_mismatch"}]}
+        return {"findings": []}
+
+    monkeypatch.setattr(reducer, "run_loaded_case", fake_run_loaded_case)
+    case = Case(
+        "case-join-right-rows",
+        7,
+        [
+            TableData("t0", [ColumnSpec("id", "int")], [{"id": 1}]),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int"), ColumnSpec("j", "int")],
+                [{"id": 1, "j": 1}, {"id": 1, "j": 99}, {"id": 1, "j": 100}],
+            ),
+        ],
+        Program("prog-join-right-rows", 7, [{"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"}]),
+    )
+
+    reduced = reducer.reduce_case(case, backends=["pandas", "polars"], target_kinds=["semantic_output_mismatch"])
+
+    assert len(reduced.tables) == 2
+    assert reduced.tables[1].rows == [{"id": 1, "j": 99}]
+
+
 def test_reducer_rejects_same_kind_with_different_root_cause(monkeypatch):
     def fake_run_loaded_case(candidate, backends, config=None, save_artifact=False):
         return {"findings": [{"kind": "semantic_output_mismatch", "root_cause": "join_semantics"}]}

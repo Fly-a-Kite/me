@@ -1,0 +1,55 @@
+{
+  "case_id": "case-duckdb-3015-official-fixture",
+  "known_bug_id": "duckdb-3015",
+  "paper_notes": "Official DuckDB issue #3015 fixture replay using generic fixture import plus per-column sort/null-order DSL.",
+  "seed": 3015,
+  "target_suite": "cross_family",
+  "target_version": "duckdb==0.3.1",
+  "fixture": {
+    "name": "orders_small",
+    "source": "https://github.com/duckdb/duckdb/issues/3015 and https://github.com/duckdb/duckdb/pull/3040",
+    "sha256": "285661a6cb619ed1016647437bfa3afce6a9d578f27d5107b78fa5997e570be2",
+    "columns": [
+      "o_orderkey",
+      "o_clerk",
+      "o_orderstatus",
+      "o_totalprice"
+    ]
+  },
+  "operations": [
+    {
+      "op": "sort",
+      "keys": [
+        {
+          "column": "o_orderkey",
+          "ascending": true,
+          "nulls": "first"
+        },
+        {
+          "column": "o_clerk",
+          "ascending": true,
+          "nulls": "first"
+        },
+        {
+          "column": "o_orderstatus",
+          "ascending": true,
+          "nulls": "first"
+        },
+        {
+          "column": "o_totalprice",
+          "ascending": false,
+          "nulls": "last"
+        }
+      ]
+    },
+    {
+      "op": "limit",
+      "n": 360
+    }
+  ],
+  "metadata": {
+    "fixture_source": "duckdb-3015-upstream",
+    "historical_bug_id": "duckdb-3015",
+    "methodology": "generic fixture replay; no bug-specific backend logic"
+  }
+}

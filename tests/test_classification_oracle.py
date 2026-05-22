@@ -29,6 +29,34 @@ def test_classification_marks_invalid_generated_program_false_positive():
     assert validate_case_program(case)
 
 
+def test_validate_case_program_accepts_and_rejects_per_column_sort_keys():
+    valid = _case(
+        [
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "x", "ascending": False, "nulls": "first"},
+                    {"column": "s", "ascending": True, "nulls": "last"},
+                ],
+            }
+        ]
+    )
+    invalid = _case([{"op": "sort", "keys": [{"column": "x", "ascending": True, "nulls": "middle"}]}])
+
+    assert validate_case_program(valid) == []
+    assert "invalid sort keys" in validate_case_program(invalid)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_offset():
+    valid = _case([{"op": "sort", "columns": ["x"], "ascending": True}, {"op": "offset", "n": 1}])
+    negative = _case([{"op": "offset", "n": -1}])
+    invalid = _case([{"op": "offset", "n": "one"}])
+
+    assert validate_case_program(valid) == []
+    assert "negative offset" in validate_case_program(negative)[0]
+    assert "non-integer offset" in validate_case_program(invalid)[0]
+
+
 def test_classification_marks_normalizer_error_false_positive():
     case = _case([{"op": "filter", "column": "x", "cmp": ">", "value": 0}])
     finding = {
@@ -279,3 +307,25 @@ def test_validate_case_rejects_duplicate_select_columns():
     errors = validate_case_program(case)
 
     assert any("select contains duplicate columns" in error for error in errors)
+
+
+def test_validate_case_allows_post_groupby_join_and_global_aggregate():
+    case = Case(
+        "case-post-groupby-join-aggregate",
+        6,
+        [
+            TableData("t0", [ColumnSpec("id", "int"), ColumnSpec("x", "int")], [{"id": 1, "x": 2}]),
+            TableData("t1", [ColumnSpec("id", "int"), ColumnSpec("z", "int")], [{"id": 1, "z": 3}]),
+        ],
+        Program(
+            "prog-post-groupby-join-aggregate",
+            6,
+            [
+                {"op": "groupby", "keys": ["id"], "aggs": [{"column": "x", "func": "sum", "as": "sum_x"}]},
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+                {"op": "aggregate", "aggs": [{"column": "sum_x", "func": "sum", "as": "total_x"}]},
+            ],
+        ),
+    )
+
+    assert validate_case_program(case) == []

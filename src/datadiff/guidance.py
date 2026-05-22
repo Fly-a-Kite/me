@@ -5,7 +5,9 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any
 
-from datadiff.dsl import Case
+from datadiff.dsl import Case, normalize_sort_keys
+from datadiff.operation_combo import classify_operation_combo
+from datadiff.reward import online_case_reward
 from datadiff.util import unique_preserve_order
 
 TARGET_ALIASES: dict[str, set[str]] = {
@@ -14,17 +16,30 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "mutate": {"op:mutate"},
     "sort": {"op:sort"},
     "limit": {"op:limit"},
+    "offset": {"op:offset"},
     "sort_limit": {"op:sort", "op:limit"},
+    "sort_offset": {"op:sort", "op:offset"},
     "nulls": {"has:null"},
     "strings": {"type:str", "has:empty_string", "has:unicode_string", "has:space_string"},
     "numeric": {"type:int", "type:float", "has:negative_number", "has:fractional_float"},
     "edge_float": {"has:special_float", "has:fractional_float"},
     "empty": {"rows:empty", "op:limit_zero"},
-    "aggregation": {"op:groupby", "agg:sum", "agg:min", "agg:max", "agg:count"},
+    "aggregation": {"op:groupby", "op:aggregate", "agg:sum", "agg:min", "agg:max", "agg:count"},
+    "global_aggregation": {"op:aggregate"},
     "null_groupby_topk": {"pattern:null_groupby_topk"},
     "null_agg_topk": {"pattern:null_agg_topk"},
+    "filter_null_agg_topk": {"pattern:filter_null_agg_topk"},
+    "join_null_agg_topk": {"pattern:join_null_agg_topk"},
+    "join_filter_groupby": {"pattern:join_filter_groupby"},
     "float_group_key": {"pattern:float_group_key"},
+    "join_null_sort": {"pattern:join_null_sort"},
+    "ordered_groupby_sort": {"pattern:ordered_groupby_sort"},
+    "topk_resort": {"pattern:topk_resort"},
+    "join_ordered_agg_topk": {"pattern:join_ordered_agg_topk"},
     "join": {"op:join", "tables:multi"},
+    "common_workflow": {"combo_frequency:high"},
+    "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
+    "topk": {"combo_risk:topk_ordering", "combo_risk:grouped_topk"},
     "expressions": {"expr:add_const", "expr:arith_const", "expr:string_length", "expr:string_lower", "expr:cast"},
     "casts": {"expr:cast"},
 }
@@ -97,7 +112,15 @@ def extract_case_features(case: Case) -> set[str]:
             width = len(op.get("columns", []))
             features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
         elif kind == "sort":
-            features.add(f"sort:{'asc' if op.get('ascending', True) else 'desc'}")
+            try:
+                sort_keys = normalize_sort_keys(op)
+            except ValueError:
+                sort_keys = []
+            directions = {key.ascending for key in sort_keys}
+            if len(directions) > 1:
+                features.add("sort:mixed")
+            else:
+                features.add(f"sort:{'asc' if (not sort_keys or sort_keys[0].ascending) else 'desc'}")
         elif kind == "join":
             features.add(f"join:{op.get('how', 'unknown')}")
             features.add(f"join_table:{op.get('table', 'unknown')}")
@@ -106,6 +129,11 @@ def extract_case_features(case: Case) -> set[str]:
             if limit == 0:
                 features.add("op:limit_zero")
             features.add(_bucket("limit", limit, [(0, "zero"), (3, "tiny"), (10, "small")], "large"))
+        elif kind == "offset":
+            offset = int(op.get("n", 0))
+            if offset == 0:
+                features.add("op:offset_zero")
+            features.add(_bucket("offset", offset, [(0, "zero"), (3, "tiny"), (10, "small")], "large"))
         elif kind == "mutate":
             expr = op.get("expr", {})
             expr_kind = expr.get("kind", "unknown")
@@ -121,17 +149,40 @@ def extract_case_features(case: Case) -> set[str]:
             for agg in op.get("aggs", []):
                 features.add(f"agg:{agg.get('func', 'unknown')}")
                 available_types[str(agg.get("as", "derived"))] = "float"
+        elif kind == "aggregate":
+            for agg in op.get("aggs", []):
+                features.add(f"agg:{agg.get('func', 'unknown')}")
+                available_types[str(agg.get("as", "derived"))] = "float"
     if op_names:
         features.add("opseq:" + ">".join(op_names))
         features.add(_bucket("op_count", len(op_names), [(1, "one"), (3, "few"), (5, "many")], "deep"))
+    combo = classify_operation_combo(case.program.operations)
+    features.add(f"combo:{combo['template']}")
+    features.add(f"combo_frequency:{combo['frequency_bucket']}")
+    for risk in combo["correctness_risks"]:
+        features.add(f"combo_risk:{risk}")
     _, frontier_buckets = _frontier_signature(case)
     features.update(frontier_buckets)
     if _has_null_groupby_topk_pattern(op_names, frontier_buckets):
         features.add("pattern:null_groupby_topk")
     if _has_null_agg_topk_pattern(case.program.operations, frontier_buckets):
         features.add("pattern:null_agg_topk")
+    if _has_filter_null_agg_topk_pattern(case.program.operations, frontier_buckets):
+        features.add("pattern:filter_null_agg_topk")
+    if _has_join_null_agg_topk_pattern(case.program.operations, frontier_buckets):
+        features.add("pattern:join_null_agg_topk")
+    if _has_join_filter_groupby_pattern(case.program.operations):
+        features.add("pattern:join_filter_groupby")
     if _has_float_group_key_pattern(case.program.operations):
         features.add("pattern:float_group_key")
+    if _has_join_null_sort_pattern(case.program.operations, frontier_buckets):
+        features.add("pattern:join_null_sort")
+    if _has_ordered_groupby_sort_pattern(case.program.operations):
+        features.add("pattern:ordered_groupby_sort")
+    if _has_topk_resort_pattern(case.program.operations):
+        features.add("pattern:topk_resort")
+    if _has_join_ordered_agg_topk_pattern(case.program.operations):
+        features.add("pattern:join_ordered_agg_topk")
     return features
 
 
@@ -146,6 +197,7 @@ class GuidanceDecision:
     pruned_candidate_count: int = 0
     frontier_buckets: list[str] = field(default_factory=list)
     score_breakdown: dict[str, float] = field(default_factory=dict)
+    online_weights: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -159,7 +211,69 @@ class GuidanceDecision:
             "score_breakdown": {
                 key: round(value, 6) for key, value in sorted(self.score_breakdown.items())
             },
+            "online_weights": self.online_weights,
         }
+
+
+@dataclass(slots=True)
+class FeatureRewardStats:
+    pulls: int = 0
+    total_reward: float = 0.0
+
+    @property
+    def mean_reward(self) -> float:
+        return self.total_reward / self.pulls if self.pulls else 0.0
+
+
+@dataclass(slots=True)
+class OnlineFeatureWeights:
+    exploration_weight: float = 0.12
+    min_multiplier: float = 0.35
+    max_multiplier: float = 2.50
+    feature_stats: dict[str, FeatureRewardStats] = field(default_factory=dict)
+    prefix_stats: dict[str, FeatureRewardStats] = field(default_factory=dict)
+    total_updates: int = 0
+
+    def record(self, features: set[str], reward: float) -> None:
+        learnable = [feature for feature in features if _is_learnable_weight_feature(feature)]
+        if not learnable:
+            return
+        self.total_updates += 1
+        for feature in learnable:
+            self._record_stat(self.feature_stats, feature, reward)
+            self._record_stat(self.prefix_stats, _feature_prefix(feature), reward)
+
+    def multiplier(self, feature: str) -> float:
+        exact = self.feature_stats.get(feature)
+        prefix = self.prefix_stats.get(_feature_prefix(feature))
+        if exact is None and prefix is None:
+            return 1.0
+        exact_signal = exact.mean_reward if exact is not None else 0.0
+        prefix_signal = prefix.mean_reward if prefix is not None else 0.0
+        pulls = exact.pulls if exact is not None else 0
+        exploration = self.exploration_weight * math.sqrt(
+            math.log(self.total_updates + 2.0) / max(1, pulls)
+        )
+        value = 1.0 + (0.65 * exact_signal) + (0.35 * prefix_signal) + exploration
+        return min(self.max_multiplier, max(self.min_multiplier, value))
+
+    def snapshot(self, limit: int = 12) -> list[dict[str, Any]]:
+        rows = [
+            {
+                "feature": feature,
+                "pulls": stats.pulls,
+                "mean_reward": stats.mean_reward,
+                "multiplier": self.multiplier(feature),
+            }
+            for feature, stats in self.feature_stats.items()
+        ]
+        return sorted(rows, key=lambda row: (row["multiplier"], row["pulls"]), reverse=True)[:limit]
+
+    @staticmethod
+    def _record_stat(stats: dict[str, FeatureRewardStats], key: str, reward: float) -> None:
+        stat = stats.setdefault(key, FeatureRewardStats())
+        stat.pulls += 1
+        stat.total_reward += reward
 
 
 @dataclass(slots=True)
@@ -169,6 +283,7 @@ class GuidanceState:
     finding_feature_counts: Counter[str] = field(default_factory=Counter)
     root_cause_counts: Counter[str] = field(default_factory=Counter)
     frontier_bucket_counts: Counter[str] = field(default_factory=Counter)
+    online_weights: OnlineFeatureWeights = field(default_factory=OnlineFeatureWeights)
 
     def choose_case(self, candidates: list[Case]) -> GuidanceDecision:
         if not candidates:
@@ -181,6 +296,9 @@ class GuidanceState:
         for decision in contributing:
             decision.contributing_candidate_count = len(contributing)
             decision.pruned_candidate_count = pruned
+        targeted = [decision for decision in contributing if decision.matched_targets]
+        if targeted:
+            return max(targeted, key=lambda decision: (len(decision.matched_targets), decision.score, -decision.case.seed))
         return max(contributing, key=lambda decision: (decision.score, -decision.case.seed))
 
     def record_result(self, case: Case, row: dict[str, Any]) -> None:
@@ -188,6 +306,7 @@ class GuidanceState:
         self.feature_counts.update(features)
         _, frontier_buckets = _frontier_signature(case)
         self.frontier_bucket_counts.update(frontier_buckets)
+        self.online_weights.record(features, _guidance_reward(row))
         findings = row.get("findings") or []
         if findings:
             self.finding_feature_counts.update(features)
@@ -198,13 +317,14 @@ class GuidanceState:
     def _score_case(self, case: Case, candidate_count: int) -> GuidanceDecision:
         features = extract_case_features(case)
         matched_targets = _matched_targets(features, self.targets)
-        path_coverage_proxy = _path_coverage_proxy(features, self.feature_counts)
-        data_sensitivity = _data_sensitivity_score(features, self.feature_counts)
+        path_coverage_proxy = _path_coverage_proxy(features, self.feature_counts, self.online_weights)
+        data_sensitivity = _data_sensitivity_score(features, self.feature_counts, self.online_weights)
         frontier_conformance, frontier_buckets = _frontier_conformance(case, self.frontier_bucket_counts)
         target_bonus = 3.0 * len(matched_targets)
         finding_yield_bonus = (
             sum(
-                _bounded_finding_signal(self.finding_feature_counts[f]) * _finding_feature_weight(f)
+                _bounded_finding_signal(self.finding_feature_counts[f])
+                * _finding_feature_weight(f, self.online_weights)
                 for f in features
             )
             / math.sqrt(max(1, len(features)))
@@ -212,7 +332,8 @@ class GuidanceState:
         )
         feature_saturation_penalty = (
             sum(
-                _feature_saturation(self.finding_feature_counts[f]) * _saturation_feature_weight(f)
+                _feature_saturation(self.finding_feature_counts[f])
+                * _saturation_feature_weight(f, self.online_weights)
                 for f in features
             )
             / math.sqrt(max(1, len(features)))
@@ -222,6 +343,7 @@ class GuidanceState:
             _root_saturation(self.root_cause_counts[root]) for root in _predicted_roots(features)
         )
         if matched_targets:
+            feature_saturation_penalty *= 0.35
             root_saturation_penalty *= 0.35
         contribution_potential = _contribution_potential(
             features,
@@ -232,7 +354,25 @@ class GuidanceState:
             frontier_bucket_counts=self.frontier_bucket_counts,
             root_cause_counts=self.root_cause_counts,
         )
-        score = path_coverage_proxy + data_sensitivity + frontier_conformance + target_bonus + finding_yield_bonus
+        combo_priority = classify_operation_combo(case.program.operations)["priority"] * 0.25
+        online_multipliers = [
+            self.online_weights.multiplier(feature)
+            for feature in features
+            if _is_learnable_weight_feature(feature)
+        ]
+        online_weight_mean = (
+            sum(online_multipliers) / len(online_multipliers)
+            if online_multipliers
+            else 1.0
+        )
+        score = (
+            path_coverage_proxy
+            + data_sensitivity
+            + frontier_conformance
+            + target_bonus
+            + finding_yield_bonus
+            + combo_priority
+        )
         score -= feature_saturation_penalty + root_saturation_penalty
         return GuidanceDecision(
             case=case,
@@ -241,13 +381,18 @@ class GuidanceState:
             matched_targets=matched_targets,
             candidate_count=candidate_count,
             frontier_buckets=frontier_buckets,
+            online_weights=self.online_weights.snapshot(limit=16),
             score_breakdown={
                 "path_coverage_proxy": path_coverage_proxy,
                 "data_sensitivity": data_sensitivity,
                 "frontier_conformance": frontier_conformance,
                 "target_bonus": target_bonus,
                 "finding_yield_bonus": finding_yield_bonus,
+                "combo_priority": combo_priority,
                 "contribution_potential": contribution_potential,
+                "online_weight_mean": online_weight_mean,
+                "online_weight_max": max(online_multipliers, default=1.0),
+                "online_weight_updates": float(self.online_weights.total_updates),
                 "feature_saturation_penalty": -feature_saturation_penalty,
                 "root_saturation_penalty": -root_saturation_penalty,
             },
@@ -303,47 +448,66 @@ def _root_saturation(count: int) -> float:
     return math.log1p(count - 20) * 0.22
 
 
-def _finding_feature_weight(feature: str) -> float:
+def _guidance_reward(row: dict[str, Any]) -> float:
+    return online_case_reward(row)
+
+
+def _finding_feature_weight(feature: str, online_weights: OnlineFeatureWeights | None = None) -> float:
     if feature.startswith(("op:", "opseq:")):
-        return 1.0
-    if feature.startswith(("agg:", "cmp:", "expr:", "mutate:", "join:", "filter_type:", "cast_to:")):
-        return 0.75
-    if feature.startswith(("has:", "type:", "nullable:")):
-        return 0.35
-    return 0.50
+        base = 1.0
+    elif feature.startswith(("agg:", "cmp:", "expr:", "mutate:", "join:", "filter_type:", "cast_to:", "combo:")):
+        base = 0.75
+    elif feature.startswith(("has:", "type:", "nullable:")):
+        base = 0.35
+    else:
+        base = 0.50
+    return base * _online_multiplier(feature, online_weights)
 
 
-def _path_coverage_proxy(features: set[str], feature_counts: Counter[str]) -> float:
+def _path_coverage_proxy(
+    features: set[str],
+    feature_counts: Counter[str],
+    online_weights: OnlineFeatureWeights | None = None,
+) -> float:
     path_features = [feature for feature in features if _is_path_feature(feature)]
     if not path_features:
         return 0.0
-    novelty = sum(_path_feature_weight(feature) / (1.0 + feature_counts[feature]) for feature in path_features)
+    novelty = sum(
+        _path_feature_weight(feature, online_weights) / (1.0 + feature_counts[feature])
+        for feature in path_features
+    )
     op_diversity = sum(1 for feature in path_features if feature.startswith("op:")) * 0.12
     sequence_bonus = 0.20 if any(feature.startswith("opseq:") for feature in path_features) else 0.0
     return novelty / math.sqrt(len(path_features)) + op_diversity + sequence_bonus
 
 
-def _data_sensitivity_score(features: set[str], feature_counts: Counter[str]) -> float:
+def _data_sensitivity_score(
+    features: set[str],
+    feature_counts: Counter[str],
+    online_weights: OnlineFeatureWeights | None = None,
+) -> float:
     data_features = [feature for feature in features if _is_data_sensitivity_feature(feature)]
     if not data_features:
         return 0.0
     weighted = sum(
-        _data_feature_weight(feature) * (1.0 + 1.0 / (1.0 + feature_counts[feature]))
+        _data_feature_weight(feature, online_weights) * (1.0 + 1.0 / (1.0 + feature_counts[feature]))
         for feature in data_features
     )
     return weighted / math.sqrt(len(data_features)) * 0.35
 
 
-def _saturation_feature_weight(feature: str) -> float:
+def _saturation_feature_weight(feature: str, online_weights: OnlineFeatureWeights | None = None) -> float:
     if feature.startswith("opseq:"):
-        return 1.0
-    if feature.startswith("op:"):
-        return 0.9
-    if feature.startswith(("agg:", "cmp:", "expr:", "mutate:", "join:", "filter_type:", "cast_to:")):
-        return 0.65
-    if feature.startswith(("has:", "type:", "nullable:")):
-        return 0.15
-    return 0.25
+        base = 1.0
+    elif feature.startswith("op:"):
+        base = 0.9
+    elif feature.startswith(("agg:", "cmp:", "expr:", "mutate:", "join:", "filter_type:", "cast_to:", "combo:")):
+        base = 0.65
+    elif feature.startswith(("has:", "type:", "nullable:")):
+        base = 0.15
+    else:
+        base = 0.25
+    return base * _online_multiplier(feature, online_weights)
 
 
 def _is_path_feature(feature: str) -> bool:
@@ -367,22 +531,31 @@ def _is_path_feature(feature: str) -> bool:
             "agg:",
             "op_count:",
             "groupby:",
+            "combo:",
+            "combo_frequency:",
+            "combo_risk:",
         )
     )
 
 
-def _path_feature_weight(feature: str) -> float:
+def _path_feature_weight(feature: str, online_weights: OnlineFeatureWeights | None = None) -> float:
     if feature.startswith("opseq:"):
-        return 1.4
-    if feature.startswith("pattern:"):
-        return 1.6
-    if feature.startswith("op:"):
-        return 1.0
-    if feature.startswith(("join:", "agg:", "expr:", "mutate:", "cmp:", "group_key_type:")):
-        return 0.9
-    if feature.startswith(("filter_type:", "select_width:", "sort:", "limit:", "cast_to:", "arith:")):
-        return 0.7
-    return 0.5
+        base = 1.4
+    elif feature.startswith("pattern:"):
+        base = 1.6
+    elif feature.startswith("op:"):
+        base = 1.0
+    elif feature.startswith(("combo:", "combo_risk:")):
+        base = 1.1
+    elif feature.startswith("combo_frequency:"):
+        base = 0.8
+    elif feature.startswith(("join:", "agg:", "expr:", "mutate:", "cmp:", "group_key_type:")):
+        base = 0.9
+    elif feature.startswith(("filter_type:", "select_width:", "sort:", "limit:", "cast_to:", "arith:")):
+        base = 0.7
+    else:
+        base = 0.5
+    return base * _online_multiplier(feature, online_weights)
 
 
 def _is_data_sensitivity_feature(feature: str) -> bool:
@@ -399,22 +572,38 @@ def _is_data_sensitivity_feature(feature: str) -> bool:
     ) or feature in {"op:limit_zero", "groupby:null-key", "groupby:null-agg-output"}
 
 
-def _data_feature_weight(feature: str) -> float:
+def _data_feature_weight(feature: str, online_weights: OnlineFeatureWeights | None = None) -> float:
     if feature == "groupby:null-key":
-        return 1.6
-    if feature == "groupby:null-agg-output":
-        return 1.7
-    if feature in {"has:special_float", "has:null", "has:unicode_string"}:
-        return 1.8
-    if feature in {"has:fractional_float", "has:negative_number", "has:empty_string", "has:space_string"}:
-        return 1.2
-    if feature in {"tables:multi", "rows:empty", "rows:tiny", "cols:wide", "op:limit_zero"}:
+        base = 1.6
+    elif feature == "groupby:null-agg-output":
+        base = 1.7
+    elif feature in {"has:special_float", "has:null", "has:unicode_string"}:
+        base = 1.8
+    elif feature in {"has:fractional_float", "has:negative_number", "has:empty_string", "has:space_string"}:
+        base = 1.2
+    elif feature in {"tables:multi", "rows:empty", "rows:tiny", "cols:wide", "op:limit_zero"}:
+        base = 1.0
+    elif feature.startswith(("nullable:", "type:")):
+        base = 0.6
+    elif feature.startswith("bool:"):
+        base = 0.4
+    else:
+        base = 0.5
+    return base * _online_multiplier(feature, online_weights)
+
+
+def _online_multiplier(feature: str, online_weights: OnlineFeatureWeights | None) -> float:
+    if online_weights is None:
         return 1.0
-    if feature.startswith(("nullable:", "type:")):
-        return 0.6
-    if feature.startswith("bool:"):
-        return 0.4
-    return 0.5
+    return online_weights.multiplier(feature)
+
+
+def _is_learnable_weight_feature(feature: str) -> bool:
+    return _is_path_feature(feature) or _is_data_sensitivity_feature(feature)
+
+
+def _feature_prefix(feature: str) -> str:
+    return feature.split(":", 1)[0] if ":" in feature else feature
 
 
 def _frontier_conformance(case: Case, frontier_bucket_counts: Counter[str]) -> tuple[float, list[str]]:
@@ -450,10 +639,7 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             if right is not None:
-                for column in right.columns:
-                    if column.name == op.get("right_on"):
-                        continue
-                    samples[column.name] = [row.get(column.name) for row in right.rows]
+                samples = _join_output_samples(samples, right, op)
         elif kind == "select":
             cols = [str(column) for column in op.get("columns", []) if str(column) in samples]
             samples = {column: samples[column] for column in unique_preserve_order(cols)}
@@ -477,6 +663,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             samples = _groupby_output_samples(samples, op)
+        elif kind == "aggregate":
+            score, op_buckets = _aggregate_frontier_score(samples, op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            samples = {str(agg.get("as", "")): [] for agg in op.get("aggs", []) if agg.get("as")}
 
     scores = [score for score in scores if score > 0.0]
     return (sum(scores) / len(scores) if scores else 0.0), unique_preserve_order(buckets)
@@ -579,6 +770,66 @@ def _join_frontier_score(
     return min(1.0, 0.35 + 0.45 * max(0.0, partial_overlap) + 0.10 * int("join:duplicate-keys" in buckets) + 0.05 * int("join:null-keys" in buckets)), buckets
 
 
+def _join_output_samples(
+    left_samples: dict[str, list[Any]],
+    right: Any,
+    op: dict[str, Any],
+) -> dict[str, list[Any]]:
+    left_on = str(op.get("left_on", ""))
+    right_on = str(op.get("right_on", ""))
+    if left_on not in left_samples:
+        return left_samples
+    right_rows = getattr(right, "rows", [])
+    right_columns = [
+        column.name
+        for column in getattr(right, "columns", [])
+        if column.name != right_on and column.name not in left_samples
+    ]
+    if not right_rows:
+        return left_samples
+
+    left_rows = _rows_from_samples(left_samples)
+    right_index: dict[Any, list[dict[str, Any]]] = {}
+    for row in right_rows:
+        key = row.get(right_on)
+        if key is not None:
+            right_index.setdefault(key, []).append(row)
+
+    how = str(op.get("how", "inner"))
+    joined_rows: list[dict[str, Any]] = []
+    for left_row in left_rows:
+        key = left_row.get(left_on)
+        matches = [] if key is None else right_index.get(key, [])
+        if matches:
+            for right_row in matches:
+                out = dict(left_row)
+                for column in right_columns:
+                    out[column] = right_row.get(column)
+                joined_rows.append(out)
+        elif how == "left":
+            out = dict(left_row)
+            for column in right_columns:
+                out[column] = None
+            joined_rows.append(out)
+
+    return _samples_from_rows(joined_rows, list(left_samples) + right_columns)
+
+
+def _rows_from_samples(samples: dict[str, list[Any]]) -> list[dict[str, Any]]:
+    row_count = min((len(values) for values in samples.values()), default=0)
+    return [
+        {column: values[idx] for column, values in samples.items()}
+        for idx in range(row_count)
+    ]
+
+
+def _samples_from_rows(rows: list[dict[str, Any]], columns: list[str]) -> dict[str, list[Any]]:
+    return {
+        column: [row.get(column) for row in rows]
+        for column in columns
+    }
+
+
 def _groupby_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
     keys = [str(key) for key in op.get("keys", []) if str(key) in samples]
     buckets: list[str] = []
@@ -647,6 +898,21 @@ def _groupby_output_samples(samples: dict[str, list[Any]], op: dict[str, Any]) -
     return out
 
 
+def _aggregate_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
+    buckets = ["aggregate:global"]
+    if len(op.get("aggs", [])) > 1:
+        buckets.append("aggregate:multi-agg")
+    for agg in op.get("aggs", []):
+        if agg.get("func") == "count":
+            continue
+        values = samples.get(str(agg.get("column", "")), [])
+        if values and all(value is None for value in values):
+            buckets.append("aggregate:null-output")
+            break
+    score = 0.55 + 0.12 * int("aggregate:multi-agg" in buckets) + 0.08 * int("aggregate:null-output" in buckets)
+    return min(1.0, score), buckets
+
+
 def _has_null_aggregate_output(
     samples: dict[str, list[Any]],
     op: dict[str, Any],
@@ -709,7 +975,11 @@ def _mutate_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) ->
 
 
 def _sort_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
-    columns = [str(column) for column in op.get("columns", []) if str(column) in samples]
+    try:
+        keys = [key for key in normalize_sort_keys(op) if key.column in samples]
+    except ValueError:
+        return 0.0, []
+    columns = [key.column for key in keys]
     buckets: list[str] = []
     if not columns:
         return 0.0, buckets
@@ -719,6 +989,10 @@ def _sort_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> t
         buckets.append("sort:duplicate-key")
     if any(value is None for value in values):
         buckets.append("sort:null-order")
+    if len({key.ascending for key in keys}) > 1:
+        buckets.append("sort:mixed-direction")
+    if len({key.nulls for key in keys}) > 1:
+        buckets.append("sort:mixed-null-placement")
     if not buckets:
         return 0.0, buckets
     return min(1.0, 0.30 + 0.20 * len(buckets)), buckets
@@ -801,6 +1075,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("join_semantics")
     if "op:groupby" in features:
         roots.add("float_group_key_instability" if "pattern:float_group_key" in features else "groupby_aggregation")
+    if "op:aggregate" in features:
+        roots.add("groupby_aggregation")
     if "op:filter" in features:
         roots.add("filter_predicate")
     if "op:mutate" in features:
@@ -810,7 +1086,7 @@ def _predicted_roots(features: set[str]) -> set[str]:
             roots.add("type_cast")
         else:
             roots.add("arithmetic_expression")
-    if features & {"op:sort", "op:limit"}:
+    if features & {"op:sort", "op:limit", "op:offset"}:
         roots.add("ordering_or_limit")
     if "has:null" in features:
         roots.add("null_semantics")
@@ -842,11 +1118,76 @@ def _has_null_agg_topk_pattern(ops: list[dict[str, Any]], frontier_buckets: list
             sort_op = ops[sort_idx]
             if sort_op.get("op") != "sort":
                 continue
-            if not (agg_aliases & {str(column) for column in sort_op.get("columns", [])}):
+            try:
+                sort_columns = {key.column for key in normalize_sort_keys(sort_op)}
+            except ValueError:
+                sort_columns = set()
+            if not (agg_aliases & sort_columns):
                 continue
             if any(later.get("op") == "limit" for later in ops[sort_idx + 1 :]):
                 return True
     return False
+
+
+def _has_filter_null_agg_topk_pattern(ops: list[dict[str, Any]], frontier_buckets: list[str]) -> bool:
+    if "groupby:null-agg-output" not in frontier_buckets or "sort:null-order" not in frontier_buckets:
+        return False
+    try:
+        filter_idx = next(idx for idx, op in enumerate(ops) if op.get("op") == "filter")
+        mutate_idx = next(
+            idx for idx, op in enumerate(ops[filter_idx + 1 :], start=filter_idx + 1) if op.get("op") == "mutate"
+        )
+        select_idx = next(
+            idx for idx, op in enumerate(ops[mutate_idx + 1 :], start=mutate_idx + 1) if op.get("op") == "select"
+        )
+        groupby_idx = next(
+            idx for idx, op in enumerate(ops[select_idx + 1 :], start=select_idx + 1) if op.get("op") == "groupby"
+        )
+        post_group_select_idx = next(
+            idx
+            for idx, op in enumerate(ops[groupby_idx + 1 :], start=groupby_idx + 1)
+            if op.get("op") == "select"
+        )
+        sort_idx = next(
+            idx
+            for idx, op in enumerate(ops[post_group_select_idx + 1 :], start=post_group_select_idx + 1)
+            if op.get("op") == "sort"
+        )
+        next(idx for idx, op in enumerate(ops[sort_idx + 1 :], start=sort_idx + 1) if op.get("op") == "limit")
+    except StopIteration:
+        return False
+    return True
+
+
+def _has_join_null_agg_topk_pattern(ops: list[dict[str, Any]], frontier_buckets: list[str]) -> bool:
+    if "groupby:null-agg-output" not in frontier_buckets or "sort:null-order" not in frontier_buckets:
+        return False
+    join_idx = None
+    for idx, op in enumerate(ops):
+        if op.get("op") == "join" and op.get("how") == "left":
+            join_idx = idx
+            break
+    if join_idx is None:
+        return False
+    try:
+        groupby_idx = next(idx for idx, op in enumerate(ops[join_idx + 1 :], start=join_idx + 1) if op.get("op") == "groupby")
+        sort_idx = next(idx for idx, op in enumerate(ops[groupby_idx + 1 :], start=groupby_idx + 1) if op.get("op") == "sort")
+        next(idx for idx, op in enumerate(ops[sort_idx + 1 :], start=sort_idx + 1) if op.get("op") == "limit")
+    except StopIteration:
+        return False
+    return True
+
+
+def _has_join_filter_groupby_pattern(ops: list[dict[str, Any]]) -> bool:
+    try:
+        join_idx = next(idx for idx, op in enumerate(ops) if op.get("op") == "join" and op.get("how") == "inner")
+        filter_idx = next(idx for idx, op in enumerate(ops[join_idx + 1 :], start=join_idx + 1) if op.get("op") == "filter")
+        next(idx for idx, op in enumerate(ops[filter_idx + 1 :], start=filter_idx + 1) if op.get("op") == "groupby")
+        sort_idx = next(idx for idx, op in enumerate(ops[filter_idx + 1 :], start=filter_idx + 1) if op.get("op") == "sort")
+        next(idx for idx, op in enumerate(ops[sort_idx + 1 :], start=sort_idx + 1) if op.get("op") == "limit")
+    except StopIteration:
+        return False
+    return True
 
 
 def _has_float_group_key_pattern(ops: list[dict[str, Any]]) -> bool:
@@ -861,3 +1202,80 @@ def _has_float_group_key_pattern(ops: list[dict[str, Any]]) -> bool:
             keys = {str(key) for key in op.get("keys", [])}
             return bool(keys & div_columns)
     return False
+
+
+def _has_ordered_groupby_sort_pattern(ops: list[dict[str, Any]]) -> bool:
+    try:
+        first_sort_idx = next(idx for idx, op in enumerate(ops) if op.get("op") == "sort")
+        groupby_idx = next(
+            idx for idx, op in enumerate(ops[first_sort_idx + 1 :], start=first_sort_idx + 1)
+            if op.get("op") == "groupby"
+        )
+        groupby = ops[groupby_idx]
+        agg_aliases = {str(agg.get("as", "")) for agg in groupby.get("aggs", []) if agg.get("as")}
+        second_sort = next(
+            op for op in ops[groupby_idx + 1 :]
+            if op.get("op") == "sort"
+            and bool(agg_aliases & {key.column for key in normalize_sort_keys(op)})
+        )
+    except (StopIteration, ValueError):
+        return False
+    return bool(second_sort)
+
+
+def _has_topk_resort_pattern(ops: list[dict[str, Any]]) -> bool:
+    try:
+        first_sort_idx = next(idx for idx, op in enumerate(ops) if op.get("op") == "sort")
+        limit_idx = next(
+            idx for idx, op in enumerate(ops[first_sort_idx + 1 :], start=first_sort_idx + 1)
+            if op.get("op") == "limit"
+        )
+        next(
+            idx for idx, op in enumerate(ops[limit_idx + 1 :], start=limit_idx + 1)
+            if op.get("op") in {"sort", "offset"}
+        )
+    except StopIteration:
+        return False
+    return True
+
+
+def _has_join_ordered_agg_topk_pattern(ops: list[dict[str, Any]]) -> bool:
+    try:
+        join_idx = next(idx for idx, op in enumerate(ops) if op.get("op") == "join")
+        first_sort_idx = next(
+            idx for idx, op in enumerate(ops[join_idx + 1 :], start=join_idx + 1)
+            if op.get("op") == "sort"
+        )
+        groupby_idx = next(
+            idx for idx, op in enumerate(ops[first_sort_idx + 1 :], start=first_sort_idx + 1)
+            if op.get("op") == "groupby"
+        )
+        groupby = ops[groupby_idx]
+        agg_aliases = {str(agg.get("as", "")) for agg in groupby.get("aggs", []) if agg.get("as")}
+        sort_idx = next(
+            idx for idx, op in enumerate(ops[groupby_idx + 1 :], start=groupby_idx + 1)
+            if op.get("op") == "sort"
+            and bool(agg_aliases & {key.column for key in normalize_sort_keys(op)})
+        )
+        next(idx for idx, op in enumerate(ops[sort_idx + 1 :], start=sort_idx + 1) if op.get("op") == "limit")
+    except (StopIteration, ValueError):
+        return False
+    return True
+
+
+def _has_join_null_sort_pattern(ops: list[dict[str, Any]], frontier_buckets: list[str]) -> bool:
+    if "sort:null-order" not in frontier_buckets:
+        return False
+    join_idx = None
+    for idx, op in enumerate(ops):
+        if op.get("op") == "join" and op.get("how") == "left":
+            join_idx = idx
+            break
+    if join_idx is None:
+        return False
+    try:
+        sort_idx = next(idx for idx, op in enumerate(ops[join_idx + 1 :], start=join_idx + 1) if op.get("op") == "sort")
+        next(idx for idx, op in enumerate(ops[sort_idx + 1 :], start=sort_idx + 1) if op.get("op") == "limit")
+    except StopIteration:
+        return False
+    return True

@@ -1,0 +1,449 @@
+from __future__ import annotations
+
+import math
+from collections import Counter
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Literal
+
+from datadiff.reward import (
+    FALSE_POSITIVE_VERDICTS,
+    SEMANTIC_DIVERGENCE_VERDICTS,
+    is_candidate_bug_finding,
+)
+from datadiff.util import load_json, read_jsonl, run_meta_path
+
+CandidateSource = Literal["generated", "feedback_mutation"]
+
+@dataclass(slots=True)
+class BatchObservation:
+    cases: int
+    elapsed_s: float
+    throughput_cases_s: float
+    findings: int
+    candidate_bug_cases: int
+    candidate_bug_families: set[str] = field(default_factory=set)
+    semantic_divergence_count: int = 0
+    false_positive_count: int = 0
+    new_behavior_cases: int = 0
+    first_candidate_bug_case_index: int | None = None
+    first_candidate_bug_elapsed_s: float | None = None
+    candidate_bug_discovery_auc: float = 0.0
+
+
+@dataclass(slots=True)
+class AdaptiveScheduleConfig:
+    batch_cases: int = 100
+    batch_duration_s: float | None = None
+    warmup_batches: int = 1
+    exploration_weight: float = 0.75
+    freshness_weight: float = 0.10
+    stale_penalty: float = 0.12
+
+
+@dataclass(slots=True)
+class ScheduledBatch:
+    arm_id: str
+    batch_index: int
+    seed: int
+    cases: int | None
+    duration_s: float | None
+    job: dict[str, Any]
+
+
+@dataclass(slots=True)
+class AdaptiveArmState:
+    arm_id: str
+    job: dict[str, Any]
+    next_seed: int
+    pulls: int = 0
+    total_reward: float = 0.0
+    last_reward: float = 0.0
+    stale_batches: int = 0
+    last_batch_index: int = -1
+    candidate_bug_families: set[str] = field(default_factory=set)
+
+    @property
+    def mean_reward(self) -> float:
+        return self.total_reward / self.pulls if self.pulls else 0.0
+
+
+@dataclass(slots=True)
+class SourceArmState:
+    name: CandidateSource
+    pulls: int = 0
+    total_reward: float = 0.0
+
+    @property
+    def mean_reward(self) -> float:
+        return self.total_reward / self.pulls if self.pulls else 0.0
+
+
+class LocalSourceScheduler:
+    def __init__(self, *, exploration_weight: float = 0.5) -> None:
+        self.exploration_weight = max(0.0, float(exploration_weight))
+        self.total_pulls = 0
+        self.arms: dict[CandidateSource, SourceArmState] = {
+            "generated": SourceArmState(name="generated"),
+            "feedback_mutation": SourceArmState(name="feedback_mutation"),
+        }
+
+    def choose_source(self, *, feedback_available: bool) -> CandidateSource:
+        if not feedback_available:
+            return "generated"
+        for source in ("generated", "feedback_mutation"):
+            if self.arms[source].pulls == 0:
+                return source
+        return max(self.arms.values(), key=self._score_arm).name
+
+    def record_result(
+        self,
+        source: CandidateSource,
+        *,
+        has_finding: bool,
+        is_new_behavior: bool,
+        preflight_valid: bool,
+        fallback_used: bool,
+        candidate_bug: bool = False,
+        semantic_divergence: bool = False,
+        false_positive: bool = False,
+    ) -> float:
+        reward = (
+            (3.0 if candidate_bug else 0.0)
+            + (0.35 if semantic_divergence else 0.0)
+            + (0.25 if has_finding and not candidate_bug and not semantic_divergence and not false_positive else 0.0)
+            + (0.5 if is_new_behavior else 0.0)
+            - (1.5 if false_positive else 0.0)
+        )
+        if not preflight_valid or fallback_used:
+            reward -= 0.5
+        if reward == 0.0:
+            reward -= 0.1
+        arm = self.arms[source]
+        arm.pulls += 1
+        arm.total_reward += reward
+        self.total_pulls += 1
+        return reward
+
+    def snapshot(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "source": arm.name,
+                "pulls": arm.pulls,
+                "mean_reward": arm.mean_reward,
+                "total_reward": arm.total_reward,
+            }
+            for arm in sorted(self.arms.values(), key=lambda item: item.name)
+        ]
+
+    def _score_arm(self, arm: SourceArmState) -> float:
+        explore = self.exploration_weight * math.sqrt(
+            math.log(self.total_pulls + 1.0) / max(1, arm.pulls)
+        )
+        return arm.mean_reward + explore
+
+
+class AdaptiveBudgetScheduler:
+    def __init__(
+        self,
+        jobs: list[dict[str, Any]],
+        *,
+        total_cases_budget: int | None,
+        total_duration_budget_s: float | None,
+        config: AdaptiveScheduleConfig,
+    ) -> None:
+        if not jobs:
+            raise ValueError("adaptive scheduler requires at least one job")
+        if total_cases_budget is None and total_duration_budget_s is None:
+            raise ValueError("adaptive scheduler requires a case or duration budget")
+        self.config = config
+        self.remaining_cases_budget = total_cases_budget
+        self.remaining_duration_budget_s = total_duration_budget_s
+        self.reserved_cases_budget = 0
+        self.reserved_duration_budget_s = 0.0
+        self.total_batches_completed = 0
+        self.total_batches_scheduled = 0
+        self.global_candidate_bug_families: set[str] = set()
+        self.arms = {
+            str(job["arm_id"]): AdaptiveArmState(
+                arm_id=str(job["arm_id"]),
+                job=dict(job),
+                next_seed=int(job["seed"]),
+            )
+            for job in jobs
+        }
+
+    def has_budget(self) -> bool:
+        if self.remaining_cases_budget is not None:
+            return self._available_cases_budget() > 0
+        return bool(self._available_duration_budget_s() and self._available_duration_budget_s() > 0)
+
+    def next_batch(self) -> ScheduledBatch:
+        batches = self.next_round(1)
+        if not batches:
+            raise RuntimeError("adaptive scheduler has no remaining budget")
+        return batches[0]
+
+    def next_round(self, max_batches: int) -> list[ScheduledBatch]:
+        batches: list[ScheduledBatch] = []
+        excluded: set[str] = set()
+        while len(batches) < max(1, int(max_batches)) and self.has_budget():
+            batch = self._schedule_next_batch(excluded)
+            if batch is None:
+                break
+            batches.append(batch)
+            excluded.add(batch.arm_id)
+        return batches
+
+    def _schedule_next_batch(self, excluded: set[str]) -> ScheduledBatch | None:
+        arm = self._choose_arm(excluded)
+        if arm is None:
+            return None
+        cases = None
+        duration_s = None
+        if self.remaining_cases_budget is not None:
+            cases = min(
+                max(1, int(self.config.batch_cases)),
+                max(1, int(self._available_cases_budget())),
+            )
+        if self.remaining_duration_budget_s is not None:
+            requested = self.config.batch_duration_s or self._available_duration_budget_s()
+            duration_s = min(float(requested), float(self._available_duration_budget_s()))
+        batch_index = self.total_batches_scheduled
+        job = dict(arm.job)
+        job["seed"] = arm.next_seed
+        job["cases"] = cases
+        job["duration_s"] = duration_s
+        job["schedule_arm_id"] = arm.arm_id
+        job["batch_index"] = batch_index
+        arm.last_batch_index = batch_index
+        if cases is not None:
+            self.reserved_cases_budget += int(cases)
+        if duration_s is not None:
+            self.reserved_duration_budget_s += float(duration_s)
+        self.total_batches_scheduled += 1
+        return ScheduledBatch(
+            arm_id=arm.arm_id,
+            batch_index=batch_index,
+            seed=arm.next_seed,
+            cases=cases,
+            duration_s=duration_s,
+            job=job,
+        )
+
+    def record_result(self, batch: ScheduledBatch, observation: BatchObservation, *, next_seed: int) -> float:
+        arm = self.arms[batch.arm_id]
+        new_global_families = observation.candidate_bug_families - self.global_candidate_bug_families
+        new_local_families = observation.candidate_bug_families - arm.candidate_bug_families
+        reward = _batch_reward(
+            observation,
+            new_global_family_count=len(new_global_families),
+            new_local_family_count=len(new_local_families),
+        )
+        arm.pulls += 1
+        arm.total_reward += reward
+        arm.last_reward = reward
+        arm.next_seed = int(next_seed)
+        arm.candidate_bug_families.update(observation.candidate_bug_families)
+        self.global_candidate_bug_families.update(observation.candidate_bug_families)
+        signal = bool(
+            observation.candidate_bug_cases
+            or observation.new_behavior_cases
+            or new_global_families
+            or new_local_families
+        )
+        arm.stale_batches = 0 if signal else arm.stale_batches + 1
+        if self.remaining_cases_budget is not None:
+            self.reserved_cases_budget = max(0, self.reserved_cases_budget - int(batch.cases or 0))
+            self.remaining_cases_budget = max(0, self.remaining_cases_budget - int(observation.cases))
+        if self.remaining_duration_budget_s is not None:
+            self.reserved_duration_budget_s = max(0.0, self.reserved_duration_budget_s - float(batch.duration_s or 0.0))
+            self.remaining_duration_budget_s = max(
+                0.0,
+                float(self.remaining_duration_budget_s) - float(observation.elapsed_s),
+            )
+        self.total_batches_completed += 1
+        return reward
+
+    def snapshot(self) -> list[dict[str, Any]]:
+        rows = []
+        for arm in sorted(self.arms.values(), key=lambda item: item.arm_id):
+            rows.append(
+                {
+                    "arm_id": arm.arm_id,
+                    "target_suite": arm.job.get("target_suite", ""),
+                    "preset": arm.job.get("preset", ""),
+                    "initial_seed": int(arm.job.get("seed", 0)),
+                    "next_seed": arm.next_seed,
+                    "pulls": arm.pulls,
+                    "mean_reward": arm.mean_reward,
+                    "last_reward": arm.last_reward,
+                    "stale_batches": arm.stale_batches,
+                    "candidate_bug_families": sorted(arm.candidate_bug_families),
+                }
+            )
+        return rows
+
+    def _choose_arm(self, excluded: set[str] | None = None) -> AdaptiveArmState | None:
+        excluded = excluded or set()
+        available = [arm for arm in self.arms.values() if arm.arm_id not in excluded]
+        if not available:
+            return None
+        warmup = [arm for arm in available if arm.pulls < max(1, int(self.config.warmup_batches))]
+        if warmup:
+            return min(warmup, key=lambda arm: (arm.pulls, arm.last_batch_index, arm.arm_id))
+        return max(available, key=self._score_arm)
+
+    def _score_arm(self, arm: AdaptiveArmState) -> float:
+        explore = self.config.exploration_weight * math.sqrt(
+            math.log(self.total_batches_completed + 2.0) / max(1, arm.pulls)
+        )
+        freshness = self.config.freshness_weight * min(
+            1.0,
+            max(0, self.total_batches_completed - arm.last_batch_index - 1) / max(1, len(self.arms)),
+        )
+        stale = self.config.stale_penalty * min(arm.stale_batches, 5)
+        return arm.mean_reward + explore + freshness - stale
+
+    def _available_cases_budget(self) -> int:
+        if self.remaining_cases_budget is None:
+            return 0
+        return max(0, int(self.remaining_cases_budget) - int(self.reserved_cases_budget))
+
+    def _available_duration_budget_s(self) -> float:
+        if self.remaining_duration_budget_s is None:
+            return 0.0
+        return max(0.0, float(self.remaining_duration_budget_s) - float(self.reserved_duration_budget_s))
+
+
+def summarize_batch_run(run_file: Path) -> BatchObservation:
+    rows = read_jsonl(run_file)
+    meta_path = run_meta_path(run_file)
+    meta = load_json(meta_path) if meta_path.exists() else {}
+    findings = 0
+    candidate_bug_cases = 0
+    candidate_bug_families: Counter[str] = Counter()
+    semantic_divergence_count = 0
+    false_positive_count = 0
+    new_behavior_cases = 0
+    for row in rows:
+        row_findings = row.get("findings", [])
+        findings += len(row_findings)
+        new_behavior_cases += int(bool(row.get("is_new_behavior")))
+        if any(is_candidate_bug_finding(finding) for finding in row_findings):
+            candidate_bug_cases += 1
+        candidate_bug_families.update(_candidate_bug_family_keys(row_findings))
+        for finding in row_findings:
+            verdict = str(finding.get("triage_verdict", "unclassified"))
+            if verdict in SEMANTIC_DIVERGENCE_VERDICTS:
+                semantic_divergence_count += 1
+            if verdict in FALSE_POSITIVE_VERDICTS:
+                false_positive_count += 1
+    first_candidate_idx, first_candidate_elapsed_s = _first_candidate_bug_position(rows)
+    return BatchObservation(
+        cases=len(rows),
+        elapsed_s=float(meta.get("elapsed_s", 0.0) or 0.0),
+        throughput_cases_s=float(meta.get("throughput_cases_s", 0.0) or 0.0),
+        findings=findings,
+        candidate_bug_cases=candidate_bug_cases,
+        candidate_bug_families=set(candidate_bug_families),
+        semantic_divergence_count=semantic_divergence_count,
+        false_positive_count=false_positive_count,
+        new_behavior_cases=new_behavior_cases,
+        first_candidate_bug_case_index=first_candidate_idx,
+        first_candidate_bug_elapsed_s=first_candidate_elapsed_s,
+        candidate_bug_discovery_auc=_candidate_bug_discovery_auc(rows),
+    )
+
+
+def _batch_reward(
+    observation: BatchObservation,
+    *,
+    new_global_family_count: int,
+    new_local_family_count: int,
+) -> float:
+    cases = max(1, int(observation.cases))
+    findings = max(1, int(observation.findings))
+    candidate_rate = observation.candidate_bug_cases / cases
+    new_behavior_rate = observation.new_behavior_cases / cases
+    semantic_rate = observation.semantic_divergence_count / findings
+    false_positive_rate = observation.false_positive_count / findings
+    throughput_signal = math.log1p(max(0.0, float(observation.throughput_cases_s))) / 6.0
+    early_case_bonus = 0.0
+    if observation.first_candidate_bug_case_index is not None:
+        early_case_bonus = max(
+            0.0,
+            1.0 - (float(observation.first_candidate_bug_case_index) / cases),
+        )
+    early_time_bonus = 0.0
+    if observation.first_candidate_bug_elapsed_s is not None:
+        elapsed = max(float(observation.elapsed_s), float(observation.first_candidate_bug_elapsed_s), 1e-9)
+        early_time_bonus = max(0.0, 1.0 - (float(observation.first_candidate_bug_elapsed_s) / elapsed))
+    reward = (
+        10.0 * candidate_rate
+        + 2.0 * new_behavior_rate
+        + 0.15 * semantic_rate
+        + 1.5 * new_local_family_count
+        + 2.5 * new_global_family_count
+        + 2.0 * early_case_bonus
+        + 1.0 * early_time_bonus
+        + 3.0 * observation.candidate_bug_discovery_auc
+        + 0.2 * throughput_signal
+        - 4.0 * false_positive_rate
+    )
+    if observation.findings == 0 and observation.new_behavior_cases == 0:
+        reward -= 0.25
+    return reward
+
+
+def _candidate_bug_family_keys(findings: list[dict[str, Any]]) -> Counter[str]:
+    keys: Counter[str] = Counter()
+    root_by_suspicious: dict[str, str] = {}
+    for finding in findings:
+        if not is_candidate_bug_finding(finding):
+            continue
+        root = str(finding.get("root_cause", "unknown"))
+        if root.startswith("metamorphic_"):
+            continue
+        suspicious = _suspicious_key(finding)
+        root_by_suspicious.setdefault(suspicious, root)
+    for finding in findings:
+        if not is_candidate_bug_finding(finding):
+            continue
+        root = str(finding.get("root_cause", "unknown"))
+        suspicious = _suspicious_key(finding)
+        if root.startswith("metamorphic_") and suspicious in root_by_suspicious:
+            root = root_by_suspicious[suspicious]
+        keys[f"{root}@{suspicious}"] += 1
+    return keys
+
+
+def _suspicious_key(finding: dict[str, Any]) -> str:
+    return ",".join(sorted(finding.get("suspicious_backends", []) or [])) or "unknown"
+
+
+def _first_candidate_bug_position(rows: list[dict[str, Any]]) -> tuple[int | None, float | None]:
+    for idx, row in enumerate(rows):
+        if any(is_candidate_bug_finding(finding) for finding in row.get("findings", [])):
+            elapsed = row.get("elapsed_s")
+            return int(row.get("case_index", idx)), float(elapsed) if elapsed not in (None, "") else None
+    return None, None
+
+
+def _candidate_bug_discovery_auc(rows: list[dict[str, Any]]) -> float:
+    if not rows:
+        return 0.0
+    cumulative = 0
+    area = 0
+    total = 0
+    per_row = []
+    for row in rows:
+        hit = int(any(is_candidate_bug_finding(finding) for finding in row.get("findings", [])))
+        per_row.append(hit)
+        total += hit
+    if total == 0:
+        return 0.0
+    for hit in per_row:
+        cumulative += hit
+        area += cumulative
+    return area / (len(rows) * total)

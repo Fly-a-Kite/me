@@ -1,3 +1,4 @@
+from datadiff.datagen import generate_case
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.guidance import GuidanceState, extract_case_features, parse_guidance_targets
 
@@ -38,6 +39,8 @@ def test_extract_case_features_tracks_structure_and_values():
     assert "cmp:>=" in features
     assert "op:sort" in features
     assert "sort:desc" in features
+    assert "combo:filter_sort" in features
+    assert "combo_frequency:exploratory" in features
     assert "has:null" in features
     assert "has:unicode_string" in features
     assert "has:empty_string" in features
@@ -132,6 +135,161 @@ def test_guidance_recognizes_null_agg_topk_pattern():
     assert "sort:null-order" in features
     assert "pattern:null_agg_topk" in features
     assert decision.matched_targets == ["null_agg_topk"]
+
+
+def test_guidance_recognizes_filter_null_agg_topk_pattern():
+    case = generate_case(30, profile="filter_null_agg_topk")
+    guidance = GuidanceState(targets=["filter_null_agg_topk"])
+
+    features = extract_case_features(case)
+    decision = guidance.choose_case([case])
+
+    assert "groupby:null-agg-output" in features
+    assert "sort:null-order" in features
+    assert "pattern:filter_null_agg_topk" in features
+    assert decision.matched_targets == ["filter_null_agg_topk"]
+
+
+def test_guidance_recognizes_join_null_agg_topk_pattern():
+    case = Case(
+        "case-join-null-agg-topk",
+        31,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("g", "str", nullable=False)],
+                [{"id": 0, "g": "a"}, {"id": 1, "g": "b"}],
+            ),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("j", "int", nullable=True)],
+                [{"id": 0, "j": 5}],
+            ),
+        ],
+        Program(
+            "prog-join-null-agg-topk",
+            31,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+                {"op": "mutate", "column": "m_0", "expr": {"kind": "cast", "source": "j", "to": "float"}},
+                {"op": "groupby", "keys": ["g"], "aggs": [{"column": "m_0", "func": "min", "as": "min_j"}]},
+                {"op": "select", "columns": ["min_j"]},
+                {"op": "sort", "columns": ["min_j"], "ascending": True},
+                {"op": "limit", "n": 3},
+            ],
+        ),
+    )
+    guidance = GuidanceState(targets=["join_null_agg_topk"])
+
+    features = extract_case_features(case)
+    decision = guidance.choose_case([case])
+
+    assert "groupby:null-agg-output" in features
+    assert "sort:null-order" in features
+    assert "pattern:join_null_agg_topk" in features
+    assert decision.matched_targets == ["join_null_agg_topk"]
+
+
+def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
+    profiles = [
+        "null_groupby_topk",
+        "null_agg_topk",
+        "filter_null_agg_topk",
+        "join_null_agg_topk",
+        "join_filter_groupby",
+        "float_group_key",
+        "join_null_sort",
+    ]
+    for profile in profiles:
+        for seed in range(50):
+            case = generate_case(seed, profile=profile)
+            guidance = GuidanceState(targets=[profile])
+
+            features = extract_case_features(case)
+            decision = guidance.choose_case([case])
+
+            assert f"pattern:{profile}" in features
+            assert decision.matched_targets == [profile]
+
+
+def test_guidance_recognizes_join_filter_groupby_pattern():
+    case = Case(
+        "case-join-filter-groupby",
+        32,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("g", "str", nullable=False),
+                    ColumnSpec("x", "int", nullable=True),
+                ],
+                [{"id": 0, "g": "a", "x": 1}, {"id": 1, "g": "b", "x": 2}],
+            ),
+            TableData(
+                "t1",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("j", "int", nullable=True),
+                    ColumnSpec("z", "float", nullable=True),
+                ],
+                [{"id": 0, "j": 5, "z": 1.0}, {"id": 1, "j": 7, "z": 0.5}],
+            ),
+        ],
+        Program(
+            "prog-join-filter-groupby",
+            32,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+                {"op": "filter", "column": "j", "cmp": ">=", "value": 0},
+                {"op": "mutate", "column": "m_0", "expr": {"kind": "add_const", "source": "x", "value": 1}},
+                {"op": "groupby", "keys": ["g"], "aggs": [{"column": "m_0", "func": "sum", "as": "sum_m_0"}]},
+                {"op": "sort", "columns": ["sum_m_0", "g"], "ascending": True},
+                {"op": "limit", "n": 2},
+            ],
+        ),
+    )
+    guidance = GuidanceState(targets=["join_filter_groupby"])
+
+    features = extract_case_features(case)
+    decision = guidance.choose_case([case])
+
+    assert "pattern:join_filter_groupby" in features
+    assert decision.matched_targets == ["join_filter_groupby"]
+
+
+def test_guidance_uses_actual_left_join_output_for_sort_null_order():
+    case = Case(
+        "case-join-null-sort",
+        4,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("x", "int", nullable=True)],
+                [{"id": 0, "x": 1}, {"id": 1, "x": 2}],
+            ),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("j", "int", nullable=True)],
+                [{"id": 1, "j": 10}],
+            ),
+        ],
+        Program(
+            "prog-join-null-sort",
+            4,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+                {"op": "select", "columns": ["id", "j"]},
+                {"op": "sort", "columns": ["j", "id"], "ascending": True},
+                {"op": "limit", "n": 2},
+            ],
+        ),
+    )
+
+    features = extract_case_features(case)
+
+    assert "sort:null-order" in features
+    assert "pattern:join_null_sort" in features
 
 
 def test_guidance_penalizes_saturated_finding_features():
@@ -234,6 +392,62 @@ def test_guidance_uses_data_sensitivity_and_path_coverage_breakdown():
     assert decision.score_breakdown["data_sensitivity"] > 0.0
     assert decision.score_breakdown["path_coverage_proxy"] > 0.0
     assert decision.score_breakdown["frontier_conformance"] > 0.0
+
+
+def test_guidance_scores_realistic_operation_combos():
+    simple_case = _case(1, [{"op": "select", "columns": ["id"]}])
+    combo_case = _case(
+        2,
+        [
+            {"op": "filter", "column": "x", "cmp": ">=", "value": 0},
+            {"op": "mutate", "column": "m_0", "expr": {"kind": "add_const", "source": "x", "value": 1}},
+            {"op": "select", "columns": ["id", "m_0"]},
+            {"op": "sort", "columns": ["m_0", "id"], "ascending": True},
+            {"op": "limit", "n": 2},
+        ],
+    )
+    guidance = GuidanceState(targets=["common_workflow", "topk"])
+
+    features = extract_case_features(combo_case)
+    decision = guidance.choose_case([simple_case, combo_case])
+
+    assert "combo:filter_mutate_select_sort_limit" in features
+    assert "combo_frequency:high" in features
+    assert "combo_risk:topk_ordering" in features
+    assert decision.case is combo_case
+    assert decision.matched_targets == ["common_workflow", "topk"]
+    assert decision.score_breakdown["combo_priority"] > 0.0
+
+
+def test_guidance_updates_online_feature_weights_from_feedback():
+    combo_case = _case(
+        3,
+        [
+            {"op": "filter", "column": "x", "cmp": ">=", "value": 0},
+            {"op": "mutate", "column": "m_0", "expr": {"kind": "add_const", "source": "x", "value": 1}},
+            {"op": "select", "columns": ["id", "m_0"]},
+            {"op": "sort", "columns": ["m_0", "id"], "ascending": True},
+            {"op": "limit", "n": 2},
+        ],
+    )
+    guidance = GuidanceState()
+
+    before = guidance.choose_case([combo_case])
+    guidance.record_result(
+        combo_case,
+        {
+            "findings": [{"kind": "semantic_output_mismatch", "root_cause": "topk_ordering"}],
+            "is_new_behavior": True,
+            "preflight": {"valid": True, "fallback_used": False},
+        },
+    )
+    after = guidance.choose_case([combo_case])
+
+    assert before.score_breakdown["online_weight_mean"] == 1.0
+    assert after.score_breakdown["online_weight_mean"] > before.score_breakdown["online_weight_mean"]
+    assert after.score_breakdown["online_weight_updates"] == 1.0
+    assert guidance.online_weights.multiplier("combo:filter_mutate_select_sort_limit") > 1.0
+    assert after.online_weights
 
 
 def test_guidance_frontier_conformance_prefers_boundary_case():

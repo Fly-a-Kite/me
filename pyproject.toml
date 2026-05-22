@@ -20,6 +20,7 @@ test = ["pytest>=8"]
 all = [
   "datafusion>=40",
   "pyarrow>=14",
+  "pysqlite3-binary>=0.5.4.post2",
   "pytest>=8",
 ]
 

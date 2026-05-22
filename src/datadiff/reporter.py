@@ -284,6 +284,7 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
             run_rows = [_refresh_summary_row_findings(row) for row in run_rows]
         meta_path = run_meta_path(run_file)
         meta = load_json(meta_path) if meta_path.exists() else {}
+        preflight = meta.get("preflight", {}) if isinstance(meta.get("preflight", {}), dict) else {}
         findings = [finding for row in run_rows for finding in row.get("findings", [])]
         unique_finding_signatures = {f.get("signature", "") for f in findings}
         root_causes = Counter(f.get("root_cause", "unknown") for f in findings)
@@ -299,15 +300,17 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
             1
             for row in run_rows
             if any(
-                finding.get("triage_verdict") == "candidate_implementation_bug"
+                _is_candidate_bug_finding(finding)
                 for finding in row.get("findings", [])
             )
         )
         first_finding_case_index = _first_case_index(run_rows, lambda finding: True)
         first_candidate_bug_case_index = _first_case_index(
             run_rows,
-            lambda finding: finding.get("triage_verdict") == "candidate_implementation_bug",
+            _is_candidate_bug_finding,
         )
+        first_candidate_bug_elapsed_s = _first_case_elapsed_s(run_rows, _is_candidate_bug_finding)
+        candidate_bug_discovery_auc = _candidate_bug_discovery_auc(run_rows)
         guidance_metrics = _guidance_metrics(run_rows)
         new_behavior_cases = sum(1 for row in run_rows if row.get("is_new_behavior"))
         rows.append(
@@ -315,6 +318,12 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
                 "target_suite": run.get("target_suite", manifest.get("target_suite", "")),
                 "preset": run.get("preset", ""),
                 "seed": run.get("seed", ""),
+                "evidence_mode": run.get("evidence_mode", manifest.get("evidence_mode", "")),
+                "known_bug_id": run.get("known_bug_id", manifest.get("known_bug_id", "")),
+                "target_version": run.get("target_version", manifest.get("target_version", "")),
+                "batch_index": run.get("batch_index", ""),
+                "schedule_arm_id": run.get("schedule_arm_id", ""),
+                "scheduler_reward": run.get("scheduler_reward", ""),
                 "cases": total,
                 "bug_cases": bug_cases,
                 "bug_rate": bug_cases / total if total else 0.0,
@@ -322,10 +331,18 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
                 "candidate_bug_case_rate": candidate_bug_cases / total if total else 0.0,
                 "first_finding_case_index": first_finding_case_index,
                 "first_candidate_bug_case_index": first_candidate_bug_case_index,
+                "first_candidate_bug_elapsed_s": first_candidate_bug_elapsed_s,
+                "candidate_bug_discovery_auc": candidate_bug_discovery_auc,
                 "findings": len(findings),
                 "unique_findings": len(unique_finding_signatures),
                 "new_behavior_cases": new_behavior_cases,
                 "new_behavior_rate": new_behavior_cases / total if total else 0.0,
+                "preflight_repaired_cases": int(preflight.get("repaired_cases", 0) or 0),
+                "preflight_fallback_cases": int(preflight.get("fallback_cases", 0) or 0),
+                "preflight_invalid_cases": int(preflight.get("invalid_cases", 0) or 0),
+                "preflight_repaired_rate": (int(preflight.get("repaired_cases", 0) or 0) / total if total else 0.0),
+                "preflight_fallback_rate": (int(preflight.get("fallback_cases", 0) or 0) / total if total else 0.0),
+                "preflight_invalid_rate": (int(preflight.get("invalid_cases", 0) or 0) / total if total else 0.0),
                 "elapsed_s": meta.get("elapsed_s", ""),
                 "throughput_cases_s": meta.get("throughput_cases_s", ""),
                 **guidance_metrics,
@@ -362,14 +379,19 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
         f"- Target suites: {', '.join(manifest.get('target_suites', [])) or manifest.get('target_suite', 'n/a')}",
         f"- Target families: {_counter_summary(Counter(target.get('family', 'unknown') for target in manifest.get('targets', [])))}",
         f"- Common target capabilities: {len(manifest.get('common_capabilities', []))}",
+        f"- Schedule: {manifest.get('schedule', 'matrix_order')}",
+        f"- Evidence mode: {manifest.get('evidence_mode', 'live')}",
+        f"- Known bug id: {manifest.get('known_bug_id', '') or 'n/a'}",
+        f"- Target version: {manifest.get('target_version', '') or 'n/a'}",
+        f"- Local source scheduler: {manifest.get('local_source_scheduler', {'enabled': False, 'exploration_weight': ''})}",
         f"- Aggregate CSV: `{aggregate_csv_path}`",
         "- Triage columns distinguish candidate implementation bugs from documented/expected semantic divergences and oracle false positives.",
         f"- Refreshed with current oracle: {'yes' if refresh else 'no'}",
         "",
         "## Runs",
         "",
-        "| target suite | preset | seed | cases | findings | candidate bugs | candidate case % | first candidate | semantic divs | false positives | new behavior % | cases/s | data sensitivity | path proxy | frontier | contribution | pruned % | roots | triage |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|",
+        "| target suite | preset | seed | batch | arm | reward | cases | findings | candidate bugs | candidate case % | first candidate | first candidate s | discovery AUC | semantic divs | false positives | new behavior % | cases/s | data sensitivity | path proxy | frontier | contribution | pruned % | roots | triage |",
+        "|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|",
     ]
     for row in rows:
         semantic_divergence_count = (
@@ -379,9 +401,9 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
         )
         false_positive_count = row["generator_false_positive_count"] + row["normalizer_false_positive_count"]
         lines.append(
-            "| {target_suite} | {preset} | {seed} | {cases} | {findings} | "
+            "| {target_suite} | {preset} | {seed} | {batch_index} | {schedule_arm_id} | {scheduler_reward} | {cases} | {findings} | "
             "{candidate_implementation_bug_count} | {candidate_bug_case_rate} | "
-            "{first_candidate_bug_case_index} | {semantic_divergence_count} | "
+            "{first_candidate_bug_case_index} | {first_candidate_bug_elapsed_s} | {candidate_bug_discovery_auc} | {semantic_divergence_count} | "
             "{false_positive_count} | {new_behavior_rate} | {throughput_cases_s} | {avg_data_sensitivity} | "
             "{avg_path_coverage_proxy} | {avg_frontier_conformance} | "
             "{avg_contribution_potential} | {pruned_candidate_rate} | {top_root_causes} | {top_triage_verdicts} |".format(
@@ -389,8 +411,12 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
                     **row,
                     "semantic_divergence_count": semantic_divergence_count,
                     "false_positive_count": false_positive_count,
+                    "batch_index": _fmt_optional_int(row["batch_index"]),
+                    "scheduler_reward": _fmt_optional_float(row["scheduler_reward"]),
                     "candidate_bug_case_rate": _fmt_percent(row["candidate_bug_case_rate"]),
                     "first_candidate_bug_case_index": _fmt_optional_int(row["first_candidate_bug_case_index"]),
+                    "first_candidate_bug_elapsed_s": _fmt_optional_float(row["first_candidate_bug_elapsed_s"]),
+                    "candidate_bug_discovery_auc": _fmt_float(row["candidate_bug_discovery_auc"]),
                     "new_behavior_rate": _fmt_percent(row["new_behavior_rate"]),
                     "throughput_cases_s": _fmt_float(row["throughput_cases_s"]),
                     "avg_data_sensitivity": _fmt_float(row["avg_data_sensitivity"]),
@@ -407,8 +433,8 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
             "",
             "## Aggregates",
             "",
-            "| target suite | preset | runs | cases | findings | candidate bugs | candidate case % | candidate cases/s | median first candidate | semantic divs | false positives | avg new behavior % | avg cases/s | avg data sensitivity | avg path proxy |",
-            "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+            "| target suite | preset | runs | cases | findings | candidate bugs | candidate case % | candidate cases/s | median first candidate | median first s | avg discovery AUC | avg reward | semantic divs | false positives | avg new behavior % | avg cases/s | avg data sensitivity | avg path proxy |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         ]
     )
     for row in aggregate_rows:
@@ -416,6 +442,7 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
             "| {target_suite} | {preset} | {runs} | {cases} | {findings} | "
             "{candidate_implementation_bug_count} | {candidate_bug_case_rate} | "
             "{candidate_bug_cases_per_s} | {median_first_candidate_bug_case_index} | "
+            "{median_first_candidate_bug_elapsed_s} | {avg_candidate_bug_discovery_auc} | {avg_scheduler_reward} | "
             "{semantic_divergence_count} | {false_positive_count} | {avg_new_behavior_rate} | "
             "{avg_throughput_cases_s} | {avg_data_sensitivity} | {avg_path_coverage_proxy} |".format(
                 **{
@@ -425,10 +452,35 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
                     "median_first_candidate_bug_case_index": _fmt_optional_number(
                         row["median_first_candidate_bug_case_index"]
                     ),
+                    "median_first_candidate_bug_elapsed_s": _fmt_optional_number(
+                        row["median_first_candidate_bug_elapsed_s"]
+                    ),
+                    "avg_candidate_bug_discovery_auc": _fmt_float(row["avg_candidate_bug_discovery_auc"]),
+                    "avg_scheduler_reward": _fmt_optional_float(row["avg_scheduler_reward"]),
                     "avg_new_behavior_rate": _fmt_percent(row["avg_new_behavior_rate"]),
                     "avg_throughput_cases_s": _fmt_float(row["avg_throughput_cases_s"]),
                     "avg_data_sensitivity": _fmt_float(row["avg_data_sensitivity"]),
                     "avg_path_coverage_proxy": _fmt_float(row["avg_path_coverage_proxy"]),
+                }
+            )
+        )
+    lines.extend(
+        [
+            "",
+            "## Preflight Integrity",
+            "",
+            "| target suite | preset | runs | cases | invalid % | repaired % | fallback % |",
+            "|---|---|---:|---:|---:|---:|---:|",
+        ]
+    )
+    for row in aggregate_rows:
+        lines.append(
+            "| {target_suite} | {preset} | {runs} | {cases} | {preflight_invalid_rate} | {preflight_repaired_rate} | {preflight_fallback_rate} |".format(
+                **{
+                    **row,
+                    "preflight_invalid_rate": _fmt_percent(row["preflight_invalid_rate"]),
+                    "preflight_repaired_rate": _fmt_percent(row["preflight_repaired_rate"]),
+                    "preflight_fallback_rate": _fmt_percent(row["preflight_fallback_rate"]),
                 }
             )
         )
@@ -461,6 +513,21 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
             "- Use `edge_float` separately from `common`; it studies boundary semantics rather than the default common subset.",
         ]
     )
+    if manifest.get("schedule") == "adaptive":
+        adaptive_summary = _adaptive_schedule_summary(rows)
+        lines.extend(
+            [
+                "",
+                "## Adaptive Schedule",
+                "",
+                f"- Config: `{manifest.get('adaptive_config', {})}`",
+                f"- Final arm state entries: {len(manifest.get('adaptive_state', []))}",
+                f"- Global first candidate case: {_fmt_optional_int(adaptive_summary['global_first_candidate_case'])}",
+                f"- Batches by suite: {adaptive_summary['batches_by_suite']}",
+                f"- Cases by suite: {adaptive_summary['cases_by_suite']}",
+                f"- Candidate cases by suite: {adaptive_summary['candidate_cases_by_suite']}",
+            ]
+        )
     md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     with csv_path.open("w", encoding="utf-8", newline="") as f:
@@ -470,6 +537,12 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
                 "target_suite",
                 "preset",
                 "seed",
+                "evidence_mode",
+                "known_bug_id",
+                "target_version",
+                "batch_index",
+                "schedule_arm_id",
+                "scheduler_reward",
                 "cases",
                 "bug_cases",
                 "bug_rate",
@@ -477,10 +550,18 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
                 "candidate_bug_case_rate",
                 "first_finding_case_index",
                 "first_candidate_bug_case_index",
+                "first_candidate_bug_elapsed_s",
+                "candidate_bug_discovery_auc",
                 "findings",
                 "unique_findings",
                 "new_behavior_cases",
                 "new_behavior_rate",
+                "preflight_repaired_cases",
+                "preflight_fallback_cases",
+                "preflight_invalid_cases",
+                "preflight_repaired_rate",
+                "preflight_fallback_rate",
+                "preflight_invalid_rate",
                 "elapsed_s",
                 "throughput_cases_s",
                 "avg_guidance_score",
@@ -529,6 +610,15 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
                 "candidate_bug_case_rate",
                 "candidate_bug_cases_per_s",
                 "median_first_candidate_bug_case_index",
+                "median_first_candidate_bug_elapsed_s",
+                "avg_candidate_bug_discovery_auc",
+                "avg_scheduler_reward",
+                "preflight_repaired_cases",
+                "preflight_fallback_cases",
+                "preflight_invalid_cases",
+                "preflight_repaired_rate",
+                "preflight_fallback_rate",
+                "preflight_invalid_rate",
                 "semantic_divergence_count",
                 "false_positive_count",
                 "avg_new_behavior_rate",
@@ -679,6 +769,12 @@ def _fmt_optional_int(value) -> str:
     return "" if value is None else str(value)
 
 
+def _fmt_optional_float(value) -> str:
+    if value is None or value == "":
+        return ""
+    return _fmt_float(value)
+
+
 def _fmt_optional_number(value) -> str:
     if value is None:
         return ""
@@ -695,6 +791,33 @@ def _first_case_index(rows: list[dict], predicate) -> int | None:
             if predicate(finding):
                 return int(row.get("case_index", idx))
     return None
+
+
+def _first_case_elapsed_s(rows: list[dict], predicate) -> float | None:
+    for row in rows:
+        for finding in row.get("findings", []):
+            if predicate(finding):
+                value = row.get("elapsed_s")
+                return float(value) if value not in (None, "") else None
+    return None
+
+
+def _candidate_bug_discovery_auc(rows: list[dict]) -> float:
+    if not rows:
+        return 0.0
+    hits = [
+        int(any(_is_candidate_bug_finding(finding) for finding in row.get("findings", [])))
+        for row in rows
+    ]
+    total = sum(hits)
+    if total == 0:
+        return 0.0
+    cumulative = 0
+    area = 0
+    for hit in hits:
+        cumulative += hit
+        area += cumulative
+    return area / (len(rows) * total)
 
 
 def _aggregate_experiment_rows(rows: list[dict]) -> list[dict]:
@@ -721,6 +844,9 @@ def _aggregate_experiment_rows(rows: list[dict]) -> list[dict]:
             int(row["generator_false_positive_count"]) + int(row["normalizer_false_positive_count"])
             for row in items
         )
+        preflight_repaired_cases = sum(int(row.get("preflight_repaired_cases", 0) or 0) for row in items)
+        preflight_fallback_cases = sum(int(row.get("preflight_fallback_cases", 0) or 0) for row in items)
+        preflight_invalid_cases = sum(int(row.get("preflight_invalid_cases", 0) or 0) for row in items)
         avg_throughput = _avg_value(items, "throughput_cases_s")
         candidate_bug_case_rate = candidate_bug_cases / cases if cases else 0.0
         out.append(
@@ -739,6 +865,17 @@ def _aggregate_experiment_rows(rows: list[dict]) -> list[dict]:
                 "median_first_candidate_bug_case_index": _median_optional_int(
                     row["first_candidate_bug_case_index"] for row in items
                 ),
+                "median_first_candidate_bug_elapsed_s": _median_optional_float(
+                    row.get("first_candidate_bug_elapsed_s") for row in items
+                ),
+                "avg_candidate_bug_discovery_auc": _avg_value(items, "candidate_bug_discovery_auc"),
+                "avg_scheduler_reward": _avg_value(items, "scheduler_reward"),
+                "preflight_repaired_cases": preflight_repaired_cases,
+                "preflight_fallback_cases": preflight_fallback_cases,
+                "preflight_invalid_cases": preflight_invalid_cases,
+                "preflight_repaired_rate": preflight_repaired_cases / cases if cases else 0.0,
+                "preflight_fallback_rate": preflight_fallback_cases / cases if cases else 0.0,
+                "preflight_invalid_rate": preflight_invalid_cases / cases if cases else 0.0,
                 "semantic_divergence_count": semantic_divergence_count,
                 "false_positive_count": false_positive_count,
                 "avg_new_behavior_rate": _avg_value(items, "new_behavior_rate"),
@@ -748,6 +885,31 @@ def _aggregate_experiment_rows(rows: list[dict]) -> list[dict]:
             }
         )
     return out
+
+
+def _adaptive_schedule_summary(rows: list[dict]) -> dict[str, object]:
+    batches_by_suite = Counter()
+    cases_by_suite = Counter()
+    candidate_cases_by_suite = Counter()
+    global_first_candidate_case: int | None = None
+    offset = 0
+    for row in rows:
+        suite = str(row.get("target_suite", "unknown"))
+        batches_by_suite[suite] += 1
+        cases = int(row.get("cases", 0) or 0)
+        cases_by_suite[suite] += cases
+        candidate_cases = int(row.get("candidate_bug_cases", 0) or 0)
+        candidate_cases_by_suite[suite] += candidate_cases
+        first_candidate = row.get("first_candidate_bug_case_index")
+        if global_first_candidate_case is None and first_candidate not in (None, ""):
+            global_first_candidate_case = offset + int(first_candidate) + 1
+        offset += cases
+    return {
+        "global_first_candidate_case": global_first_candidate_case,
+        "batches_by_suite": _counter_summary(batches_by_suite),
+        "cases_by_suite": _counter_summary(cases_by_suite),
+        "candidate_cases_by_suite": _counter_summary(candidate_cases_by_suite),
+    }
 
 
 def _avg_value(rows: list[dict], key: str) -> float:
@@ -764,6 +926,16 @@ def _median_optional_int(values) -> float | None:
     if len(ints) % 2 == 1:
         return float(ints[middle])
     return (ints[middle - 1] + ints[middle]) / 2.0
+
+
+def _median_optional_float(values) -> float | None:
+    floats = sorted(float(value) for value in values if value is not None and value != "")
+    if not floats:
+        return None
+    middle = len(floats) // 2
+    if len(floats) % 2 == 1:
+        return floats[middle]
+    return (floats[middle - 1] + floats[middle]) / 2.0
 
 
 def _float_or_none(value) -> float | None:

@@ -13,6 +13,11 @@ TARGETED_PRESET_BY_SUITE = {
     "seeded_groupby": "guided_groupby",
     "seeded_join": "guided_join",
     "seeded_mutate": "guided_mutate",
+    "arrow_cross": "live_arrow",
+    "dataframe_lazy": "live_polars_lazy",
+    "embedded_sql": "live_embedded_sql",
+    "datafusion_cross": "live_datafusion",
+    "latest_all_engines": "live_cross_family",
 }
 
 
@@ -83,6 +88,10 @@ def _compare_rows(
     current_yield = _float(current, "candidate_bug_cases_per_s")
     base_first = _optional_float(baseline.get("median_first_candidate_bug_case_index"))
     current_first = _optional_float(current.get("median_first_candidate_bug_case_index"))
+    base_first_s = _optional_float(baseline.get("median_first_candidate_bug_elapsed_s"))
+    current_first_s = _optional_float(current.get("median_first_candidate_bug_elapsed_s"))
+    base_auc = _float(baseline, "avg_candidate_bug_discovery_auc")
+    current_auc = _float(current, "avg_candidate_bug_discovery_auc")
     return {
         "target_suite": suite,
         "baseline_preset": baseline_preset,
@@ -99,6 +108,12 @@ def _compare_rows(
         "baseline_median_first_candidate": base_first,
         "median_first_candidate": current_first,
         "first_candidate_delta": _optional_delta(current_first, base_first),
+        "baseline_median_first_candidate_s": base_first_s,
+        "median_first_candidate_s": current_first_s,
+        "first_candidate_s_delta": _optional_delta(current_first_s, base_first_s),
+        "baseline_discovery_auc": base_auc,
+        "discovery_auc": current_auc,
+        "discovery_auc_delta": current_auc - base_auc,
         "baseline_cases": int(float(baseline.get("cases", "0") or 0)),
         "cases": int(float(current.get("cases", "0") or 0)),
         "baseline_candidate_bug_cases": int(float(baseline.get("candidate_bug_cases", "0") or 0)),
@@ -127,8 +142,8 @@ def _write_analysis_markdown(
         "",
         "## Targeted Guidance Contrasts",
         "",
-        "| target suite | preset | candidate case % | rate delta | rate ratio | candidate cases/s | yield delta | yield ratio | median first | first delta |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| target suite | preset | candidate case % | rate delta | rate ratio | candidate cases/s | yield delta | yield ratio | median first | median first s | discovery AUC |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in comparisons:
         if not row["is_targeted_preset"]:
@@ -139,13 +154,13 @@ def _write_analysis_markdown(
             "",
             "## All Baseline Comparisons",
             "",
-            "| target suite | preset | targeted | candidate case % | rate ratio | candidate cases/s | yield ratio | median first |",
-            "|---|---|---|---:|---:|---:|---:|---:|",
+            "| target suite | preset | targeted | candidate case % | rate ratio | candidate cases/s | yield ratio | median first | median first s | discovery AUC |",
+            "|---|---|---|---:|---:|---:|---:|---:|---:|---:|",
         ]
     )
     for row in comparisons:
         lines.append(
-            "| {target_suite} | {preset} | {targeted} | {rate} | {rate_ratio} | {yield_} | {yield_ratio} | {first} |".format(
+            "| {target_suite} | {preset} | {targeted} | {rate} | {rate_ratio} | {yield_} | {yield_ratio} | {first} | {first_s} | {auc} |".format(
                 target_suite=row["target_suite"],
                 preset=row["preset"],
                 targeted="yes" if row["is_targeted_preset"] else "no",
@@ -154,6 +169,8 @@ def _write_analysis_markdown(
                 yield_=_fmt_float(row["candidate_bug_cases_per_s"]),
                 yield_ratio=_fmt_ratio(row["candidate_bug_cases_per_s_ratio"]),
                 first=_fmt_optional(row["median_first_candidate"]),
+                first_s=_fmt_optional(row["median_first_candidate_s"]),
+                auc=_fmt_float(row["discovery_auc"]),
             )
         )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -176,6 +193,12 @@ def _write_analysis_csv(path: Path, comparisons: list[dict[str, Any]]) -> None:
         "baseline_median_first_candidate",
         "median_first_candidate",
         "first_candidate_delta",
+        "baseline_median_first_candidate_s",
+        "median_first_candidate_s",
+        "first_candidate_s_delta",
+        "baseline_discovery_auc",
+        "discovery_auc",
+        "discovery_auc_delta",
         "baseline_cases",
         "cases",
         "baseline_candidate_bug_cases",
@@ -190,7 +213,7 @@ def _write_analysis_csv(path: Path, comparisons: list[dict[str, Any]]) -> None:
 def _comparison_markdown_row(row: dict[str, Any]) -> str:
     return (
         "| {target_suite} | {preset} | {rate} | {rate_delta} | {rate_ratio} | "
-        "{yield_} | {yield_delta} | {yield_ratio} | {first} | {first_delta} |"
+        "{yield_} | {yield_delta} | {yield_ratio} | {first} | {first_s} | {auc} |"
     ).format(
         target_suite=row["target_suite"],
         preset=row["preset"],
@@ -201,7 +224,8 @@ def _comparison_markdown_row(row: dict[str, Any]) -> str:
         yield_delta=_fmt_signed_float(row["candidate_bug_cases_per_s_delta"]),
         yield_ratio=_fmt_ratio(row["candidate_bug_cases_per_s_ratio"]),
         first=_fmt_optional(row["median_first_candidate"]),
-        first_delta=_fmt_optional_signed(row["first_candidate_delta"]),
+        first_s=_fmt_optional(row["median_first_candidate_s"]),
+        auc=_fmt_float(row["discovery_auc"]),
     )
 
 

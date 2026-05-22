@@ -21,6 +21,7 @@ def _write_run(path, *, candidate_indexes, throughput):
             {
                 "status": "bug" if findings else "ok",
                 "case_index": idx,
+                "elapsed_s": (idx + 1) * 0.05,
                 "case": {"case_id": f"case-{idx}", "seed": idx, "program": {"operations": []}},
                 "findings": findings,
                 "behavior_signature": f"behavior-{idx}",
@@ -86,11 +87,12 @@ def test_analyze_experiment_writes_baseline_comparison(tmp_path, monkeypatch):
     md = md_path.read_text(encoding="utf-8")
     row = next(csv.DictReader(csv_path.open(encoding="utf-8")))
     assert "## Targeted Guidance Contrasts" in md
-    assert "| seeded_filter | guided_filter | 100.0% | +50.0% | 2.00x | 8.00 | +3.00 | 1.60x | 0 | -1 |" in md
+    assert "| seeded_filter | guided_filter | 100.0% | +50.0% | 2.00x | 8.00 | +3.00 | 1.60x | 0 | 0.1 | 0.75 |" in md
     assert row["target_suite"] == "seeded_filter"
     assert row["preset"] == "guided_filter"
     assert row["is_targeted_preset"] == "True"
     assert row["candidate_bug_case_rate_ratio"] == "2.0"
+    assert row["discovery_auc_delta"] == "0.25"
 
 
 def test_analyze_experiment_can_refresh_summary_before_analysis(tmp_path, monkeypatch):

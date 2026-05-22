@@ -12,7 +12,16 @@ GeneratorProfile = Literal[
     "bughunt_no_groupby",
     "null_groupby_topk",
     "null_agg_topk",
+    "filter_null_agg_topk",
+    "join_null_agg_topk",
+    "join_filter_groupby",
+    "join_groupby_stress",
+    "storage_offset",
     "float_group_key",
+    "join_null_sort",
+    "ordered_groupby_sort",
+    "topk_resort",
+    "join_ordered_agg_topk",
 ]
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]
@@ -31,6 +40,8 @@ class ExperimentConfig:
     enable_preflight_repair: bool = True
     persist_feedback_corpus: bool = False
     feedback_persist_limit: int = 4096
+    enable_local_source_scheduler: bool = False
+    local_source_exploration_weight: float = 0.5
     compress_run_log: bool = True
     artifact_limit: int | None = None
     oracle_mode: OracleMode = "differential"

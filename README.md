@@ -52,6 +52,7 @@ python3 -m venv .venv
 
 - `dataframe`: pandas, polars
 - `embedded_sql`: DuckDB, SQLite
+- `duckdb_storage_cross`: pandas, DuckDB persistent-storage target for storage-aware historical replay
 - `cross_family`: pandas, DuckDB，用于低成本覆盖 DataFrame vs embedded SQL 跨目标族差分
 - `core` / `all`: pandas, polars, DuckDB, SQLite
 
@@ -105,6 +106,19 @@ feedback corpus 默认只保留在内存中，不再把每个 interesting case �
 需要落盘做后续 corpus replay 时加 `--persist-feedback-corpus`；单次运行默认最多写 4096 个，
 可用 `--feedback-persist-limit N` 调整，或设为 0 完全禁止写盘。
 
+如果希望在单次运行内部也对“纯生成候选 vs feedback mutation”做自适应分配，可显式开启
+本地 source scheduler：
+
+```bash
+.venv/bin/datadiff fuzz \
+  --cases 1000 \
+  --enable-local-source-scheduler \
+  --local-source-exploration-weight 0.25
+```
+
+`--enable-local-source-scheduler` 会让运行时在 `generated` 和 `feedback_mutation` 两个来源之间
+做轻量探索/利用；`--local-source-exploration-weight` 越大，越倾向继续探索尚未证明收益较低的来源。
+
 当前测试用例生成具备基础多样化：随机行数/列子集、`int/float/bool/str` 类型、空值、Unicode/空字符串、
 边界数值、多表 `join`、数值表达式、字符串派生、类型转换，以及
 `filter/select/sort/limit/mutate/groupby` 操作组合。开启 feedback 后，
@@ -119,6 +133,7 @@ feedback corpus 默认只保留在内存中，不再把每个 interesting case �
 .venv/bin/datadiff experiment --cases 1000 --presets workflow --target-suite core
 .venv/bin/datadiff experiment --cases 1000 --presets workflow_metamorphic --target-suites dataframe,embedded_sql,cross_family
 .venv/bin/datadiff experiment --cases 1000 --presets edge_float,edge_float_guided,edge_float_metamorphic --target-suites dataframe,embedded_sql,cross_family
+.venv/bin/datadiff experiment --cases 1000 --presets baseline --target-suites core,datafusion_cross --schedule adaptive --batch-cases 100 --local-source-exploration-weight 0.25
 ```
 
 - `common`: 默认公共语义子集，尽量减少已知边界语义误报。

@@ -1,6 +1,8 @@
 from datadiff import feedback
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.feedback import FeedbackState
+from datadiff.mutator import MUTATION_OPERATOR_NAMES
+from datadiff.scheduler import LocalSourceScheduler
 
 
 def _case(seed: int) -> Case:
@@ -36,3 +38,47 @@ def test_feedback_persistence_limit_zero_disables_disk_writes(tmp_path, monkeypa
 
     assert state.last_persisted_to_disk is False
     assert not (tmp_path / "corpus" / "interesting").exists()
+
+
+def test_feedback_source_scheduler_prefers_productive_mutations():
+    scheduler = LocalSourceScheduler(exploration_weight=0.0)
+    state = FeedbackState(source_scheduler=scheduler, interesting_cases=[_case(1)])
+    generated = _case(7)
+
+    first = state.choose_case(7, generated)
+    assert first.case_id == generated.case_id
+    assert state.last_candidate_source == "generated"
+    assert state.last_candidate_metadata["seed_lineage"]["root_seed"] == 7
+    assert state.last_candidate_metadata["seed_lineage"]["depth"] == 0
+    assert state.last_candidate_metadata["mutation"]["operator"] == "generated"
+
+    generated_reward = state.record_candidate_result(
+        "generated",
+        has_finding=False,
+        is_new_behavior=False,
+        preflight={"valid": True, "fallback_used": False},
+    )
+    assert generated_reward == -0.1
+    assert state.last_source_reward == -0.1
+
+    second = state.choose_case(8, generated)
+    assert second.case_id.endswith("-mut-8")
+    assert state.last_candidate_source == "feedback_mutation"
+    assert state.last_candidate_metadata["seed_lineage"]["parent_case_id"] == "case-1"
+    assert state.last_candidate_metadata["seed_lineage"]["mutation_seed"] == 8
+    assert state.last_candidate_metadata["seed_lineage"]["depth"] == 1
+    assert state.last_candidate_metadata["mutation"]["operator"] in MUTATION_OPERATOR_NAMES
+
+    feedback_reward = state.record_candidate_result(
+        "feedback_mutation",
+        has_finding=True,
+        is_new_behavior=True,
+        preflight={"valid": True, "fallback_used": False},
+        candidate_bug=True,
+    )
+    assert feedback_reward == 3.5
+    assert state.last_source_reward == 3.5
+
+    third = state.choose_case(9, generated)
+    assert third.case_id.endswith("-mut-9")
+    assert state.last_candidate_source == "feedback_mutation"

@@ -19,8 +19,11 @@ from datadiff.guidance import GuidanceState
 from datadiff.metamorphic import build_metamorphic_variants, evaluate_metamorphic_variants
 from datadiff.normalizer import normalize_result
 from datadiff.oracle import evaluate_case
+from datadiff.operation_combo import classify_operation_combo
 from datadiff.preflight import preflight_case
 from datadiff.quality_oracles import evaluate_quality_oracles
+from datadiff.reward import row_reward_signals
+from datadiff.scheduler import LocalSourceScheduler
 from datadiff.targets import common_capabilities, describe_targets
 from datadiff.util import CORPUS_DIR, RUNS_DIR, JsonlWriter, append_jsonl, dump_json, ensure_dirs, run_meta_path, utc_now
 
@@ -81,6 +84,10 @@ def _guidance_summary(guidance: dict[str, Any]) -> dict[str, Any]:
         "data_sensitivity": guidance.get("score_breakdown", {}).get("data_sensitivity", 0.0),
         "frontier_conformance": guidance.get("score_breakdown", {}).get("frontier_conformance", 0.0),
         "contribution_potential": guidance.get("score_breakdown", {}).get("contribution_potential", 0.0),
+        "combo_priority": guidance.get("score_breakdown", {}).get("combo_priority", 0.0),
+        "online_weight_mean": guidance.get("score_breakdown", {}).get("online_weight_mean", 1.0),
+        "online_weight_max": guidance.get("score_breakdown", {}).get("online_weight_max", 1.0),
+        "online_weight_updates": guidance.get("score_breakdown", {}).get("online_weight_updates", 0.0),
     }
 
 
@@ -96,11 +103,35 @@ def _quality_oracle_summary(oracles: list[dict[str, Any]]) -> list[dict[str, Any
     ]
 
 
+def _generated_candidate_metadata(case: Case) -> dict[str, Any]:
+    return {
+        "seed_lineage": {
+            "root_seed": case.seed,
+            "parent_seed": None,
+            "parent_case_id": "",
+            "mutation_seed": None,
+            "depth": 0,
+        },
+        "mutation": {
+            "operator": "generated",
+            "detail": "generated",
+            "changed": False,
+        },
+    }
+
+
+def _source_scheduler_snapshot(feedback: FeedbackState | None) -> list[dict[str, Any]]:
+    scheduler = getattr(feedback, "source_scheduler", None) if feedback is not None else None
+    if scheduler is None or not hasattr(scheduler, "snapshot"):
+        return []
+    return scheduler.snapshot()
+
+
 def _compact_log_row(row: dict[str, Any], log_level: str) -> dict[str, Any]:
     if log_level == "full":
         return row
     has_findings = bool(row.get("findings"))
-    if log_level == "compact" and has_findings:
+    if has_findings and log_level in {"compact", "minimal"}:
         # Finding rows keep reproduction detail; run-level duplicated metadata
         # stays in meta.json and artifacts.
         return {
@@ -118,6 +149,11 @@ def _compact_log_row(row: dict[str, Any], log_level: str) -> dict[str, Any]:
         "findings": row.get("findings", []),
         "bug_dir": row.get("bug_dir", ""),
         "candidate_source": row.get("candidate_source", "generated"),
+        "seed_lineage": row.get("seed_lineage", {}),
+        "mutation": row.get("mutation", {}),
+        "operation_combo": row.get("operation_combo", {}),
+        "source_reward": row.get("source_reward"),
+        "source_scheduler": row.get("source_scheduler", []),
         "preflight": row.get("preflight", {}),
         "quality_oracles": _quality_oracle_summary(row.get("quality_oracles", [])),
         "guidance": _guidance_summary(row.get("guidance", {})),
@@ -290,6 +326,11 @@ def run_fuzz(
         FeedbackState(
             persist_to_disk=config.persist_feedback_corpus,
             max_persisted=config.feedback_persist_limit,
+            source_scheduler=(
+                LocalSourceScheduler(exploration_weight=config.local_source_exploration_weight)
+                if config.enable_local_source_scheduler
+                else None
+            ),
         )
         if config.enable_feedback
         else None
@@ -373,7 +414,12 @@ def run_fuzz(
                 profile=config.generator_profile,
             )
             selected = feedback.choose_case(case_seed, generated) if feedback is not None else generated
-            source = "feedback_mutation" if selected.case_id != generated.case_id else "generated"
+            source = getattr(feedback, "last_candidate_source", "generated") if feedback is not None else "generated"
+            metadata = (
+                getattr(feedback, "last_candidate_metadata", None)
+                if feedback is not None
+                else None
+            ) or selected.metadata or _generated_candidate_metadata(generated)
             preflight = preflight_case(
                 selected,
                 enable_validation=config.enable_preflight_validation,
@@ -383,6 +429,9 @@ def run_fuzz(
             candidate_meta[id(candidate)] = {
                 "source": source,
                 "generated_seed": case_seed,
+                "seed_lineage": metadata.get("seed_lineage", {}),
+                "mutation": metadata.get("mutation", {}),
+                "operation_combo": classify_operation_combo(candidate.program.operations),
                 "preflight": preflight.to_dict(),
             }
             candidates.append(candidate)
@@ -404,6 +453,9 @@ def run_fuzz(
             {
                 "source": "generated",
                 "generated_seed": case.seed,
+                "seed_lineage": _generated_candidate_metadata(case)["seed_lineage"],
+                "mutation": _generated_candidate_metadata(case)["mutation"],
+                "operation_combo": classify_operation_combo(case.program.operations),
                 "preflight": {
                     "valid": True,
                     "repaired": False,
@@ -425,6 +477,9 @@ def run_fuzz(
                     "candidate_pool_size": candidate_pool,
                     "guidance": guidance_row,
                     "candidate_source": selected_meta["source"],
+                    "seed_lineage": selected_meta["seed_lineage"],
+                    "mutation": selected_meta["mutation"],
+                    "operation_combo": selected_meta["operation_combo"],
                     "preflight": preflight_row,
                     "generated_at": utc_now(),
                     "case": case.to_dict(),
@@ -491,13 +546,29 @@ def run_fuzz(
         if feedback is not None:
             row["stored_in_feedback_corpus"] = feedback.record(case, sig, bool(row["findings"]))
             row["feedback_corpus_persisted"] = feedback.last_persisted_to_disk
+            reward_signals = row_reward_signals(row)
+            row["source_reward"] = feedback.record_candidate_result(
+                selected_meta["source"],
+                has_finding=bool(row["findings"]),
+                is_new_behavior=bool(row["is_new_behavior"]),
+                preflight=preflight_row,
+                candidate_bug=bool(reward_signals["candidate_bug"]),
+                semantic_divergence=bool(reward_signals["semantic_divergence"]),
+                false_positive=bool(reward_signals["false_positive"]),
+            )
+            row["source_scheduler"] = _source_scheduler_snapshot(feedback)
         else:
             row["stored_in_feedback_corpus"] = False
             row["feedback_corpus_persisted"] = False
+            row["source_reward"] = None
+            row["source_scheduler"] = []
         if guidance is not None:
             guidance.record_result(case, row)
         row["guidance"] = guidance_row
         row["candidate_source"] = selected_meta["source"]
+        row["seed_lineage"] = selected_meta["seed_lineage"]
+        row["mutation"] = selected_meta["mutation"]
+        row["operation_combo"] = selected_meta["operation_combo"]
         row["preflight"] = preflight_row
         row["candidate_seed_start"] = candidate_seed_start
         row["candidate_pool_size"] = candidate_pool

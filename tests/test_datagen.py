@@ -1,5 +1,7 @@
 from datadiff.datagen import generate_case
 from datadiff.classification_oracle import validate_case_program
+from datadiff.dsl import sort_columns
+from datadiff.guidance import extract_case_features
 
 
 def _assert_program_columns_are_valid(case):
@@ -18,8 +20,9 @@ def _assert_program_columns_are_valid(case):
             assert len(op["columns"]) == len(set(op["columns"]))
             known_cols = set(op["columns"])
         elif op["op"] == "sort":
-            assert set(op["columns"]).issubset(known_cols)
-            assert len(op["columns"]) == len(set(op["columns"]))
+            columns = sort_columns(op)
+            assert set(columns).issubset(known_cols)
+            assert len(columns) == len(set(columns))
         elif op["op"] == "mutate":
             assert op["expr"]["source"] in known_cols
             known_cols.add(op["column"])
@@ -31,6 +34,12 @@ def _assert_program_columns_are_valid(case):
             aliases = [agg["as"] for agg in op["aggs"]]
             assert len(aliases) == len(set(aliases))
             known_cols = set(op["keys"]) | {agg["as"] for agg in op["aggs"]}
+        elif op["op"] == "aggregate":
+            for agg in op["aggs"]:
+                assert agg["column"] in known_cols
+            aliases = [agg["as"] for agg in op["aggs"]]
+            assert len(aliases) == len(set(aliases))
+            known_cols = {agg["as"] for agg in op["aggs"]}
 
 
 def test_generate_case_is_deterministic():
@@ -70,6 +79,20 @@ def test_generate_case_bughunt_profile_is_supported_and_valid():
     assert validate_case_program(case) == []
 
 
+def test_bughunt_profile_covers_per_column_sort_null_order():
+    cases = [generate_case(seed, profile="bughunt") for seed in range(50)]
+    sort_ops = [
+        op
+        for case in cases
+        for op in case.program.operations
+        if op.get("op") == "sort" and "keys" in op
+    ]
+
+    assert sort_ops
+    assert any(any(key["nulls"] == "first" for key in op["keys"]) for op in sort_ops)
+    assert all(validate_case_program(case) == [] for case in cases)
+
+
 def test_generate_case_bughunt_no_groupby_profile_is_supported_and_valid():
     case = generate_case(123, profile="bughunt_no_groupby")
     assert case.case_id == "case-00000123-bughunt-no-groupby"
@@ -107,6 +130,98 @@ def test_generate_case_null_agg_topk_profile_is_supported_and_valid():
     assert validate_case_program(case) == []
 
 
+def test_generate_case_filter_null_agg_topk_profile_is_supported_and_valid():
+    case = generate_case(123, profile="filter_null_agg_topk")
+    assert case.case_id == "case-00000123-filter-null-agg-topk"
+    assert [op["op"] for op in case.program.operations] == [
+        "filter",
+        "mutate",
+        "select",
+        "groupby",
+        "select",
+        "sort",
+        "limit",
+    ]
+    assert case.program.operations[0] == {"op": "filter", "column": "lane", "cmp": "!=", "value": "skip"}
+    assert case.program.operations[1] == {
+        "op": "mutate",
+        "column": "m_0",
+        "expr": {"kind": "add_const", "source": "x", "value": 0},
+    }
+    assert case.program.operations[2]["columns"] == ["g", "m_0"]
+    agg = case.program.operations[3]["aggs"][0]
+    sort = case.program.operations[5]
+    assert agg["func"] in {"min", "max"}
+    assert case.program.operations[4]["columns"] == [agg["as"]]
+    assert sort["columns"] == [agg["as"]]
+    assert sort["ascending"] is (agg["func"] == "min")
+    assert any(row["x"] is None for row in case.tables[0].rows if row["g"] == "a")
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_join_null_agg_topk_profile_is_supported_and_valid():
+    case = generate_case(123, profile="join_null_agg_topk")
+    assert case.case_id == "case-00000123-join-null-agg-topk"
+    assert [op["op"] for op in case.program.operations] == ["join", "mutate", "groupby", "select", "sort", "limit"]
+    assert case.program.operations[0]["how"] == "left"
+    agg = case.program.operations[2]["aggs"][0]
+    sort = case.program.operations[4]
+    assert agg["func"] in {"min", "max"}
+    assert case.program.operations[3]["columns"] == [agg["as"]]
+    assert sort["columns"] == [agg["as"]]
+    assert sort["ascending"] is (agg["func"] == "min")
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_join_filter_groupby_profile_is_supported_and_valid():
+    case = generate_case(123, profile="join_filter_groupby")
+    assert case.case_id == "case-00000123-join-filter-groupby"
+    assert [op["op"] for op in case.program.operations] == [
+        "join",
+        "filter",
+        "mutate",
+        "mutate",
+        "groupby",
+        "select",
+        "sort",
+        "limit",
+    ]
+    assert case.program.operations[0]["how"] == "inner"
+    assert case.program.operations[1]["column"] == "j"
+    assert len(case.program.operations[4]["aggs"]) == 3
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_join_groupby_stress_profile_is_supported_and_valid():
+    case = generate_case(123, profile="join_groupby_stress")
+
+    assert case.case_id == "case-00000123-join-groupby-stress"
+    assert [op["op"] for op in case.program.operations] == [
+        "join",
+        "groupby",
+        "join",
+        "groupby",
+        "aggregate",
+    ]
+    assert [len(table.rows) for table in case.tables] == [99999, 99999, 99999]
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_storage_offset_profile_is_supported_and_valid():
+    even = generate_case(22656, profile="storage_offset")
+    odd = generate_case(22657, profile="storage_offset")
+
+    assert even.case_id == "case-00022656-storage-offset"
+    assert [op["op"] for op in even.program.operations] == ["sort", "offset"]
+    assert even.program.operations[0]["columns"] == ["id"]
+    assert even.program.operations[1] == {"op": "offset", "n": 0}
+    assert even.metadata["row_count"] == 300_000
+    assert len(even.tables[0].rows) == 300_000
+    assert odd.program.operations[1] == {"op": "offset", "n": 200_000}
+    assert validate_case_program(even) == []
+    assert validate_case_program(odd) == []
+
+
 def test_null_agg_topk_profile_covers_min_asc_and_max_desc():
     pairs = set()
     for seed in range(50):
@@ -132,6 +247,54 @@ def test_generate_case_float_group_key_profile_is_supported_and_valid():
         "groupby",
     ]
     assert case.program.operations[-1]["keys"] == ["m_3"]
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_join_null_sort_profile_is_supported_and_valid():
+    case = generate_case(123, profile="join_null_sort")
+    assert case.case_id == "case-00000123-join-null-sort"
+    assert [op["op"] for op in case.program.operations] == [
+        "join",
+        "mutate",
+        "mutate",
+        "select",
+        "sort",
+        "limit",
+    ]
+    assert case.program.operations[0]["how"] == "left"
+    assert all(row["id"] is not None for row in case.tables[0].rows)
+    assert all(row["id"] is not None for row in case.tables[1].rows)
+    assert any(row["j"] is None for row in case.tables[1].rows)
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_ordered_groupby_sort_profile_is_supported_and_valid():
+    case = generate_case(123, profile="ordered_groupby_sort")
+
+    assert case.case_id == "case-00000123-ordered-groupby-sort"
+    assert [op["op"] for op in case.program.operations] == ["sort", "groupby", "select", "sort"]
+    assert case.program.order_sensitive is True
+    assert "pattern:ordered_groupby_sort" in extract_case_features(case)
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_topk_resort_profile_is_supported_and_valid():
+    case = generate_case(123, profile="topk_resort")
+
+    assert case.case_id == "case-00000123-topk-resort"
+    assert [op["op"] for op in case.program.operations] == ["sort", "limit", "sort", "offset"]
+    assert case.program.order_sensitive is True
+    assert "pattern:topk_resort" in extract_case_features(case)
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_join_ordered_agg_topk_profile_is_supported_and_valid():
+    case = generate_case(123, profile="join_ordered_agg_topk")
+
+    assert case.case_id == "case-00000123-join-ordered-agg-topk"
+    assert [op["op"] for op in case.program.operations] == ["join", "sort", "groupby", "select", "sort", "limit"]
+    assert case.program.order_sensitive is True
+    assert "pattern:join_ordered_agg_topk" in extract_case_features(case)
     assert validate_case_program(case) == []
 
 

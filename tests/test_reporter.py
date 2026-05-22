@@ -219,6 +219,7 @@ def test_write_experiment_summary_aggregates_triage_verdicts(tmp_path, monkeypat
             {
                 "status": "bug",
                 "case_index": idx,
+                "elapsed_s": (idx + 1) * 0.05,
                 "case": {"case_id": f"case-{idx}", "seed": idx, "program": {"operations": []}},
                 "findings": [
                     {
@@ -273,12 +274,16 @@ def test_write_experiment_summary_aggregates_triage_verdicts(tmp_path, monkeypat
     assert row["candidate_bug_case_rate"] == "0.25"
     assert row["first_finding_case_index"] == "0"
     assert row["first_candidate_bug_case_index"] == "0"
+    assert row["first_candidate_bug_elapsed_s"] == "0.05"
+    assert row["candidate_bug_discovery_auc"] == "1.0"
     assert "candidate_implementation_bug:1" in row["top_triage_verdicts"]
     assert "## Aggregates" in md
-    assert "| core | edge_float | 1 | 4 | 4 | 1 | 25.0% | 5.00 | 0 | 2 | 1 |" in md
+    assert "| core | edge_float | 1 | 4 | 4 | 1 | 25.0% | 5.00 | 0 | 0.1 | 1.00 | 0.00 | 2 | 1 |" in md
     assert aggregate_row["candidate_bug_case_rate"] == "0.25"
     assert aggregate_row["candidate_bug_cases_per_s"] == "5.0"
     assert aggregate_row["median_first_candidate_bug_case_index"] == "0.0"
+    assert aggregate_row["median_first_candidate_bug_elapsed_s"] == "0.05"
+    assert aggregate_row["avg_candidate_bug_discovery_auc"] == "1.0"
 
 
 def test_write_experiment_summary_reports_candidate_bug_families(tmp_path, monkeypatch):
@@ -342,6 +347,171 @@ def test_write_experiment_summary_reports_candidate_bug_families(tmp_path, monke
     assert row["candidate_bug_families"] == "2"
     assert "grouped_topk_null_sort_key@datafusion:2" in row["top_candidate_bug_families"]
     assert aggregate_row["candidate_bug_families"] == "2"
+
+
+def test_write_experiment_summary_includes_adaptive_schedule_fields(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(reporter, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(reporter, "REPORTS_DIR", reports_dir)
+    run_file = runs_dir / "run-adaptive.jsonl.gz"
+    append_jsonl(
+        {
+            "status": "bug",
+            "case_index": 0,
+            "case": {"case_id": "case-0", "seed": 0, "program": {"operations": []}},
+            "findings": [
+                {
+                    "kind": "semantic_output_mismatch",
+                    "root_cause": "grouped_topk_null_sort_key",
+                    "triage_verdict": "candidate_implementation_bug",
+                    "suspicious_backends": ["datafusion"],
+                    "signature": "sig-0",
+                }
+            ],
+            "behavior_signature": "sig-0",
+            "backend_status": {},
+            "quality_oracles": [],
+            "is_new_behavior": True,
+        },
+        run_file,
+    )
+    dump_json(
+        {
+            "elapsed_s": 0.1,
+            "throughput_cases_s": 10.0,
+            "backends": [],
+            "targets": [],
+            "common_capabilities": [],
+        },
+        run_meta_path(run_file),
+    )
+    manifest = runs_dir / "experiment-adaptive.json"
+    dump_json(
+        {
+            "presets": ["baseline"],
+            "seeds": [1],
+            "backends": [],
+            "target_suite": "datafusion_cross",
+            "targets": [],
+            "common_capabilities": [],
+            "schedule": "adaptive",
+            "local_source_scheduler": {"enabled": True, "exploration_weight": 0.25},
+            "adaptive_config": {"jobs": 2, "batch_cases": 1},
+            "adaptive_state": [{"arm_id": "datafusion_cross:baseline:seed1"}],
+            "runs": [
+                {
+                    "target_suite": "datafusion_cross",
+                    "preset": "baseline",
+                    "seed": 1,
+                    "batch_index": 3,
+                    "schedule_arm_id": "datafusion_cross:baseline:seed1",
+                    "scheduler_reward": 4.25,
+                    "run_file": str(run_file),
+                    "report": "",
+                }
+            ],
+        },
+        manifest,
+    )
+
+    md_path, csv_path = reporter.write_experiment_summary(manifest)
+    row = next(csv.DictReader(csv_path.open(encoding="utf-8")))
+    aggregate_csv_path = reports_dir / "experiment-summary-experiment-adaptive-aggregates.csv"
+    aggregate_row = next(csv.DictReader(aggregate_csv_path.open(encoding="utf-8")))
+    md = md_path.read_text(encoding="utf-8")
+
+    assert "- Schedule: adaptive" in md
+    assert "- Local source scheduler: {'enabled': True, 'exploration_weight': 0.25}" in md
+    assert "## Adaptive Schedule" in md
+    assert "- Global first candidate case: 1" in md
+    assert "- Batches by suite: datafusion_cross:1" in md
+    assert "- Cases by suite: datafusion_cross:1" in md
+    assert "- Candidate cases by suite: datafusion_cross:1" in md
+    assert row["batch_index"] == "3"
+    assert row["schedule_arm_id"] == "datafusion_cross:baseline:seed1"
+    assert row["scheduler_reward"] == "4.25"
+    assert aggregate_row["avg_scheduler_reward"] == "4.25"
+
+
+def test_write_experiment_summary_reports_preflight_integrity(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(reporter, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(reporter, "REPORTS_DIR", reports_dir)
+    run_file = runs_dir / "run-preflight.jsonl.gz"
+    append_jsonl(
+        {
+            "status": "ok",
+            "case_index": 0,
+            "case": {"case_id": "case-0", "seed": 0, "program": {"operations": []}},
+            "findings": [],
+            "behavior_signature": "sig-0",
+            "backend_status": {},
+            "quality_oracles": [],
+            "is_new_behavior": False,
+        },
+        run_file,
+    )
+    append_jsonl(
+        {
+            "status": "ok",
+            "case_index": 1,
+            "case": {"case_id": "case-1", "seed": 1, "program": {"operations": []}},
+            "findings": [],
+            "behavior_signature": "sig-1",
+            "backend_status": {},
+            "quality_oracles": [],
+            "is_new_behavior": True,
+        },
+        run_file,
+    )
+    dump_json(
+        {
+            "elapsed_s": 0.2,
+            "throughput_cases_s": 10.0,
+            "backends": [],
+            "targets": [],
+            "common_capabilities": [],
+            "preflight": {"repaired_cases": 1, "fallback_cases": 1, "invalid_cases": 0},
+        },
+        run_meta_path(run_file),
+    )
+    manifest = runs_dir / "experiment-preflight.json"
+    dump_json(
+        {
+            "presets": ["baseline"],
+            "seeds": [1],
+            "backends": [],
+            "target_suite": "core",
+            "targets": [],
+            "common_capabilities": [],
+            "runs": [
+                {
+                    "target_suite": "core",
+                    "preset": "baseline",
+                    "seed": 1,
+                    "run_file": str(run_file),
+                    "report": "",
+                }
+            ],
+        },
+        manifest,
+    )
+
+    md_path, csv_path = reporter.write_experiment_summary(manifest)
+    row = next(csv.DictReader(csv_path.open(encoding="utf-8")))
+    aggregate_csv_path = reports_dir / "experiment-summary-experiment-preflight-aggregates.csv"
+    aggregate_row = next(csv.DictReader(aggregate_csv_path.open(encoding="utf-8")))
+    md = md_path.read_text(encoding="utf-8")
+
+    assert "## Preflight Integrity" in md
+    assert "| core | baseline | 1 | 2 | 0.0% | 50.0% | 50.0% |" in md
+    assert row["preflight_repaired_cases"] == "1"
+    assert row["preflight_fallback_cases"] == "1"
+    assert row["preflight_invalid_cases"] == "0"
+    assert aggregate_row["preflight_repaired_rate"] == "0.5"
+    assert aggregate_row["preflight_fallback_rate"] == "0.5"
 
 
 def test_candidate_bug_family_dedup_maps_metamorphic_to_differential_root(tmp_path, monkeypatch):

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+import os
+import time
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, ThreadPoolExecutor, as_completed, wait
 from collections import Counter
 from pathlib import Path
 
@@ -11,13 +13,23 @@ from datadiff.classification_oracle import classify_finding
 from datadiff.config import ExperimentConfig
 from datadiff.dsl import Case
 from datadiff.experiment_analysis import analyze_experiment
+from datadiff.fixture_replay import build_fixture_replay_case, load_fixture_replay_spec
+from datadiff.historical import list_historical_bugs
 from datadiff.normalizer import NormalizedResult
 from datadiff.guidance import parse_guidance_targets
+from datadiff.operation_combo import classify_operation_combo
 from datadiff.oracle import evaluate_case
 from datadiff.pattern_analysis import analyze_pattern_variants
 from datadiff.reporter import latest_run_file, write_experiment_summary, write_report
 from datadiff.reducer import reduce_case
-from datadiff.runner import run_fuzz, run_loaded_case
+from datadiff.run_journal import (
+    append_run_journal_entries,
+    build_run_journal_entry,
+    record_run_journal,
+    write_run_journal_markdown,
+)
+from datadiff.runner import _compact_log_row, run_fuzz, run_loaded_case
+from datadiff.scheduler import AdaptiveBudgetScheduler, AdaptiveScheduleConfig, summarize_batch_run
 from datadiff.seeded_analysis import analyze_seeded_sensitivity
 from datadiff.targets import (
     TARGETS,
@@ -38,6 +50,7 @@ from datadiff.triage import (
 from datadiff.util import (
     BUGS_DIR,
     CORPUS_DIR,
+    JsonlWriter,
     REPORTS_DIR,
     RUNS_DIR,
     dump_json,
@@ -45,12 +58,115 @@ from datadiff.util import (
     load_json,
     parse_duration,
     read_jsonl,
+    run_meta_path,
+    slugify,
     utc_now,
 )
+
+LIVE_BUGHUNT_TARGETS = [
+    "common_workflow",
+    "operation_combo",
+    "topk",
+    "join",
+    "groupby",
+    "mutate",
+    "filter",
+    "nulls",
+    "aggregation",
+    "sort_limit",
+    "topk_resort",
+    "ordered_groupby_sort",
+    "join_ordered_agg_topk",
+    "expressions",
+]
+
+LIVE_ARROW_TARGETS = [
+    "common_workflow",
+    "operation_combo",
+    "join",
+    "groupby",
+    "mutate",
+    "filter",
+    "strings",
+    "casts",
+    "nulls",
+    "aggregation",
+    "sort_limit",
+    "topk",
+    "topk_resort",
+    "ordered_groupby_sort",
+    "join_ordered_agg_topk",
+    "expressions",
+]
+
+LIVE_POLARS_LAZY_TARGETS = [
+    "common_workflow",
+    "operation_combo",
+    "join",
+    "filter",
+    "mutate",
+    "groupby",
+    "strings",
+    "casts",
+    "nulls",
+    "sort_limit",
+    "topk",
+    "topk_resort",
+    "ordered_groupby_sort",
+    "join_ordered_agg_topk",
+    "expressions",
+]
+
+LIVE_EMBEDDED_SQL_TARGETS = [
+    "common_workflow",
+    "operation_combo",
+    "join",
+    "filter",
+    "mutate",
+    "groupby",
+    "nulls",
+    "aggregation",
+    "sort_limit",
+    "topk",
+    "topk_resort",
+    "ordered_groupby_sort",
+    "join_ordered_agg_topk",
+    "casts",
+    "expressions",
+]
+
+LIVE_CROSS_FAMILY_TARGETS = [
+    "common_workflow",
+    "operation_combo",
+    "join",
+    "filter",
+    "mutate",
+    "groupby",
+    "strings",
+    "casts",
+    "nulls",
+    "aggregation",
+    "sort_limit",
+    "topk",
+    "topk_resort",
+    "ordered_groupby_sort",
+    "join_ordered_agg_topk",
+    "expressions",
+]
 
 
 def _parse_backends(value: str) -> list[str]:
     return parse_backend_names(value)
+
+
+def _parse_jobs(value: str) -> int | str:
+    text = str(value).strip().lower()
+    if text == "auto":
+        return "auto"
+    jobs = int(text)
+    if jobs < 1:
+        raise argparse.ArgumentTypeError("--jobs must be a positive integer or 'auto'")
+    return jobs
 
 
 def _resolve_run_backends(args: argparse.Namespace) -> list[str]:
@@ -73,6 +189,10 @@ def _config_from_args(args: argparse.Namespace) -> ExperimentConfig:
         enable_preflight_repair=not args.disable_preflight_repair,
         persist_feedback_corpus=args.persist_feedback_corpus,
         feedback_persist_limit=max(0, int(getattr(args, "feedback_persist_limit", 4096))),
+        enable_local_source_scheduler=bool(getattr(args, "enable_local_source_scheduler", False)),
+        local_source_exploration_weight=max(
+            0.0, float(getattr(args, "local_source_exploration_weight", 0.5))
+        ),
         compress_run_log=not args.no_compress_run_log,
         artifact_limit=args.artifact_limit,
         oracle_mode="both" if args.enable_metamorphic_oracle else "differential",
@@ -101,6 +221,17 @@ def add_ablation_flags(parser: argparse.ArgumentParser) -> None:
         type=int,
         default=4096,
         help="maximum interesting feedback cases to write to corpus/interesting for this run",
+    )
+    parser.add_argument(
+        "--enable-local-source-scheduler",
+        action="store_true",
+        help="adaptively choose between generated candidates and feedback mutations within a run",
+    )
+    parser.add_argument(
+        "--local-source-exploration-weight",
+        type=float,
+        default=0.5,
+        help="exploration weight for the within-run generated-vs-feedback source scheduler",
     )
     parser.add_argument("--no-compress-run-log", action="store_true")
     parser.add_argument(
@@ -160,6 +291,24 @@ def add_target_suite_flags(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def add_paper_journal_flags(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--run-theme",
+        default="",
+        help="paper-facing run theme recorded in reports/paper-run-journal.*",
+    )
+    parser.add_argument(
+        "--paper-notes",
+        default="",
+        help="short paper-facing notes recorded with the run journal entry",
+    )
+    parser.add_argument(
+        "--skip-paper-journal",
+        action="store_true",
+        help="skip paper-run journal writes for IO-sensitive long runs; summarize later from the manifest/run log",
+    )
+
+
 def cmd_init(args: argparse.Namespace) -> int:
     ensure_dirs()
     print("Initialized DataDiffFuzz")
@@ -178,7 +327,40 @@ def cmd_fuzz(args: argparse.Namespace) -> int:
         duration_s=parse_duration(args.duration),
     )
     print(f"run log written: {out}")
+    if not getattr(args, "skip_paper_journal", False):
+        journal_path, journal_md = _record_cli_run_journal(out, args, command="fuzz")
+        print(f"paper run journal: {journal_path}")
+        if journal_md is not None:
+            print(f"paper run journal markdown: {journal_md}")
     return 0
+
+
+def _record_cli_run_journal(run_file: Path, args: argparse.Namespace, *, command: str) -> tuple[Path, Path | None]:
+    context = {
+        "command": command,
+        "theme": _single_run_theme(args, command=command),
+        "notes": str(getattr(args, "paper_notes", "") or ""),
+        "evidence_mode": "live",
+        "target_suite": str(getattr(args, "target_suite", "") or ""),
+        "profile": str(getattr(args, "profile", "") or ""),
+        "seed": getattr(args, "seed", ""),
+        "backends": _resolve_run_backends(args),
+    }
+    return record_run_journal(
+        run_file,
+        context=context,
+        journal_file=REPORTS_DIR / "paper-run-journal.jsonl",
+    )
+
+
+def _single_run_theme(args: argparse.Namespace, *, command: str) -> str:
+    explicit = str(getattr(args, "run_theme", "") or "").strip()
+    if explicit:
+        return explicit
+    target_suite = str(getattr(args, "target_suite", "") or "core")
+    profile = str(getattr(args, "profile", "") or "common")
+    seed = getattr(args, "seed", "")
+    return f"{command}:{target_suite}:{profile}:seed{seed}"
 
 
 def _print_longrun_progress(snapshot: dict) -> None:
@@ -208,6 +390,11 @@ def cmd_longrun(args: argparse.Namespace) -> int:
         progress_callback=_print_longrun_progress if not args.quiet else None,
     )
     print(f"run log written: {out}")
+    if not getattr(args, "skip_paper_journal", False):
+        journal_path, journal_md = _record_cli_run_journal(out, args, command="longrun")
+        print(f"paper run journal: {journal_path}")
+        if journal_md is not None:
+            print(f"paper run journal markdown: {journal_md}")
     return 0
 
 
@@ -737,6 +924,211 @@ def cmd_reduce(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_replay_fixture(args: argparse.Namespace) -> int:
+    ensure_dirs()
+    spec = load_fixture_replay_spec(args.spec)
+    fixture_path = _resolve_fixture_replay_path(args)
+    case = build_fixture_replay_case(spec, fixture_path)
+    suite = str(args.target_suite or spec.get("target_suite") or "core")
+    backends = _parse_backends(args.backends) if args.backends else resolve_target_backends(None, suite)
+    evidence_mode = str(args.evidence_mode)
+    known_bug_id = str(args.known_bug_id or spec.get("known_bug_id") or "")
+    target_version = str(args.target_version or spec.get("target_version") or "")
+    run_theme = str(args.run_theme or f"{evidence_mode}-fixture:{known_bug_id or case.case_id}")
+    paper_notes = str(args.paper_notes or spec.get("paper_notes") or "")
+    config = ExperimentConfig(
+        enable_artifact=not args.disable_artifact,
+        compress_run_log=not args.no_compress_run_log,
+        artifact_limit=args.artifact_limit,
+        log_level=args.log_level,
+    )
+    started = time.perf_counter()
+    row = run_loaded_case(
+        case,
+        backends=backends,
+        config=config,
+        save_artifact=not args.disable_artifact and _fixture_artifact_budget_allows(args.artifact_limit),
+        target_specs=describe_targets(backends),
+    )
+    elapsed_s = time.perf_counter() - started
+    row["case_index"] = 0
+    row["elapsed_s"] = round(elapsed_s, 6)
+    row["candidate_source"] = "fixture"
+    row["seed_lineage"] = {
+        "root_seed": case.seed,
+        "parent_seed": None,
+        "parent_case_id": "",
+        "mutation_seed": None,
+        "depth": 0,
+    }
+    row["mutation"] = {"operator": "fixture", "detail": "fixture_replay", "changed": False}
+    row["operation_combo"] = classify_operation_combo(case.program.operations)
+    row["preflight"] = {
+        "valid": True,
+        "repaired": False,
+        "fallback_used": False,
+        "errors_before": [],
+        "errors_after": [],
+    }
+    row["guidance"] = {
+        "score": 0.0,
+        "features": [],
+        "matched_targets": [],
+        "candidate_count": 1,
+    }
+    row["candidate_seed_start"] = case.seed
+    row["candidate_pool_size"] = 1
+    row["is_new_behavior"] = bool(row.get("findings"))
+    row["stored_in_feedback_corpus"] = False
+    row["feedback_corpus_persisted"] = False
+    row["source_reward"] = None
+    row["source_scheduler"] = []
+
+    run_id = _fixture_replay_run_id(known_bug_id or case.case_id)
+    suffix = ".jsonl.gz" if config.compress_run_log else ".jsonl"
+    run_file = RUNS_DIR / f"{run_id}{suffix}"
+    with JsonlWriter(run_file, compresslevel=1) as writer:
+        writer.write(_compact_log_row(row, config.log_level))
+
+    meta = {
+        "run_id": run_id,
+        "status": "completed",
+        "run_file": str(run_file),
+        "case_log_file": "",
+        "checkpoint_file": "",
+        "requested_cases": 1,
+        "executed_cases": 1,
+        "duration_s": None,
+        "elapsed_s": elapsed_s,
+        "throughput_cases_s": 1 / elapsed_s if elapsed_s else 0.0,
+        "findings": len(row.get("findings", [])),
+        "new_behavior_cases": int(bool(row.get("findings"))),
+        "saved_artifacts": int(bool(row.get("bug_dir"))),
+        "preflight": {"fixture_cases": 1},
+        "quality_oracles": {},
+        "seed": case.seed,
+        "next_seed": case.seed + 1,
+        "backends": backends,
+        "targets": describe_targets(backends),
+        "common_capabilities": common_capabilities(backends),
+        "config": config.to_dict(),
+        "environment": row.get("environment", {}),
+        "log_level": config.log_level,
+        "target_suite": suite,
+        "preset": "fixture_replay",
+        "evidence_mode": evidence_mode,
+        "known_bug_id": known_bug_id,
+        "target_version": target_version,
+        "run_theme": run_theme,
+        "paper_notes": paper_notes,
+        "fixture_spec": str(args.spec),
+        "fixture_path": str(fixture_path),
+        "fixture_sha256": case.metadata.get("fixture_sha256", ""),
+        "updated_at": utc_now(),
+    }
+    dump_json(meta, run_meta_path(run_file))
+    journal_path, journal_md = record_run_journal(
+        run_file,
+        context={
+            "command": "replay-fixture",
+            "theme": run_theme,
+            "notes": paper_notes,
+            "evidence_mode": evidence_mode,
+            "known_bug_id": known_bug_id,
+            "target_version": target_version,
+            "target_suite": suite,
+            "preset": "fixture_replay",
+            "seed": case.seed,
+            "backends": backends,
+        },
+        journal_file=REPORTS_DIR / "paper-run-journal.jsonl",
+    )
+
+    print(f"status={row['status']}")
+    print(f"run_file={run_file}")
+    print(f"meta_file={run_meta_path(run_file)}")
+    print(f"paper_run_journal={journal_path}")
+    print(f"paper_run_journal_markdown={journal_md}")
+    for finding in row.get("findings", []):
+        print(
+            f"- {finding.get('kind', '')} root={finding.get('root_cause', 'unknown')} "
+            f"verdict={finding.get('triage_verdict', '')} "
+            f"suspicious={','.join(finding.get('suspicious_backends', []) or [])}"
+        )
+    return 0
+
+
+def cmd_historical_status(args: argparse.Namespace) -> int:
+    specs = list_historical_bugs(include_pending=bool(args.include_pending))
+    rows = [_historical_status_row(spec) for spec in specs]
+    if args.json:
+        print(json.dumps({"historical_bugs": rows}, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
+    print("bug_id\tstatus\tcounted\treplay_kind\ttarget_version\tfixture_env")
+    for row in rows:
+        print(
+            "\t".join(
+                [
+                    row["bug_id"],
+                    row["status"],
+                    "yes" if row["counted"] else "no",
+                    row["replay_kind"],
+                    row["target_version"],
+                    row["fixture_env_status"],
+                ]
+            )
+        )
+    return 0
+
+
+def _historical_status_row(spec: object) -> dict:
+    fixture_env = str(getattr(spec, "fixture_env", "") or "")
+    fixture_env_value = os.environ.get(fixture_env) if fixture_env else ""
+    return {
+        "bug_id": str(getattr(spec, "bug_id")),
+        "project": str(getattr(spec, "project")),
+        "status": str(getattr(spec, "status")),
+        "counted": getattr(spec, "status") == "confirmed_fixed",
+        "replay_kind": str(getattr(spec, "replay_kind", "experiment")),
+        "target_suite": str(getattr(spec, "target_suite")),
+        "target_version": str(getattr(spec, "target_version")),
+        "fixed_version": str(getattr(spec, "fixed_version", "")),
+        "issue_url": str(getattr(spec, "issue_url", "")),
+        "default_presets": list(getattr(spec, "default_presets", ())),
+        "default_cases": int(getattr(spec, "default_cases", 0)),
+        "default_seeds": list(getattr(spec, "default_seeds", ())),
+        "expected_root_causes": list(getattr(spec, "expected_root_causes", ())),
+        "expected_suspicious_backends": list(getattr(spec, "expected_suspicious_backends", ())),
+        "fixture_spec": str(getattr(spec, "fixture_spec", "")),
+        "fixture_env": fixture_env,
+        "fixture_env_set": bool(fixture_env_value),
+        "fixture_env_status": "set" if fixture_env_value else "unset" if fixture_env else "n/a",
+        "notes": str(getattr(spec, "notes", "")),
+    }
+
+
+def _resolve_fixture_replay_path(args: argparse.Namespace) -> Path:
+    if args.fixture and args.fixture_env:
+        raise ValueError("use only one of --fixture or --fixture-env")
+    if args.fixture:
+        return Path(args.fixture)
+    if args.fixture_env:
+        value = os.environ.get(args.fixture_env)
+        if not value:
+            raise ValueError(f"environment variable {args.fixture_env} is not set")
+        return Path(value)
+    raise ValueError("one of --fixture or --fixture-env is required")
+
+
+def _fixture_artifact_budget_allows(artifact_limit: int | None) -> bool:
+    return artifact_limit is None or int(artifact_limit) > 0
+
+
+def _fixture_replay_run_id(label: str) -> str:
+    ts = utc_now().replace(":", "").replace("-", "").replace("Z", "")
+    return f"run-fixture-{slugify(label)}-{ts}-{time.time_ns()}"
+
+
 def _load_artifact_config(bug_dir: Path) -> dict:
     config_path = bug_dir / "config.json"
     return load_json(config_path) if config_path.exists() else {}
@@ -806,6 +1198,28 @@ def _experiment_target_runs(args: argparse.Namespace) -> list[tuple[str, list[st
         return [(getattr(args, "target_suite", "custom"), _resolve_run_backends(args))]
     suites = _parse_target_suites(getattr(args, "target_suites", None)) or [args.target_suite]
     return [(suite, resolve_target_backends(target_suite=suite)) for suite in suites]
+
+
+def _live_bughunt_config(
+    *,
+    guidance_targets: list[str],
+    generator_profile: str = "bughunt",
+    candidate_pool: int = 12,
+    local_source_exploration_weight: float = 0.40,
+    metamorphic: bool = False,
+    metamorphic_variant_limit: int = 4,
+) -> ExperimentConfig:
+    return ExperimentConfig(
+        generator_profile=generator_profile,
+        enable_metamorphic_oracle=metamorphic,
+        oracle_mode="both" if metamorphic else "differential",
+        guidance_strategy="guided",
+        guidance_candidate_pool=candidate_pool,
+        guidance_targets=list(guidance_targets),
+        enable_local_source_scheduler=True,
+        local_source_exploration_weight=local_source_exploration_weight,
+        metamorphic_variant_limit=metamorphic_variant_limit,
+    )
 
 
 def _preset_config(name: str) -> ExperimentConfig:
@@ -918,6 +1332,54 @@ def _preset_config(name: str) -> ExperimentConfig:
             guidance_targets=["null_agg_topk", "groupby", "nulls", "aggregation", "sort_limit"],
             metamorphic_variant_limit=4,
         )
+    if name == "filter_null_agg_topk":
+        return ExperimentConfig(
+            generator_profile="filter_null_agg_topk",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=[
+                "filter_null_agg_topk",
+                "filter",
+                "groupby",
+                "nulls",
+                "aggregation",
+                "sort_limit",
+                "expressions",
+            ],
+            metamorphic_variant_limit=4,
+        )
+    if name == "join_null_agg_topk":
+        return ExperimentConfig(
+            generator_profile="join_null_agg_topk",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["join_null_agg_topk", "join", "nulls", "aggregation", "sort_limit", "expressions"],
+            metamorphic_variant_limit=4,
+        )
+    if name == "join_filter_groupby":
+        return ExperimentConfig(
+            generator_profile="join_filter_groupby",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["join_filter_groupby", "join", "filter", "groupby", "aggregation", "sort_limit", "expressions"],
+            metamorphic_variant_limit=4,
+        )
+    if name == "join_groupby_stress":
+        return ExperimentConfig(
+            generator_profile="join_groupby_stress",
+            guidance_strategy="guided",
+            guidance_candidate_pool=1,
+            guidance_targets=["join", "groupby", "aggregation", "global_aggregation"],
+            metamorphic_variant_limit=2,
+        )
+    if name == "storage_offset":
+        return ExperimentConfig(
+            generator_profile="storage_offset",
+            guidance_strategy="guided",
+            guidance_candidate_pool=1,
+            guidance_targets=["sort_limit", "sort_offset", "offset"],
+            metamorphic_variant_limit=0,
+        )
     if name == "null_groupby_topk_metamorphic":
         return ExperimentConfig(
             generator_profile="null_groupby_topk",
@@ -938,6 +1400,54 @@ def _preset_config(name: str) -> ExperimentConfig:
             guidance_targets=["null_agg_topk", "groupby", "nulls", "aggregation", "sort_limit"],
             metamorphic_variant_limit=8,
         )
+    if name == "filter_null_agg_topk_metamorphic":
+        return ExperimentConfig(
+            generator_profile="filter_null_agg_topk",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=[
+                "filter_null_agg_topk",
+                "filter",
+                "groupby",
+                "nulls",
+                "aggregation",
+                "sort_limit",
+                "expressions",
+            ],
+            metamorphic_variant_limit=8,
+        )
+    if name == "join_null_agg_topk_metamorphic":
+        return ExperimentConfig(
+            generator_profile="join_null_agg_topk",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["join_null_agg_topk", "join", "nulls", "aggregation", "sort_limit", "expressions"],
+            metamorphic_variant_limit=8,
+        )
+    if name == "join_filter_groupby_metamorphic":
+        return ExperimentConfig(
+            generator_profile="join_filter_groupby",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["join_filter_groupby", "join", "filter", "groupby", "aggregation", "sort_limit", "expressions"],
+            metamorphic_variant_limit=8,
+        )
+    if name == "join_groupby_stress_metamorphic":
+        return ExperimentConfig(
+            generator_profile="join_groupby_stress",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=1,
+            guidance_targets=["join", "groupby", "aggregation", "global_aggregation"],
+            metamorphic_variant_limit=4,
+        )
     if name == "float_group_key":
         return ExperimentConfig(
             generator_profile="float_group_key",
@@ -955,6 +1465,145 @@ def _preset_config(name: str) -> ExperimentConfig:
             guidance_candidate_pool=4,
             guidance_targets=["float_group_key", "join", "mutate", "groupby", "expressions"],
             metamorphic_variant_limit=8,
+        )
+    if name == "join_null_sort":
+        return ExperimentConfig(
+            generator_profile="join_null_sort",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["join_null_sort", "join", "nulls", "sort_limit", "expressions"],
+            metamorphic_variant_limit=4,
+        )
+    if name == "join_null_sort_metamorphic":
+        return ExperimentConfig(
+            generator_profile="join_null_sort",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["join_null_sort", "join", "nulls", "sort_limit", "expressions"],
+            metamorphic_variant_limit=8,
+        )
+    if name == "ordered_groupby_sort":
+        return ExperimentConfig(
+            generator_profile="ordered_groupby_sort",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["ordered_groupby_sort", "groupby", "aggregation", "sort_limit"],
+            metamorphic_variant_limit=4,
+        )
+    if name == "ordered_groupby_sort_metamorphic":
+        return ExperimentConfig(
+            generator_profile="ordered_groupby_sort",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["ordered_groupby_sort", "groupby", "aggregation", "sort_limit"],
+            metamorphic_variant_limit=8,
+        )
+    if name == "topk_resort":
+        return ExperimentConfig(
+            generator_profile="topk_resort",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["topk_resort", "sort_limit", "topk", "nulls"],
+            metamorphic_variant_limit=4,
+        )
+    if name == "topk_resort_metamorphic":
+        return ExperimentConfig(
+            generator_profile="topk_resort",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["topk_resort", "sort_limit", "topk", "nulls"],
+            metamorphic_variant_limit=8,
+        )
+    if name == "join_ordered_agg_topk":
+        return ExperimentConfig(
+            generator_profile="join_ordered_agg_topk",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["join_ordered_agg_topk", "join", "groupby", "aggregation", "sort_limit", "topk"],
+            metamorphic_variant_limit=4,
+        )
+    if name == "join_ordered_agg_topk_metamorphic":
+        return ExperimentConfig(
+            generator_profile="join_ordered_agg_topk",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["join_ordered_agg_topk", "join", "groupby", "aggregation", "sort_limit", "topk"],
+            metamorphic_variant_limit=8,
+        )
+    if name == "live_datafusion":
+        return _live_bughunt_config(
+            guidance_targets=list(LIVE_BUGHUNT_TARGETS),
+            local_source_exploration_weight=0.35,
+        )
+    if name == "live_datafusion_metamorphic":
+        return _live_bughunt_config(
+            candidate_pool=8,
+            guidance_targets=list(LIVE_BUGHUNT_TARGETS),
+            local_source_exploration_weight=0.35,
+            metamorphic=True,
+            metamorphic_variant_limit=6,
+        )
+    if name == "live_arrow":
+        return _live_bughunt_config(
+            guidance_targets=list(LIVE_ARROW_TARGETS),
+            local_source_exploration_weight=0.45,
+        )
+    if name == "live_arrow_metamorphic":
+        return _live_bughunt_config(
+            candidate_pool=8,
+            guidance_targets=list(LIVE_ARROW_TARGETS),
+            local_source_exploration_weight=0.45,
+            metamorphic=True,
+            metamorphic_variant_limit=6,
+        )
+    if name == "live_polars_lazy":
+        return _live_bughunt_config(
+            guidance_targets=list(LIVE_POLARS_LAZY_TARGETS),
+            local_source_exploration_weight=0.45,
+        )
+    if name == "live_polars_lazy_metamorphic":
+        return _live_bughunt_config(
+            candidate_pool=8,
+            guidance_targets=list(LIVE_POLARS_LAZY_TARGETS),
+            local_source_exploration_weight=0.45,
+            metamorphic=True,
+            metamorphic_variant_limit=8,
+        )
+    if name == "live_embedded_sql":
+        return _live_bughunt_config(
+            generator_profile="workflow",
+            guidance_targets=list(LIVE_EMBEDDED_SQL_TARGETS),
+            local_source_exploration_weight=0.40,
+        )
+    if name == "live_embedded_sql_metamorphic":
+        return _live_bughunt_config(
+            generator_profile="workflow",
+            candidate_pool=8,
+            guidance_targets=list(LIVE_EMBEDDED_SQL_TARGETS),
+            local_source_exploration_weight=0.40,
+            metamorphic=True,
+            metamorphic_variant_limit=8,
+        )
+    if name == "live_cross_family":
+        return _live_bughunt_config(
+            guidance_targets=list(LIVE_CROSS_FAMILY_TARGETS),
+            local_source_exploration_weight=0.40,
+        )
+    if name == "live_cross_family_metamorphic":
+        return _live_bughunt_config(
+            candidate_pool=8,
+            guidance_targets=list(LIVE_CROSS_FAMILY_TARGETS),
+            local_source_exploration_weight=0.40,
+            metamorphic=True,
+            metamorphic_variant_limit=6,
         )
     if name == "guided":
         return ExperimentConfig(guidance_strategy="guided", guidance_candidate_pool=8)
@@ -991,32 +1640,14 @@ def cmd_experiment(args: argparse.Namespace) -> int:
     presets = _parse_presets(args.presets)
     seeds = _parse_seeds(args.seeds)
     target_runs = _experiment_target_runs(args)
-    jobs = max(1, int(getattr(args, "jobs", 1)))
     suite_names = [suite for suite, _ in target_runs]
     backend_union = sorted({backend for _, backends in target_runs for backend in backends})
     duration_s = parse_duration(args.duration)
-    manifest = {
-        "created_at": utc_now(),
-        "presets": presets,
-        "seeds": seeds,
-        "cases": args.cases,
-        "duration_s": duration_s,
-        "backends": backend_union,
-        "target_suite": suite_names[0] if len(suite_names) == 1 else ",".join(suite_names),
-        "target_suites": suite_names,
-        "backends_by_suite": {suite: backends for suite, backends in target_runs},
-        "targets": describe_targets(backend_union),
-        "common_capabilities": common_capabilities(backend_union),
-        "log_level": args.log_level,
-        "compress_run_log": not args.no_compress_run_log,
-        "metamorphic_variant_limit": args.metamorphic_variant_limit,
-        "jobs": jobs,
-        "schedule": "longest_first" if jobs > 1 else "matrix_order",
-        "runs": [],
-    }
+    evidence_mode = _resolve_evidence_mode(getattr(args, "evidence_mode", "auto"), suite_names)
     planned_runs = [
         {
             "order": order,
+            "arm_id": f"{target_suite}:{preset}:seed{seed}",
             "target_suite": target_suite,
             "backends": backends,
             "preset": preset,
@@ -1027,6 +1658,15 @@ def cmd_experiment(args: argparse.Namespace) -> int:
             "compress_run_log": not args.no_compress_run_log,
             "artifact_limit": args.artifact_limit,
             "metamorphic_variant_limit": args.metamorphic_variant_limit,
+            "evidence_mode": evidence_mode,
+            "known_bug_id": str(getattr(args, "known_bug_id", "") or ""),
+            "target_version": str(getattr(args, "target_version", "") or ""),
+            "run_theme": str(getattr(args, "run_theme", "") or ""),
+            "paper_notes": str(getattr(args, "paper_notes", "") or ""),
+            "enable_local_source_scheduler": bool(getattr(args, "enable_local_source_scheduler", False)),
+            "local_source_exploration_weight": max(
+                0.0, float(getattr(args, "local_source_exploration_weight", 0.5))
+            ),
             "skip_run_reports": args.skip_run_reports,
         }
         for order, (target_suite, backends, preset, seed) in enumerate(
@@ -1036,6 +1676,55 @@ def cmd_experiment(args: argparse.Namespace) -> int:
             for seed in seeds
         )
     ]
+    for job in planned_runs:
+        job["estimated_cost"] = round(_experiment_job_weight(job), 4)
+    parallelism = _resolve_experiment_parallelism(args, planned_runs)
+    for job in planned_runs:
+        job["worker_thread_limit"] = parallelism["worker_thread_limit"]
+    jobs = int(parallelism["worker_count"])
+    schedule = _resolve_experiment_schedule(args, jobs=jobs)
+    manifest = {
+        "created_at": utc_now(),
+        "presets": presets,
+        "seeds": seeds,
+        "cases": args.cases,
+        "duration_s": duration_s,
+        "evidence_mode": evidence_mode,
+        "known_bug_id": str(getattr(args, "known_bug_id", "") or ""),
+        "target_version": str(getattr(args, "target_version", "") or ""),
+        "run_theme": str(getattr(args, "run_theme", "") or ""),
+        "paper_notes": str(getattr(args, "paper_notes", "") or ""),
+        "backends": backend_union,
+        "target_suite": suite_names[0] if len(suite_names) == 1 else ",".join(suite_names),
+        "target_suites": suite_names,
+        "backends_by_suite": {suite: backends for suite, backends in target_runs},
+        "targets": describe_targets(backend_union),
+        "common_capabilities": common_capabilities(backend_union),
+        "log_level": args.log_level,
+        "compress_run_log": not args.no_compress_run_log,
+        "metamorphic_variant_limit": args.metamorphic_variant_limit,
+        "jobs": jobs,
+        "parallelism": parallelism,
+        "schedule": schedule,
+        "local_source_scheduler": {
+            "enabled": bool(getattr(args, "enable_local_source_scheduler", False) or schedule == "adaptive"),
+            "exploration_weight": max(0.0, float(getattr(args, "local_source_exploration_weight", 0.5))),
+        },
+        "runs": [],
+    }
+    if schedule == "adaptive":
+        completed_runs = _run_experiment_adaptive(args, manifest, planned_runs, duration_s, jobs=jobs)
+        for result in completed_runs:
+            manifest["runs"].append(result["run"])
+        manifest["adaptive_state"] = completed_runs[-1]["scheduler_state"] if completed_runs else []
+        manifest_path = _experiment_manifest_path()
+        dump_json(manifest, manifest_path)
+        print(f"experiment manifest: {manifest_path}")
+        if not getattr(args, "skip_paper_journal", False):
+            journal_path, journal_md = _record_experiment_journal(manifest_path, manifest)
+            print(f"paper run journal: {journal_path}")
+            print(f"paper run journal markdown: {journal_md}")
+        return 0
     completed_runs = []
     if jobs == 1:
         for job in planned_runs:
@@ -1045,29 +1734,319 @@ def cmd_experiment(args: argparse.Namespace) -> int:
     else:
         worker_count = min(jobs, len(planned_runs))
         try:
-            completed_runs = _run_experiment_jobs_parallel(ProcessPoolExecutor, worker_count, planned_runs)
+            completed_runs = _run_experiment_jobs_parallel(
+                ProcessPoolExecutor,
+                worker_count,
+                planned_runs,
+                max_parallel_cost=float(parallelism["max_parallel_cost"]),
+            )
         except PermissionError:
             print("process parallelism unavailable; falling back to threaded workers", flush=True)
-            completed_runs = _run_experiment_jobs_parallel(ThreadPoolExecutor, worker_count, planned_runs)
+            completed_runs = _run_experiment_jobs_parallel(
+                ThreadPoolExecutor,
+                worker_count,
+                planned_runs,
+                max_parallel_cost=float(parallelism["max_parallel_cost"]),
+            )
     for result in sorted(completed_runs, key=lambda item: item["order"]):
         manifest["runs"].append(result["run"])
-    ts = utc_now().replace(":", "").replace("-", "").replace("Z", "")
-    manifest_path = RUNS_DIR / f"experiment-{ts}.json"
+    manifest_path = _experiment_manifest_path()
     dump_json(manifest, manifest_path)
     print(f"experiment manifest: {manifest_path}")
+    if not getattr(args, "skip_paper_journal", False):
+        journal_path, journal_md = _record_experiment_journal(manifest_path, manifest)
+        print(f"paper run journal: {journal_path}")
+        print(f"paper run journal markdown: {journal_md}")
     return 0
 
 
-def _run_experiment_jobs_parallel(executor_cls: type, worker_count: int, planned_runs: list[dict]) -> list[dict]:
+def _record_experiment_journal(manifest_path: Path, manifest: dict) -> tuple[Path, Path]:
+    journal_file = REPORTS_DIR / "paper-run-journal.jsonl"
+    entries = []
+    for run in manifest.get("runs", []):
+        run_file = Path(run.get("run_file", ""))
+        context = {
+            "command": "experiment",
+            "theme": _experiment_run_theme(manifest, run),
+            "notes": str(manifest.get("paper_notes", "") or ""),
+            "evidence_mode": str(run.get("evidence_mode") or manifest.get("evidence_mode", "")),
+            "known_bug_id": str(run.get("known_bug_id") or manifest.get("known_bug_id", "")),
+            "target_version": str(run.get("target_version") or manifest.get("target_version", "")),
+            "target_suite": str(run.get("target_suite", "")),
+            "preset": str(run.get("preset", "")),
+            "seed": run.get("seed", ""),
+            "backends": run.get("backends", []),
+            "manifest_file": str(manifest_path),
+        }
+        entries.append(build_run_journal_entry(run_file, context))
+    append_run_journal_entries(entries, journal_file)
+    md_path = write_run_journal_markdown(journal_file)
+    return journal_file, md_path
+
+
+def _experiment_run_theme(manifest: dict, run: dict) -> str:
+    base = str(manifest.get("run_theme", "") or "").strip()
+    suffix = f"{run.get('target_suite', '')}:{run.get('preset', '')}:seed{run.get('seed', '')}"
+    if base:
+        return f"{base} | {suffix}"
+    evidence_mode = str(run.get("evidence_mode") or manifest.get("evidence_mode", "live"))
+    known_bug_id = str(run.get("known_bug_id") or manifest.get("known_bug_id", "") or "")
+    if evidence_mode == "historical" and known_bug_id:
+        return f"historical:{known_bug_id}:{suffix}"
+    return f"{evidence_mode}:{suffix}"
+
+
+def _run_experiment_adaptive(
+    args: argparse.Namespace,
+    manifest: dict[str, Any],
+    planned_runs: list[dict[str, Any]],
+    duration_s: float | None,
+    *,
+    jobs: int,
+) -> list[dict[str, Any]]:
+    default_batch_cases = min(100, max(1, int(args.cases or 100)))
+    batch_cases = max(1, int(getattr(args, "batch_cases", 0) or default_batch_cases))
+    batch_duration_s = parse_duration(getattr(args, "batch_duration", None))
+    if batch_duration_s is None and duration_s is not None and args.cases is None:
+        batch_duration_s = min(duration_s, 30.0)
+    if args.cases is not None:
+        total_cases_budget = len(planned_runs) * max(1, int(args.cases))
+    elif duration_s is None:
+        total_cases_budget = len(planned_runs) * 100
+    else:
+        total_cases_budget = None
+    total_duration_budget_s = None if args.cases is not None or duration_s is None else len(planned_runs) * duration_s
+    schedule_config = AdaptiveScheduleConfig(
+        batch_cases=batch_cases,
+        batch_duration_s=batch_duration_s,
+        warmup_batches=max(1, int(getattr(args, "warmup_batches", 1))),
+        exploration_weight=max(0.0, float(getattr(args, "exploration_weight", 0.75))),
+    )
+    scheduler = AdaptiveBudgetScheduler(
+        planned_runs,
+        total_cases_budget=total_cases_budget,
+        total_duration_budget_s=total_duration_budget_s,
+        config=schedule_config,
+    )
+    manifest["adaptive_config"] = {
+        "total_cases_budget": total_cases_budget,
+        "total_duration_budget_s": total_duration_budget_s,
+        "batch_cases": batch_cases,
+        "batch_duration_s": batch_duration_s,
+        "warmup_batches": schedule_config.warmup_batches,
+        "exploration_weight": schedule_config.exploration_weight,
+        "fine_grained_local_source_scheduler": True,
+        "local_source_exploration_weight": max(
+            0.0, float(getattr(args, "local_source_exploration_weight", 0.5))
+        ),
+        "jobs": jobs,
+        "parallelism": manifest.get("parallelism", {}),
+    }
+    completed_runs = []
+    worker_count = min(max(1, jobs), len(planned_runs))
+    if worker_count == 1:
+        while scheduler.has_budget():
+            batches = scheduler.next_round(1)
+            if not batches:
+                break
+            completed_runs.extend(_complete_adaptive_round(scheduler, [_run_experiment_job(_adaptive_job(batches[0]))], batches))
+            print(completed_runs[-1]["message"], flush=True)
+        return completed_runs
+    try:
+        completed_runs.extend(_run_experiment_adaptive_parallel(ProcessPoolExecutor, worker_count, scheduler))
+    except PermissionError:
+        print("process parallelism unavailable; falling back to threaded workers", flush=True)
+        completed_runs.extend(_run_experiment_adaptive_parallel(ThreadPoolExecutor, worker_count, scheduler))
+    return completed_runs
+
+
+def _resolve_experiment_parallelism(args: argparse.Namespace, planned_runs: list[dict[str, Any]]) -> dict[str, Any]:
+    cpu_count = max(1, os.cpu_count() or 1)
+    requested = getattr(args, "jobs", "auto")
+    if requested == "auto":
+        # Each matrix job runs several native engines that may use their own
+        # thread pools. A conservative default gives better 24h throughput than
+        # letting every target compete for every core.
+        worker_count = max(1, min(len(planned_runs), max(1, cpu_count // 4), 6))
+    else:
+        worker_count = max(1, int(requested))
+        worker_count = min(worker_count, max(1, len(planned_runs)))
+    costs = [_experiment_job_weight(job) for job in planned_runs] or [1.0]
+    max_job_cost = max(costs)
+    requested_cost = getattr(args, "max_parallel_cost", None)
+    if requested_cost is None:
+        # Cost units are backend-weighted, not CPU cores. This budget allows
+        # several light runs together but usually keeps latest_all_engines-style
+        # jobs from stacking on top of each other.
+        max_parallel_cost = max(max_job_cost, cpu_count * 0.75)
+    else:
+        max_parallel_cost = max(max_job_cost, float(requested_cost))
+    worker_thread_limit = max(1, min(4, cpu_count // max(1, worker_count)))
+    return {
+        "requested_jobs": requested,
+        "worker_count": worker_count,
+        "cpu_count": cpu_count,
+        "max_parallel_cost": round(max_parallel_cost, 4),
+        "max_job_cost": round(max_job_cost, 4),
+        "worker_thread_limit": worker_thread_limit,
+        "bounded_submission": True,
+        "cost_limited": True,
+    }
+
+
+def _run_experiment_adaptive_parallel(
+    executor_cls: type,
+    worker_count: int,
+    scheduler: AdaptiveBudgetScheduler,
+) -> list[dict[str, Any]]:
+    completed_runs: list[dict[str, Any]] = []
+    with executor_cls(max_workers=worker_count) as executor:
+        while scheduler.has_budget():
+            batches = scheduler.next_round(worker_count)
+            if not batches:
+                break
+            futures = {
+                executor.submit(_run_experiment_job, _adaptive_job(batch)): batch
+                for batch in batches
+            }
+            round_results = [future.result() for future in as_completed(futures)]
+            completed_runs.extend(_complete_adaptive_round(scheduler, round_results, batches))
+            for item in completed_runs[-len(batches):]:
+                print(item["message"], flush=True)
+    return completed_runs
+
+
+def _adaptive_job(batch: Any) -> dict[str, Any]:
+    job = dict(batch.job)
+    job["enable_local_source_scheduler"] = True
+    return job
+
+
+def _complete_adaptive_round(
+    scheduler: AdaptiveBudgetScheduler,
+    round_results: list[dict[str, Any]],
+    batches: list[Any],
+) -> list[dict[str, Any]]:
+    results_by_batch = {int(item["run"]["batch_index"]): item for item in round_results}
+    batch_by_index = {int(batch.batch_index): batch for batch in batches}
+    completed: list[dict[str, Any]] = []
+    for batch_index in sorted(batch_by_index):
+        batch = batch_by_index[batch_index]
+        result = results_by_batch[batch_index]
+        run_file = Path(result["run"]["run_file"])
+        observation = summarize_batch_run(run_file)
+        meta_path = run_meta_path(run_file)
+        meta = load_json(meta_path) if meta_path.exists() else {}
+        reward = scheduler.record_result(
+            batch,
+            observation,
+            next_seed=int(meta.get("next_seed", batch.seed + max(1, observation.cases))),
+        )
+        result["run"].update(
+            {
+                "schedule_arm_id": batch.arm_id,
+                "batch_index": batch.batch_index,
+                "scheduler_reward": reward,
+                "scheduler_observation": {
+                    "cases": observation.cases,
+                    "elapsed_s": observation.elapsed_s,
+                    "throughput_cases_s": observation.throughput_cases_s,
+                    "findings": observation.findings,
+                    "candidate_bug_cases": observation.candidate_bug_cases,
+                    "candidate_bug_families": sorted(observation.candidate_bug_families),
+                    "semantic_divergence_count": observation.semantic_divergence_count,
+                    "false_positive_count": observation.false_positive_count,
+                    "new_behavior_cases": observation.new_behavior_cases,
+                    "first_candidate_bug_case_index": observation.first_candidate_bug_case_index,
+                    "first_candidate_bug_elapsed_s": observation.first_candidate_bug_elapsed_s,
+                    "candidate_bug_discovery_auc": observation.candidate_bug_discovery_auc,
+                },
+            }
+        )
+        completed.append(
+            {
+                **result,
+                "scheduler_state": scheduler.snapshot(),
+                "message": (
+                    f"{result['message']} batch={batch.batch_index} "
+                    f"reward={reward:.3f} remaining_cases={scheduler.remaining_cases_budget} "
+                    f"remaining_duration_s={scheduler.remaining_duration_budget_s}"
+                ),
+            }
+        )
+    return completed
+
+
+def _resolve_experiment_schedule(args: argparse.Namespace, *, jobs: int) -> str:
+    schedule = getattr(args, "schedule", None)
+    if schedule:
+        return str(schedule)
+    return "longest_first" if jobs > 1 else "matrix_order"
+
+
+def _resolve_evidence_mode(value: str, suite_names: list[str]) -> str:
+    if value != "auto":
+        return value
+    if suite_names and all(suite.startswith("seeded_") for suite in suite_names):
+        return "seeded"
+    return "live"
+
+
+def _experiment_manifest_path() -> Path:
+    ts = utc_now().replace(":", "").replace("-", "").replace("Z", "")
+    return RUNS_DIR / f"experiment-{ts}-{time.time_ns()}.json"
+
+
+def _run_experiment_jobs_parallel(
+    executor_cls: type,
+    worker_count: int,
+    planned_runs: list[dict],
+    *,
+    max_parallel_cost: float,
+) -> list[dict]:
     completed_runs = []
     scheduled_runs = sorted(planned_runs, key=_experiment_job_sort_key)
+    queued_runs = list(scheduled_runs)
+    running = {}
+    running_cost = 0.0
     with executor_cls(max_workers=worker_count) as executor:
-        futures = [executor.submit(_run_experiment_job, job) for job in scheduled_runs]
-        for future in as_completed(futures):
-            result = future.result()
-            completed_runs.append(result)
-            print(result["message"], flush=True)
+        while queued_runs or running:
+            while len(running) < worker_count and queued_runs:
+                available_cost = max_parallel_cost - running_cost
+                index = _next_schedulable_job_index(queued_runs, available_cost)
+                if index is None:
+                    break
+                job = queued_runs.pop(index)
+                cost = _job_estimated_cost(job)
+                future = executor.submit(_run_experiment_job, job)
+                running[future] = cost
+                running_cost += cost
+            if not running and queued_runs:
+                # A single run can exceed the current cost budget; allow it so
+                # the queue cannot deadlock.
+                job = queued_runs.pop(0)
+                cost = _job_estimated_cost(job)
+                future = executor.submit(_run_experiment_job, job)
+                running[future] = cost
+                running_cost += cost
+            done, _ = wait(running, return_when=FIRST_COMPLETED)
+            for future in done:
+                running_cost -= running.pop(future)
+                result = future.result()
+                completed_runs.append(result)
+                print(result["message"], flush=True)
     return completed_runs
+
+
+def _next_schedulable_job_index(queued_runs: list[dict], available_cost: float) -> int | None:
+    for index, job in enumerate(queued_runs):
+        if _job_estimated_cost(job) <= max(0.0, available_cost):
+            return index
+    return None
+
+
+def _job_estimated_cost(job: dict) -> float:
+    return float(job.get("estimated_cost", _experiment_job_weight(job)))
 
 
 def _experiment_job_sort_key(job: dict) -> tuple[float, int]:
@@ -1082,12 +2061,21 @@ def _experiment_job_weight(job: dict) -> float:
         metamorphic_multiplier += max(1, int(config.metamorphic_variant_limit))
     profile_multiplier = {
         "float_group_key": 1.6,
+        "join_null_sort": 1.5,
         "bughunt": 1.3,
         "bughunt_no_groupby": 1.2,
         "workflow": 1.2,
         "edge_float": 1.1,
         "null_groupby_topk": 1.0,
         "null_agg_topk": 1.0,
+        "filter_null_agg_topk": 1.2,
+        "join_null_agg_topk": 1.3,
+        "join_filter_groupby": 1.4,
+        "join_groupby_stress": 2.0,
+        "storage_offset": 2.0,
+        "ordered_groupby_sort": 1.2,
+        "topk_resort": 1.1,
+        "join_ordered_agg_topk": 1.5,
         "common": 1.0,
     }.get(config.generator_profile, 1.0)
     guidance_multiplier = 1.0 + 0.03 * max(0, int(config.guidance_candidate_pool) - 1)
@@ -1099,6 +2087,7 @@ def _backend_cost(backend: str) -> float:
         "datafusion": 1.5,
         "polars_lazy": 1.4,
         "duckdb": 1.2,
+        "duckdb_persistent": 1.4,
         "sqlite": 1.0,
         "polars": 1.0,
         "pandas": 1.0,
@@ -1107,10 +2096,18 @@ def _backend_cost(backend: str) -> float:
 
 
 def _run_experiment_job(job: dict) -> dict:
+    _apply_native_thread_limits(int(job.get("worker_thread_limit", 1) or 1))
     preset_config = _preset_config(str(job["preset"]))
     preset_config.log_level = str(job["log_level"])
     preset_config.compress_run_log = bool(job["compress_run_log"])
     preset_config.artifact_limit = job["artifact_limit"]
+    job_source_scheduler_enabled = bool(job.get("enable_local_source_scheduler", False))
+    preset_config.enable_local_source_scheduler = preset_config.enable_local_source_scheduler or job_source_scheduler_enabled
+    if job_source_scheduler_enabled:
+        preset_config.local_source_exploration_weight = max(
+            0.0,
+            float(job.get("local_source_exploration_weight", preset_config.local_source_exploration_weight)),
+        )
     if job["metamorphic_variant_limit"] is not None:
         preset_config.metamorphic_variant_limit = max(0, int(job["metamorphic_variant_limit"]))
     run_file = run_fuzz(
@@ -1128,6 +2125,13 @@ def _run_experiment_job(job: dict) -> dict:
         "backends": job["backends"],
         "preset": job["preset"],
         "seed": job["seed"],
+        "evidence_mode": job.get("evidence_mode", ""),
+        "known_bug_id": job.get("known_bug_id", ""),
+        "target_version": job.get("target_version", ""),
+        "batch_index": job.get("batch_index"),
+        "schedule_arm_id": job.get("schedule_arm_id", ""),
+        "estimated_cost": job.get("estimated_cost", ""),
+        "worker_thread_limit": job.get("worker_thread_limit", ""),
         "run_file": str(run_file),
         "report": str(md_path),
         "csv": str(csv_path),
@@ -1137,6 +2141,21 @@ def _run_experiment_job(job: dict) -> dict:
         "run": run,
         "message": f"{job['target_suite']} {job['preset']} seed={job['seed']} run={run_file}",
     }
+
+
+def _apply_native_thread_limits(thread_limit: int) -> None:
+    value = str(max(1, int(thread_limit)))
+    for name in [
+        "DATADIFF_DUCKDB_THREADS",
+        "POLARS_MAX_THREADS",
+        "RAYON_NUM_THREADS",
+        "OMP_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+        "ARROW_NUM_THREADS",
+    ]:
+        os.environ[name] = value
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1168,9 +2187,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_fuzz.add_argument("--duration", default=None, help="wall-clock budget such as 10s, 5m, 24h")
     p_fuzz.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_fuzz)
-    p_fuzz.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "float_group_key"], default="common")
+    p_fuzz.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_filter_groupby", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk"], default="common")
     add_guidance_flags(p_fuzz, default_strategy="random", default_candidate_pool=8)
     add_ablation_flags(p_fuzz)
+    add_paper_journal_flags(p_fuzz)
     p_fuzz.set_defaults(func=cmd_fuzz)
 
     p_long = sub.add_parser("longrun", help="run long-duration fuzzing and persist generated test cases")
@@ -1178,7 +2198,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_long.add_argument("--duration", default="24h", help="wall-clock budget such as 10m, 24h, 2d")
     p_long.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_long)
-    p_long.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "float_group_key"], default="common")
+    p_long.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_filter_groupby", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk"], default="common")
     add_guidance_flags(p_long, default_strategy="guided", default_candidate_pool=8)
     p_long.add_argument("--case-log", default=None, help="optional JSONL path for generated test cases")
     p_long.add_argument("--checkpoint-interval", default="60s", help="checkpoint write interval")
@@ -1187,6 +2207,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_long.add_argument("--no-save-cases", action="store_true", help="do not persist generated test cases separately")
     p_long.add_argument("--quiet", action="store_true", help="suppress periodic progress output")
     add_ablation_flags(p_long)
+    add_paper_journal_flags(p_long)
     p_long.set_defaults(func=cmd_longrun)
 
     p_report = sub.add_parser("report", help="generate markdown/csv report")
@@ -1319,10 +2340,69 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_reduce.set_defaults(func=cmd_reduce)
 
+    p_hist = sub.add_parser("historical-status", help="show historical replay registry admission status")
+    p_hist.add_argument(
+        "--include-pending",
+        action="store_true",
+        help="include candidate and pending historical case studies",
+    )
+    p_hist.add_argument("--json", action="store_true", help="emit historical registry status as JSON")
+    p_hist.set_defaults(func=cmd_historical_status)
+
+    p_fixture = sub.add_parser(
+        "replay-fixture",
+        help="run a declared fixture-backed case through normal differential oracle and journal recording",
+    )
+    p_fixture.add_argument("--spec", required=True, help="fixture replay spec JSON")
+    p_fixture.add_argument("--fixture", default=None, help="path to the external fixture data file")
+    p_fixture.add_argument(
+        "--fixture-env",
+        default=None,
+        help="environment variable containing the external fixture data file path",
+    )
+    p_fixture.add_argument("--backends", default=None, help="explicit comma-separated backend targets")
+    p_fixture.add_argument(
+        "--target-suite",
+        choices=sorted(TARGET_SUITES),
+        default=None,
+        help="backend target suite used when --backends is not provided; defaults to the spec target_suite",
+    )
+    p_fixture.add_argument(
+        "--evidence-mode",
+        choices=["live", "historical", "seeded"],
+        default="historical",
+        help="paper evidence layer for this replay",
+    )
+    p_fixture.add_argument("--known-bug-id", default="", help="historical bug id recorded in the run journal")
+    p_fixture.add_argument("--target-version", default="", help="target dependency version or commit under replay")
+    p_fixture.add_argument("--run-theme", default="", help="short paper-facing run theme")
+    p_fixture.add_argument("--paper-notes", default="", help="brief paper-facing run notes")
+    p_fixture.add_argument("--artifact-limit", type=int, default=None, help="0 disables artifact writes")
+    p_fixture.add_argument("--log-level", choices=["full", "compact", "minimal"], default="compact")
+    p_fixture.add_argument("--disable-artifact", action="store_true")
+    p_fixture.add_argument("--no-compress-run-log", action="store_true")
+    p_fixture.set_defaults(func=cmd_replay_fixture)
+
     p_exp = sub.add_parser("experiment", help="run repeatable ablation experiment matrix")
     p_exp.add_argument("--cases", type=int, default=None, help="maximum cases; defaults to 100 when --duration is absent")
     p_exp.add_argument("--duration", default=None, help="optional per-run wall-clock budget such as 10s, 5m, 24h")
     p_exp.add_argument("--seeds", default="1,1001,2001")
+    p_exp.add_argument(
+        "--evidence-mode",
+        choices=["auto", "live", "historical", "seeded"],
+        default="auto",
+        help="experiment evidence layer: live latest-version finding, historical fixed-bug replay, or seeded fault ablation",
+    )
+    p_exp.add_argument(
+        "--known-bug-id",
+        default="",
+        help="identifier for a replayed historical/upstream bug when --evidence-mode=historical",
+    )
+    p_exp.add_argument(
+        "--target-version",
+        default="",
+        help="target dependency version or commit used by a historical replay run",
+    )
     add_target_suite_flags(p_exp)
     p_exp.add_argument(
         "--target-suites",
@@ -1338,9 +2418,55 @@ def build_parser() -> argparse.ArgumentParser:
     p_exp.add_argument("--log-level", choices=["full", "compact", "minimal"], default="compact")
     p_exp.add_argument(
         "--jobs",
+        type=_parse_jobs,
+        default="auto",
+        help="number of experiment matrix runs to execute in parallel, or 'auto'",
+    )
+    p_exp.add_argument(
+        "--max-parallel-cost",
+        type=float,
+        default=None,
+        help="cost-token budget for concurrently running experiment jobs; defaults to a CPU-based budget",
+    )
+    p_exp.add_argument(
+        "--schedule",
+        choices=["matrix_order", "longest_first", "adaptive"],
+        default=None,
+        help="experiment scheduler; adaptive shares the matrix budget across runs",
+    )
+    p_exp.add_argument(
+        "--batch-cases",
+        type=int,
+        default=None,
+        help="adaptive-schedule batch size in cases; ignored by static schedules",
+    )
+    p_exp.add_argument(
+        "--batch-duration",
+        default=None,
+        help="adaptive-schedule batch wall-clock budget such as 30s; ignored by static schedules",
+    )
+    p_exp.add_argument(
+        "--warmup-batches",
         type=int,
         default=1,
-        help="number of experiment matrix runs to execute in parallel",
+        help="minimum adaptive batches to allocate to each arm before exploitation",
+    )
+    p_exp.add_argument(
+        "--exploration-weight",
+        type=float,
+        default=0.75,
+        help="adaptive scheduler exploration weight",
+    )
+    p_exp.add_argument(
+        "--enable-local-source-scheduler",
+        action="store_true",
+        help="enable within-run generated-vs-feedback source scheduling for non-adaptive experiment jobs",
+    )
+    p_exp.add_argument(
+        "--local-source-exploration-weight",
+        type=float,
+        default=0.5,
+        help="exploration weight for the within-run generated-vs-feedback source scheduler",
     )
     p_exp.add_argument(
         "--metamorphic-variant-limit",
@@ -1359,6 +2485,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="baseline,no_type_aware,no_normalizer,no_feedback,metamorphic,reducer",
         help="comma-separated presets",
     )
+    add_paper_journal_flags(p_exp)
     p_exp.set_defaults(func=cmd_experiment)
     return parser
 

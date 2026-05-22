@@ -6,6 +6,7 @@
 - Status: `submitted_upstream_needs_external_confirmation`
 - Upstream issue: https://github.com/apache/datafusion/issues/22190
 - Submitted: 2026-05-15
+- Upstream workflow: open bug; DataFusion member `xiedeyantu` replied `take` on 2026-05-17 UTC and is assigned.
 - Primary issue draft: `bugs/bug_9b4d1fa7aac3b391/upstream_issue.md`
 - Minimal standalone reproducer: `bugs/bug_9b4d1fa7aac3b391/standalone_datafusion_groupby_null_sortkey_limit.py`
 - Boundary preflight script: `scripts/datafusion_topk_null_sortkey_preflight.py`
@@ -43,6 +44,6 @@
 
 ## Submission Note
 
-Submitted upstream as https://github.com/apache/datafusion/issues/22190. Keep the paper-facing status as `submitted_upstream_needs_external_confirmation` until the DataFusion maintainers confirm, reject, or explain the behavior.
+Submitted upstream as https://github.com/apache/datafusion/issues/22190. A DataFusion project member has taken the issue, but has not yet confirmed, rejected, or explained the behavior. Keep the paper-facing status as `submitted_upstream_needs_external_confirmation` until that happens.
 
 The issue draft should avoid claiming that all NULL aggregate sort keys are affected. The current evidence supports a narrower claim: grouped top-k can drop groups whose `MIN`/`MAX` aggregate sort key is NULL, specifically in the order direction that corresponds to the aggregate extremum (`MIN ASC`, `MAX DESC`).

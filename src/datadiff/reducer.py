@@ -31,16 +31,19 @@ def reduce_case(
     while changed:
         changed = False
 
-        table = best.tables[0]
-        for idx in range(len(table.rows)):
-            if len(table.rows) <= 1:
-                break
-            candidate_rows = table.rows[:idx] + table.rows[idx + 1 :]
-            candidate_table = type(table)(table.name, table.columns, candidate_rows)
-            candidate = Case(best.case_id, best.seed, [candidate_table, *best.tables[1:]], best.program)
-            if _preserves_target(candidate, backends, config, target, target_root_set):
-                best = candidate
-                changed = True
+        for table_idx, table in enumerate(best.tables):
+            for row_idx in range(len(table.rows)):
+                if len(table.rows) <= 1:
+                    break
+                candidate_rows = table.rows[:row_idx] + table.rows[row_idx + 1 :]
+                candidate_tables = list(best.tables)
+                candidate_tables[table_idx] = type(table)(table.name, table.columns, candidate_rows)
+                candidate = Case(best.case_id, best.seed, candidate_tables, best.program, best.metadata)
+                if _preserves_target(candidate, backends, config, target, target_root_set):
+                    best = candidate
+                    changed = True
+                    break
+            if changed:
                 break
 
         if changed:
@@ -53,7 +56,7 @@ def reduce_case(
             if not _can_remove_operation(ops, idx):
                 continue
             candidate_program = type(best.program)(best.program.program_id, best.program.seed, ops[:idx] + ops[idx + 1 :])
-            candidate = Case(best.case_id, best.seed, best.tables, candidate_program)
+            candidate = Case(best.case_id, best.seed, best.tables, candidate_program, best.metadata)
             if _preserves_target(candidate, backends, config, target, target_root_set):
                 best = candidate
                 changed = True
@@ -66,7 +69,7 @@ def reduce_case(
             table_name = best.tables[idx].name
             if _program_references_table(best.program.operations, table_name):
                 continue
-            candidate = Case(best.case_id, best.seed, best.tables[:idx] + best.tables[idx + 1 :], best.program)
+            candidate = Case(best.case_id, best.seed, best.tables[:idx] + best.tables[idx + 1 :], best.program, best.metadata)
             if _preserves_target(candidate, backends, config, target, target_root_set):
                 best = candidate
                 changed = True
@@ -75,20 +78,23 @@ def reduce_case(
         if changed:
             continue
 
-        table = best.tables[0]
-        for idx, column in enumerate(table.columns):
-            if len(table.columns) <= 1:
-                break
-            candidate_columns = table.columns[:idx] + table.columns[idx + 1 :]
-            candidate_rows = [
-                {col.name: row.get(col.name) for col in candidate_columns}
-                for row in table.rows
-            ]
-            candidate_table = type(table)(table.name, candidate_columns, candidate_rows)
-            candidate = Case(best.case_id, best.seed, [candidate_table, *best.tables[1:]], best.program)
-            if _preserves_target(candidate, backends, config, target, target_root_set):
-                best = candidate
-                changed = True
+        for table_idx, table in enumerate(best.tables):
+            for col_idx, _column in enumerate(table.columns):
+                if len(table.columns) <= 1:
+                    break
+                candidate_columns = table.columns[:col_idx] + table.columns[col_idx + 1 :]
+                candidate_rows = [
+                    {col.name: row.get(col.name) for col in candidate_columns}
+                    for row in table.rows
+                ]
+                candidate_tables = list(best.tables)
+                candidate_tables[table_idx] = type(table)(table.name, candidate_columns, candidate_rows)
+                candidate = Case(best.case_id, best.seed, candidate_tables, best.program, best.metadata)
+                if _preserves_target(candidate, backends, config, target, target_root_set):
+                    best = candidate
+                    changed = True
+                    break
+            if changed:
                 break
 
     return best
@@ -98,12 +104,12 @@ def _can_remove_operation(ops: list[dict], idx: int) -> bool:
     op = ops[idx]
     if op.get("op") != "sort":
         return True
-    # Dropping a sort while keeping a later limit turns deterministic top-k
+    # Dropping a sort while keeping a later limit/offset turns deterministic top-k
     # semantics into an arbitrary prefix. That can preserve a finding for the
     # wrong reason and produce a misleading reduced artifact. A later sort
     # supersedes the current one before any limit observes it.
     for later in ops[idx + 1 :]:
-        if later.get("op") == "limit":
+        if later.get("op") in {"limit", "offset"}:
             return False
         if later.get("op") == "sort":
             return True

@@ -155,6 +155,7 @@ def _case_features(case: Case) -> dict[str, Any]:
         "uses_groupby": "groupby" in ops,
         "uses_sort": "sort" in ops,
         "uses_limit": "limit" in ops,
+        "uses_offset": "offset" in ops,
         "operation_sequence": ops,
     }
 

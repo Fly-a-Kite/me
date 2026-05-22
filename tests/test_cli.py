@@ -1,10 +1,13 @@
 import json
 import os
+from pathlib import Path
+
+import pytest
 
 from datadiff import cli
 from datadiff.cli import _experiment_target_runs, _preset_config, build_parser
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
-from datadiff.util import append_jsonl
+from datadiff.util import append_jsonl, run_meta_path
 
 
 def test_cli_parses_fuzz_ablation_flags():
@@ -26,6 +29,9 @@ def test_cli_parses_fuzz_ablation_flags():
             "--persist-feedback-corpus",
             "--feedback-persist-limit",
             "12",
+            "--enable-local-source-scheduler",
+            "--local-source-exploration-weight",
+            "0.25",
             "--metamorphic-variant-limit",
             "9",
             "--log-level",
@@ -42,6 +48,8 @@ def test_cli_parses_fuzz_ablation_flags():
     assert args.disable_preflight_repair is True
     assert args.persist_feedback_corpus is True
     assert args.feedback_persist_limit == 12
+    assert args.enable_local_source_scheduler is True
+    assert args.local_source_exploration_weight == 0.25
     assert args.metamorphic_variant_limit == 9
     assert args.log_level == "minimal"
     assert args.no_compress_run_log is False
@@ -123,6 +131,61 @@ def test_cli_parses_null_agg_topk_profile():
     assert args.profile == "null_agg_topk"
 
 
+def test_cli_parses_filter_null_agg_topk_profile():
+    parser = build_parser()
+    args = parser.parse_args(["fuzz", "--profile", "filter_null_agg_topk"])
+    assert args.cmd == "fuzz"
+    assert args.profile == "filter_null_agg_topk"
+
+    args = parser.parse_args(["longrun", "--profile", "filter_null_agg_topk"])
+    assert args.cmd == "longrun"
+    assert args.profile == "filter_null_agg_topk"
+
+
+def test_cli_parses_join_null_agg_topk_profile():
+    parser = build_parser()
+    args = parser.parse_args(["fuzz", "--profile", "join_null_agg_topk"])
+    assert args.cmd == "fuzz"
+    assert args.profile == "join_null_agg_topk"
+
+    args = parser.parse_args(["longrun", "--profile", "join_null_agg_topk"])
+    assert args.cmd == "longrun"
+    assert args.profile == "join_null_agg_topk"
+
+
+def test_cli_parses_join_filter_groupby_profile():
+    parser = build_parser()
+    args = parser.parse_args(["fuzz", "--profile", "join_filter_groupby"])
+    assert args.cmd == "fuzz"
+    assert args.profile == "join_filter_groupby"
+
+    args = parser.parse_args(["longrun", "--profile", "join_filter_groupby"])
+    assert args.cmd == "longrun"
+    assert args.profile == "join_filter_groupby"
+
+
+def test_cli_parses_join_groupby_stress_profile():
+    parser = build_parser()
+    args = parser.parse_args(["fuzz", "--profile", "join_groupby_stress"])
+    assert args.cmd == "fuzz"
+    assert args.profile == "join_groupby_stress"
+
+    args = parser.parse_args(["longrun", "--profile", "join_groupby_stress"])
+    assert args.cmd == "longrun"
+    assert args.profile == "join_groupby_stress"
+
+
+def test_cli_parses_storage_offset_profile():
+    parser = build_parser()
+    args = parser.parse_args(["fuzz", "--profile", "storage_offset"])
+    assert args.cmd == "fuzz"
+    assert args.profile == "storage_offset"
+
+    args = parser.parse_args(["longrun", "--profile", "storage_offset"])
+    assert args.cmd == "longrun"
+    assert args.profile == "storage_offset"
+
+
 def test_cli_parses_float_group_key_profile():
     parser = build_parser()
     args = parser.parse_args(["fuzz", "--profile", "float_group_key"])
@@ -132,6 +195,29 @@ def test_cli_parses_float_group_key_profile():
     args = parser.parse_args(["longrun", "--profile", "float_group_key"])
     assert args.cmd == "longrun"
     assert args.profile == "float_group_key"
+
+
+def test_cli_parses_join_null_sort_profile():
+    parser = build_parser()
+    args = parser.parse_args(["fuzz", "--profile", "join_null_sort"])
+    assert args.cmd == "fuzz"
+    assert args.profile == "join_null_sort"
+
+    args = parser.parse_args(["longrun", "--profile", "join_null_sort"])
+    assert args.cmd == "longrun"
+    assert args.profile == "join_null_sort"
+
+
+def test_cli_parses_order_sensitive_bug_hunt_profiles():
+    parser = build_parser()
+    for profile in ["ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk"]:
+        args = parser.parse_args(["fuzz", "--profile", profile])
+        assert args.cmd == "fuzz"
+        assert args.profile == profile
+
+        args = parser.parse_args(["longrun", "--profile", profile])
+        assert args.cmd == "longrun"
+        assert args.profile == profile
 
 
 def test_cli_parses_target_suite():
@@ -270,9 +356,26 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("null_agg_topk").generator_profile == "null_agg_topk"
     assert _preset_config("null_agg_topk").guidance_targets[0] == "null_agg_topk"
     assert _preset_config("null_agg_topk_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("filter_null_agg_topk").generator_profile == "filter_null_agg_topk"
+    assert _preset_config("filter_null_agg_topk").guidance_targets[0] == "filter_null_agg_topk"
+    assert _preset_config("filter_null_agg_topk_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("join_null_agg_topk").generator_profile == "join_null_agg_topk"
+    assert _preset_config("join_null_agg_topk").guidance_targets[0] == "join_null_agg_topk"
+    assert _preset_config("join_null_agg_topk_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("join_filter_groupby").generator_profile == "join_filter_groupby"
+    assert _preset_config("join_filter_groupby").guidance_targets[0] == "join_filter_groupby"
+    assert _preset_config("join_filter_groupby_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("join_groupby_stress").generator_profile == "join_groupby_stress"
+    assert "global_aggregation" in _preset_config("join_groupby_stress").guidance_targets
+    assert _preset_config("join_groupby_stress_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("storage_offset").generator_profile == "storage_offset"
+    assert {"sort_offset", "offset"}.issubset(_preset_config("storage_offset").guidance_targets)
     assert _preset_config("float_group_key").generator_profile == "float_group_key"
     assert _preset_config("float_group_key").guidance_targets[0] == "float_group_key"
     assert _preset_config("float_group_key_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("join_null_sort").generator_profile == "join_null_sort"
+    assert _preset_config("join_null_sort").guidance_targets[0] == "join_null_sort"
+    assert _preset_config("join_null_sort_metamorphic").enable_metamorphic_oracle is True
 
 
 def test_cli_parses_bughunt_guided_metamorphic_preset():
@@ -308,6 +411,56 @@ def test_cli_parses_bughunt_experiment_presets():
     no_groupby_metamorphic = _preset_config("bughunt_no_groupby_metamorphic")
     assert no_groupby_metamorphic.generator_profile == "bughunt_no_groupby"
     assert no_groupby_metamorphic.enable_metamorphic_oracle is True
+
+
+def test_cli_parses_live_datafusion_presets():
+    live = _preset_config("live_datafusion")
+    assert live.generator_profile == "bughunt"
+    assert live.guidance_strategy == "guided"
+    assert live.guidance_candidate_pool == 12
+    assert live.enable_local_source_scheduler is True
+    assert live.local_source_exploration_weight == 0.35
+    assert {"common_workflow", "operation_combo", "topk", "join", "groupby"}.issubset(live.guidance_targets)
+
+    metamorphic = _preset_config("live_datafusion_metamorphic")
+    assert metamorphic.enable_metamorphic_oracle is True
+    assert metamorphic.oracle_mode == "both"
+    assert metamorphic.metamorphic_variant_limit == 6
+
+
+def test_cli_parses_non_datafusion_live_presets():
+    arrow = _preset_config("live_arrow")
+    assert arrow.generator_profile == "bughunt"
+    assert arrow.guidance_strategy == "guided"
+    assert {"join", "groupby", "strings", "casts", "topk"}.issubset(arrow.guidance_targets)
+    assert arrow.enable_local_source_scheduler is True
+
+    polars_lazy = _preset_config("live_polars_lazy")
+    assert polars_lazy.generator_profile == "bughunt"
+    assert {"join", "filter", "mutate", "sort_limit", "topk"}.issubset(polars_lazy.guidance_targets)
+    assert polars_lazy.local_source_exploration_weight == 0.45
+
+    embedded_sql = _preset_config("live_embedded_sql")
+    assert embedded_sql.generator_profile == "workflow"
+    assert {"join", "filter", "groupby", "aggregation", "casts"}.issubset(embedded_sql.guidance_targets)
+
+    cross_family = _preset_config("live_cross_family")
+    assert cross_family.generator_profile == "bughunt"
+    assert {"common_workflow", "operation_combo", "join", "groupby", "topk"}.issubset(cross_family.guidance_targets)
+
+
+def test_cli_parses_non_datafusion_live_metamorphic_presets():
+    for preset in [
+        "live_arrow_metamorphic",
+        "live_polars_lazy_metamorphic",
+        "live_embedded_sql_metamorphic",
+        "live_cross_family_metamorphic",
+    ]:
+        config = _preset_config(preset)
+        assert config.enable_metamorphic_oracle is True
+        assert config.oracle_mode == "both"
+        assert config.guidance_strategy == "guided"
+        assert config.enable_local_source_scheduler is True
 
 
 def test_cli_experiment_duration_can_run_without_case_cap():
@@ -473,6 +626,420 @@ def test_cli_experiment_parses_jobs():
     assert args.jobs == 4
 
 
+def test_cli_experiment_parses_auto_jobs_and_parallel_cost():
+    parser = build_parser()
+    args = parser.parse_args(["experiment", "--jobs", "auto", "--max-parallel-cost", "9.5"])
+    assert args.cmd == "experiment"
+    assert args.jobs == "auto"
+    assert args.max_parallel_cost == 9.5
+
+
+def test_cli_experiment_parses_adaptive_schedule_flags():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "experiment",
+            "--schedule",
+            "adaptive",
+            "--batch-cases",
+            "25",
+            "--batch-duration",
+            "30s",
+            "--warmup-batches",
+            "2",
+            "--exploration-weight",
+            "0.5",
+            "--local-source-exploration-weight",
+            "0.2",
+        ]
+    )
+    assert args.cmd == "experiment"
+    assert args.schedule == "adaptive"
+    assert args.batch_cases == 25
+    assert args.batch_duration == "30s"
+    assert args.warmup_batches == 2
+    assert args.exploration_weight == 0.5
+    assert args.local_source_exploration_weight == 0.2
+
+
+def test_cli_experiment_parses_evidence_mode_flags():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "experiment",
+            "--evidence-mode",
+            "historical",
+            "--known-bug-id",
+            "datafusion-22190",
+            "--target-version",
+            "pre-fix-sha",
+        ]
+    )
+    assert args.evidence_mode == "historical"
+    assert args.known_bug_id == "datafusion-22190"
+    assert args.target_version == "pre-fix-sha"
+
+
+def test_cli_parses_paper_run_journal_flags():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "experiment",
+            "--run-theme",
+            "final-live:datafusion",
+            "--paper-notes",
+            "24h latest-version run",
+            "--skip-paper-journal",
+        ]
+    )
+    assert args.run_theme == "final-live:datafusion"
+    assert args.paper_notes == "24h latest-version run"
+    assert args.skip_paper_journal is True
+
+
+def test_run_experiment_job_propagates_local_source_scheduler(monkeypatch):
+    captured = {}
+
+    def fake_run_fuzz(*, cases, seed, backends, config, duration_s):
+        captured["enable_local_source_scheduler"] = config.enable_local_source_scheduler
+        captured["local_source_exploration_weight"] = config.local_source_exploration_weight
+        return Path("runs/fake.jsonl")
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    result = cli._run_experiment_job(
+        {
+            "order": 0,
+            "target_suite": "core",
+            "backends": ["pandas"],
+            "preset": "baseline",
+            "seed": 1,
+            "cases": 1,
+            "duration_s": None,
+            "log_level": "compact",
+            "compress_run_log": True,
+            "artifact_limit": None,
+            "metamorphic_variant_limit": None,
+            "enable_local_source_scheduler": True,
+            "local_source_exploration_weight": 0.125,
+            "skip_run_reports": True,
+        }
+    )
+
+    assert captured["enable_local_source_scheduler"] is True
+    assert captured["local_source_exploration_weight"] == 0.125
+    assert result["run"]["run_file"] == "runs/fake.jsonl"
+
+
+def test_run_experiment_job_preserves_live_preset_source_scheduler(monkeypatch):
+    captured = {}
+
+    def fake_run_fuzz(*, cases, seed, backends, config, duration_s):
+        captured["enable_local_source_scheduler"] = config.enable_local_source_scheduler
+        captured["local_source_exploration_weight"] = config.local_source_exploration_weight
+        captured["guidance_candidate_pool"] = config.guidance_candidate_pool
+        return Path("runs/fake-live.jsonl")
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    cli._run_experiment_job(
+        {
+            "order": 0,
+            "target_suite": "datafusion_cross",
+            "backends": ["pandas", "duckdb", "datafusion"],
+            "preset": "live_datafusion",
+            "seed": 1,
+            "cases": 1,
+            "duration_s": None,
+            "log_level": "compact",
+            "compress_run_log": True,
+            "artifact_limit": None,
+            "metamorphic_variant_limit": None,
+            "enable_local_source_scheduler": False,
+            "local_source_exploration_weight": 0.5,
+            "skip_run_reports": True,
+        }
+    )
+
+    assert captured["enable_local_source_scheduler"] is True
+    assert captured["local_source_exploration_weight"] == 0.35
+    assert captured["guidance_candidate_pool"] == 12
+
+
+def test_cli_experiment_static_manifest_records_local_source_scheduler(tmp_path, monkeypatch, capsys):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    bugs_dir = tmp_path / "bugs"
+    corpus_dir = tmp_path / "corpus"
+    monkeypatch.setattr(cli, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(cli, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(cli, "BUGS_DIR", bugs_dir)
+    monkeypatch.setattr(cli, "CORPUS_DIR", corpus_dir)
+
+    def fake_run_fuzz(*, cases, seed, backends, config, duration_s):
+        run_file = runs_dir / "run-static.jsonl"
+        append_jsonl(
+            {
+                "case": {"case_id": "case-0", "seed": seed},
+                "is_new_behavior": False,
+                "findings": [],
+            },
+            run_file,
+        )
+        meta_path = Path(str(run_file).replace(".jsonl", ".meta.json"))
+        meta_path.write_text(
+            json.dumps(
+                {
+                    "elapsed_s": 0.1,
+                    "throughput_cases_s": 10.0,
+                    "next_seed": seed + (cases or 1),
+                }
+            ),
+            encoding="utf-8",
+        )
+        return run_file
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "experiment",
+            "--target-suites",
+            "core",
+            "--presets",
+            "baseline",
+            "--seeds",
+            "1",
+            "--cases",
+            "1",
+            "--enable-local-source-scheduler",
+            "--local-source-exploration-weight",
+            "0.25",
+            "--skip-run-reports",
+        ]
+    )
+
+    assert args.func(args) == 0
+    manifests = sorted(runs_dir.glob("experiment-*.json"))
+    manifest = json.loads(manifests[0].read_text(encoding="utf-8"))
+    assert manifest["schedule"] == "matrix_order"
+    assert manifest["evidence_mode"] == "live"
+    assert manifest["local_source_scheduler"]["enabled"] is True
+    assert manifest["local_source_scheduler"]["exploration_weight"] == 0.25
+
+
+def test_cli_experiment_manifest_records_historical_evidence_metadata(tmp_path, monkeypatch, capsys):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(cli, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(cli, "REPORTS_DIR", reports_dir)
+
+    def fake_run_fuzz(*, cases, seed, backends, config, duration_s):
+        run_file = runs_dir / "run-historical.jsonl"
+        append_jsonl({"case": {"case_id": "case-0", "seed": seed}, "findings": []}, run_file)
+        run_meta_path(run_file).write_text(
+            json.dumps({"elapsed_s": 0.1, "throughput_cases_s": 10.0, "next_seed": seed + 1}),
+            encoding="utf-8",
+        )
+        return run_file
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "experiment",
+            "--target-suites",
+            "core",
+            "--presets",
+            "baseline",
+            "--seeds",
+            "1",
+            "--cases",
+            "1",
+            "--evidence-mode",
+            "historical",
+            "--known-bug-id",
+            "datafusion-22190",
+            "--target-version",
+            "pre-fix-sha",
+            "--skip-run-reports",
+        ]
+    )
+
+    assert args.func(args) == 0
+    manifest = json.loads(next(runs_dir.glob("experiment-*.json")).read_text(encoding="utf-8"))
+    assert manifest["evidence_mode"] == "historical"
+    assert manifest["known_bug_id"] == "datafusion-22190"
+    assert manifest["target_version"] == "pre-fix-sha"
+    assert manifest["runs"][0]["evidence_mode"] == "historical"
+
+
+def test_cli_replay_fixture_records_single_case_run_and_journal(tmp_path, monkeypatch, capsys):
+    pyarrow = pytest.importorskip("pyarrow")
+    pq = pytest.importorskip("pyarrow.parquet")
+    from datadiff.fixture_replay import fixture_sha256
+
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(cli, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(cli, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(cli, "BUGS_DIR", tmp_path / "bugs")
+    monkeypatch.setattr(cli, "CORPUS_DIR", tmp_path / "corpus")
+
+    fixture_path = tmp_path / "fixture.parquet"
+    table = pyarrow.table(
+        {
+            "a": pyarrow.array([None, 2, 1], type=pyarrow.int64()),
+            "b": pyarrow.array(["n", "z", "a"], type=pyarrow.string()),
+        }
+    )
+    pq.write_table(table, fixture_path)
+    spec_path = tmp_path / "spec.json"
+    spec_path.write_text(
+        json.dumps(
+            {
+                "case_id": "case-cli-fixture",
+                "seed": 77,
+                "target_suite": "cross_family",
+                "fixture": {
+                    "name": "declared",
+                    "columns": ["a", "b"],
+                    "sha256": fixture_sha256(fixture_path),
+                },
+                "operations": [
+                    {
+                        "op": "sort",
+                        "keys": [
+                            {"column": "a", "ascending": True, "nulls": "first"},
+                            {"column": "b", "ascending": True, "nulls": "last"},
+                        ],
+                    },
+                    {"op": "limit", "n": 2},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "replay-fixture",
+            "--spec",
+            str(spec_path),
+            "--fixture",
+            str(fixture_path),
+            "--backends",
+            "pandas",
+            "--known-bug-id",
+            "fixture-test",
+            "--target-version",
+            "target==1.0",
+            "--artifact-limit",
+            "0",
+            "--no-compress-run-log",
+        ]
+    )
+
+    assert args.func(args) == 0
+    run_file = next(runs_dir.glob("run-fixture-*.jsonl"))
+    meta = json.loads(run_meta_path(run_file).read_text(encoding="utf-8"))
+    journal = (reports_dir / "paper-run-journal.jsonl").read_text(encoding="utf-8")
+    output = capsys.readouterr().out
+    assert "status=ok" in output
+    assert meta["preset"] == "fixture_replay"
+    assert meta["evidence_mode"] == "historical"
+    assert meta["known_bug_id"] == "fixture-test"
+    assert meta["fixture_sha256"] == fixture_sha256(fixture_path)
+    assert '"known_bug_id": "fixture-test"' in journal
+
+
+def test_cli_historical_status_marks_counted_and_pending(capsys):
+    parser = build_parser()
+    args = parser.parse_args(["historical-status", "--include-pending", "--json"])
+
+    assert args.func(args) == 0
+    payload = json.loads(capsys.readouterr().out)
+    by_id = {row["bug_id"]: row for row in payload["historical_bugs"]}
+    assert by_id["duckdb-22075"]["counted"] is True
+    assert by_id["duckdb-22656"]["counted"] is True
+    assert by_id["duckdb-22656"]["target_suite"] == "duckdb_storage_cross"
+    assert by_id["duckdb-3015"]["counted"] is False
+    assert by_id["duckdb-3015"]["replay_kind"] == "fixture"
+    assert by_id["duckdb-3015"]["fixture_env_status"] in {"set", "unset"}
+
+
+def test_cli_experiment_manifest_names_do_not_collide_within_same_second(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    bugs_dir = tmp_path / "bugs"
+    corpus_dir = tmp_path / "corpus"
+    monkeypatch.setattr(cli, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(cli, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(cli, "BUGS_DIR", bugs_dir)
+    monkeypatch.setattr(cli, "CORPUS_DIR", corpus_dir)
+    monkeypatch.setattr(cli, "utc_now", lambda: "2026-05-19T15:42:27Z")
+    ticks = iter([111, 222])
+    monkeypatch.setattr(cli.time, "time_ns", lambda: next(ticks))
+
+    def fake_run_fuzz(*, cases, seed, backends, config, duration_s):
+        run_file = runs_dir / f"run-{seed}.jsonl"
+        append_jsonl(
+            {
+                "case": {"case_id": f"case-{seed}", "seed": seed},
+                "is_new_behavior": False,
+                "findings": [],
+            },
+            run_file,
+        )
+        meta_path = Path(str(run_file).replace(".jsonl", ".meta.json"))
+        meta_path.write_text(
+            json.dumps(
+                {
+                    "elapsed_s": 0.1,
+                    "throughput_cases_s": 10.0,
+                    "next_seed": seed + (cases or 1),
+                }
+            ),
+            encoding="utf-8",
+        )
+        return run_file
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    parser = build_parser()
+    argv = [
+        "experiment",
+        "--target-suites",
+        "core",
+        "--presets",
+        "baseline",
+        "--seeds",
+        "1",
+        "--cases",
+        "1",
+        "--skip-run-reports",
+    ]
+
+    args = parser.parse_args(argv)
+    assert args.func(args) == 0
+    args = parser.parse_args(argv)
+    assert args.func(args) == 0
+
+    manifests = sorted(runs_dir.glob("experiment-*.json"))
+    assert [path.name for path in manifests] == [
+        "experiment-20260519T154227-111.json",
+        "experiment-20260519T154227-222.json",
+    ]
+
+
 def test_experiment_parallel_scheduler_starts_heavy_jobs_first():
     fast = {
         "order": 0,
@@ -486,6 +1053,224 @@ def test_experiment_parallel_scheduler_starts_heavy_jobs_first():
     }
 
     assert sorted([fast, slow], key=cli._experiment_job_sort_key) == [slow, fast]
+
+
+def test_experiment_parallelism_auto_uses_bounded_workers(monkeypatch):
+    monkeypatch.setattr(cli.os, "cpu_count", lambda: 20)
+    parser = build_parser()
+    args = parser.parse_args(["experiment", "--jobs", "auto"])
+    planned = [
+        {"order": 0, "preset": "live_cross_family", "backends": ["pandas", "duckdb", "datafusion"]},
+        {"order": 1, "preset": "live_polars_lazy", "backends": ["polars", "polars_lazy"]},
+        {"order": 2, "preset": "live_arrow", "backends": ["pandas", "duckdb", "pyarrow"]},
+        {"order": 3, "preset": "baseline", "backends": ["pandas", "duckdb"]},
+        {"order": 4, "preset": "baseline", "backends": ["pandas", "sqlite"]},
+    ]
+
+    parallelism = cli._resolve_experiment_parallelism(args, planned)
+
+    assert parallelism["worker_count"] == 5
+    assert parallelism["bounded_submission"] is True
+    assert parallelism["cost_limited"] is True
+    assert parallelism["worker_thread_limit"] == 4
+
+
+def test_cli_experiment_adaptive_scheduler_reuses_budget_on_high_yield_arm(tmp_path, monkeypatch, capsys):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    bugs_dir = tmp_path / "bugs"
+    corpus_dir = tmp_path / "corpus"
+    monkeypatch.setattr(cli, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(cli, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(cli, "BUGS_DIR", bugs_dir)
+    monkeypatch.setattr(cli, "CORPUS_DIR", corpus_dir)
+
+    counter = {"index": 0}
+
+    def fake_run_fuzz(*, cases, seed, backends, config, duration_s):
+        idx = counter["index"]
+        counter["index"] += 1
+        assert config.enable_local_source_scheduler is True
+        assert config.local_source_exploration_weight == 0.125
+        run_file = runs_dir / f"run-{idx}.jsonl"
+        target_suite = "datafusion_cross" if "datafusion" in backends else "core"
+        if target_suite == "datafusion_cross":
+            append_jsonl(
+                {
+                    "case": {"case_id": f"case-{idx}", "seed": seed},
+                    "is_new_behavior": True,
+                    "findings": [
+                        {
+                            "root_cause": "grouped_topk_null_sort_key",
+                            "triage_verdict": "candidate_implementation_bug",
+                            "suspicious_backends": ["datafusion"],
+                            "signature": f"sig-{idx}",
+                        }
+                    ],
+                },
+                run_file,
+            )
+        else:
+            append_jsonl(
+                {
+                    "case": {"case_id": f"case-{idx}", "seed": seed},
+                    "is_new_behavior": False,
+                    "findings": [],
+                },
+                run_file,
+            )
+        meta_path = Path(str(run_file).replace(".jsonl", ".meta.json"))
+        meta_path.write_text(
+            json.dumps(
+                {
+                    "elapsed_s": 0.1,
+                    "throughput_cases_s": 10.0,
+                    "next_seed": seed + cases,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return run_file
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "experiment",
+            "--target-suites",
+            "core,datafusion_cross",
+            "--presets",
+            "baseline",
+            "--seeds",
+            "1",
+            "--cases",
+            "2",
+            "--schedule",
+            "adaptive",
+            "--batch-cases",
+            "1",
+            "--jobs",
+            "1",
+            "--local-source-exploration-weight",
+            "0.125",
+            "--skip-run-reports",
+        ]
+    )
+
+    assert args.func(args) == 0
+    out = capsys.readouterr().out
+    assert "reward=" in out
+
+    manifests = sorted(runs_dir.glob("experiment-*.json"))
+    assert len(manifests) == 1
+    manifest = json.loads(manifests[0].read_text(encoding="utf-8"))
+    assert manifest["schedule"] == "adaptive"
+    assert manifest["adaptive_config"]["fine_grained_local_source_scheduler"] is True
+    assert manifest["adaptive_config"]["local_source_exploration_weight"] == 0.125
+    suites = [run["target_suite"] for run in manifest["runs"]]
+    assert suites.count("datafusion_cross") > suites.count("core")
+
+
+def test_cli_experiment_adaptive_scheduler_supports_parallel_rounds(tmp_path, monkeypatch, capsys):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    bugs_dir = tmp_path / "bugs"
+    corpus_dir = tmp_path / "corpus"
+    monkeypatch.setattr(cli, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(cli, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(cli, "BUGS_DIR", bugs_dir)
+    monkeypatch.setattr(cli, "CORPUS_DIR", corpus_dir)
+    monkeypatch.setattr(cli, "ProcessPoolExecutor", cli.ThreadPoolExecutor)
+
+    counter = {"index": 0}
+
+    def fake_run_fuzz(*, cases, seed, backends, config, duration_s):
+        idx = counter["index"]
+        counter["index"] += 1
+        run_file = runs_dir / f"run-{idx}.jsonl"
+        target_suite = (
+            "datafusion_cross"
+            if "datafusion" in backends
+            else "dataframe"
+            if "polars" in backends
+            else "core"
+        )
+        if target_suite == "datafusion_cross":
+            payload = {
+                "case": {"case_id": f"case-{idx}", "seed": seed},
+                "is_new_behavior": True,
+                "findings": [
+                    {
+                        "root_cause": "grouped_topk_null_sort_key",
+                        "triage_verdict": "candidate_implementation_bug",
+                        "suspicious_backends": ["datafusion"],
+                        "signature": f"sig-{idx}",
+                    }
+                ],
+            }
+        elif target_suite == "dataframe":
+            payload = {
+                "case": {"case_id": f"case-{idx}", "seed": seed},
+                "is_new_behavior": True,
+                "findings": [],
+            }
+        else:
+            payload = {
+                "case": {"case_id": f"case-{idx}", "seed": seed},
+                "is_new_behavior": False,
+                "findings": [],
+            }
+        append_jsonl(payload, run_file)
+        meta_path = Path(str(run_file).replace(".jsonl", ".meta.json"))
+        meta_path.write_text(
+            json.dumps(
+                {
+                    "elapsed_s": 0.1,
+                    "throughput_cases_s": 10.0,
+                    "next_seed": seed + cases,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return run_file
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "experiment",
+            "--target-suites",
+            "core,dataframe,datafusion_cross",
+            "--presets",
+            "baseline",
+            "--seeds",
+            "1",
+            "--cases",
+            "2",
+            "--schedule",
+            "adaptive",
+            "--batch-cases",
+            "1",
+            "--jobs",
+            "2",
+            "--skip-run-reports",
+        ]
+    )
+
+    assert args.func(args) == 0
+    out = capsys.readouterr().out
+    assert "reward=" in out
+
+    manifests = sorted(runs_dir.glob("experiment-*.json"))
+    manifest = json.loads(manifests[0].read_text(encoding="utf-8"))
+    assert manifest["adaptive_config"]["jobs"] == 2
+    suites = [run["target_suite"] for run in manifest["runs"]]
+    assert suites.count("datafusion_cross") >= suites.count("core")
+    assert any(run["scheduler_reward"] > 0 for run in manifest["runs"])
 
 
 def test_cli_experiment_summary_parses_refresh():

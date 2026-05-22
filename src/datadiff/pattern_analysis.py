@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+from datadiff.dsl import normalize_sort_keys
 from datadiff.reporter import latest_experiment_manifest
 from datadiff.util import REPORTS_DIR, ensure_dirs, load_json, read_jsonl
 
@@ -100,13 +101,18 @@ def _null_agg_topk_variant(case: dict[str, Any]) -> dict[str, str] | None:
             sort = ops[sort_idx]
             if sort.get("op") != "sort":
                 continue
-            if alias not in {str(column) for column in sort.get("columns", [])}:
+            try:
+                sort_keys = normalize_sort_keys(sort)
+            except ValueError:
+                continue
+            matching_key = next((key for key in sort_keys if key.column == alias), None)
+            if matching_key is None:
                 continue
             if not any(later.get("op") == "limit" for later in ops[sort_idx + 1 :]):
                 continue
             return {
                 "agg_func": str(agg.get("func", "unknown")),
-                "sort_direction": "asc" if sort.get("ascending", True) else "desc",
+                "sort_direction": "asc" if matching_key.ascending else "desc",
             }
     return None
 

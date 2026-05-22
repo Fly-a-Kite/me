@@ -96,7 +96,7 @@ def normalize_result(result: BackendResult, program: Program, enable_normalizer:
         rows: list[list[Any]] = []
         for _, row in df.iterrows():
             rows.append([_norm_value(row.iloc[idx]) for idx, _ in column_positions])
-        if enable_normalizer:
+        if enable_normalizer and not program.order_sensitive:
             # SQL/DataFrame backends differ on stable ordering for ties and on
             # whether intermediate order is observable. The default oracle is
             # bag-semantics; order-sensitive metamorphic checks should be tested

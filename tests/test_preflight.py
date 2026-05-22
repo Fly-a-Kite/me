@@ -8,6 +8,7 @@ def test_preflight_repairs_invalid_program_with_fallback():
         1,
         [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
         Program("prog-invalid", 1, [{"op": "select", "columns": ["missing"]}]),
+        metadata={"seed_lineage": {"root_seed": 1, "depth": 1}, "mutation": {"operator": "drop_op"}},
     )
 
     result = preflight_case(case)
@@ -16,6 +17,7 @@ def test_preflight_repairs_invalid_program_with_fallback():
     assert result.repaired is True
     assert result.fallback_used is True
     assert result.case.program.operations == [{"op": "limit", "n": 1}]
+    assert result.case.metadata == case.metadata
     assert result.errors_before
     assert result.errors_after == []
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import json
 import tarfile
@@ -73,9 +74,26 @@ def validate_paths(paths: list[str], *, root: Path) -> None:
 
 
 def write_bundle(paths: list[str], output_path: Path, *, root: Path) -> None:
-    with tarfile.open(output_path, "w:gz") as tar:
-        for rel_path in sorted(paths):
-            tar.add(root / rel_path, arcname=rel_path, recursive=False)
+    with output_path.open("wb") as handle:
+        with gzip.GzipFile(filename="", mode="wb", fileobj=handle, mtime=0) as gz_handle:
+            with tarfile.open(fileobj=gz_handle, mode="w") as tar:
+                for rel_path in sorted(paths):
+                    tar.add(
+                        root / rel_path,
+                        arcname=rel_path,
+                        recursive=False,
+                        filter=normalize_tarinfo,
+                    )
+
+
+def normalize_tarinfo(tarinfo: tarfile.TarInfo) -> tarfile.TarInfo:
+    tarinfo.uid = 0
+    tarinfo.gid = 0
+    tarinfo.uname = ""
+    tarinfo.gname = ""
+    tarinfo.mtime = 0
+    tarinfo.mode = 0o755 if tarinfo.mode & 0o111 else 0o644
+    return tarinfo
 
 
 def sha256_file(path: Path) -> str:

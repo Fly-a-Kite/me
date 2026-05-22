@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from typing import Any
 
 from datadiff.backends.base import Backend, BackendResult
-from datadiff.dsl import Program, TableData
+from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
 
 
 class PyArrowBackend(Backend):
@@ -23,6 +23,7 @@ class PyArrowBackend(Backend):
         start = time.perf_counter()
         try:
             with _suppress_native_stderr():
+                import pyarrow as pa
                 import pyarrow.compute as pc
 
                 table_by_name = {table.name: table for table in tables}
@@ -58,13 +59,11 @@ class PyArrowBackend(Backend):
                         current_cols = list(op["columns"])
                         current = current.select(current_cols)
                     elif kind == "sort":
-                        direction = "ascending" if op["ascending"] else "descending"
-                        current = current.sort_by(
-                            [(column, direction) for column in op["columns"]],
-                            null_placement="at_end",
-                        )
+                        current = _sort_table(pa, current, normalize_sort_keys(op))
                     elif kind == "limit":
                         current = current.slice(0, int(op["n"]))
+                    elif kind == "offset":
+                        current = current.slice(int(op["n"]))
                     elif kind == "mutate":
                         expr = op["expr"]
                         values = _eval_expr(pc, current, expr)
@@ -77,6 +76,12 @@ class PyArrowBackend(Backend):
                         target_names = [*keys, *[agg["as"] for agg in op["aggs"]]]
                         current = _select_existing(current, source_names).rename_columns(target_names)
                         current_cols = target_names
+                    elif kind == "aggregate":
+                        values = {}
+                        for agg in op["aggs"]:
+                            values[agg["as"]] = [_global_aggregate(pc, current[agg["column"]], agg["func"])]
+                        current = pa.Table.from_pydict(values)
+                        current_cols = [agg["as"] for agg in op["aggs"]]
                     else:
                         raise ValueError(kind)
 
@@ -137,6 +142,37 @@ def _eval_expr(pc, table: Any, expr: dict[str, Any]):
     if expr["kind"] == "string_lower":
         return pc.utf8_lower(source)
     raise ValueError(expr["kind"])
+
+
+def _global_aggregate(pc, array: Any, func: str) -> Any:
+    if func == "count":
+        return pc.count(array, mode="only_valid").as_py()
+    if func == "sum":
+        return pc.sum(array).as_py()
+    if func == "min":
+        return pc.min(array).as_py()
+    if func == "max":
+        return pc.max(array).as_py()
+    raise ValueError(func)
+
+
+def _sort_table(pa: Any, table: Any, sort_keys: list[SortKey]) -> Any:
+    null_placements = {key.nulls for key in sort_keys}
+    if len(null_placements) <= 1:
+        return table.sort_by(
+            [(key.column, "ascending" if key.ascending else "descending") for key in sort_keys],
+            null_placement="at_start" if sort_keys and sort_keys[0].nulls == "first" else "at_end",
+        )
+
+    df = table.to_pandas(use_threads=False)
+    for key in reversed(sort_keys):
+        df = df.sort_values(
+            key.column,
+            ascending=key.ascending,
+            na_position=key.nulls,
+            kind="mergesort",
+        )
+    return pa.Table.from_pandas(df, schema=table.schema, preserve_index=False)
 
 
 def _replace_column(table: Any, cols: list[str], column: str, values: Any) -> tuple[Any, list[str]]:
