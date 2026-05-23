@@ -550,6 +550,34 @@ def test_oracle_classifies_pyarrow_dataset_isin_all_match_semantics():
     assert findings[0].root_cause == "pyarrow_dataset_isin_all_match_semantics"
 
 
+def test_oracle_classifies_last_output_probe_when_mutation_appends_multiple_probes():
+    case = Case(
+        "case-multi-probe-root",
+        17,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-multi-probe-root",
+            17,
+            [
+                {"op": "group_quantile_probe", "as": "quantile_key_mismatch"},
+                {"op": "dataset_isin_all_match_probe", "as": "dataset_isin_all_match_mismatch"},
+            ],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["dataset_isin_all_match_mismatch"], [[False]]),
+            "pyarrow": NormalizedResult("pyarrow", "ok", ["dataset_isin_all_match_mismatch"], [[True]]),
+            "polars": NormalizedResult("polars", "ok", ["dataset_isin_all_match_mismatch"], [[False]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "pyarrow_dataset_isin_all_match_semantics"
+
+
 def test_oracle_classifies_pyarrow_large_string_partition_schema_semantics():
     case = generate_case(370039, profile="pyarrow_large_string_partition_schema_semantics")
 

@@ -58,56 +58,11 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
     ops = case.program.op_sequence()
     if kind == "exception_mismatch":
         return "exception_taxonomy"
+    probe_root = _last_probe_root(case)
+    if probe_root is not None:
+        return probe_root
     if _case_has_running_sum(case):
         return "running_sum_precision"
-    if _case_has_sortedness_check(case):
-        return "sortedness_null_placement"
-    if _case_has_random_case_probe(case):
-        return "simple_case_random_subject"
-    if _case_has_group_quantile_probe(case):
-        return "group_quantile_key_expression"
-    if _case_has_scalar_subquery_probe(case):
-        return "scalar_subquery_double_parentheses"
-    if _case_has_window_avg_probe(case):
-        return "window_avg_rows_frame"
-    if _case_has_struct_distinct_probe(case):
-        return "struct_distinct_unnest"
-    if _case_has_bit_compare_probe(case):
-        return "bit_compare_unequal_length"
-    if _case_has_round_even_probe(case):
-        return "round_even_float_scale"
-    if _case_has_series_rtruediv_probe(case):
-        return "series_rtruediv_operand_order"
-    if _case_has_uint64_isin_probe(case):
-        return "pandas_uint64_isin_precision"
-    if _case_has_tuple_anti_null_probe(case):
-        return "duckdb_tuple_anti_null_semantics"
-    if _case_has_json_predicate_order_probe(case):
-        return "duckdb_json_predicate_order_semantics"
-    if _case_has_sparse_mask_probe(case):
-        return "pandas_sparse_array_mask_semantics"
-    if _case_has_float_wrap_probe(case):
-        return "polars_float_wrap_numerical_semantics"
-    if _case_has_index_bool_probe(case):
-        return "pandas_index_bool_result_type"
-    if _case_has_empty_literal_groupby_probe(case):
-        return "polars_empty_literal_groupby_semantics"
-    if _case_has_arrow_string_eq_sum_probe(case):
-        return "pandas_arrow_string_eq_sum_semantics"
-    if _case_has_arrow_timestamp_loc_slice_probe(case):
-        return "pandas_arrow_timestamp_loc_slice_semantics"
-    if _case_has_arrow_timestamp_index_attr_probe(case):
-        return "pandas_arrow_timestamp_index_attr_semantics"
-    if _case_has_eval_inplace_alias_probe(case):
-        return "pandas_eval_inplace_aliasing_semantics"
-    if _case_has_dataset_isin_all_match_probe(case):
-        return "pyarrow_dataset_isin_all_match_semantics"
-    if _case_has_large_string_partition_probe(case):
-        return "pyarrow_large_string_partition_schema_semantics"
-    if _case_has_hash_pivot_wider_probe(case):
-        return "pyarrow_hash_pivot_wider_order_semantics"
-    if _case_has_rolling_mean_by_null_count_probe(case):
-        return "polars_rolling_mean_by_null_count_semantics"
     if _case_contains_special_float(case):
         return "nan_inf_semantics"
     if _case_uses_modulo(case):
@@ -155,6 +110,42 @@ def _case_contains_null(case: Case) -> bool:
             if any(v is None for v in row.values()):
                 return True
     return False
+
+
+PROBE_ROOTS = {
+    "sortedness_check": "sortedness_null_placement",
+    "random_case_probe": "simple_case_random_subject",
+    "group_quantile_probe": "group_quantile_key_expression",
+    "scalar_subquery_probe": "scalar_subquery_double_parentheses",
+    "window_avg_probe": "window_avg_rows_frame",
+    "struct_distinct_probe": "struct_distinct_unnest",
+    "bit_compare_probe": "bit_compare_unequal_length",
+    "round_even_probe": "round_even_float_scale",
+    "series_rtruediv_probe": "series_rtruediv_operand_order",
+    "uint64_isin_probe": "pandas_uint64_isin_precision",
+    "tuple_anti_null_probe": "duckdb_tuple_anti_null_semantics",
+    "json_predicate_order_probe": "duckdb_json_predicate_order_semantics",
+    "sparse_mask_probe": "pandas_sparse_array_mask_semantics",
+    "float_wrap_probe": "polars_float_wrap_numerical_semantics",
+    "index_bool_probe": "pandas_index_bool_result_type",
+    "empty_literal_groupby_probe": "polars_empty_literal_groupby_semantics",
+    "arrow_string_eq_sum_probe": "pandas_arrow_string_eq_sum_semantics",
+    "arrow_timestamp_loc_slice_probe": "pandas_arrow_timestamp_loc_slice_semantics",
+    "arrow_timestamp_index_attr_probe": "pandas_arrow_timestamp_index_attr_semantics",
+    "eval_inplace_alias_probe": "pandas_eval_inplace_aliasing_semantics",
+    "dataset_isin_all_match_probe": "pyarrow_dataset_isin_all_match_semantics",
+    "large_string_partition_probe": "pyarrow_large_string_partition_schema_semantics",
+    "hash_pivot_wider_probe": "pyarrow_hash_pivot_wider_order_semantics",
+    "rolling_mean_by_null_count_probe": "polars_rolling_mean_by_null_count_semantics",
+}
+
+
+def _last_probe_root(case: Case) -> str | None:
+    for op in reversed(case.program.operations):
+        root = PROBE_ROOTS.get(str(op.get("op", "")))
+        if root is not None:
+            return root
+    return None
 
 
 def _case_contains_special_float(case: Case) -> bool:
