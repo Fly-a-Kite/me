@@ -35,6 +35,7 @@ GeneratorProfile = Literal[
     "global_null_aggregate",
     "string_count_groupby",
     "unique_count_groupby",
+    "set_membership_filter",
 ]
 
 
@@ -154,6 +155,16 @@ def _literal_for_column(rnd: random.Random, table: TableData, col: str) -> Any:
     return rnd.choice(["", "alpha", "beta", "中文", "missing"])
 
 
+def _literal_list_for_column(rnd: random.Random, table: TableData, col: str) -> list[Any]:
+    typ = table.column_type(col)
+    values = unique_preserve_order([row.get(col) for row in table.rows if row.get(col) is not None])
+    values = [value for value in values if not (isinstance(value, float) and math.isnan(value))]
+    rnd.shuffle(values)
+    selected = values[: rnd.randint(1, max(1, min(3, len(values))))]
+    fallback = _literal_list_for_type(rnd, typ)
+    return unique_preserve_order([*selected, *fallback])[:3]
+
+
 def _literal_for_type(rnd: random.Random, typ: str) -> Any:
     if typ == "int":
         return rnd.choice([-10, -1, 0, 1, 2, 10])
@@ -162,6 +173,16 @@ def _literal_for_type(rnd: random.Random, typ: str) -> Any:
     if typ == "bool":
         return rnd.choice([True, False])
     return rnd.choice(["", "alpha", "beta", "中文", "missing"])
+
+
+def _literal_list_for_type(rnd: random.Random, typ: str) -> list[Any]:
+    if typ == "int":
+        return rnd.sample([-10, -1, 0, 1, 2, 10], k=3)
+    if typ == "float":
+        return rnd.sample([-1.0, 0.0, 0.5, 1.0, 10.0], k=3)
+    if typ == "bool":
+        return rnd.sample([True, False], k=rnd.randint(1, 2))
+    return rnd.sample(["", "alpha", "beta", "中文", "missing"], k=3)
 
 
 def generate_program(
@@ -282,9 +303,15 @@ def generate_program(
                     "le_is_not_false",
                     *cmp_ops,
                 ]
+            if bughunt_profile and rnd.random() < 0.20:
+                cmp_ops = ["in_set", *cmp_ops]
             base_cols = {c.name for c in table.columns}
-            value = _literal_for_column(rnd, table, col) if col in base_cols else _literal_for_type(rnd, typ)
-            ops.append({"op": "filter", "column": col, "cmp": rnd.choice(cmp_ops), "value": value})
+            cmp = rnd.choice(cmp_ops)
+            if cmp == "in_set":
+                value = _literal_list_for_column(rnd, table, col) if col in base_cols else _literal_list_for_type(rnd, typ)
+            else:
+                value = _literal_for_column(rnd, table, col) if col in base_cols else _literal_for_type(rnd, typ)
+            ops.append({"op": "filter", "column": col, "cmp": cmp, "value": value})
 
         elif op == "select" and available_cols:
             k = rnd.randint(1, len(available_cols))
@@ -703,6 +730,10 @@ def _mutate_output_type(
 def _filter_literal_is_valid(column_type: str, comparator: Any, value: Any) -> bool:
     if not filter_comparator_supports_type(column_type, comparator):
         return False
+    if comparator == "in_set":
+        if not isinstance(value, list) or not value or any(item is None for item in value):
+            return False
+        return all(_filter_literal_is_valid(column_type, "==", item) for item in value)
     if value is None:
         return True
     if column_type == "str":
@@ -757,6 +788,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_string_count_groupby_case(seed)
     if profile == "unique_count_groupby" and type_aware:
         return generate_unique_count_groupby_case(seed)
+    if profile == "set_membership_filter" and type_aware:
+        return generate_set_membership_filter_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -800,6 +833,8 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         return _as_bughunt_mixed_case(generate_join_null_key_topk_case(seed), seed, "join_null_key_topk")
     if selector == 47:
         return _as_bughunt_mixed_case(generate_string_count_groupby_case(seed), seed, "string_count_groupby")
+    if selector == 50:
+        return _as_bughunt_mixed_case(generate_set_membership_filter_case(seed), seed, "set_membership_filter")
     if selector == 56:
         return _as_bughunt_mixed_case(generate_unique_count_groupby_case(seed), seed, "unique_count_groupby")
     if selector == 53:
@@ -1945,6 +1980,66 @@ def generate_unique_count_groupby_case(seed: int) -> Case:
         metadata={
             "generator_profile": "unique_count_groupby",
             "source_issue": "https://github.com/apache/arrow/issues/36149",
+        },
+    )
+
+
+def generate_set_membership_filter_case(seed: int) -> Case:
+    rows = [
+        {"id": 0, "g": "alpha", "s": "red", "x": 1, "flag": True},
+        {"id": 1, "g": "alpha", "s": "", "x": 2, "flag": False},
+        {"id": 2, "g": "alpha", "s": None, "x": None, "flag": None},
+        {"id": 3, "g": "beta", "s": "blue", "x": 2, "flag": True},
+        {"id": 4, "g": "beta", "s": "中文", "x": 3, "flag": False},
+        {"id": 5, "g": "beta", "s": "space value", "x": None, "flag": True},
+        {"id": 6, "g": None, "s": "", "x": 4, "flag": None},
+        {"id": 7, "g": None, "s": "red", "x": 4, "flag": False},
+        {"id": 8, "g": "gamma", "s": None, "x": 5, "flag": True},
+    ]
+    if seed % 2:
+        rows.append({"id": 9, "g": "gamma", "s": "中文", "x": 5, "flag": False})
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("s", "str", nullable=True),
+            ColumnSpec("x", "int", nullable=True),
+            ColumnSpec("flag", "bool", nullable=True),
+        ],
+        rows,
+    )
+    program = Program(
+        f"prog-{seed:08d}-set-membership-filter",
+        seed,
+        [
+            {"op": "filter", "column": "s", "cmp": "in_set", "value": ["red", "", "中文"]},
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [
+                    {"column": "s", "func": "count", "as": "count_s"},
+                    {"column": "x", "func": "nunique", "as": "uniq_x_count"},
+                ],
+            },
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "count_s", "ascending": False, "nulls": "last"},
+                    {"column": "g", "ascending": True, "nulls": "first"},
+                ],
+            },
+            {"op": "limit", "n": 5},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-set-membership-filter",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "set_membership_filter",
+            "source_issue": "https://github.com/pola-rs/polars/issues/22149",
         },
     )
 

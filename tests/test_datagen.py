@@ -109,6 +109,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "global_null_aggregate",
         "string_count_groupby",
         "unique_count_groupby",
+        "set_membership_filter",
         "wide_offset_topk",
         "join_null_key_topk",
         "empty_filter_groupby",
@@ -423,6 +424,19 @@ def test_generate_case_unique_count_groupby_profile_is_supported_and_valid():
     assert "agg:nunique:int" in features
     assert "groupby:null-key" in features
     assert case.metadata["source_issue"] == "https://github.com/apache/arrow/issues/36149"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_set_membership_filter_profile_is_supported_and_valid():
+    case = generate_case(123, profile="set_membership_filter")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000123-set-membership-filter"
+    assert [op["op"] for op in case.program.operations] == ["filter", "groupby", "sort", "limit"]
+    assert case.program.operations[0] == {"op": "filter", "column": "s", "cmp": "in_set", "value": ["red", "", "中文"]}
+    assert "pattern:set_membership_filter" in features
+    assert "filter:set-membership" in features
+    assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/22149"
     assert validate_case_program(case) == []
 
 

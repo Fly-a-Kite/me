@@ -29,6 +29,7 @@ GeneratorProfile = Literal[
     "global_null_aggregate",
     "string_count_groupby",
     "unique_count_groupby",
+    "set_membership_filter",
 ]
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]

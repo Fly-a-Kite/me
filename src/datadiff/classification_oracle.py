@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from datadiff.dsl import Case, SortKey, normalize_sort_keys
-from datadiff.filtering import evaluate_filter_predicate, filter_comparator_supports_type, is_filter_comparator
+from datadiff.filtering import evaluate_filter_predicate, filter_comparator_supports_type, is_filter_comparator, parse_filter_comparator
 from datadiff.identifiers import is_reserved_output_name
 from datadiff.normalizer import NormalizedResult, _norm_value
 from datadiff.oracle import Finding
@@ -480,8 +480,23 @@ def _mutate_output_type(
 def _filter_literal_error(column_type: str, comparator: Any, value: Any) -> str:
     if not filter_comparator_supports_type(column_type, comparator):
         return f"comparator {comparator!r} is not supported for {column_type} filter"
+    parsed = parse_filter_comparator(comparator)
+    if parsed is not None and parsed.base == "in_set":
+        if not isinstance(value, list) or not value:
+            return f"filter literal {value!r} is not a non-empty list for in_set"
+        if any(item is None for item in value):
+            return "in_set filter literals must not contain NULL"
+        for item in value:
+            item_error = _scalar_filter_literal_error(column_type, item)
+            if item_error:
+                return item_error
+        return ""
     if value is None:
         return ""
+    return _scalar_filter_literal_error(column_type, value)
+
+
+def _scalar_filter_literal_error(column_type: str, value: Any) -> str:
     if column_type == "str" and not isinstance(value, str):
         return f"filter literal {value!r} is not compatible with str column"
     if column_type == "bool" and not isinstance(value, bool):

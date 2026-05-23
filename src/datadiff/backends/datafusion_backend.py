@@ -16,6 +16,8 @@ def _quote(name: str) -> str:
 def _lit(value: Any) -> str:
     if value is None:
         return "NULL"
+    if isinstance(value, (list, tuple)):
+        return "(" + ", ".join(_lit(item) for item in value) + ")"
     if isinstance(value, bool):
         return "TRUE" if value else "FALSE"
     if isinstance(value, int):

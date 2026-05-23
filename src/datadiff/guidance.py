@@ -46,6 +46,8 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "string_count_groupby": {"pattern:string_count_groupby"},
     "unique_count_groupby": {"pattern:unique_count_groupby"},
     "unique_count": {"agg:nunique"},
+    "set_membership_filter": {"pattern:set_membership_filter"},
+    "set_membership": {"filter:set-membership"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -121,6 +123,7 @@ def extract_case_features(case: Case) -> set[str]:
     available_types = {column.name: column.type for column in table.columns}
     has_string_count_groupby = False
     has_unique_count_groupby = False
+    has_set_membership_filter = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -131,6 +134,9 @@ def extract_case_features(case: Case) -> set[str]:
             features.add(f"cmp:{cmp}")
             features.add(f"filter_type:{available_types.get(column, 'derived')}")
             parsed = parse_filter_comparator(cmp)
+            if parsed is not None and parsed.base == "in_set":
+                features.add("filter:set-membership")
+                has_set_membership_filter = True
             if parsed is not None and parsed.truth_test is not None:
                 features.add("filter:truth-test")
                 features.add(f"filter:truth:{parsed.truth_test}")
@@ -241,6 +247,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:string_count_groupby")
     if has_unique_count_groupby:
         features.add("pattern:unique_count_groupby")
+    if has_set_membership_filter:
+        features.add("pattern:set_membership_filter")
     return features
 
 
@@ -865,6 +873,8 @@ def _filter_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) ->
     if any(value is None for value in values):
         buckets.append("filter:null-aware")
     parsed = parse_filter_comparator(comparator)
+    if parsed is not None and parsed.base == "in_set":
+        buckets.append("filter:set-membership")
     if parsed is not None and parsed.truth_test is not None:
         buckets.append("filter:truth-test")
         buckets.append(f"filter:truth:{parsed.truth_test}")
@@ -891,6 +901,16 @@ def _filter_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) ->
         ), buckets
 
     scalar_values = [value for value in values if value is not None]
+    if isinstance(literal, list):
+        hits = sum(1 for value in scalar_values if value in literal)
+        if hits:
+            buckets.append("filter:set-hit")
+        return min(
+            1.0,
+            0.55
+            + (0.20 if hits and hits < len(scalar_values) else 0.0)
+            + (0.10 if "filter:null-aware" in buckets else 0.0),
+        ), buckets
     if literal in scalar_values:
         buckets.append("filter:exact-hit")
         return 0.85, buckets

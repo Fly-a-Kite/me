@@ -6,6 +6,7 @@ from numbers import Real
 from typing import Any
 
 BASE_FILTER_COMPARATORS = (">", ">=", "<", "<=", "==", "!=")
+SET_FILTER_COMPARATORS = ("in_set",)
 _COMPARATOR_TOKENS = {
     "gt": ">",
     "ge": ">=",
@@ -35,7 +36,7 @@ TRUTH_FILTER_COMPARATORS = tuple(
     for token in _COMPARATOR_TOKENS
     for truth_test in TRUTH_TESTS
 )
-FILTER_COMPARATORS = frozenset(BASE_FILTER_COMPARATORS + TRUTH_FILTER_COMPARATORS)
+FILTER_COMPARATORS = frozenset(BASE_FILTER_COMPARATORS + TRUTH_FILTER_COMPARATORS + SET_FILTER_COMPARATORS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +48,8 @@ class FilterComparator:
 def parse_filter_comparator(raw: Any) -> FilterComparator | None:
     comparator = str(raw)
     if comparator in BASE_FILTER_COMPARATORS:
+        return FilterComparator(comparator)
+    if comparator in SET_FILTER_COMPARATORS:
         return FilterComparator(comparator)
     for token, base in _COMPARATOR_TOKENS.items():
         prefix = f"{token}_"
@@ -65,6 +68,8 @@ def filter_comparator_supports_type(column_type: str, raw: Any) -> bool:
     parsed = parse_filter_comparator(raw)
     if parsed is None:
         return False
+    if parsed.base in SET_FILTER_COMPARATORS:
+        return parsed.truth_test is None and column_type in {"int", "float", "str", "bool"}
     if column_type in {"str", "bool"}:
         return parsed.base in {"==", "!="}
     return column_type in {"int", "float"}
@@ -74,6 +79,12 @@ def evaluate_filter_predicate(left: Any, raw: Any, right: Any) -> bool:
     parsed = parse_filter_comparator(raw)
     if parsed is None:
         raise ValueError(raw)
+    if parsed.base == "in_set":
+        if _is_nullish_scalar(left):
+            return False
+        if not isinstance(right, (list, tuple, frozenset, set)):
+            raise ValueError("in_set literal must be a collection")
+        return left in right
     comparison = _compare_three_valued(left, parsed.base, right)
     if parsed.truth_test is None:
         return comparison is True
@@ -84,6 +95,8 @@ def sql_filter_condition(column_sql: str, literal_sql: str, raw: Any) -> str:
     parsed = parse_filter_comparator(raw)
     if parsed is None:
         raise ValueError(raw)
+    if parsed.base == "in_set":
+        return f"{column_sql} IN {literal_sql}"
     base = f"{column_sql} {_SQL_COMPARATORS[parsed.base]} {literal_sql}"
     truth_test = parsed.truth_test
     if truth_test is None:

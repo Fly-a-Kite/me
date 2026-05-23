@@ -18,6 +18,8 @@ def _lit(value: Any) -> str:
 
     if value is None:
         return "NULL"
+    if isinstance(value, (list, tuple)):
+        return "(" + ", ".join(_lit(item) for item in value) + ")"
     if isinstance(value, bool):
         return "1" if value else "0"
     if isinstance(value, int):

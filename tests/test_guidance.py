@@ -206,6 +206,7 @@ def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
         "global_null_aggregate",
         "string_count_groupby",
         "unique_count_groupby",
+        "set_membership_filter",
     ]
     for profile in profiles:
         for seed in range(50):

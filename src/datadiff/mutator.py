@@ -300,7 +300,10 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
         cmp = rnd.choice(["==", "!="] if typ in {"str", "bool"} else [">", ">=", "<", "<=", "==", "!="])
         if typ in {"int", "float"} and rnd.random() < 0.20:
             cmp = rnd.choice(["gt_is_not_true", "ge_is_not_true", "lt_is_not_false", "le_is_not_false"])
-        return {"op": "filter", "column": col, "cmp": cmp, "value": _literal_for_type(typ, rnd)}
+        if rnd.random() < 0.15:
+            cmp = "in_set"
+        value = _literal_list_for_type(typ, rnd) if cmp == "in_set" else _literal_for_type(typ, rnd)
+        return {"op": "filter", "column": col, "cmp": cmp, "value": value}
     if kind == "select":
         count = rnd.randint(1, len(available))
         return {"op": "select", "columns": sorted(rnd.sample(available, count))}
@@ -416,6 +419,16 @@ def _literal_for_type(typ: str, rnd: random.Random) -> Any:
     if typ == "bool":
         return rnd.choice([True, False])
     return rnd.choice(["", "alpha", "beta", "中文", "missing"])
+
+
+def _literal_list_for_type(typ: str, rnd: random.Random) -> list[Any]:
+    if typ == "int":
+        return rnd.sample([-10, -1, 0, 1, 2, 10], k=3)
+    if typ == "float":
+        return rnd.sample([-1.0, 0.0, 0.5, 1.0, 10.0], k=3)
+    if typ == "bool":
+        return rnd.sample([True, False], k=rnd.randint(1, 2))
+    return rnd.sample(["", "alpha", "beta", "中文", "missing"], k=3)
 
 
 MUTATION_OPERATORS: tuple[MutationOperator, ...] = (

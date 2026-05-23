@@ -464,6 +464,31 @@ def test_validate_case_accepts_null_aware_truth_filter_comparator():
     assert any("not supported for str filter" in error for error in validate_case_program(invalid))
 
 
+def test_validate_case_accepts_typed_set_membership_filter():
+    valid = Case(
+        "case-set-filter",
+        5,
+        [TableData("t0", [ColumnSpec("s", "str")], [{"s": "alpha"}, {"s": None}])],
+        Program("prog-set-filter", 5, [{"op": "filter", "column": "s", "cmp": "in_set", "value": ["alpha", "中文"]}]),
+    )
+    invalid_null = Case(
+        "case-set-filter-null",
+        6,
+        [TableData("t0", [ColumnSpec("s", "str")], [{"s": "alpha"}])],
+        Program("prog-set-filter-null", 6, [{"op": "filter", "column": "s", "cmp": "in_set", "value": ["alpha", None]}]),
+    )
+    invalid_type = Case(
+        "case-set-filter-type",
+        7,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-set-filter-type", 7, [{"op": "filter", "column": "x", "cmp": "in_set", "value": [1, "2"]}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("must not contain NULL" in error for error in validate_case_program(invalid_null))
+    assert any("not compatible with int column" in error for error in validate_case_program(invalid_type))
+
+
 def test_validate_case_rejects_duplicate_select_columns():
     case = Case(
         "case-dup-select",
