@@ -44,6 +44,7 @@ GeneratorProfile = Literal[
     "sortedness_null_placement",
     "simple_case_random_subject",
     "group_quantile_key_probe",
+    "scalar_subquery_double_parentheses",
 ]
 
 
@@ -482,6 +483,9 @@ def _available_columns_after_operations(
         elif kind == "group_quantile_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "scalar_subquery_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "groupby":
             available = unique_preserve_order(
                 [str(key) for key in op.get("keys", [])]
@@ -739,6 +743,17 @@ def repair_operations(
                     "quantiles": list(quantiles),
                 }
             )
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
+        elif kind == "scalar_subquery_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "scalar_subquery_probe", "as": alias})
             available = {alias}
             col_types = {alias: "bool"}
             numeric = set()
@@ -1006,6 +1021,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_simple_case_random_subject_case(seed)
     if profile == "group_quantile_key_probe" and type_aware:
         return generate_group_quantile_key_probe_case(seed)
+    if profile == "scalar_subquery_double_parentheses" and type_aware:
+        return generate_scalar_subquery_double_parentheses_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -1073,6 +1090,12 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         return _as_bughunt_mixed_case(generate_simple_case_random_subject_case(seed), seed, "simple_case_random_subject")
     if seed % 79 == 63:
         return _as_bughunt_mixed_case(generate_group_quantile_key_probe_case(seed), seed, "group_quantile_key_probe")
+    if seed % 83 == 64:
+        return _as_bughunt_mixed_case(
+            generate_scalar_subquery_double_parentheses_case(seed),
+            seed,
+            "scalar_subquery_double_parentheses",
+        )
     return None
 
 
@@ -2668,6 +2691,32 @@ def generate_group_quantile_key_probe_case(seed: int) -> Case:
             "source_issue": "https://github.com/pola-rs/polars/issues/25888",
             "expected_quantiles": [1.0, 2.0, 3.0],
             "expected_quantile_key_mismatch": False,
+        },
+    )
+
+
+def generate_scalar_subquery_double_parentheses_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("scalar_subquery_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-scalar-subquery-double-parentheses",
+        seed,
+        [{"op": "scalar_subquery_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-scalar-subquery-double-parentheses",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "scalar_subquery_double_parentheses",
+            "source_issue": "https://github.com/duckdb/duckdb/issues/19851",
+            "expected_scalar_subquery_mismatch": False,
+            "expected_rows": [[2]],
         },
     )
 

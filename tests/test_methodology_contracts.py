@@ -115,6 +115,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     sortedness_null_placement = _preset_config("sortedness_null_placement")
     simple_case_random_subject = _preset_config("simple_case_random_subject")
     group_quantile_key_probe = _preset_config("group_quantile_key_probe")
+    scalar_subquery_double_parentheses = _preset_config("scalar_subquery_double_parentheses")
 
     assert null_groupby.generator_profile == "null_groupby_topk"
     assert {"groupby", "nulls", "sort_limit"}.issubset(null_groupby.guidance_targets)
@@ -174,6 +175,10 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert {"random_case_probe", "case_expression"}.issubset(simple_case_random_subject.guidance_targets)
     assert group_quantile_key_probe.generator_profile == "group_quantile_key_probe"
     assert {"group_quantile_probe", "dynamic_quantile", "groupby"}.issubset(group_quantile_key_probe.guidance_targets)
+    assert scalar_subquery_double_parentheses.generator_profile == "scalar_subquery_double_parentheses"
+    assert {"scalar_subquery_probe", "correlated_subquery"}.issubset(
+        scalar_subquery_double_parentheses.guidance_targets
+    )
 
 
 def test_methodology_seeded_fault_suites_support_sensitivity_evaluation():

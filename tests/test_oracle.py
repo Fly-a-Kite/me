@@ -278,6 +278,21 @@ def test_oracle_classifies_group_quantile_key_expression():
     assert findings[0].root_cause == "group_quantile_key_expression"
 
 
+def test_oracle_classifies_scalar_subquery_double_parentheses():
+    case = generate_case(370022, profile="scalar_subquery_double_parentheses")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["scalar_subquery_mismatch"], [[False]]),
+            "duckdb": NormalizedResult("duckdb", "ok", ["scalar_subquery_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "scalar_subquery_double_parentheses"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

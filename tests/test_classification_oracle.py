@@ -772,6 +772,24 @@ def test_validate_case_accepts_group_quantile_probe():
     assert any("numeric values and quantiles" in error for error in validate_case_program(bad_values))
 
 
+def test_validate_case_accepts_scalar_subquery_probe():
+    valid = Case(
+        "case-scalar-subquery-probe",
+        35,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-scalar-subquery-probe", 35, [{"op": "scalar_subquery_probe", "as": "scalar_subquery_mismatch"}]),
+    )
+    bad_alias = Case(
+        "case-scalar-subquery-probe-alias",
+        36,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-scalar-subquery-probe-alias", 36, [{"op": "scalar_subquery_probe", "as": "where"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

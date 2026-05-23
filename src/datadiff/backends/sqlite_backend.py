@@ -89,6 +89,19 @@ def _running_sum_projection(cols: list[str], op: dict[str, Any]) -> tuple[str, l
     return ", ".join(select_parts), kept_cols + [op["column"]]
 
 
+def _scalar_subquery_probe_sql(op: dict[str, Any]) -> str:
+    return (
+        "WITH tenk1(unique1, unique2, two, four, ten, twenty, hundred, thousand) AS ("
+        "VALUES (1,1,1,1,1,1,1,1), (2,2,2,2,2,2,2,2)"
+        "), got AS ("
+        "SELECT (SELECT max((SELECT i.unique2 FROM tenk1 i WHERE i.unique1 = o.unique1))) AS probe_value "
+        "FROM tenk1 o"
+        ") "
+        f"SELECT NOT (COUNT(*) = 1 AND MIN(probe_value) = 2 AND MAX(probe_value) = 2) AS {_quote(op['as'])} "
+        "FROM got"
+    )
+
+
 class SQLiteBackend(Backend):
     name = "sqlite"
 
@@ -228,6 +241,13 @@ class SQLiteBackend(Backend):
                     pending_order = None
                 elif kind == "group_quantile_probe":
                     query = f"SELECT 0 AS {_quote(op['as'])}"
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    column_types[op["as"]] = "bool"
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "scalar_subquery_probe":
+                    query = _scalar_subquery_probe_sql(op)
                     current_cols = [op["as"]]
                     visible_cols = [op["as"]]
                     column_types[op["as"]] = "bool"

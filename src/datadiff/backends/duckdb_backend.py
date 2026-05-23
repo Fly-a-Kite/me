@@ -97,6 +97,19 @@ def _random_case_probe_sql(op: dict) -> str:
     )
 
 
+def _scalar_subquery_probe_sql(op: dict) -> str:
+    return (
+        "WITH tenk1(unique1, unique2, two, four, ten, twenty, hundred, thousand) AS ("
+        "VALUES (1,1,1,1,1,1,1,1), (2,2,2,2,2,2,2,2)"
+        "), got AS ("
+        "SELECT (SELECT max((SELECT i.unique2 FROM tenk1 i WHERE i.unique1 = o.unique1))) AS probe_value "
+        "FROM tenk1 o"
+        ") "
+        f"SELECT NOT (COUNT(*) = 1 AND MIN(probe_value) = 2 AND MAX(probe_value) = 2) AS {_quote(op['as'])} "
+        "FROM got"
+    )
+
+
 class DuckDBBackend(Backend):
     name = "duckdb"
     persistent_storage = False
@@ -257,6 +270,13 @@ class DuckDBBackend(Backend):
                 elif kind == "group_quantile_probe":
                     ctes = []
                     relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "scalar_subquery_probe":
+                    ctes = []
+                    relation = add_step(_scalar_subquery_probe_sql(op))
                     current_cols = [op["as"]]
                     visible_cols = [op["as"]]
                     hidden_order_cols = []

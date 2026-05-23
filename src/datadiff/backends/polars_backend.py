@@ -78,6 +78,8 @@ class PolarsBackend(Backend):
                 elif kind == "group_quantile_probe":
                     mismatch = _polars_group_quantile_key_mismatch(pl, op, lazy=False)
                     df = pl.DataFrame({op["as"]: [mismatch]})
+                elif kind == "scalar_subquery_probe":
+                    df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -227,6 +229,8 @@ class PolarsLazyBackend(PolarsBackend):
                 elif kind == "group_quantile_probe":
                     mismatch = _polars_group_quantile_key_mismatch(pl, op, lazy=True)
                     lf = pl.DataFrame({op["as"]: [mismatch]}).lazy()
+                elif kind == "scalar_subquery_probe":
+                    lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))
                 elif kind == "sort":

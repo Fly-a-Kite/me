@@ -88,6 +88,13 @@ def test_classify_operation_combo_tracks_group_quantile_key_expression_risk():
     assert "group_quantile_key_expression" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_scalar_subquery_double_parentheses_risk():
+    combo = classify_operation_combo([{"op": "scalar_subquery_probe"}])
+
+    assert combo["template"] == "scalar_subquery_probe"
+    assert "scalar_subquery_double_parentheses" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

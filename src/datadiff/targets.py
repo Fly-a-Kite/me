@@ -32,6 +32,7 @@ COMMON_DSL_CAPABILITIES: tuple[str, ...] = (
     "op:sortedness_check",
     "op:random_case_probe",
     "op:group_quantile_probe",
+    "op:scalar_subquery_probe",
     "op:groupby",
     "op:aggregate",
     "op:join",

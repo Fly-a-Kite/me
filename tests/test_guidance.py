@@ -215,6 +215,7 @@ def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
         "sortedness_null_placement",
         "simple_case_random_subject",
         "group_quantile_key_probe",
+        "scalar_subquery_double_parentheses",
     ]
     for profile in profiles:
         for seed in range(50):
