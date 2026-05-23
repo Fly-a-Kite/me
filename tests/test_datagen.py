@@ -63,6 +63,9 @@ def _assert_program_columns_are_valid(case):
         elif op["op"] == "series_rtruediv_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
+        elif op["op"] == "uint64_isin_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
         elif op["op"] == "groupby":
             assert set(op["keys"]).issubset(known_cols)
             assert len(op["keys"]) == len(set(op["keys"]))
@@ -165,6 +168,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "bit_compare_unequal_length",
         "round_even_float_scale",
         "series_rtruediv_operand_order",
+        "pandas_uint64_isin_precision",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -708,6 +712,18 @@ def test_generate_case_series_rtruediv_operand_order_profile_is_supported_and_va
     assert "pattern:series_rtruediv_operand_order" in features
     assert "series:reverse-division" in features
     assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/17760"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_pandas_uint64_isin_precision_profile_is_supported_and_valid():
+    case = generate_case(136, profile="pandas_uint64_isin_precision")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000136-pandas-uint64-isin-precision"
+    assert case.program.operations == [{"op": "uint64_isin_probe", "as": "uint64_isin_mismatch"}]
+    assert "pattern:pandas_uint64_isin_precision" in features
+    assert "pandas:uint64-isin" in features
+    assert case.metadata["source_issue"] == "https://github.com/pandas-dev/pandas/issues/59609"
     assert validate_case_program(case) == []
 
 

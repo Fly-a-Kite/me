@@ -16,6 +16,7 @@ CANONICAL_OPERATION_ORDER = (
     "bit_compare_probe",
     "round_even_probe",
     "series_rtruediv_probe",
+    "uint64_isin_probe",
     "groupby",
     "aggregate",
     "select",
@@ -121,6 +122,8 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("round_even_float_scale")
     if "series_rtruediv_probe" in op_set:
         risks.append("series_rtruediv_operand_order")
+    if "uint64_isin_probe" in op_set:
+        risks.append("pandas_uint64_isin_precision")
     if "groupby" in op_set:
         risks.append("groupby_aggregation")
     if "aggregate" in op_set:

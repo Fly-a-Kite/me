@@ -368,6 +368,21 @@ def test_oracle_classifies_series_rtruediv_operand_order():
     assert findings[0].root_cause == "series_rtruediv_operand_order"
 
 
+def test_oracle_classifies_pandas_uint64_isin_precision():
+    case = generate_case(370028, profile="pandas_uint64_isin_precision")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["uint64_isin_mismatch"], [[False]]),
+            "pandas": NormalizedResult("pandas", "ok", ["uint64_isin_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "pandas_uint64_isin_precision"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

@@ -50,6 +50,7 @@ GeneratorProfile = Literal[
     "bit_compare_unequal_length",
     "round_even_float_scale",
     "series_rtruediv_operand_order",
+    "pandas_uint64_isin_precision",
 ]
 
 
@@ -506,6 +507,9 @@ def _available_columns_after_operations(
         elif kind == "series_rtruediv_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "uint64_isin_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "groupby":
             available = unique_preserve_order(
                 [str(key) for key in op.get("keys", [])]
@@ -835,6 +839,17 @@ def repair_operations(
             strings = set()
             order_pending = False
             pending_order_columns = set()
+        elif kind == "uint64_isin_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "uint64_isin_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "select":
             cols = unique_preserve_order([c for c in op["columns"] if c in available])
             if not cols:
@@ -1108,6 +1123,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_round_even_float_scale_case(seed)
     if profile == "series_rtruediv_operand_order" and type_aware:
         return generate_series_rtruediv_operand_order_case(seed)
+    if profile == "pandas_uint64_isin_precision" and type_aware:
+        return generate_pandas_uint64_isin_precision_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -1198,6 +1215,12 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
             generate_series_rtruediv_operand_order_case(seed),
             seed,
             "series_rtruediv_operand_order",
+        )
+    if seed % 109 == 72:
+        return _as_bughunt_mixed_case(
+            generate_pandas_uint64_isin_precision_case(seed),
+            seed,
+            "pandas_uint64_isin_precision",
         )
     return None
 
@@ -2950,6 +2973,32 @@ def generate_series_rtruediv_operand_order_case(seed: int) -> Case:
             "source_issue": "https://github.com/pola-rs/polars/issues/17760",
             "expected_series_rtruediv_mismatch": False,
             "expected_series_rtruediv_values": [2.0, 1.5, 4.0 / 3.0],
+        },
+    )
+
+
+def generate_pandas_uint64_isin_precision_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("uint64_isin_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-pandas-uint64-isin-precision",
+        seed,
+        [{"op": "uint64_isin_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-pandas-uint64-isin-precision",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "pandas_uint64_isin_precision",
+            "source_issue": "https://github.com/pandas-dev/pandas/issues/59609",
+            "expected_uint64_isin_mismatch": False,
+            "expected_uint64_isin_value": False,
         },
     )
 

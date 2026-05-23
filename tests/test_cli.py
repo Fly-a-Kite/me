@@ -255,6 +255,7 @@ def test_cli_parses_order_sensitive_bug_hunt_profiles():
         "bit_compare_unequal_length",
         "round_even_float_scale",
         "series_rtruediv_operand_order",
+        "pandas_uint64_isin_precision",
     ]:
         args = parser.parse_args(["fuzz", "--profile", profile])
         assert args.cmd == "fuzz"
@@ -484,6 +485,9 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("series_rtruediv_operand_order").generator_profile == "series_rtruediv_operand_order"
     assert _preset_config("series_rtruediv_operand_order").guidance_targets[0] == "series_rtruediv_operand_order"
     assert _preset_config("series_rtruediv_operand_order_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("pandas_uint64_isin_precision").generator_profile == "pandas_uint64_isin_precision"
+    assert _preset_config("pandas_uint64_isin_precision").guidance_targets[0] == "pandas_uint64_isin_precision"
+    assert _preset_config("pandas_uint64_isin_precision_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("join_null_sort").generator_profile == "join_null_sort"
     assert _preset_config("join_null_sort").guidance_targets[0] == "join_null_sort"
     assert _preset_config("join_null_sort_metamorphic").enable_metamorphic_oracle is True
@@ -567,6 +571,7 @@ def test_cli_parses_non_datafusion_live_presets():
         "bit_compare_unequal_length",
         "round_even_float_scale",
         "series_rtruediv_operand_order",
+        "pandas_uint64_isin_precision",
     }.issubset(arrow.guidance_targets)
     assert arrow.enable_local_source_scheduler is True
 

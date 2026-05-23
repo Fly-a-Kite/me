@@ -981,6 +981,55 @@ def test_classification_reference_understands_series_rtruediv_probe():
     assert classification.implicated_backends == ["polars"]
 
 
+def test_validate_case_accepts_uint64_isin_probe():
+    valid = Case(
+        "case-uint64-isin-probe",
+        50,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-uint64-isin-probe", 50, [{"op": "uint64_isin_probe", "as": "uint64_isin_mismatch"}]),
+    )
+    bad_alias = Case(
+        "case-uint64-isin-probe-alias",
+        51,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-uint64-isin-probe-alias", 51, [{"op": "uint64_isin_probe", "as": "where"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_uint64_isin_probe():
+    case = Case(
+        "case-uint64-isin-reference",
+        52,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-uint64-isin-reference", 52, [{"op": "uint64_isin_probe", "as": "uint64_isin_mismatch"}]),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "pandas_uint64_isin_precision",
+        "confidence": "high",
+        "suspicious_backends": ["pandas"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["uint64_isin_mismatch"], [[False]]),
+        "pandas": NormalizedResult("pandas", "ok", ["uint64_isin_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "pandas_uint64_isin_precision"},
+        ["reference", "pandas"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["pandas"]
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

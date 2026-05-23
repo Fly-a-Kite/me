@@ -92,6 +92,13 @@ class PandasBackend(Backend):
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "series_rtruediv_probe":
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
+                elif kind == "uint64_isin_probe":
+                    import numpy as np
+
+                    observed = pd.Series([635554097106142143], dtype="UInt64").isin(
+                        np.array([635554097106142079])
+                    ).iloc[0]
+                    df = pd.DataFrame([{op["as"]: bool(observed)}], columns=[op["as"]])
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":

@@ -130,6 +130,13 @@ def test_classify_operation_combo_tracks_series_rtruediv_operand_order_risk():
     assert "series_rtruediv_operand_order" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_pandas_uint64_isin_precision_risk():
+    combo = classify_operation_combo([{"op": "uint64_isin_probe"}])
+
+    assert combo["template"] == "uint64_isin_probe"
+    assert "pandas_uint64_isin_precision" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

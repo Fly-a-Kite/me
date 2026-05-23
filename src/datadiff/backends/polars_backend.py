@@ -92,6 +92,8 @@ class PolarsBackend(Backend):
                 elif kind == "series_rtruediv_probe":
                     mismatch = _polars_series_rtruediv_mismatch(pl)
                     df = pl.DataFrame({op["as"]: [mismatch]})
+                elif kind == "uint64_isin_probe":
+                    df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -253,6 +255,8 @@ class PolarsLazyBackend(PolarsBackend):
                 elif kind == "round_even_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "series_rtruediv_probe":
+                    lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "uint64_isin_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))

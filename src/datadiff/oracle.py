@@ -78,6 +78,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "round_even_float_scale"
     if _case_has_series_rtruediv_probe(case):
         return "series_rtruediv_operand_order"
+    if _case_has_uint64_isin_probe(case):
+        return "pandas_uint64_isin_precision"
     if _case_contains_special_float(case):
         return "nan_inf_semantics"
     if _case_uses_modulo(case):
@@ -176,6 +178,10 @@ def _case_has_round_even_probe(case: Case) -> bool:
 
 def _case_has_series_rtruediv_probe(case: Case) -> bool:
     return any(op.get("op") == "series_rtruediv_probe" for op in case.program.operations)
+
+
+def _case_has_uint64_isin_probe(case: Case) -> bool:
+    return any(op.get("op") == "uint64_isin_probe" for op in case.program.operations)
 
 
 def _case_uses_modulo(case: Case) -> bool:

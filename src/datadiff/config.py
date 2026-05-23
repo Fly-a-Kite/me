@@ -44,6 +44,7 @@ GeneratorProfile = Literal[
     "bit_compare_unequal_length",
     "round_even_float_scale",
     "series_rtruediv_operand_order",
+    "pandas_uint64_isin_precision",
 ]
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]
