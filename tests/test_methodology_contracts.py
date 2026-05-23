@@ -125,6 +125,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     duckdb_tuple_anti_null_semantics = _preset_config("duckdb_tuple_anti_null_semantics")
     pandas_sparse_array_mask_semantics = _preset_config("pandas_sparse_array_mask_semantics")
     polars_float_wrap_numerical_semantics = _preset_config("polars_float_wrap_numerical_semantics")
+    pandas_index_bool_result_type = _preset_config("pandas_index_bool_result_type")
 
     assert null_groupby.generator_profile == "null_groupby_topk"
     assert {"groupby", "nulls", "sort_limit"}.issubset(null_groupby.guidance_targets)
@@ -215,6 +216,10 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert polars_float_wrap_numerical_semantics.generator_profile == "polars_float_wrap_numerical_semantics"
     assert {"float_wrap_probe", "wrap_numerical", "casts"}.issubset(
         polars_float_wrap_numerical_semantics.guidance_targets
+    )
+    assert pandas_index_bool_result_type.generator_profile == "pandas_index_bool_result_type"
+    assert {"index_bool_probe", "index_boolean_result", "filter"}.issubset(
+        pandas_index_bool_result_type.guidance_targets
     )
 
 

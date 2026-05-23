@@ -54,6 +54,7 @@ GeneratorProfile = Literal[
     "duckdb_tuple_anti_null_semantics",
     "pandas_sparse_array_mask_semantics",
     "polars_float_wrap_numerical_semantics",
+    "pandas_index_bool_result_type",
 ]
 
 
@@ -522,6 +523,9 @@ def _available_columns_after_operations(
         elif kind == "float_wrap_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "index_bool_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "groupby":
             available = unique_preserve_order(
                 [str(key) for key in op.get("keys", [])]
@@ -895,6 +899,17 @@ def repair_operations(
             strings = set()
             order_pending = False
             pending_order_columns = set()
+        elif kind == "index_bool_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "index_bool_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "select":
             cols = unique_preserve_order([c for c in op["columns"] if c in available])
             if not cols:
@@ -1176,6 +1191,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_pandas_sparse_array_mask_semantics_case(seed)
     if profile == "polars_float_wrap_numerical_semantics" and type_aware:
         return generate_polars_float_wrap_numerical_semantics_case(seed)
+    if profile == "pandas_index_bool_result_type" and type_aware:
+        return generate_pandas_index_bool_result_type_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -1290,6 +1307,12 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
             generate_polars_float_wrap_numerical_semantics_case(seed),
             seed,
             "polars_float_wrap_numerical_semantics",
+        )
+    if seed % 137 == 76:
+        return _as_bughunt_mixed_case(
+            generate_pandas_index_bool_result_type_case(seed),
+            seed,
+            "pandas_index_bool_result_type",
         )
     return None
 
@@ -3146,6 +3169,32 @@ def generate_polars_float_wrap_numerical_semantics_case(seed: int) -> Case:
             "source_issue": "https://github.com/pola-rs/polars/issues/18546",
             "expected_float_wrap_mismatch": False,
             "expected_wrapped_uint8": [100, 44],
+        },
+    )
+
+
+def generate_pandas_index_bool_result_type_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("index_bool_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-pandas-index-bool-result-type",
+        seed,
+        [{"op": "index_bool_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-pandas-index-bool-result-type",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "pandas_index_bool_result_type",
+            "source_issue": "https://github.com/pandas-dev/pandas/issues/62766",
+            "expected_index_bool_mismatch": False,
+            "expected_index_bool_type": "Index",
         },
     )
 

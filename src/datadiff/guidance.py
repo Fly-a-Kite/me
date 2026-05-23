@@ -100,6 +100,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "polars_float_wrap_numerical_semantics": {"pattern:polars_float_wrap_numerical_semantics"},
     "float_wrap_probe": {"op:float_wrap_probe"},
     "wrap_numerical": {"polars:wrap-numerical", "cast:float-overflow"},
+    "pandas_index_bool_result_type": {"pattern:pandas_index_bool_result_type"},
+    "index_bool_probe": {"op:index_bool_probe"},
+    "index_boolean_result": {"pandas:index-bool", "api:result-type"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -194,6 +197,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_tuple_anti_null_probe = False
     has_sparse_mask_probe = False
     has_float_wrap_probe = False
+    has_index_bool_probe = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -301,6 +305,11 @@ def extract_case_features(case: Case) -> set[str]:
             features.add("cast:float-overflow")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_float_wrap_probe = True
+        elif kind == "index_bool_probe":
+            features.add("pandas:index-bool")
+            features.add("api:result-type")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_index_bool_probe = True
         elif kind == "select":
             width = len(op.get("columns", []))
             features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
@@ -448,6 +457,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:pandas_sparse_array_mask_semantics")
     if has_float_wrap_probe:
         features.add("pattern:polars_float_wrap_numerical_semantics")
+    if has_index_bool_probe:
+        features.add("pattern:pandas_index_bool_result_type")
     return features
 
 
@@ -1073,6 +1084,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "index_bool_probe":
+            score, op_buckets, samples = _index_bool_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "select":
             cols = [str(column) for column in op.get("columns", []) if str(column) in samples]
             samples = {column: samples[column] for column in unique_preserve_order(cols)}
@@ -1547,6 +1563,12 @@ def _float_wrap_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], di
     return 0.90, buckets, {alias: [False]} if alias else {}
 
 
+def _index_bool_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    buckets = ["pandas:index-bool", "api:result-type"]
+    return 0.90, buckets, {alias: [False]} if alias else {}
+
+
 def _groupby_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
     keys = [str(key) for key in op.get("keys", []) if str(key) in samples]
     buckets: list[str] = []
@@ -1930,6 +1952,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("pandas_sparse_array_mask_semantics")
     if "pattern:polars_float_wrap_numerical_semantics" in features or "op:float_wrap_probe" in features:
         roots.add("polars_float_wrap_numerical_semantics")
+    if "pattern:pandas_index_bool_result_type" in features or "op:index_bool_probe" in features:
+        roots.add("pandas_index_bool_result_type")
     if features & {
         "pattern:null_groupby_topk",
         "pattern:null_agg_topk",

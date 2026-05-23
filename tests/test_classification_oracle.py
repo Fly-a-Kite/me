@@ -1178,6 +1178,55 @@ def test_classification_reference_understands_float_wrap_probe():
     assert classification.implicated_backends == ["polars", "polars_lazy"]
 
 
+def test_validate_case_accepts_index_bool_probe():
+    valid = Case(
+        "case-index-bool-probe",
+        62,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-index-bool-probe", 62, [{"op": "index_bool_probe", "as": "index_bool_mismatch"}]),
+    )
+    bad_alias = Case(
+        "case-index-bool-probe-alias",
+        63,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-index-bool-probe-alias", 63, [{"op": "index_bool_probe", "as": "where"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_index_bool_probe():
+    case = Case(
+        "case-index-bool-reference",
+        64,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-index-bool-reference", 64, [{"op": "index_bool_probe", "as": "index_bool_mismatch"}]),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "pandas_index_bool_result_type",
+        "confidence": "high",
+        "suspicious_backends": ["pandas"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["index_bool_mismatch"], [[False]]),
+        "pandas": NormalizedResult("pandas", "ok", ["index_bool_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "pandas_index_bool_result_type"},
+        ["reference", "pandas"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["pandas"]
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

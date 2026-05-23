@@ -158,6 +158,13 @@ def test_classify_operation_combo_tracks_polars_float_wrap_numerical_semantics_r
     assert "polars_float_wrap_numerical_semantics" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_pandas_index_bool_result_type_risk():
+    combo = classify_operation_combo([{"op": "index_bool_probe"}])
+
+    assert combo["template"] == "index_bool_probe"
+    assert "pandas_index_bool_result_type" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

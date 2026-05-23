@@ -429,6 +429,21 @@ def test_oracle_classifies_polars_float_wrap_numerical_semantics():
     assert findings[0].root_cause == "polars_float_wrap_numerical_semantics"
 
 
+def test_oracle_classifies_pandas_index_bool_result_type():
+    case = generate_case(370032, profile="pandas_index_bool_result_type")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["index_bool_mismatch"], [[False]]),
+            "pandas": NormalizedResult("pandas", "ok", ["index_bool_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "pandas_index_bool_result_type"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

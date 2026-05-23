@@ -75,6 +75,9 @@ def _assert_program_columns_are_valid(case):
         elif op["op"] == "float_wrap_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
+        elif op["op"] == "index_bool_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
         elif op["op"] == "groupby":
             assert set(op["keys"]).issubset(known_cols)
             assert len(op["keys"]) == len(set(op["keys"]))
@@ -181,6 +184,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "duckdb_tuple_anti_null_semantics",
         "pandas_sparse_array_mask_semantics",
         "polars_float_wrap_numerical_semantics",
+        "pandas_index_bool_result_type",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -772,6 +776,18 @@ def test_generate_case_polars_float_wrap_numerical_semantics_profile_is_supporte
     assert "pattern:polars_float_wrap_numerical_semantics" in features
     assert "polars:wrap-numerical" in features
     assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/18546"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_pandas_index_bool_result_type_profile_is_supported_and_valid():
+    case = generate_case(140, profile="pandas_index_bool_result_type")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000140-pandas-index-bool-result-type"
+    assert case.program.operations == [{"op": "index_bool_probe", "as": "index_bool_mismatch"}]
+    assert "pattern:pandas_index_bool_result_type" in features
+    assert "pandas:index-bool" in features
+    assert case.metadata["source_issue"] == "https://github.com/pandas-dev/pandas/issues/62766"
     assert validate_case_program(case) == []
 
 

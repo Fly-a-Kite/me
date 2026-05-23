@@ -487,6 +487,15 @@ def _append_float_wrap_probe(tables: list[TableData], operations: list[dict[str,
     return f"append_float_wrap_probe:out={alias}"
 
 
+def _append_index_bool_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
+    if not tables:
+        return "append_index_bool_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("index_bool_mismatch", used=set(available))
+    operations.append({"op": "index_bool_probe", "as": alias})
+    return f"append_index_bool_probe:out={alias}"
+
+
 def _append_grouped_topk_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
     if not tables:
         return "append_grouped_topk:none"
@@ -703,6 +712,9 @@ def _available_columns(tables: list[TableData], operations: list[dict[str, Any]]
         elif op.get("op") == "float_wrap_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif op.get("op") == "index_bool_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif op.get("op") == "groupby":
             available = unique_preserve_order(list(op.get("keys", [])) + [agg["as"] for agg in op.get("aggs", [])])
         elif op.get("op") == "aggregate":
@@ -740,6 +752,8 @@ def _column_type(tables: list[TableData], name: str) -> str:
     if name == "sparse_mask_mismatch" or name.startswith("sparse_mask_mismatch_"):
         return "bool"
     if name == "float_wrap_mismatch" or name.startswith("float_wrap_mismatch_"):
+        return "bool"
+    if name == "index_bool_mismatch" or name.startswith("index_bool_mismatch_"):
         return "bool"
     return "float" if name.startswith(("m_", "sum_", "min_", "max_", "run_")) else "int"
 
@@ -794,6 +808,7 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_tuple_anti_null_probe", _append_tuple_anti_null_probe),
     MutationOperator("append_sparse_mask_probe", _append_sparse_mask_probe),
     MutationOperator("append_float_wrap_probe", _append_float_wrap_probe),
+    MutationOperator("append_index_bool_probe", _append_index_bool_probe),
     MutationOperator("append_grouped_topk", _append_grouped_topk_probe),
     MutationOperator("drop_op", _drop_operation),
     MutationOperator("tweak_op", _tweak_random_operation),

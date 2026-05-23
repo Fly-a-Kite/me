@@ -101,6 +101,8 @@ class PolarsBackend(Backend):
                 elif kind == "float_wrap_probe":
                     mismatch = _polars_float_wrap_mismatch(pl, lazy=False)
                     df = pl.DataFrame({op["as"]: [mismatch]})
+                elif kind == "index_bool_probe":
+                    df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -272,6 +274,8 @@ class PolarsLazyBackend(PolarsBackend):
                 elif kind == "float_wrap_probe":
                     mismatch = _polars_float_wrap_mismatch(pl, lazy=True)
                     lf = pl.DataFrame({op["as"]: [mismatch]}).lazy()
+                elif kind == "index_bool_probe":
+                    lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))
                 elif kind == "sort":
