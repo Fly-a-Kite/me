@@ -233,7 +233,7 @@ def test_cli_parses_join_null_sort_profile():
 
 def test_cli_parses_order_sensitive_bug_hunt_profiles():
     parser = build_parser()
-    for profile in ["ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk"]:
+    for profile in ["ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate"]:
         args = parser.parse_args(["fuzz", "--profile", profile])
         assert args.cmd == "fuzz"
         assert args.profile == profile
@@ -408,6 +408,9 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("float_group_key").generator_profile == "float_group_key"
     assert _preset_config("float_group_key").guidance_targets[0] == "float_group_key"
     assert _preset_config("float_group_key_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("global_null_aggregate").generator_profile == "global_null_aggregate"
+    assert _preset_config("global_null_aggregate").guidance_targets[0] == "global_null_aggregate"
+    assert _preset_config("global_null_aggregate_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("join_null_sort").generator_profile == "join_null_sort"
     assert _preset_config("join_null_sort").guidance_targets[0] == "join_null_sort"
     assert _preset_config("join_null_sort_metamorphic").enable_metamorphic_oracle is True
@@ -467,12 +470,12 @@ def test_cli_parses_non_datafusion_live_presets():
     arrow = _preset_config("live_arrow")
     assert arrow.generator_profile == "bughunt"
     assert arrow.guidance_strategy == "guided"
-    assert {"join", "groupby", "strings", "casts", "topk"}.issubset(arrow.guidance_targets)
+    assert {"join", "groupby", "strings", "casts", "topk", "global_null_aggregate"}.issubset(arrow.guidance_targets)
     assert arrow.enable_local_source_scheduler is True
 
     polars_lazy = _preset_config("live_polars_lazy")
     assert polars_lazy.generator_profile == "bughunt"
-    assert {"join", "filter", "mutate", "sort_limit", "topk"}.issubset(polars_lazy.guidance_targets)
+    assert {"join", "filter", "mutate", "sort_limit", "topk", "global_aggregation"}.issubset(polars_lazy.guidance_targets)
     assert polars_lazy.local_source_exploration_weight == 0.45
 
     embedded_sql = _preset_config("live_embedded_sql")

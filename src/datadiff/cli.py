@@ -76,10 +76,12 @@ LIVE_BUGHUNT_TARGETS = [
     "truth_filter",
     "nulls",
     "aggregation",
+    "global_aggregation",
     "sort_limit",
     "topk_resort",
     "ordered_groupby_sort",
     "join_ordered_agg_topk",
+    "global_null_aggregate",
     "wide_offset_topk",
     "empty_filter_groupby",
     "expressions",
@@ -99,11 +101,13 @@ LIVE_ARROW_TARGETS = [
     "casts",
     "nulls",
     "aggregation",
+    "global_aggregation",
     "sort_limit",
     "topk",
     "topk_resort",
     "ordered_groupby_sort",
     "join_ordered_agg_topk",
+    "global_null_aggregate",
     "wide_offset_topk",
     "empty_filter_groupby",
     "expressions",
@@ -122,11 +126,13 @@ LIVE_POLARS_LAZY_TARGETS = [
     "strings",
     "casts",
     "nulls",
+    "global_aggregation",
     "sort_limit",
     "topk",
     "topk_resort",
     "ordered_groupby_sort",
     "join_ordered_agg_topk",
+    "global_null_aggregate",
     "empty_filter_groupby",
     "expressions",
 ]
@@ -143,11 +149,13 @@ LIVE_EMBEDDED_SQL_TARGETS = [
     "groupby",
     "nulls",
     "aggregation",
+    "global_aggregation",
     "sort_limit",
     "topk",
     "topk_resort",
     "ordered_groupby_sort",
     "join_ordered_agg_topk",
+    "global_null_aggregate",
     "wide_offset_topk",
     "empty_filter_groupby",
     "casts",
@@ -168,11 +176,13 @@ LIVE_CROSS_FAMILY_TARGETS = [
     "casts",
     "nulls",
     "aggregation",
+    "global_aggregation",
     "sort_limit",
     "topk",
     "topk_resort",
     "ordered_groupby_sort",
     "join_ordered_agg_topk",
+    "global_null_aggregate",
     "wide_offset_topk",
     "empty_filter_groupby",
     "expressions",
@@ -1634,6 +1644,24 @@ def _preset_config(name: str) -> ExperimentConfig:
             guidance_targets=["join_ordered_agg_topk", "join", "groupby", "aggregation", "sort_limit", "topk"],
             metamorphic_variant_limit=8,
         )
+    if name == "global_null_aggregate":
+        return ExperimentConfig(
+            generator_profile="global_null_aggregate",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["global_null_aggregate", "global_aggregation", "aggregation", "nulls", "sort_limit"],
+            metamorphic_variant_limit=4,
+        )
+    if name == "global_null_aggregate_metamorphic":
+        return ExperimentConfig(
+            generator_profile="global_null_aggregate",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["global_null_aggregate", "global_aggregation", "aggregation", "nulls", "sort_limit"],
+            metamorphic_variant_limit=8,
+        )
     if name == "live_datafusion":
         return _live_bughunt_config(
             guidance_targets=list(LIVE_BUGHUNT_TARGETS),
@@ -2285,7 +2313,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_fuzz.add_argument("--duration", default=None, help="wall-clock budget such as 10s, 5m, 24h")
     p_fuzz.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_fuzz)
-    p_fuzz.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk"], default="common")
+    p_fuzz.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate"], default="common")
     add_guidance_flags(p_fuzz, default_strategy="random", default_candidate_pool=8)
     add_ablation_flags(p_fuzz)
     add_paper_journal_flags(p_fuzz)
@@ -2296,7 +2324,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_long.add_argument("--duration", default="24h", help="wall-clock budget such as 10m, 24h, 2d")
     p_long.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_long)
-    p_long.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk"], default="common")
+    p_long.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate"], default="common")
     add_guidance_flags(p_long, default_strategy="guided", default_candidate_pool=8)
     p_long.add_argument("--case-log", default=None, help="optional JSONL path for generated test cases")
     p_long.add_argument("--checkpoint-interval", default="60s", help="checkpoint write interval")

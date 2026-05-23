@@ -32,6 +32,7 @@ GeneratorProfile = Literal[
     "ordered_groupby_sort",
     "topk_resort",
     "join_ordered_agg_topk",
+    "global_null_aggregate",
 ]
 
 
@@ -740,6 +741,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_topk_resort_case(seed)
     if profile == "join_ordered_agg_topk" and type_aware:
         return generate_join_ordered_agg_topk_case(seed)
+    if profile == "global_null_aggregate" and type_aware:
+        return generate_global_null_aggregate_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -771,6 +774,8 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
     selector = seed % 60
     if selector == 2:
         return _as_bughunt_mixed_case(generate_join_null_truth_filter_case(seed), seed, "join_null_truth_filter")
+    if selector == 5:
+        return _as_bughunt_mixed_case(generate_global_null_aggregate_case(seed), seed, "global_null_aggregate")
     if selector == 11:
         return _as_bughunt_mixed_case(generate_empty_filter_groupby_case(seed), seed, "empty_filter_groupby")
     if selector == 20:
@@ -1758,6 +1763,57 @@ def generate_join_ordered_agg_topk_case(seed: int) -> Case:
         tables=[left, right],
         program=program,
         metadata={"generator_profile": "join_ordered_agg_topk"},
+    )
+
+
+def generate_global_null_aggregate_case(seed: int) -> Case:
+    empty_input = seed % 2 == 0
+    rows = [] if empty_input else [
+        {"id": 0, "g": "a", "x": None, "y": None},
+        {"id": 1, "g": "b", "x": None, "y": None},
+        {"id": 2, "g": None, "x": None, "y": 5},
+        {"id": 3, "g": "space value", "x": None, "y": -1},
+    ]
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("x", "int", nullable=True),
+            ColumnSpec("y", "int", nullable=True),
+        ],
+        rows,
+    )
+    program = Program(
+        f"prog-{seed:08d}-global-null-aggregate",
+        seed,
+        [
+            {
+                "op": "aggregate",
+                "aggs": [
+                    {"column": "x", "func": "sum", "as": "sum_x"},
+                    {"column": "x", "func": "min", "as": "min_x"},
+                    {"column": "x", "func": "max", "as": "max_x"},
+                    {"column": "x", "func": "count", "as": "count_x"},
+                    {"column": "y", "func": "sum", "as": "sum_y"},
+                ],
+            },
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "sum_x", "ascending": True, "nulls": "first"},
+                    {"column": "count_x", "ascending": False, "nulls": "last"},
+                ],
+            },
+            {"op": "limit", "n": 1},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-global-null-aggregate",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={"generator_profile": "global_null_aggregate", "empty_input": empty_input},
     )
 
 

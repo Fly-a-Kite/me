@@ -26,6 +26,7 @@ GeneratorProfile = Literal[
     "ordered_groupby_sort",
     "topk_resort",
     "join_ordered_agg_topk",
+    "global_null_aggregate",
 ]
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]

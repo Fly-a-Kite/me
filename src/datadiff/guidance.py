@@ -42,6 +42,7 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "ordered_groupby_sort": {"pattern:ordered_groupby_sort"},
     "topk_resort": {"pattern:topk_resort"},
     "join_ordered_agg_topk": {"pattern:join_ordered_agg_topk"},
+    "global_null_aggregate": {"pattern:global_null_aggregate"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -211,6 +212,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:topk_resort")
     if _has_join_ordered_agg_topk_pattern(case.program.operations):
         features.add("pattern:join_ordered_agg_topk")
+    if _has_global_null_aggregate_pattern(case.program.operations, frontier_buckets):
+        features.add("pattern:global_null_aggregate")
     return features
 
 
@@ -1064,10 +1067,18 @@ def _aggregate_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any])
         if agg.get("func") == "count":
             continue
         values = samples.get(str(agg.get("column", "")), [])
-        if values and all(value is None for value in values):
+        if not values:
+            buckets.append("aggregate:empty-input")
+            break
+        if all(value is None for value in values):
             buckets.append("aggregate:null-output")
             break
-    score = 0.55 + 0.12 * int("aggregate:multi-agg" in buckets) + 0.08 * int("aggregate:null-output" in buckets)
+    score = (
+        0.55
+        + 0.12 * int("aggregate:multi-agg" in buckets)
+        + 0.08 * int("aggregate:null-output" in buckets)
+        + 0.08 * int("aggregate:empty-input" in buckets)
+    )
     return min(1.0, score), buckets
 
 
@@ -1531,6 +1542,14 @@ def _has_join_ordered_agg_topk_pattern(ops: list[dict[str, Any]]) -> bool:
     except (StopIteration, ValueError):
         return False
     return True
+
+
+def _has_global_null_aggregate_pattern(ops: list[dict[str, Any]], frontier_buckets: list[str]) -> bool:
+    if "aggregate:global" not in frontier_buckets:
+        return False
+    if not {"aggregate:null-output", "aggregate:empty-input"} & set(frontier_buckets):
+        return False
+    return any(op.get("op") == "aggregate" for op in ops)
 
 
 def _has_join_null_sort_pattern(ops: list[dict[str, Any]], frontier_buckets: list[str]) -> bool:

@@ -106,6 +106,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
     assert any("pattern:empty_filter_groupby" in item for item in features)
     assert {
         "join_null_truth_filter",
+        "global_null_aggregate",
         "wide_offset_topk",
         "join_null_key_topk",
         "empty_filter_groupby",
@@ -380,6 +381,21 @@ def test_generate_case_join_ordered_agg_topk_profile_is_supported_and_valid():
     assert case.program.order_sensitive is True
     assert "pattern:join_ordered_agg_topk" in extract_case_features(case)
     assert validate_case_program(case) == []
+
+
+def test_generate_case_global_null_aggregate_profile_is_supported_and_valid():
+    empty_case = generate_case(124, profile="global_null_aggregate")
+    all_null_case = generate_case(125, profile="global_null_aggregate")
+
+    for case in [empty_case, all_null_case]:
+        assert case.case_id.endswith("-global-null-aggregate")
+        assert [op["op"] for op in case.program.operations] == ["aggregate", "sort", "limit"]
+        assert "pattern:global_null_aggregate" in extract_case_features(case)
+        assert "op:aggregate" in extract_case_features(case)
+        assert validate_case_program(case) == []
+
+    assert empty_case.metadata["empty_input"] is True
+    assert all_null_case.metadata["empty_input"] is False
 
 
 def test_bughunt_profile_biases_toward_multi_table_and_deeper_programs():

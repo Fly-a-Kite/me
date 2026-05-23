@@ -203,6 +203,7 @@ def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
         "join_null_truth_filter",
         "float_group_key",
         "join_null_sort",
+        "global_null_aggregate",
     ]
     for profile in profiles:
         for seed in range(50):
