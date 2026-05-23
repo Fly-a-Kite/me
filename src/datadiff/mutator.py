@@ -35,14 +35,15 @@ def mutate_case(case: Case, seed: int) -> Case:
     return mutate_case_with_metadata(case, seed).case
 
 
-def mutate_case_with_metadata(case: Case, seed: int) -> MutationResult:
+def mutate_case_with_metadata(case: Case, seed: int, *, allow_probe_operators: bool = True) -> MutationResult:
     rnd = random.Random(seed * 104729 + case.seed)
     tables = copy.deepcopy(case.tables)
     table = tables[0]
     operations = copy.deepcopy(case.program.operations)
     original_rows = copy.deepcopy(table.rows)
     original_ops = copy.deepcopy(operations)
-    operator = rnd.choice(MUTATION_OPERATORS)
+    operator_pool = MUTATION_OPERATORS if allow_probe_operators else DISCOVERY_MUTATION_OPERATORS
+    operator = rnd.choice(operator_pool)
     choice = operator.name
     detail = operator.apply(tables, operations, rnd)
 
@@ -998,4 +999,13 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("drop_op", _drop_operation),
     MutationOperator("tweak_op", _tweak_random_operation),
 )
+PROBE_MUTATION_OPERATOR_NAMES = frozenset(
+    operator.name
+    for operator in MUTATION_OPERATORS
+    if operator.name.endswith("_probe")
+)
+DISCOVERY_MUTATION_OPERATORS: tuple[MutationOperator, ...] = tuple(
+    operator for operator in MUTATION_OPERATORS if operator.name not in PROBE_MUTATION_OPERATOR_NAMES
+)
 MUTATION_OPERATOR_NAMES = tuple(operator.name for operator in MUTATION_OPERATORS)
+DISCOVERY_MUTATION_OPERATOR_NAMES = tuple(operator.name for operator in DISCOVERY_MUTATION_OPERATORS)

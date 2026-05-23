@@ -3,7 +3,9 @@ import random
 from datadiff.classification_oracle import validate_case_program
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.mutator import (
+    DISCOVERY_MUTATION_OPERATOR_NAMES,
     MUTATION_OPERATOR_NAMES,
+    PROBE_MUTATION_OPERATOR_NAMES,
     _append_group_quantile_probe,
     _append_scalar_subquery_probe,
     _append_window_avg_probe,
@@ -121,6 +123,25 @@ def test_mutate_case_preserves_issue_profile_metadata_for_guidance():
     assert result.metadata["generator_profile"] == "bughunt"
     assert result.metadata["mixed_generator_profile"] == "post_topk_range_filter"
     assert result.metadata["source_issue"] == "https://github.com/example/project/issues/1"
+
+
+def test_mutate_case_can_exclude_probe_append_operators():
+    base = Case(
+        "case-base",
+        10,
+        [TableData("t0", [ColumnSpec("x", "int"), ColumnSpec("s", "str")], [{"x": 1, "s": "a"}, {"x": None, "s": "b"}])],
+        Program("prog-base", 10, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}]),
+    )
+
+    seen = set()
+    for seed in range(200):
+        result = mutate_case_with_metadata(base, seed, allow_probe_operators=False)
+        operator_name = result.metadata["mutation"]["operator"]
+        seen.add(operator_name)
+        assert operator_name not in PROBE_MUTATION_OPERATOR_NAMES
+        assert operator_name in DISCOVERY_MUTATION_OPERATOR_NAMES
+
+    assert seen
 
 
 def test_mutation_operator_registry_covers_row_value_and_operation_mutations():

@@ -38,7 +38,7 @@ class FeedbackState:
                 return generated
         self.last_candidate_source = "feedback_mutation"
         base = self.interesting_cases[seed % len(self.interesting_cases)]
-        result = mutate_case_with_metadata(base, seed)
+        result = mutate_case_with_metadata(base, seed, allow_probe_operators=False)
         self.last_candidate_metadata = result.metadata
         return result.case
 

@@ -1,7 +1,7 @@
 from datadiff import feedback
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.feedback import FeedbackState
-from datadiff.mutator import MUTATION_OPERATOR_NAMES
+from datadiff.mutator import MUTATION_OPERATOR_NAMES, PROBE_MUTATION_OPERATOR_NAMES
 from datadiff.scheduler import LocalSourceScheduler
 
 
@@ -82,3 +82,26 @@ def test_feedback_source_scheduler_prefers_productive_mutations():
     third = state.choose_case(9, generated)
     assert third.case_id.endswith("-mut-9")
     assert state.last_candidate_source == "feedback_mutation"
+
+
+def test_feedback_mutations_avoid_direct_probe_append_operators():
+    scheduler = LocalSourceScheduler(exploration_weight=0.0, min_feedback_share=1.0)
+    state = FeedbackState(source_scheduler=scheduler, interesting_cases=[_case(1)])
+    generated = _case(7)
+    scheduler.record_result(
+        "generated",
+        has_finding=False,
+        is_new_behavior=False,
+        preflight_valid=True,
+        fallback_used=False,
+    )
+
+    seen = set()
+    for seed in range(8, 80):
+        selected = state.choose_case(seed, generated)
+        operator_name = state.last_candidate_metadata["mutation"]["operator"]
+        seen.add(operator_name)
+        assert selected.case_id.endswith(f"-mut-{seed}")
+        assert operator_name not in PROBE_MUTATION_OPERATOR_NAMES
+
+    assert seen
