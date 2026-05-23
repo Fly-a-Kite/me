@@ -130,6 +130,9 @@ class PandasBackend(Backend):
                 elif kind == "arrow_timestamp_index_attr_probe":
                     mismatch = _pandas_arrow_timestamp_index_attr_mismatch(pd)
                     df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
+                elif kind == "eval_inplace_alias_probe":
+                    mismatch = _pandas_eval_inplace_alias_mismatch(pd)
+                    df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
                 elif kind == "dataset_isin_all_match_probe":
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "large_string_partition_probe":
@@ -253,3 +256,13 @@ def _pandas_arrow_timestamp_index_attr_mismatch(pd) -> bool:
     except AttributeError:
         return True
     return observed != [5, 6]
+
+
+def _pandas_eval_inplace_alias_mismatch(pd) -> bool:
+    import numpy as np
+
+    original = np.array([-1, 1, -1], dtype=np.int32)
+    frame = pd.DataFrame({"nums": original.copy()})
+    frame.eval("nums2 = nums", inplace=True)
+    frame.loc[[True, False, True], "nums2"] = 0
+    return not np.array_equal(frame["nums"].to_numpy(), original)

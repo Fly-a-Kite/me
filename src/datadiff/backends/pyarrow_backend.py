@@ -140,6 +140,9 @@ class PyArrowBackend(Backend):
                     elif kind == "arrow_timestamp_index_attr_probe":
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [False]})
+                    elif kind == "eval_inplace_alias_probe":
+                        current_cols = [op["as"]]
+                        current = pa.Table.from_pydict({op["as"]: [False]})
                     elif kind == "dataset_isin_all_match_probe":
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [_pyarrow_dataset_isin_all_match_mismatch(pa)]})

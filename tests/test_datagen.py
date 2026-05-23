@@ -84,6 +84,9 @@ def _assert_program_columns_are_valid(case):
         elif op["op"] == "empty_literal_groupby_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
+        elif op["op"] == "eval_inplace_alias_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
         elif op["op"] == "large_string_partition_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
@@ -202,6 +205,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "pandas_arrow_string_eq_sum_semantics",
         "pandas_arrow_timestamp_loc_slice_semantics",
         "pandas_arrow_timestamp_index_attr_semantics",
+        "pandas_eval_inplace_aliasing_semantics",
         "pyarrow_dataset_isin_all_match_semantics",
         "pyarrow_large_string_partition_schema_semantics",
         "pyarrow_hash_pivot_wider_order_semantics",
@@ -879,6 +883,20 @@ def test_generate_case_pandas_arrow_timestamp_index_attr_semantics_profile_is_su
     assert "pattern:pandas_arrow_timestamp_index_attr_semantics" in features
     assert "pandas:arrow-timestamp-index-attr" in features
     assert case.metadata["source_issue"] == "https://github.com/pandas-dev/pandas/issues/63527"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_pandas_eval_inplace_aliasing_semantics_profile_is_supported_and_valid():
+    case = generate_case(150, profile="pandas_eval_inplace_aliasing_semantics")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000150-pandas-eval-inplace-aliasing-semantics"
+    assert case.program.operations == [
+        {"op": "eval_inplace_alias_probe", "as": "eval_inplace_alias_mismatch"}
+    ]
+    assert "pattern:pandas_eval_inplace_aliasing_semantics" in features
+    assert "pandas:eval-inplace-alias" in features
+    assert case.metadata["source_issue"] == "https://github.com/pandas-dev/pandas/issues/65664"
     assert validate_case_program(case) == []
 
 

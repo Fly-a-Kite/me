@@ -60,6 +60,7 @@ GeneratorProfile = Literal[
     "pandas_arrow_string_eq_sum_semantics",
     "pandas_arrow_timestamp_loc_slice_semantics",
     "pandas_arrow_timestamp_index_attr_semantics",
+    "pandas_eval_inplace_aliasing_semantics",
     "pyarrow_dataset_isin_all_match_semantics",
     "pyarrow_large_string_partition_schema_semantics",
     "pyarrow_hash_pivot_wider_order_semantics",
@@ -550,6 +551,9 @@ def _available_columns_after_operations(
         elif kind == "arrow_timestamp_index_attr_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "eval_inplace_alias_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "dataset_isin_all_match_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
@@ -1001,6 +1005,17 @@ def repair_operations(
             strings = set()
             order_pending = False
             pending_order_columns = set()
+        elif kind == "eval_inplace_alias_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "eval_inplace_alias_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "dataset_isin_all_match_probe":
             alias = str(op.get("as", ""))
             if not alias or is_reserved_output_name(alias):
@@ -1338,6 +1353,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_pandas_arrow_timestamp_loc_slice_semantics_case(seed)
     if profile == "pandas_arrow_timestamp_index_attr_semantics" and type_aware:
         return generate_pandas_arrow_timestamp_index_attr_semantics_case(seed)
+    if profile == "pandas_eval_inplace_aliasing_semantics" and type_aware:
+        return generate_pandas_eval_inplace_aliasing_semantics_case(seed)
     if profile == "pyarrow_dataset_isin_all_match_semantics" and type_aware:
         return generate_pyarrow_dataset_isin_all_match_semantics_case(seed)
     if profile == "pyarrow_large_string_partition_schema_semantics" and type_aware:
@@ -1496,6 +1513,12 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
             generate_pandas_arrow_timestamp_index_attr_semantics_case(seed),
             seed,
             "pandas_arrow_timestamp_index_attr_semantics",
+        )
+    if seed % 181 == 108:
+        return _as_bughunt_mixed_case(
+            generate_pandas_eval_inplace_aliasing_semantics_case(seed),
+            seed,
+            "pandas_eval_inplace_aliasing_semantics",
         )
     if seed % 163 == 82:
         return _as_bughunt_mixed_case(
@@ -3532,6 +3555,32 @@ def generate_pandas_arrow_timestamp_index_attr_semantics_case(seed: int) -> Case
             "source_issue": "https://github.com/pandas-dev/pandas/issues/63527",
             "expected_arrow_timestamp_index_attr_mismatch": False,
             "expected_arrow_timestamp_index_months": [5, 6],
+        },
+    )
+
+
+def generate_pandas_eval_inplace_aliasing_semantics_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("eval_inplace_alias_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-pandas-eval-inplace-aliasing-semantics",
+        seed,
+        [{"op": "eval_inplace_alias_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-pandas-eval-inplace-aliasing-semantics",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "pandas_eval_inplace_aliasing_semantics",
+            "source_issue": "https://github.com/pandas-dev/pandas/issues/65664",
+            "expected_eval_inplace_alias_mismatch": False,
+            "expected_eval_inplace_alias_rows": 3,
         },
     )
 

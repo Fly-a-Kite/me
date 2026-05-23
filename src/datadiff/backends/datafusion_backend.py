@@ -324,6 +324,12 @@ class DataFusionBackend(Backend):
                     visible_cols = [op["as"]]
                     hidden_order_cols = []
                     pending_order = None
+                elif kind == "eval_inplace_alias_probe":
+                    query = f"SELECT false AS {_quote(op['as'])}"
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
                 elif kind == "dataset_isin_all_match_probe":
                     query = f"SELECT false AS {_quote(op['as'])}"
                     current_cols = [op["as"]]

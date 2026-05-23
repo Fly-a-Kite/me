@@ -520,6 +520,21 @@ def test_oracle_classifies_pandas_arrow_timestamp_index_attr_semantics():
     assert findings[0].root_cause == "pandas_arrow_timestamp_index_attr_semantics"
 
 
+def test_oracle_classifies_pandas_eval_inplace_aliasing_semantics():
+    case = generate_case(370041, profile="pandas_eval_inplace_aliasing_semantics")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["eval_inplace_alias_mismatch"], [[False]]),
+            "pandas": NormalizedResult("pandas", "ok", ["eval_inplace_alias_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "pandas_eval_inplace_aliasing_semantics"
+
+
 def test_oracle_classifies_pyarrow_dataset_isin_all_match_semantics():
     case = generate_case(370037, profile="pyarrow_dataset_isin_all_match_semantics")
 

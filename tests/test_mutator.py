@@ -21,6 +21,7 @@ from datadiff.mutator import (
     _append_arrow_string_eq_sum_probe,
     _append_arrow_timestamp_loc_slice_probe,
     _append_arrow_timestamp_index_attr_probe,
+    _append_eval_inplace_alias_probe,
     _append_dataset_isin_all_match_probe,
     _append_large_string_partition_probe,
     _append_hash_pivot_wider_probe,
@@ -129,6 +130,7 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_arrow_string_eq_sum_probe" in MUTATION_OPERATOR_NAMES
     assert "append_arrow_timestamp_loc_slice_probe" in MUTATION_OPERATOR_NAMES
     assert "append_arrow_timestamp_index_attr_probe" in MUTATION_OPERATOR_NAMES
+    assert "append_eval_inplace_alias_probe" in MUTATION_OPERATOR_NAMES
     assert "append_dataset_isin_all_match_probe" in MUTATION_OPERATOR_NAMES
     assert "append_large_string_partition_probe" in MUTATION_OPERATOR_NAMES
     assert "append_hash_pivot_wider_probe" in MUTATION_OPERATOR_NAMES
@@ -626,6 +628,30 @@ def test_append_large_string_partition_probe_mutation_stays_valid():
         1,
         [table],
         Program("prog-mut-large-string-partition", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
+def test_append_eval_inplace_alias_probe_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("nums", "int")],
+        [{"id": 0, "nums": -1}],
+    )
+    operations = [{"op": "select", "columns": ["nums"]}]
+
+    detail = _append_eval_inplace_alias_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_eval_inplace_alias_probe:")
+    assert operations[-1] == {
+        "op": "eval_inplace_alias_probe",
+        "as": "eval_inplace_alias_mismatch",
+    }
+    case = Case(
+        "case-mut-eval-inplace-alias",
+        1,
+        [table],
+        Program("prog-mut-eval-inplace-alias", 1, operations),
     )
     assert validate_case_program(case) == []
 

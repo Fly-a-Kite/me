@@ -200,6 +200,13 @@ def test_classify_operation_combo_tracks_pandas_arrow_timestamp_index_attr_seman
     assert "pandas_arrow_timestamp_index_attr_semantics" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_pandas_eval_inplace_aliasing_risk():
+    combo = classify_operation_combo([{"op": "eval_inplace_alias_probe"}])
+
+    assert combo["template"] == "eval_inplace_alias_probe"
+    assert "pandas_eval_inplace_aliasing_semantics" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_pyarrow_dataset_isin_all_match_semantics_risk():
     combo = classify_operation_combo([{"op": "dataset_isin_all_match_probe"}])
 

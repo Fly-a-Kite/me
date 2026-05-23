@@ -48,6 +48,7 @@ COMMON_DSL_CAPABILITIES: tuple[str, ...] = (
     "op:arrow_string_eq_sum_probe",
     "op:arrow_timestamp_loc_slice_probe",
     "op:arrow_timestamp_index_attr_probe",
+    "op:eval_inplace_alias_probe",
     "op:dataset_isin_all_match_probe",
     "op:large_string_partition_probe",
     "op:hash_pivot_wider_probe",

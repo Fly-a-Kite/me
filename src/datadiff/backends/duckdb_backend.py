@@ -474,6 +474,13 @@ class DuckDBBackend(Backend):
                     visible_cols = [op["as"]]
                     hidden_order_cols = []
                     pending_order = None
+                elif kind == "eval_inplace_alias_probe":
+                    ctes = []
+                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
                 elif kind == "dataset_isin_all_match_probe":
                     ctes = []
                     relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")

@@ -231,6 +231,7 @@ def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
         "pandas_arrow_string_eq_sum_semantics",
         "pandas_arrow_timestamp_loc_slice_semantics",
         "pandas_arrow_timestamp_index_attr_semantics",
+        "pandas_eval_inplace_aliasing_semantics",
         "pyarrow_dataset_isin_all_match_semantics",
         "pyarrow_large_string_partition_schema_semantics",
         "pyarrow_hash_pivot_wider_order_semantics",

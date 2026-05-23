@@ -265,6 +265,7 @@ def test_cli_parses_order_sensitive_bug_hunt_profiles():
         "pandas_arrow_string_eq_sum_semantics",
         "pandas_arrow_timestamp_loc_slice_semantics",
         "pandas_arrow_timestamp_index_attr_semantics",
+        "pandas_eval_inplace_aliasing_semantics",
         "pyarrow_dataset_isin_all_match_semantics",
         "pyarrow_large_string_partition_schema_semantics",
         "pyarrow_hash_pivot_wider_order_semantics",
@@ -547,6 +548,15 @@ def test_cli_parses_targeted_guided_experiment_presets():
     )
     assert _preset_config("pandas_arrow_timestamp_index_attr_semantics_metamorphic").enable_metamorphic_oracle is True
     assert (
+        _preset_config("pandas_eval_inplace_aliasing_semantics").generator_profile
+        == "pandas_eval_inplace_aliasing_semantics"
+    )
+    assert (
+        _preset_config("pandas_eval_inplace_aliasing_semantics").guidance_targets[0]
+        == "pandas_eval_inplace_aliasing_semantics"
+    )
+    assert _preset_config("pandas_eval_inplace_aliasing_semantics_metamorphic").enable_metamorphic_oracle is True
+    assert (
         _preset_config("pyarrow_dataset_isin_all_match_semantics").generator_profile
         == "pyarrow_dataset_isin_all_match_semantics"
     )
@@ -675,6 +685,7 @@ def test_cli_parses_non_datafusion_live_presets():
         "pandas_arrow_string_eq_sum_semantics",
         "pandas_arrow_timestamp_loc_slice_semantics",
         "pandas_arrow_timestamp_index_attr_semantics",
+        "pandas_eval_inplace_aliasing_semantics",
         "pyarrow_dataset_isin_all_match_semantics",
         "pyarrow_large_string_partition_schema_semantics",
         "pyarrow_hash_pivot_wider_order_semantics",

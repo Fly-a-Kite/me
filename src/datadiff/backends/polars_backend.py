@@ -114,6 +114,8 @@ class PolarsBackend(Backend):
                     df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "arrow_timestamp_index_attr_probe":
                     df = pl.DataFrame({op["as"]: [False]})
+                elif kind == "eval_inplace_alias_probe":
+                    df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "dataset_isin_all_match_probe":
                     df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "large_string_partition_probe":
@@ -306,6 +308,8 @@ class PolarsLazyBackend(PolarsBackend):
                 elif kind == "arrow_timestamp_loc_slice_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "arrow_timestamp_index_attr_probe":
+                    lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "eval_inplace_alias_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "dataset_isin_all_match_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()

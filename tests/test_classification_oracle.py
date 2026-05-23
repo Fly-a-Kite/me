@@ -1582,6 +1582,67 @@ def test_classification_reference_understands_dataset_isin_all_match_probe():
     assert classification.implicated_backends == ["pyarrow"]
 
 
+def test_validate_case_accepts_eval_inplace_alias_probe():
+    valid = Case(
+        "case-eval-inplace-alias-probe",
+        89,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-eval-inplace-alias-probe",
+            89,
+            [{"op": "eval_inplace_alias_probe", "as": "eval_inplace_alias_mismatch"}],
+        ),
+    )
+    bad_alias = Case(
+        "case-eval-inplace-alias-probe-alias",
+        90,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-eval-inplace-alias-probe-alias",
+            90,
+            [{"op": "eval_inplace_alias_probe", "as": "where"}],
+        ),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_eval_inplace_alias_probe():
+    case = Case(
+        "case-eval-inplace-alias-reference",
+        91,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-eval-inplace-alias-reference",
+            91,
+            [{"op": "eval_inplace_alias_probe", "as": "eval_inplace_alias_mismatch"}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "pandas_eval_inplace_aliasing_semantics",
+        "confidence": "high",
+        "suspicious_backends": ["pandas"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["eval_inplace_alias_mismatch"], [[False]]),
+        "pandas": NormalizedResult("pandas", "ok", ["eval_inplace_alias_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "pandas_eval_inplace_aliasing_semantics"},
+        ["reference", "pandas"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["pandas"]
+
+
 def test_validate_case_accepts_rolling_mean_by_null_count_probe():
     valid = Case(
         "case-rolling-mean-by-null-count-probe",

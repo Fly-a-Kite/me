@@ -118,6 +118,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "pandas_arrow_timestamp_index_attr_semantics": {"pattern:pandas_arrow_timestamp_index_attr_semantics"},
     "arrow_timestamp_index_attr_probe": {"op:arrow_timestamp_index_attr_probe"},
     "arrow_timestamp_attributes": {"pandas:arrow-timestamp-index-attr", "arrow:timestamp-index-attribute"},
+    "pandas_eval_inplace_aliasing_semantics": {"pattern:pandas_eval_inplace_aliasing_semantics"},
+    "eval_inplace_alias_probe": {"op:eval_inplace_alias_probe"},
+    "eval_inplace_aliasing": {"pandas:eval-inplace-alias", "copy:on-write-alias"},
     "pyarrow_dataset_isin_all_match_semantics": {"pattern:pyarrow_dataset_isin_all_match_semantics"},
     "dataset_isin_all_match_probe": {"op:dataset_isin_all_match_probe"},
     "dataset_membership_filter": {"pyarrow:dataset-isin-all-match", "dataset:membership-filter"},
@@ -230,6 +233,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_arrow_string_eq_sum_probe = False
     has_arrow_timestamp_loc_slice_probe = False
     has_arrow_timestamp_index_attr_probe = False
+    has_eval_inplace_alias_probe = False
     has_dataset_isin_all_match_probe = False
     has_large_string_partition_probe = False
     has_hash_pivot_wider_probe = False
@@ -371,6 +375,11 @@ def extract_case_features(case: Case) -> set[str]:
             features.add("arrow:timestamp-index-attribute")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_arrow_timestamp_index_attr_probe = True
+        elif kind == "eval_inplace_alias_probe":
+            features.add("pandas:eval-inplace-alias")
+            features.add("copy:on-write-alias")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_eval_inplace_alias_probe = True
         elif kind == "dataset_isin_all_match_probe":
             features.add("pyarrow:dataset-isin-all-match")
             features.add("dataset:membership-filter")
@@ -550,6 +559,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:pandas_arrow_timestamp_loc_slice_semantics")
     if has_arrow_timestamp_index_attr_probe:
         features.add("pattern:pandas_arrow_timestamp_index_attr_semantics")
+    if has_eval_inplace_alias_probe:
+        features.add("pattern:pandas_eval_inplace_aliasing_semantics")
     if has_dataset_isin_all_match_probe:
         features.add("pattern:pyarrow_dataset_isin_all_match_semantics")
     if has_large_string_partition_probe:
@@ -1213,6 +1224,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "eval_inplace_alias_probe":
+            score, op_buckets, samples = _eval_inplace_alias_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "dataset_isin_all_match_probe":
             score, op_buckets, samples = _dataset_isin_all_match_frontier_score(op)
             scores.append(score)
@@ -1743,6 +1759,12 @@ def _arrow_timestamp_index_attr_frontier_score(op: dict[str, Any]) -> tuple[floa
     return 0.90, buckets, {alias: [False]} if alias else {}
 
 
+def _eval_inplace_alias_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    buckets = ["pandas:eval-inplace-alias", "copy:on-write-alias"]
+    return 0.90, buckets, {alias: [False]} if alias else {}
+
+
 def _dataset_isin_all_match_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
     alias = str(op.get("as", ""))
     buckets = ["pyarrow:dataset-isin-all-match", "dataset:membership-filter"]
@@ -2168,6 +2190,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         or "op:arrow_timestamp_index_attr_probe" in features
     ):
         roots.add("pandas_arrow_timestamp_index_attr_semantics")
+    if "pattern:pandas_eval_inplace_aliasing_semantics" in features or "op:eval_inplace_alias_probe" in features:
+        roots.add("pandas_eval_inplace_aliasing_semantics")
     if "pattern:pyarrow_dataset_isin_all_match_semantics" in features or "op:dataset_isin_all_match_probe" in features:
         roots.add("pyarrow_dataset_isin_all_match_semantics")
     if (

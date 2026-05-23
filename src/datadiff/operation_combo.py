@@ -26,6 +26,7 @@ CANONICAL_OPERATION_ORDER = (
     "arrow_string_eq_sum_probe",
     "arrow_timestamp_loc_slice_probe",
     "arrow_timestamp_index_attr_probe",
+    "eval_inplace_alias_probe",
     "dataset_isin_all_match_probe",
     "large_string_partition_probe",
     "hash_pivot_wider_probe",
@@ -155,6 +156,8 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("pandas_arrow_timestamp_loc_slice_semantics")
     if "arrow_timestamp_index_attr_probe" in op_set:
         risks.append("pandas_arrow_timestamp_index_attr_semantics")
+    if "eval_inplace_alias_probe" in op_set:
+        risks.append("pandas_eval_inplace_aliasing_semantics")
     if "dataset_isin_all_match_probe" in op_set:
         risks.append("pyarrow_dataset_isin_all_match_semantics")
     if "large_string_partition_probe" in op_set:

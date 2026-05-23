@@ -549,6 +549,17 @@ def _append_arrow_timestamp_index_attr_probe(
     return f"append_arrow_timestamp_index_attr_probe:out={alias}"
 
 
+def _append_eval_inplace_alias_probe(
+    tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random
+) -> str:
+    if not tables:
+        return "append_eval_inplace_alias_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("eval_inplace_alias_mismatch", used=set(available))
+    operations.append({"op": "eval_inplace_alias_probe", "as": alias})
+    return f"append_eval_inplace_alias_probe:out={alias}"
+
+
 def _append_dataset_isin_all_match_probe(
     tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random
 ) -> str:
@@ -827,6 +838,9 @@ def _available_columns(tables: list[TableData], operations: list[dict[str, Any]]
         elif op.get("op") == "arrow_timestamp_index_attr_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif op.get("op") == "eval_inplace_alias_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif op.get("op") == "dataset_isin_all_match_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
@@ -888,6 +902,8 @@ def _column_type(tables: list[TableData], name: str) -> str:
     if name == "arrow_timestamp_loc_slice_mismatch" or name.startswith("arrow_timestamp_loc_slice_mismatch_"):
         return "bool"
     if name == "arrow_timestamp_index_attr_mismatch" or name.startswith("arrow_timestamp_index_attr_mismatch_"):
+        return "bool"
+    if name == "eval_inplace_alias_mismatch" or name.startswith("eval_inplace_alias_mismatch_"):
         return "bool"
     if name == "dataset_isin_all_match_mismatch" or name.startswith("dataset_isin_all_match_mismatch_"):
         return "bool"
@@ -956,6 +972,7 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_arrow_string_eq_sum_probe", _append_arrow_string_eq_sum_probe),
     MutationOperator("append_arrow_timestamp_loc_slice_probe", _append_arrow_timestamp_loc_slice_probe),
     MutationOperator("append_arrow_timestamp_index_attr_probe", _append_arrow_timestamp_index_attr_probe),
+    MutationOperator("append_eval_inplace_alias_probe", _append_eval_inplace_alias_probe),
     MutationOperator("append_dataset_isin_all_match_probe", _append_dataset_isin_all_match_probe),
     MutationOperator("append_large_string_partition_probe", _append_large_string_partition_probe),
     MutationOperator("append_hash_pivot_wider_probe", _append_hash_pivot_wider_probe),
