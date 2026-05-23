@@ -243,7 +243,8 @@ def _append_grouped_topk_probe(tables: list[TableData], operations: list[dict[st
     numeric = [
         column
         for column in available
-        if _column_type(tables, column) in {"int", "float"} or column.startswith(("m_", "sum_", "min_", "max_", "count_"))
+        if _column_type(tables, column) in {"int", "float"}
+        or column.startswith(("m_", "sum_", "min_", "max_", "count_", "nunique_", "uniq_"))
     ]
     if not numeric:
         return "append_grouped_topk:no-numeric-column"
@@ -279,7 +280,12 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
     available = _available_columns(tables, operations)
     if not available:
         return None
-    numeric = [c for c in available if _column_type(tables, c) in {"int", "float"} or c.startswith(("m_", "sum_", "min_", "max_", "count_"))]
+    numeric = [
+        c
+        for c in available
+        if _column_type(tables, c) in {"int", "float"}
+        or c.startswith(("m_", "sum_", "min_", "max_", "count_", "nunique_", "uniq_"))
+    ]
     strings = [c for c in available if _column_type(tables, c) == "str"]
     choices = ["filter", "select", "sort", "limit"]
     if numeric or strings:
@@ -334,12 +340,12 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
     if kind == "groupby" and numeric:
         keys = [rnd.choice(available)]
         val = rnd.choice(numeric)
-        func = rnd.choice(["sum", "min", "max", "count"])
+        func = rnd.choice(["sum", "min", "max", "count", "nunique"])
         alias = make_safe_output_name(f"{func}_{val}", used=set(keys))
         return {"op": "groupby", "keys": keys, "aggs": [{"column": val, "func": func, "as": alias}]}
     if kind == "aggregate" and numeric:
         val = rnd.choice(numeric)
-        func = rnd.choice(["sum", "min", "max", "count"])
+        func = rnd.choice(["sum", "min", "max", "count", "nunique"])
         alias = make_safe_output_name(f"{func}_{val}_all")
         return {"op": "aggregate", "aggs": [{"column": val, "func": func, "as": alias}]}
     return None

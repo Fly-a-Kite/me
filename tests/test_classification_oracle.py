@@ -516,7 +516,7 @@ def test_validate_case_rejects_groupby_alias_that_collides_with_key():
     assert any("aliases collide with keys" in error for error in errors)
 
 
-def test_validate_case_allows_count_on_string_columns_only():
+def test_validate_case_allows_count_and_nunique_on_string_columns_only():
     count_string = Case(
         "case-count-string",
         8,
@@ -533,9 +533,25 @@ def test_validate_case_allows_count_on_string_columns_only():
             [{"op": "groupby", "keys": ["g"], "aggs": [{"column": "s", "func": "count", "as": "count_s"}]}],
         ),
     )
+    nunique_string = Case(
+        "case-nunique-string",
+        9,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("g", "str"), ColumnSpec("s", "str")],
+                [{"g": "a", "s": "alpha"}, {"g": "a", "s": "alpha"}, {"g": "a", "s": None}],
+            )
+        ],
+        Program(
+            "prog-nunique-string",
+            9,
+            [{"op": "groupby", "keys": ["g"], "aggs": [{"column": "s", "func": "nunique", "as": "uniq_s"}]}],
+        ),
+    )
     sum_string = Case(
         "case-sum-string",
-        9,
+        10,
         [
             TableData(
                 "t0",
@@ -551,6 +567,7 @@ def test_validate_case_allows_count_on_string_columns_only():
     )
 
     assert validate_case_program(count_string) == []
+    assert validate_case_program(nunique_string) == []
     assert any("not numeric" in error for error in validate_case_program(sum_string))
 
 

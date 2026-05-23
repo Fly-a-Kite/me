@@ -34,6 +34,7 @@ GeneratorProfile = Literal[
     "join_ordered_agg_topk",
     "global_null_aggregate",
     "string_count_groupby",
+    "unique_count_groupby",
 ]
 
 
@@ -328,7 +329,7 @@ def generate_program(
             aggs = []
             used_aliases = set()
             for val in rnd.sample(numeric_cols, agg_count):
-                func = rnd.choice(["sum", "min", "max", "count"])
+                func = rnd.choice(["sum", "min", "max", "count", "nunique"])
                 alias = make_safe_output_name(f"{func}_{val}", used=used_aliases | set(keys))
                 used_aliases.add(alias)
                 aggs.append({"column": val, "func": func, "as": alias})
@@ -486,7 +487,7 @@ def _generate_type_oblivious_operation(
         }
     numeric_cols = table.numeric_columns()
     agg_col = rnd.choice(numeric_cols or available_cols)
-    func = rnd.choice(["sum", "min", "max", "count"])
+    func = rnd.choice(["sum", "min", "max", "count", "nunique"] if agg_col in numeric_cols else ["count", "nunique"])
     alias = make_safe_output_name(f"{func}_{agg_col}", used={col})
     return {"op": "groupby", "keys": [col], "aggs": [{"column": agg_col, "func": func, "as": alias}]}
 
@@ -595,7 +596,7 @@ def repair_operations(
             aggs = [
                 a
                 for a in op["aggs"]
-                if a["column"] in available and (a["func"] == "count" or a["column"] in numeric)
+                if a["column"] in available and (a["func"] in {"count", "nunique"} or a["column"] in numeric)
             ]
             unique_aggs: list[dict[str, Any]] = []
             seen_aliases: set[str] = set()
@@ -614,14 +615,14 @@ def repair_operations(
             numeric |= {a["as"] for a in aggs}
             strings = {k for k in keys if col_types.get(k) == "str"}
             for agg in aggs:
-                col_types[agg["as"]] = "int" if agg["func"] == "count" else col_types.get(agg["column"], "float")
+                col_types[agg["as"]] = "int" if agg["func"] in {"count", "nunique"} else col_types.get(agg["column"], "float")
             order_pending = False
             pending_order_columns = set()
         elif kind == "aggregate":
             aggs = [
                 a
                 for a in op["aggs"]
-                if a["column"] in available and (a["func"] == "count" or a["column"] in numeric)
+                if a["column"] in available and (a["func"] in {"count", "nunique"} or a["column"] in numeric)
             ]
             unique_aggs = []
             seen_aliases: set[str] = set()
@@ -638,7 +639,7 @@ def repair_operations(
             numeric = set(available)
             strings = set()
             for agg in unique_aggs:
-                col_types[agg["as"]] = "int" if agg["func"] == "count" else col_types.get(agg["column"], "float")
+                col_types[agg["as"]] = "int" if agg["func"] in {"count", "nunique"} else col_types.get(agg["column"], "float")
             order_pending = False
             pending_order_columns = set()
     return repaired
@@ -754,6 +755,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_global_null_aggregate_case(seed)
     if profile == "string_count_groupby" and type_aware:
         return generate_string_count_groupby_case(seed)
+    if profile == "unique_count_groupby" and type_aware:
+        return generate_unique_count_groupby_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -797,6 +800,8 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         return _as_bughunt_mixed_case(generate_join_null_key_topk_case(seed), seed, "join_null_key_topk")
     if selector == 47:
         return _as_bughunt_mixed_case(generate_string_count_groupby_case(seed), seed, "string_count_groupby")
+    if selector == 56:
+        return _as_bughunt_mixed_case(generate_unique_count_groupby_case(seed), seed, "unique_count_groupby")
     if selector == 53:
         return _as_bughunt_mixed_case(generate_topk_resort_case(seed), seed, "topk_resort")
     if selector == 58:
@@ -1881,6 +1886,66 @@ def generate_string_count_groupby_case(seed: int) -> Case:
         tables=[table],
         program=program,
         metadata={"generator_profile": "string_count_groupby"},
+    )
+
+
+def generate_unique_count_groupby_case(seed: int) -> Case:
+    rows = [
+        {"id": 0, "g": "alpha", "s": "red", "x": 1},
+        {"id": 1, "g": "alpha", "s": "red", "x": 1},
+        {"id": 2, "g": "alpha", "s": None, "x": None},
+        {"id": 3, "g": "beta", "s": "", "x": 2},
+        {"id": 4, "g": "beta", "s": "space value", "x": 3},
+        {"id": 5, "g": "beta", "s": "", "x": 2},
+        {"id": 6, "g": None, "s": None, "x": None},
+        {"id": 7, "g": None, "s": "中文", "x": 4},
+        {"id": 8, "g": "gamma", "s": None, "x": None},
+    ]
+    if seed % 2:
+        rows.append({"id": 9, "g": "gamma", "s": "red", "x": 4})
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("s", "str", nullable=True),
+            ColumnSpec("x", "int", nullable=True),
+        ],
+        rows,
+    )
+    program = Program(
+        f"prog-{seed:08d}-unique-count-groupby",
+        seed,
+        [
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [
+                    {"column": "s", "func": "nunique", "as": "uniq_s_count"},
+                    {"column": "x", "func": "nunique", "as": "uniq_x_count"},
+                    {"column": "s", "func": "count", "as": "count_s"},
+                ],
+            },
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "uniq_s_count", "ascending": False, "nulls": "last"},
+                    {"column": "uniq_x_count", "ascending": False, "nulls": "last"},
+                    {"column": "g", "ascending": True, "nulls": "first"},
+                ],
+            },
+            {"op": "limit", "n": 5},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-unique-count-groupby",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "unique_count_groupby",
+            "source_issue": "https://github.com/apache/arrow/issues/36149",
+        },
     )
 
 

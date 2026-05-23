@@ -55,6 +55,13 @@ def _order_clause(sort_keys: list[SortKey]) -> str:
     )
 
 
+def _agg_expr(column: str, func: str) -> str:
+    if func == "nunique":
+        return f"COUNT(DISTINCT {_quote(column)})"
+    sql_func = "COUNT" if func == "count" else func.upper()
+    return f"{sql_func}({_quote(column)})"
+
+
 class DuckDBBackend(Backend):
     name = "duckdb"
     persistent_storage = False
@@ -220,8 +227,7 @@ class DuckDBBackend(Backend):
                     key_sql = ", ".join(_quote(k) for k in keys)
                     agg_sql = []
                     for agg in op["aggs"]:
-                        func = "COUNT" if agg["func"] == "count" else agg["func"].upper()
-                        agg_sql.append(f"{func}({_quote(agg['column'])}) AS {_quote(agg['as'])}")
+                        agg_sql.append(f"{_agg_expr(agg['column'], agg['func'])} AS {_quote(agg['as'])}")
                     relation = add_step(
                         f"SELECT {key_sql}, {', '.join(agg_sql)} FROM {relation} q "
                         f"GROUP BY {key_sql}"
@@ -233,8 +239,7 @@ class DuckDBBackend(Backend):
                     drop_hidden_order_cols()
                     agg_sql = []
                     for agg in op["aggs"]:
-                        func = "COUNT" if agg["func"] == "count" else agg["func"].upper()
-                        agg_sql.append(f"{func}({_quote(agg['column'])}) AS {_quote(agg['as'])}")
+                        agg_sql.append(f"{_agg_expr(agg['column'], agg['func'])} AS {_quote(agg['as'])}")
                     relation = add_step(f"SELECT {', '.join(agg_sql)} FROM {relation} q")
                     current_cols = [agg["as"] for agg in op["aggs"]]
                     visible_cols = list(current_cols)

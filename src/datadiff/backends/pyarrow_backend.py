@@ -71,9 +71,9 @@ class PyArrowBackend(Backend):
                         current, current_cols = _replace_column(current, current_cols, op["column"], values)
                     elif kind == "groupby":
                         keys = list(op["keys"])
-                        aggregates = [(agg["column"], agg["func"]) for agg in op["aggs"]]
+                        aggregates = [(agg["column"], _arrow_aggregate_func(agg["func"])) for agg in op["aggs"]]
                         current = current.group_by(keys, use_threads=False).aggregate(aggregates)
-                        source_names = [*keys, *[f"{agg['column']}_{agg['func']}" for agg in op["aggs"]]]
+                        source_names = [*keys, *[f"{agg['column']}_{_arrow_aggregate_func(agg['func'])}" for agg in op["aggs"]]]
                         target_names = [*keys, *[agg["as"] for agg in op["aggs"]]]
                         current = _select_existing(current, source_names).rename_columns(target_names)
                         current_cols = target_names
@@ -169,6 +169,8 @@ def _eval_expr(pc, table: Any, expr: dict[str, Any]):
 def _global_aggregate(pc, array: Any, func: str) -> Any:
     if func == "count":
         return pc.count(array, mode="only_valid").as_py()
+    if func == "nunique":
+        return pc.count_distinct(array).as_py()
     if func == "sum":
         return pc.sum(array).as_py()
     if func == "min":
@@ -176,6 +178,10 @@ def _global_aggregate(pc, array: Any, func: str) -> Any:
     if func == "max":
         return pc.max(array).as_py()
     raise ValueError(func)
+
+
+def _arrow_aggregate_func(func: str) -> str:
+    return "count_distinct" if func == "nunique" else func
 
 
 def _sort_table(pa: Any, table: Any, sort_keys: list[SortKey]) -> Any:

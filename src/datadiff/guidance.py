@@ -44,6 +44,8 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "join_ordered_agg_topk": {"pattern:join_ordered_agg_topk"},
     "global_null_aggregate": {"pattern:global_null_aggregate"},
     "string_count_groupby": {"pattern:string_count_groupby"},
+    "unique_count_groupby": {"pattern:unique_count_groupby"},
+    "unique_count": {"agg:nunique"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -118,6 +120,7 @@ def extract_case_features(case: Case) -> set[str]:
     op_names = []
     available_types = {column.name: column.type for column in table.columns}
     has_string_count_groupby = False
+    has_unique_count_groupby = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -176,7 +179,12 @@ def extract_case_features(case: Case) -> set[str]:
                 if agg.get("func") == "count" and source_type == "str":
                     features.add("agg:count:str")
                     has_string_count_groupby = True
-                available_types[str(agg.get("as", "derived"))] = "float"
+                if agg.get("func") == "nunique":
+                    features.add(f"agg:nunique:{source_type}")
+                    has_unique_count_groupby = True
+                available_types[str(agg.get("as", "derived"))] = (
+                    "int" if agg.get("func") in {"count", "nunique"} else "float"
+                )
         elif kind == "aggregate":
             for agg in op.get("aggs", []):
                 source_type = available_types.get(str(agg.get("column", "")), "derived")
@@ -184,7 +192,11 @@ def extract_case_features(case: Case) -> set[str]:
                 features.add(f"agg_source_type:{source_type}")
                 if agg.get("func") == "count" and source_type == "str":
                     features.add("agg:count:str")
-                available_types[str(agg.get("as", "derived"))] = "float"
+                if agg.get("func") == "nunique":
+                    features.add(f"agg:nunique:{source_type}")
+                available_types[str(agg.get("as", "derived"))] = (
+                    "int" if agg.get("func") in {"count", "nunique"} else "float"
+                )
     if op_names:
         features.add("opseq:" + ">".join(op_names))
         features.add(_bucket("op_count", len(op_names), [(1, "one"), (3, "few"), (5, "many")], "deep"))
@@ -227,6 +239,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:global_null_aggregate")
     if has_string_count_groupby:
         features.add("pattern:string_count_groupby")
+    if has_unique_count_groupby:
+        features.add("pattern:unique_count_groupby")
     return features
 
 

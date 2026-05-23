@@ -106,6 +106,8 @@ class PolarsBackend(Backend):
                         col, func, alias = agg["column"], agg["func"], agg["as"]
                         if func == "count":
                             aggs.append(pl.col(col).count().alias(alias))
+                        elif func == "nunique":
+                            aggs.append(pl.col(col).drop_nulls().n_unique().alias(alias))
                         elif func == "sum":
                             aggs.append(
                                 pl.when(pl.col(col).count() == 0)
@@ -122,6 +124,8 @@ class PolarsBackend(Backend):
                         col, func, alias = agg["column"], agg["func"], agg["as"]
                         if func == "count":
                             aggs.append(pl.col(col).count().alias(alias))
+                        elif func == "nunique":
+                            aggs.append(pl.col(col).drop_nulls().n_unique().alias(alias))
                         elif func == "sum":
                             aggs.append(
                                 pl.when(pl.col(col).count() == 0)
@@ -227,6 +231,8 @@ class PolarsLazyBackend(PolarsBackend):
                         col, func, alias = agg["column"], agg["func"], agg["as"]
                         if func == "count":
                             aggs.append(pl.col(col).count().alias(alias))
+                        elif func == "nunique":
+                            aggs.append(pl.col(col).drop_nulls().n_unique().alias(alias))
                         elif func == "sum":
                             aggs.append(
                                 pl.when(pl.col(col).count() == 0)
@@ -243,6 +249,8 @@ class PolarsLazyBackend(PolarsBackend):
                         col, func, alias = agg["column"], agg["func"], agg["as"]
                         if func == "count":
                             aggs.append(pl.col(col).count().alias(alias))
+                        elif func == "nunique":
+                            aggs.append(pl.col(col).drop_nulls().n_unique().alias(alias))
                         elif func == "sum":
                             aggs.append(
                                 pl.when(pl.col(col).count() == 0)

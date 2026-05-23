@@ -314,17 +314,20 @@ def validate_case_program(case: Case) -> list[str]:
                 col = agg.get("column")
                 if col not in available:
                     errors.append(f"op {idx}: aggregation column {col!r} is unavailable")
-                if agg.get("func") != "count" and col not in numeric:
+                func = agg.get("func")
+                if func not in {"count", "nunique"} and col not in numeric:
                     errors.append(f"op {idx}: aggregation column {col!r} is not numeric")
-                if agg.get("func") not in {"sum", "min", "max", "count"}:
-                    errors.append(f"op {idx}: unsupported aggregation {agg.get('func')!r}")
+                if func not in {"sum", "min", "max", "count", "nunique"}:
+                    errors.append(f"op {idx}: unsupported aggregation {func!r}")
             available = set(keys) | {str(agg.get("as")) for agg in aggs if agg.get("as")}
             numeric = {key for key in keys if col_types.get(key) in {"int", "float"}}
             numeric |= {str(agg.get("as")) for agg in aggs if agg.get("as")}
             strings = {key for key in keys if col_types.get(key) == "str"}
             for agg in aggs:
                 if agg.get("as"):
-                    col_types[str(agg["as"])] = "int" if agg.get("func") == "count" else col_types.get(str(agg.get("column")), "float")
+                    col_types[str(agg["as"])] = (
+                        "int" if agg.get("func") in {"count", "nunique"} else col_types.get(str(agg.get("column")), "float")
+                    )
         elif kind == "aggregate":
             aggs = list(op.get("aggs", []))
             if not aggs:
@@ -339,16 +342,19 @@ def validate_case_program(case: Case) -> list[str]:
                 col = agg.get("column")
                 if col not in available:
                     errors.append(f"op {idx}: aggregation column {col!r} is unavailable")
-                if agg.get("func") != "count" and col not in numeric:
+                func = agg.get("func")
+                if func not in {"count", "nunique"} and col not in numeric:
                     errors.append(f"op {idx}: aggregation column {col!r} is not numeric")
-                if agg.get("func") not in {"sum", "min", "max", "count"}:
-                    errors.append(f"op {idx}: unsupported aggregation {agg.get('func')!r}")
+                if func not in {"sum", "min", "max", "count", "nunique"}:
+                    errors.append(f"op {idx}: unsupported aggregation {func!r}")
             available = {str(agg.get("as")) for agg in aggs if agg.get("as")}
             numeric = set(available)
             strings = set()
             for agg in aggs:
                 if agg.get("as"):
-                    col_types[str(agg["as"])] = "int" if agg.get("func") == "count" else col_types.get(str(agg.get("column")), "float")
+                    col_types[str(agg["as"])] = (
+                        "int" if agg.get("func") in {"count", "nunique"} else col_types.get(str(agg.get("column")), "float")
+                    )
         else:
             errors.append(f"op {idx}: unknown operation {kind!r}")
     return errors
@@ -637,6 +643,8 @@ def _reference_aggregate(rows: list[dict[str, Any]], column: str, func: str) -> 
     values = [row.get(column) for row in rows if row.get(column) is not None]
     if func == "count":
         return len(values)
+    if func == "nunique":
+        return len(set(values))
     if not values:
         return None
     if func == "sum":

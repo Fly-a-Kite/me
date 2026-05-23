@@ -96,6 +96,8 @@ class PandasBackend(Backend):
                         col, func, alias = agg["column"], agg["func"], agg["as"]
                         if func == "count":
                             series = group[col].count().rename(alias)
+                        elif func == "nunique":
+                            series = group[col].nunique(dropna=True).rename(alias)
                         elif func == "sum":
                             series = group[col].sum(min_count=1).rename(alias)
                         else:
@@ -108,6 +110,8 @@ class PandasBackend(Backend):
                         col, func, alias = agg["column"], agg["func"], agg["as"]
                         if func == "count":
                             values[alias] = int(df[col].count())
+                        elif func == "nunique":
+                            values[alias] = int(df[col].nunique(dropna=True))
                         elif func == "sum":
                             values[alias] = df[col].sum(min_count=1)
                         else:

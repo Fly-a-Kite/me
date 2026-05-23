@@ -108,6 +108,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "join_null_truth_filter",
         "global_null_aggregate",
         "string_count_groupby",
+        "unique_count_groupby",
         "wide_offset_topk",
         "join_null_key_topk",
         "empty_filter_groupby",
@@ -411,7 +412,21 @@ def test_generate_case_string_count_groupby_profile_is_supported_and_valid():
     assert validate_case_program(case) == []
 
 
-def test_repair_operations_keeps_count_on_string_columns_only():
+def test_generate_case_unique_count_groupby_profile_is_supported_and_valid():
+    case = generate_case(123, profile="unique_count_groupby")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000123-unique-count-groupby"
+    assert [op["op"] for op in case.program.operations] == ["groupby", "sort", "limit"]
+    assert "pattern:unique_count_groupby" in features
+    assert "agg:nunique:str" in features
+    assert "agg:nunique:int" in features
+    assert "groupby:null-key" in features
+    assert case.metadata["source_issue"] == "https://github.com/apache/arrow/issues/36149"
+    assert validate_case_program(case) == []
+
+
+def test_repair_operations_keeps_safe_string_aggregations_only():
     case = generate_case(123, profile="string_count_groupby")
 
     repaired = repair_operations(
@@ -422,6 +437,7 @@ def test_repair_operations_keeps_count_on_string_columns_only():
                 "keys": ["g"],
                 "aggs": [
                     {"column": "s", "func": "count", "as": "count_s"},
+                    {"column": "s", "func": "nunique", "as": "uniq_s_count"},
                     {"column": "s", "func": "sum", "as": "sum_s"},
                     {"column": "x", "func": "sum", "as": "sum_x"},
                 ],
@@ -429,7 +445,7 @@ def test_repair_operations_keeps_count_on_string_columns_only():
         ],
     )
 
-    assert [agg["as"] for agg in repaired[0]["aggs"]] == ["count_s", "sum_x"]
+    assert [agg["as"] for agg in repaired[0]["aggs"]] == ["count_s", "uniq_s_count", "sum_x"]
 
 
 def test_bughunt_profile_biases_toward_multi_table_and_deeper_programs():

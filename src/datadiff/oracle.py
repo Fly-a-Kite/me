@@ -443,6 +443,8 @@ def _groupby_output_samples(samples: dict[str, list[Any]], op: dict[str, Any]) -
             func = agg.get("func")
             if func == "count":
                 values.append(len(non_null))
+            elif func == "nunique":
+                values.append(len(set(non_null)))
             elif not non_null:
                 values.append(None)
             elif func == "sum":
