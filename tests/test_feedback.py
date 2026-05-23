@@ -1,7 +1,7 @@
 from datadiff import feedback
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.feedback import FeedbackState
-from datadiff.mutator import MUTATION_OPERATOR_NAMES, PROBE_MUTATION_OPERATOR_NAMES
+from datadiff.mutator import MUTATION_OPERATOR_NAMES, PROBE_MUTATION_OPERATOR_NAMES, ROOT_TARGETED_MUTATION_OPERATOR_NAMES
 from datadiff.scheduler import LocalSourceScheduler
 
 
@@ -103,5 +103,6 @@ def test_feedback_mutations_avoid_direct_probe_append_operators():
         seen.add(operator_name)
         assert selected.case_id.endswith(f"-mut-{seed}")
         assert operator_name not in PROBE_MUTATION_OPERATOR_NAMES
+        assert operator_name not in ROOT_TARGETED_MUTATION_OPERATOR_NAMES
 
     assert seen

@@ -6,6 +6,7 @@ from datadiff.mutator import (
     DISCOVERY_MUTATION_OPERATOR_NAMES,
     MUTATION_OPERATOR_NAMES,
     PROBE_MUTATION_OPERATOR_NAMES,
+    ROOT_TARGETED_MUTATION_OPERATOR_NAMES,
     _append_group_quantile_probe,
     _append_scalar_subquery_probe,
     _append_window_avg_probe,
@@ -139,6 +140,7 @@ def test_mutate_case_can_exclude_probe_append_operators():
         operator_name = result.metadata["mutation"]["operator"]
         seen.add(operator_name)
         assert operator_name not in PROBE_MUTATION_OPERATOR_NAMES
+        assert operator_name not in ROOT_TARGETED_MUTATION_OPERATOR_NAMES
         assert operator_name in DISCOVERY_MUTATION_OPERATOR_NAMES
 
     assert seen

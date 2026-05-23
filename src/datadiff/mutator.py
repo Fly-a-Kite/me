@@ -1004,8 +1004,19 @@ PROBE_MUTATION_OPERATOR_NAMES = frozenset(
     for operator in MUTATION_OPERATORS
     if operator.name.endswith("_probe")
 )
+ROOT_TARGETED_MUTATION_OPERATOR_NAMES = frozenset(
+    {
+        "append_grouped_topk",
+        "append_running_sum",
+        "append_sortedness_check",
+        "append_tuple_absence_filter",
+    }
+)
 DISCOVERY_MUTATION_OPERATORS: tuple[MutationOperator, ...] = tuple(
-    operator for operator in MUTATION_OPERATORS if operator.name not in PROBE_MUTATION_OPERATOR_NAMES
+    operator
+    for operator in MUTATION_OPERATORS
+    if operator.name not in PROBE_MUTATION_OPERATOR_NAMES
+    and operator.name not in ROOT_TARGETED_MUTATION_OPERATOR_NAMES
 )
 MUTATION_OPERATOR_NAMES = tuple(operator.name for operator in MUTATION_OPERATORS)
 DISCOVERY_MUTATION_OPERATOR_NAMES = tuple(operator.name for operator in DISCOVERY_MUTATION_OPERATORS)

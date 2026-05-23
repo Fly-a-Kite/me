@@ -200,7 +200,10 @@ def behavior_signature(row: dict[str, Any]) -> str:
     return hashlib.sha256(raw).hexdigest()[:16]
 
 
-CALIBRATION_PROBE_OPS = frozenset(op for op in PROBE_ROOTS if op.endswith("_probe"))
+CALIBRATION_PROBE_OPS = frozenset(PROBE_ROOTS) | {
+    "running_sum",
+    "tuple_absence_filter",
+}
 
 
 def _feedback_storage_decision(case: Case) -> tuple[bool, str]:

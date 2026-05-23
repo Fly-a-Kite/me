@@ -929,24 +929,45 @@ def test_run_fuzz_records_duration_and_feedback():
 
 
 def test_feedback_storage_skips_calibration_probe_cases():
-    probe_case = Case(
-        "case-probe-feedback",
-        1,
-        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
-        Program(
-            "prog-probe-feedback",
+    probe_cases = [
+        Case(
+            "case-probe-feedback",
             1,
-            [{"op": "dataset_isin_all_match_probe", "as": "dataset_isin_all_match_mismatch"}],
+            [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+            Program(
+                "prog-probe-feedback",
+                1,
+                [{"op": "dataset_isin_all_match_probe", "as": "dataset_isin_all_match_mismatch"}],
+            ),
         ),
-    )
+        Case(
+            "case-sortedness-feedback",
+            2,
+            [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}, {"x": None}])],
+            Program("prog-sortedness-feedback", 2, [{"op": "sortedness_check", "column": "x", "as": "is_sorted"}]),
+        ),
+        Case(
+            "case-running-feedback",
+            3,
+            [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}, {"x": None}])],
+            Program("prog-running-feedback", 3, [{"op": "running_sum", "source": "x", "as": "run_x"}]),
+        ),
+        Case(
+            "case-tuple-absence-feedback",
+            4,
+            [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}, {"x": None}])],
+            Program("prog-tuple-absence-feedback", 4, [{"op": "tuple_absence_filter", "columns": ["x"]}]),
+        ),
+    ]
     ordinary_case = Case(
         "case-ordinary-feedback",
-        2,
+        5,
         [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
-        Program("prog-ordinary-feedback", 2, [{"op": "filter", "column": "x", "cmp": ">", "value": 0}]),
+        Program("prog-ordinary-feedback", 5, [{"op": "filter", "column": "x", "cmp": ">", "value": 0}]),
     )
 
-    assert runner_module._feedback_storage_decision(probe_case) == (False, "calibration_probe_case")
+    for probe_case in probe_cases:
+        assert runner_module._feedback_storage_decision(probe_case) == (False, "calibration_probe_case")
     assert runner_module._feedback_storage_decision(ordinary_case) == (True, "")
 
 
