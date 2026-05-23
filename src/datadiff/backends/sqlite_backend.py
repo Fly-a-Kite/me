@@ -6,6 +6,7 @@ from typing import Any
 from datadiff.backends.base import Backend, BackendResult
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
 from datadiff.filtering import sql_filter_condition
+from datadiff.sortedness import is_sorted_values
 from datadiff.sqlite_runtime import sqlite3
 
 
@@ -126,6 +127,19 @@ class SQLiteBackend(Backend):
                 current_cols = list(visible_cols)
                 hidden_order_cols = []
 
+            def materialize_visible_query():
+                if pending_order is not None:
+                    body = (
+                        f"SELECT {visible_projection()} FROM ({query}) q "
+                        f"ORDER BY {_order_clause(pending_order)}"
+                    )
+                else:
+                    drop_hidden_order_cols()
+                    body = f"SELECT {visible_projection()} FROM ({query}) q"
+                cur = con.execute(body)
+                columns = [desc[0] for desc in cur.description]
+                return pd.DataFrame(cur.fetchall(), columns=columns)
+
             def select_with_pending_order(cols: list[str]) -> str:
                 nonlocal pending_order, hidden_order_cols
                 if pending_order is None:
@@ -192,6 +206,19 @@ class SQLiteBackend(Backend):
                     query = f"SELECT {projection} FROM ({query}) q"
                     visible_cols = [col for col in visible_cols if col != op["column"]] + [op["column"]]
                     pending_order = order_keys
+                elif kind == "sortedness_check":
+                    materialized = materialize_visible_query()
+                    ok = is_sorted_values(
+                        materialized[op["column"]].tolist(),
+                        ascending=bool(op.get("ascending", True)),
+                        nulls=str(op.get("nulls", "last")),
+                    )
+                    query = f"SELECT {1 if ok else 0} AS {_quote(op['as'])}"
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    column_types[op["as"]] = "bool"
+                    hidden_order_cols = []
+                    pending_order = None
                 elif kind == "select":
                     cols = list(op["columns"])
                     projection = select_with_pending_order(cols)

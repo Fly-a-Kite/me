@@ -67,6 +67,13 @@ def test_classify_operation_combo_tracks_running_sum_precision_risk():
     assert combo["has_sort_limit"] is True
 
 
+def test_classify_operation_combo_tracks_sortedness_null_placement_risk():
+    combo = classify_operation_combo([{"op": "sort"}, {"op": "sortedness_check"}])
+
+    assert combo["template"] == "sort_sortedness_check"
+    assert "sortedness_null_placement" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

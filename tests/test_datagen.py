@@ -33,6 +33,10 @@ def _assert_program_columns_are_valid(case):
             assert all(key["column"] in known_cols for key in op["order_by"])
             assert not is_reserved_output_name(op["column"])
             known_cols.add(op["column"])
+        elif op["op"] == "sortedness_check":
+            assert op["column"] in known_cols
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
         elif op["op"] == "groupby":
             assert set(op["keys"]).issubset(known_cols)
             assert len(op["keys"]) == len(set(op["keys"]))
@@ -126,6 +130,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "topk_resort",
         "join_ordered_agg_topk",
         "running_sum_precision",
+        "sortedness_null_placement",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -535,6 +540,30 @@ def test_generate_case_running_sum_precision_profile_is_supported_and_valid():
     assert "pattern:running_sum_precision" in features
     assert "running:float32" in features
     assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/27662"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_sortedness_null_placement_profile_is_supported_and_valid():
+    case = generate_case(127, profile="sortedness_null_placement")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000127-sortedness-null-placement"
+    assert [op["op"] for op in case.program.operations] == ["sort", "sortedness_check"]
+    assert case.program.operations[0] == {
+        "op": "sort",
+        "keys": [{"column": "x", "ascending": True, "nulls": "last"}],
+    }
+    assert case.program.operations[1] == {
+        "op": "sortedness_check",
+        "column": "x",
+        "as": "sorted_ok_x",
+        "ascending": True,
+        "nulls": "first",
+    }
+    assert case.program.order_sensitive is True
+    assert "pattern:sortedness_null_placement" in features
+    assert "sortedness:null-placement-mismatch" in features
+    assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/26993"
     assert validate_case_program(case) == []
 
 

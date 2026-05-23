@@ -41,6 +41,7 @@ GeneratorProfile = Literal[
     "post_topk_range_filter",
     "tuple_absence_filter",
     "running_sum_precision",
+    "sortedness_null_placement",
 ]
 
 
@@ -470,6 +471,9 @@ def _available_columns_after_operations(
             column = str(op.get("column", ""))
             if column:
                 available = [existing for existing in available if existing != column] + [column]
+        elif kind == "sortedness_check":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "groupby":
             available = unique_preserve_order(
                 [str(key) for key in op.get("keys", [])]
@@ -660,6 +664,32 @@ def repair_operations(
             strings.discard(column)
             order_pending = True
             pending_order_columns = {key.column for key in order_keys}
+        elif kind == "sortedness_check":
+            column = str(op.get("column", ""))
+            alias = str(op.get("as", ""))
+            ascending = op.get("ascending", True)
+            nulls = str(op.get("nulls", "last"))
+            if column not in available:
+                continue
+            if not alias or is_reserved_output_name(alias):
+                continue
+            if not isinstance(ascending, bool) or nulls not in {"first", "last"}:
+                continue
+            repaired.append(
+                {
+                    "op": "sortedness_check",
+                    "column": column,
+                    "as": alias,
+                    "ascending": ascending,
+                    "nulls": nulls,
+                }
+            )
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "select":
             cols = unique_preserve_order([c for c in op["columns"] if c in available])
             if not cols:
@@ -900,6 +930,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_tuple_absence_filter_case(seed)
     if profile == "running_sum_precision" and type_aware:
         return generate_running_sum_precision_case(seed)
+    if profile == "sortedness_null_placement" and type_aware:
+        return generate_sortedness_null_placement_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -961,6 +993,8 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         return _as_bughunt_mixed_case(generate_join_ordered_agg_topk_case(seed), seed, "join_ordered_agg_topk")
     if selector == 59:
         return _as_bughunt_mixed_case(generate_running_sum_precision_case(seed), seed, "running_sum_precision")
+    if seed % 71 == 60:
+        return _as_bughunt_mixed_case(generate_sortedness_null_placement_case(seed), seed, "sortedness_null_placement")
     return None
 
 
@@ -2441,6 +2475,52 @@ def generate_running_sum_precision_case(seed: int) -> Case:
             "row_count": row_count,
             "increment": increment,
             "expected_total": row_count * increment,
+        },
+    )
+
+
+def generate_sortedness_null_placement_case(seed: int) -> Case:
+    rows = [
+        {"row_id": 0, "x": 3},
+        {"row_id": 1, "x": 1},
+        {"row_id": 2, "x": 2},
+        {"row_id": 3, "x": None},
+    ]
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("row_id", "int", nullable=False),
+            ColumnSpec("x", "int", nullable=True),
+        ],
+        rows,
+    )
+    alias = make_safe_output_name("sorted_ok_x", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-sortedness-null-placement",
+        seed,
+        [
+            {
+                "op": "sort",
+                "keys": [{"column": "x", "ascending": True, "nulls": "last"}],
+            },
+            {
+                "op": "sortedness_check",
+                "column": "x",
+                "as": alias,
+                "ascending": True,
+                "nulls": "first",
+            },
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-sortedness-null-placement",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "sortedness_null_placement",
+            "source_issue": "https://github.com/pola-rs/polars/issues/26993",
+            "expected_sortedness": False,
         },
     )
 

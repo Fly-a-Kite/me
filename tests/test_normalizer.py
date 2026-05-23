@@ -84,3 +84,16 @@ def test_order_sensitive_survives_row_preserving_ops_after_sort():
     )
 
     assert program.order_sensitive is True
+
+
+def test_sortedness_check_marks_program_order_sensitive():
+    program = Program(
+        "prog",
+        1,
+        [
+            {"op": "sort", "keys": [{"column": "x", "ascending": True, "nulls": "last"}]},
+            {"op": "sortedness_check", "column": "x", "as": "sorted_ok_x", "ascending": True, "nulls": "first"},
+        ],
+    )
+
+    assert program.order_sensitive is True

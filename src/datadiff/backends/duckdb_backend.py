@@ -7,6 +7,7 @@ import os
 from datadiff.backends.base import Backend, BackendResult
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
 from datadiff.filtering import sql_filter_condition
+from datadiff.sortedness import is_sorted_values
 
 
 def _quote(name: str) -> str:
@@ -144,6 +145,20 @@ class DuckDBBackend(Backend):
                 current_cols = list(visible_cols)
                 hidden_order_cols = []
 
+            def materialize_visible_relation():
+                if pending_order is not None:
+                    body = (
+                        f"SELECT {visible_projection()} FROM {relation} q "
+                        f"ORDER BY {_order_clause(pending_order)}"
+                    )
+                else:
+                    drop_hidden_order_cols()
+                    body = f"SELECT {visible_projection()} FROM {relation} q"
+                if ctes:
+                    cte_sql = ", ".join(f"{_quote(name)} AS ({sql})" for name, sql in ctes)
+                    body = f"WITH {cte_sql} {body}"
+                return con.execute(body).df()
+
             def select_with_pending_order(cols: list[str]) -> str:
                 nonlocal pending_order, hidden_order_cols
                 if pending_order is None:
@@ -204,6 +219,21 @@ class DuckDBBackend(Backend):
                     relation = add_step(f"SELECT {projection} FROM {relation} q")
                     visible_cols = [col for col in visible_cols if col != op["column"]] + [op["column"]]
                     pending_order = order_keys
+                elif kind == "sortedness_check":
+                    materialized = materialize_visible_relation()
+                    ok = is_sorted_values(
+                        materialized[op["column"]].tolist(),
+                        ascending=bool(op.get("ascending", True)),
+                        nulls=str(op.get("nulls", "last")),
+                    )
+                    materialized_name = f"__datadiff_sortedness_{len(ctes)}"
+                    con.register(materialized_name, pd.DataFrame({op["as"]: [ok]}))
+                    ctes = []
+                    relation = _quote(materialized_name)
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
                 elif kind == "select":
                     cols = list(op["columns"])
                     projection = select_with_pending_order(cols)

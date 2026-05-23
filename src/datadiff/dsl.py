@@ -82,7 +82,7 @@ class Program:
         }
         for op in reversed(self.operations):
             kind = op.get("op")
-            if kind in {"sort", "running_sum"}:
+            if kind in {"sort", "running_sum", "sortedness_check"}:
                 return True
             if kind in row_order_preserving:
                 continue

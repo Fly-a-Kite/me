@@ -7,6 +7,7 @@ from typing import Any
 from datadiff.backends.base import Backend, BackendResult
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
 from datadiff.filtering import sql_filter_condition
+from datadiff.sortedness import is_sorted_values
 
 
 def _quote(name: str) -> str:
@@ -123,6 +124,17 @@ class DataFusionBackend(Backend):
                 current_cols = list(visible_cols)
                 hidden_order_cols = []
 
+            def materialize_visible_query():
+                if pending_order is not None:
+                    body = (
+                        f"SELECT {visible_projection()} FROM ({query}) q "
+                        f"ORDER BY {_order_clause(pending_order)}"
+                    )
+                else:
+                    drop_hidden_order_cols()
+                    body = f"SELECT {visible_projection()} FROM ({query}) q"
+                return ctx.sql(body).to_pandas()
+
             def select_with_pending_order(cols: list[str]) -> str:
                 nonlocal pending_order, hidden_order_cols
                 if pending_order is None:
@@ -189,6 +201,21 @@ class DataFusionBackend(Backend):
                     query = f"SELECT {projection} FROM ({query}) q"
                     visible_cols = [col for col in visible_cols if col != op["column"]] + [op["column"]]
                     pending_order = order_keys
+                elif kind == "sortedness_check":
+                    materialized = materialize_visible_query()
+                    ok = is_sorted_values(
+                        materialized[op["column"]].tolist(),
+                        ascending=bool(op.get("ascending", True)),
+                        nulls=str(op.get("nulls", "last")),
+                    )
+                    materialized_name = f"__datadiff_sortedness_{len(current_cols)}"
+                    arrow_table = pa.Table.from_pydict({op["as"]: [ok]})
+                    ctx.register_record_batches(materialized_name, [arrow_table.to_batches()])
+                    query = f"SELECT * FROM {_quote(materialized_name)}"
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
                 elif kind == "select":
                     cols = list(op["columns"])
                     projection = select_with_pending_order(cols)

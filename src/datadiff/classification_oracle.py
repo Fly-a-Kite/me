@@ -11,6 +11,7 @@ from datadiff.identifiers import is_reserved_output_name
 from datadiff.normalizer import NormalizedResult, _norm_value
 from datadiff.oracle import Finding
 from datadiff.running import sort_rows_for_running, stable_running_sum_values
+from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
 from datadiff.util import unique_preserve_order
 
@@ -289,6 +290,26 @@ def validate_case_program(case: Case) -> list[str]:
                 col_types[column] = "float"
                 numeric.add(column)
                 strings.discard(column)
+        elif kind == "sortedness_check":
+            column = str(op.get("column", ""))
+            alias = str(op.get("as", ""))
+            ascending = op.get("ascending", True)
+            nulls = str(op.get("nulls", "last"))
+            if column not in available:
+                errors.append(f"op {idx}: sortedness_check column {column!r} is unavailable")
+            if not alias:
+                errors.append(f"op {idx}: sortedness_check output alias is empty")
+            elif is_reserved_output_name(alias):
+                errors.append(f"op {idx}: sortedness_check output alias {alias!r} is reserved")
+            if not isinstance(ascending, bool):
+                errors.append(f"op {idx}: sortedness_check ascending must be boolean")
+            if nulls not in {"first", "last"}:
+                errors.append(f"op {idx}: sortedness_check nulls must be 'first' or 'last'")
+            if alias:
+                available = {alias}
+                col_types = {alias: "bool"}
+                numeric = set()
+                strings = set()
         elif kind == "select":
             cols = list(op.get("columns", []))
             missing = [col for col in cols if col not in available]
@@ -640,6 +661,15 @@ def _reference_result(case: Case) -> NormalizedResult | None:
                 values = stable_running_sum_values(rows, str(op["source"]))
                 rows = [{**row, column: value} for row, value in zip(rows, values)]
                 columns = [name for name in columns if name != column] + [column]
+            elif kind == "sortedness_check":
+                alias = str(op["as"])
+                ok = is_sorted_values(
+                    [row.get(op["column"]) for row in rows],
+                    ascending=bool(op.get("ascending", True)),
+                    nulls=str(op.get("nulls", "last")),
+                )
+                columns = [alias]
+                rows = [{alias: ok}]
             elif kind == "select":
                 columns = list(op["columns"])
                 rows = [{column: row.get(column) for column in columns} for row in rows]

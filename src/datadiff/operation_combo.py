@@ -12,6 +12,7 @@ CANONICAL_OPERATION_ORDER = (
     "aggregate",
     "select",
     "sort",
+    "sortedness_check",
     "offset",
     "limit",
 )
@@ -94,6 +95,8 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("tuple_absence_null_filter")
     if "running_sum" in op_set:
         risks.append("running_sum_precision")
+    if "sortedness_check" in op_set:
+        risks.append("sortedness_null_placement")
     if "groupby" in op_set:
         risks.append("groupby_aggregation")
     if "aggregate" in op_set:

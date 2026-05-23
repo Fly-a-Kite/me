@@ -9,6 +9,7 @@ from datadiff.mutator import (
     _append_order_projection_probe,
     _append_range_filter_probe,
     _append_running_sum_probe,
+    _append_sortedness_check_probe,
     _append_truth_filter_probe,
     _append_tuple_absence_filter_probe,
     _available_columns,
@@ -87,6 +88,7 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_range_filter" in MUTATION_OPERATOR_NAMES
     assert "append_tuple_absence_filter" in MUTATION_OPERATOR_NAMES
     assert "append_running_sum" in MUTATION_OPERATOR_NAMES
+    assert "append_sortedness_check" in MUTATION_OPERATOR_NAMES
     assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
 
 
@@ -200,6 +202,23 @@ def test_append_running_sum_mutation_stays_valid():
     assert operations[-1]["op"] == "running_sum"
     assert operations[-1]["column"].startswith("run_")
     case = Case("case-mut-running-sum", 1, [table], Program("prog-mut-running-sum", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_sortedness_check_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+        [{"id": 0, "x": 2, "s": "b"}, {"id": 1, "x": None, "s": "a"}],
+    )
+    operations = [{"op": "select", "columns": ["id", "x"]}]
+
+    detail = _append_sortedness_check_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_sortedness_check:")
+    assert [op["op"] for op in operations[-2:]] == ["sort", "sortedness_check"]
+    assert operations[-1]["as"].startswith("sorted_ok_")
+    case = Case("case-mut-sortedness", 1, [table], Program("prog-mut-sortedness", 1, operations))
     assert validate_case_program(case) == []
 
 

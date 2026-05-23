@@ -636,6 +636,66 @@ def test_validate_case_accepts_running_sum():
     assert any("has no order_by" in error for error in validate_case_program(invalid_order))
 
 
+def test_validate_case_accepts_sortedness_check():
+    valid = Case(
+        "case-sortedness",
+        23,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}, {"x": None}])],
+        Program(
+            "prog-sortedness",
+            23,
+            [
+                {"op": "sort", "keys": [{"column": "x", "ascending": True, "nulls": "last"}]},
+                {
+                    "op": "sortedness_check",
+                    "column": "x",
+                    "as": "sorted_ok_x",
+                    "ascending": True,
+                    "nulls": "first",
+                },
+            ],
+        ),
+    )
+    missing_column = Case(
+        "case-sortedness-missing",
+        24,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-sortedness-missing", 24, [{"op": "sortedness_check", "column": "y", "as": "sorted_ok_y"}]),
+    )
+    bad_alias = Case(
+        "case-sortedness-alias",
+        25,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-sortedness-alias", 25, [{"op": "sortedness_check", "column": "x", "as": "select"}]),
+    )
+    bad_ascending = Case(
+        "case-sortedness-ascending",
+        26,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program(
+            "prog-sortedness-ascending",
+            26,
+            [{"op": "sortedness_check", "column": "x", "as": "sorted_ok_x", "ascending": "yes"}],
+        ),
+    )
+    bad_nulls = Case(
+        "case-sortedness-nulls",
+        27,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program(
+            "prog-sortedness-nulls",
+            27,
+            [{"op": "sortedness_check", "column": "x", "as": "sorted_ok_x", "nulls": "middle"}],
+        ),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("sortedness_check column" in error for error in validate_case_program(missing_column))
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+    assert any("ascending must be boolean" in error for error in validate_case_program(bad_ascending))
+    assert any("nulls must be 'first' or 'last'" in error for error in validate_case_program(bad_nulls))
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

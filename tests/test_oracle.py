@@ -233,6 +233,21 @@ def test_oracle_classifies_running_sum_precision():
     assert findings[0].root_cause == "running_sum_precision"
 
 
+def test_oracle_classifies_sortedness_null_placement():
+    case = generate_case(370019, profile="sortedness_null_placement")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["sorted_ok_x"], [[False]]),
+            "polars": NormalizedResult("polars", "ok", ["sorted_ok_x"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "sortedness_null_placement"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

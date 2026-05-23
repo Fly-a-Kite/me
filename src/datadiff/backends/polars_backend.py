@@ -6,6 +6,7 @@ import warnings
 from datadiff.backends.base import Backend, BackendResult
 from datadiff.dsl import Program, TableData, normalize_sort_keys
 from datadiff.filtering import parse_filter_comparator
+from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
 
 
@@ -67,6 +68,10 @@ class PolarsBackend(Backend):
                         descending=[not key.ascending for key in keys],
                         nulls_last=[key.nulls == "last" for key in keys],
                     ).with_columns(_polars_running_sum_expr(pl, op))
+                elif kind == "sortedness_check":
+                    series = df.get_column(op["column"])
+                    ok = _polars_is_sorted(series, op)
+                    df = pl.DataFrame({op["as"]: [ok]})
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -207,6 +212,10 @@ class PolarsLazyBackend(PolarsBackend):
                         descending=[not key.ascending for key in keys],
                         nulls_last=[key.nulls == "last" for key in keys],
                     ).with_columns(_polars_running_sum_expr(pl, op))
+                elif kind == "sortedness_check":
+                    series = lf.collect().get_column(op["column"])
+                    ok = _polars_is_sorted(series, op)
+                    lf = pl.DataFrame({op["as"]: [ok]}).lazy()
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))
                 elif kind == "sort":
@@ -319,6 +328,24 @@ def _polars_running_sum_expr(pl, op: dict):
     else:
         source = source.cast(pl.Float64)
     return source.cum_sum().alias(op["column"])
+
+
+def _polars_is_sorted(series, op: dict) -> bool:
+    ascending = bool(op.get("ascending", True))
+    nulls = str(op.get("nulls", "last"))
+    try:
+        return bool(
+            series.is_sorted(
+                descending=not ascending,
+                nulls_last=nulls == "last",
+            )
+        )
+    except TypeError:
+        return is_sorted_values(
+            series.to_list(),
+            ascending=ascending,
+            nulls=nulls,
+        )
 
 
 def _polars_filter_expr(col, comparator: str, value):

@@ -335,6 +335,41 @@ def _append_running_sum_probe(tables: list[TableData], operations: list[dict[str
     return f"append_running_sum:{source}:order={order_column}:out={output_column}"
 
 
+def _append_sortedness_check_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
+    if not tables:
+        return "append_sortedness_check:none"
+    available = _available_columns(tables, operations)
+    candidates = [
+        column
+        for column in available
+        if _column_type(tables, column) in {"int", "float", "str", "bool"}
+    ]
+    if not candidates:
+        return "append_sortedness_check:no-comparable-column"
+    null_candidates = [column for column in candidates if _column_has_null(tables, column)]
+    column = rnd.choice(null_candidates or candidates)
+    sort_nulls = rnd.choice(["first", "last"])
+    check_nulls = "last" if sort_nulls == "first" else "first"
+    ascending = rnd.choice([True, False])
+    alias = make_safe_output_name(f"sorted_ok_{column}", used=set(available))
+    operations.extend(
+        [
+            {
+                "op": "sort",
+                "keys": [{"column": column, "ascending": ascending, "nulls": sort_nulls}],
+            },
+            {
+                "op": "sortedness_check",
+                "column": column,
+                "as": alias,
+                "ascending": ascending,
+                "nulls": check_nulls,
+            },
+        ]
+    )
+    return f"append_sortedness_check:{column}:sort_nulls={sort_nulls}:check_nulls={check_nulls}:out={alias}"
+
+
 def _append_grouped_topk_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
     if not tables:
         return "append_grouped_topk:none"
@@ -512,6 +547,9 @@ def _available_columns(tables: list[TableData], operations: list[dict[str, Any]]
             available.append(op["column"])
         elif op.get("op") == "running_sum":
             available.append(op["column"])
+        elif op.get("op") == "sortedness_check":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif op.get("op") == "groupby":
             available = unique_preserve_order(list(op.get("keys", [])) + [agg["as"] for agg in op.get("aggs", [])])
         elif op.get("op") == "aggregate":
@@ -524,7 +562,13 @@ def _column_type(tables: list[TableData], name: str) -> str:
         for col in table.columns:
             if col.name == name:
                 return col.type
+    if name.startswith("sorted_ok_"):
+        return "bool"
     return "float" if name.startswith(("m_", "sum_", "min_", "max_", "run_")) else "int"
+
+
+def _column_has_null(tables: list[TableData], name: str) -> bool:
+    return any(name in row and row.get(name) is None for table in tables for row in table.rows)
 
 
 def _literal_for_type(typ: str, rnd: random.Random) -> Any:
@@ -560,6 +604,7 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_range_filter", _append_range_filter_probe),
     MutationOperator("append_tuple_absence_filter", _append_tuple_absence_filter_probe),
     MutationOperator("append_running_sum", _append_running_sum_probe),
+    MutationOperator("append_sortedness_check", _append_sortedness_check_probe),
     MutationOperator("append_grouped_topk", _append_grouped_topk_probe),
     MutationOperator("drop_op", _drop_operation),
     MutationOperator("tweak_op", _tweak_random_operation),

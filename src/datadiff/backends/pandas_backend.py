@@ -7,6 +7,7 @@ from datadiff.backends.base import Backend, BackendResult
 from datadiff.dsl import Program, TableData, normalize_sort_keys
 from datadiff.filtering import evaluate_filter_predicate
 from datadiff.running import sort_rows_for_running, stable_running_sum_values
+from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
 
 
@@ -68,6 +69,13 @@ class PandasBackend(Backend):
                     values = stable_running_sum_values(rows, op["source"])
                     rows = [{**row, op["column"]: value} for row, value in zip(rows, values)]
                     df = pd.DataFrame(rows, columns=columns)
+                elif kind == "sortedness_check":
+                    ok = is_sorted_values(
+                        df[op["column"]].tolist(),
+                        ascending=bool(op.get("ascending", True)),
+                        nulls=str(op.get("nulls", "last")),
+                    )
+                    df = pd.DataFrame([{op["as"]: ok}], columns=[op["as"]])
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":

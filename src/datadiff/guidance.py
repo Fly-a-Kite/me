@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from collections import Counter
 from dataclasses import dataclass, field
+from functools import cmp_to_key
 from typing import Any
 
 from datadiff.dsl import Case, normalize_sort_keys
@@ -10,6 +11,7 @@ from datadiff.filtering import evaluate_filter_predicate, parse_filter_comparato
 from datadiff.operation_combo import classify_operation_combo
 from datadiff.reward import online_case_reward
 from datadiff.running import sort_rows_for_running, stable_running_sum_values
+from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
 from datadiff.util import unique_preserve_order
 
@@ -60,6 +62,8 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "tuple_absence": {"filter:tuple-absence"},
     "running_sum_precision": {"pattern:running_sum_precision"},
     "running_sum": {"op:running_sum"},
+    "sortedness_null_placement": {"pattern:sortedness_null_placement"},
+    "sortedness": {"op:sortedness_check"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -141,6 +145,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_range_filter = False
     has_tuple_absence_filter = False
     has_running_sum_precision = False
+    has_sortedness_check = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -179,6 +184,14 @@ def extract_case_features(case: Case) -> set[str]:
             if input_dtype == "float32":
                 has_running_sum_precision = True
             available_types[str(op.get("column", "derived"))] = "float"
+        elif kind == "sortedness_check":
+            column = str(op.get("column", ""))
+            nulls = str(op.get("nulls", "last"))
+            features.add(f"sortedness:nulls:{nulls}")
+            features.add(f"sortedness:{'asc' if op.get('ascending', True) else 'desc'}")
+            features.add(f"sortedness_source_type:{available_types.get(column, 'derived')}")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_sortedness_check = True
         elif kind == "select":
             width = len(op.get("columns", []))
             features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
@@ -300,6 +313,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:tuple_absence_filter")
     if has_running_sum_precision or _has_running_sum_precision_pattern(case.program.operations):
         features.add("pattern:running_sum_precision")
+    if has_sortedness_check and _has_sortedness_null_placement_pattern(case.program.operations):
+        features.add("pattern:sortedness_null_placement")
     return features
 
 
@@ -832,6 +847,7 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
     samples = {column.name: [row.get(column.name) for row in case.tables[0].rows] for column in case.tables[0].columns}
     scores: list[float] = []
     buckets: list[str] = []
+    last_sort_op: dict[str, Any] | None = None
 
     for op in case.program.operations:
         kind = str(op.get("op", ""))
@@ -853,10 +869,17 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             buckets.extend(op_buckets)
             if right is not None:
                 samples = _join_output_samples(samples, right, op)
+            last_sort_op = None
         elif kind == "running_sum":
             score, op_buckets, samples = _running_sum_frontier_score(samples, op)
             scores.append(score)
             buckets.extend(op_buckets)
+            last_sort_op = {"op": "sort", "keys": op.get("order_by", [])}
+        elif kind == "sortedness_check":
+            score, op_buckets, samples = _sortedness_frontier_score(samples, op, last_sort_op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "select":
             cols = [str(column) for column in op.get("columns", []) if str(column) in samples]
             samples = {column: samples[column] for column in unique_preserve_order(cols)}
@@ -864,6 +887,8 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             score, op_buckets = _sort_frontier_score(samples, op)
             scores.append(score)
             buckets.extend(op_buckets)
+            samples = _sort_output_samples(samples, op)
+            last_sort_op = op
         elif kind == "limit":
             score, op_buckets = _limit_frontier_score(samples, op)
             scores.append(score)
@@ -886,11 +911,13 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             samples = _groupby_output_samples(samples, op)
+            last_sort_op = None
         elif kind == "aggregate":
             score, op_buckets = _aggregate_frontier_score(samples, op)
             scores.append(score)
             buckets.extend(op_buckets)
             samples = {str(agg.get("as", "")): [] for agg in op.get("aggs", []) if agg.get("as")}
+            last_sort_op = None
 
     scores = [score for score in scores if score > 0.0]
     return (sum(scores) / len(scores) if scores else 0.0), unique_preserve_order(buckets)
@@ -1209,6 +1236,35 @@ def _running_sum_frontier_score(
     return min(1.0, score), buckets, _samples_from_rows(out_rows, out_columns)
 
 
+def _sortedness_frontier_score(
+    samples: dict[str, list[Any]],
+    op: dict[str, Any],
+    last_sort_op: dict[str, Any] | None,
+) -> tuple[float, list[str], dict[str, list[Any]]]:
+    column = str(op.get("column", ""))
+    alias = str(op.get("as", ""))
+    values = list(samples.get(column, []))
+    ascending = bool(op.get("ascending", True))
+    nulls = str(op.get("nulls", "last"))
+    ok = is_sorted_values(values, ascending=ascending, nulls=nulls)
+    buckets = [
+        "sortedness:check",
+        f"sortedness:nulls:{nulls}",
+        f"sortedness:{'true' if ok else 'false'}",
+    ]
+    if any(_is_null_like(value) for value in values):
+        buckets.append("sortedness:null-aware")
+    if _sort_null_placement_mismatch(last_sort_op, column, nulls):
+        buckets.append("sortedness:null-placement-mismatch")
+    score = (
+        0.45
+        + 0.25 * int("sortedness:null-aware" in buckets)
+        + 0.25 * int("sortedness:null-placement-mismatch" in buckets)
+        + 0.05 * int(not ok)
+    )
+    return min(1.0, score), buckets, {alias: [ok]} if alias else samples
+
+
 def _groupby_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
     keys = [str(key) for key in op.get("keys", []) if str(key) in samples]
     buckets: list[str] = []
@@ -1385,6 +1441,66 @@ def _sort_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> t
     return min(1.0, 0.30 + 0.20 * len(buckets)), buckets
 
 
+def _sort_output_samples(samples: dict[str, list[Any]], op: dict[str, Any]) -> dict[str, list[Any]]:
+    try:
+        keys = [key for key in normalize_sort_keys(op) if key.column in samples]
+    except ValueError:
+        return samples
+    if not keys:
+        return samples
+    columns = list(samples)
+    rows = _rows_from_samples(samples)
+    rows = sorted(rows, key=cmp_to_key(lambda left, right: _compare_sample_rows(left, right, keys)))
+    return _samples_from_rows(rows, columns)
+
+
+def _compare_sample_rows(left: dict[str, Any], right: dict[str, Any], keys: list[Any]) -> int:
+    for key in keys:
+        left_value = left.get(key.column)
+        right_value = right.get(key.column)
+        if _is_null_like(left_value) and _is_null_like(right_value):
+            continue
+        if _is_null_like(left_value):
+            return -1 if key.nulls == "first" else 1
+        if _is_null_like(right_value):
+            return 1 if key.nulls == "first" else -1
+        cmp = _compare_sample_values(left_value, right_value)
+        if cmp:
+            return cmp if key.ascending else -cmp
+    return 0
+
+
+def _compare_sample_values(left: Any, right: Any) -> int:
+    try:
+        if left < right:
+            return -1
+        if left > right:
+            return 1
+        return 0
+    except TypeError:
+        left_text = repr(left)
+        right_text = repr(right)
+        if left_text < right_text:
+            return -1
+        if left_text > right_text:
+            return 1
+        return 0
+
+
+def _sort_null_placement_mismatch(
+    sort_op: dict[str, Any] | None,
+    column: str,
+    check_nulls: str,
+) -> bool:
+    if sort_op is None:
+        return False
+    try:
+        keys = normalize_sort_keys(sort_op)
+    except ValueError:
+        return False
+    return any(key.column == column and key.nulls != check_nulls for key in keys)
+
+
 def _limit_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
     row_count = max((len(values) for values in samples.values()), default=0)
     try:
@@ -1483,6 +1599,10 @@ def _numeric_values(values: list[Any]) -> list[float]:
     return out
 
 
+def _is_null_like(value: Any) -> bool:
+    return value is None or (isinstance(value, float) and math.isnan(value))
+
+
 def _has_mixed_case(value: str) -> bool:
     letters = [ch for ch in value if ch.isalpha()]
     return any(ch.islower() for ch in letters) and any(ch.isupper() for ch in letters)
@@ -1502,6 +1622,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("tuple_absence_null_filter")
     if "pattern:running_sum_precision" in features or "op:running_sum" in features:
         roots.add("running_sum_precision")
+    if "pattern:sortedness_null_placement" in features or "op:sortedness_check" in features:
+        roots.add("sortedness_null_placement")
     if features & {
         "pattern:null_groupby_topk",
         "pattern:null_agg_topk",
@@ -1762,6 +1884,20 @@ def _has_running_sum_precision_pattern(ops: list[dict[str, Any]]) -> bool:
         op.get("op") == "running_sum" and op.get("input_dtype") == "float32"
         for op in ops
     )
+
+
+def _has_sortedness_null_placement_pattern(ops: list[dict[str, Any]]) -> bool:
+    for idx, op in enumerate(ops):
+        if op.get("op") != "sortedness_check":
+            continue
+        column = str(op.get("column", ""))
+        check_nulls = str(op.get("nulls", "last"))
+        for previous in reversed(ops[:idx]):
+            if previous.get("op") != "sort":
+                continue
+            if _sort_null_placement_mismatch(previous, column, check_nulls):
+                return True
+    return False
 
 
 def _has_join_ordered_agg_topk_pattern(ops: list[dict[str, Any]]) -> bool:

@@ -246,6 +246,7 @@ def test_cli_parses_order_sensitive_bug_hunt_profiles():
         "post_topk_range_filter",
         "tuple_absence_filter",
         "running_sum_precision",
+        "sortedness_null_placement",
     ]:
         args = parser.parse_args(["fuzz", "--profile", profile])
         assert args.cmd == "fuzz"
@@ -448,6 +449,9 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("running_sum_precision").generator_profile == "running_sum_precision"
     assert _preset_config("running_sum_precision").guidance_targets[0] == "running_sum_precision"
     assert _preset_config("running_sum_precision_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("sortedness_null_placement").generator_profile == "sortedness_null_placement"
+    assert _preset_config("sortedness_null_placement").guidance_targets[0] == "sortedness_null_placement"
+    assert _preset_config("sortedness_null_placement_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("join_null_sort").generator_profile == "join_null_sort"
     assert _preset_config("join_null_sort").guidance_targets[0] == "join_null_sort"
     assert _preset_config("join_null_sort_metamorphic").enable_metamorphic_oracle is True
@@ -522,6 +526,7 @@ def test_cli_parses_non_datafusion_live_presets():
         "post_topk_range_filter",
         "tuple_absence_filter",
         "running_sum_precision",
+        "sortedness_null_placement",
     }.issubset(arrow.guidance_targets)
     assert arrow.enable_local_source_scheduler is True
 

@@ -8,6 +8,7 @@ from datadiff.backends.base import Backend, BackendResult
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
 from datadiff.filtering import parse_filter_comparator
 from datadiff.running import sort_rows_for_running, stable_running_sum_values
+from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
 
 
@@ -77,6 +78,14 @@ class PyArrowBackend(Backend):
                             field for field in current.schema if field.name != op["column"]
                         ] + [pa.field(op["column"], pa.float64(), nullable=True)]
                         current = pa.Table.from_pylist(rows, schema=pa.schema(fields))
+                    elif kind == "sortedness_check":
+                        ok = is_sorted_values(
+                            current[op["column"]].to_pylist(),
+                            ascending=bool(op.get("ascending", True)),
+                            nulls=str(op.get("nulls", "last")),
+                        )
+                        current_cols = [op["as"]]
+                        current = pa.Table.from_pydict({op["as"]: [ok]})
                     elif kind == "select":
                         current_cols = list(op["columns"])
                         current = current.select(current_cols)
