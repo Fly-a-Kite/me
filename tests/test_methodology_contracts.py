@@ -130,6 +130,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     pandas_arrow_string_eq_sum_semantics = _preset_config("pandas_arrow_string_eq_sum_semantics")
     pandas_arrow_timestamp_loc_slice_semantics = _preset_config("pandas_arrow_timestamp_loc_slice_semantics")
     pandas_arrow_timestamp_index_attr_semantics = _preset_config("pandas_arrow_timestamp_index_attr_semantics")
+    pyarrow_dataset_isin_all_match_semantics = _preset_config("pyarrow_dataset_isin_all_match_semantics")
 
     assert null_groupby.generator_profile == "null_groupby_topk"
     assert {"groupby", "nulls", "sort_limit"}.issubset(null_groupby.guidance_targets)
@@ -246,6 +247,10 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     )
     assert {"arrow_timestamp_index_attr_probe", "arrow_timestamp_attributes", "sort_limit"}.issubset(
         pandas_arrow_timestamp_index_attr_semantics.guidance_targets
+    )
+    assert pyarrow_dataset_isin_all_match_semantics.generator_profile == "pyarrow_dataset_isin_all_match_semantics"
+    assert {"dataset_isin_all_match_probe", "dataset_membership_filter", "filter"}.issubset(
+        pyarrow_dataset_isin_all_match_semantics.guidance_targets
     )
 
 

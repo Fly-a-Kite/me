@@ -193,6 +193,13 @@ def test_classify_operation_combo_tracks_pandas_arrow_timestamp_index_attr_seman
     assert "pandas_arrow_timestamp_index_attr_semantics" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_pyarrow_dataset_isin_all_match_semantics_risk():
+    combo = classify_operation_combo([{"op": "dataset_isin_all_match_probe"}])
+
+    assert combo["template"] == "dataset_isin_all_match_probe"
+    assert "pyarrow_dataset_isin_all_match_semantics" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

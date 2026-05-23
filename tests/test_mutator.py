@@ -20,6 +20,7 @@ from datadiff.mutator import (
     _append_arrow_string_eq_sum_probe,
     _append_arrow_timestamp_loc_slice_probe,
     _append_arrow_timestamp_index_attr_probe,
+    _append_dataset_isin_all_match_probe,
     _append_boolean_predicate_filter_probe,
     _append_grouped_topk_probe,
     _append_order_projection_probe,
@@ -123,6 +124,7 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_arrow_string_eq_sum_probe" in MUTATION_OPERATOR_NAMES
     assert "append_arrow_timestamp_loc_slice_probe" in MUTATION_OPERATOR_NAMES
     assert "append_arrow_timestamp_index_attr_probe" in MUTATION_OPERATOR_NAMES
+    assert "append_dataset_isin_all_match_probe" in MUTATION_OPERATOR_NAMES
     assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
 
 
@@ -552,6 +554,30 @@ def test_append_arrow_timestamp_index_attr_probe_mutation_stays_valid():
         1,
         [table],
         Program("prog-mut-arrow-timestamp-index-attr", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
+def test_append_dataset_isin_all_match_probe_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "float")],
+        [{"id": 0, "x": 0.0}],
+    )
+    operations = [{"op": "select", "columns": ["x"]}]
+
+    detail = _append_dataset_isin_all_match_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_dataset_isin_all_match_probe:")
+    assert operations[-1] == {
+        "op": "dataset_isin_all_match_probe",
+        "as": "dataset_isin_all_match_mismatch",
+    }
+    case = Case(
+        "case-mut-dataset-isin-all-match",
+        1,
+        [table],
+        Program("prog-mut-dataset-isin-all-match", 1, operations),
     )
     assert validate_case_program(case) == []
 

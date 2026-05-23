@@ -137,6 +137,9 @@ class PyArrowBackend(Backend):
                     elif kind == "arrow_timestamp_index_attr_probe":
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [False]})
+                    elif kind == "dataset_isin_all_match_probe":
+                        current_cols = [op["as"]]
+                        current = pa.Table.from_pydict({op["as"]: [_pyarrow_dataset_isin_all_match_mismatch(pa)]})
                     elif kind == "select":
                         current_cols = list(op["columns"])
                         current = current.select(current_cols)
@@ -183,6 +186,21 @@ class PyArrowBackend(Backend):
                 error=str(exc),
                 duration_ms=(time.perf_counter() - start) * 1000,
             )
+
+
+def _pyarrow_dataset_isin_all_match_mismatch(pa) -> bool:
+    import tempfile
+
+    import pyarrow.compute as pc
+    import pyarrow.dataset as ds
+    import pyarrow.parquet as pq
+
+    expected = pa.table({"x": [0.0]})
+    filter_expr = pc.field("x").isin([0.0])
+    with tempfile.TemporaryDirectory() as tmpdir:
+        pq.write_to_dataset(expected, tmpdir)
+        observed = ds.dataset(tmpdir).filter(filter_expr).to_table()
+    return observed.to_pydict() != expected.to_pydict()
 
 
 def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):

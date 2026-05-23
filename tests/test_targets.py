@@ -67,6 +67,7 @@ def test_target_descriptions_capture_methodology_axes():
     assert "op:arrow_string_eq_sum_probe" in specs[0]["capabilities"]
     assert "op:arrow_timestamp_loc_slice_probe" in specs[0]["capabilities"]
     assert "op:arrow_timestamp_index_attr_probe" in specs[0]["capabilities"]
+    assert "op:dataset_isin_all_match_probe" in specs[0]["capabilities"]
 
 
 def test_list_target_suites_includes_core():
@@ -99,6 +100,7 @@ def test_list_target_suites_includes_core():
     assert "op:arrow_string_eq_sum_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:arrow_timestamp_loc_slice_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:arrow_timestamp_index_attr_probe" in suites["latest_all_engines"]["common_capabilities"]
+    assert "op:dataset_isin_all_match_probe" in suites["latest_all_engines"]["common_capabilities"]
 
 
 def test_target_capability_matrix_and_intersection():

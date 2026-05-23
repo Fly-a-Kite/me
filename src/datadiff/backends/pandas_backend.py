@@ -128,6 +128,8 @@ class PandasBackend(Backend):
                 elif kind == "arrow_timestamp_index_attr_probe":
                     mismatch = _pandas_arrow_timestamp_index_attr_mismatch(pd)
                     df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
+                elif kind == "dataset_isin_all_match_probe":
+                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":

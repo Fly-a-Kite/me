@@ -53,6 +53,7 @@ GeneratorProfile = Literal[
     "pandas_arrow_string_eq_sum_semantics",
     "pandas_arrow_timestamp_loc_slice_semantics",
     "pandas_arrow_timestamp_index_attr_semantics",
+    "pyarrow_dataset_isin_all_match_semantics",
 ]
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]

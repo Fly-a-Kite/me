@@ -192,6 +192,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "pandas_arrow_string_eq_sum_semantics",
         "pandas_arrow_timestamp_loc_slice_semantics",
         "pandas_arrow_timestamp_index_attr_semantics",
+        "pyarrow_dataset_isin_all_match_semantics",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -851,6 +852,20 @@ def test_generate_case_pandas_arrow_timestamp_index_attr_semantics_profile_is_su
     assert "pattern:pandas_arrow_timestamp_index_attr_semantics" in features
     assert "pandas:arrow-timestamp-index-attr" in features
     assert case.metadata["source_issue"] == "https://github.com/pandas-dev/pandas/issues/63527"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_pyarrow_dataset_isin_all_match_semantics_profile_is_supported_and_valid():
+    case = generate_case(145, profile="pyarrow_dataset_isin_all_match_semantics")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000145-pyarrow-dataset-isin-all-match-semantics"
+    assert case.program.operations == [
+        {"op": "dataset_isin_all_match_probe", "as": "dataset_isin_all_match_mismatch"}
+    ]
+    assert "pattern:pyarrow_dataset_isin_all_match_semantics" in features
+    assert "pyarrow:dataset-isin-all-match" in features
+    assert case.metadata["source_issue"] == "https://github.com/apache/arrow/issues/46183"
     assert validate_case_program(case) == []
 
 

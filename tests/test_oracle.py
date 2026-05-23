@@ -505,6 +505,21 @@ def test_oracle_classifies_pandas_arrow_timestamp_index_attr_semantics():
     assert findings[0].root_cause == "pandas_arrow_timestamp_index_attr_semantics"
 
 
+def test_oracle_classifies_pyarrow_dataset_isin_all_match_semantics():
+    case = generate_case(370037, profile="pyarrow_dataset_isin_all_match_semantics")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["dataset_isin_all_match_mismatch"], [[False]]),
+            "pyarrow": NormalizedResult("pyarrow", "ok", ["dataset_isin_all_match_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "pyarrow_dataset_isin_all_match_semantics"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

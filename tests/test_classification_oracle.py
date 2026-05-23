@@ -1464,6 +1464,63 @@ def test_classification_reference_understands_arrow_timestamp_index_attr_probe()
     assert classification.implicated_backends == ["pandas"]
 
 
+def test_validate_case_accepts_dataset_isin_all_match_probe():
+    valid = Case(
+        "case-dataset-isin-all-match-probe",
+        77,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-dataset-isin-all-match-probe",
+            77,
+            [{"op": "dataset_isin_all_match_probe", "as": "dataset_isin_all_match_mismatch"}],
+        ),
+    )
+    bad_alias = Case(
+        "case-dataset-isin-all-match-probe-alias",
+        78,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-dataset-isin-all-match-probe-alias", 78, [{"op": "dataset_isin_all_match_probe", "as": "where"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_dataset_isin_all_match_probe():
+    case = Case(
+        "case-dataset-isin-all-match-reference",
+        79,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-dataset-isin-all-match-reference",
+            79,
+            [{"op": "dataset_isin_all_match_probe", "as": "dataset_isin_all_match_mismatch"}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "pyarrow_dataset_isin_all_match_semantics",
+        "confidence": "high",
+        "suspicious_backends": ["pyarrow"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["dataset_isin_all_match_mismatch"], [[False]]),
+        "pyarrow": NormalizedResult("pyarrow", "ok", ["dataset_isin_all_match_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "pyarrow_dataset_isin_all_match_semantics"},
+        ["reference", "pyarrow"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["pyarrow"]
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",
