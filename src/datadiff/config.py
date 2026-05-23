@@ -49,6 +49,7 @@ GeneratorProfile = Literal[
     "pandas_sparse_array_mask_semantics",
     "polars_float_wrap_numerical_semantics",
     "pandas_index_bool_result_type",
+    "polars_empty_literal_groupby_semantics",
 ]
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]

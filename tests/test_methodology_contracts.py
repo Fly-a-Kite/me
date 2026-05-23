@@ -126,6 +126,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     pandas_sparse_array_mask_semantics = _preset_config("pandas_sparse_array_mask_semantics")
     polars_float_wrap_numerical_semantics = _preset_config("polars_float_wrap_numerical_semantics")
     pandas_index_bool_result_type = _preset_config("pandas_index_bool_result_type")
+    polars_empty_literal_groupby_semantics = _preset_config("polars_empty_literal_groupby_semantics")
 
     assert null_groupby.generator_profile == "null_groupby_topk"
     assert {"groupby", "nulls", "sort_limit"}.issubset(null_groupby.guidance_targets)
@@ -220,6 +221,10 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert pandas_index_bool_result_type.generator_profile == "pandas_index_bool_result_type"
     assert {"index_bool_probe", "index_boolean_result", "filter"}.issubset(
         pandas_index_bool_result_type.guidance_targets
+    )
+    assert polars_empty_literal_groupby_semantics.generator_profile == "polars_empty_literal_groupby_semantics"
+    assert {"empty_literal_groupby_probe", "literal_empty_groupby", "groupby"}.issubset(
+        polars_empty_literal_groupby_semantics.guidance_targets
     )
 
 

@@ -125,6 +125,9 @@ class PyArrowBackend(Backend):
                     elif kind == "index_bool_probe":
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [False]})
+                    elif kind == "empty_literal_groupby_probe":
+                        current_cols = [op["as"]]
+                        current = pa.Table.from_pydict({op["as"]: [False]})
                     elif kind == "select":
                         current_cols = list(op["columns"])
                         current = current.select(current_cols)

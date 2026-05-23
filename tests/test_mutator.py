@@ -16,6 +16,7 @@ from datadiff.mutator import (
     _append_sparse_mask_probe,
     _append_float_wrap_probe,
     _append_index_bool_probe,
+    _append_empty_literal_groupby_probe,
     _append_boolean_predicate_filter_probe,
     _append_grouped_topk_probe,
     _append_order_projection_probe,
@@ -115,6 +116,7 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_sparse_mask_probe" in MUTATION_OPERATOR_NAMES
     assert "append_float_wrap_probe" in MUTATION_OPERATOR_NAMES
     assert "append_index_bool_probe" in MUTATION_OPERATOR_NAMES
+    assert "append_empty_literal_groupby_probe" in MUTATION_OPERATOR_NAMES
     assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
 
 
@@ -459,6 +461,25 @@ def test_append_index_bool_probe_mutation_stays_valid():
     assert detail.startswith("append_index_bool_probe:")
     assert operations[-1] == {"op": "index_bool_probe", "as": "index_bool_mismatch"}
     case = Case("case-mut-index-bool", 1, [table], Program("prog-mut-index-bool", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_empty_literal_groupby_probe_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int")],
+        [{"id": 0, "x": 2}],
+    )
+    operations = [{"op": "select", "columns": ["id"]}]
+
+    detail = _append_empty_literal_groupby_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_empty_literal_groupby_probe:")
+    assert operations[-1] == {
+        "op": "empty_literal_groupby_probe",
+        "as": "empty_literal_groupby_mismatch",
+    }
+    case = Case("case-mut-empty-literal-groupby", 1, [table], Program("prog-mut-empty-literal-groupby", 1, operations))
     assert validate_case_program(case) == []
 
 

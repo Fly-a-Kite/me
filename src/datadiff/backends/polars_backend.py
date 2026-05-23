@@ -103,6 +103,9 @@ class PolarsBackend(Backend):
                     df = pl.DataFrame({op["as"]: [mismatch]})
                 elif kind == "index_bool_probe":
                     df = pl.DataFrame({op["as"]: [False]})
+                elif kind == "empty_literal_groupby_probe":
+                    mismatch = _polars_empty_literal_groupby_mismatch(pl, lazy=False)
+                    df = pl.DataFrame({op["as"]: [mismatch]})
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -276,6 +279,9 @@ class PolarsLazyBackend(PolarsBackend):
                     lf = pl.DataFrame({op["as"]: [mismatch]}).lazy()
                 elif kind == "index_bool_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "empty_literal_groupby_probe":
+                    mismatch = _polars_empty_literal_groupby_mismatch(pl, lazy=True)
+                    lf = pl.DataFrame({op["as"]: [mismatch]}).lazy()
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))
                 elif kind == "sort":
@@ -494,6 +500,16 @@ def _polars_float_wrap_mismatch(pl, *, lazy: bool) -> bool:
     observed_float = result.get_column("wrapped_float").to_list()
     observed_int = result.get_column("wrapped_int").to_list()
     return observed_float != expected or observed_int != expected
+
+
+def _polars_empty_literal_groupby_mismatch(pl, *, lazy: bool) -> bool:
+    frame = pl.DataFrame({})
+    if lazy:
+        frame = frame.lazy()
+    result = frame.group_by(pl.lit("A")).agg(pl.len())
+    if lazy:
+        result = result.collect()
+    return result.height != 0
 
 
 def _polars_filter_expr(col, comparator: str, value):

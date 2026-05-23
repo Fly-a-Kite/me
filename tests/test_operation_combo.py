@@ -165,6 +165,13 @@ def test_classify_operation_combo_tracks_pandas_index_bool_result_type_risk():
     assert "pandas_index_bool_result_type" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_polars_empty_literal_groupby_semantics_risk():
+    combo = classify_operation_combo([{"op": "empty_literal_groupby_probe"}])
+
+    assert combo["template"] == "empty_literal_groupby_probe"
+    assert "polars_empty_literal_groupby_semantics" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

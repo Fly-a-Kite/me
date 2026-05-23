@@ -78,6 +78,9 @@ def _assert_program_columns_are_valid(case):
         elif op["op"] == "index_bool_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
+        elif op["op"] == "empty_literal_groupby_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
         elif op["op"] == "groupby":
             assert set(op["keys"]).issubset(known_cols)
             assert len(op["keys"]) == len(set(op["keys"]))
@@ -185,6 +188,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "pandas_sparse_array_mask_semantics",
         "polars_float_wrap_numerical_semantics",
         "pandas_index_bool_result_type",
+        "polars_empty_literal_groupby_semantics",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -788,6 +792,20 @@ def test_generate_case_pandas_index_bool_result_type_profile_is_supported_and_va
     assert "pattern:pandas_index_bool_result_type" in features
     assert "pandas:index-bool" in features
     assert case.metadata["source_issue"] == "https://github.com/pandas-dev/pandas/issues/62766"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_polars_empty_literal_groupby_semantics_profile_is_supported_and_valid():
+    case = generate_case(141, profile="polars_empty_literal_groupby_semantics")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000141-polars-empty-literal-groupby-semantics"
+    assert case.program.operations == [
+        {"op": "empty_literal_groupby_probe", "as": "empty_literal_groupby_mismatch"}
+    ]
+    assert "pattern:polars_empty_literal_groupby_semantics" in features
+    assert "polars:empty-literal-groupby" in features
+    assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/23870"
     assert validate_case_program(case) == []
 
 

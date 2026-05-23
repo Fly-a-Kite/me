@@ -1227,6 +1227,64 @@ def test_classification_reference_understands_index_bool_probe():
     assert classification.implicated_backends == ["pandas"]
 
 
+def test_validate_case_accepts_empty_literal_groupby_probe():
+    valid = Case(
+        "case-empty-literal-groupby-probe",
+        65,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-empty-literal-groupby-probe",
+            65,
+            [{"op": "empty_literal_groupby_probe", "as": "empty_literal_groupby_mismatch"}],
+        ),
+    )
+    bad_alias = Case(
+        "case-empty-literal-groupby-probe-alias",
+        66,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-empty-literal-groupby-probe-alias", 66, [{"op": "empty_literal_groupby_probe", "as": "where"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_empty_literal_groupby_probe():
+    case = Case(
+        "case-empty-literal-groupby-reference",
+        67,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-empty-literal-groupby-reference",
+            67,
+            [{"op": "empty_literal_groupby_probe", "as": "empty_literal_groupby_mismatch"}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "polars_empty_literal_groupby_semantics",
+        "confidence": "high",
+        "suspicious_backends": ["polars", "polars_lazy"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["empty_literal_groupby_mismatch"], [[False]]),
+        "polars": NormalizedResult("polars", "ok", ["empty_literal_groupby_mismatch"], [[True]]),
+        "polars_lazy": NormalizedResult("polars_lazy", "ok", ["empty_literal_groupby_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "polars_empty_literal_groupby_semantics"},
+        ["reference", "polars", "polars_lazy"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["polars", "polars_lazy"]
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

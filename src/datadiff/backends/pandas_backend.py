@@ -117,6 +117,8 @@ class PandasBackend(Backend):
                 elif kind == "index_bool_probe":
                     observed = pd.Index([3, 5, 8], name="i") == 5
                     df = pd.DataFrame([{op["as"]: not isinstance(observed, pd.Index)}], columns=[op["as"]])
+                elif kind == "empty_literal_groupby_probe":
+                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":

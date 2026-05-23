@@ -226,6 +226,7 @@ def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
         "pandas_sparse_array_mask_semantics",
         "polars_float_wrap_numerical_semantics",
         "pandas_index_bool_result_type",
+        "polars_empty_literal_groupby_semantics",
     ]
     for profile in profiles:
         for seed in range(50):

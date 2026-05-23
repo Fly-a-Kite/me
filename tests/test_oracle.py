@@ -444,6 +444,22 @@ def test_oracle_classifies_pandas_index_bool_result_type():
     assert findings[0].root_cause == "pandas_index_bool_result_type"
 
 
+def test_oracle_classifies_polars_empty_literal_groupby_semantics():
+    case = generate_case(370033, profile="polars_empty_literal_groupby_semantics")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["empty_literal_groupby_mismatch"], [[False]]),
+            "polars": NormalizedResult("polars", "ok", ["empty_literal_groupby_mismatch"], [[True]]),
+            "polars_lazy": NormalizedResult("polars_lazy", "ok", ["empty_literal_groupby_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "polars_empty_literal_groupby_semantics"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

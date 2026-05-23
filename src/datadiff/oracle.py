@@ -88,6 +88,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "polars_float_wrap_numerical_semantics"
     if _case_has_index_bool_probe(case):
         return "pandas_index_bool_result_type"
+    if _case_has_empty_literal_groupby_probe(case):
+        return "polars_empty_literal_groupby_semantics"
     if _case_contains_special_float(case):
         return "nan_inf_semantics"
     if _case_uses_modulo(case):
@@ -206,6 +208,10 @@ def _case_has_float_wrap_probe(case: Case) -> bool:
 
 def _case_has_index_bool_probe(case: Case) -> bool:
     return any(op.get("op") == "index_bool_probe" for op in case.program.operations)
+
+
+def _case_has_empty_literal_groupby_probe(case: Case) -> bool:
+    return any(op.get("op") == "empty_literal_groupby_probe" for op in case.program.operations)
 
 
 def _case_uses_modulo(case: Case) -> bool:
