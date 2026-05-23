@@ -571,6 +571,17 @@ def _append_large_string_partition_probe(
     return f"append_large_string_partition_probe:out={alias}"
 
 
+def _append_hash_pivot_wider_probe(
+    tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random
+) -> str:
+    if not tables:
+        return "append_hash_pivot_wider_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("hash_pivot_wider_mismatch", used=set(available))
+    operations.append({"op": "hash_pivot_wider_probe", "as": alias})
+    return f"append_hash_pivot_wider_probe:out={alias}"
+
+
 def _append_rolling_mean_by_null_count_probe(
     tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random
 ) -> str:
@@ -822,6 +833,9 @@ def _available_columns(tables: list[TableData], operations: list[dict[str, Any]]
         elif op.get("op") == "large_string_partition_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif op.get("op") == "hash_pivot_wider_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif op.get("op") == "rolling_mean_by_null_count_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
@@ -878,6 +892,8 @@ def _column_type(tables: list[TableData], name: str) -> str:
     if name == "dataset_isin_all_match_mismatch" or name.startswith("dataset_isin_all_match_mismatch_"):
         return "bool"
     if name == "large_string_partition_mismatch" or name.startswith("large_string_partition_mismatch_"):
+        return "bool"
+    if name == "hash_pivot_wider_mismatch" or name.startswith("hash_pivot_wider_mismatch_"):
         return "bool"
     if name == "rolling_mean_by_null_count_mismatch" or name.startswith("rolling_mean_by_null_count_mismatch_"):
         return "bool"
@@ -942,6 +958,7 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_arrow_timestamp_index_attr_probe", _append_arrow_timestamp_index_attr_probe),
     MutationOperator("append_dataset_isin_all_match_probe", _append_dataset_isin_all_match_probe),
     MutationOperator("append_large_string_partition_probe", _append_large_string_partition_probe),
+    MutationOperator("append_hash_pivot_wider_probe", _append_hash_pivot_wider_probe),
     MutationOperator("append_rolling_mean_by_null_count_probe", _append_rolling_mean_by_null_count_probe),
     MutationOperator("append_grouped_topk", _append_grouped_topk_probe),
     MutationOperator("drop_op", _drop_operation),

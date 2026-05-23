@@ -87,6 +87,9 @@ def _assert_program_columns_are_valid(case):
         elif op["op"] == "large_string_partition_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
+        elif op["op"] == "hash_pivot_wider_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
         elif op["op"] == "groupby":
             assert set(op["keys"]).issubset(known_cols)
             assert len(op["keys"]) == len(set(op["keys"]))
@@ -201,6 +204,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "pandas_arrow_timestamp_index_attr_semantics",
         "pyarrow_dataset_isin_all_match_semantics",
         "pyarrow_large_string_partition_schema_semantics",
+        "pyarrow_hash_pivot_wider_order_semantics",
         "polars_rolling_mean_by_null_count_semantics",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
@@ -903,6 +907,20 @@ def test_generate_case_pyarrow_large_string_partition_schema_profile_is_supporte
     assert "pattern:pyarrow_large_string_partition_schema_semantics" in features
     assert "pyarrow:large-string-partition" in features
     assert case.metadata["source_issue"] == "https://github.com/apache/arrow/issues/47177"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_pyarrow_hash_pivot_wider_order_profile_is_supported_and_valid():
+    case = generate_case(149, profile="pyarrow_hash_pivot_wider_order_semantics")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000149-pyarrow-hash-pivot-wider-order-semantics"
+    assert case.program.operations == [
+        {"op": "hash_pivot_wider_probe", "as": "hash_pivot_wider_mismatch"}
+    ]
+    assert "pattern:pyarrow_hash_pivot_wider_order_semantics" in features
+    assert "pyarrow:hash-pivot-wider" in features
+    assert case.metadata["source_issue"] == "https://github.com/apache/arrow/issues/48679"
     assert validate_case_program(case) == []
 
 

@@ -550,6 +550,21 @@ def test_oracle_classifies_pyarrow_large_string_partition_schema_semantics():
     assert findings[0].root_cause == "pyarrow_large_string_partition_schema_semantics"
 
 
+def test_oracle_classifies_pyarrow_hash_pivot_wider_order_semantics():
+    case = generate_case(370040, profile="pyarrow_hash_pivot_wider_order_semantics")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["hash_pivot_wider_mismatch"], [[False]]),
+            "pyarrow": NormalizedResult("pyarrow", "ok", ["hash_pivot_wider_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "pyarrow_hash_pivot_wider_order_semantics"
+
+
 def test_oracle_classifies_polars_rolling_mean_by_null_count_semantics():
     case = generate_case(370038, profile="polars_rolling_mean_by_null_count_semantics")
 

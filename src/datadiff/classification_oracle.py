@@ -545,6 +545,17 @@ def validate_case_program(case: Case) -> list[str]:
                 col_types = {alias: "bool"}
                 numeric = set()
                 strings = set()
+        elif kind == "hash_pivot_wider_probe":
+            alias = str(op.get("as", ""))
+            if not alias:
+                errors.append(f"op {idx}: hash_pivot_wider_probe output alias is empty")
+            elif is_reserved_output_name(alias):
+                errors.append(f"op {idx}: hash_pivot_wider_probe output alias {alias!r} is reserved")
+            if alias:
+                available = {alias}
+                col_types = {alias: "bool"}
+                numeric = set()
+                strings = set()
         elif kind == "rolling_mean_by_null_count_probe":
             alias = str(op.get("as", ""))
             if not alias:
@@ -1008,6 +1019,10 @@ def _reference_result(case: Case) -> NormalizedResult | None:
                 columns = [alias]
                 rows = [{alias: False}]
             elif kind == "large_string_partition_probe":
+                alias = str(op["as"])
+                columns = [alias]
+                rows = [{alias: False}]
+            elif kind == "hash_pivot_wider_probe":
                 alias = str(op["as"])
                 columns = [alias]
                 rows = [{alias: False}]

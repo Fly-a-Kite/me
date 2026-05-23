@@ -146,6 +146,9 @@ class PyArrowBackend(Backend):
                     elif kind == "large_string_partition_probe":
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [_pyarrow_large_string_partition_mismatch(pa)]})
+                    elif kind == "hash_pivot_wider_probe":
+                        current_cols = [op["as"]]
+                        current = pa.Table.from_pydict({op["as"]: [_pyarrow_hash_pivot_wider_mismatch(pa)]})
                     elif kind == "rolling_mean_by_null_count_probe":
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [False]})
@@ -238,6 +241,34 @@ def _pyarrow_large_string_partition_mismatch(pa) -> bool:
         except pa.ArrowTypeError:
             return True
     return observed.num_rows != expected.num_rows
+
+
+def _pyarrow_hash_pivot_wider_mismatch(pa) -> bool:
+    import pyarrow.compute as pc
+    from pyarrow.acero import AggregateNodeOptions, Declaration, TableSourceNodeOptions
+
+    data = {
+        "foo": ["A", "A", "B", "B", "C"],
+        "bar": ["k", "l", "m", "n", "o"],
+        "N1": [1, 2, 2, 4, 2],
+        "N2": [1, 2, 2, 4, 2],
+    }
+    table = pa.Table.from_pydict(data)
+    source = Declaration("table_source", options=TableSourceNodeOptions(table))
+    key_names = table.column("bar").unique().to_pylist()
+    options = pc.PivotWiderOptions(key_names, unexpected_key_behavior="raise")
+    aggregates = [(["bar", "N1"], "hash_pivot_wider", options, "N1")]
+    pivot = Declaration("aggregate", AggregateNodeOptions(aggregates, ["foo"]))
+    observed = Declaration.from_sequence([source, pivot]).to_table().flatten().to_pydict()
+    expected = {
+        "foo": ["A", "B", "C"],
+        "N1.k": [1, None, None],
+        "N1.l": [2, None, None],
+        "N1.m": [None, 2, None],
+        "N1.n": [None, 4, None],
+        "N1.o": [None, None, 2],
+    }
+    return observed != expected
 
 
 def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):

@@ -62,6 +62,7 @@ GeneratorProfile = Literal[
     "pandas_arrow_timestamp_index_attr_semantics",
     "pyarrow_dataset_isin_all_match_semantics",
     "pyarrow_large_string_partition_schema_semantics",
+    "pyarrow_hash_pivot_wider_order_semantics",
     "polars_rolling_mean_by_null_count_semantics",
 ]
 
@@ -555,6 +556,9 @@ def _available_columns_after_operations(
         elif kind == "large_string_partition_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "hash_pivot_wider_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "rolling_mean_by_null_count_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
@@ -1019,6 +1023,17 @@ def repair_operations(
             strings = set()
             order_pending = False
             pending_order_columns = set()
+        elif kind == "hash_pivot_wider_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "hash_pivot_wider_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "rolling_mean_by_null_count_probe":
             alias = str(op.get("as", ""))
             if not alias or is_reserved_output_name(alias):
@@ -1327,6 +1342,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_pyarrow_dataset_isin_all_match_semantics_case(seed)
     if profile == "pyarrow_large_string_partition_schema_semantics" and type_aware:
         return generate_pyarrow_large_string_partition_schema_semantics_case(seed)
+    if profile == "pyarrow_hash_pivot_wider_order_semantics" and type_aware:
+        return generate_pyarrow_hash_pivot_wider_order_semantics_case(seed)
     if profile == "polars_rolling_mean_by_null_count_semantics" and type_aware:
         return generate_polars_rolling_mean_by_null_count_semantics_case(seed)
     if profile == "workflow" and type_aware:
@@ -1491,6 +1508,12 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
             generate_pyarrow_large_string_partition_schema_semantics_case(seed),
             seed,
             "pyarrow_large_string_partition_schema_semantics",
+        )
+    if seed % 191 == 106:
+        return _as_bughunt_mixed_case(
+            generate_pyarrow_hash_pivot_wider_order_semantics_case(seed),
+            seed,
+            "pyarrow_hash_pivot_wider_order_semantics",
         )
     if seed % 167 == 83:
         return _as_bughunt_mixed_case(
@@ -3561,6 +3584,32 @@ def generate_pyarrow_large_string_partition_schema_semantics_case(seed: int) -> 
             "source_issue": "https://github.com/apache/arrow/issues/47177",
             "expected_large_string_partition_mismatch": False,
             "expected_large_string_partition_rows": 4,
+        },
+    )
+
+
+def generate_pyarrow_hash_pivot_wider_order_semantics_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("hash_pivot_wider_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-pyarrow-hash-pivot-wider-order-semantics",
+        seed,
+        [{"op": "hash_pivot_wider_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-pyarrow-hash-pivot-wider-order-semantics",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "pyarrow_hash_pivot_wider_order_semantics",
+            "source_issue": "https://github.com/apache/arrow/issues/48679",
+            "expected_hash_pivot_wider_mismatch": False,
+            "expected_hash_pivot_wider_rows": 3,
         },
     )
 

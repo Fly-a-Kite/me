@@ -28,6 +28,7 @@ CANONICAL_OPERATION_ORDER = (
     "arrow_timestamp_index_attr_probe",
     "dataset_isin_all_match_probe",
     "large_string_partition_probe",
+    "hash_pivot_wider_probe",
     "rolling_mean_by_null_count_probe",
     "groupby",
     "aggregate",
@@ -158,6 +159,8 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("pyarrow_dataset_isin_all_match_semantics")
     if "large_string_partition_probe" in op_set:
         risks.append("pyarrow_large_string_partition_schema_semantics")
+    if "hash_pivot_wider_probe" in op_set:
+        risks.append("pyarrow_hash_pivot_wider_order_semantics")
     if "rolling_mean_by_null_count_probe" in op_set:
         risks.append("polars_rolling_mean_by_null_count_semantics")
     if "groupby" in op_set:

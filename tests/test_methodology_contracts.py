@@ -135,6 +135,9 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     pyarrow_large_string_partition_schema_semantics = _preset_config(
         "pyarrow_large_string_partition_schema_semantics"
     )
+    pyarrow_hash_pivot_wider_order_semantics = _preset_config(
+        "pyarrow_hash_pivot_wider_order_semantics"
+    )
     polars_rolling_mean_by_null_count_semantics = _preset_config("polars_rolling_mean_by_null_count_semantics")
 
     assert null_groupby.generator_profile == "null_groupby_topk"
@@ -267,6 +270,13 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     )
     assert {"large_string_partition_probe", "large_string_partition", "strings"}.issubset(
         pyarrow_large_string_partition_schema_semantics.guidance_targets
+    )
+    assert (
+        pyarrow_hash_pivot_wider_order_semantics.generator_profile
+        == "pyarrow_hash_pivot_wider_order_semantics"
+    )
+    assert {"hash_pivot_wider_probe", "hash_pivot_wider", "aggregation"}.issubset(
+        pyarrow_hash_pivot_wider_order_semantics.guidance_targets
     )
     assert (
         polars_rolling_mean_by_null_count_semantics.generator_profile

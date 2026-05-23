@@ -336,6 +336,12 @@ class DataFusionBackend(Backend):
                     visible_cols = [op["as"]]
                     hidden_order_cols = []
                     pending_order = None
+                elif kind == "hash_pivot_wider_probe":
+                    query = f"SELECT false AS {_quote(op['as'])}"
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
                 elif kind == "rolling_mean_by_null_count_probe":
                     query = f"SELECT false AS {_quote(op['as'])}"
                     current_cols = [op["as"]]

@@ -1634,6 +1634,32 @@ def test_validate_case_accepts_large_string_partition_probe():
     assert any("reserved" in error for error in validate_case_program(bad_alias))
 
 
+def test_validate_case_accepts_hash_pivot_wider_probe():
+    valid = Case(
+        "case-hash-pivot-wider-probe",
+        86,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-hash-pivot-wider-probe",
+            86,
+            [{"op": "hash_pivot_wider_probe", "as": "hash_pivot_wider_mismatch"}],
+        ),
+    )
+    bad_alias = Case(
+        "case-hash-pivot-wider-probe-alias",
+        87,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-hash-pivot-wider-probe-alias",
+            87,
+            [{"op": "hash_pivot_wider_probe", "as": "select"}],
+        ),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
 def test_classification_reference_understands_large_string_partition_probe():
     case = Case(
         "case-large-string-partition-reference",
@@ -1662,6 +1688,41 @@ def test_classification_reference_understands_large_string_partition_probe():
         normalized,
         {},
         {"generator_profile": "pyarrow_large_string_partition_schema_semantics"},
+        ["reference", "pyarrow"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["pyarrow"]
+
+
+def test_classification_reference_understands_hash_pivot_wider_probe():
+    case = Case(
+        "case-hash-pivot-wider-reference",
+        88,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-hash-pivot-wider-reference",
+            88,
+            [{"op": "hash_pivot_wider_probe", "as": "hash_pivot_wider_mismatch"}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "pyarrow_hash_pivot_wider_order_semantics",
+        "confidence": "high",
+        "suspicious_backends": ["pyarrow"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["hash_pivot_wider_mismatch"], [[False]]),
+        "pyarrow": NormalizedResult("pyarrow", "ok", ["hash_pivot_wider_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "pyarrow_hash_pivot_wider_order_semantics"},
         ["reference", "pyarrow"],
     )
 

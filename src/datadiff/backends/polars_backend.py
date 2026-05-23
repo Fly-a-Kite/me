@@ -118,6 +118,8 @@ class PolarsBackend(Backend):
                     df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "large_string_partition_probe":
                     df = pl.DataFrame({op["as"]: [False]})
+                elif kind == "hash_pivot_wider_probe":
+                    df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "rolling_mean_by_null_count_probe":
                     mismatch = _polars_rolling_mean_by_null_count_mismatch(pl, lazy=False)
                     df = pl.DataFrame({op["as"]: [mismatch]})
@@ -308,6 +310,8 @@ class PolarsLazyBackend(PolarsBackend):
                 elif kind == "dataset_isin_all_match_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "large_string_partition_probe":
+                    lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "hash_pivot_wider_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "rolling_mean_by_null_count_probe":
                     mismatch = _polars_rolling_mean_by_null_count_mismatch(pl, lazy=True)

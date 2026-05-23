@@ -102,6 +102,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "pyarrow_dataset_isin_all_match_semantics"
     if _case_has_large_string_partition_probe(case):
         return "pyarrow_large_string_partition_schema_semantics"
+    if _case_has_hash_pivot_wider_probe(case):
+        return "pyarrow_hash_pivot_wider_order_semantics"
     if _case_has_rolling_mean_by_null_count_probe(case):
         return "polars_rolling_mean_by_null_count_semantics"
     if _case_contains_special_float(case):
@@ -250,6 +252,10 @@ def _case_has_dataset_isin_all_match_probe(case: Case) -> bool:
 
 def _case_has_large_string_partition_probe(case: Case) -> bool:
     return any(op.get("op") == "large_string_partition_probe" for op in case.program.operations)
+
+
+def _case_has_hash_pivot_wider_probe(case: Case) -> bool:
+    return any(op.get("op") == "hash_pivot_wider_probe" for op in case.program.operations)
 
 
 def _case_has_rolling_mean_by_null_count_probe(case: Case) -> bool:

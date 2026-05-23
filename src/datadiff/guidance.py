@@ -124,6 +124,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "pyarrow_large_string_partition_schema_semantics": {"pattern:pyarrow_large_string_partition_schema_semantics"},
     "large_string_partition_probe": {"op:large_string_partition_probe"},
     "large_string_partition": {"pyarrow:large-string-partition", "dataset:partition-schema"},
+    "pyarrow_hash_pivot_wider_order_semantics": {"pattern:pyarrow_hash_pivot_wider_order_semantics"},
+    "hash_pivot_wider_probe": {"op:hash_pivot_wider_probe"},
+    "hash_pivot_wider": {"pyarrow:hash-pivot-wider", "pivot:wider-order"},
     "polars_rolling_mean_by_null_count_semantics": {"pattern:polars_rolling_mean_by_null_count_semantics"},
     "rolling_mean_by_null_count_probe": {"op:rolling_mean_by_null_count_probe"},
     "rolling_temporal_nulls": {"polars:rolling-mean-by-null-count", "rolling:temporal-min-samples"},
@@ -229,6 +232,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_arrow_timestamp_index_attr_probe = False
     has_dataset_isin_all_match_probe = False
     has_large_string_partition_probe = False
+    has_hash_pivot_wider_probe = False
     has_rolling_mean_by_null_count_probe = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
@@ -377,6 +381,11 @@ def extract_case_features(case: Case) -> set[str]:
             features.add("dataset:partition-schema")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_large_string_partition_probe = True
+        elif kind == "hash_pivot_wider_probe":
+            features.add("pyarrow:hash-pivot-wider")
+            features.add("pivot:wider-order")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_hash_pivot_wider_probe = True
         elif kind == "rolling_mean_by_null_count_probe":
             features.add("polars:rolling-mean-by-null-count")
             features.add("rolling:temporal-min-samples")
@@ -545,6 +554,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:pyarrow_dataset_isin_all_match_semantics")
     if has_large_string_partition_probe:
         features.add("pattern:pyarrow_large_string_partition_schema_semantics")
+    if has_hash_pivot_wider_probe:
+        features.add("pattern:pyarrow_hash_pivot_wider_order_semantics")
     if has_rolling_mean_by_null_count_probe:
         features.add("pattern:polars_rolling_mean_by_null_count_semantics")
     return features
@@ -1212,6 +1223,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "hash_pivot_wider_probe":
+            score, op_buckets, samples = _hash_pivot_wider_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "rolling_mean_by_null_count_probe":
             score, op_buckets, samples = _rolling_mean_by_null_count_frontier_score(op)
             scores.append(score)
@@ -1739,6 +1755,12 @@ def _large_string_partition_frontier_score(op: dict[str, Any]) -> tuple[float, l
     return 0.90, buckets, {alias: [False]} if alias else {}
 
 
+def _hash_pivot_wider_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    buckets = ["pyarrow:hash-pivot-wider", "pivot:wider-order"]
+    return 0.90, buckets, {alias: [False]} if alias else {}
+
+
 def _rolling_mean_by_null_count_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
     alias = str(op.get("as", ""))
     buckets = ["polars:rolling-mean-by-null-count", "rolling:temporal-min-samples"]
@@ -2153,6 +2175,11 @@ def _predicted_roots(features: set[str]) -> set[str]:
         or "op:large_string_partition_probe" in features
     ):
         roots.add("pyarrow_large_string_partition_schema_semantics")
+    if (
+        "pattern:pyarrow_hash_pivot_wider_order_semantics" in features
+        or "op:hash_pivot_wider_probe" in features
+    ):
+        roots.add("pyarrow_hash_pivot_wider_order_semantics")
     if (
         "pattern:polars_rolling_mean_by_null_count_semantics" in features
         or "op:rolling_mean_by_null_count_probe" in features

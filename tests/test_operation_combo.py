@@ -214,6 +214,13 @@ def test_classify_operation_combo_tracks_pyarrow_large_string_partition_schema_r
     assert "pyarrow_large_string_partition_schema_semantics" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_pyarrow_hash_pivot_wider_order_risk():
+    combo = classify_operation_combo([{"op": "hash_pivot_wider_probe"}])
+
+    assert combo["template"] == "hash_pivot_wider_probe"
+    assert "pyarrow_hash_pivot_wider_order_semantics" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_polars_rolling_mean_by_null_count_semantics_risk():
     combo = classify_operation_combo([{"op": "rolling_mean_by_null_count_probe"}])
 
