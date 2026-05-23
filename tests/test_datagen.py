@@ -191,6 +191,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "polars_empty_literal_groupby_semantics",
         "pandas_arrow_string_eq_sum_semantics",
         "pandas_arrow_timestamp_loc_slice_semantics",
+        "pandas_arrow_timestamp_index_attr_semantics",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -836,6 +837,20 @@ def test_generate_case_pandas_arrow_timestamp_loc_slice_semantics_profile_is_sup
     assert "pattern:pandas_arrow_timestamp_loc_slice_semantics" in features
     assert "pandas:arrow-timestamp-loc-slice" in features
     assert case.metadata["source_issue"] == "https://github.com/pandas-dev/pandas/issues/63526"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_pandas_arrow_timestamp_index_attr_semantics_profile_is_supported_and_valid():
+    case = generate_case(144, profile="pandas_arrow_timestamp_index_attr_semantics")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000144-pandas-arrow-timestamp-index-attr-semantics"
+    assert case.program.operations == [
+        {"op": "arrow_timestamp_index_attr_probe", "as": "arrow_timestamp_index_attr_mismatch"}
+    ]
+    assert "pattern:pandas_arrow_timestamp_index_attr_semantics" in features
+    assert "pandas:arrow-timestamp-index-attr" in features
+    assert case.metadata["source_issue"] == "https://github.com/pandas-dev/pandas/issues/63527"
     assert validate_case_program(case) == []
 
 

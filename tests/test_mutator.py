@@ -19,6 +19,7 @@ from datadiff.mutator import (
     _append_empty_literal_groupby_probe,
     _append_arrow_string_eq_sum_probe,
     _append_arrow_timestamp_loc_slice_probe,
+    _append_arrow_timestamp_index_attr_probe,
     _append_boolean_predicate_filter_probe,
     _append_grouped_topk_probe,
     _append_order_projection_probe,
@@ -121,6 +122,7 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_empty_literal_groupby_probe" in MUTATION_OPERATOR_NAMES
     assert "append_arrow_string_eq_sum_probe" in MUTATION_OPERATOR_NAMES
     assert "append_arrow_timestamp_loc_slice_probe" in MUTATION_OPERATOR_NAMES
+    assert "append_arrow_timestamp_index_attr_probe" in MUTATION_OPERATOR_NAMES
     assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
 
 
@@ -526,6 +528,30 @@ def test_append_arrow_timestamp_loc_slice_probe_mutation_stays_valid():
         1,
         [table],
         Program("prog-mut-arrow-timestamp-loc-slice", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
+def test_append_arrow_timestamp_index_attr_probe_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("s", "str")],
+        [{"id": 0, "s": "a"}],
+    )
+    operations = [{"op": "select", "columns": ["s"]}]
+
+    detail = _append_arrow_timestamp_index_attr_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_arrow_timestamp_index_attr_probe:")
+    assert operations[-1] == {
+        "op": "arrow_timestamp_index_attr_probe",
+        "as": "arrow_timestamp_index_attr_mismatch",
+    }
+    case = Case(
+        "case-mut-arrow-timestamp-index-attr",
+        1,
+        [table],
+        Program("prog-mut-arrow-timestamp-index-attr", 1, operations),
     )
     assert validate_case_program(case) == []
 

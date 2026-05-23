@@ -110,6 +110,8 @@ class PolarsBackend(Backend):
                     df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "arrow_timestamp_loc_slice_probe":
                     df = pl.DataFrame({op["as"]: [False]})
+                elif kind == "arrow_timestamp_index_attr_probe":
+                    df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -289,6 +291,8 @@ class PolarsLazyBackend(PolarsBackend):
                 elif kind == "arrow_string_eq_sum_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "arrow_timestamp_loc_slice_probe":
+                    lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "arrow_timestamp_index_attr_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))

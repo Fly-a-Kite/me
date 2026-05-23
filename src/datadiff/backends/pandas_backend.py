@@ -125,6 +125,9 @@ class PandasBackend(Backend):
                 elif kind == "arrow_timestamp_loc_slice_probe":
                     mismatch = _pandas_arrow_timestamp_loc_slice_mismatch(pd)
                     df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
+                elif kind == "arrow_timestamp_index_attr_probe":
+                    mismatch = _pandas_arrow_timestamp_index_attr_mismatch(pd)
+                    df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":
@@ -223,3 +226,20 @@ def _pandas_arrow_timestamp_loc_slice_mismatch(pd) -> bool:
     except TypeError:
         return True
     return len(observed) != 1
+
+
+def _pandas_arrow_timestamp_index_attr_mismatch(pd) -> bool:
+    values = pd.Series(["2001-05-07 01:00:00", "2001-06-08 02:00:00"])
+    index = (
+        values.astype("timestamp[ns][pyarrow]")
+        .dt.tz_localize("UTC")
+        .rename("event_time")
+        .to_frame()
+        .set_index("event_time")
+        .index
+    )
+    try:
+        observed = list(index.month)
+    except AttributeError:
+        return True
+    return observed != [5, 6]

@@ -24,6 +24,7 @@ CANONICAL_OPERATION_ORDER = (
     "empty_literal_groupby_probe",
     "arrow_string_eq_sum_probe",
     "arrow_timestamp_loc_slice_probe",
+    "arrow_timestamp_index_attr_probe",
     "groupby",
     "aggregate",
     "select",
@@ -145,6 +146,8 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("pandas_arrow_string_eq_sum_semantics")
     if "arrow_timestamp_loc_slice_probe" in op_set:
         risks.append("pandas_arrow_timestamp_loc_slice_semantics")
+    if "arrow_timestamp_index_attr_probe" in op_set:
+        risks.append("pandas_arrow_timestamp_index_attr_semantics")
     if "groupby" in op_set:
         risks.append("groupby_aggregation")
     if "aggregate" in op_set:

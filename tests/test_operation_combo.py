@@ -186,6 +186,13 @@ def test_classify_operation_combo_tracks_pandas_arrow_timestamp_loc_slice_semant
     assert "pandas_arrow_timestamp_loc_slice_semantics" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_pandas_arrow_timestamp_index_attr_semantics_risk():
+    combo = classify_operation_combo([{"op": "arrow_timestamp_index_attr_probe"}])
+
+    assert combo["template"] == "arrow_timestamp_index_attr_probe"
+    assert "pandas_arrow_timestamp_index_attr_semantics" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

@@ -1403,6 +1403,67 @@ def test_classification_reference_understands_arrow_timestamp_loc_slice_probe():
     assert classification.implicated_backends == ["pandas"]
 
 
+def test_validate_case_accepts_arrow_timestamp_index_attr_probe():
+    valid = Case(
+        "case-arrow-timestamp-index-attr-probe",
+        74,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-arrow-timestamp-index-attr-probe",
+            74,
+            [{"op": "arrow_timestamp_index_attr_probe", "as": "arrow_timestamp_index_attr_mismatch"}],
+        ),
+    )
+    bad_alias = Case(
+        "case-arrow-timestamp-index-attr-probe-alias",
+        75,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-arrow-timestamp-index-attr-probe-alias",
+            75,
+            [{"op": "arrow_timestamp_index_attr_probe", "as": "where"}],
+        ),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_arrow_timestamp_index_attr_probe():
+    case = Case(
+        "case-arrow-timestamp-index-attr-reference",
+        76,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-arrow-timestamp-index-attr-reference",
+            76,
+            [{"op": "arrow_timestamp_index_attr_probe", "as": "arrow_timestamp_index_attr_mismatch"}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "pandas_arrow_timestamp_index_attr_semantics",
+        "confidence": "high",
+        "suspicious_backends": ["pandas"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["arrow_timestamp_index_attr_mismatch"], [[False]]),
+        "pandas": NormalizedResult("pandas", "ok", ["arrow_timestamp_index_attr_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "pandas_arrow_timestamp_index_attr_semantics"},
+        ["reference", "pandas"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["pandas"]
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

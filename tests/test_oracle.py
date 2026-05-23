@@ -490,6 +490,21 @@ def test_oracle_classifies_pandas_arrow_timestamp_loc_slice_semantics():
     assert findings[0].root_cause == "pandas_arrow_timestamp_loc_slice_semantics"
 
 
+def test_oracle_classifies_pandas_arrow_timestamp_index_attr_semantics():
+    case = generate_case(370036, profile="pandas_arrow_timestamp_index_attr_semantics")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["arrow_timestamp_index_attr_mismatch"], [[False]]),
+            "pandas": NormalizedResult("pandas", "ok", ["arrow_timestamp_index_attr_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "pandas_arrow_timestamp_index_attr_semantics"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",
