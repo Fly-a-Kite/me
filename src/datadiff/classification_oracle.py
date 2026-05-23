@@ -435,6 +435,17 @@ def validate_case_program(case: Case) -> list[str]:
                 col_types = {alias: "bool"}
                 numeric = set()
                 strings = set()
+        elif kind == "json_predicate_order_probe":
+            alias = str(op.get("as", ""))
+            if not alias:
+                errors.append(f"op {idx}: json_predicate_order_probe output alias is empty")
+            elif is_reserved_output_name(alias):
+                errors.append(f"op {idx}: json_predicate_order_probe output alias {alias!r} is reserved")
+            if alias:
+                available = {alias}
+                col_types = {alias: "bool"}
+                numeric = set()
+                strings = set()
         elif kind == "sparse_mask_probe":
             alias = str(op.get("as", ""))
             if not alias:
@@ -957,6 +968,10 @@ def _reference_result(case: Case) -> NormalizedResult | None:
                 columns = [alias]
                 rows = [{alias: False}]
             elif kind == "tuple_anti_null_probe":
+                alias = str(op["as"])
+                columns = [alias]
+                rows = [{alias: False}]
+            elif kind == "json_predicate_order_probe":
                 alias = str(op["as"])
                 columns = [alias]
                 rows = [{alias: False}]

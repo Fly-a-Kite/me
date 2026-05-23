@@ -257,6 +257,7 @@ def test_cli_parses_order_sensitive_bug_hunt_profiles():
         "series_rtruediv_operand_order",
         "pandas_uint64_isin_precision",
         "duckdb_tuple_anti_null_semantics",
+        "duckdb_json_predicate_order_semantics",
         "pandas_sparse_array_mask_semantics",
         "polars_float_wrap_numerical_semantics",
         "pandas_index_bool_result_type",
@@ -502,6 +503,9 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("duckdb_tuple_anti_null_semantics").generator_profile == "duckdb_tuple_anti_null_semantics"
     assert _preset_config("duckdb_tuple_anti_null_semantics").guidance_targets[0] == "duckdb_tuple_anti_null_semantics"
     assert _preset_config("duckdb_tuple_anti_null_semantics_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("duckdb_json_predicate_order_semantics").generator_profile == "duckdb_json_predicate_order_semantics"
+    assert _preset_config("duckdb_json_predicate_order_semantics").guidance_targets[0] == "duckdb_json_predicate_order_semantics"
+    assert _preset_config("duckdb_json_predicate_order_semantics_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("pandas_sparse_array_mask_semantics").generator_profile == "pandas_sparse_array_mask_semantics"
     assert _preset_config("pandas_sparse_array_mask_semantics").guidance_targets[0] == "pandas_sparse_array_mask_semantics"
     assert _preset_config("pandas_sparse_array_mask_semantics_metamorphic").enable_metamorphic_oracle is True
@@ -653,6 +657,7 @@ def test_cli_parses_non_datafusion_live_presets():
         "series_rtruediv_operand_order",
         "pandas_uint64_isin_precision",
         "duckdb_tuple_anti_null_semantics",
+        "duckdb_json_predicate_order_semantics",
         "pandas_sparse_array_mask_semantics",
         "polars_float_wrap_numerical_semantics",
         "pandas_index_bool_result_type",

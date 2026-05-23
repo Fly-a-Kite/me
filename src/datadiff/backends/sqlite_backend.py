@@ -302,6 +302,13 @@ class SQLiteBackend(Backend):
                     column_types[op["as"]] = "bool"
                     hidden_order_cols = []
                     pending_order = None
+                elif kind == "json_predicate_order_probe":
+                    query = f"SELECT 0 AS {_quote(op['as'])}"
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    column_types[op["as"]] = "bool"
+                    hidden_order_cols = []
+                    pending_order = None
                 elif kind == "sparse_mask_probe":
                     query = f"SELECT 0 AS {_quote(op['as'])}"
                     current_cols = [op["as"]]

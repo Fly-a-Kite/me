@@ -276,6 +276,12 @@ class DataFusionBackend(Backend):
                     visible_cols = [op["as"]]
                     hidden_order_cols = []
                     pending_order = None
+                elif kind == "json_predicate_order_probe":
+                    query = f"SELECT false AS {_quote(op['as'])}"
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
                 elif kind == "sparse_mask_probe":
                     query = f"SELECT false AS {_quote(op['as'])}"
                     current_cols = [op["as"]]

@@ -69,6 +69,9 @@ def _assert_program_columns_are_valid(case):
         elif op["op"] == "tuple_anti_null_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
+        elif op["op"] == "json_predicate_order_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
         elif op["op"] == "sparse_mask_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
@@ -188,6 +191,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "series_rtruediv_operand_order",
         "pandas_uint64_isin_precision",
         "duckdb_tuple_anti_null_semantics",
+        "duckdb_json_predicate_order_semantics",
         "pandas_sparse_array_mask_semantics",
         "polars_float_wrap_numerical_semantics",
         "pandas_index_bool_result_type",
@@ -765,6 +769,20 @@ def test_generate_case_duckdb_tuple_anti_null_semantics_profile_is_supported_and
     assert "pattern:duckdb_tuple_anti_null_semantics" in features
     assert "duckdb:tuple-anti-null" in features
     assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/22418"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_duckdb_json_predicate_order_semantics_profile_is_supported_and_valid():
+    case = generate_case(148, profile="duckdb_json_predicate_order_semantics")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000148-duckdb-json-predicate-order-semantics"
+    assert case.program.operations == [
+        {"op": "json_predicate_order_probe", "as": "json_predicate_order_mismatch"}
+    ]
+    assert "pattern:duckdb_json_predicate_order_semantics" in features
+    assert "duckdb:json-predicate-order" in features
+    assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/20366"
     assert validate_case_program(case) == []
 
 

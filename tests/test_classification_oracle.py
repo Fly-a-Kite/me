@@ -1079,6 +1079,67 @@ def test_classification_reference_understands_tuple_anti_null_probe():
     assert classification.implicated_backends == ["duckdb"]
 
 
+def test_validate_case_accepts_json_predicate_order_probe():
+    valid = Case(
+        "case-json-predicate-order-probe",
+        86,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-json-predicate-order-probe",
+            86,
+            [{"op": "json_predicate_order_probe", "as": "json_predicate_order_mismatch"}],
+        ),
+    )
+    bad_alias = Case(
+        "case-json-predicate-order-probe-alias",
+        87,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-json-predicate-order-probe-alias",
+            87,
+            [{"op": "json_predicate_order_probe", "as": "select"}],
+        ),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_json_predicate_order_probe():
+    case = Case(
+        "case-json-predicate-order-reference",
+        88,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-json-predicate-order-reference",
+            88,
+            [{"op": "json_predicate_order_probe", "as": "json_predicate_order_mismatch"}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "duckdb_json_predicate_order_semantics",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb", "duckdb_persistent"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["json_predicate_order_mismatch"], [[False]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["json_predicate_order_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "duckdb_json_predicate_order_semantics"},
+        ["reference", "duckdb"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["duckdb"]
+
+
 def test_validate_case_accepts_sparse_mask_probe():
     valid = Case(
         "case-sparse-mask-probe",

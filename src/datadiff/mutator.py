@@ -469,6 +469,15 @@ def _append_tuple_anti_null_probe(tables: list[TableData], operations: list[dict
     return f"append_tuple_anti_null_probe:out={alias}"
 
 
+def _append_json_predicate_order_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
+    if not tables:
+        return "append_json_predicate_order_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("json_predicate_order_mismatch", used=set(available))
+    operations.append({"op": "json_predicate_order_probe", "as": alias})
+    return f"append_json_predicate_order_probe:out={alias}"
+
+
 def _append_sparse_mask_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
     if not tables:
         return "append_sparse_mask_probe:none"
@@ -783,6 +792,9 @@ def _available_columns(tables: list[TableData], operations: list[dict[str, Any]]
         elif op.get("op") == "tuple_anti_null_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif op.get("op") == "json_predicate_order_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif op.get("op") == "sparse_mask_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
@@ -846,6 +858,8 @@ def _column_type(tables: list[TableData], name: str) -> str:
     if name == "uint64_isin_mismatch" or name.startswith("uint64_isin_mismatch_"):
         return "bool"
     if name == "tuple_anti_null_mismatch" or name.startswith("tuple_anti_null_mismatch_"):
+        return "bool"
+    if name == "json_predicate_order_mismatch" or name.startswith("json_predicate_order_mismatch_"):
         return "bool"
     if name == "sparse_mask_mismatch" or name.startswith("sparse_mask_mismatch_"):
         return "bool"
@@ -918,6 +932,7 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_series_rtruediv_probe", _append_series_rtruediv_probe),
     MutationOperator("append_uint64_isin_probe", _append_uint64_isin_probe),
     MutationOperator("append_tuple_anti_null_probe", _append_tuple_anti_null_probe),
+    MutationOperator("append_json_predicate_order_probe", _append_json_predicate_order_probe),
     MutationOperator("append_sparse_mask_probe", _append_sparse_mask_probe),
     MutationOperator("append_float_wrap_probe", _append_float_wrap_probe),
     MutationOperator("append_index_bool_probe", _append_index_bool_probe),

@@ -123,6 +123,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     series_rtruediv_operand_order = _preset_config("series_rtruediv_operand_order")
     pandas_uint64_isin_precision = _preset_config("pandas_uint64_isin_precision")
     duckdb_tuple_anti_null_semantics = _preset_config("duckdb_tuple_anti_null_semantics")
+    duckdb_json_predicate_order_semantics = _preset_config("duckdb_json_predicate_order_semantics")
     pandas_sparse_array_mask_semantics = _preset_config("pandas_sparse_array_mask_semantics")
     polars_float_wrap_numerical_semantics = _preset_config("polars_float_wrap_numerical_semantics")
     pandas_index_bool_result_type = _preset_config("pandas_index_bool_result_type")
@@ -217,6 +218,10 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert duckdb_tuple_anti_null_semantics.generator_profile == "duckdb_tuple_anti_null_semantics"
     assert {"tuple_anti_null_probe", "tuple_null_membership", "nulls"}.issubset(
         duckdb_tuple_anti_null_semantics.guidance_targets
+    )
+    assert duckdb_json_predicate_order_semantics.generator_profile == "duckdb_json_predicate_order_semantics"
+    assert {"json_predicate_order_probe", "json_predicate_order", "filter"}.issubset(
+        duckdb_json_predicate_order_semantics.guidance_targets
     )
     assert pandas_sparse_array_mask_semantics.generator_profile == "pandas_sparse_array_mask_semantics"
     assert {"sparse_mask_probe", "sparse_masking", "filter"}.issubset(

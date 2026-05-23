@@ -398,6 +398,21 @@ def test_oracle_classifies_duckdb_tuple_anti_null_semantics():
     assert findings[0].root_cause == "duckdb_tuple_anti_null_semantics"
 
 
+def test_oracle_classifies_duckdb_json_predicate_order_semantics():
+    case = generate_case(370040, profile="duckdb_json_predicate_order_semantics")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["json_predicate_order_mismatch"], [[False]]),
+            "duckdb": NormalizedResult("duckdb", "ok", ["json_predicate_order_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "duckdb_json_predicate_order_semantics"
+
+
 def test_oracle_classifies_pandas_sparse_array_mask_semantics():
     case = generate_case(370030, profile="pandas_sparse_array_mask_semantics")
 

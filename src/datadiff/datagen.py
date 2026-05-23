@@ -52,6 +52,7 @@ GeneratorProfile = Literal[
     "series_rtruediv_operand_order",
     "pandas_uint64_isin_precision",
     "duckdb_tuple_anti_null_semantics",
+    "duckdb_json_predicate_order_semantics",
     "pandas_sparse_array_mask_semantics",
     "polars_float_wrap_numerical_semantics",
     "pandas_index_bool_result_type",
@@ -524,6 +525,9 @@ def _available_columns_after_operations(
         elif kind == "tuple_anti_null_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "json_predicate_order_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "sparse_mask_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
@@ -899,6 +903,17 @@ def repair_operations(
             if not alias or is_reserved_output_name(alias):
                 continue
             repaired.append({"op": "tuple_anti_null_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
+        elif kind == "json_predicate_order_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "json_predicate_order_probe", "as": alias})
             available = {alias}
             col_types = {alias: "bool"}
             numeric = set()
@@ -1292,6 +1307,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_pandas_uint64_isin_precision_case(seed)
     if profile == "duckdb_tuple_anti_null_semantics" and type_aware:
         return generate_duckdb_tuple_anti_null_semantics_case(seed)
+    if profile == "duckdb_json_predicate_order_semantics" and type_aware:
+        return generate_duckdb_json_predicate_order_semantics_case(seed)
     if profile == "pandas_sparse_array_mask_semantics" and type_aware:
         return generate_pandas_sparse_array_mask_semantics_case(seed)
     if profile == "polars_float_wrap_numerical_semantics" and type_aware:
@@ -1414,6 +1431,12 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
             generate_duckdb_tuple_anti_null_semantics_case(seed),
             seed,
             "duckdb_tuple_anti_null_semantics",
+        )
+    if seed % 181 == 105:
+        return _as_bughunt_mixed_case(
+            generate_duckdb_json_predicate_order_semantics_case(seed),
+            seed,
+            "duckdb_json_predicate_order_semantics",
         )
     if seed % 127 == 74:
         return _as_bughunt_mixed_case(
@@ -3278,6 +3301,32 @@ def generate_duckdb_tuple_anti_null_semantics_case(seed: int) -> Case:
             "source_issue": "https://github.com/duckdb/duckdb/issues/22418",
             "expected_tuple_anti_null_mismatch": False,
             "expected_tuple_anti_null_counts": [1, 1, 2],
+        },
+    )
+
+
+def generate_duckdb_json_predicate_order_semantics_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("json_predicate_order_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-duckdb-json-predicate-order-semantics",
+        seed,
+        [{"op": "json_predicate_order_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-duckdb-json-predicate-order-semantics",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "duckdb_json_predicate_order_semantics",
+            "source_issue": "https://github.com/duckdb/duckdb/issues/20366",
+            "expected_json_predicate_order_mismatch": False,
+            "expected_json_predicate_order_rows": 1,
         },
     )
 

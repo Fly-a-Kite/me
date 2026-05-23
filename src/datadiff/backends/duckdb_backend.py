@@ -153,6 +153,48 @@ def _tuple_anti_null_probe_sql(op: dict) -> str:
     )
 
 
+def _duckdb_json_predicate_order_mismatch(con) -> bool:
+    con.execute("DROP TABLE IF EXISTS __datadiff_json_predicate_data")
+    con.execute(
+        """
+        CREATE TEMP TABLE __datadiff_json_predicate_data (
+            data_id INTEGER NOT NULL,
+            data_json JSON
+        )
+        """
+    )
+    con.execute(
+        """
+        INSERT INTO __datadiff_json_predicate_data VALUES
+            (1, '{"data": [{"id":0,"type":"type1","val":"305.123"},{"id":1,"type":"type2","val":"39.35"}]}'),
+            (2, '{"data": [{"id":0,"type":"type1","val":"223.752"},{"id":1,"type":"type2","val":"160.875"}]}')
+        """
+    )
+    select_sql = (
+        "SELECT je.value->>'type' AS ct, CAST(je.value->>'val' AS DOUBLE) AS duration, d.data_id "
+        "FROM __datadiff_json_predicate_data d, json_each(d.data_json, 'data') je "
+    )
+    safe_query = (
+        select_sql
+        + "WHERE je.value->>'type' = 'type1' "
+        + "AND CAST(je.value->>'val' AS DOUBLE) > 300 "
+        + "ORDER BY d.data_id"
+    )
+    reordered_query = (
+        select_sql
+        + "WHERE CAST(je.value->>'val' AS DOUBLE) > 300 "
+        + "AND je.value->>'type' = 'type1' "
+        + "ORDER BY d.data_id"
+    )
+    expected = [("type1", 305.123, 1)]
+    try:
+        safe_result = con.execute(safe_query).fetchall()
+        reordered_result = con.execute(reordered_query).fetchall()
+    except Exception:
+        return True
+    return safe_result != expected or reordered_result != expected
+
+
 class DuckDBBackend(Backend):
     name = "duckdb"
     persistent_storage = False
@@ -369,6 +411,16 @@ class DuckDBBackend(Backend):
                 elif kind == "tuple_anti_null_probe":
                     ctes = []
                     relation = add_step(_tuple_anti_null_probe_sql(op))
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "json_predicate_order_probe":
+                    ctes = []
+                    mismatch = _duckdb_json_predicate_order_mismatch(con)
+                    materialized_name = f"__datadiff_json_predicate_order_{len(ctes)}"
+                    con.register(materialized_name, pd.DataFrame({op["as"]: [mismatch]}))
+                    relation = _quote(materialized_name)
                     current_cols = [op["as"]]
                     visible_cols = [op["as"]]
                     hidden_order_cols = []

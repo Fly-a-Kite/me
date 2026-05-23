@@ -144,6 +144,13 @@ def test_classify_operation_combo_tracks_duckdb_tuple_anti_null_semantics_risk()
     assert "duckdb_tuple_anti_null_semantics" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_duckdb_json_predicate_order_semantics_risk():
+    combo = classify_operation_combo([{"op": "json_predicate_order_probe"}])
+
+    assert combo["template"] == "json_predicate_order_probe"
+    assert "duckdb_json_predicate_order_semantics" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_pandas_sparse_array_mask_semantics_risk():
     combo = classify_operation_combo([{"op": "sparse_mask_probe"}])
 
