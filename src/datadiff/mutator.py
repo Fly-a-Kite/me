@@ -302,7 +302,14 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
             cmp = rnd.choice(["gt_is_not_true", "ge_is_not_true", "lt_is_not_false", "le_is_not_false"])
         if rnd.random() < 0.15:
             cmp = "in_set"
-        value = _literal_list_for_type(typ, rnd) if cmp == "in_set" else _literal_for_type(typ, rnd)
+        if rnd.random() < 0.12:
+            cmp = rnd.choice(["is_null", "is_not_null"])
+        if cmp == "in_set":
+            value = _literal_list_for_type(typ, rnd)
+        elif cmp in {"is_null", "is_not_null"}:
+            value = None
+        else:
+            value = _literal_for_type(typ, rnd)
         return {"op": "filter", "column": col, "cmp": cmp, "value": value}
     if kind == "select":
         count = rnd.randint(1, len(available))

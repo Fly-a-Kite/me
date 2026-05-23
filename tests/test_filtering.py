@@ -33,3 +33,12 @@ def test_set_membership_filter_uses_two_valued_null_safe_semantics():
     assert evaluate_filter_predicate("beta", "in_set", ["alpha", "中文"]) is False
     assert evaluate_filter_predicate(None, "in_set", ["alpha", "中文"]) is False
     assert sql_filter_condition('q."s"', "('alpha', '中文')", "in_set") == 'q."s" IN (\'alpha\', \'中文\')'
+
+
+def test_null_predicate_filters_are_explicit_null_checks():
+    assert evaluate_filter_predicate(None, "is_null", None) is True
+    assert evaluate_filter_predicate("alpha", "is_null", None) is False
+    assert evaluate_filter_predicate(None, "is_not_null", None) is False
+    assert evaluate_filter_predicate("alpha", "is_not_null", None) is True
+    assert sql_filter_condition('q."s"', "NULL", "is_null") == 'q."s" IS NULL'
+    assert sql_filter_condition('q."s"', "NULL", "is_not_null") == 'q."s" IS NOT NULL'

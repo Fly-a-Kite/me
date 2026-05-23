@@ -36,6 +36,7 @@ GeneratorProfile = Literal[
     "string_count_groupby",
     "unique_count_groupby",
     "set_membership_filter",
+    "null_predicate_filter",
 ]
 
 
@@ -305,10 +306,14 @@ def generate_program(
                 ]
             if bughunt_profile and rnd.random() < 0.20:
                 cmp_ops = ["in_set", *cmp_ops]
+            if bughunt_profile and rnd.random() < 0.15:
+                cmp_ops = [rnd.choice(["is_null", "is_not_null"]), *cmp_ops]
             base_cols = {c.name for c in table.columns}
             cmp = rnd.choice(cmp_ops)
             if cmp == "in_set":
                 value = _literal_list_for_column(rnd, table, col) if col in base_cols else _literal_list_for_type(rnd, typ)
+            elif cmp in {"is_null", "is_not_null"}:
+                value = None
             else:
                 value = _literal_for_column(rnd, table, col) if col in base_cols else _literal_for_type(rnd, typ)
             ops.append({"op": "filter", "column": col, "cmp": cmp, "value": value})
@@ -734,6 +739,8 @@ def _filter_literal_is_valid(column_type: str, comparator: Any, value: Any) -> b
         if not isinstance(value, list) or not value or any(item is None for item in value):
             return False
         return all(_filter_literal_is_valid(column_type, "==", item) for item in value)
+    if comparator in {"is_null", "is_not_null"}:
+        return value is None
     if value is None:
         return True
     if column_type == "str":
@@ -790,6 +797,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_unique_count_groupby_case(seed)
     if profile == "set_membership_filter" and type_aware:
         return generate_set_membership_filter_case(seed)
+    if profile == "null_predicate_filter" and type_aware:
+        return generate_null_predicate_filter_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -835,6 +844,8 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         return _as_bughunt_mixed_case(generate_string_count_groupby_case(seed), seed, "string_count_groupby")
     if selector == 50:
         return _as_bughunt_mixed_case(generate_set_membership_filter_case(seed), seed, "set_membership_filter")
+    if selector == 51:
+        return _as_bughunt_mixed_case(generate_null_predicate_filter_case(seed), seed, "null_predicate_filter")
     if selector == 56:
         return _as_bughunt_mixed_case(generate_unique_count_groupby_case(seed), seed, "unique_count_groupby")
     if selector == 53:
@@ -2040,6 +2051,66 @@ def generate_set_membership_filter_case(seed: int) -> Case:
         metadata={
             "generator_profile": "set_membership_filter",
             "source_issue": "https://github.com/pola-rs/polars/issues/22149",
+        },
+    )
+
+
+def generate_null_predicate_filter_case(seed: int) -> Case:
+    use_is_null = seed % 2 == 0
+    predicate = "is_null" if use_is_null else "is_not_null"
+    rows = [
+        {"id": 0, "g": "alpha", "s": "red", "x": 1, "flag": True},
+        {"id": 1, "g": "alpha", "s": None, "x": 2, "flag": False},
+        {"id": 2, "g": "beta", "s": "", "x": None, "flag": None},
+        {"id": 3, "g": "beta", "s": "blue", "x": 2, "flag": True},
+        {"id": 4, "g": None, "s": None, "x": 3, "flag": False},
+        {"id": 5, "g": None, "s": "中文", "x": None, "flag": None},
+        {"id": 6, "g": "gamma", "s": "space value", "x": 4, "flag": True},
+        {"id": 7, "g": "gamma", "s": None, "x": 4, "flag": False},
+    ]
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("s", "str", nullable=True),
+            ColumnSpec("x", "int", nullable=True),
+            ColumnSpec("flag", "bool", nullable=True),
+        ],
+        rows,
+    )
+    program = Program(
+        f"prog-{seed:08d}-null-predicate-filter",
+        seed,
+        [
+            {"op": "filter", "column": "s", "cmp": predicate, "value": None},
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [
+                    {"column": "id", "func": "count", "as": "count_id"},
+                    {"column": "x", "func": "sum", "as": "sum_x"},
+                ],
+            },
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "count_id", "ascending": False, "nulls": "last"},
+                    {"column": "g", "ascending": True, "nulls": "first"},
+                ],
+            },
+            {"op": "limit", "n": 5},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-null-predicate-filter",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "null_predicate_filter",
+            "predicate": predicate,
+            "source_issue": "https://github.com/duckdb/duckdb/issues/4978",
         },
     )
 

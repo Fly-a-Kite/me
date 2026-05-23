@@ -112,6 +112,10 @@ def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):
         values = list(value)
         value_set = pa.array(values, type=array.type)
         return pc.fill_null(pc.is_in(array, value_set=value_set), False)
+    if parsed.base == "is_null":
+        return pc.is_null(array)
+    if parsed.base == "is_not_null":
+        return pc.invert(pc.is_null(array))
     scalar = value
     if scalar is None:
         mask = pa.array([None] * len(array), type=pa.bool_())

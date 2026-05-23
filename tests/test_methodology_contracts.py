@@ -107,6 +107,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     string_count_groupby = _preset_config("string_count_groupby")
     unique_count_groupby = _preset_config("unique_count_groupby")
     set_membership_filter = _preset_config("set_membership_filter")
+    null_predicate_filter = _preset_config("null_predicate_filter")
 
     assert null_groupby.generator_profile == "null_groupby_topk"
     assert {"groupby", "nulls", "sort_limit"}.issubset(null_groupby.guidance_targets)
@@ -150,6 +151,8 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert {"groupby", "strings", "unique_count", "aggregation", "sort_limit"}.issubset(unique_count_groupby.guidance_targets)
     assert set_membership_filter.generator_profile == "set_membership_filter"
     assert {"filter", "strings", "set_membership", "aggregation", "sort_limit"}.issubset(set_membership_filter.guidance_targets)
+    assert null_predicate_filter.generator_profile == "null_predicate_filter"
+    assert {"filter", "null_predicate", "aggregation", "sort_limit"}.issubset(null_predicate_filter.guidance_targets)
 
 
 def test_methodology_seeded_fault_suites_support_sensitivity_evaluation():

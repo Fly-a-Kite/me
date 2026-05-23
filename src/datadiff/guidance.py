@@ -48,6 +48,8 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "unique_count": {"agg:nunique"},
     "set_membership_filter": {"pattern:set_membership_filter"},
     "set_membership": {"filter:set-membership"},
+    "null_predicate_filter": {"pattern:null_predicate_filter"},
+    "null_predicate": {"filter:null-predicate"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -124,6 +126,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_string_count_groupby = False
     has_unique_count_groupby = False
     has_set_membership_filter = False
+    has_null_predicate_filter = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -137,6 +140,10 @@ def extract_case_features(case: Case) -> set[str]:
             if parsed is not None and parsed.base == "in_set":
                 features.add("filter:set-membership")
                 has_set_membership_filter = True
+            if parsed is not None and parsed.base in {"is_null", "is_not_null"}:
+                features.add("filter:null-predicate")
+                features.add(f"filter:null-predicate:{parsed.base}")
+                has_null_predicate_filter = True
             if parsed is not None and parsed.truth_test is not None:
                 features.add("filter:truth-test")
                 features.add(f"filter:truth:{parsed.truth_test}")
@@ -249,6 +256,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:unique_count_groupby")
     if has_set_membership_filter:
         features.add("pattern:set_membership_filter")
+    if has_null_predicate_filter:
+        features.add("pattern:null_predicate_filter")
     return features
 
 
@@ -875,6 +884,9 @@ def _filter_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) ->
     parsed = parse_filter_comparator(comparator)
     if parsed is not None and parsed.base == "in_set":
         buckets.append("filter:set-membership")
+    if parsed is not None and parsed.base in {"is_null", "is_not_null"}:
+        buckets.append("filter:null-predicate")
+        buckets.append(f"filter:null-predicate:{parsed.base}")
     if parsed is not None and parsed.truth_test is not None:
         buckets.append("filter:truth-test")
         buckets.append(f"filter:truth:{parsed.truth_test}")

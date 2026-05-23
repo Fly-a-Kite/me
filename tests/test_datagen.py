@@ -110,6 +110,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "string_count_groupby",
         "unique_count_groupby",
         "set_membership_filter",
+        "null_predicate_filter",
         "wide_offset_topk",
         "join_null_key_topk",
         "empty_filter_groupby",
@@ -438,6 +439,24 @@ def test_generate_case_set_membership_filter_profile_is_supported_and_valid():
     assert "filter:set-membership" in features
     assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/22149"
     assert validate_case_program(case) == []
+
+
+def test_generate_case_null_predicate_filter_profile_is_supported_and_valid():
+    even_case = generate_case(124, profile="null_predicate_filter")
+    odd_case = generate_case(125, profile="null_predicate_filter")
+
+    for case in [even_case, odd_case]:
+        features = extract_case_features(case)
+        assert case.case_id.endswith("-null-predicate-filter")
+        assert [op["op"] for op in case.program.operations] == ["filter", "groupby", "sort", "limit"]
+        assert case.program.operations[0]["cmp"] in {"is_null", "is_not_null"}
+        assert "pattern:null_predicate_filter" in features
+        assert "filter:null-predicate" in features
+        assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/4978"
+        assert validate_case_program(case) == []
+
+    assert even_case.program.operations[0]["cmp"] == "is_null"
+    assert odd_case.program.operations[0]["cmp"] == "is_not_null"
 
 
 def test_repair_operations_keeps_safe_string_aggregations_only():

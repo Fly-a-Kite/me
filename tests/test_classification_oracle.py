@@ -331,6 +331,44 @@ def test_classification_reference_understands_null_aware_truth_filter():
     assert classification.implicated_backends == ["datafusion"]
 
 
+def test_classification_does_not_treat_explicit_null_predicate_as_null_comparison_noise():
+    case = Case(
+        "case-reference-null-predicate",
+        32,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int"), ColumnSpec("s", "str")],
+                [{"id": 1, "s": "alpha"}, {"id": 2, "s": None}],
+            )
+        ],
+        Program("prog-reference-null-predicate", 32, [{"op": "filter", "column": "s", "cmp": "is_null", "value": None}]),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "filter_predicate",
+        "confidence": "high",
+        "suspicious_backends": ["datafusion"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["id", "s"], [[2, None]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["id", "s"], [[2, None]]),
+        "datafusion": NormalizedResult("datafusion", "ok", ["id", "s"], []),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "null_predicate_filter"},
+        ["pandas", "duckdb", "datafusion"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.false_positive is False
+
+
 def test_classification_reference_understands_join_null_key_topk():
     case = Case(
         "case-reference-join-null-key-topk",
@@ -487,6 +525,24 @@ def test_validate_case_accepts_typed_set_membership_filter():
     assert validate_case_program(valid) == []
     assert any("must not contain NULL" in error for error in validate_case_program(invalid_null))
     assert any("not compatible with int column" in error for error in validate_case_program(invalid_type))
+
+
+def test_validate_case_accepts_explicit_null_predicate_filter():
+    valid = Case(
+        "case-null-predicate",
+        8,
+        [TableData("t0", [ColumnSpec("s", "str")], [{"s": "alpha"}, {"s": None}])],
+        Program("prog-null-predicate", 8, [{"op": "filter", "column": "s", "cmp": "is_null", "value": None}]),
+    )
+    invalid_literal = Case(
+        "case-null-predicate-literal",
+        9,
+        [TableData("t0", [ColumnSpec("s", "str")], [{"s": "alpha"}])],
+        Program("prog-null-predicate-literal", 9, [{"op": "filter", "column": "s", "cmp": "is_not_null", "value": "alpha"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("must be NULL for is_not_null" in error for error in validate_case_program(invalid_literal))
 
 
 def test_validate_case_rejects_duplicate_select_columns():

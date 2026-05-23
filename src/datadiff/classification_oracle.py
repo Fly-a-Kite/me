@@ -491,6 +491,8 @@ def _filter_literal_error(column_type: str, comparator: Any, value: Any) -> str:
             if item_error:
                 return item_error
         return ""
+    if parsed is not None and parsed.base in {"is_null", "is_not_null"}:
+        return "" if value is None else f"filter literal {value!r} must be NULL for {parsed.base}"
     if value is None:
         return ""
     return _scalar_filter_literal_error(column_type, value)
@@ -855,9 +857,16 @@ def _case_uses_modulo(case: Case) -> bool:
 
 def _case_has_null_filter_literal(case: Case) -> bool:
     return any(
-        op.get("op") == "filter" and op.get("value") is None
+        op.get("op") == "filter"
+        and op.get("value") is None
+        and _filter_comparator_base(op) not in {"is_null", "is_not_null"}
         for op in case.program.operations
     )
+
+
+def _filter_comparator_base(op: dict[str, Any]) -> str:
+    parsed = parse_filter_comparator(op.get("cmp"))
+    return parsed.base if parsed is not None else ""
 
 
 def _case_contains_non_ascii_string(case: Case) -> bool:

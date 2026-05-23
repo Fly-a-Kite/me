@@ -284,6 +284,10 @@ def _polars_filter_expr(col, comparator: str, value):
         raise ValueError(comparator)
     if parsed.base == "in_set":
         expr = col.is_in(list(value))
+    elif parsed.base == "is_null":
+        expr = col.is_null()
+    elif parsed.base == "is_not_null":
+        expr = col.is_not_null()
     elif parsed.base == ">":
         expr = col > value
     elif parsed.base == ">=":
