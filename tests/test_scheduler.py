@@ -40,6 +40,69 @@ def test_local_source_scheduler_prefers_feedback_after_productive_mutation():
     assert snapshot["feedback_mutation"]["mean_reward"] > snapshot["generated"]["mean_reward"]
 
 
+def test_local_source_scheduler_discounts_repeated_candidate_bug_family():
+    scheduler = LocalSourceScheduler(exploration_weight=0.0)
+
+    first_reward = scheduler.record_result(
+        "generated",
+        has_finding=True,
+        is_new_behavior=True,
+        preflight_valid=True,
+        fallback_used=False,
+        candidate_bug=True,
+        candidate_bug_families=["topk_filter_pushdown@datafusion"],
+        candidate_bug_signatures=["sig-a"],
+    )
+    repeated_family_reward = scheduler.record_result(
+        "generated",
+        has_finding=True,
+        is_new_behavior=True,
+        preflight_valid=True,
+        fallback_used=False,
+        candidate_bug=True,
+        candidate_bug_families=["topk_filter_pushdown@datafusion"],
+        candidate_bug_signatures=["sig-b"],
+    )
+    repeated_signature_reward = scheduler.record_result(
+        "generated",
+        has_finding=True,
+        is_new_behavior=False,
+        preflight_valid=True,
+        fallback_used=False,
+        candidate_bug=True,
+        candidate_bug_families=["topk_filter_pushdown@datafusion"],
+        candidate_bug_signatures=["sig-b"],
+    )
+
+    assert first_reward == 4.5
+    assert 0.0 < repeated_signature_reward < repeated_family_reward < first_reward
+    snapshot = {row["source"]: row for row in scheduler.snapshot()}
+    assert snapshot["generated"]["candidate_bug_family_count"] == 1
+    assert snapshot["generated"]["candidate_bug_signature_count"] == 2
+
+
+def test_local_source_scheduler_keeps_feedback_mutation_sampling_floor():
+    scheduler = LocalSourceScheduler(exploration_weight=0.0, min_feedback_share=0.20)
+
+    for _ in range(10):
+        scheduler.record_result(
+            "generated",
+            has_finding=False,
+            is_new_behavior=True,
+            preflight_valid=True,
+            fallback_used=False,
+        )
+    scheduler.record_result(
+        "feedback_mutation",
+        has_finding=False,
+        is_new_behavior=False,
+        preflight_valid=True,
+        fallback_used=False,
+    )
+
+    assert scheduler.choose_source(feedback_available=True) == "feedback_mutation"
+
+
 def test_adaptive_budget_scheduler_warmup_then_exploits_high_reward_arm():
     scheduler = AdaptiveBudgetScheduler(
         [

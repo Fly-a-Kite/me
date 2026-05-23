@@ -11,6 +11,13 @@ from datadiff.dsl import Case, Program, TableData, normalize_sort_keys
 from datadiff.identifiers import make_safe_output_name
 from datadiff.util import unique_preserve_order
 
+INHERITED_METADATA_KEYS = (
+    "generator_profile",
+    "mixed_generator_profile",
+    "source_issue",
+    "source_issue_alt",
+)
+
 
 @dataclass(slots=True)
 class MutationResult:
@@ -46,20 +53,24 @@ def mutate_case_with_metadata(case: Case, seed: int) -> MutationResult:
     parent_lineage = case.metadata.get("seed_lineage", {}) if isinstance(case.metadata, dict) else {}
     root_seed = parent_lineage.get("root_seed", case.seed)
     depth = int(parent_lineage.get("depth", 0) or 0) + 1
-    metadata = {
-        "seed_lineage": {
-            "root_seed": root_seed,
-            "parent_seed": case.seed,
-            "parent_case_id": case.case_id,
-            "mutation_seed": seed,
-            "depth": depth,
-        },
-        "mutation": {
-            "operator": choice,
-            "detail": detail,
-            "changed": changed,
-        },
-    }
+    metadata = _inherited_metadata(case.metadata)
+    metadata.update(
+        {
+            "candidate_source": "feedback_mutation",
+            "seed_lineage": {
+                "root_seed": root_seed,
+                "parent_seed": case.seed,
+                "parent_case_id": case.case_id,
+                "mutation_seed": seed,
+                "depth": depth,
+            },
+            "mutation": {
+                "operator": choice,
+                "detail": detail,
+                "changed": changed,
+            },
+        }
+    )
     program = Program(
         program_id=f"{case.program.program_id}-mut-{seed}",
         seed=seed,
@@ -73,6 +84,12 @@ def mutate_case_with_metadata(case: Case, seed: int) -> MutationResult:
         metadata=metadata,
     )
     return MutationResult(mutated, metadata)
+
+
+def _inherited_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(metadata, dict):
+        return {}
+    return {key: copy.deepcopy(metadata[key]) for key in INHERITED_METADATA_KEYS if key in metadata}
 
 
 def _mutate_scalar_value(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:

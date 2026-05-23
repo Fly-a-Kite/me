@@ -68,6 +68,8 @@ class FeedbackState:
         candidate_bug: bool = False,
         semantic_divergence: bool = False,
         false_positive: bool = False,
+        candidate_bug_families: list[str] | None = None,
+        candidate_bug_signatures: list[str] | None = None,
     ) -> float | None:
         if self.source_scheduler is None:
             self.last_source_reward = None
@@ -81,6 +83,8 @@ class FeedbackState:
             candidate_bug=candidate_bug,
             semantic_divergence=semantic_divergence,
             false_positive=false_positive,
+            candidate_bug_families=candidate_bug_families,
+            candidate_bug_signatures=candidate_bug_signatures,
         )
         self.last_source_reward = reward
         return reward

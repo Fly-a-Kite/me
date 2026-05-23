@@ -1,6 +1,7 @@
 from datadiff.datagen import generate_case
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
-from datadiff.guidance import GuidanceState, extract_case_features, parse_guidance_targets
+from datadiff.guidance import GuidanceState, _guidance_reward, extract_case_features, parse_guidance_targets
+from datadiff.mutator import mutate_case_with_metadata
 
 
 def _case(seed: int, operations: list[dict]) -> Case:
@@ -614,6 +615,85 @@ def test_guidance_updates_online_feature_weights_from_feedback():
     assert after.score_breakdown["online_weight_updates"] == 1.0
     assert guidance.online_weights.multiplier("combo:filter_mutate_select_sort_limit") > 1.0
     assert after.online_weights
+
+
+def test_guidance_reward_discounts_repeated_candidate_bug_family():
+    row = {
+        "findings": [
+            {
+                "root_cause": "topk_filter_pushdown",
+                "triage_verdict": "candidate_implementation_bug",
+                "suspicious_backends": ["datafusion"],
+                "signature": "sig-a",
+            }
+        ],
+        "is_new_behavior": True,
+        "preflight": {"valid": True, "fallback_used": False},
+    }
+
+    fresh = _guidance_reward(row)
+    repeated = _guidance_reward(
+        row,
+        root_cause_counts={"topk_filter_pushdown": 12},
+        candidate_bug_family_counts={"topk_filter_pushdown@datafusion": 12},
+        candidate_bug_signature_counts={"sig-a": 1},
+    )
+
+    assert fresh == 4.5
+    assert 0.0 < repeated < 1.0
+
+
+def test_guidance_features_keep_feedback_mutation_issue_profile():
+    base = generate_case(260000, profile="bughunt")
+
+    mutated = mutate_case_with_metadata(base, 260001).case
+    features = extract_case_features(mutated)
+
+    assert "source:feedback_mutation" in features
+    assert "mutation_depth:one" in features
+    assert "generator_profile:bughunt" in features
+    assert f"mixed_generator_profile:{base.metadata['mixed_generator_profile']}" in features
+
+
+def test_guidance_moves_off_repeated_bughunt_template_findings():
+    repeated_template = generate_case(55, profile="bughunt")
+    alternate_template = generate_case(56, profile="bughunt")
+    guidance = GuidanceState(
+        targets=[
+            "common_workflow",
+            "operation_combo",
+            "join",
+            "groupby",
+            "mutate",
+            "filter",
+            "aggregation",
+            "sort_limit",
+            "topk",
+            "expressions",
+            "nulls",
+            "strings",
+        ]
+    )
+    for idx in range(8):
+        guidance.record_result(
+            repeated_template,
+            {
+                "findings": [
+                    {
+                        "root_cause": "topk_filter_pushdown",
+                        "triage_verdict": "candidate_implementation_bug",
+                        "suspicious_backends": ["datafusion"],
+                        "signature": f"sig-{idx}",
+                    }
+                ]
+            },
+        )
+
+    repeated_decision = guidance.choose_case([repeated_template])
+    decision = guidance.choose_case([repeated_template, alternate_template])
+
+    assert repeated_decision.score_breakdown["profile_saturation_penalty"] < 0.0
+    assert decision.case is alternate_template
 
 
 def test_guidance_frontier_conformance_prefers_boundary_case():

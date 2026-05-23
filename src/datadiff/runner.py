@@ -22,7 +22,7 @@ from datadiff.oracle import PROBE_ROOTS, evaluate_case
 from datadiff.operation_combo import classify_operation_combo
 from datadiff.preflight import preflight_case
 from datadiff.quality_oracles import evaluate_quality_oracles
-from datadiff.reward import row_reward_signals
+from datadiff.reward import candidate_bug_family_keys, candidate_bug_signatures, row_reward_signals
 from datadiff.scheduler import LocalSourceScheduler
 from datadiff.targets import common_capabilities, describe_targets
 from datadiff.util import CORPUS_DIR, RUNS_DIR, JsonlWriter, append_jsonl, dump_json, ensure_dirs, run_meta_path, utc_now
@@ -566,6 +566,8 @@ def run_fuzz(
                 row["stored_in_feedback_corpus"] = False
                 row["feedback_corpus_persisted"] = False
             reward_signals = row_reward_signals(row)
+            row_candidate_families = list(candidate_bug_family_keys(row.get("findings") or []))
+            row_candidate_signatures = list(candidate_bug_signatures(row.get("findings") or []))
             row["source_reward"] = feedback.record_candidate_result(
                 selected_meta["source"],
                 has_finding=bool(row["findings"]),
@@ -574,6 +576,8 @@ def run_fuzz(
                 candidate_bug=bool(reward_signals["candidate_bug"]),
                 semantic_divergence=bool(reward_signals["semantic_divergence"]),
                 false_positive=bool(reward_signals["false_positive"]),
+                candidate_bug_families=row_candidate_families,
+                candidate_bug_signatures=row_candidate_signatures,
             )
             row["source_scheduler"] = _source_scheduler_snapshot(feedback)
         else:

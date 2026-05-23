@@ -102,6 +102,27 @@ def test_mutate_case_with_metadata_records_lineage_and_operator():
     assert isinstance(mutate_case(base, 100), Case)
 
 
+def test_mutate_case_preserves_issue_profile_metadata_for_guidance():
+    base = Case(
+        "case-template",
+        10,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}, {"x": None}])],
+        Program("prog-template", 10, [{"op": "limit", "n": 2}]),
+        metadata={
+            "generator_profile": "bughunt",
+            "mixed_generator_profile": "post_topk_range_filter",
+            "source_issue": "https://github.com/example/project/issues/1",
+        },
+    )
+
+    result = mutate_case_with_metadata(base, 99)
+
+    assert result.metadata["candidate_source"] == "feedback_mutation"
+    assert result.metadata["generator_profile"] == "bughunt"
+    assert result.metadata["mixed_generator_profile"] == "post_topk_range_filter"
+    assert result.metadata["source_issue"] == "https://github.com/example/project/issues/1"
+
+
 def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert {"value", "nullify_value", "duplicate_row", "drop_row", "shuffle_rows"}.issubset(MUTATION_OPERATOR_NAMES)
     assert {"append_op", "drop_op", "tweak_op"}.issubset(MUTATION_OPERATOR_NAMES)

@@ -10,7 +10,9 @@ from datadiff.reward import (
     FALSE_POSITIVE_VERDICTS,
     NEEDS_CONFIRMATION_VERDICTS,
     SEMANTIC_DIVERGENCE_VERDICTS,
+    candidate_bug_family_keys,
     is_candidate_bug_finding,
+    suspicious_key,
 )
 from datadiff.util import load_json, read_jsonl, run_meta_path
 
@@ -75,6 +77,8 @@ class SourceArmState:
     name: CandidateSource
     pulls: int = 0
     total_reward: float = 0.0
+    candidate_bug_families: Counter[str] = field(default_factory=Counter)
+    candidate_bug_signatures: Counter[str] = field(default_factory=Counter)
 
     @property
     def mean_reward(self) -> float:
@@ -82,9 +86,12 @@ class SourceArmState:
 
 
 class LocalSourceScheduler:
-    def __init__(self, *, exploration_weight: float = 0.5) -> None:
+    def __init__(self, *, exploration_weight: float = 0.5, min_feedback_share: float = 0.12) -> None:
         self.exploration_weight = max(0.0, float(exploration_weight))
+        self.min_feedback_share = min(0.5, max(0.0, float(min_feedback_share)))
         self.total_pulls = 0
+        self.candidate_bug_families: Counter[str] = Counter()
+        self.candidate_bug_signatures: Counter[str] = Counter()
         self.arms: dict[CandidateSource, SourceArmState] = {
             "generated": SourceArmState(name="generated"),
             "feedback_mutation": SourceArmState(name="feedback_mutation"),
@@ -96,6 +103,9 @@ class LocalSourceScheduler:
         for source in ("generated", "feedback_mutation"):
             if self.arms[source].pulls == 0:
                 return source
+        feedback_pulls = self.arms["feedback_mutation"].pulls
+        if self.total_pulls >= 4 and feedback_pulls / max(1, self.total_pulls) < self.min_feedback_share:
+            return "feedback_mutation"
         return max(self.arms.values(), key=self._score_arm).name
 
     def record_result(
@@ -109,9 +119,23 @@ class LocalSourceScheduler:
         candidate_bug: bool = False,
         semantic_divergence: bool = False,
         false_positive: bool = False,
+        candidate_bug_families: list[str] | None = None,
+        candidate_bug_signatures: list[str] | None = None,
     ) -> float:
+        family_keys = _unique_nonempty(candidate_bug_families or [])
+        signature_keys = _unique_nonempty(candidate_bug_signatures or [])
+        candidate_bug_reward = 0.0
+        if candidate_bug:
+            if family_keys:
+                candidate_bug_reward = sum(
+                    _candidate_family_reward(self.candidate_bug_families[family]) for family in family_keys
+                )
+                if signature_keys and all(self.candidate_bug_signatures[signature] > 0 for signature in signature_keys):
+                    candidate_bug_reward *= 0.5
+            else:
+                candidate_bug_reward = 4.0
         reward = (
-            (4.0 if candidate_bug else 0.0)
+            candidate_bug_reward
             + (0.20 if semantic_divergence else 0.0)
             + (0.05 if has_finding and not candidate_bug and not semantic_divergence and not false_positive else 0.0)
             + (0.5 if is_new_behavior else 0.0)
@@ -124,6 +148,10 @@ class LocalSourceScheduler:
         arm = self.arms[source]
         arm.pulls += 1
         arm.total_reward += reward
+        arm.candidate_bug_families.update(family_keys)
+        arm.candidate_bug_signatures.update(signature_keys)
+        self.candidate_bug_families.update(family_keys)
+        self.candidate_bug_signatures.update(signature_keys)
         self.total_pulls += 1
         return reward
 
@@ -134,6 +162,9 @@ class LocalSourceScheduler:
                 "pulls": arm.pulls,
                 "mean_reward": arm.mean_reward,
                 "total_reward": arm.total_reward,
+                "candidate_bug_family_count": len(arm.candidate_bug_families),
+                "candidate_bug_signature_count": len(arm.candidate_bug_signatures),
+                "min_feedback_share": self.min_feedback_share,
             }
             for arm in sorted(self.arms.values(), key=lambda item: item.name)
         ]
@@ -335,7 +366,7 @@ def summarize_batch_run(run_file: Path) -> BatchObservation:
         new_behavior_cases += int(bool(row.get("is_new_behavior")))
         if any(is_candidate_bug_finding(finding) for finding in row_findings):
             candidate_bug_cases += 1
-        candidate_bug_families.update(_candidate_bug_family_keys(row_findings))
+        candidate_bug_families.update(candidate_bug_family_keys(row_findings))
         for finding in row_findings:
             verdict = str(finding.get("triage_verdict", "unclassified"))
             if verdict in SEMANTIC_DIVERGENCE_VERDICTS:
@@ -405,29 +436,31 @@ def _batch_reward(
 
 
 def _candidate_bug_family_keys(findings: list[dict[str, Any]]) -> Counter[str]:
-    keys: Counter[str] = Counter()
-    root_by_suspicious: dict[str, str] = {}
-    for finding in findings:
-        if not is_candidate_bug_finding(finding):
-            continue
-        root = str(finding.get("root_cause", "unknown"))
-        if root.startswith("metamorphic_"):
-            continue
-        suspicious = _suspicious_key(finding)
-        root_by_suspicious.setdefault(suspicious, root)
-    for finding in findings:
-        if not is_candidate_bug_finding(finding):
-            continue
-        root = str(finding.get("root_cause", "unknown"))
-        suspicious = _suspicious_key(finding)
-        if root.startswith("metamorphic_") and suspicious in root_by_suspicious:
-            root = root_by_suspicious[suspicious]
-        keys[f"{root}@{suspicious}"] += 1
-    return keys
+    return candidate_bug_family_keys(findings)
 
 
 def _suspicious_key(finding: dict[str, Any]) -> str:
-    return ",".join(sorted(finding.get("suspicious_backends", []) or [])) or "unknown"
+    return suspicious_key(finding)
+
+
+def _candidate_family_reward(previous_hits: int) -> float:
+    if previous_hits <= 0:
+        return 4.0
+    if previous_hits <= 2:
+        return 1.25
+    return max(0.15, 0.75 / math.sqrt(previous_hits))
+
+
+def _unique_nonempty(values: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        item = str(value).strip()
+        if not item or item in seen:
+            continue
+        out.append(item)
+        seen.add(item)
+    return out
 
 
 def _first_candidate_bug_position(rows: list[dict[str, Any]]) -> tuple[int | None, float | None]:

@@ -9,7 +9,12 @@ from typing import Any
 from datadiff.dsl import Case, normalize_sort_keys
 from datadiff.filtering import evaluate_filter_predicate, parse_filter_comparator
 from datadiff.operation_combo import classify_operation_combo
-from datadiff.reward import online_case_reward
+from datadiff.reward import (
+    candidate_bug_family_keys,
+    candidate_bug_signatures,
+    is_candidate_bug_finding,
+    row_reward_signals,
+)
 from datadiff.running import sort_rows_for_running, stable_running_sum_values
 from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
@@ -168,6 +173,20 @@ def extract_case_features(case: Case) -> set[str]:
     mixed_generator_profile = str(case.metadata.get("mixed_generator_profile", "")).strip()
     if mixed_generator_profile:
         features.add(f"mixed_generator_profile:{mixed_generator_profile}")
+    candidate_source = str(case.metadata.get("candidate_source", "")).strip()
+    if candidate_source:
+        features.add(f"source:{candidate_source}")
+    seed_lineage = case.metadata.get("seed_lineage", {})
+    if isinstance(seed_lineage, dict):
+        depth = int(seed_lineage.get("depth", 0) or 0)
+        if depth > 0:
+            features.add("source:feedback_mutation")
+            features.add(_bucket("mutation_depth", depth, [(1, "one"), (3, "shallow")], "deep"))
+    mutation = case.metadata.get("mutation", {})
+    if isinstance(mutation, dict):
+        operator_name = str(mutation.get("operator", "")).strip()
+        if operator_name and operator_name != "generated":
+            features.add(f"mutation_op:{operator_name}")
     row_count = len(table.rows)
     col_count = len(table.columns)
     features.add(_bucket("rows", row_count, [(0, "empty"), (3, "tiny"), (10, "small"), (20, "medium")], "large"))
@@ -668,6 +687,8 @@ class GuidanceState:
     feature_counts: Counter[str] = field(default_factory=Counter)
     finding_feature_counts: Counter[str] = field(default_factory=Counter)
     root_cause_counts: Counter[str] = field(default_factory=Counter)
+    candidate_bug_family_counts: Counter[str] = field(default_factory=Counter)
+    candidate_bug_signature_counts: Counter[str] = field(default_factory=Counter)
     frontier_bucket_counts: Counter[str] = field(default_factory=Counter)
     online_weights: OnlineFeatureWeights = field(default_factory=OnlineFeatureWeights)
 
@@ -684,16 +705,7 @@ class GuidanceState:
             decision.pruned_candidate_count = pruned
         targeted = [decision for decision in contributing if decision.matched_targets]
         if targeted:
-            return max(
-                targeted,
-                key=lambda decision: (
-                    decision.score_breakdown.get("specific_target_matches", 0.0),
-                    decision.score_breakdown.get("target_priority", float(len(decision.matched_targets))),
-                    decision.score,
-                    len(decision.matched_targets),
-                    -decision.case.seed,
-                ),
-            )
+            return max(targeted, key=_targeted_decision_key)
         return max(contributing, key=lambda decision: (decision.score, -decision.case.seed))
 
     def record_result(self, case: Case, row: dict[str, Any]) -> None:
@@ -701,13 +713,23 @@ class GuidanceState:
         self.feature_counts.update(features)
         _, frontier_buckets = _frontier_signature(case)
         self.frontier_bucket_counts.update(frontier_buckets)
-        self.online_weights.record(features, _guidance_reward(row))
+        self.online_weights.record(
+            features,
+            _guidance_reward(
+                row,
+                root_cause_counts=self.root_cause_counts,
+                candidate_bug_family_counts=self.candidate_bug_family_counts,
+                candidate_bug_signature_counts=self.candidate_bug_signature_counts,
+            ),
+        )
         findings = row.get("findings") or []
         if findings:
             self.finding_feature_counts.update(features)
             for finding in findings:
                 root = str(finding.get("root_cause", "unknown"))
                 self.root_cause_counts[root] += 1
+            self.candidate_bug_family_counts.update(candidate_bug_family_keys(findings))
+            self.candidate_bug_signature_counts.update(candidate_bug_signatures(findings))
 
     def _score_case(self, case: Case, candidate_count: int) -> GuidanceDecision:
         features = extract_case_features(case)
@@ -738,12 +760,19 @@ class GuidanceState:
             / math.sqrt(max(1, len(features)))
             * 0.08
         )
+        profile_saturation_penalty = sum(
+            _profile_saturation(self.finding_feature_counts[f])
+            for f in features
+            if f.startswith("mixed_generator_profile:")
+        )
         root_saturation_penalty = sum(
             _root_saturation(self.root_cause_counts[root]) for root in _predicted_roots(features)
         )
         if matched_targets:
-            feature_saturation_penalty *= 0.35
-            root_saturation_penalty *= 0.35
+            saturation_multiplier = 0.35 if specific_target_matches else 0.85
+            feature_saturation_penalty *= saturation_multiplier
+            root_saturation_penalty *= saturation_multiplier
+            profile_saturation_penalty *= saturation_multiplier
         contribution_potential = _contribution_potential(
             features,
             frontier_buckets,
@@ -772,7 +801,7 @@ class GuidanceState:
             + finding_yield_bonus
             + combo_priority
         )
-        score -= feature_saturation_penalty + root_saturation_penalty
+        score -= feature_saturation_penalty + root_saturation_penalty + profile_saturation_penalty
         return GuidanceDecision(
             case=case,
             score=score,
@@ -798,6 +827,7 @@ class GuidanceState:
                 "online_weight_updates": float(self.online_weights.total_updates),
                 "feature_saturation_penalty": -feature_saturation_penalty,
                 "root_saturation_penalty": -root_saturation_penalty,
+                "profile_saturation_penalty": -profile_saturation_penalty,
             },
         )
 
@@ -815,6 +845,14 @@ class GuidanceState:
         if frontier_conformance >= 0.80:
             return True
         return contribution_potential >= 1.15
+
+
+def _targeted_decision_key(decision: GuidanceDecision) -> tuple[float, float, float, float, int]:
+    specific_matches = decision.score_breakdown.get("specific_target_matches", 0.0)
+    target_priority = decision.score_breakdown.get("target_priority", float(len(decision.matched_targets)))
+    if specific_matches > 0.0:
+        return (1.0, specific_matches, target_priority, decision.score, -decision.case.seed)
+    return (0.0, decision.score, target_priority, float(len(decision.matched_targets)), -decision.case.seed)
 
 
 def _matched_targets(features: set[str], targets: list[str]) -> list[str]:
@@ -897,13 +935,85 @@ def _feature_saturation(count: int) -> float:
 
 
 def _root_saturation(count: int) -> float:
-    if count <= 20:
+    if count <= 6:
         return 0.0
-    return math.log1p(count - 20) * 0.22
+    return math.log1p(count - 6) * 0.45
 
 
-def _guidance_reward(row: dict[str, Any]) -> float:
-    return online_case_reward(row)
+def _profile_saturation(count: int) -> float:
+    if count <= 3:
+        return 0.0
+    return min(4.0, math.log1p(count - 3) * 1.15)
+
+
+def _guidance_reward(
+    row: dict[str, Any],
+    *,
+    root_cause_counts: Counter[str] | None = None,
+    candidate_bug_family_counts: Counter[str] | None = None,
+    candidate_bug_signature_counts: Counter[str] | None = None,
+) -> float:
+    findings = row.get("findings") or []
+    signals = row_reward_signals(row)
+    reward = (
+        _candidate_bug_guidance_reward(
+            findings,
+            root_cause_counts=root_cause_counts or Counter(),
+            candidate_bug_family_counts=candidate_bug_family_counts or Counter(),
+            candidate_bug_signature_counts=candidate_bug_signature_counts or Counter(),
+        )
+        + 0.20 * signals["semantic_divergence_count"]
+        + (0.5 if row.get("is_new_behavior") else 0.0)
+        - 0.25 * signals["needs_confirmation_count"]
+        - 2.5 * signals["false_positive_count"]
+    )
+    preflight = row.get("preflight") or {}
+    if not bool(preflight.get("valid", True)) or bool(preflight.get("fallback_used", False)):
+        reward -= 0.5
+    if reward == 0.0:
+        reward -= 0.1
+    return reward
+
+
+def _candidate_bug_guidance_reward(
+    findings: list[dict[str, Any]],
+    *,
+    root_cause_counts: Counter[str],
+    candidate_bug_family_counts: Counter[str],
+    candidate_bug_signature_counts: Counter[str],
+) -> float:
+    families = candidate_bug_family_keys(findings)
+    signatures = candidate_bug_signatures(findings)
+    if families:
+        reward = 0.0
+        for family in families:
+            root = family.split("@", 1)[0]
+            previous_hits = max(candidate_bug_family_counts[family], root_cause_counts[root])
+            reward += _candidate_bug_novelty_reward(previous_hits)
+        if signatures:
+            duplicate_signatures = sum(1 for signature in signatures if candidate_bug_signature_counts[signature] > 0)
+            if duplicate_signatures == len(signatures):
+                reward *= 0.35
+            elif duplicate_signatures:
+                reward *= 0.75
+        return reward
+    reward = 0.0
+    for finding in findings:
+        if not is_candidate_bug_finding(finding):
+            continue
+        root = str(finding.get("root_cause", "unknown"))
+        reward += _candidate_bug_novelty_reward(root_cause_counts[root])
+    return reward
+
+
+def _candidate_bug_novelty_reward(previous_hits: int) -> float:
+    if previous_hits <= 0:
+        return 4.0
+    if previous_hits <= 2:
+        return 1.5
+    if previous_hits <= 8:
+        return 0.75 / math.sqrt(previous_hits)
+    return 0.10
 
 
 def _finding_feature_weight(feature: str, online_weights: OnlineFeatureWeights | None = None) -> float:
@@ -1306,7 +1416,7 @@ def _contribution_potential(
     data_novelty = sum(1 for feature in features if _is_data_sensitivity_feature(feature) and feature_counts[feature] == 0)
     frontier_novelty = sum(1 for bucket in frontier_buckets if frontier_bucket_counts[bucket] == 0)
     root_novelty = sum(1 for root in _predicted_roots(features) if root_cause_counts[root] == 0)
-    root_saturation = sum(1 for root in _predicted_roots(features) if root_cause_counts[root] >= 40)
+    root_saturation = sum(1 for root in _predicted_roots(features) if root_cause_counts[root] >= 12)
     return (
         frontier_conformance
         + 0.30 * path_novelty

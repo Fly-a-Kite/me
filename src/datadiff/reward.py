@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from typing import Any
 
 CANDIDATE_BUG_VERDICT = "candidate_implementation_bug"
@@ -28,6 +29,42 @@ def is_semantic_divergence_finding(finding: dict[str, Any]) -> bool:
 
 def is_false_positive_finding(finding: dict[str, Any]) -> bool:
     return bool(finding.get("false_positive")) or str(finding.get("triage_verdict", "unclassified")) in FALSE_POSITIVE_VERDICTS
+
+
+def suspicious_key(finding: dict[str, Any]) -> str:
+    return ",".join(sorted(finding.get("suspicious_backends", []) or [])) or "unknown"
+
+
+def candidate_bug_family_keys(findings: list[dict[str, Any]]) -> Counter[str]:
+    keys: Counter[str] = Counter()
+    root_by_suspicious: dict[str, str] = {}
+    for finding in findings:
+        if not is_candidate_bug_finding(finding):
+            continue
+        root = str(finding.get("root_cause", "unknown"))
+        if root.startswith("metamorphic_"):
+            continue
+        root_by_suspicious.setdefault(suspicious_key(finding), root)
+    for finding in findings:
+        if not is_candidate_bug_finding(finding):
+            continue
+        root = str(finding.get("root_cause", "unknown"))
+        suspicious = suspicious_key(finding)
+        if root.startswith("metamorphic_") and suspicious in root_by_suspicious:
+            root = root_by_suspicious[suspicious]
+        keys[f"{root}@{suspicious}"] += 1
+    return keys
+
+
+def candidate_bug_signatures(findings: list[dict[str, Any]]) -> Counter[str]:
+    signatures: Counter[str] = Counter()
+    for finding in findings:
+        if not is_candidate_bug_finding(finding):
+            continue
+        signature = str(finding.get("signature", "")).strip()
+        if signature:
+            signatures[signature] += 1
+    return signatures
 
 
 def row_reward_signals(row: dict[str, Any]) -> dict[str, Any]:
