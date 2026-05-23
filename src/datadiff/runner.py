@@ -166,6 +166,7 @@ def _compact_log_row(row: dict[str, Any], log_level: str) -> dict[str, Any]:
         "feedback_corpus_persisted": row.get("feedback_corpus_persisted", False),
         "feedback_eligible": row.get("feedback_eligible", True),
         "feedback_skip_reason": row.get("feedback_skip_reason", ""),
+        "feedback_record_skip_reason": row.get("feedback_record_skip_reason", ""),
     }
     if log_level == "compact":
         out["normalized"] = _normalized_summary(row.get("normalized", {}))
@@ -206,7 +207,17 @@ CALIBRATION_PROBE_OPS = frozenset(PROBE_ROOTS) | {
 }
 
 
-def _feedback_storage_decision(case: Case) -> tuple[bool, str]:
+def _feedback_storage_decision(
+    case: Case,
+    *,
+    candidate_source: str = "generated",
+    seed_lineage: dict[str, Any] | None = None,
+) -> tuple[bool, str]:
+    lineage_depth = 0
+    if isinstance(seed_lineage, dict):
+        lineage_depth = int(seed_lineage.get("depth", 0) or 0)
+    if candidate_source == "feedback_mutation" or lineage_depth > 0:
+        return False, "feedback_mutation_child"
     if any(str(op.get("op", "")) in CALIBRATION_PROBE_OPS for op in case.program.operations):
         return False, "calibration_probe_case"
     return True, ""
@@ -558,19 +569,30 @@ def run_fuzz(
         row["is_new_behavior"] = sig not in seen
         seen.add(sig)
         if feedback is not None:
-            feedback_eligible, feedback_skip_reason = _feedback_storage_decision(case)
+            reward_signals = row_reward_signals(row)
+            row_candidate_families = list(candidate_bug_family_keys(row.get("findings") or []))
+            row_candidate_signatures = list(candidate_bug_signatures(row.get("findings") or []))
+            feedback_eligible, feedback_skip_reason = _feedback_storage_decision(
+                case,
+                candidate_source=selected_meta["source"],
+                seed_lineage=selected_meta["seed_lineage"],
+            )
             row["feedback_eligible"] = feedback_eligible
             row["feedback_skip_reason"] = feedback_skip_reason
             if feedback_eligible:
-                row["stored_in_feedback_corpus"] = feedback.record(case, sig, bool(row["findings"]))
+                row["stored_in_feedback_corpus"] = feedback.record(
+                    case,
+                    sig,
+                    bool(row["findings"]),
+                    candidate_bug_families=row_candidate_families,
+                )
                 row["feedback_corpus_persisted"] = feedback.last_persisted_to_disk
+                row["feedback_record_skip_reason"] = feedback.last_record_skip_reason
             else:
                 feedback.last_persisted_to_disk = False
                 row["stored_in_feedback_corpus"] = False
                 row["feedback_corpus_persisted"] = False
-            reward_signals = row_reward_signals(row)
-            row_candidate_families = list(candidate_bug_family_keys(row.get("findings") or []))
-            row_candidate_signatures = list(candidate_bug_signatures(row.get("findings") or []))
+                row["feedback_record_skip_reason"] = ""
             row["source_reward"] = feedback.record_candidate_result(
                 selected_meta["source"],
                 has_finding=bool(row["findings"]),
@@ -588,6 +610,7 @@ def run_fuzz(
             row["feedback_corpus_persisted"] = False
             row["feedback_eligible"] = False
             row["feedback_skip_reason"] = "feedback_disabled"
+            row["feedback_record_skip_reason"] = ""
             row["source_reward"] = None
             row["source_scheduler"] = []
         if guidance is not None:

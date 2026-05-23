@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from datadiff import feedback
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.feedback import FeedbackState
@@ -38,6 +40,32 @@ def test_feedback_persistence_limit_zero_disables_disk_writes(tmp_path, monkeypa
 
     assert state.last_persisted_to_disk is False
     assert not (tmp_path / "corpus" / "interesting").exists()
+
+
+def test_feedback_record_caps_candidate_bug_family_storage():
+    state = FeedbackState(max_cases_per_candidate_family=2)
+
+    assert state.record(
+        _case(1),
+        "0000000000000001",
+        True,
+        candidate_bug_families=["grouped_topk_null_sort_key@datafusion"],
+    )
+    assert state.record(
+        _case(2),
+        "0000000000000002",
+        True,
+        candidate_bug_families=["grouped_topk_null_sort_key@datafusion"],
+    )
+    assert not state.record(
+        _case(3),
+        "0000000000000003",
+        True,
+        candidate_bug_families=["grouped_topk_null_sort_key@datafusion"],
+    )
+
+    assert state.last_record_skip_reason == "candidate_family_saturated"
+    assert len(state.interesting_cases) == 2
 
 
 def test_feedback_source_scheduler_prefers_productive_mutations():
@@ -82,6 +110,45 @@ def test_feedback_source_scheduler_prefers_productive_mutations():
     third = state.choose_case(9, generated)
     assert third.case_id.endswith("-mut-9")
     assert state.last_candidate_source == "feedback_mutation"
+
+
+def test_feedback_mutation_falls_back_to_generated_when_attempts_do_not_change(monkeypatch):
+    scheduler = LocalSourceScheduler(exploration_weight=0.0)
+    state = FeedbackState(source_scheduler=scheduler, interesting_cases=[_case(1), _case(2)])
+    generated = _case(7)
+
+    state.record_candidate_result(
+        "generated",
+        has_finding=False,
+        is_new_behavior=False,
+        preflight={"valid": True, "fallback_used": False},
+    )
+
+    def unchanged_mutation(case, seed, *, allow_probe_operators=True):
+        metadata = {
+            "candidate_source": "feedback_mutation",
+            "seed_lineage": {
+                "root_seed": case.seed,
+                "parent_seed": case.seed,
+                "parent_case_id": case.case_id,
+                "mutation_seed": seed,
+                "depth": 1,
+            },
+            "mutation": {
+                "operator": "value",
+                "detail": "value:int:x",
+                "changed": False,
+            },
+        }
+        return SimpleNamespace(case=case, metadata=metadata)
+
+    monkeypatch.setattr(feedback, "mutate_case_with_metadata", unchanged_mutation)
+
+    selected = state.choose_case(8, generated)
+
+    assert selected.case_id == generated.case_id
+    assert state.last_candidate_source == "generated"
+    assert state.last_candidate_metadata["mutation"]["operator"] == "generated"
 
 
 def test_feedback_mutations_avoid_direct_probe_append_operators():

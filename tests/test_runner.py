@@ -969,6 +969,11 @@ def test_feedback_storage_skips_calibration_probe_cases():
     for probe_case in probe_cases:
         assert runner_module._feedback_storage_decision(probe_case) == (False, "calibration_probe_case")
     assert runner_module._feedback_storage_decision(ordinary_case) == (True, "")
+    assert runner_module._feedback_storage_decision(
+        ordinary_case,
+        candidate_source="feedback_mutation",
+        seed_lineage={"depth": 1},
+    ) == (False, "feedback_mutation_child")
 
 
 def test_run_fuzz_can_persist_generated_cases_and_checkpoint(tmp_path):
@@ -1086,6 +1091,8 @@ def test_run_fuzz_uses_feedback_source_marker_for_candidate_source(tmp_path, mon
     assert row["mutation"]["operator"] == "value"
     assert row["operation_combo"]["operation_count"] == len(row["case"]["program"]["operations"])
     assert row["source_reward"] == 1.25
+    assert row["stored_in_feedback_corpus"] is False
+    assert row["feedback_skip_reason"] == "feedback_mutation_child"
     assert case_log_row["seed_lineage"]["parent_case_id"] == "case-parent"
     assert case_log_row["mutation"]["operator"] == "value"
     assert "operation_combo" in case_log_row
