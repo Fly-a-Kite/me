@@ -90,7 +90,11 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     null_agg = _preset_config("null_agg_topk")
     filter_null_agg = _preset_config("filter_null_agg_topk")
     join_null_agg = _preset_config("join_null_agg_topk")
+    join_null_key = _preset_config("join_null_key_topk")
+    wide_offset = _preset_config("wide_offset_topk")
+    empty_filter_groupby = _preset_config("empty_filter_groupby")
     join_filter_groupby = _preset_config("join_filter_groupby")
+    join_null_truth_filter = _preset_config("join_null_truth_filter")
     join_groupby_stress = _preset_config("join_groupby_stress")
     storage_offset = _preset_config("storage_offset")
     float_group = _preset_config("float_group_key")
@@ -108,8 +112,16 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert {"filter", "aggregation", "nulls", "sort_limit", "expressions"}.issubset(filter_null_agg.guidance_targets)
     assert join_null_agg.generator_profile == "join_null_agg_topk"
     assert {"join", "aggregation", "nulls", "sort_limit"}.issubset(join_null_agg.guidance_targets)
+    assert join_null_key.generator_profile == "join_null_key_topk"
+    assert {"join", "groupby", "nulls", "sort_limit", "topk"}.issubset(join_null_key.guidance_targets)
+    assert wide_offset.generator_profile == "wide_offset_topk"
+    assert {"sort_offset", "offset", "topk"}.issubset(wide_offset.guidance_targets)
+    assert empty_filter_groupby.generator_profile == "empty_filter_groupby"
+    assert {"filter", "groupby", "aggregation", "empty"}.issubset(empty_filter_groupby.guidance_targets)
     assert join_filter_groupby.generator_profile == "join_filter_groupby"
     assert {"join", "filter", "groupby", "aggregation", "sort_limit"}.issubset(join_filter_groupby.guidance_targets)
+    assert join_null_truth_filter.generator_profile == "join_null_truth_filter"
+    assert {"join", "filter", "truth_filter", "nulls"}.issubset(join_null_truth_filter.guidance_targets)
     assert join_groupby_stress.generator_profile == "join_groupby_stress"
     assert {"join", "groupby", "aggregation", "global_aggregation"}.issubset(join_groupby_stress.guidance_targets)
     assert storage_offset.generator_profile == "storage_offset"

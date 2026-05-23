@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 from datadiff.datagen import repair_operations
 from datadiff.dsl import Case, Program, TableData, normalize_sort_keys
+from datadiff.identifiers import make_safe_output_name
 from datadiff.util import unique_preserve_order
 
 
@@ -176,6 +177,103 @@ def _tweak_random_operation(tables: list[TableData], operations: list[dict[str, 
     return _tweak_operation(tables, op, rnd)
 
 
+def _append_order_projection_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
+    if not tables:
+        return "append_order_projection:none"
+    available = _available_columns(tables, operations)
+    if len(available) < 2:
+        return "append_order_projection:too-few-columns"
+    primary = rnd.choice(available)
+    selected_candidates = [column for column in available if column != primary]
+    selected_count = rnd.randint(1, min(3, len(selected_candidates)))
+    selected = sorted(rnd.sample(selected_candidates, selected_count))
+    sort_columns = [primary] + sorted(column for column in available if column != primary)
+    operations.append(
+        {
+            "op": "sort",
+            "keys": [
+                {
+                    "column": column,
+                    "ascending": rnd.choice([True, False]),
+                    "nulls": rnd.choice(["first", "last"]),
+                }
+                for column in sort_columns
+            ],
+        }
+    )
+    operations.append({"op": "select", "columns": selected})
+    if rnd.random() < 0.75:
+        if rnd.random() < 0.70:
+            operations.append({"op": "limit", "n": rnd.randint(1, max(1, min(len(tables[0].rows) + 2, 8)))})
+            tail = "limit"
+        else:
+            operations.append({"op": "offset", "n": rnd.randint(0, 2)})
+            tail = "offset"
+    else:
+        tail = "none"
+    return f"append_order_projection:{primary}:tail={tail}"
+
+
+def _append_truth_filter_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
+    if not tables:
+        return "append_truth_filter:none"
+    available = _available_columns(tables, operations)
+    numeric = [column for column in available if _column_type(tables, column) in {"int", "float"}]
+    if not numeric:
+        return "append_truth_filter:no-numeric-column"
+    column = rnd.choice(numeric)
+    comparator = rnd.choice(["gt_is_not_true", "ge_is_not_true", "lt_is_not_false", "le_is_not_false"])
+    operations.append(
+        {
+            "op": "filter",
+            "column": column,
+            "cmp": comparator,
+            "value": _literal_for_type(_column_type(tables, column), rnd),
+        }
+    )
+    return f"append_truth_filter:{column}:{comparator}"
+
+
+def _append_grouped_topk_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
+    if not tables:
+        return "append_grouped_topk:none"
+    available = _available_columns(tables, operations)
+    if not available:
+        return "append_grouped_topk:no-columns"
+    numeric = [
+        column
+        for column in available
+        if _column_type(tables, column) in {"int", "float"} or column.startswith(("m_", "sum_", "min_", "max_", "count_"))
+    ]
+    if not numeric:
+        return "append_grouped_topk:no-numeric-column"
+    key = rnd.choice(numeric)
+    value = rnd.choice([column for column in numeric if column != key] or numeric)
+    alias = make_safe_output_name(f"count_{value}", used={key})
+    operations.extend(
+        [
+            {
+                "op": "groupby",
+                "keys": [key],
+                "aggs": [{"column": value, "func": "count", "as": alias}],
+            },
+            {"op": "select", "columns": [key]},
+            {
+                "op": "sort",
+                "keys": [
+                    {
+                        "column": key,
+                        "ascending": rnd.choice([True, False]),
+                        "nulls": rnd.choice(["first", "last"]),
+                    }
+                ],
+            },
+            {"op": "limit", "n": rnd.randint(1, max(1, min(len(tables[0].rows) + 2, 8)))},
+        ]
+    )
+    return f"append_grouped_topk:{key}:{value}"
+
+
 def _random_operation(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> dict[str, Any] | None:
     table = tables[0]
     available = _available_columns(tables, operations)
@@ -194,6 +292,8 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
         col = rnd.choice(available)
         typ = _column_type(tables, col)
         cmp = rnd.choice(["==", "!="] if typ in {"str", "bool"} else [">", ">=", "<", "<=", "==", "!="])
+        if typ in {"int", "float"} and rnd.random() < 0.20:
+            cmp = rnd.choice(["gt_is_not_true", "ge_is_not_true", "lt_is_not_false", "le_is_not_false"])
         return {"op": "filter", "column": col, "cmp": cmp, "value": _literal_for_type(typ, rnd)}
     if kind == "select":
         count = rnd.randint(1, len(available))
@@ -235,11 +335,13 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
         keys = [rnd.choice(available)]
         val = rnd.choice(numeric)
         func = rnd.choice(["sum", "min", "max", "count"])
-        return {"op": "groupby", "keys": keys, "aggs": [{"column": val, "func": func, "as": f"{func}_{val}"}]}
+        alias = make_safe_output_name(f"{func}_{val}", used=set(keys))
+        return {"op": "groupby", "keys": keys, "aggs": [{"column": val, "func": func, "as": alias}]}
     if kind == "aggregate" and numeric:
         val = rnd.choice(numeric)
         func = rnd.choice(["sum", "min", "max", "count"])
-        return {"op": "aggregate", "aggs": [{"column": val, "func": func, "as": f"{func}_{val}_all"}]}
+        alias = make_safe_output_name(f"{func}_{val}_all")
+        return {"op": "aggregate", "aggs": [{"column": val, "func": func, "as": alias}]}
     return None
 
 
@@ -317,6 +419,9 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("drop_row", _drop_row),
     MutationOperator("shuffle_rows", _shuffle_rows),
     MutationOperator("append_op", _append_operation),
+    MutationOperator("append_order_projection", _append_order_projection_probe),
+    MutationOperator("append_truth_filter", _append_truth_filter_probe),
+    MutationOperator("append_grouped_topk", _append_grouped_topk_probe),
     MutationOperator("drop_op", _drop_operation),
     MutationOperator("tweak_op", _tweak_random_operation),
 )

@@ -12,6 +12,10 @@ FALSE_POSITIVE_VERDICTS = {
     "generator_false_positive",
     "normalizer_false_positive",
 }
+NEEDS_CONFIRMATION_VERDICTS = {
+    "needs_manual_confirmation",
+    "semantic_divergence_needs_confirmation",
+}
 
 
 def is_candidate_bug_finding(finding: dict[str, Any]) -> bool:
@@ -31,6 +35,11 @@ def row_reward_signals(row: dict[str, Any]) -> dict[str, Any]:
     candidate_bug_count = sum(1 for finding in findings if is_candidate_bug_finding(finding))
     semantic_divergence_count = sum(1 for finding in findings if is_semantic_divergence_finding(finding))
     false_positive_count = sum(1 for finding in findings if is_false_positive_finding(finding))
+    needs_confirmation_count = sum(
+        1
+        for finding in findings
+        if str(finding.get("triage_verdict", "unclassified")) in NEEDS_CONFIRMATION_VERDICTS
+    )
     return {
         "candidate_bug": candidate_bug_count > 0,
         "candidate_bug_count": candidate_bug_count,
@@ -38,6 +47,8 @@ def row_reward_signals(row: dict[str, Any]) -> dict[str, Any]:
         "semantic_divergence_count": semantic_divergence_count,
         "false_positive": false_positive_count > 0,
         "false_positive_count": false_positive_count,
+        "needs_confirmation": needs_confirmation_count > 0,
+        "needs_confirmation_count": needs_confirmation_count,
     }
 
 
@@ -45,10 +56,11 @@ def online_case_reward(row: dict[str, Any]) -> float:
     signals = row_reward_signals(row)
     preflight = row.get("preflight") or {}
     reward = (
-        3.0 * signals["candidate_bug_count"]
-        + 0.35 * signals["semantic_divergence_count"]
+        4.0 * signals["candidate_bug_count"]
+        + 0.20 * signals["semantic_divergence_count"]
         + (0.5 if row.get("is_new_behavior") else 0.0)
-        - 1.5 * signals["false_positive_count"]
+        - 0.25 * signals["needs_confirmation_count"]
+        - 2.5 * signals["false_positive_count"]
     )
     if not bool(preflight.get("valid", True)) or bool(preflight.get("fallback_used", False)):
         reward -= 0.5

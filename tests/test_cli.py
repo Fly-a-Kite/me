@@ -153,6 +153,18 @@ def test_cli_parses_join_null_agg_topk_profile():
     assert args.profile == "join_null_agg_topk"
 
 
+def test_cli_parses_additional_issue_inspired_profiles():
+    parser = build_parser()
+    for profile in ["join_null_key_topk", "wide_offset_topk", "empty_filter_groupby"]:
+        args = parser.parse_args(["fuzz", "--profile", profile])
+        assert args.cmd == "fuzz"
+        assert args.profile == profile
+
+        args = parser.parse_args(["longrun", "--profile", profile])
+        assert args.cmd == "longrun"
+        assert args.profile == profile
+
+
 def test_cli_parses_join_filter_groupby_profile():
     parser = build_parser()
     args = parser.parse_args(["fuzz", "--profile", "join_filter_groupby"])
@@ -162,6 +174,17 @@ def test_cli_parses_join_filter_groupby_profile():
     args = parser.parse_args(["longrun", "--profile", "join_filter_groupby"])
     assert args.cmd == "longrun"
     assert args.profile == "join_filter_groupby"
+
+
+def test_cli_parses_join_null_truth_filter_profile():
+    parser = build_parser()
+    args = parser.parse_args(["fuzz", "--profile", "join_null_truth_filter"])
+    assert args.cmd == "fuzz"
+    assert args.profile == "join_null_truth_filter"
+
+    args = parser.parse_args(["longrun", "--profile", "join_null_truth_filter"])
+    assert args.cmd == "longrun"
+    assert args.profile == "join_null_truth_filter"
 
 
 def test_cli_parses_join_groupby_stress_profile():
@@ -362,9 +385,21 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("join_null_agg_topk").generator_profile == "join_null_agg_topk"
     assert _preset_config("join_null_agg_topk").guidance_targets[0] == "join_null_agg_topk"
     assert _preset_config("join_null_agg_topk_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("join_null_key_topk").generator_profile == "join_null_key_topk"
+    assert _preset_config("join_null_key_topk").guidance_targets[0] == "join_null_key_topk"
+    assert _preset_config("join_null_key_topk_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("wide_offset_topk").generator_profile == "wide_offset_topk"
+    assert _preset_config("wide_offset_topk").guidance_targets[0] == "wide_offset_topk"
+    assert _preset_config("wide_offset_topk_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("empty_filter_groupby").generator_profile == "empty_filter_groupby"
+    assert _preset_config("empty_filter_groupby").guidance_targets[0] == "empty_filter_groupby"
+    assert _preset_config("empty_filter_groupby_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("join_filter_groupby").generator_profile == "join_filter_groupby"
     assert _preset_config("join_filter_groupby").guidance_targets[0] == "join_filter_groupby"
     assert _preset_config("join_filter_groupby_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("join_null_truth_filter").generator_profile == "join_null_truth_filter"
+    assert _preset_config("join_null_truth_filter").guidance_targets[0] == "join_null_truth_filter"
+    assert _preset_config("join_null_truth_filter_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("join_groupby_stress").generator_profile == "join_groupby_stress"
     assert "global_aggregation" in _preset_config("join_groupby_stress").guidance_targets
     assert _preset_config("join_groupby_stress_metamorphic").enable_metamorphic_oracle is True
@@ -420,7 +455,7 @@ def test_cli_parses_live_datafusion_presets():
     assert live.guidance_candidate_pool == 12
     assert live.enable_local_source_scheduler is True
     assert live.local_source_exploration_weight == 0.35
-    assert {"common_workflow", "operation_combo", "topk", "join", "groupby"}.issubset(live.guidance_targets)
+    assert {"common_workflow", "operation_combo", "topk", "join", "groupby", "join_null_key_topk"}.issubset(live.guidance_targets)
 
     metamorphic = _preset_config("live_datafusion_metamorphic")
     assert metamorphic.enable_metamorphic_oracle is True
@@ -971,6 +1006,10 @@ def test_cli_historical_status_marks_counted_and_pending(capsys):
     assert by_id["duckdb-22656"]["counted"] is True
     assert by_id["duckdb-22656"]["target_suite"] == "duckdb_storage_cross"
     assert by_id["duckdb-3015"]["counted"] is False
+    assert by_id["duckdb-11261"]["counted"] is False
+    assert by_id["duckdb-11261"]["target_suite"] == "duckdb_storage_cross"
+    assert by_id["arrow-42231"]["counted"] is False
+    assert by_id["arrow-42231"]["target_suite"] == "arrow_cross"
     assert by_id["duckdb-3015"]["replay_kind"] == "fixture"
     assert by_id["duckdb-3015"]["fixture_env_status"] in {"set", "unset"}
 

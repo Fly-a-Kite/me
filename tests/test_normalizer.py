@@ -68,3 +68,19 @@ def test_order_sensitive_survives_limit_and_offset_after_sort():
     )
 
     assert program.order_sensitive is True
+
+
+def test_order_sensitive_survives_row_preserving_ops_after_sort():
+    program = Program(
+        "prog",
+        1,
+        [
+            {"op": "sort", "columns": ["x"], "ascending": False},
+            {"op": "filter", "column": "flag", "cmp": "==", "value": True},
+            {"op": "mutate", "column": "m", "expr": {"kind": "add_const", "source": "x", "value": 1}},
+            {"op": "select", "columns": ["m"]},
+            {"op": "limit", "n": 1},
+        ],
+    )
+
+    assert program.order_sensitive is True

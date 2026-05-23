@@ -127,6 +127,7 @@ HISTORICAL_BUGS: tuple[HistoricalBugSpec, ...] = (
             "bughunt_guided",
             "filter_null_agg_topk",
             "join_null_agg_topk",
+            "join_null_key_topk",
             "join_filter_groupby",
             "join_null_sort",
         ),
@@ -137,6 +138,70 @@ HISTORICAL_BUGS: tuple[HistoricalBugSpec, ...] = (
         notes=(
             "Tracked as pending until the upstream fix is merged/released and a vulnerable "
             "target version is recorded. Do not count as confirmed historical replay evidence yet."
+        ),
+    ),
+    HistoricalBugSpec(
+        bug_id="duckdb-11261",
+        project="duckdb/duckdb",
+        status="candidate",
+        target_suite="duckdb_storage_cross",
+        target_version="duckdb-pre-fix-resource-boundary",
+        fixed_version="",
+        issue_url="https://github.com/duckdb/duckdb/issues/11261",
+        default_presets=("wide_offset_topk",),
+        default_cases=10,
+        default_seeds=(11261,),
+        expected_root_causes=("ordering_or_limit",),
+        expected_suspicious_backends=("duckdb_persistent",),
+        notes=(
+            "Resource-sensitive ORDER BY/LIMIT/OFFSET over wide tables. The default "
+            "profile keeps row counts modest for CI and can be scaled manually for "
+            "performance replay; do not count as confirmed historical evidence."
+        ),
+        default_artifact_limit=0,
+        default_log_level="minimal",
+    ),
+    HistoricalBugSpec(
+        bug_id="arrow-42231",
+        project="apache/arrow",
+        status="candidate",
+        target_suite="arrow_cross",
+        target_version="pyarrow-pre-fix-large-groupby",
+        fixed_version="",
+        issue_url="https://github.com/apache/arrow/issues/42231",
+        default_presets=("join_groupby_stress",),
+        default_cases=5,
+        default_seeds=(42231,),
+        expected_root_causes=("groupby_aggregation",),
+        expected_suspicious_backends=("pyarrow",),
+        notes=(
+            "Targets PyArrow Table.group_by/aggregate key-collision behavior on larger "
+            "inputs using the existing join/groupby stress generator. Keep as a "
+            "candidate study until a vulnerable PyArrow version is pinned locally."
+        ),
+        default_artifact_limit=5,
+        default_log_level="minimal",
+    ),
+    HistoricalBugSpec(
+        bug_id="datafusion-22441",
+        project="apache/datafusion",
+        status="pending_merge",
+        target_suite="datafusion_cross",
+        target_version="datafusion-cli-v53.1.0",
+        fixed_version="pending-upstream-fix",
+        issue_url="https://github.com/apache/datafusion/issues/22441",
+        default_presets=(
+            "join_null_truth_filter",
+            "bughunt_guided",
+        ),
+        default_cases=500,
+        default_seeds=(1, 1001, 2001),
+        expected_root_causes=("outer_join_truth_filter",),
+        expected_suspicious_backends=("datafusion",),
+        notes=(
+            "Targets LEFT JOIN rows preserved by NOT ((right_col > literal) IS TRUE). "
+            "Do not count as confirmed historical replay evidence until an upstream fix "
+            "or documented expected behavior is available."
         ),
     ),
 )

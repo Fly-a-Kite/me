@@ -8,6 +8,7 @@ from typing import Any, Literal
 
 from datadiff.reward import (
     FALSE_POSITIVE_VERDICTS,
+    NEEDS_CONFIRMATION_VERDICTS,
     SEMANTIC_DIVERGENCE_VERDICTS,
     is_candidate_bug_finding,
 )
@@ -25,6 +26,7 @@ class BatchObservation:
     candidate_bug_families: set[str] = field(default_factory=set)
     semantic_divergence_count: int = 0
     false_positive_count: int = 0
+    needs_confirmation_count: int = 0
     new_behavior_cases: int = 0
     first_candidate_bug_case_index: int | None = None
     first_candidate_bug_elapsed_s: float | None = None
@@ -109,14 +111,14 @@ class LocalSourceScheduler:
         false_positive: bool = False,
     ) -> float:
         reward = (
-            (3.0 if candidate_bug else 0.0)
-            + (0.35 if semantic_divergence else 0.0)
-            + (0.25 if has_finding and not candidate_bug and not semantic_divergence and not false_positive else 0.0)
+            (4.0 if candidate_bug else 0.0)
+            + (0.20 if semantic_divergence else 0.0)
+            + (0.05 if has_finding and not candidate_bug and not semantic_divergence and not false_positive else 0.0)
             + (0.5 if is_new_behavior else 0.0)
-            - (1.5 if false_positive else 0.0)
+            - (2.5 if false_positive else 0.0)
         )
         if not preflight_valid or fallback_used:
-            reward -= 0.5
+            reward -= 0.75
         if reward == 0.0:
             reward -= 0.1
         arm = self.arms[source]
@@ -325,6 +327,7 @@ def summarize_batch_run(run_file: Path) -> BatchObservation:
     candidate_bug_families: Counter[str] = Counter()
     semantic_divergence_count = 0
     false_positive_count = 0
+    needs_confirmation_count = 0
     new_behavior_cases = 0
     for row in rows:
         row_findings = row.get("findings", [])
@@ -339,6 +342,8 @@ def summarize_batch_run(run_file: Path) -> BatchObservation:
                 semantic_divergence_count += 1
             if verdict in FALSE_POSITIVE_VERDICTS:
                 false_positive_count += 1
+            if verdict in NEEDS_CONFIRMATION_VERDICTS:
+                needs_confirmation_count += 1
     first_candidate_idx, first_candidate_elapsed_s = _first_candidate_bug_position(rows)
     return BatchObservation(
         cases=len(rows),
@@ -349,6 +354,7 @@ def summarize_batch_run(run_file: Path) -> BatchObservation:
         candidate_bug_families=set(candidate_bug_families),
         semantic_divergence_count=semantic_divergence_count,
         false_positive_count=false_positive_count,
+        needs_confirmation_count=needs_confirmation_count,
         new_behavior_cases=new_behavior_cases,
         first_candidate_bug_case_index=first_candidate_idx,
         first_candidate_bug_elapsed_s=first_candidate_elapsed_s,
@@ -368,6 +374,7 @@ def _batch_reward(
     new_behavior_rate = observation.new_behavior_cases / cases
     semantic_rate = observation.semantic_divergence_count / findings
     false_positive_rate = observation.false_positive_count / findings
+    needs_confirmation_rate = observation.needs_confirmation_count / findings
     throughput_signal = math.log1p(max(0.0, float(observation.throughput_cases_s))) / 6.0
     early_case_bonus = 0.0
     if observation.first_candidate_bug_case_index is not None:
@@ -382,14 +389,15 @@ def _batch_reward(
     reward = (
         10.0 * candidate_rate
         + 2.0 * new_behavior_rate
-        + 0.15 * semantic_rate
+        + 0.10 * semantic_rate
         + 1.5 * new_local_family_count
-        + 2.5 * new_global_family_count
+        + 3.0 * new_global_family_count
         + 2.0 * early_case_bonus
         + 1.0 * early_time_bonus
         + 3.0 * observation.candidate_bug_discovery_auc
         + 0.2 * throughput_signal
-        - 4.0 * false_positive_rate
+        - 1.0 * needs_confirmation_rate
+        - 6.0 * false_positive_rate
     )
     if observation.findings == 0 and observation.new_behavior_cases == 0:
         reward -= 0.25

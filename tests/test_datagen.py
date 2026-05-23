@@ -1,7 +1,8 @@
-from datadiff.datagen import generate_case
+from datadiff.datagen import generate_case, repair_operations
 from datadiff.classification_oracle import validate_case_program
 from datadiff.dsl import sort_columns
 from datadiff.guidance import extract_case_features
+from datadiff.identifiers import is_reserved_output_name, make_safe_output_name
 
 
 def _assert_program_columns_are_valid(case):
@@ -25,6 +26,7 @@ def _assert_program_columns_are_valid(case):
             assert len(columns) == len(set(columns))
         elif op["op"] == "mutate":
             assert op["expr"]["source"] in known_cols
+            assert not is_reserved_output_name(op["column"])
             known_cols.add(op["column"])
         elif op["op"] == "groupby":
             assert set(op["keys"]).issubset(known_cols)
@@ -33,12 +35,14 @@ def _assert_program_columns_are_valid(case):
                 assert agg["column"] in known_cols
             aliases = [agg["as"] for agg in op["aggs"]]
             assert len(aliases) == len(set(aliases))
+            assert all(not is_reserved_output_name(alias) for alias in aliases)
             known_cols = set(op["keys"]) | {agg["as"] for agg in op["aggs"]}
         elif op["op"] == "aggregate":
             for agg in op["aggs"]:
                 assert agg["column"] in known_cols
             aliases = [agg["as"] for agg in op["aggs"]]
             assert len(aliases) == len(set(aliases))
+            assert all(not is_reserved_output_name(alias) for alias in aliases)
             known_cols = {agg["as"] for agg in op["aggs"]}
 
 
@@ -173,6 +177,40 @@ def test_generate_case_join_null_agg_topk_profile_is_supported_and_valid():
     assert validate_case_program(case) == []
 
 
+def test_generate_case_join_null_key_topk_profile_is_supported_and_valid():
+    case = generate_case(123, profile="join_null_key_topk")
+
+    assert case.case_id == "case-00000123-join-null-key-topk"
+    assert [op["op"] for op in case.program.operations] == ["join", "groupby", "select", "sort", "limit"]
+    assert case.program.operations[0]["how"] == "left"
+    assert case.program.operations[1]["keys"] == ["j"]
+    assert case.program.operations[2]["columns"] == ["j"]
+    assert "pattern:join_null_key_topk" in extract_case_features(case)
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_wide_offset_topk_profile_is_supported_and_valid():
+    case = generate_case(123, profile="wide_offset_topk")
+
+    assert case.case_id == "case-00000123-wide-offset-topk"
+    assert [op["op"] for op in case.program.operations] == ["sort", "offset", "limit"]
+    assert len(case.tables[0].columns) >= 20
+    assert "pattern:wide_offset_topk" in extract_case_features(case)
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_empty_filter_groupby_profile_is_supported_and_valid():
+    case = generate_case(123, profile="empty_filter_groupby")
+
+    assert case.case_id == "case-00000123-empty-filter-groupby"
+    assert [op["op"] for op in case.program.operations] == ["filter", "groupby", "select", "sort", "limit"]
+    assert case.program.operations[0] == {"op": "filter", "column": "lane", "cmp": "==", "value": "missing"}
+    features = extract_case_features(case)
+    assert "filter:empty-output" in features
+    assert "pattern:empty_filter_groupby" in features
+    assert validate_case_program(case) == []
+
+
 def test_generate_case_join_filter_groupby_profile_is_supported_and_valid():
     case = generate_case(123, profile="join_filter_groupby")
     assert case.case_id == "case-00000123-join-filter-groupby"
@@ -189,6 +227,22 @@ def test_generate_case_join_filter_groupby_profile_is_supported_and_valid():
     assert case.program.operations[0]["how"] == "inner"
     assert case.program.operations[1]["column"] == "j"
     assert len(case.program.operations[4]["aggs"]) == 3
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_join_null_truth_filter_profile_is_supported_and_valid():
+    case = generate_case(123, profile="join_null_truth_filter")
+
+    assert case.case_id == "case-00000123-join-null-truth-filter"
+    assert [op["op"] for op in case.program.operations] == ["join", "filter", "select", "sort"]
+    assert case.program.operations[0]["how"] == "left"
+    assert case.program.operations[1]["cmp"] == "gt_is_not_true"
+    assert case.program.operations[1]["column"] == "j"
+    assert "pattern:join_null_truth_filter" in extract_case_features(case)
+    left_ids = {row["id"] for row in case.tables[0].rows}
+    right_ids = {row["id"] for row in case.tables[1].rows}
+    assert left_ids - right_ids
+    assert not any(row["id"] is None for table in case.tables for row in table.rows)
     assert validate_case_program(case) == []
 
 
@@ -332,6 +386,107 @@ def test_bughunt_no_groupby_profile_biases_join_mutate_filter_without_groupby():
         mut_filter += int({"mutate", "filter"}.issubset(ops))
     assert joined >= 50
     assert mut_filter >= 50
+
+
+def test_bughunt_profile_injects_order_projection_probes():
+    cases = [generate_case(seed, profile="bughunt") for seed in range(100)]
+    probe_count = 0
+    for case in cases:
+        ops = case.program.operations
+        assert validate_case_program(case) == []
+        for idx in range(len(ops) - 1):
+            if ops[idx].get("op") != "sort" or ops[idx + 1].get("op") != "select":
+                continue
+            sort_key = sort_columns(ops[idx])[0]
+            if sort_key not in set(ops[idx + 1].get("columns", [])):
+                probe_count += 1
+                break
+
+    assert probe_count >= 10
+
+
+def test_repair_preserves_limit_after_sort_select_projection():
+    case = generate_case(7)
+    table = case.tables[0]
+    repaired = repair_operations(
+        table,
+        [
+            {"op": "sort", "columns": ["id"], "ascending": False},
+            {"op": "select", "columns": ["g"]},
+            {"op": "limit", "n": 1},
+        ],
+    )
+
+    assert [op["op"] for op in repaired] == ["sort", "select", "limit"]
+
+
+def test_repair_drops_groupby_aggregation_alias_colliding_with_key():
+    case = generate_case(7)
+    table = case.tables[0]
+    repaired = repair_operations(
+        table,
+        [
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [
+                    {"column": "x", "func": "max", "as": "g"},
+                    {"column": "x", "func": "min", "as": "min_x"},
+                ],
+            },
+        ],
+    )
+
+    assert repaired == [
+        {
+            "op": "groupby",
+            "keys": ["g"],
+            "aggs": [{"column": "x", "func": "min", "as": "min_x"}],
+        }
+    ]
+
+
+def test_repair_drops_reserved_aggregation_aliases():
+    case = generate_case(7)
+    table = case.tables[0]
+
+    repaired = repair_operations(
+        table,
+        [
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [
+                    {"column": "x", "func": "max", "as": "select"},
+                    {"column": "x", "func": "min", "as": "min_x"},
+                ],
+            },
+            {
+                "op": "aggregate",
+                "aggs": [
+                    {"column": "min_x", "func": "max", "as": "where"},
+                    {"column": "min_x", "func": "min", "as": "min_min_x"},
+                ],
+            },
+        ],
+    )
+
+    assert repaired == [
+        {
+            "op": "groupby",
+            "keys": ["g"],
+            "aggs": [{"column": "x", "func": "min", "as": "min_x"}],
+        },
+        {
+            "op": "aggregate",
+            "aggs": [{"column": "min_x", "func": "min", "as": "min_min_x"}],
+        },
+    ]
+
+
+def test_make_safe_output_name_avoids_keywords_and_duplicates():
+    assert make_safe_output_name("select") == "derived_select"
+    assert make_safe_output_name("sum_x", used={"sum_x"}) == "sum_x_1"
 
 
 def test_generated_program_uses_existing_columns_initially():

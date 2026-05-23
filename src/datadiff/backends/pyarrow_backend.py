@@ -6,6 +6,7 @@ from typing import Any
 
 from datadiff.backends.base import Backend, BackendResult
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
+from datadiff.filtering import parse_filter_comparator
 
 
 class PyArrowBackend(Backend):
@@ -53,7 +54,7 @@ class PyArrowBackend(Backend):
                         current_cols = [*current_cols, *right_cols]
                         current = _select_existing(current, current_cols)
                     elif kind == "filter":
-                        mask = _comparison_mask(pc, current[op["column"]], op["cmp"], op["value"])
+                        mask = _comparison_mask(pa, pc, current[op["column"]], op["cmp"], op["value"])
                         current = current.filter(mask)
                     elif kind == "select":
                         current_cols = list(op["columns"])
@@ -103,21 +104,42 @@ class PyArrowBackend(Backend):
             )
 
 
-def _comparison_mask(pc, array: Any, comparator: str, value: Any):
+def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):
+    parsed = parse_filter_comparator(comparator)
+    if parsed is None:
+        raise ValueError(comparator)
     scalar = value
-    if comparator == ">":
-        return pc.greater(array, scalar)
-    if comparator == ">=":
-        return pc.greater_equal(array, scalar)
-    if comparator == "<":
-        return pc.less(array, scalar)
-    if comparator == "<=":
-        return pc.less_equal(array, scalar)
-    if comparator == "==":
-        return pc.equal(array, scalar)
-    if comparator == "!=":
-        return pc.not_equal(array, scalar)
-    raise ValueError(comparator)
+    if scalar is None:
+        mask = pa.array([None] * len(array), type=pa.bool_())
+    elif parsed.base == ">":
+        mask = pc.greater(array, scalar)
+    elif parsed.base == ">=":
+        mask = pc.greater_equal(array, scalar)
+    elif parsed.base == "<":
+        mask = pc.less(array, scalar)
+    elif parsed.base == "<=":
+        mask = pc.less_equal(array, scalar)
+    elif parsed.base == "==":
+        mask = pc.equal(array, scalar)
+    elif parsed.base == "!=":
+        mask = pc.not_equal(array, scalar)
+    else:
+        raise ValueError(parsed.base)
+    if parsed.truth_test is None:
+        return mask
+    if parsed.truth_test == "is_true":
+        return pc.fill_null(mask, False)
+    if parsed.truth_test == "is_not_true":
+        return pc.invert(pc.fill_null(mask, False))
+    if parsed.truth_test == "is_false":
+        return pc.invert(pc.fill_null(mask, True))
+    if parsed.truth_test == "is_not_false":
+        return pc.fill_null(mask, True)
+    if parsed.truth_test == "is_unknown":
+        return pc.is_null(mask)
+    if parsed.truth_test == "is_not_unknown":
+        return pc.invert(pc.is_null(mask))
+    raise ValueError(parsed.truth_test)
 
 
 def _eval_expr(pc, table: Any, expr: dict[str, Any]):

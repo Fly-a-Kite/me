@@ -54,7 +54,15 @@ def test_pending_historical_specs_are_explicit_case_studies():
     commands = module.build_plan(_args(track="historical", include_pending_historical=True))
 
     by_name = {command.name: command for command in commands}
-    assert set(by_name) == {"duckdb-3015", "duckdb-22075", "duckdb-22656", "datafusion-22190"}
+    assert set(by_name) == {
+        "duckdb-3015",
+        "duckdb-11261",
+        "duckdb-22075",
+        "duckdb-22656",
+        "arrow-42231",
+        "datafusion-22190",
+        "datafusion-22441",
+    }
     assert by_name["duckdb-22075"].count_as_real_bugs is True
     assert by_name["duckdb-22656"].count_as_real_bugs is True
     assert "duckdb_storage_cross" in by_name["duckdb-22656"].command
@@ -62,9 +70,15 @@ def test_pending_historical_specs_are_explicit_case_studies():
     assert _flag_value(by_name["duckdb-22656"].command, "--artifact-limit") == "0"
     assert _flag_value(by_name["duckdb-22656"].command, "--log-level") == "minimal"
     assert by_name["datafusion-22190"].count_as_real_bugs is False
+    assert by_name["datafusion-22441"].count_as_real_bugs is False
     assert by_name["duckdb-3015"].count_as_real_bugs is False
+    assert by_name["duckdb-11261"].count_as_real_bugs is False
+    assert by_name["arrow-42231"].count_as_real_bugs is False
+    assert "wide_offset_topk" in _flag_value(by_name["duckdb-11261"].command, "--presets")
+    assert "join_groupby_stress" in _flag_value(by_name["arrow-42231"].command, "--presets")
     assert "--evidence-mode" in by_name["datafusion-22190"].command
     assert "historical" in by_name["datafusion-22190"].command
+    assert "join_null_truth_filter" in _flag_value(by_name["datafusion-22441"].command, "--presets")
     assert "replay-fixture" in by_name["duckdb-3015"].command
     assert "DATADIFF_DUCKDB_3015_FIXTURE" in by_name["duckdb-3015"].command
 

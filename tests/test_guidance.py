@@ -196,7 +196,11 @@ def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
         "null_agg_topk",
         "filter_null_agg_topk",
         "join_null_agg_topk",
+        "join_null_key_topk",
+        "wide_offset_topk",
+        "empty_filter_groupby",
         "join_filter_groupby",
+        "join_null_truth_filter",
         "float_group_key",
         "join_null_sort",
     ]
@@ -256,6 +260,31 @@ def test_guidance_recognizes_join_filter_groupby_pattern():
 
     assert "pattern:join_filter_groupby" in features
     assert decision.matched_targets == ["join_filter_groupby"]
+
+
+def test_guidance_recognizes_join_null_truth_filter_pattern():
+    case = generate_case(123, profile="join_null_truth_filter")
+    guidance = GuidanceState(targets=["join_null_truth_filter"])
+
+    features = extract_case_features(case)
+    decision = guidance.choose_case([case])
+
+    assert "filter:truth-test" in features
+    assert "filter:truth:is_not_true" in features
+    assert "pattern:join_null_truth_filter" in features
+    assert decision.matched_targets == ["join_null_truth_filter"]
+
+
+def test_guidance_recognizes_empty_filter_groupby_pattern():
+    case = generate_case(123, profile="empty_filter_groupby")
+    guidance = GuidanceState(targets=["empty_filter_groupby"])
+
+    features = extract_case_features(case)
+    decision = guidance.choose_case([case])
+
+    assert "filter:empty-output" in features
+    assert "pattern:empty_filter_groupby" in features
+    assert decision.matched_targets == ["empty_filter_groupby"]
 
 
 def test_guidance_uses_actual_left_join_output_for_sort_null_order():

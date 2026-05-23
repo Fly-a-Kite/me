@@ -5,6 +5,7 @@ import warnings
 
 from datadiff.backends.base import Backend, BackendResult
 from datadiff.dsl import Program, TableData, normalize_sort_keys
+from datadiff.filtering import parse_filter_comparator
 
 
 class PolarsBackend(Backend):
@@ -47,21 +48,14 @@ class PolarsBackend(Backend):
                 elif kind == "filter":
                     col = pl.col(op["column"])
                     val = op["value"]
-                    cmp = op["cmp"]
                     with warnings.catch_warnings():
                         warnings.filterwarnings(
                             "ignore",
                             message="Comparisons with None always result in null.*",
                             category=UserWarning,
                         )
-                        if cmp == ">": expr = col > val
-                        elif cmp == ">=": expr = col >= val
-                        elif cmp == "<": expr = col < val
-                        elif cmp == "<=": expr = col <= val
-                        elif cmp == "==": expr = col == val
-                        elif cmp == "!=": expr = col != val
-                        else: raise ValueError(cmp)
-                    df = df.filter(expr.fill_null(False))
+                        expr = _polars_filter_expr(col, op["cmp"], val)
+                    df = df.filter(expr)
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -178,21 +172,14 @@ class PolarsLazyBackend(PolarsBackend):
                 elif kind == "filter":
                     col = pl.col(op["column"])
                     val = op["value"]
-                    cmp = op["cmp"]
                     with warnings.catch_warnings():
                         warnings.filterwarnings(
                             "ignore",
                             message="Comparisons with None always result in null.*",
                             category=UserWarning,
                         )
-                        if cmp == ">": expr = col > val
-                        elif cmp == ">=": expr = col >= val
-                        elif cmp == "<": expr = col < val
-                        elif cmp == "<=": expr = col <= val
-                        elif cmp == "==": expr = col == val
-                        elif cmp == "!=": expr = col != val
-                        else: raise ValueError(cmp)
-                    lf = lf.filter(expr.fill_null(False))
+                        expr = _polars_filter_expr(col, op["cmp"], val)
+                    lf = lf.filter(expr)
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))
                 elif kind == "sort":
@@ -281,3 +268,36 @@ def _polars_dtype(pl, kind: str):
     if kind == "bool":
         return pl.Boolean
     return pl.Utf8
+
+
+def _polars_filter_expr(col, comparator: str, value):
+    parsed = parse_filter_comparator(comparator)
+    if parsed is None:
+        raise ValueError(comparator)
+    if parsed.base == ">":
+        expr = col > value
+    elif parsed.base == ">=":
+        expr = col >= value
+    elif parsed.base == "<":
+        expr = col < value
+    elif parsed.base == "<=":
+        expr = col <= value
+    elif parsed.base == "==":
+        expr = col == value
+    elif parsed.base == "!=":
+        expr = col != value
+    else:
+        raise ValueError(parsed.base)
+    if parsed.truth_test is None or parsed.truth_test == "is_true":
+        return expr.fill_null(False)
+    if parsed.truth_test == "is_not_true":
+        return ~expr.fill_null(False)
+    if parsed.truth_test == "is_false":
+        return ~expr.fill_null(True)
+    if parsed.truth_test == "is_not_false":
+        return expr.fill_null(True)
+    if parsed.truth_test == "is_unknown":
+        return expr.is_null()
+    if parsed.truth_test == "is_not_unknown":
+        return expr.is_not_null()
+    raise ValueError(parsed.truth_test)

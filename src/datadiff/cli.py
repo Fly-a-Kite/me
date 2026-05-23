@@ -68,15 +68,20 @@ LIVE_BUGHUNT_TARGETS = [
     "operation_combo",
     "topk",
     "join",
+    "join_null_truth_filter",
+    "join_null_key_topk",
     "groupby",
     "mutate",
     "filter",
+    "truth_filter",
     "nulls",
     "aggregation",
     "sort_limit",
     "topk_resort",
     "ordered_groupby_sort",
     "join_ordered_agg_topk",
+    "wide_offset_topk",
+    "empty_filter_groupby",
     "expressions",
 ]
 
@@ -84,9 +89,12 @@ LIVE_ARROW_TARGETS = [
     "common_workflow",
     "operation_combo",
     "join",
+    "join_null_truth_filter",
+    "join_null_key_topk",
     "groupby",
     "mutate",
     "filter",
+    "truth_filter",
     "strings",
     "casts",
     "nulls",
@@ -96,6 +104,8 @@ LIVE_ARROW_TARGETS = [
     "topk_resort",
     "ordered_groupby_sort",
     "join_ordered_agg_topk",
+    "wide_offset_topk",
+    "empty_filter_groupby",
     "expressions",
 ]
 
@@ -103,7 +113,10 @@ LIVE_POLARS_LAZY_TARGETS = [
     "common_workflow",
     "operation_combo",
     "join",
+    "join_null_truth_filter",
+    "join_null_key_topk",
     "filter",
+    "truth_filter",
     "mutate",
     "groupby",
     "strings",
@@ -114,6 +127,7 @@ LIVE_POLARS_LAZY_TARGETS = [
     "topk_resort",
     "ordered_groupby_sort",
     "join_ordered_agg_topk",
+    "empty_filter_groupby",
     "expressions",
 ]
 
@@ -121,7 +135,10 @@ LIVE_EMBEDDED_SQL_TARGETS = [
     "common_workflow",
     "operation_combo",
     "join",
+    "join_null_truth_filter",
+    "join_null_key_topk",
     "filter",
+    "truth_filter",
     "mutate",
     "groupby",
     "nulls",
@@ -131,6 +148,8 @@ LIVE_EMBEDDED_SQL_TARGETS = [
     "topk_resort",
     "ordered_groupby_sort",
     "join_ordered_agg_topk",
+    "wide_offset_topk",
+    "empty_filter_groupby",
     "casts",
     "expressions",
 ]
@@ -139,7 +158,10 @@ LIVE_CROSS_FAMILY_TARGETS = [
     "common_workflow",
     "operation_combo",
     "join",
+    "join_null_truth_filter",
+    "join_null_key_topk",
     "filter",
+    "truth_filter",
     "mutate",
     "groupby",
     "strings",
@@ -151,6 +173,8 @@ LIVE_CROSS_FAMILY_TARGETS = [
     "topk_resort",
     "ordered_groupby_sort",
     "join_ordered_agg_topk",
+    "wide_offset_topk",
+    "empty_filter_groupby",
     "expressions",
 ]
 
@@ -1356,12 +1380,44 @@ def _preset_config(name: str) -> ExperimentConfig:
             guidance_targets=["join_null_agg_topk", "join", "nulls", "aggregation", "sort_limit", "expressions"],
             metamorphic_variant_limit=4,
         )
+    if name == "join_null_key_topk":
+        return ExperimentConfig(
+            generator_profile="join_null_key_topk",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["join_null_key_topk", "join", "groupby", "nulls", "sort_limit", "topk"],
+            metamorphic_variant_limit=4,
+        )
+    if name == "wide_offset_topk":
+        return ExperimentConfig(
+            generator_profile="wide_offset_topk",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=["wide_offset_topk", "sort_limit", "sort_offset", "offset", "topk", "nulls"],
+            metamorphic_variant_limit=2,
+        )
+    if name == "empty_filter_groupby":
+        return ExperimentConfig(
+            generator_profile="empty_filter_groupby",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["empty_filter_groupby", "filter", "groupby", "aggregation", "empty", "sort_limit"],
+            metamorphic_variant_limit=4,
+        )
     if name == "join_filter_groupby":
         return ExperimentConfig(
             generator_profile="join_filter_groupby",
             guidance_strategy="guided",
             guidance_candidate_pool=4,
             guidance_targets=["join_filter_groupby", "join", "filter", "groupby", "aggregation", "sort_limit", "expressions"],
+            metamorphic_variant_limit=4,
+        )
+    if name == "join_null_truth_filter":
+        return ExperimentConfig(
+            generator_profile="join_null_truth_filter",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["join_null_truth_filter", "join", "filter", "truth_filter", "nulls"],
             metamorphic_variant_limit=4,
         )
     if name == "join_groupby_stress":
@@ -1428,6 +1484,36 @@ def _preset_config(name: str) -> ExperimentConfig:
             guidance_targets=["join_null_agg_topk", "join", "nulls", "aggregation", "sort_limit", "expressions"],
             metamorphic_variant_limit=8,
         )
+    if name == "join_null_key_topk_metamorphic":
+        return ExperimentConfig(
+            generator_profile="join_null_key_topk",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["join_null_key_topk", "join", "groupby", "nulls", "sort_limit", "topk"],
+            metamorphic_variant_limit=8,
+        )
+    if name == "wide_offset_topk_metamorphic":
+        return ExperimentConfig(
+            generator_profile="wide_offset_topk",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=["wide_offset_topk", "sort_limit", "sort_offset", "offset", "topk", "nulls"],
+            metamorphic_variant_limit=4,
+        )
+    if name == "empty_filter_groupby_metamorphic":
+        return ExperimentConfig(
+            generator_profile="empty_filter_groupby",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["empty_filter_groupby", "filter", "groupby", "aggregation", "empty", "sort_limit"],
+            metamorphic_variant_limit=8,
+        )
     if name == "join_filter_groupby_metamorphic":
         return ExperimentConfig(
             generator_profile="join_filter_groupby",
@@ -1436,6 +1522,16 @@ def _preset_config(name: str) -> ExperimentConfig:
             guidance_strategy="guided",
             guidance_candidate_pool=4,
             guidance_targets=["join_filter_groupby", "join", "filter", "groupby", "aggregation", "sort_limit", "expressions"],
+            metamorphic_variant_limit=8,
+        )
+    if name == "join_null_truth_filter_metamorphic":
+        return ExperimentConfig(
+            generator_profile="join_null_truth_filter",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["join_null_truth_filter", "join", "filter", "truth_filter", "nulls"],
             metamorphic_variant_limit=8,
         )
     if name == "join_groupby_stress_metamorphic":
@@ -2070,7 +2166,11 @@ def _experiment_job_weight(job: dict) -> float:
         "null_agg_topk": 1.0,
         "filter_null_agg_topk": 1.2,
         "join_null_agg_topk": 1.3,
+        "join_null_key_topk": 1.3,
+        "wide_offset_topk": 1.4,
+        "empty_filter_groupby": 1.1,
         "join_filter_groupby": 1.4,
+        "join_null_truth_filter": 1.3,
         "join_groupby_stress": 2.0,
         "storage_offset": 2.0,
         "ordered_groupby_sort": 1.2,
@@ -2187,7 +2287,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_fuzz.add_argument("--duration", default=None, help="wall-clock budget such as 10s, 5m, 24h")
     p_fuzz.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_fuzz)
-    p_fuzz.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_filter_groupby", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk"], default="common")
+    p_fuzz.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk"], default="common")
     add_guidance_flags(p_fuzz, default_strategy="random", default_candidate_pool=8)
     add_ablation_flags(p_fuzz)
     add_paper_journal_flags(p_fuzz)
@@ -2198,7 +2298,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_long.add_argument("--duration", default="24h", help="wall-clock budget such as 10m, 24h, 2d")
     p_long.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_long)
-    p_long.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_filter_groupby", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk"], default="common")
+    p_long.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk"], default="common")
     add_guidance_flags(p_long, default_strategy="guided", default_candidate_pool=8)
     p_long.add_argument("--case-log", default=None, help="optional JSONL path for generated test cases")
     p_long.add_argument("--checkpoint-interval", default="60s", help="checkpoint write interval")

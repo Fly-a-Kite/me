@@ -77,6 +77,62 @@ def test_classification_marks_normalizer_error_false_positive():
     assert classification.false_positive_reason == "normalization_error"
 
 
+def test_classification_marks_order_insensitive_order_only_mismatch_false_positive():
+    case = _case([])
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "unknown",
+        "confidence": "medium",
+        "suspicious_backends": ["pandas", "duckdb"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["x"], [[1], [2]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["x"], [[2], [1]]),
+    }
+
+    classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "common"}, ["pandas", "duckdb"])
+
+    assert classification.verdict == "normalizer_false_positive"
+    assert classification.false_positive is True
+    assert classification.false_positive_reason == "order_only_normalization_mismatch"
+
+
+def test_classification_uses_ordered_reference_for_order_sensitive_mismatch():
+    case = Case(
+        "case-order-sensitive",
+        41,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+                [{"x": 1, "s": "a"}, {"x": 2, "s": "b"}],
+            )
+        ],
+        Program(
+            "prog-order-sensitive",
+            41,
+            [{"op": "sort", "columns": ["x"], "ascending": False}, {"op": "select", "columns": ["s"]}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "ordering_or_limit",
+        "confidence": "medium",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["s"], [["b"], ["a"]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["s"], [["a"], ["b"]]),
+    }
+
+    classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "common"}, ["pandas", "duckdb"])
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.false_positive is False
+    assert classification.false_positive_reason == ""
+    assert classification.implicated_backends == ["duckdb"]
+
+
 def test_classification_marks_nan_semantics_as_documented_divergence():
     case = Case(
         "case-nan",
@@ -225,6 +281,100 @@ def test_classification_uses_dsl_reference_to_identify_mismatching_backend():
     assert "pandas" in classification.evidence
 
 
+def test_classification_reference_understands_null_aware_truth_filter():
+    case = Case(
+        "case-reference-truth-filter",
+        33,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("g", "str")],
+                [{"id": 1, "g": "a"}, {"id": 2, "g": "b"}],
+            ),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("j", "int")],
+                [{"id": 1, "j": 100}],
+            ),
+        ],
+        Program(
+            "prog-reference-truth-filter",
+            33,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+                {"op": "filter", "column": "j", "cmp": "gt_is_not_true", "value": 150},
+                {"op": "select", "columns": ["id", "g", "j"]},
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "outer_join_truth_filter",
+        "confidence": "medium",
+        "suspicious_backends": ["datafusion"],
+    }
+    normalized = {
+        "duckdb": NormalizedResult("duckdb", "ok", ["g", "id", "j"], [["a", 1, 100], ["b", 2, None]]),
+        "datafusion": NormalizedResult("datafusion", "ok", ["g", "id", "j"], [["a", 1, 100]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "join_null_truth_filter"},
+        ["duckdb", "datafusion"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["datafusion"]
+
+
+def test_classification_reference_understands_join_null_key_topk():
+    case = Case(
+        "case-reference-join-null-key-topk",
+        34,
+        [
+            TableData("t0", [ColumnSpec("id", "int", nullable=False), ColumnSpec("x", "int")], [{"id": 1, "x": -1}]),
+            TableData("t1", [ColumnSpec("id", "int", nullable=False), ColumnSpec("j", "int")], [{"id": 9, "j": 9}]),
+        ],
+        Program(
+            "prog-reference-join-null-key-topk",
+            34,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+                {"op": "groupby", "keys": ["j"], "aggs": [{"column": "x", "func": "count", "as": "count_x"}]},
+                {"op": "select", "columns": ["j"]},
+                {"op": "sort", "columns": ["j"], "ascending": True},
+                {"op": "limit", "n": 4},
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "grouped_topk_null_sort_key",
+        "confidence": "medium",
+        "suspicious_backends": ["datafusion"],
+    }
+    normalized = {
+        "duckdb": NormalizedResult("duckdb", "ok", ["j"], [[None]]),
+        "datafusion": NormalizedResult("datafusion", "ok", ["j"], []),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "join_null_key_topk"},
+        ["duckdb", "datafusion"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["datafusion"]
+
+
 def test_classification_marks_modulo_as_expected_semantic_divergence_before_reference():
     case = Case(
         "case-mod",
@@ -296,6 +446,24 @@ def test_validate_case_rejects_cross_type_filter_literal():
     assert any("not supported for str filter" in error for error in errors)
 
 
+def test_validate_case_accepts_null_aware_truth_filter_comparator():
+    valid = Case(
+        "case-truth-filter",
+        4,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}, {"x": None}])],
+        Program("prog-truth-filter", 4, [{"op": "filter", "column": "x", "cmp": "gt_is_not_true", "value": 0}]),
+    )
+    invalid = Case(
+        "case-invalid-truth-filter",
+        4,
+        [TableData("t0", [ColumnSpec("s", "str")], [{"s": "a"}])],
+        Program("prog-invalid-truth-filter", 4, [{"op": "filter", "column": "s", "cmp": "gt_is_not_true", "value": "a"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("not supported for str filter" in error for error in validate_case_program(invalid))
+
+
 def test_validate_case_rejects_duplicate_select_columns():
     case = Case(
         "case-dup-select",
@@ -329,3 +497,57 @@ def test_validate_case_allows_post_groupby_join_and_global_aggregate():
     )
 
     assert validate_case_program(case) == []
+
+
+def test_validate_case_rejects_groupby_alias_that_collides_with_key():
+    case = Case(
+        "case-groupby-alias-collision",
+        7,
+        [TableData("t0", [ColumnSpec("g", "str"), ColumnSpec("x", "int")], [{"g": "a", "x": 1}])],
+        Program(
+            "prog-groupby-alias-collision",
+            7,
+            [{"op": "groupby", "keys": ["g"], "aggs": [{"column": "x", "func": "max", "as": "g"}]}],
+        ),
+    )
+
+    errors = validate_case_program(case)
+
+    assert any("aliases collide with keys" in error for error in errors)
+
+
+def test_validate_case_rejects_reserved_output_aliases():
+    groupby_case = Case(
+        "case-groupby-reserved-alias",
+        8,
+        [TableData("t0", [ColumnSpec("g", "str"), ColumnSpec("x", "int")], [{"g": "a", "x": 1}])],
+        Program(
+            "prog-groupby-reserved-alias",
+            8,
+            [{"op": "groupby", "keys": ["g"], "aggs": [{"column": "x", "func": "max", "as": "select"}]}],
+        ),
+    )
+    aggregate_case = Case(
+        "case-aggregate-reserved-alias",
+        9,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program(
+            "prog-aggregate-reserved-alias",
+            9,
+            [{"op": "aggregate", "aggs": [{"column": "x", "func": "max", "as": "where"}]}],
+        ),
+    )
+    mutate_case = Case(
+        "case-mutate-reserved-column",
+        10,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program(
+            "prog-mutate-reserved-column",
+            10,
+            [{"op": "mutate", "column": "__datadiff_tmp", "expr": {"kind": "add_const", "source": "x", "value": 1}}],
+        ),
+    )
+
+    assert any("reserved names" in error for error in validate_case_program(groupby_case))
+    assert any("reserved names" in error for error in validate_case_program(aggregate_case))
+    assert any("mutate output column" in error and "reserved" in error for error in validate_case_program(mutate_case))

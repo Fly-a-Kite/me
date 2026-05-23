@@ -5,6 +5,7 @@ from typing import Any
 
 from datadiff.backends.base import Backend, BackendResult
 from datadiff.dsl import Program, TableData, normalize_sort_keys
+from datadiff.filtering import evaluate_filter_predicate
 
 
 class PandasBackend(Backend):
@@ -45,18 +46,10 @@ class PandasBackend(Backend):
                 elif kind == "filter":
                     col = op["column"]
                     val = op["value"]
-                    cmp = op["cmp"]
+                    comparator = op["cmp"]
                     series = df[col]
-                    if cmp == ">": mask = series > val
-                    elif cmp == ">=": mask = series >= val
-                    elif cmp == "<": mask = series < val
-                    elif cmp == "<=": mask = series <= val
-                    elif cmp == "==": mask = series == val
-                    elif cmp == "!=": mask = series != val
-                    else: raise ValueError(cmp)
-                    if val is not None:
-                        mask = mask & series.notna()
-                    df = df[mask.fillna(False)]
+                    mask = series.map(lambda value: evaluate_filter_predicate(value, comparator, val)).astype(bool)
+                    df = df[mask]
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":

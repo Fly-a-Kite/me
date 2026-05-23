@@ -32,6 +32,26 @@ def test_oracle_semantic_output_mismatch():
     assert findings
     assert findings[0].kind == "semantic_output_mismatch"
     assert findings[0].confidence in {"high", "medium"}
+    assert findings[0].mismatch_class == "value"
+
+
+def test_oracle_labels_row_order_only_mismatch():
+    case = Program("prog-order", 1, [{"op": "sort", "columns": ["x"], "ascending": True}])
+    findings = evaluate_case(
+        Case(
+            "case-order",
+            1,
+            [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}, {"x": 2}])],
+            case,
+        ),
+        {
+            "a": NormalizedResult("a", "ok", ["x"], [[1], [2]]),
+            "b": NormalizedResult("b", "ok", ["x"], [[2], [1]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].mismatch_class == "row_order"
 
 
 def test_oracle_no_mismatch_for_equal_results():
@@ -133,6 +153,36 @@ def test_oracle_classifies_groupby_after_join_as_aggregation():
     assert findings[0].root_cause == "groupby_aggregation"
 
 
+def test_oracle_classifies_outer_join_truth_filter_before_plain_join():
+    case = Case(
+        "case-outer-join-truth-filter",
+        16,
+        [
+            TableData("t0", [ColumnSpec("id", "int", nullable=False)], [{"id": 1}, {"id": 2}]),
+            TableData("t1", [ColumnSpec("id", "int", nullable=False), ColumnSpec("j", "int")], [{"id": 1, "j": 100}]),
+        ],
+        Program(
+            "prog-outer-join-truth-filter",
+            16,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+                {"op": "filter", "column": "j", "cmp": "gt_is_not_true", "value": 150},
+            ],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "a": NormalizedResult("a", "ok", ["id", "j"], [[1, 100], [2, None]]),
+            "b": NormalizedResult("b", "ok", ["id", "j"], [[1, 100]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "outer_join_truth_filter"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",
@@ -200,6 +250,47 @@ def test_oracle_classifies_grouped_topk_null_sort_key_after_join():
         {
             "a": NormalizedResult("a", "ok", ["min_x"], [[None], [5]]),
             "b": NormalizedResult("b", "ok", ["min_x"], [[5]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "grouped_topk_null_sort_key"
+
+
+def test_oracle_classifies_grouped_topk_null_sort_key_from_join_null_key():
+    case = Case(
+        "case-join-null-key-topk",
+        17,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("x", "int")],
+                [{"id": 1, "x": -1}],
+            ),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("j", "int")],
+                [{"id": 9, "j": 9}],
+            ),
+        ],
+        Program(
+            "prog-join-null-key-topk",
+            17,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+                {"op": "groupby", "keys": ["j"], "aggs": [{"column": "x", "func": "count", "as": "count_x"}]},
+                {"op": "select", "columns": ["j"]},
+                {"op": "sort", "columns": ["j"], "ascending": True},
+                {"op": "limit", "n": 4},
+            ],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "a": NormalizedResult("a", "ok", ["j"], [[None]]),
+            "b": NormalizedResult("b", "ok", ["j"], []),
         },
     )
 

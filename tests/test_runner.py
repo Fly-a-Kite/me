@@ -13,6 +13,7 @@ from datadiff.util import load_json, read_jsonl, run_meta_path
 
 
 REQUIRED_BACKENDS = ["pandas", "polars", "duckdb", "sqlite"]
+SQL_ORDER_BACKENDS = ["pandas", "duckdb", "sqlite"]
 DATAFUSION_BACKENDS = ["pandas", "duckdb", "datafusion"]
 PYARROW_BACKENDS = ["pandas", "duckdb", "pyarrow"]
 LATEST_ALL_ENGINE_PACKAGES = ["pandas", "pyarrow", "polars", "duckdb", "datafusion"]
@@ -90,6 +91,97 @@ def test_run_loaded_case_supports_join_expressions_and_multi_agg():
     row = run_loaded_case(case, REQUIRED_BACKENDS, save_artifact=False)
     assert row["status"] == "ok"
     assert set(row["normalized"]) == set(REQUIRED_BACKENDS)
+
+
+@pytest.mark.skipif(
+    any(name != "sqlite" and importlib.util.find_spec(name) is None for name in REQUIRED_BACKENDS),
+    reason="data backends are not installed",
+)
+def test_run_loaded_case_supports_null_aware_truth_filter():
+    case = generate_case(123, profile="join_null_truth_filter")
+
+    row = run_loaded_case(case, REQUIRED_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert set(row["normalized"]) == set(REQUIRED_BACKENDS)
+    assert {tuple(tuple(item) for item in result["rows"]) for result in row["normalized"].values()} == {
+        (("a", 1, 100, "p"), ("c", 3, None, None), ("d", 4, None, None))
+    }
+
+
+@pytest.mark.skipif(
+    any(name != "sqlite" and importlib.util.find_spec(name) is None for name in REQUIRED_BACKENDS),
+    reason="data backends are not installed",
+)
+def test_run_loaded_case_pandas_join_nulls_do_not_pass_string_neq_filter():
+    case = Case(
+        "case-join-null-string-filter",
+        223,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("label", "str")],
+                [{"id": 1, "label": "matched"}, {"id": 2, "label": "unmatched"}],
+            ),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("tag", "str")],
+                [{"id": 1, "tag": "keep"}],
+            ),
+        ],
+        Program(
+            "prog-join-null-string-filter",
+            223,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+                {"op": "filter", "column": "tag", "cmp": "!=", "value": ""},
+                {"op": "select", "columns": ["id", "label", "tag"]},
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, REQUIRED_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert {tuple(tuple(item) for item in result["rows"]) for result in row["normalized"].values()} == {
+        ((1, "matched", "keep"),)
+    }
+
+
+@pytest.mark.skipif(
+    any(name != "sqlite" and importlib.util.find_spec(name) is None for name in REQUIRED_BACKENDS),
+    reason="data backends are not installed",
+)
+def test_run_loaded_case_pandas_empty_filter_preserves_columns_for_groupby():
+    case = Case(
+        "case-empty-filter-groupby",
+        224,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("tag", "str"),
+                    ColumnSpec("x", "int"),
+                ],
+                [{"id": 1, "tag": "a", "x": 10}],
+            )
+        ],
+        Program(
+            "prog-empty-filter-groupby",
+            224,
+            [
+                {"op": "filter", "column": "id", "cmp": ">", "value": 100},
+                {"op": "groupby", "keys": ["tag"], "aggs": [{"column": "x", "func": "sum", "as": "sum_x"}]},
+                {"op": "select", "columns": ["sum_x"]},
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, REQUIRED_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert {tuple(tuple(item) for item in result["rows"]) for result in row["normalized"].values()} == {()}
 
 
 @pytest.mark.skipif(
@@ -208,6 +300,154 @@ def test_run_loaded_case_supports_post_groupby_join_and_global_aggregate():
     assert set(row["normalized"]) == set(REQUIRED_BACKENDS)
     assert {tuple(tuple(item) for item in result["rows"]) for result in row["normalized"].values()} == {
         ((2, 10),)
+    }
+
+
+def _ordered_groupby_sort_projection_case() -> Case:
+    return Case(
+        "case-ordered-groupby-sort-select-drops-key",
+        1064,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("g", "str", nullable=False),
+                    ColumnSpec("x", "int"),
+                    ColumnSpec("z", "int"),
+                ],
+                [
+                    {"id": 0, "g": "a", "x": 1, "z": 1},
+                    {"id": 1, "g": "b", "x": 2, "z": 2},
+                    {"id": 2, "g": "b", "x": 0, "z": 0},
+                    {"id": 3, "g": "d", "x": 0, "z": 1},
+                    {"id": 4, "g": "a", "x": None, "z": 1},
+                    {"id": 5, "g": "b", "x": 0, "z": 8},
+                    {"id": 6, "g": "c", "x": 2, "z": 1},
+                    {"id": 7, "g": "d", "x": -2, "z": -1},
+                ],
+            )
+        ],
+        Program(
+            "prog-ordered-groupby-sort-select-drops-key",
+            1064,
+            [
+                {
+                    "op": "sort",
+                    "keys": [
+                        {"column": "x", "ascending": True, "nulls": "last"},
+                        {"column": "g", "ascending": True, "nulls": "last"},
+                        {"column": "id", "ascending": True, "nulls": "last"},
+                        {"column": "z", "ascending": True, "nulls": "last"},
+                    ],
+                },
+                {"op": "groupby", "keys": ["g"], "aggs": [{"column": "x", "func": "max", "as": "max_x"}]},
+                {"op": "select", "columns": ["g", "max_x"]},
+                {
+                    "op": "sort",
+                    "keys": [
+                        {"column": "max_x", "ascending": False, "nulls": "last"},
+                        {"column": "g", "ascending": True, "nulls": "last"},
+                    ],
+                },
+                {"op": "select", "columns": ["g"]},
+            ],
+        ),
+    )
+
+
+@pytest.mark.skipif(
+    any(name != "sqlite" and importlib.util.find_spec(name) is None for name in SQL_ORDER_BACKENDS),
+    reason="SQL order-preservation backends are not installed",
+)
+def test_sql_backends_preserve_sort_when_select_drops_sort_key():
+    row = run_loaded_case(_ordered_groupby_sort_projection_case(), SQL_ORDER_BACKENDS, save_artifact=False)
+
+    assert row["findings"] == []
+    assert {tuple(tuple(item) for item in result["rows"]) for result in row["normalized"].values()} == {
+        (("b",), ("c",), ("a",), ("d",))
+    }
+
+
+@pytest.mark.skipif(
+    any(name != "sqlite" and importlib.util.find_spec(name) is None for name in SQL_ORDER_BACKENDS),
+    reason="SQL order-preservation backends are not installed",
+)
+def test_sql_backends_apply_limit_after_select_drops_sort_key():
+    case = Case(
+        "case-sort-select-limit-drops-key",
+        1065,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+                [{"x": 1, "s": "a"}, {"x": 3, "s": "c"}, {"x": 2, "s": "b"}],
+            )
+        ],
+        Program(
+            "prog-sort-select-limit-drops-key",
+            1065,
+            [
+                {"op": "sort", "columns": ["x"], "ascending": False},
+                {"op": "select", "columns": ["s"]},
+                {"op": "limit", "n": 1},
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, SQL_ORDER_BACKENDS, save_artifact=False)
+
+    assert row["findings"] == []
+    assert {tuple(tuple(item) for item in result["rows"]) for result in row["normalized"].values()} == {
+        (("c",),)
+    }
+
+
+@pytest.mark.skipif(
+    any(name != "sqlite" and importlib.util.find_spec(name) is None for name in SQL_ORDER_BACKENDS),
+    reason="SQL order-preservation backends are not installed",
+)
+def test_sql_backends_apply_offset_then_limit_after_select_drops_sort_key():
+    case = Case(
+        "case-sort-select-offset-limit-drops-key",
+        1066,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+                [{"x": 1, "s": "a"}, {"x": 3, "s": "c"}, {"x": 2, "s": "b"}],
+            )
+        ],
+        Program(
+            "prog-sort-select-offset-limit-drops-key",
+            1066,
+            [
+                {"op": "sort", "columns": ["x"], "ascending": False},
+                {"op": "select", "columns": ["s"]},
+                {"op": "offset", "n": 1},
+                {"op": "limit", "n": 1},
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, SQL_ORDER_BACKENDS, save_artifact=False)
+
+    assert row["findings"] == []
+    assert {tuple(tuple(item) for item in result["rows"]) for result in row["normalized"].values()} == {
+        (("b",),)
+    }
+
+
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in DATAFUSION_BACKENDS),
+    reason="DataFusion order-preservation backends are not installed",
+)
+def test_datafusion_backend_preserves_sort_when_select_drops_sort_key():
+    row = run_loaded_case(_ordered_groupby_sort_projection_case(), DATAFUSION_BACKENDS, save_artifact=False)
+
+    assert row["findings"] == []
+    assert {tuple(tuple(item) for item in result["rows"]) for result in row["normalized"].values()} == {
+        (("b",), ("c",), ("a",), ("d",))
     }
 
 

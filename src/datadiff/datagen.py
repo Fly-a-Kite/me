@@ -6,6 +6,8 @@ import string
 from typing import Any, Literal
 
 from .dsl import Case, ColumnSpec, Program, SortKey, TableData, normalize_sort_keys
+from .filtering import filter_comparator_supports_type
+from .identifiers import is_reserved_output_name, make_safe_output_name
 from .util import unique_preserve_order
 
 GeneratorProfile = Literal[
@@ -18,7 +20,11 @@ GeneratorProfile = Literal[
     "null_agg_topk",
     "filter_null_agg_topk",
     "join_null_agg_topk",
+    "join_null_key_topk",
+    "wide_offset_topk",
+    "empty_filter_groupby",
     "join_filter_groupby",
+    "join_null_truth_filter",
     "join_groupby_stress",
     "storage_offset",
     "float_group_key",
@@ -265,6 +271,14 @@ def generate_program(
             col = rnd.choice(comparable_cols)
             typ = col_types[col]
             cmp_ops = ["==", "!="] if typ in {"str", "bool"} else [">", ">=", "<", "<=", "==", "!="]
+            if bughunt_profile and typ in {"int", "float"} and rnd.random() < 0.35:
+                cmp_ops = [
+                    "gt_is_not_true",
+                    "ge_is_not_true",
+                    "lt_is_not_false",
+                    "le_is_not_false",
+                    *cmp_ops,
+                ]
             base_cols = {c.name for c in table.columns}
             value = _literal_for_column(rnd, table, col) if col in base_cols else _literal_for_type(rnd, typ)
             ops.append({"op": "filter", "column": col, "cmp": rnd.choice(cmp_ops), "value": value})
@@ -313,9 +327,7 @@ def generate_program(
             used_aliases = set()
             for val in rnd.sample(numeric_cols, agg_count):
                 func = rnd.choice(["sum", "min", "max", "count"])
-                alias = f"{func}_{val}"
-                if alias in used_aliases:
-                    alias = f"{alias}_{len(used_aliases)}"
+                alias = make_safe_output_name(f"{func}_{val}", used=used_aliases | set(keys))
                 used_aliases.add(alias)
                 aggs.append({"column": val, "func": func, "as": alias})
             ops.append({"op": "groupby", "keys": keys, "aggs": aggs})
@@ -329,9 +341,76 @@ def generate_program(
 
     if type_aware:
         ops = repair_operations(table, ops, extra_tables=extra_tables)
+        if bughunt_profile:
+            ops = _add_bughunt_order_projection_probe(ops, table, extra_tables, rnd)
     if not ops:
         ops.append({"op": "limit", "n": len(table.rows)})
     return Program(program_id=f"prog-{seed:08d}", seed=seed, operations=ops)
+
+
+def _add_bughunt_order_projection_probe(
+    ops: list[dict[str, Any]],
+    table: TableData,
+    extra_tables: list[TableData],
+    rnd: random.Random,
+) -> list[dict[str, Any]]:
+    if rnd.random() >= 0.35:
+        return ops
+    available = _available_columns_after_operations(table, ops, extra_tables=extra_tables)
+    if len(available) < 2:
+        return ops
+
+    primary = rnd.choice(available)
+    selected_candidates = [column for column in available if column != primary]
+    selected_count = rnd.randint(1, min(3, len(selected_candidates)))
+    selected = sorted(rnd.sample(selected_candidates, selected_count))
+    sort_columns = [primary] + sorted(column for column in available if column != primary)
+    out = list(ops)
+    out.append(_random_sort_op(rnd, sort_columns, allow_mixed=True))
+    out.append({"op": "select", "columns": selected})
+    if rnd.random() < 0.75:
+        if rnd.random() < 0.70:
+            out.append({"op": "limit", "n": rnd.randint(1, max(1, min(len(table.rows) + 2, 8)))})
+        else:
+            out.append({"op": "offset", "n": rnd.randint(0, 2)})
+    return out
+
+
+def _available_columns_after_operations(
+    table: TableData,
+    ops: list[dict[str, Any]],
+    extra_tables: list[TableData] | None = None,
+) -> list[str]:
+    extra_tables = extra_tables or []
+    table_by_name = {t.name: t for t in [table] + extra_tables}
+    available = [column.name for column in table.columns]
+    for op in ops:
+        kind = op.get("op")
+        if kind == "join":
+            right = table_by_name.get(str(op.get("table", "")))
+            if right is not None:
+                available.extend(
+                    column.name
+                    for column in right.columns
+                    if column.name != op.get("right_on") and column.name not in available
+                )
+        elif kind == "select":
+            selected = [str(column) for column in op.get("columns", [])]
+            available = [column for column in selected if column in available]
+        elif kind == "mutate":
+            column = str(op.get("column", ""))
+            if column:
+                available = [existing for existing in available if existing != column] + [column]
+        elif kind == "groupby":
+            available = unique_preserve_order(
+                [str(key) for key in op.get("keys", [])]
+                + [str(agg.get("as", "")) for agg in op.get("aggs", []) if agg.get("as")]
+            )
+        elif kind == "aggregate":
+            available = unique_preserve_order(
+                [str(agg.get("as", "")) for agg in op.get("aggs", []) if agg.get("as")]
+            )
+    return unique_preserve_order(available)
 
 
 def _random_mutate_expr(
@@ -406,7 +485,8 @@ def _generate_type_oblivious_operation(
     numeric_cols = table.numeric_columns()
     agg_col = rnd.choice(numeric_cols or available_cols)
     func = rnd.choice(["sum", "min", "max", "count"])
-    return {"op": "groupby", "keys": [col], "aggs": [{"column": agg_col, "func": func, "as": f"{func}_{agg_col}"}]}
+    alias = make_safe_output_name(f"{func}_{agg_col}", used={col})
+    return {"op": "groupby", "keys": [col], "aggs": [{"column": agg_col, "func": func, "as": alias}]}
 
 
 def repair_operations(
@@ -427,6 +507,8 @@ def repair_operations(
     col_types = {c.name: c.type for c in table.columns}
     numeric = {c.name for c in table.columns if c.type in {"int", "float"}}
     strings = {c.name for c in table.columns if c.type == "str"}
+    order_pending = False
+    pending_order_columns: set[str] = set()
     for op in ops:
         kind = op["op"]
         if kind == "join":
@@ -450,6 +532,8 @@ def repair_operations(
                     numeric.add(col.name)
                 if col.type == "str":
                     strings.add(col.name)
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "filter":
             if op["column"] not in available:
                 continue
@@ -479,25 +563,31 @@ def repair_operations(
                     repaired.append({"op": "sort", "keys": [key.to_dict() for key in full_keys]})
                 else:
                     repaired.append({**op, "columns": [key.column for key in full_keys]})
+                order_pending = True
+                pending_order_columns = {key.column for key in full_keys}
         elif kind == "limit":
-            if repaired and repaired[-1].get("op") == "sort":
+            if order_pending:
                 repaired.append(op)
             break
         elif kind == "offset":
-            if repaired and repaired[-1].get("op") == "sort":
+            if order_pending:
                 repaired.append({"op": "offset", "n": max(0, int(op.get("n", 0)))})
         elif kind == "mutate":
             expr = op["expr"]
             out_type = _mutate_output_type(expr, available, numeric, strings, col_types)
             if out_type is None:
                 continue
+            column = str(op["column"])
             repaired.append(op)
-            available.add(op["column"])
-            col_types[op["column"]] = out_type
+            available.add(column)
+            col_types[column] = out_type
             if out_type in {"int", "float"}:
-                numeric.add(op["column"])
+                numeric.add(column)
             if out_type == "str":
-                strings.add(op["column"])
+                strings.add(column)
+            if column in pending_order_columns:
+                order_pending = False
+                pending_order_columns = set()
         elif kind == "groupby":
             keys = unique_preserve_order([k for k in op["keys"] if k in available])
             aggs = [a for a in op["aggs"] if a["column"] in available and a["column"] in numeric]
@@ -505,7 +595,7 @@ def repair_operations(
             seen_aliases: set[str] = set()
             for agg in aggs:
                 alias = str(agg.get("as", ""))
-                if not alias or alias in seen_aliases:
+                if not alias or alias in seen_aliases or alias in keys or is_reserved_output_name(alias):
                     continue
                 seen_aliases.add(alias)
                 unique_aggs.append(agg)
@@ -519,13 +609,15 @@ def repair_operations(
             strings = {k for k in keys if col_types.get(k) == "str"}
             for agg in aggs:
                 col_types[agg["as"]] = "int" if agg["func"] == "count" else col_types.get(agg["column"], "float")
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "aggregate":
             aggs = [a for a in op["aggs"] if a["column"] in available and a["column"] in numeric]
             unique_aggs = []
             seen_aliases: set[str] = set()
             for agg in aggs:
                 alias = str(agg.get("as", ""))
-                if not alias or alias in seen_aliases:
+                if not alias or alias in seen_aliases or is_reserved_output_name(alias):
                     continue
                 seen_aliases.add(alias)
                 unique_aggs.append(agg)
@@ -537,6 +629,8 @@ def repair_operations(
             strings = set()
             for agg in unique_aggs:
                 col_types[agg["as"]] = "int" if agg["func"] == "count" else col_types.get(agg["column"], "float")
+            order_pending = False
+            pending_order_columns = set()
     return repaired
 
 
@@ -596,7 +690,7 @@ def _mutate_output_type(
 
 
 def _filter_literal_is_valid(column_type: str, comparator: Any, value: Any) -> bool:
-    if column_type in {"str", "bool"} and comparator not in {"==", "!="}:
+    if not filter_comparator_supports_type(column_type, comparator):
         return False
     if value is None:
         return True
@@ -618,8 +712,16 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_filter_null_agg_topk_case(seed)
     if profile == "join_null_agg_topk" and type_aware:
         return generate_join_null_agg_topk_case(seed)
+    if profile == "join_null_key_topk" and type_aware:
+        return generate_join_null_key_topk_case(seed)
+    if profile == "wide_offset_topk" and type_aware:
+        return generate_wide_offset_topk_case(seed)
+    if profile == "empty_filter_groupby" and type_aware:
+        return generate_empty_filter_groupby_case(seed)
     if profile == "join_filter_groupby" and type_aware:
         return generate_join_filter_groupby_case(seed)
+    if profile == "join_null_truth_filter" and type_aware:
+        return generate_join_null_truth_filter_case(seed)
     if profile == "join_groupby_stress" and type_aware:
         return generate_join_groupby_stress_case(seed)
     if profile == "storage_offset" and type_aware:
@@ -886,6 +988,180 @@ def generate_join_null_agg_topk_case(seed: int) -> Case:
     )
 
 
+def generate_join_null_key_topk_case(seed: int) -> Case:
+    rnd = random.Random(seed * 82_589_933 + 43)
+    left = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("x", "int", nullable=True),
+        ],
+        [
+            {"id": 1, "g": "a", "x": -1},
+            {"id": 2, "g": "b", "x": 2},
+            {"id": 3, "g": "c", "x": rnd.choice([0, 3, 5])},
+        ],
+    )
+    right = TableData(
+        "t1",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("j", "int", nullable=True),
+            ColumnSpec("tag", "str", nullable=True),
+        ],
+        [
+            {"id": 2, "j": rnd.choice([5, 7, 9]), "tag": "match"},
+            {"id": 9, "j": rnd.choice([11, None]), "tag": "orphan"},
+        ],
+    )
+    program = Program(
+        f"prog-{seed:08d}-join-null-key-topk",
+        seed,
+        [
+            {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+            {
+                "op": "groupby",
+                "keys": ["j"],
+                "aggs": [{"column": "x", "func": "count", "as": "count_x"}],
+            },
+            {"op": "select", "columns": ["j"]},
+            {
+                "op": "sort",
+                "keys": [
+                    {
+                        "column": "j",
+                        "ascending": rnd.choice([True, False]),
+                        "nulls": rnd.choice(["first", "last"]),
+                    }
+                ],
+            },
+            {"op": "limit", "n": 5},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-join-null-key-topk",
+        seed=seed,
+        tables=[left, right],
+        program=program,
+        metadata={
+            "generator_profile": "join_null_key_topk",
+            "source_issue": "https://github.com/apache/datafusion/issues/22190",
+        },
+    )
+
+
+def generate_wide_offset_topk_case(seed: int) -> Case:
+    rnd = random.Random(seed * 99_991 + 47)
+    payload_columns = [
+        ColumnSpec(f"p_{idx}", "float" if idx % 3 == 0 else "int", nullable=True)
+        for idx in range(18)
+    ]
+    columns = [
+        ColumnSpec("id", "int", nullable=False),
+        ColumnSpec("sort_key", "int", nullable=True),
+        *payload_columns,
+    ]
+    row_count = 384
+    rows: list[dict[str, Any]] = []
+    for idx in range(row_count):
+        row: dict[str, Any] = {
+            "id": idx,
+            "sort_key": None if idx % 97 == 0 else (row_count - idx + (idx % 7)),
+        }
+        for column in payload_columns:
+            payload_idx = int(column.name.split("_", 1)[1])
+            if idx % (payload_idx + 11) == 0:
+                row[column.name] = None
+            elif column.type == "float":
+                row[column.name] = round((idx * (payload_idx + 1)) / 13.0, 6)
+            else:
+                row[column.name] = idx * (payload_idx + 1)
+        rows.append(row)
+    offset_n = rnd.randint(240, 340)
+    limit_n = rnd.randint(1, 4)
+    table = TableData("t0", columns, rows)
+    program = Program(
+        f"prog-{seed:08d}-wide-offset-topk",
+        seed,
+        [
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "sort_key", "ascending": True, "nulls": "last"},
+                    {"column": "id", "ascending": True, "nulls": "last"},
+                ],
+            },
+            {"op": "offset", "n": offset_n},
+            {"op": "limit", "n": limit_n},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-wide-offset-topk",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "wide_offset_topk",
+            "source_issue": "https://github.com/duckdb/duckdb/issues/11261",
+            "row_count": row_count,
+            "offset": offset_n,
+            "limit": limit_n,
+        },
+    )
+
+
+def generate_empty_filter_groupby_case(seed: int) -> Case:
+    rnd = random.Random(seed * 1_299_709 + 53)
+    rows = [
+        {"id": 0, "g": "a", "x": 1, "lane": "keep"},
+        {"id": 1, "g": "a", "x": None, "lane": "keep"},
+        {"id": 2, "g": "b", "x": 2, "lane": "skip"},
+        {"id": 3, "g": None, "x": rnd.choice([3, None]), "lane": "skip"},
+    ]
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("x", "int", nullable=True),
+            ColumnSpec("lane", "str", nullable=False),
+        ],
+        rows,
+    )
+    program = Program(
+        f"prog-{seed:08d}-empty-filter-groupby",
+        seed,
+        [
+            {"op": "filter", "column": "lane", "cmp": "==", "value": "missing"},
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [{"column": "x", "func": "count", "as": "count_x"}],
+            },
+            {"op": "select", "columns": ["g", "count_x"]},
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "g", "ascending": True, "nulls": "last"},
+                    {"column": "count_x", "ascending": True, "nulls": "last"},
+                ],
+            },
+            {"op": "limit", "n": 4},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-empty-filter-groupby",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "empty_filter_groupby",
+            "source_issue": "https://github.com/pandas-dev/pandas/issues/43767",
+        },
+    )
+
+
 def generate_join_filter_groupby_case(seed: int) -> Case:
     rnd = random.Random(seed * 91815541 + 33)
     left = TableData(
@@ -947,6 +1223,65 @@ def generate_join_filter_groupby_case(seed: int) -> Case:
         seed=seed,
         tables=[left, right],
         program=program,
+    )
+
+
+def generate_join_null_truth_filter_case(seed: int) -> Case:
+    rnd = random.Random(seed * 97_409 + 37)
+    left = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=False),
+            ColumnSpec("x", "int", nullable=True),
+        ],
+        [
+            {"id": 1, "g": "a", "x": 10},
+            {"id": 2, "g": "b", "x": 20},
+            {"id": 3, "g": "c", "x": 30},
+            {"id": 4, "g": "d", "x": 40},
+        ],
+    )
+    right = TableData(
+        "t1",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("j", "int", nullable=True),
+            ColumnSpec("z", "float", nullable=True),
+            ColumnSpec("tag", "str", nullable=True),
+        ],
+        [
+            {"id": 1, "j": 100, "z": 1.0, "tag": "p"},
+            {"id": 2, "j": 200, "z": 2.0, "tag": "q"},
+            {"id": 5, "j": 300, "z": 3.0, "tag": "r"},
+        ],
+    )
+    threshold = rnd.choice([125, 150, 175])
+    program = Program(
+        f"prog-{seed:08d}-join-null-truth-filter",
+        seed,
+        [
+            {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+            {"op": "filter", "column": "j", "cmp": "gt_is_not_true", "value": threshold},
+            {"op": "select", "columns": ["id", "g", "j", "tag"]},
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "g", "ascending": True, "nulls": "last"},
+                    {"column": "id", "ascending": True, "nulls": "last"},
+                ],
+            },
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-join-null-truth-filter",
+        seed=seed,
+        tables=[left, right],
+        program=program,
+        metadata={
+            "generator_profile": "join_null_truth_filter",
+            "source_issue": "https://github.com/apache/datafusion/issues/22441",
+        },
     )
 
 

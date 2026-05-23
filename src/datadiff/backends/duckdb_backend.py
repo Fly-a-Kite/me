@@ -6,6 +6,7 @@ import os
 
 from datadiff.backends.base import Backend, BackendResult
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
+from datadiff.filtering import sql_filter_condition
 
 
 def _quote(name: str) -> str:
@@ -96,15 +97,54 @@ class DuckDBBackend(Backend):
             ctes: list[tuple[str, str]] = []
             relation = _quote(tables[0].name)
             pending_order: list[SortKey] | None = None
+            visible_cols = list(current_cols)
+            hidden_order_cols: list[str] = []
 
             def add_step(sql: str) -> str:
                 name = f"step_{len(ctes)}"
                 ctes.append((name, sql))
                 return _quote(name)
 
+            def visible_projection() -> str:
+                return ", ".join(f"q.{_quote(col)}" for col in visible_cols)
+
+            def drop_hidden_order_cols() -> None:
+                nonlocal relation, current_cols, hidden_order_cols
+                if not hidden_order_cols:
+                    return
+                relation = add_step(f"SELECT {visible_projection()} FROM {relation} q")
+                current_cols = list(visible_cols)
+                hidden_order_cols = []
+
+            def select_with_pending_order(cols: list[str]) -> str:
+                nonlocal pending_order, hidden_order_cols
+                if pending_order is None:
+                    return ", ".join(f"q.{_quote(c)}" for c in cols)
+                projection = [f"q.{_quote(c)}" for c in cols]
+                selected = set(cols)
+                updated_order: list[SortKey] = []
+                for idx, key in enumerate(pending_order):
+                    if key.column in selected:
+                        updated_order.append(key)
+                        continue
+                    hidden = (
+                        key.column
+                        if key.column in hidden_order_cols
+                        else f"__datadiff_order_{len(hidden_order_cols)}_{idx}"
+                    )
+                    if hidden not in hidden_order_cols:
+                        projection.append(f"q.{_quote(key.column)} AS {_quote(hidden)}")
+                        hidden_order_cols.append(hidden)
+                    else:
+                        projection.append(f"q.{_quote(hidden)}")
+                    updated_order.append(SortKey(hidden, key.ascending, key.nulls))
+                pending_order = updated_order
+                return ", ".join(projection)
+
             for op in program.operations:
                 kind = op["op"]
                 if kind == "join":
+                    drop_hidden_order_cols()
                     right = table_by_name[op["table"]]
                     right_cols = [
                         f"r.{_quote(c.name)} AS {_quote(c.name)}"
@@ -122,18 +162,19 @@ class DuckDBBackend(Backend):
                         for c in right.columns
                         if c.name != op["right_on"] and c.name not in current_cols
                     )
+                    visible_cols = list(current_cols)
                     pending_order = None
                 elif kind == "filter":
-                    cmp = op["cmp"]
-                    col = _quote(op["column"])
-                    relation = add_step(f"SELECT * FROM {relation} q WHERE q.{col} {cmp} {_lit(op['value'])}")
+                    condition = sql_filter_condition(f"q.{_quote(op['column'])}", _lit(op["value"]), op["cmp"])
+                    relation = add_step(f"SELECT * FROM {relation} q WHERE {condition}")
                 elif kind == "select":
-                    cols = ", ".join(_quote(c) for c in op["columns"])
-                    relation = add_step(f"SELECT {cols} FROM {relation} q")
-                    current_cols = list(op["columns"])
-                    if pending_order is not None:
-                        pending_order = pending_order if {key.column for key in pending_order}.issubset(current_cols) else None
+                    cols = list(op["columns"])
+                    projection = select_with_pending_order(cols)
+                    relation = add_step(f"SELECT {projection} FROM {relation} q")
+                    visible_cols = cols
+                    current_cols = cols + [col for col in hidden_order_cols if col not in cols]
                 elif kind == "sort":
+                    drop_hidden_order_cols()
                     pending_order = normalize_sort_keys(op)
                 elif kind == "limit":
                     if pending_order is not None:
@@ -143,7 +184,6 @@ class DuckDBBackend(Backend):
                         )
                     else:
                         relation = add_step(f"SELECT * FROM {relation} q LIMIT {int(op['n'])}")
-                    pending_order = None
                 elif kind == "offset":
                     if pending_order is not None:
                         relation = add_step(
@@ -152,7 +192,6 @@ class DuckDBBackend(Backend):
                         )
                     else:
                         relation = add_step(f"SELECT * FROM {relation} q OFFSET {int(op['n'])}")
-                    pending_order = None
                 elif kind == "mutate":
                     expr = op["expr"]
                     if expr["kind"] == "add_const":
@@ -171,9 +210,12 @@ class DuckDBBackend(Backend):
                         raise ValueError(expr["kind"])
                     projection, current_cols = _replace_projection(current_cols, op["column"], expr_sql)
                     relation = add_step(f"SELECT {projection} FROM {relation} q")
+                    visible_cols = [col for col in visible_cols if col != op["column"]] + [op["column"]]
                     if pending_order is not None and op["column"] in {key.column for key in pending_order}:
                         pending_order = None
+                        drop_hidden_order_cols()
                 elif kind == "groupby":
+                    drop_hidden_order_cols()
                     keys = list(op["keys"])
                     key_sql = ", ".join(_quote(k) for k in keys)
                     agg_sql = []
@@ -185,19 +227,24 @@ class DuckDBBackend(Backend):
                         f"GROUP BY {key_sql}"
                     )
                     current_cols = keys + [agg["as"] for agg in op["aggs"]]
+                    visible_cols = list(current_cols)
                     pending_order = None
                 elif kind == "aggregate":
+                    drop_hidden_order_cols()
                     agg_sql = []
                     for agg in op["aggs"]:
                         func = "COUNT" if agg["func"] == "count" else agg["func"].upper()
                         agg_sql.append(f"{func}({_quote(agg['column'])}) AS {_quote(agg['as'])}")
                     relation = add_step(f"SELECT {', '.join(agg_sql)} FROM {relation} q")
                     current_cols = [agg["as"] for agg in op["aggs"]]
+                    visible_cols = list(current_cols)
                     pending_order = None
                 else:
                     raise ValueError(kind)
             if pending_order is not None:
-                relation = add_step(f"SELECT * FROM {relation} q ORDER BY {_order_clause(pending_order)}")
+                relation = add_step(f"SELECT {visible_projection()} FROM {relation} q ORDER BY {_order_clause(pending_order)}")
+            else:
+                drop_hidden_order_cols()
             if ctes:
                 cte_sql = ", ".join(f"{_quote(name)} AS ({sql})" for name, sql in ctes)
                 query = f"WITH {cte_sql} SELECT * FROM {relation}"

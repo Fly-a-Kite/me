@@ -76,8 +76,8 @@ def test_feedback_source_scheduler_prefers_productive_mutations():
         preflight={"valid": True, "fallback_used": False},
         candidate_bug=True,
     )
-    assert feedback_reward == 3.5
-    assert state.last_source_reward == 3.5
+    assert feedback_reward == 4.5
+    assert state.last_source_reward == 4.5
 
     third = state.choose_case(9, generated)
     assert third.case_id.endswith("-mut-9")

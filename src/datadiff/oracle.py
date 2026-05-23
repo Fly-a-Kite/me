@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from datadiff.dsl import Case, normalize_sort_keys
+from datadiff.filtering import evaluate_filter_predicate, parse_filter_comparator
 from datadiff.normalizer import NormalizedResult
 
 
@@ -28,6 +29,7 @@ class Finding:
     triage_evidence: str = ""
     recommendation: list[str] = field(default_factory=list)
     documentation_refs: list[dict[str, str]] = field(default_factory=list)
+    mismatch_class: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -64,6 +66,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "grouped_topk_null_sort_key"
     if _case_has_float_group_key_instability(case, normalized):
         return "float_group_key_instability"
+    if _case_has_outer_join_truth_filter(case):
+        return "outer_join_truth_filter"
     if any(op in {"groupby", "aggregate"} for op in ops):
         return "groupby_aggregation"
     if any(op == "join" for op in ops):
@@ -117,6 +121,20 @@ def _case_uses_modulo(case: Case) -> bool:
         and op.get("expr", {}).get("op") == "mod"
         for op in case.program.operations
     )
+
+
+def _case_has_outer_join_truth_filter(case: Case) -> bool:
+    after_left_join = False
+    for op in case.program.operations:
+        if op.get("op") == "join":
+            after_left_join = op.get("how") == "left"
+        elif op.get("op") == "filter" and after_left_join:
+            parsed = parse_filter_comparator(op.get("cmp", ""))
+            if parsed is not None and parsed.truth_test is not None:
+                return True
+        elif op.get("op") in {"groupby", "aggregate"}:
+            after_left_join = False
+    return False
 
 
 def _case_has_grouped_topk_null_sort_key(case: Case) -> bool:
@@ -356,24 +374,10 @@ def _filter_samples(samples: dict[str, list[Any]], op: dict[str, Any]) -> dict[s
 
 
 def _compare_value(left: Any, comparator: str, right: Any) -> bool:
-    if left is None or right is None:
-        return False
     try:
-        if comparator == ">":
-            return left > right
-        if comparator == ">=":
-            return left >= right
-        if comparator == "<":
-            return left < right
-        if comparator == "<=":
-            return left <= right
-        if comparator == "==":
-            return left == right
-        if comparator == "!=":
-            return left != right
+        return evaluate_filter_predicate(left, comparator, right)
     except Exception:
         return False
-    return False
 
 
 def _eval_expr_samples(samples: dict[str, list[Any]], expr: dict[str, Any]) -> list[Any] | None:
@@ -472,6 +476,7 @@ def evaluate_case(case: Case, normalized: dict[str, NormalizedResult]) -> list[F
             root_cause=classify_root_cause(case, normalized, kind),
             oracle="differential",
             confidence="high",
+            mismatch_class="accept_reject",
         ))
         return findings
 
@@ -488,6 +493,7 @@ def evaluate_case(case: Case, normalized: dict[str, NormalizedResult]) -> list[F
             root_cause=classify_root_cause(case, normalized, kind),
             oracle="differential",
             confidence="medium",
+            mismatch_class="exception_taxonomy",
         ))
         return findings
 
@@ -508,15 +514,37 @@ def evaluate_case(case: Case, normalized: dict[str, NormalizedResult]) -> list[F
             sig = _signature(case, normalized, "semantic_output_mismatch")
             kind = "semantic_output_mismatch"
             shapes = {b: (len(r.rows), len(r.columns)) for b, r in ok.items()}
+            mismatch_class = _semantic_mismatch_class(ok)
             findings.append(Finding(
                 finding_id=f"finding-{sig}",
                 kind=kind,
                 severity="critical",
                 suspicious_backends=suspicious,
-                evidence=f"Backends returned different canonical tables; shapes={shapes}",
+                evidence=f"Backends returned different canonical tables; mismatch_class={mismatch_class}; shapes={shapes}",
                 signature=sig,
                 root_cause=classify_root_cause(case, normalized, kind),
                 oracle="differential",
                 confidence="high" if len(suspicious) < len(ok) else "medium",
+                mismatch_class=mismatch_class,
             ))
     return findings
+
+
+def _semantic_mismatch_class(ok_results: dict[str, NormalizedResult]) -> str:
+    columns = [tuple(result.columns) for result in ok_results.values()]
+    if len(set(columns)) > 1:
+        return "schema"
+    row_counts = [len(result.rows) for result in ok_results.values()]
+    if len(set(row_counts)) > 1:
+        return "row_count"
+    ordered = [_stable_rows(result.rows) for result in ok_results.values()]
+    if len({tuple(rows) for rows in ordered}) <= 1:
+        return "none"
+    unordered = [tuple(sorted(rows)) for rows in ordered]
+    if len(set(unordered)) == 1:
+        return "row_order"
+    return "value"
+
+
+def _stable_rows(rows: list[list[Any]]) -> list[str]:
+    return [json.dumps(row, ensure_ascii=False, sort_keys=True) for row in rows]

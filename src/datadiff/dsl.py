@@ -71,11 +71,12 @@ class Program:
 
     @property
     def order_sensitive(self) -> bool:
+        row_order_preserving = {"filter", "select", "mutate", "limit", "offset"}
         for op in reversed(self.operations):
             kind = op.get("op")
             if kind == "sort":
                 return True
-            if kind in {"select", "limit", "offset"}:
+            if kind in row_order_preserving:
                 continue
             return False
         return False

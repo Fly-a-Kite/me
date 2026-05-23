@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from datadiff.dsl import Case, SortKey, normalize_sort_keys
+from datadiff.filtering import evaluate_filter_predicate, filter_comparator_supports_type, is_filter_comparator
+from datadiff.identifiers import is_reserved_output_name
 from datadiff.normalizer import NormalizedResult, _norm_value
 from datadiff.oracle import Finding
 from datadiff.util import unique_preserve_order
@@ -101,7 +103,7 @@ def classify_finding(
             ],
         )
 
-    if _is_order_only_mismatch(normalized):
+    if _is_order_only_mismatch(normalized) and not case.program.order_sensitive:
         return Classification(
             verdict="normalizer_false_positive",
             paper_status="exclude_normalizer_failure",
@@ -222,7 +224,7 @@ def validate_case_program(case: Case) -> list[str]:
         elif kind == "filter":
             if op.get("column") not in available:
                 errors.append(f"op {idx}: filter column {op.get('column')!r} is unavailable")
-            if op.get("cmp") not in {">", ">=", "<", "<=", "==", "!="}:
+            if not is_filter_comparator(op.get("cmp")):
                 errors.append(f"op {idx}: unsupported comparator {op.get('cmp')!r}")
             column_type = col_types.get(str(op.get("column")))
             if column_type is not None:
@@ -277,6 +279,9 @@ def validate_case_program(case: Case) -> list[str]:
             if not column:
                 errors.append(f"op {idx}: mutate output column is empty")
                 continue
+            if is_reserved_output_name(column):
+                errors.append(f"op {idx}: mutate output column {column!r} is reserved")
+                continue
             available.add(column)
             col_types[column] = out_type
             if out_type in {"int", "float"}:
@@ -298,6 +303,13 @@ def validate_case_program(case: Case) -> list[str]:
             aliases = [str(agg.get("as")) for agg in aggs if agg.get("as")]
             if len(unique_preserve_order(aliases)) != len(aliases):
                 errors.append(f"op {idx}: groupby contains duplicate aggregation aliases")
+            key_set = {str(key) for key in keys}
+            colliding_aliases = [alias for alias in aliases if alias in key_set]
+            if colliding_aliases:
+                errors.append(f"op {idx}: groupby aggregation aliases collide with keys: {colliding_aliases}")
+            reserved_aliases = [alias for alias in aliases if is_reserved_output_name(alias)]
+            if reserved_aliases:
+                errors.append(f"op {idx}: groupby aggregation aliases use reserved names: {reserved_aliases}")
             for agg in aggs:
                 col = agg.get("column")
                 if col not in available:
@@ -320,6 +332,9 @@ def validate_case_program(case: Case) -> list[str]:
             aliases = [str(agg.get("as")) for agg in aggs if agg.get("as")]
             if len(unique_preserve_order(aliases)) != len(aliases):
                 errors.append(f"op {idx}: aggregate contains duplicate aggregation aliases")
+            reserved_aliases = [alias for alias in aliases if is_reserved_output_name(alias)]
+            if reserved_aliases:
+                errors.append(f"op {idx}: aggregate aliases use reserved names: {reserved_aliases}")
             for agg in aggs:
                 col = agg.get("column")
                 if col not in available:
@@ -457,7 +472,7 @@ def _mutate_output_type(
 
 
 def _filter_literal_error(column_type: str, comparator: Any, value: Any) -> str:
-    if column_type in {"str", "bool"} and comparator not in {"==", "!="}:
+    if not filter_comparator_supports_type(column_type, comparator):
         return f"comparator {comparator!r} is not supported for {column_type} filter"
     if value is None:
         return ""
@@ -559,19 +574,26 @@ def _reference_result(case: Case) -> NormalizedResult | None:
                 rows = [out]
             else:
                 return None
-        return _normalize_reference_rows(columns, rows)
+        return _normalize_reference_rows(columns, rows, preserve_order=case.program.order_sensitive)
     except Exception:
         return None
 
 
-def _normalize_reference_rows(columns: list[str], rows: list[dict[str, Any]]) -> NormalizedResult:
+def _normalize_reference_rows(
+    columns: list[str],
+    rows: list[dict[str, Any]],
+    *,
+    preserve_order: bool = False,
+) -> NormalizedResult:
     column_positions = sorted(enumerate(columns), key=lambda item: (item[1], item[0]))
     out_columns = [name for _, name in column_positions]
     out_rows = [
         [_norm_value(row.get(columns[idx])) for idx, _ in column_positions]
         for row in rows
     ]
-    return NormalizedResult("dsl_reference", "ok", out_columns, sorted(out_rows, key=_stable_row_key))
+    if not preserve_order:
+        out_rows = sorted(out_rows, key=_stable_row_key)
+    return NormalizedResult("dsl_reference", "ok", out_columns, out_rows)
 
 
 def _stable_row_key(row: list[Any]) -> str:
@@ -581,21 +603,7 @@ def _stable_row_key(row: list[Any]) -> str:
 
 
 def _reference_compare(left: Any, comparator: str, right: Any) -> bool:
-    if left is None or right is None:
-        return False
-    if comparator == ">":
-        return bool(left > right)
-    if comparator == ">=":
-        return bool(left >= right)
-    if comparator == "<":
-        return bool(left < right)
-    if comparator == "<=":
-        return bool(left <= right)
-    if comparator == "==":
-        return bool(left == right)
-    if comparator == "!=":
-        return bool(left != right)
-    raise ValueError(comparator)
+    return evaluate_filter_predicate(left, comparator, right)
 
 
 def _reference_eval_expr(row: dict[str, Any], expr: dict[str, Any]) -> Any:

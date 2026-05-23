@@ -1,8 +1,12 @@
 import random
 
+from datadiff.classification_oracle import validate_case_program
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.mutator import (
     MUTATION_OPERATOR_NAMES,
+    _append_grouped_topk_probe,
+    _append_order_projection_probe,
+    _append_truth_filter_probe,
     _available_columns,
     _random_operation,
     mutate_case,
@@ -73,3 +77,59 @@ def test_mutate_case_with_metadata_records_lineage_and_operator():
 def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert {"value", "nullify_value", "duplicate_row", "drop_row", "shuffle_rows"}.issubset(MUTATION_OPERATOR_NAMES)
     assert {"append_op", "drop_op", "tweak_op"}.issubset(MUTATION_OPERATOR_NAMES)
+    assert "append_order_projection" in MUTATION_OPERATOR_NAMES
+    assert "append_truth_filter" in MUTATION_OPERATOR_NAMES
+    assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
+
+
+def test_append_order_projection_mutation_drops_sort_key_but_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+        [{"id": 0, "x": 2, "s": "b"}, {"id": 1, "x": 1, "s": "a"}],
+    )
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_order_projection_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_order_projection:")
+    sort_idx = next(idx for idx, op in enumerate(operations) if op["op"] == "sort")
+    assert operations[sort_idx + 1]["op"] == "select"
+    sort_op = operations[sort_idx]
+    select_op = operations[sort_idx + 1]
+    assert sort_op["keys"][0]["column"] not in set(select_op["columns"])
+    case = Case("case-mut-order", 1, [table], Program("prog-mut-order", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_truth_filter_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+        [{"id": 0, "x": 2, "s": "b"}, {"id": 1, "x": None, "s": "a"}],
+    )
+    operations = [{"op": "select", "columns": ["id", "x"]}]
+
+    detail = _append_truth_filter_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_truth_filter:")
+    assert operations[-1]["op"] == "filter"
+    assert operations[-1]["cmp"].endswith(("is_not_true", "is_not_false"))
+    case = Case("case-mut-truth-filter", 1, [table], Program("prog-mut-truth-filter", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_grouped_topk_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+        [{"id": 0, "x": 2, "s": "b"}, {"id": 1, "x": None, "s": "a"}],
+    )
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_grouped_topk_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_grouped_topk:")
+    assert [op["op"] for op in operations[-4:]] == ["groupby", "select", "sort", "limit"]
+    case = Case("case-mut-grouped-topk", 1, [table], Program("prog-mut-grouped-topk", 1, operations))
+    assert validate_case_program(case) == []

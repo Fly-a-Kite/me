@@ -161,6 +161,23 @@ def test_summarize_batch_run_counts_scheduler_signals(tmp_path: Path):
         },
         run_file,
     )
+    append_jsonl(
+        {
+            "case": {"case_id": "case-4", "seed": 4},
+            "case_index": 3,
+            "elapsed_s": 0.4,
+            "is_new_behavior": False,
+            "findings": [
+                {
+                    "root_cause": "unknown",
+                    "triage_verdict": "needs_manual_confirmation",
+                    "suspicious_backends": ["duckdb"],
+                    "signature": "sig-4",
+                }
+            ],
+        },
+        run_file,
+    )
     dump_json(
         {
             "elapsed_s": 0.5,
@@ -171,12 +188,13 @@ def test_summarize_batch_run_counts_scheduler_signals(tmp_path: Path):
 
     observation = summarize_batch_run(run_file)
 
-    assert observation.cases == 3
-    assert observation.findings == 3
+    assert observation.cases == 4
+    assert observation.findings == 4
     assert observation.candidate_bug_cases == 1
     assert observation.candidate_bug_families == {"grouped_topk_null_sort_key@datafusion"}
     assert observation.semantic_divergence_count == 1
     assert observation.false_positive_count == 1
+    assert observation.needs_confirmation_count == 1
     assert observation.new_behavior_cases == 1
     assert observation.throughput_cases_s == 6.0
     assert observation.first_candidate_bug_case_index == 0
