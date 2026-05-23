@@ -442,6 +442,15 @@ def _append_round_even_probe(tables: list[TableData], operations: list[dict[str,
     return f"append_round_even_probe:out={alias}"
 
 
+def _append_series_rtruediv_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
+    if not tables:
+        return "append_series_rtruediv_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("series_rtruediv_mismatch", used=set(available))
+    operations.append({"op": "series_rtruediv_probe", "as": alias})
+    return f"append_series_rtruediv_probe:out={alias}"
+
+
 def _append_grouped_topk_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
     if not tables:
         return "append_grouped_topk:none"
@@ -643,6 +652,9 @@ def _available_columns(tables: list[TableData], operations: list[dict[str, Any]]
         elif op.get("op") == "round_even_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif op.get("op") == "series_rtruediv_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif op.get("op") == "groupby":
             available = unique_preserve_order(list(op.get("keys", [])) + [agg["as"] for agg in op.get("aggs", [])])
         elif op.get("op") == "aggregate":
@@ -670,6 +682,8 @@ def _column_type(tables: list[TableData], name: str) -> str:
     if name == "bit_compare_mismatch" or name.startswith("bit_compare_mismatch_"):
         return "bool"
     if name == "round_even_mismatch" or name.startswith("round_even_mismatch_"):
+        return "bool"
+    if name == "series_rtruediv_mismatch" or name.startswith("series_rtruediv_mismatch_"):
         return "bool"
     return "float" if name.startswith(("m_", "sum_", "min_", "max_", "run_")) else "int"
 
@@ -719,6 +733,7 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_struct_distinct_probe", _append_struct_distinct_probe),
     MutationOperator("append_bit_compare_probe", _append_bit_compare_probe),
     MutationOperator("append_round_even_probe", _append_round_even_probe),
+    MutationOperator("append_series_rtruediv_probe", _append_series_rtruediv_probe),
     MutationOperator("append_grouped_topk", _append_grouped_topk_probe),
     MutationOperator("drop_op", _drop_operation),
     MutationOperator("tweak_op", _tweak_random_operation),

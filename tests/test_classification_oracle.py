@@ -924,6 +924,63 @@ def test_classification_reference_understands_round_even_probe():
     assert classification.implicated_backends == ["duckdb"]
 
 
+def test_validate_case_accepts_series_rtruediv_probe():
+    valid = Case(
+        "case-series-rtruediv-probe",
+        47,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-series-rtruediv-probe",
+            47,
+            [{"op": "series_rtruediv_probe", "as": "series_rtruediv_mismatch"}],
+        ),
+    )
+    bad_alias = Case(
+        "case-series-rtruediv-probe-alias",
+        48,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-series-rtruediv-probe-alias", 48, [{"op": "series_rtruediv_probe", "as": "where"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_series_rtruediv_probe():
+    case = Case(
+        "case-series-rtruediv-reference",
+        49,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-series-rtruediv-reference",
+            49,
+            [{"op": "series_rtruediv_probe", "as": "series_rtruediv_mismatch"}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "series_rtruediv_operand_order",
+        "confidence": "high",
+        "suspicious_backends": ["polars"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["series_rtruediv_mismatch"], [[False]]),
+        "polars": NormalizedResult("polars", "ok", ["series_rtruediv_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "series_rtruediv_operand_order"},
+        ["pandas", "polars"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["polars"]
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

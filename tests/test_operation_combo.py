@@ -123,6 +123,13 @@ def test_classify_operation_combo_tracks_round_even_float_scale_risk():
     assert "round_even_float_scale" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_series_rtruediv_operand_order_risk():
+    combo = classify_operation_combo([{"op": "series_rtruediv_probe"}])
+
+    assert combo["template"] == "series_rtruediv_probe"
+    assert "series_rtruediv_operand_order" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

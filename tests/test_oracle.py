@@ -353,6 +353,21 @@ def test_oracle_classifies_round_even_float_scale():
     assert findings[0].root_cause == "round_even_float_scale"
 
 
+def test_oracle_classifies_series_rtruediv_operand_order():
+    case = generate_case(370027, profile="series_rtruediv_operand_order")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["series_rtruediv_mismatch"], [[False]]),
+            "polars": NormalizedResult("polars", "ok", ["series_rtruediv_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "series_rtruediv_operand_order"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

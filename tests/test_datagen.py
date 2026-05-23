@@ -60,6 +60,9 @@ def _assert_program_columns_are_valid(case):
         elif op["op"] == "round_even_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
+        elif op["op"] == "series_rtruediv_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
         elif op["op"] == "groupby":
             assert set(op["keys"]).issubset(known_cols)
             assert len(op["keys"]) == len(set(op["keys"]))
@@ -161,6 +164,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "struct_distinct_unnest",
         "bit_compare_unequal_length",
         "round_even_float_scale",
+        "series_rtruediv_operand_order",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -692,6 +696,18 @@ def test_generate_case_round_even_float_scale_profile_is_supported_and_valid():
     assert "pattern:round_even_float_scale" in features
     assert "numeric:round-even" in features
     assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/19491"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_series_rtruediv_operand_order_profile_is_supported_and_valid():
+    case = generate_case(135, profile="series_rtruediv_operand_order")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000135-series-rtruediv-operand-order"
+    assert case.program.operations == [{"op": "series_rtruediv_probe", "as": "series_rtruediv_mismatch"}]
+    assert "pattern:series_rtruediv_operand_order" in features
+    assert "series:reverse-division" in features
+    assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/17760"
     assert validate_case_program(case) == []
 
 

@@ -43,6 +43,7 @@ GeneratorProfile = Literal[
     "struct_distinct_unnest",
     "bit_compare_unequal_length",
     "round_even_float_scale",
+    "series_rtruediv_operand_order",
 ]
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]

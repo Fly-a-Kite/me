@@ -89,6 +89,9 @@ class PolarsBackend(Backend):
                     df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "round_even_probe":
                     df = pl.DataFrame({op["as"]: [False]})
+                elif kind == "series_rtruediv_probe":
+                    mismatch = _polars_series_rtruediv_mismatch(pl)
+                    df = pl.DataFrame({op["as"]: [mismatch]})
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -248,6 +251,8 @@ class PolarsLazyBackend(PolarsBackend):
                 elif kind == "bit_compare_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "round_even_probe":
+                    lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "series_rtruediv_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))
@@ -438,6 +443,15 @@ def _polars_sql_window_avg_mismatch(pl) -> bool:
         """
     ).collect()
     observed = result.get_column("mean_avg").to_list()
+    return len(observed) != len(expected) or any(
+        actual is None or not math.isclose(float(actual), want, rel_tol=0.0, abs_tol=1e-12)
+        for actual, want in zip(observed, expected)
+    )
+
+
+def _polars_series_rtruediv_mismatch(pl) -> bool:
+    expected = [2.0, 1.5, 4.0 / 3.0]
+    observed = pl.Series([1, 2, 3]).__rtruediv__(pl.Series([2, 3, 4])).to_list()
     return len(observed) != len(expected) or any(
         actual is None or not math.isclose(float(actual), want, rel_tol=0.0, abs_tol=1e-12)
         for actual, want in zip(observed, expected)

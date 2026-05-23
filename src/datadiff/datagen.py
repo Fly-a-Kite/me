@@ -49,6 +49,7 @@ GeneratorProfile = Literal[
     "struct_distinct_unnest",
     "bit_compare_unequal_length",
     "round_even_float_scale",
+    "series_rtruediv_operand_order",
 ]
 
 
@@ -502,6 +503,9 @@ def _available_columns_after_operations(
         elif kind == "round_even_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "series_rtruediv_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "groupby":
             available = unique_preserve_order(
                 [str(key) for key in op.get("keys", [])]
@@ -820,6 +824,17 @@ def repair_operations(
             strings = set()
             order_pending = False
             pending_order_columns = set()
+        elif kind == "series_rtruediv_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "series_rtruediv_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "select":
             cols = unique_preserve_order([c for c in op["columns"] if c in available])
             if not cols:
@@ -1091,6 +1106,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_bit_compare_unequal_length_case(seed)
     if profile == "round_even_float_scale" and type_aware:
         return generate_round_even_float_scale_case(seed)
+    if profile == "series_rtruediv_operand_order" and type_aware:
+        return generate_series_rtruediv_operand_order_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -1176,6 +1193,12 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         )
     if seed % 103 == 69:
         return _as_bughunt_mixed_case(generate_round_even_float_scale_case(seed), seed, "round_even_float_scale")
+    if seed % 107 == 70:
+        return _as_bughunt_mixed_case(
+            generate_series_rtruediv_operand_order_case(seed),
+            seed,
+            "series_rtruediv_operand_order",
+        )
     return None
 
 
@@ -2901,6 +2924,32 @@ def generate_round_even_float_scale_case(seed: int) -> Case:
             "source_issue": "https://github.com/duckdb/duckdb/issues/19491",
             "expected_round_even_mismatch": False,
             "expected_round_even_value": 2.67,
+        },
+    )
+
+
+def generate_series_rtruediv_operand_order_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("series_rtruediv_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-series-rtruediv-operand-order",
+        seed,
+        [{"op": "series_rtruediv_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-series-rtruediv-operand-order",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "series_rtruediv_operand_order",
+            "source_issue": "https://github.com/pola-rs/polars/issues/17760",
+            "expected_series_rtruediv_mismatch": False,
+            "expected_series_rtruediv_values": [2.0, 1.5, 4.0 / 3.0],
         },
     )
 

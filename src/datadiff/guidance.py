@@ -85,6 +85,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "round_even_float_scale": {"pattern:round_even_float_scale"},
     "round_even_probe": {"op:round_even_probe"},
     "rounding": {"numeric:round-even", "float:decimal-scale"},
+    "series_rtruediv_operand_order": {"pattern:series_rtruediv_operand_order"},
+    "series_rtruediv_probe": {"op:series_rtruediv_probe"},
+    "reverse_division": {"series:reverse-division", "arithmetic:operand-order"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -174,6 +177,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_struct_distinct_probe = False
     has_bit_compare_probe = False
     has_round_even_probe = False
+    has_series_rtruediv_probe = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -256,6 +260,11 @@ def extract_case_features(case: Case) -> set[str]:
             features.add("float:decimal-scale")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_round_even_probe = True
+        elif kind == "series_rtruediv_probe":
+            features.add("series:reverse-division")
+            features.add("arithmetic:operand-order")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_series_rtruediv_probe = True
         elif kind == "select":
             width = len(op.get("columns", []))
             features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
@@ -393,6 +402,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:bit_compare_unequal_length")
     if has_round_even_probe:
         features.add("pattern:round_even_float_scale")
+    if has_series_rtruediv_probe:
+        features.add("pattern:series_rtruediv_operand_order")
     return features
 
 
@@ -993,6 +1004,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "series_rtruediv_probe":
+            score, op_buckets, samples = _series_rtruediv_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "select":
             cols = [str(column) for column in op.get("columns", []) if str(column) in samples]
             samples = {column: samples[column] for column in unique_preserve_order(cols)}
@@ -1437,6 +1453,12 @@ def _round_even_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], di
     return 0.90, buckets, {alias: [False]} if alias else {}
 
 
+def _series_rtruediv_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    buckets = ["series:reverse-division", "arithmetic:operand-order"]
+    return 0.90, buckets, {alias: [False]} if alias else {}
+
+
 def _groupby_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
     keys = [str(key) for key in op.get("keys", []) if str(key) in samples]
     buckets: list[str] = []
@@ -1810,6 +1832,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("bit_compare_unequal_length")
     if "pattern:round_even_float_scale" in features or "op:round_even_probe" in features:
         roots.add("round_even_float_scale")
+    if "pattern:series_rtruediv_operand_order" in features or "op:series_rtruediv_probe" in features:
+        roots.add("series_rtruediv_operand_order")
     if features & {
         "pattern:null_groupby_topk",
         "pattern:null_agg_topk",

@@ -254,6 +254,7 @@ def test_cli_parses_order_sensitive_bug_hunt_profiles():
         "struct_distinct_unnest",
         "bit_compare_unequal_length",
         "round_even_float_scale",
+        "series_rtruediv_operand_order",
     ]:
         args = parser.parse_args(["fuzz", "--profile", profile])
         assert args.cmd == "fuzz"
@@ -480,6 +481,9 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("round_even_float_scale").generator_profile == "round_even_float_scale"
     assert _preset_config("round_even_float_scale").guidance_targets[0] == "round_even_float_scale"
     assert _preset_config("round_even_float_scale_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("series_rtruediv_operand_order").generator_profile == "series_rtruediv_operand_order"
+    assert _preset_config("series_rtruediv_operand_order").guidance_targets[0] == "series_rtruediv_operand_order"
+    assert _preset_config("series_rtruediv_operand_order_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("join_null_sort").generator_profile == "join_null_sort"
     assert _preset_config("join_null_sort").guidance_targets[0] == "join_null_sort"
     assert _preset_config("join_null_sort_metamorphic").enable_metamorphic_oracle is True
@@ -562,6 +566,7 @@ def test_cli_parses_non_datafusion_live_presets():
         "struct_distinct_unnest",
         "bit_compare_unequal_length",
         "round_even_float_scale",
+        "series_rtruediv_operand_order",
     }.issubset(arrow.guidance_targets)
     assert arrow.enable_local_source_scheduler is True
 
