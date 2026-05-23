@@ -98,6 +98,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "pandas_arrow_timestamp_index_attr_semantics"
     if _case_has_dataset_isin_all_match_probe(case):
         return "pyarrow_dataset_isin_all_match_semantics"
+    if _case_has_rolling_mean_by_null_count_probe(case):
+        return "polars_rolling_mean_by_null_count_semantics"
     if _case_contains_special_float(case):
         return "nan_inf_semantics"
     if _case_uses_modulo(case):
@@ -236,6 +238,10 @@ def _case_has_arrow_timestamp_index_attr_probe(case: Case) -> bool:
 
 def _case_has_dataset_isin_all_match_probe(case: Case) -> bool:
     return any(op.get("op") == "dataset_isin_all_match_probe" for op in case.program.operations)
+
+
+def _case_has_rolling_mean_by_null_count_probe(case: Case) -> bool:
+    return any(op.get("op") == "rolling_mean_by_null_count_probe" for op in case.program.operations)
 
 
 def _case_uses_modulo(case: Case) -> bool:

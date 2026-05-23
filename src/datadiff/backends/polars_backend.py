@@ -114,6 +114,9 @@ class PolarsBackend(Backend):
                     df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "dataset_isin_all_match_probe":
                     df = pl.DataFrame({op["as"]: [False]})
+                elif kind == "rolling_mean_by_null_count_probe":
+                    mismatch = _polars_rolling_mean_by_null_count_mismatch(pl, lazy=False)
+                    df = pl.DataFrame({op["as"]: [mismatch]})
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -298,6 +301,9 @@ class PolarsLazyBackend(PolarsBackend):
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "dataset_isin_all_match_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "rolling_mean_by_null_count_probe":
+                    mismatch = _polars_rolling_mean_by_null_count_mismatch(pl, lazy=True)
+                    lf = pl.DataFrame({op["as"]: [mismatch]}).lazy()
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))
                 elif kind == "sort":
@@ -526,6 +532,35 @@ def _polars_empty_literal_groupby_mismatch(pl, *, lazy: bool) -> bool:
     if lazy:
         result = result.collect()
     return result.height != 0
+
+
+def _polars_rolling_mean_by_null_count_mismatch(pl, *, lazy: bool) -> bool:
+    from datetime import datetime
+
+    frame = pl.DataFrame(
+        {
+            "timestamp": pl.datetime_range(
+                datetime(year=2026, month=1, day=9, hour=5, minute=23, second=37),
+                datetime(year=2026, month=1, day=9, hour=5, minute=23, second=39),
+                interval="1s",
+                time_unit="ms",
+                eager=True,
+            ),
+            "power": [303, 498, None],
+        }
+    )
+    if lazy:
+        frame = frame.lazy()
+    result = frame.with_columns(
+        observed=pl.col("power").rolling_mean_by(
+            "timestamp",
+            window_size="2s",
+            min_samples=2,
+        )
+    )
+    if lazy:
+        result = result.collect()
+    return result.get_column("observed").to_list() != [None, 400.5, None]
 
 
 def _polars_filter_expr(col, comparator: str, value):

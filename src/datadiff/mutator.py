@@ -551,6 +551,17 @@ def _append_dataset_isin_all_match_probe(
     return f"append_dataset_isin_all_match_probe:out={alias}"
 
 
+def _append_rolling_mean_by_null_count_probe(
+    tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random
+) -> str:
+    if not tables:
+        return "append_rolling_mean_by_null_count_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("rolling_mean_by_null_count_mismatch", used=set(available))
+    operations.append({"op": "rolling_mean_by_null_count_probe", "as": alias})
+    return f"append_rolling_mean_by_null_count_probe:out={alias}"
+
+
 def _append_grouped_topk_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
     if not tables:
         return "append_grouped_topk:none"
@@ -785,6 +796,9 @@ def _available_columns(tables: list[TableData], operations: list[dict[str, Any]]
         elif op.get("op") == "dataset_isin_all_match_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif op.get("op") == "rolling_mean_by_null_count_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif op.get("op") == "groupby":
             available = unique_preserve_order(list(op.get("keys", [])) + [agg["as"] for agg in op.get("aggs", [])])
         elif op.get("op") == "aggregate":
@@ -834,6 +848,8 @@ def _column_type(tables: list[TableData], name: str) -> str:
     if name == "arrow_timestamp_index_attr_mismatch" or name.startswith("arrow_timestamp_index_attr_mismatch_"):
         return "bool"
     if name == "dataset_isin_all_match_mismatch" or name.startswith("dataset_isin_all_match_mismatch_"):
+        return "bool"
+    if name == "rolling_mean_by_null_count_mismatch" or name.startswith("rolling_mean_by_null_count_mismatch_"):
         return "bool"
     return "float" if name.startswith(("m_", "sum_", "min_", "max_", "run_")) else "int"
 
@@ -894,6 +910,7 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_arrow_timestamp_loc_slice_probe", _append_arrow_timestamp_loc_slice_probe),
     MutationOperator("append_arrow_timestamp_index_attr_probe", _append_arrow_timestamp_index_attr_probe),
     MutationOperator("append_dataset_isin_all_match_probe", _append_dataset_isin_all_match_probe),
+    MutationOperator("append_rolling_mean_by_null_count_probe", _append_rolling_mean_by_null_count_probe),
     MutationOperator("append_grouped_topk", _append_grouped_topk_probe),
     MutationOperator("drop_op", _drop_operation),
     MutationOperator("tweak_op", _tweak_random_operation),

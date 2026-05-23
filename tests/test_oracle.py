@@ -520,6 +520,22 @@ def test_oracle_classifies_pyarrow_dataset_isin_all_match_semantics():
     assert findings[0].root_cause == "pyarrow_dataset_isin_all_match_semantics"
 
 
+def test_oracle_classifies_polars_rolling_mean_by_null_count_semantics():
+    case = generate_case(370038, profile="polars_rolling_mean_by_null_count_semantics")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["rolling_mean_by_null_count_mismatch"], [[False]]),
+            "polars": NormalizedResult("polars", "ok", ["rolling_mean_by_null_count_mismatch"], [[True]]),
+            "polars_lazy": NormalizedResult("polars_lazy", "ok", ["rolling_mean_by_null_count_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "polars_rolling_mean_by_null_count_semantics"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

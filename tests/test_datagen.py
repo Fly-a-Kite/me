@@ -193,6 +193,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "pandas_arrow_timestamp_loc_slice_semantics",
         "pandas_arrow_timestamp_index_attr_semantics",
         "pyarrow_dataset_isin_all_match_semantics",
+        "polars_rolling_mean_by_null_count_semantics",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -866,6 +867,20 @@ def test_generate_case_pyarrow_dataset_isin_all_match_semantics_profile_is_suppo
     assert "pattern:pyarrow_dataset_isin_all_match_semantics" in features
     assert "pyarrow:dataset-isin-all-match" in features
     assert case.metadata["source_issue"] == "https://github.com/apache/arrow/issues/46183"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_polars_rolling_mean_by_null_count_semantics_profile_is_supported_and_valid():
+    case = generate_case(146, profile="polars_rolling_mean_by_null_count_semantics")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000146-polars-rolling-mean-by-null-count-semantics"
+    assert case.program.operations == [
+        {"op": "rolling_mean_by_null_count_probe", "as": "rolling_mean_by_null_count_mismatch"}
+    ]
+    assert "pattern:polars_rolling_mean_by_null_count_semantics" in features
+    assert "polars:rolling-mean-by-null-count" in features
+    assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/27661"
     assert validate_case_program(case) == []
 
 

@@ -140,6 +140,9 @@ class PyArrowBackend(Backend):
                     elif kind == "dataset_isin_all_match_probe":
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [_pyarrow_dataset_isin_all_match_mismatch(pa)]})
+                    elif kind == "rolling_mean_by_null_count_probe":
+                        current_cols = [op["as"]]
+                        current = pa.Table.from_pydict({op["as"]: [False]})
                     elif kind == "select":
                         current_cols = list(op["columns"])
                         current = current.select(current_cols)

@@ -26,6 +26,7 @@ CANONICAL_OPERATION_ORDER = (
     "arrow_timestamp_loc_slice_probe",
     "arrow_timestamp_index_attr_probe",
     "dataset_isin_all_match_probe",
+    "rolling_mean_by_null_count_probe",
     "groupby",
     "aggregate",
     "select",
@@ -151,6 +152,8 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("pandas_arrow_timestamp_index_attr_semantics")
     if "dataset_isin_all_match_probe" in op_set:
         risks.append("pyarrow_dataset_isin_all_match_semantics")
+    if "rolling_mean_by_null_count_probe" in op_set:
+        risks.append("polars_rolling_mean_by_null_count_semantics")
     if "groupby" in op_set:
         risks.append("groupby_aggregation")
     if "aggregate" in op_set:

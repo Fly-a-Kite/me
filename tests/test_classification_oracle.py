@@ -1521,6 +1521,68 @@ def test_classification_reference_understands_dataset_isin_all_match_probe():
     assert classification.implicated_backends == ["pyarrow"]
 
 
+def test_validate_case_accepts_rolling_mean_by_null_count_probe():
+    valid = Case(
+        "case-rolling-mean-by-null-count-probe",
+        80,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-rolling-mean-by-null-count-probe",
+            80,
+            [{"op": "rolling_mean_by_null_count_probe", "as": "rolling_mean_by_null_count_mismatch"}],
+        ),
+    )
+    bad_alias = Case(
+        "case-rolling-mean-by-null-count-probe-alias",
+        81,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-rolling-mean-by-null-count-probe-alias",
+            81,
+            [{"op": "rolling_mean_by_null_count_probe", "as": "where"}],
+        ),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_rolling_mean_by_null_count_probe():
+    case = Case(
+        "case-rolling-mean-by-null-count-reference",
+        82,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-rolling-mean-by-null-count-reference",
+            82,
+            [{"op": "rolling_mean_by_null_count_probe", "as": "rolling_mean_by_null_count_mismatch"}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "polars_rolling_mean_by_null_count_semantics",
+        "confidence": "high",
+        "suspicious_backends": ["polars", "polars_lazy"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["rolling_mean_by_null_count_mismatch"], [[False]]),
+        "polars": NormalizedResult("polars", "ok", ["rolling_mean_by_null_count_mismatch"], [[True]]),
+        "polars_lazy": NormalizedResult("polars_lazy", "ok", ["rolling_mean_by_null_count_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "polars_rolling_mean_by_null_count_semantics"},
+        ["reference", "polars", "polars_lazy"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["polars", "polars_lazy"]
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

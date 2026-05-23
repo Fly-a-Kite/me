@@ -118,6 +118,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "pyarrow_dataset_isin_all_match_semantics": {"pattern:pyarrow_dataset_isin_all_match_semantics"},
     "dataset_isin_all_match_probe": {"op:dataset_isin_all_match_probe"},
     "dataset_membership_filter": {"pyarrow:dataset-isin-all-match", "dataset:membership-filter"},
+    "polars_rolling_mean_by_null_count_semantics": {"pattern:polars_rolling_mean_by_null_count_semantics"},
+    "rolling_mean_by_null_count_probe": {"op:rolling_mean_by_null_count_probe"},
+    "rolling_temporal_nulls": {"polars:rolling-mean-by-null-count", "rolling:temporal-min-samples"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -218,6 +221,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_arrow_timestamp_loc_slice_probe = False
     has_arrow_timestamp_index_attr_probe = False
     has_dataset_isin_all_match_probe = False
+    has_rolling_mean_by_null_count_probe = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -355,6 +359,11 @@ def extract_case_features(case: Case) -> set[str]:
             features.add("dataset:membership-filter")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_dataset_isin_all_match_probe = True
+        elif kind == "rolling_mean_by_null_count_probe":
+            features.add("polars:rolling-mean-by-null-count")
+            features.add("rolling:temporal-min-samples")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_rolling_mean_by_null_count_probe = True
         elif kind == "select":
             width = len(op.get("columns", []))
             features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
@@ -514,6 +523,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:pandas_arrow_timestamp_index_attr_semantics")
     if has_dataset_isin_all_match_probe:
         features.add("pattern:pyarrow_dataset_isin_all_match_semantics")
+    if has_rolling_mean_by_null_count_probe:
+        features.add("pattern:polars_rolling_mean_by_null_count_semantics")
     return features
 
 
@@ -1169,6 +1180,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "rolling_mean_by_null_count_probe":
+            score, op_buckets, samples = _rolling_mean_by_null_count_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "select":
             cols = [str(column) for column in op.get("columns", []) if str(column) in samples]
             samples = {column: samples[column] for column in unique_preserve_order(cols)}
@@ -1679,6 +1695,12 @@ def _dataset_isin_all_match_frontier_score(op: dict[str, Any]) -> tuple[float, l
     return 0.90, buckets, {alias: [False]} if alias else {}
 
 
+def _rolling_mean_by_null_count_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    buckets = ["polars:rolling-mean-by-null-count", "rolling:temporal-min-samples"]
+    return 0.90, buckets, {alias: [False]} if alias else {}
+
+
 def _groupby_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
     keys = [str(key) for key in op.get("keys", []) if str(key) in samples]
     buckets: list[str] = []
@@ -2080,6 +2102,11 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("pandas_arrow_timestamp_index_attr_semantics")
     if "pattern:pyarrow_dataset_isin_all_match_semantics" in features or "op:dataset_isin_all_match_probe" in features:
         roots.add("pyarrow_dataset_isin_all_match_semantics")
+    if (
+        "pattern:polars_rolling_mean_by_null_count_semantics" in features
+        or "op:rolling_mean_by_null_count_probe" in features
+    ):
+        roots.add("polars_rolling_mean_by_null_count_semantics")
     if features & {
         "pattern:null_groupby_topk",
         "pattern:null_agg_topk",
