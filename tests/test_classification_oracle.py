@@ -790,6 +790,24 @@ def test_validate_case_accepts_scalar_subquery_probe():
     assert any("reserved" in error for error in validate_case_program(bad_alias))
 
 
+def test_validate_case_accepts_window_avg_probe():
+    valid = Case(
+        "case-window-avg-probe",
+        37,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-window-avg-probe", 37, [{"op": "window_avg_probe", "as": "window_avg_mismatch"}]),
+    )
+    bad_alias = Case(
+        "case-window-avg-probe-alias",
+        38,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-window-avg-probe-alias", 38, [{"op": "window_avg_probe", "as": "where"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

@@ -216,6 +216,7 @@ def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
         "simple_case_random_subject",
         "group_quantile_key_probe",
         "scalar_subquery_double_parentheses",
+        "window_avg_rows_frame",
     ]
     for profile in profiles:
         for seed in range(50):

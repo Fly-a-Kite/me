@@ -45,6 +45,7 @@ GeneratorProfile = Literal[
     "simple_case_random_subject",
     "group_quantile_key_probe",
     "scalar_subquery_double_parentheses",
+    "window_avg_rows_frame",
 ]
 
 
@@ -486,6 +487,9 @@ def _available_columns_after_operations(
         elif kind == "scalar_subquery_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "window_avg_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "groupby":
             available = unique_preserve_order(
                 [str(key) for key in op.get("keys", [])]
@@ -760,6 +764,17 @@ def repair_operations(
             strings = set()
             order_pending = False
             pending_order_columns = set()
+        elif kind == "window_avg_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "window_avg_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "select":
             cols = unique_preserve_order([c for c in op["columns"] if c in available])
             if not cols:
@@ -1023,6 +1038,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_group_quantile_key_probe_case(seed)
     if profile == "scalar_subquery_double_parentheses" and type_aware:
         return generate_scalar_subquery_double_parentheses_case(seed)
+    if profile == "window_avg_rows_frame" and type_aware:
+        return generate_window_avg_rows_frame_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -1096,6 +1113,8 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
             seed,
             "scalar_subquery_double_parentheses",
         )
+    if seed % 89 == 66:
+        return _as_bughunt_mixed_case(generate_window_avg_rows_frame_case(seed), seed, "window_avg_rows_frame")
     return None
 
 
@@ -2717,6 +2736,32 @@ def generate_scalar_subquery_double_parentheses_case(seed: int) -> Case:
             "source_issue": "https://github.com/duckdb/duckdb/issues/19851",
             "expected_scalar_subquery_mismatch": False,
             "expected_rows": [[2]],
+        },
+    )
+
+
+def generate_window_avg_rows_frame_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("window_avg_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-window-avg-rows-frame",
+        seed,
+        [{"op": "window_avg_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-window-avg-rows-frame",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "window_avg_rows_frame",
+            "source_issue": "https://github.com/pola-rs/polars/issues/26065",
+            "expected_window_avg_mismatch": False,
+            "expected_window_avg_values": [10.0, 15.0, 20.0, 25.0, 30.0],
         },
     )
 

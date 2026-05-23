@@ -68,6 +68,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "group_quantile_key_expression"
     if _case_has_scalar_subquery_probe(case):
         return "scalar_subquery_double_parentheses"
+    if _case_has_window_avg_probe(case):
+        return "window_avg_rows_frame"
     if _case_contains_special_float(case):
         return "nan_inf_semantics"
     if _case_uses_modulo(case):
@@ -146,6 +148,10 @@ def _case_has_group_quantile_probe(case: Case) -> bool:
 
 def _case_has_scalar_subquery_probe(case: Case) -> bool:
     return any(op.get("op") == "scalar_subquery_probe" for op in case.program.operations)
+
+
+def _case_has_window_avg_probe(case: Case) -> bool:
+    return any(op.get("op") == "window_avg_probe" for op in case.program.operations)
 
 
 def _case_uses_modulo(case: Case) -> bool:

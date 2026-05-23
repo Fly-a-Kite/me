@@ -39,6 +39,7 @@ GeneratorProfile = Literal[
     "simple_case_random_subject",
     "group_quantile_key_probe",
     "scalar_subquery_double_parentheses",
+    "window_avg_rows_frame",
 ]
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]

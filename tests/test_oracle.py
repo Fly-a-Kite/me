@@ -293,6 +293,21 @@ def test_oracle_classifies_scalar_subquery_double_parentheses():
     assert findings[0].root_cause == "scalar_subquery_double_parentheses"
 
 
+def test_oracle_classifies_window_avg_rows_frame():
+    case = generate_case(370023, profile="window_avg_rows_frame")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["window_avg_mismatch"], [[False]]),
+            "polars": NormalizedResult("polars", "ok", ["window_avg_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "window_avg_rows_frame"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

@@ -95,6 +95,13 @@ def test_classify_operation_combo_tracks_scalar_subquery_double_parentheses_risk
     assert "scalar_subquery_double_parentheses" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_window_avg_rows_frame_risk():
+    combo = classify_operation_combo([{"op": "window_avg_probe"}])
+
+    assert combo["template"] == "window_avg_probe"
+    assert "window_avg_rows_frame" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

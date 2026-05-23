@@ -6,6 +6,7 @@ from datadiff.mutator import (
     MUTATION_OPERATOR_NAMES,
     _append_group_quantile_probe,
     _append_scalar_subquery_probe,
+    _append_window_avg_probe,
     _append_boolean_predicate_filter_probe,
     _append_grouped_topk_probe,
     _append_order_projection_probe,
@@ -95,6 +96,7 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_random_case_probe" in MUTATION_OPERATOR_NAMES
     assert "append_group_quantile_probe" in MUTATION_OPERATOR_NAMES
     assert "append_scalar_subquery_probe" in MUTATION_OPERATOR_NAMES
+    assert "append_window_avg_probe" in MUTATION_OPERATOR_NAMES
     assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
 
 
@@ -279,6 +281,22 @@ def test_append_scalar_subquery_probe_mutation_stays_valid():
     assert detail.startswith("append_scalar_subquery_probe:")
     assert operations[-1] == {"op": "scalar_subquery_probe", "as": "scalar_subquery_mismatch"}
     case = Case("case-mut-scalar-subquery", 1, [table], Program("prog-mut-scalar-subquery", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_window_avg_probe_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int")],
+        [{"id": 0, "x": 2}],
+    )
+    operations = [{"op": "select", "columns": ["id"]}]
+
+    detail = _append_window_avg_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_window_avg_probe:")
+    assert operations[-1] == {"op": "window_avg_probe", "as": "window_avg_mismatch"}
+    case = Case("case-mut-window-avg", 1, [table], Program("prog-mut-window-avg", 1, operations))
     assert validate_case_program(case) == []
 
 

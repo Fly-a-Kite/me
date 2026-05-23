@@ -80,6 +80,9 @@ class PolarsBackend(Backend):
                     df = pl.DataFrame({op["as"]: [mismatch]})
                 elif kind == "scalar_subquery_probe":
                     df = pl.DataFrame({op["as"]: [False]})
+                elif kind == "window_avg_probe":
+                    mismatch = _polars_sql_window_avg_mismatch(pl)
+                    df = pl.DataFrame({op["as"]: [mismatch]})
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -231,6 +234,9 @@ class PolarsLazyBackend(PolarsBackend):
                     lf = pl.DataFrame({op["as"]: [mismatch]}).lazy()
                 elif kind == "scalar_subquery_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "window_avg_probe":
+                    mismatch = _polars_sql_window_avg_mismatch(pl)
+                    lf = pl.DataFrame({op["as"]: [mismatch]}).lazy()
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))
                 elif kind == "sort":
@@ -392,6 +398,38 @@ def _nearest_quantile(values: list[float], quantile: float) -> float:
     index = int(math.floor(quantile * (len(sorted_values) - 1) + 0.5))
     index = max(0, min(index, len(sorted_values) - 1))
     return float(sorted_values[index])
+
+
+def _polars_sql_window_avg_mismatch(pl) -> bool:
+    expected = [10.0, 15.0, 20.0, 25.0, 30.0]
+    ctx = pl.SQLContext()
+    ctx.register(
+        "df",
+        pl.DataFrame(
+            {
+                "foo": [1, 2, 3, 4, 5],
+                "bar": [10.0, 20.0, 30.0, 40.0, 50.0],
+            }
+        ).lazy(),
+    )
+    result = ctx.execute(
+        """
+        SELECT
+            foo,
+            bar,
+            AVG(bar) OVER (
+                ORDER BY foo
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS mean_avg
+        FROM df
+        ORDER BY foo
+        """
+    ).collect()
+    observed = result.get_column("mean_avg").to_list()
+    return len(observed) != len(expected) or any(
+        actual is None or not math.isclose(float(actual), want, rel_tol=0.0, abs_tol=1e-12)
+        for actual, want in zip(observed, expected)
+    )
 
 
 def _polars_filter_expr(col, comparator: str, value):

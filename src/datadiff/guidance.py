@@ -73,6 +73,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "scalar_subquery_double_parentheses": {"pattern:scalar_subquery_double_parentheses"},
     "scalar_subquery_probe": {"op:scalar_subquery_probe"},
     "correlated_subquery": {"subquery:correlated-scalar"},
+    "window_avg_rows_frame": {"pattern:window_avg_rows_frame"},
+    "window_avg_probe": {"op:window_avg_probe"},
+    "window_frame": {"window:rows-frame"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -158,6 +161,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_random_case_probe = False
     has_group_quantile_probe = False
     has_scalar_subquery_probe = False
+    has_window_avg_probe = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -220,6 +224,11 @@ def extract_case_features(case: Case) -> set[str]:
             features.add("subquery:nested-aggregate")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_scalar_subquery_probe = True
+        elif kind == "window_avg_probe":
+            features.add("window:rows-frame")
+            features.add("window:avg")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_window_avg_probe = True
         elif kind == "select":
             width = len(op.get("columns", []))
             features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
@@ -349,6 +358,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:group_quantile_key_probe")
     if has_scalar_subquery_probe:
         features.add("pattern:scalar_subquery_double_parentheses")
+    if has_window_avg_probe:
+        features.add("pattern:window_avg_rows_frame")
     return features
 
 
@@ -929,6 +940,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "window_avg_probe":
+            score, op_buckets, samples = _window_avg_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "select":
             cols = [str(column) for column in op.get("columns", []) if str(column) in samples]
             samples = {column: samples[column] for column in unique_preserve_order(cols)}
@@ -1349,6 +1365,12 @@ def _scalar_subquery_frontier_score(op: dict[str, Any]) -> tuple[float, list[str
     return 0.90, buckets, {alias: [False]} if alias else {}
 
 
+def _window_avg_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    buckets = ["window:rows-frame", "window:avg"]
+    return 0.90, buckets, {alias: [False]} if alias else {}
+
+
 def _groupby_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
     keys = [str(key) for key in op.get("keys", []) if str(key) in samples]
     buckets: list[str] = []
@@ -1714,6 +1736,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("group_quantile_key_expression")
     if "pattern:scalar_subquery_double_parentheses" in features or "op:scalar_subquery_probe" in features:
         roots.add("scalar_subquery_double_parentheses")
+    if "pattern:window_avg_rows_frame" in features or "op:window_avg_probe" in features:
+        roots.add("window_avg_rows_frame")
     if features & {
         "pattern:null_groupby_topk",
         "pattern:null_agg_topk",
