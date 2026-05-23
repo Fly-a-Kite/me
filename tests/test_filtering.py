@@ -42,3 +42,21 @@ def test_null_predicate_filters_are_explicit_null_checks():
     assert evaluate_filter_predicate("alpha", "is_not_null", None) is True
     assert sql_filter_condition('q."s"', "NULL", "is_null") == 'q."s" IS NULL'
     assert sql_filter_condition('q."s"', "NULL", "is_not_null") == 'q."s" IS NOT NULL'
+
+
+def test_boolean_predicate_filters_match_sql_truth_tests():
+    assert evaluate_filter_predicate(True, "bool_is_true", None) is True
+    assert evaluate_filter_predicate(False, "bool_is_true", None) is False
+    assert evaluate_filter_predicate(None, "bool_is_true", None) is False
+
+    assert evaluate_filter_predicate(True, "bool_is_not_true", None) is False
+    assert evaluate_filter_predicate(False, "bool_is_not_true", None) is True
+    assert evaluate_filter_predicate(None, "bool_is_not_true", None) is True
+
+    assert evaluate_filter_predicate(False, "bool_is_false", None) is True
+    assert evaluate_filter_predicate(None, "bool_is_not_false", None) is True
+    assert evaluate_filter_predicate(None, "bool_is_unknown", None) is True
+    assert evaluate_filter_predicate(True, "bool_is_not_unknown", None) is True
+    assert sql_filter_condition('q."flag"', "NULL", "bool_is_true") == 'q."flag" IS TRUE'
+    assert sql_filter_condition('q."flag"', "NULL", "bool_is_not_true") == 'q."flag" IS NOT TRUE'
+    assert sql_filter_condition('q."flag"', "NULL", "bool_is_unknown") == 'q."flag" IS NULL'

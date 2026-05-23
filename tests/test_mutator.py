@@ -4,6 +4,7 @@ from datadiff.classification_oracle import validate_case_program
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.mutator import (
     MUTATION_OPERATOR_NAMES,
+    _append_boolean_predicate_filter_probe,
     _append_grouped_topk_probe,
     _append_order_projection_probe,
     _append_truth_filter_probe,
@@ -79,6 +80,7 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert {"append_op", "drop_op", "tweak_op"}.issubset(MUTATION_OPERATOR_NAMES)
     assert "append_order_projection" in MUTATION_OPERATOR_NAMES
     assert "append_truth_filter" in MUTATION_OPERATOR_NAMES
+    assert "append_boolean_predicate_filter" in MUTATION_OPERATOR_NAMES
     assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
 
 
@@ -116,6 +118,24 @@ def test_append_truth_filter_mutation_stays_valid():
     assert operations[-1]["op"] == "filter"
     assert operations[-1]["cmp"].endswith(("is_not_true", "is_not_false"))
     case = Case("case-mut-truth-filter", 1, [table], Program("prog-mut-truth-filter", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_boolean_predicate_filter_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("flag", "bool"), ColumnSpec("s", "str")],
+        [{"id": 0, "flag": True, "s": "b"}, {"id": 1, "flag": None, "s": "a"}],
+    )
+    operations = [{"op": "select", "columns": ["id", "flag"]}]
+
+    detail = _append_boolean_predicate_filter_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_boolean_predicate_filter:")
+    assert operations[-1]["op"] == "filter"
+    assert operations[-1]["cmp"].startswith("bool_is_")
+    assert operations[-1]["value"] is None
+    case = Case("case-mut-bool-filter", 1, [table], Program("prog-mut-bool-filter", 1, operations))
     assert validate_case_program(case) == []
 
 

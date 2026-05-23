@@ -288,6 +288,8 @@ def _polars_filter_expr(col, comparator: str, value):
         expr = col.is_null()
     elif parsed.base == "is_not_null":
         expr = col.is_not_null()
+    elif parsed.base == "bool_predicate":
+        expr = col
     elif parsed.base == ">":
         expr = col > value
     elif parsed.base == ">=":

@@ -493,6 +493,8 @@ def _filter_literal_error(column_type: str, comparator: Any, value: Any) -> str:
         return ""
     if parsed is not None and parsed.base in {"is_null", "is_not_null"}:
         return "" if value is None else f"filter literal {value!r} must be NULL for {parsed.base}"
+    if parsed is not None and parsed.base == "bool_predicate":
+        return "" if value is None else f"filter literal {value!r} must be NULL for {comparator}"
     if value is None:
         return ""
     return _scalar_filter_literal_error(column_type, value)
@@ -859,7 +861,7 @@ def _case_has_null_filter_literal(case: Case) -> bool:
     return any(
         op.get("op") == "filter"
         and op.get("value") is None
-        and _filter_comparator_base(op) not in {"is_null", "is_not_null"}
+        and _filter_comparator_base(op) not in {"is_null", "is_not_null", "bool_predicate"}
         for op in case.program.operations
     )
 

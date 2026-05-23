@@ -242,6 +242,7 @@ def test_cli_parses_order_sensitive_bug_hunt_profiles():
         "unique_count_groupby",
         "set_membership_filter",
         "null_predicate_filter",
+        "boolean_predicate_filter",
     ]:
         args = parser.parse_args(["fuzz", "--profile", profile])
         assert args.cmd == "fuzz"
@@ -432,6 +433,9 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("null_predicate_filter").generator_profile == "null_predicate_filter"
     assert _preset_config("null_predicate_filter").guidance_targets[0] == "null_predicate_filter"
     assert _preset_config("null_predicate_filter_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("boolean_predicate_filter").generator_profile == "boolean_predicate_filter"
+    assert _preset_config("boolean_predicate_filter").guidance_targets[0] == "boolean_predicate_filter"
+    assert _preset_config("boolean_predicate_filter_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("join_null_sort").generator_profile == "join_null_sort"
     assert _preset_config("join_null_sort").guidance_targets[0] == "join_null_sort"
     assert _preset_config("join_null_sort_metamorphic").enable_metamorphic_oracle is True
@@ -502,6 +506,7 @@ def test_cli_parses_non_datafusion_live_presets():
         "unique_count_groupby",
         "set_membership_filter",
         "null_predicate_filter",
+        "boolean_predicate_filter",
     }.issubset(arrow.guidance_targets)
     assert arrow.enable_local_source_scheduler is True
 

@@ -50,6 +50,8 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "set_membership": {"filter:set-membership"},
     "null_predicate_filter": {"pattern:null_predicate_filter"},
     "null_predicate": {"filter:null-predicate"},
+    "boolean_predicate_filter": {"pattern:boolean_predicate_filter"},
+    "boolean_predicate": {"filter:boolean-predicate"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -127,6 +129,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_unique_count_groupby = False
     has_set_membership_filter = False
     has_null_predicate_filter = False
+    has_boolean_predicate_filter = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -144,6 +147,10 @@ def extract_case_features(case: Case) -> set[str]:
                 features.add("filter:null-predicate")
                 features.add(f"filter:null-predicate:{parsed.base}")
                 has_null_predicate_filter = True
+            if parsed is not None and parsed.base == "bool_predicate":
+                features.add("filter:boolean-predicate")
+                features.add(f"filter:boolean-predicate:{parsed.truth_test}")
+                has_boolean_predicate_filter = True
             if parsed is not None and parsed.truth_test is not None:
                 features.add("filter:truth-test")
                 features.add(f"filter:truth:{parsed.truth_test}")
@@ -258,6 +265,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:set_membership_filter")
     if has_null_predicate_filter:
         features.add("pattern:null_predicate_filter")
+    if has_boolean_predicate_filter:
+        features.add("pattern:boolean_predicate_filter")
     return features
 
 
@@ -887,6 +896,9 @@ def _filter_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) ->
     if parsed is not None and parsed.base in {"is_null", "is_not_null"}:
         buckets.append("filter:null-predicate")
         buckets.append(f"filter:null-predicate:{parsed.base}")
+    if parsed is not None and parsed.base == "bool_predicate":
+        buckets.append("filter:boolean-predicate")
+        buckets.append(f"filter:boolean-predicate:{parsed.truth_test}")
     if parsed is not None and parsed.truth_test is not None:
         buckets.append("filter:truth-test")
         buckets.append(f"filter:truth:{parsed.truth_test}")
@@ -1335,6 +1347,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("nan_inf_semantics")
     if "pattern:join_null_truth_filter" in features:
         roots.add("outer_join_truth_filter")
+    if "pattern:boolean_predicate_filter" in features:
+        roots.add("boolean_null_filter")
     if features & {
         "pattern:null_groupby_topk",
         "pattern:null_agg_topk",

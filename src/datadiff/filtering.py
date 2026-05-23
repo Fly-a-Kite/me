@@ -8,6 +8,14 @@ from typing import Any
 BASE_FILTER_COMPARATORS = (">", ">=", "<", "<=", "==", "!=")
 SET_FILTER_COMPARATORS = ("in_set",)
 NULL_FILTER_COMPARATORS = ("is_null", "is_not_null")
+BOOLEAN_FILTER_COMPARATORS = (
+    "bool_is_true",
+    "bool_is_not_true",
+    "bool_is_false",
+    "bool_is_not_false",
+    "bool_is_unknown",
+    "bool_is_not_unknown",
+)
 _COMPARATOR_TOKENS = {
     "gt": ">",
     "ge": ">=",
@@ -38,7 +46,11 @@ TRUTH_FILTER_COMPARATORS = tuple(
     for truth_test in TRUTH_TESTS
 )
 FILTER_COMPARATORS = frozenset(
-    BASE_FILTER_COMPARATORS + TRUTH_FILTER_COMPARATORS + SET_FILTER_COMPARATORS + NULL_FILTER_COMPARATORS
+    BASE_FILTER_COMPARATORS
+    + TRUTH_FILTER_COMPARATORS
+    + SET_FILTER_COMPARATORS
+    + NULL_FILTER_COMPARATORS
+    + BOOLEAN_FILTER_COMPARATORS
 )
 
 
@@ -56,6 +68,8 @@ def parse_filter_comparator(raw: Any) -> FilterComparator | None:
         return FilterComparator(comparator)
     if comparator in NULL_FILTER_COMPARATORS:
         return FilterComparator(comparator)
+    if comparator in BOOLEAN_FILTER_COMPARATORS:
+        return FilterComparator("bool_predicate", comparator.removeprefix("bool_"))
     for token, base in _COMPARATOR_TOKENS.items():
         prefix = f"{token}_"
         if comparator.startswith(prefix):
@@ -77,6 +91,8 @@ def filter_comparator_supports_type(column_type: str, raw: Any) -> bool:
         return parsed.truth_test is None and column_type in {"int", "float", "str", "bool"}
     if parsed.base in NULL_FILTER_COMPARATORS:
         return parsed.truth_test is None and column_type in {"int", "float", "str", "bool"}
+    if parsed.base == "bool_predicate":
+        return column_type == "bool" and parsed.truth_test in TRUTH_TESTS
     if column_type in {"str", "bool"}:
         return parsed.base in {"==", "!="}
     return column_type in {"int", "float"}
@@ -96,6 +112,8 @@ def evaluate_filter_predicate(left: Any, raw: Any, right: Any) -> bool:
         return _is_nullish_scalar(left)
     if parsed.base == "is_not_null":
         return not _is_nullish_scalar(left)
+    if parsed.base == "bool_predicate":
+        return _apply_truth_test(_bool_three_valued(left), parsed.truth_test or "")
     comparison = _compare_three_valued(left, parsed.base, right)
     if parsed.truth_test is None:
         return comparison is True
@@ -112,6 +130,21 @@ def sql_filter_condition(column_sql: str, literal_sql: str, raw: Any) -> str:
         return f"{column_sql} IS NULL"
     if parsed.base == "is_not_null":
         return f"{column_sql} IS NOT NULL"
+    if parsed.base == "bool_predicate":
+        truth_test = parsed.truth_test
+        if truth_test == "is_true":
+            return f"{column_sql} IS TRUE"
+        if truth_test == "is_not_true":
+            return f"{column_sql} IS NOT TRUE"
+        if truth_test == "is_false":
+            return f"{column_sql} IS FALSE"
+        if truth_test == "is_not_false":
+            return f"{column_sql} IS NOT FALSE"
+        if truth_test == "is_unknown":
+            return f"{column_sql} IS NULL"
+        if truth_test == "is_not_unknown":
+            return f"{column_sql} IS NOT NULL"
+        raise ValueError(truth_test)
     base = f"{column_sql} {_SQL_COMPARATORS[parsed.base]} {literal_sql}"
     truth_test = parsed.truth_test
     if truth_test is None:
@@ -164,6 +197,14 @@ def _is_nullish_scalar(value: Any) -> bool:
     if cls.__module__.startswith("pandas.") and cls.__name__ in {"NAType", "NaTType"}:
         return True
     return False
+
+
+def _bool_three_valued(value: Any) -> bool | None:
+    if _is_nullish_scalar(value):
+        return None
+    if isinstance(value, bool):
+        return value
+    return None
 
 
 def _apply_truth_test(value: bool | None, truth_test: str) -> bool:

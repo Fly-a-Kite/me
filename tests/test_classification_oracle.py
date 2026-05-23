@@ -545,6 +545,31 @@ def test_validate_case_accepts_explicit_null_predicate_filter():
     assert any("must be NULL for is_not_null" in error for error in validate_case_program(invalid_literal))
 
 
+def test_validate_case_accepts_boolean_predicate_filter():
+    valid = Case(
+        "case-bool-predicate",
+        10,
+        [TableData("t0", [ColumnSpec("flag", "bool")], [{"flag": True}, {"flag": None}])],
+        Program("prog-bool-predicate", 10, [{"op": "filter", "column": "flag", "cmp": "bool_is_not_true", "value": None}]),
+    )
+    invalid_type = Case(
+        "case-bool-predicate-type",
+        11,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-bool-predicate-type", 11, [{"op": "filter", "column": "x", "cmp": "bool_is_true", "value": None}]),
+    )
+    invalid_literal = Case(
+        "case-bool-predicate-literal",
+        12,
+        [TableData("t0", [ColumnSpec("flag", "bool")], [{"flag": True}])],
+        Program("prog-bool-predicate-literal", 12, [{"op": "filter", "column": "flag", "cmp": "bool_is_false", "value": False}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("not supported for int filter" in error for error in validate_case_program(invalid_type))
+    assert any("must be NULL for bool_is_false" in error for error in validate_case_program(invalid_literal))
+
+
 def test_validate_case_rejects_duplicate_select_columns():
     case = Case(
         "case-dup-select",

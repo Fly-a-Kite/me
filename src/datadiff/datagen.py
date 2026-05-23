@@ -6,7 +6,7 @@ import string
 from typing import Any, Literal
 
 from .dsl import Case, ColumnSpec, Program, SortKey, TableData, normalize_sort_keys
-from .filtering import filter_comparator_supports_type
+from .filtering import filter_comparator_supports_type, parse_filter_comparator
 from .identifiers import is_reserved_output_name, make_safe_output_name
 from .util import unique_preserve_order
 
@@ -37,6 +37,7 @@ GeneratorProfile = Literal[
     "unique_count_groupby",
     "set_membership_filter",
     "null_predicate_filter",
+    "boolean_predicate_filter",
 ]
 
 
@@ -308,11 +309,16 @@ def generate_program(
                 cmp_ops = ["in_set", *cmp_ops]
             if bughunt_profile and rnd.random() < 0.15:
                 cmp_ops = [rnd.choice(["is_null", "is_not_null"]), *cmp_ops]
+            if bughunt_profile and typ == "bool" and rnd.random() < 0.35:
+                cmp_ops = [
+                    rnd.choice(["bool_is_true", "bool_is_not_true", "bool_is_false", "bool_is_not_false"]),
+                    *cmp_ops,
+                ]
             base_cols = {c.name for c in table.columns}
             cmp = rnd.choice(cmp_ops)
             if cmp == "in_set":
                 value = _literal_list_for_column(rnd, table, col) if col in base_cols else _literal_list_for_type(rnd, typ)
-            elif cmp in {"is_null", "is_not_null"}:
+            elif cmp in {"is_null", "is_not_null", "bool_is_true", "bool_is_not_true", "bool_is_false", "bool_is_not_false"}:
                 value = None
             else:
                 value = _literal_for_column(rnd, table, col) if col in base_cols else _literal_for_type(rnd, typ)
@@ -735,11 +741,14 @@ def _mutate_output_type(
 def _filter_literal_is_valid(column_type: str, comparator: Any, value: Any) -> bool:
     if not filter_comparator_supports_type(column_type, comparator):
         return False
+    parsed = parse_filter_comparator(comparator)
     if comparator == "in_set":
         if not isinstance(value, list) or not value or any(item is None for item in value):
             return False
         return all(_filter_literal_is_valid(column_type, "==", item) for item in value)
     if comparator in {"is_null", "is_not_null"}:
+        return value is None
+    if parsed is not None and parsed.base == "bool_predicate":
         return value is None
     if value is None:
         return True
@@ -799,6 +808,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_set_membership_filter_case(seed)
     if profile == "null_predicate_filter" and type_aware:
         return generate_null_predicate_filter_case(seed)
+    if profile == "boolean_predicate_filter" and type_aware:
+        return generate_boolean_predicate_filter_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -846,6 +857,8 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         return _as_bughunt_mixed_case(generate_set_membership_filter_case(seed), seed, "set_membership_filter")
     if selector == 51:
         return _as_bughunt_mixed_case(generate_null_predicate_filter_case(seed), seed, "null_predicate_filter")
+    if selector == 54:
+        return _as_bughunt_mixed_case(generate_boolean_predicate_filter_case(seed), seed, "boolean_predicate_filter")
     if selector == 56:
         return _as_bughunt_mixed_case(generate_unique_count_groupby_case(seed), seed, "unique_count_groupby")
     if selector == 53:
@@ -2111,6 +2124,68 @@ def generate_null_predicate_filter_case(seed: int) -> Case:
             "generator_profile": "null_predicate_filter",
             "predicate": predicate,
             "source_issue": "https://github.com/duckdb/duckdb/issues/4978",
+        },
+    )
+
+
+def generate_boolean_predicate_filter_case(seed: int) -> Case:
+    predicates = ["bool_is_true", "bool_is_not_true", "bool_is_false", "bool_is_not_false"]
+    predicate = predicates[seed % len(predicates)]
+    rows = [
+        {"id": 0, "g": "alpha", "flag": True, "x": 1, "s": "red"},
+        {"id": 1, "g": "alpha", "flag": False, "x": 2, "s": ""},
+        {"id": 2, "g": "alpha", "flag": None, "x": None, "s": None},
+        {"id": 3, "g": "beta", "flag": True, "x": 2, "s": "blue"},
+        {"id": 4, "g": "beta", "flag": False, "x": 3, "s": "中文"},
+        {"id": 5, "g": "beta", "flag": None, "x": None, "s": "space value"},
+        {"id": 6, "g": None, "flag": True, "x": 4, "s": "red"},
+        {"id": 7, "g": None, "flag": False, "x": 4, "s": None},
+        {"id": 8, "g": "gamma", "flag": None, "x": 5, "s": ""},
+    ]
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("flag", "bool", nullable=True),
+            ColumnSpec("x", "int", nullable=True),
+            ColumnSpec("s", "str", nullable=True),
+        ],
+        rows,
+    )
+    program = Program(
+        f"prog-{seed:08d}-boolean-predicate-filter",
+        seed,
+        [
+            {"op": "filter", "column": "flag", "cmp": predicate, "value": None},
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [
+                    {"column": "id", "func": "count", "as": "count_id"},
+                    {"column": "x", "func": "sum", "as": "sum_x"},
+                ],
+            },
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "count_id", "ascending": False, "nulls": "last"},
+                    {"column": "g", "ascending": True, "nulls": "first"},
+                ],
+            },
+            {"op": "limit", "n": 5},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-boolean-predicate-filter",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "boolean_predicate_filter",
+            "predicate": predicate,
+            "source_issue": "https://github.com/pola-rs/polars/issues/8516",
+            "source_issue_alt": "https://github.com/apache/datafusion/issues/22441",
         },
     )
 

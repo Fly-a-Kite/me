@@ -116,6 +116,8 @@ def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):
         return pc.is_null(array)
     if parsed.base == "is_not_null":
         return pc.invert(pc.is_null(array))
+    if parsed.base == "bool_predicate":
+        return _apply_boolean_truth_test(pc, array, parsed.truth_test)
     scalar = value
     if scalar is None:
         mask = pa.array([None] * len(array), type=pa.bool_())
@@ -148,6 +150,22 @@ def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):
     if parsed.truth_test == "is_not_unknown":
         return pc.invert(pc.is_null(mask))
     raise ValueError(parsed.truth_test)
+
+
+def _apply_boolean_truth_test(pc, mask: Any, truth_test: str | None):
+    if truth_test == "is_true":
+        return pc.fill_null(mask, False)
+    if truth_test == "is_not_true":
+        return pc.invert(pc.fill_null(mask, False))
+    if truth_test == "is_false":
+        return pc.invert(pc.fill_null(mask, True))
+    if truth_test == "is_not_false":
+        return pc.fill_null(mask, True)
+    if truth_test == "is_unknown":
+        return pc.is_null(mask)
+    if truth_test == "is_not_unknown":
+        return pc.invert(pc.is_null(mask))
+    raise ValueError(truth_test)
 
 
 def _eval_expr(pc, table: Any, expr: dict[str, Any]):

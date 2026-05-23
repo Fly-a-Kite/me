@@ -111,6 +111,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "unique_count_groupby",
         "set_membership_filter",
         "null_predicate_filter",
+        "boolean_predicate_filter",
         "wide_offset_topk",
         "join_null_key_topk",
         "empty_filter_groupby",
@@ -457,6 +458,25 @@ def test_generate_case_null_predicate_filter_profile_is_supported_and_valid():
 
     assert even_case.program.operations[0]["cmp"] == "is_null"
     assert odd_case.program.operations[0]["cmp"] == "is_not_null"
+
+
+def test_generate_case_boolean_predicate_filter_profile_is_supported_and_valid():
+    cases = [generate_case(seed, profile="boolean_predicate_filter") for seed in range(124, 128)]
+    predicates = {case.program.operations[0]["cmp"] for case in cases}
+
+    for case in cases:
+        features = extract_case_features(case)
+        assert case.case_id.endswith("-boolean-predicate-filter")
+        assert [op["op"] for op in case.program.operations] == ["filter", "groupby", "sort", "limit"]
+        assert case.program.operations[0]["column"] == "flag"
+        assert case.program.operations[0]["value"] is None
+        assert "pattern:boolean_predicate_filter" in features
+        assert "filter:boolean-predicate" in features
+        assert "filter:truth-test" in features
+        assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/8516"
+        assert validate_case_program(case) == []
+
+    assert predicates == {"bool_is_true", "bool_is_not_true", "bool_is_false", "bool_is_not_false"}
 
 
 def test_repair_operations_keeps_safe_string_aggregations_only():
