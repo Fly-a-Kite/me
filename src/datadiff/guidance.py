@@ -50,7 +50,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "casts": {"expr:cast"},
 }
 
-PATTERN_TARGET_WEIGHT = 6.0
+PATTERN_TARGET_WEIGHT = 8.0
+GENERIC_COMPANION_TARGET_WEIGHT = 0.25
+TEMPLATE_TARGET_BONUS = 3.0
 
 
 def parse_guidance_targets(value: str | list[str] | tuple[str, ...] | None) -> list[str]:
@@ -327,11 +329,10 @@ class GuidanceState:
             return max(
                 targeted,
                 key=lambda decision: (
-                    decision.score_breakdown.get("target_template_matches", 0.0),
                     decision.score_breakdown.get("specific_target_matches", 0.0),
                     decision.score_breakdown.get("target_priority", float(len(decision.matched_targets))),
-                    len(decision.matched_targets),
                     decision.score,
+                    len(decision.matched_targets),
                     -decision.case.seed,
                 ),
             )
@@ -353,8 +354,9 @@ class GuidanceState:
     def _score_case(self, case: Case, candidate_count: int) -> GuidanceDecision:
         features = extract_case_features(case)
         matched_targets = _matched_targets(features, self.targets)
-        target_priority = _target_match_priority(matched_targets)
+        target_priority = _target_match_priority(features, matched_targets, self.feature_counts)
         target_template_matches = _target_template_match_count(features, matched_targets)
+        target_template_bonus = _target_template_bonus(features, matched_targets, self.feature_counts)
         specific_target_matches = _specific_target_count(matched_targets)
         path_coverage_proxy = _path_coverage_proxy(features, self.feature_counts, self.online_weights)
         data_sensitivity = _data_sensitivity_score(features, self.feature_counts, self.online_weights)
@@ -428,6 +430,7 @@ class GuidanceState:
                 "target_bonus": target_bonus,
                 "target_priority": target_priority,
                 "target_template_matches": float(target_template_matches),
+                "target_template_bonus": target_template_bonus,
                 "specific_target_matches": float(specific_target_matches),
                 "finding_yield_bonus": finding_yield_bonus,
                 "combo_priority": combo_priority,
@@ -465,8 +468,16 @@ def _matched_targets(features: set[str], targets: list[str]) -> list[str]:
     return matched
 
 
-def _target_match_priority(matched_targets: list[str]) -> float:
-    return sum(_target_match_weight(target) for target in matched_targets)
+def _target_match_priority(
+    features: set[str],
+    matched_targets: list[str],
+    feature_counts: Counter[str],
+) -> float:
+    has_specific_target = any(_is_specific_target(target) for target in matched_targets)
+    generic_weight = GENERIC_COMPANION_TARGET_WEIGHT if has_specific_target else 1.0
+    return sum(
+        _target_match_weight(target, generic_weight=generic_weight) for target in matched_targets
+    ) + _target_template_bonus(features, matched_targets, feature_counts)
 
 
 def _target_template_match_count(features: set[str], matched_targets: list[str]) -> int:
@@ -477,10 +488,27 @@ def _target_template_match_count(features: set[str], matched_targets: list[str])
     )
 
 
-def _target_match_weight(target: str) -> float:
+def _target_template_bonus(
+    features: set[str],
+    matched_targets: list[str],
+    feature_counts: Counter[str],
+) -> float:
+    bonus = 0.0
+    for target in matched_targets:
+        template_features = [
+            feature
+            for feature in (f"mixed_generator_profile:{target}", f"generator_profile:{target}")
+            if feature in features
+        ]
+        for feature in template_features:
+            bonus += TEMPLATE_TARGET_BONUS / math.sqrt(1.0 + feature_counts[feature])
+    return bonus
+
+
+def _target_match_weight(target: str, *, generic_weight: float) -> float:
     if _is_specific_target(target):
         return PATTERN_TARGET_WEIGHT
-    return 1.0
+    return generic_weight
 
 
 def _specific_target_count(matched_targets: list[str]) -> int:

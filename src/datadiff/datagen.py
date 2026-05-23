@@ -768,11 +768,21 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
 
 
 def _bughunt_issue_inspired_case(seed: int) -> Case | None:
-    selector = seed % 20
-    if selector == 0:
-        return _as_bughunt_mixed_case(generate_join_null_key_topk_case(seed), seed, "join_null_key_topk")
+    selector = seed % 60
+    if selector == 2:
+        return _as_bughunt_mixed_case(generate_join_null_truth_filter_case(seed), seed, "join_null_truth_filter")
     if selector == 11:
         return _as_bughunt_mixed_case(generate_empty_filter_groupby_case(seed), seed, "empty_filter_groupby")
+    if selector == 20:
+        return _as_bughunt_mixed_case(generate_wide_offset_topk_case(seed), seed, "wide_offset_topk")
+    if selector == 31:
+        return _as_bughunt_mixed_case(generate_ordered_groupby_sort_case(seed), seed, "ordered_groupby_sort")
+    if selector == 40:
+        return _as_bughunt_mixed_case(generate_join_null_key_topk_case(seed), seed, "join_null_key_topk")
+    if selector == 53:
+        return _as_bughunt_mixed_case(generate_topk_resort_case(seed), seed, "topk_resort")
+    if selector == 58:
+        return _as_bughunt_mixed_case(generate_join_ordered_agg_topk_case(seed), seed, "join_ordered_agg_topk")
     return None
 
 
@@ -1641,7 +1651,7 @@ def generate_topk_resort_case(seed: int) -> Case:
         rows,
     )
     first_col = rnd.choice(["x", "z", "g", "s"])
-    second_col = rnd.choice([col for col in ["x", "z", "g", "s", "id"] if col != first_col])
+    second_col = rnd.choice([col for col in ["x", "z", "g", "s"] if col != first_col])
     limit_n = rnd.randint(1, 6)
     offset_n = rnd.randint(0, 2)
     program = Program(

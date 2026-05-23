@@ -98,11 +98,21 @@ def test_bughunt_profile_covers_per_column_sort_null_order():
 
 
 def test_bughunt_profile_mixes_issue_inspired_templates():
-    cases = [generate_case(seed, profile="bughunt") for seed in range(40)]
+    cases = [generate_case(seed, profile="bughunt") for seed in range(120)]
     features = [extract_case_features(case) for case in cases]
+    mixed_profiles = {case.metadata.get("mixed_generator_profile") for case in cases}
 
     assert any("pattern:join_null_key_topk" in item for item in features)
     assert any("pattern:empty_filter_groupby" in item for item in features)
+    assert {
+        "join_null_truth_filter",
+        "wide_offset_topk",
+        "join_null_key_topk",
+        "empty_filter_groupby",
+        "ordered_groupby_sort",
+        "topk_resort",
+        "join_ordered_agg_topk",
+    }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
 
@@ -350,6 +360,16 @@ def test_generate_case_topk_resort_profile_is_supported_and_valid():
     assert case.program.order_sensitive is True
     assert "pattern:topk_resort" in extract_case_features(case)
     assert validate_case_program(case) == []
+
+
+def test_topk_resort_profile_avoids_duplicate_sort_columns():
+    for seed in range(120):
+        case = generate_case(seed, profile="topk_resort")
+        for op in case.program.operations:
+            if op["op"] == "sort":
+                columns = sort_columns(op)
+                assert len(columns) == len(set(columns))
+        assert validate_case_program(case) == []
 
 
 def test_generate_case_join_ordered_agg_topk_profile_is_supported_and_valid():

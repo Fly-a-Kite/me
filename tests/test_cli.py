@@ -476,7 +476,7 @@ def test_cli_parses_non_datafusion_live_presets():
     assert polars_lazy.local_source_exploration_weight == 0.45
 
     embedded_sql = _preset_config("live_embedded_sql")
-    assert embedded_sql.generator_profile == "workflow"
+    assert embedded_sql.generator_profile == "bughunt"
     assert {"join", "filter", "groupby", "aggregation", "casts"}.issubset(embedded_sql.guidance_targets)
 
     cross_family = _preset_config("live_cross_family")

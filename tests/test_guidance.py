@@ -411,7 +411,7 @@ def test_guidance_prioritizes_specific_pattern_target_over_generic_target_count(
             {"op": "limit", "n": 2},
         ],
     )
-    pattern_case = generate_case(20, profile="bughunt")
+    pattern_case = generate_case(40, profile="bughunt")
     guidance_targets = [
         "common_workflow",
         "operation_combo",
@@ -468,6 +468,40 @@ def test_guidance_prioritizes_issue_template_over_organic_pattern_match():
     assert organic_decision.score_breakdown["target_template_matches"] == 0.0
     assert template_decision.score_breakdown["target_template_matches"] == 1.0
     assert decision.case is template_case
+
+
+def test_guidance_template_priority_decays_after_repeated_template_selection():
+    template_case = generate_case(260020, profile="bughunt")
+    organic_case = generate_case(260026, profile="bughunt")
+    guidance = GuidanceState(
+        targets=[
+            "common_workflow",
+            "operation_combo",
+            "topk",
+            "join",
+            "join_null_key_topk",
+            "groupby",
+            "mutate",
+            "filter",
+            "nulls",
+            "aggregation",
+            "sort_limit",
+            "expressions",
+        ]
+    )
+
+    first = guidance.choose_case([organic_case, template_case])
+    for _ in range(8):
+        guidance.record_result(template_case, {"findings": []})
+    after_repeated_template_hits = guidance.choose_case([organic_case, template_case])
+
+    assert first.case is template_case
+    assert first.score_breakdown["target_template_bonus"] > 0.0
+    assert after_repeated_template_hits.case is organic_case
+    assert (
+        after_repeated_template_hits.score_breakdown["target_priority"]
+        > guidance.choose_case([template_case]).score_breakdown["target_priority"]
+    )
 
 
 def test_guidance_uses_data_sensitivity_and_path_coverage_breakdown():

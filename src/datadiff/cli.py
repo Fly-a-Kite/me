@@ -1675,13 +1675,11 @@ def _preset_config(name: str) -> ExperimentConfig:
         )
     if name == "live_embedded_sql":
         return _live_bughunt_config(
-            generator_profile="workflow",
             guidance_targets=list(LIVE_EMBEDDED_SQL_TARGETS),
             local_source_exploration_weight=0.40,
         )
     if name == "live_embedded_sql_metamorphic":
         return _live_bughunt_config(
-            generator_profile="workflow",
             candidate_pool=8,
             guidance_targets=list(LIVE_EMBEDDED_SQL_TARGETS),
             local_source_exploration_weight=0.40,
