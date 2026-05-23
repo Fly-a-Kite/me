@@ -265,6 +265,7 @@ def test_cli_parses_order_sensitive_bug_hunt_profiles():
         "pandas_arrow_timestamp_loc_slice_semantics",
         "pandas_arrow_timestamp_index_attr_semantics",
         "pyarrow_dataset_isin_all_match_semantics",
+        "pyarrow_large_string_partition_schema_semantics",
         "polars_rolling_mean_by_null_count_semantics",
     ]:
         args = parser.parse_args(["fuzz", "--profile", profile])
@@ -550,6 +551,15 @@ def test_cli_parses_targeted_guided_experiment_presets():
     )
     assert _preset_config("pyarrow_dataset_isin_all_match_semantics_metamorphic").enable_metamorphic_oracle is True
     assert (
+        _preset_config("pyarrow_large_string_partition_schema_semantics").generator_profile
+        == "pyarrow_large_string_partition_schema_semantics"
+    )
+    assert (
+        _preset_config("pyarrow_large_string_partition_schema_semantics").guidance_targets[0]
+        == "pyarrow_large_string_partition_schema_semantics"
+    )
+    assert _preset_config("pyarrow_large_string_partition_schema_semantics_metamorphic").enable_metamorphic_oracle is True
+    assert (
         _preset_config("polars_rolling_mean_by_null_count_semantics").generator_profile
         == "polars_rolling_mean_by_null_count_semantics"
     )
@@ -651,6 +661,7 @@ def test_cli_parses_non_datafusion_live_presets():
         "pandas_arrow_timestamp_loc_slice_semantics",
         "pandas_arrow_timestamp_index_attr_semantics",
         "pyarrow_dataset_isin_all_match_semantics",
+        "pyarrow_large_string_partition_schema_semantics",
         "polars_rolling_mean_by_null_count_semantics",
     }.issubset(arrow.guidance_targets)
     assert arrow.enable_local_source_scheduler is True

@@ -520,6 +520,21 @@ def test_oracle_classifies_pyarrow_dataset_isin_all_match_semantics():
     assert findings[0].root_cause == "pyarrow_dataset_isin_all_match_semantics"
 
 
+def test_oracle_classifies_pyarrow_large_string_partition_schema_semantics():
+    case = generate_case(370039, profile="pyarrow_large_string_partition_schema_semantics")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["large_string_partition_mismatch"], [[False]]),
+            "pyarrow": NormalizedResult("pyarrow", "ok", ["large_string_partition_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "pyarrow_large_string_partition_schema_semantics"
+
+
 def test_oracle_classifies_polars_rolling_mean_by_null_count_semantics():
     case = generate_case(370038, profile="polars_rolling_mean_by_null_count_semantics")
 

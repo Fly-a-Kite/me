@@ -200,6 +200,13 @@ def test_classify_operation_combo_tracks_pyarrow_dataset_isin_all_match_semantic
     assert "pyarrow_dataset_isin_all_match_semantics" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_pyarrow_large_string_partition_schema_risk():
+    combo = classify_operation_combo([{"op": "large_string_partition_probe"}])
+
+    assert combo["template"] == "large_string_partition_probe"
+    assert "pyarrow_large_string_partition_schema_semantics" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_polars_rolling_mean_by_null_count_semantics_risk():
     combo = classify_operation_combo([{"op": "rolling_mean_by_null_count_probe"}])
 

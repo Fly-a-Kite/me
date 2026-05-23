@@ -118,6 +118,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "pyarrow_dataset_isin_all_match_semantics": {"pattern:pyarrow_dataset_isin_all_match_semantics"},
     "dataset_isin_all_match_probe": {"op:dataset_isin_all_match_probe"},
     "dataset_membership_filter": {"pyarrow:dataset-isin-all-match", "dataset:membership-filter"},
+    "pyarrow_large_string_partition_schema_semantics": {"pattern:pyarrow_large_string_partition_schema_semantics"},
+    "large_string_partition_probe": {"op:large_string_partition_probe"},
+    "large_string_partition": {"pyarrow:large-string-partition", "dataset:partition-schema"},
     "polars_rolling_mean_by_null_count_semantics": {"pattern:polars_rolling_mean_by_null_count_semantics"},
     "rolling_mean_by_null_count_probe": {"op:rolling_mean_by_null_count_probe"},
     "rolling_temporal_nulls": {"polars:rolling-mean-by-null-count", "rolling:temporal-min-samples"},
@@ -221,6 +224,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_arrow_timestamp_loc_slice_probe = False
     has_arrow_timestamp_index_attr_probe = False
     has_dataset_isin_all_match_probe = False
+    has_large_string_partition_probe = False
     has_rolling_mean_by_null_count_probe = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
@@ -359,6 +363,11 @@ def extract_case_features(case: Case) -> set[str]:
             features.add("dataset:membership-filter")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_dataset_isin_all_match_probe = True
+        elif kind == "large_string_partition_probe":
+            features.add("pyarrow:large-string-partition")
+            features.add("dataset:partition-schema")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_large_string_partition_probe = True
         elif kind == "rolling_mean_by_null_count_probe":
             features.add("polars:rolling-mean-by-null-count")
             features.add("rolling:temporal-min-samples")
@@ -523,6 +532,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:pandas_arrow_timestamp_index_attr_semantics")
     if has_dataset_isin_all_match_probe:
         features.add("pattern:pyarrow_dataset_isin_all_match_semantics")
+    if has_large_string_partition_probe:
+        features.add("pattern:pyarrow_large_string_partition_schema_semantics")
     if has_rolling_mean_by_null_count_probe:
         features.add("pattern:polars_rolling_mean_by_null_count_semantics")
     return features
@@ -1180,6 +1191,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "large_string_partition_probe":
+            score, op_buckets, samples = _large_string_partition_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "rolling_mean_by_null_count_probe":
             score, op_buckets, samples = _rolling_mean_by_null_count_frontier_score(op)
             scores.append(score)
@@ -1695,6 +1711,12 @@ def _dataset_isin_all_match_frontier_score(op: dict[str, Any]) -> tuple[float, l
     return 0.90, buckets, {alias: [False]} if alias else {}
 
 
+def _large_string_partition_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    buckets = ["pyarrow:large-string-partition", "dataset:partition-schema"]
+    return 0.90, buckets, {alias: [False]} if alias else {}
+
+
 def _rolling_mean_by_null_count_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
     alias = str(op.get("as", ""))
     buckets = ["polars:rolling-mean-by-null-count", "rolling:temporal-min-samples"]
@@ -2102,6 +2124,11 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("pandas_arrow_timestamp_index_attr_semantics")
     if "pattern:pyarrow_dataset_isin_all_match_semantics" in features or "op:dataset_isin_all_match_probe" in features:
         roots.add("pyarrow_dataset_isin_all_match_semantics")
+    if (
+        "pattern:pyarrow_large_string_partition_schema_semantics" in features
+        or "op:large_string_partition_probe" in features
+    ):
+        roots.add("pyarrow_large_string_partition_schema_semantics")
     if (
         "pattern:polars_rolling_mean_by_null_count_semantics" in features
         or "op:rolling_mean_by_null_count_probe" in features

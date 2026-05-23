@@ -130,6 +130,8 @@ class PandasBackend(Backend):
                     df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
                 elif kind == "dataset_isin_all_match_probe":
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
+                elif kind == "large_string_partition_probe":
+                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "rolling_mean_by_null_count_probe":
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "select":

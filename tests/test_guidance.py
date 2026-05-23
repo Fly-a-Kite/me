@@ -231,6 +231,7 @@ def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
         "pandas_arrow_timestamp_loc_slice_semantics",
         "pandas_arrow_timestamp_index_attr_semantics",
         "pyarrow_dataset_isin_all_match_semantics",
+        "pyarrow_large_string_partition_schema_semantics",
         "polars_rolling_mean_by_null_count_semantics",
     ]
     for profile in profiles:

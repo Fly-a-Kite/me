@@ -131,6 +131,9 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     pandas_arrow_timestamp_loc_slice_semantics = _preset_config("pandas_arrow_timestamp_loc_slice_semantics")
     pandas_arrow_timestamp_index_attr_semantics = _preset_config("pandas_arrow_timestamp_index_attr_semantics")
     pyarrow_dataset_isin_all_match_semantics = _preset_config("pyarrow_dataset_isin_all_match_semantics")
+    pyarrow_large_string_partition_schema_semantics = _preset_config(
+        "pyarrow_large_string_partition_schema_semantics"
+    )
     polars_rolling_mean_by_null_count_semantics = _preset_config("polars_rolling_mean_by_null_count_semantics")
 
     assert null_groupby.generator_profile == "null_groupby_topk"
@@ -252,6 +255,13 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert pyarrow_dataset_isin_all_match_semantics.generator_profile == "pyarrow_dataset_isin_all_match_semantics"
     assert {"dataset_isin_all_match_probe", "dataset_membership_filter", "filter"}.issubset(
         pyarrow_dataset_isin_all_match_semantics.guidance_targets
+    )
+    assert (
+        pyarrow_large_string_partition_schema_semantics.generator_profile
+        == "pyarrow_large_string_partition_schema_semantics"
+    )
+    assert {"large_string_partition_probe", "large_string_partition", "strings"}.issubset(
+        pyarrow_large_string_partition_schema_semantics.guidance_targets
     )
     assert (
         polars_rolling_mean_by_null_count_semantics.generator_profile

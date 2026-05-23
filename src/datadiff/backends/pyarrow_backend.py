@@ -140,6 +140,9 @@ class PyArrowBackend(Backend):
                     elif kind == "dataset_isin_all_match_probe":
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [_pyarrow_dataset_isin_all_match_mismatch(pa)]})
+                    elif kind == "large_string_partition_probe":
+                        current_cols = [op["as"]]
+                        current = pa.Table.from_pydict({op["as"]: [_pyarrow_large_string_partition_mismatch(pa)]})
                     elif kind == "rolling_mean_by_null_count_probe":
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [False]})
@@ -204,6 +207,34 @@ def _pyarrow_dataset_isin_all_match_mismatch(pa) -> bool:
         pq.write_to_dataset(expected, tmpdir)
         observed = ds.dataset(tmpdir).filter(filter_expr).to_table()
     return observed.to_pydict() != expected.to_pydict()
+
+
+def _pyarrow_large_string_partition_mismatch(pa) -> bool:
+    import tempfile
+    from pathlib import Path
+
+    import pyarrow.dataset as ds
+    import pyarrow.parquet as pq
+
+    expected = pa.table(
+        {
+            "part": pa.array(["a", "a", "b", "b"], type=pa.large_string()),
+            "col": [1, 2, 3, 4],
+        }
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir) / "large_string_dataset"
+        part_a = root / "a" / "data.parquet"
+        part_b = root / "b" / "data.parquet"
+        part_a.parent.mkdir(parents=True)
+        part_b.parent.mkdir(parents=True)
+        pq.write_table(expected.slice(0, 2), part_a)
+        pq.write_table(expected.slice(2, 2), part_b)
+        try:
+            observed = ds.dataset(root, partitioning=["part"], partition_base_dir=str(root)).to_table()
+        except pa.ArrowTypeError:
+            return True
+    return observed.num_rows != expected.num_rows
 
 
 def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):

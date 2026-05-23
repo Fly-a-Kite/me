@@ -1547,6 +1547,67 @@ def test_validate_case_accepts_rolling_mean_by_null_count_probe():
     assert any("reserved" in error for error in validate_case_program(bad_alias))
 
 
+def test_validate_case_accepts_large_string_partition_probe():
+    valid = Case(
+        "case-large-string-partition-probe",
+        83,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-large-string-partition-probe",
+            83,
+            [{"op": "large_string_partition_probe", "as": "large_string_partition_mismatch"}],
+        ),
+    )
+    bad_alias = Case(
+        "case-large-string-partition-probe-alias",
+        84,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-large-string-partition-probe-alias",
+            84,
+            [{"op": "large_string_partition_probe", "as": "from"}],
+        ),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_large_string_partition_probe():
+    case = Case(
+        "case-large-string-partition-reference",
+        85,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-large-string-partition-reference",
+            85,
+            [{"op": "large_string_partition_probe", "as": "large_string_partition_mismatch"}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "pyarrow_large_string_partition_schema_semantics",
+        "confidence": "high",
+        "suspicious_backends": ["pyarrow"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["large_string_partition_mismatch"], [[False]]),
+        "pyarrow": NormalizedResult("pyarrow", "ok", ["large_string_partition_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "pyarrow_large_string_partition_schema_semantics"},
+        ["reference", "pyarrow"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["pyarrow"]
+
+
 def test_classification_reference_understands_rolling_mean_by_null_count_probe():
     case = Case(
         "case-rolling-mean-by-null-count-reference",
