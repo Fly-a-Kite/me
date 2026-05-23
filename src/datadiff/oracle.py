@@ -92,6 +92,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "polars_empty_literal_groupby_semantics"
     if _case_has_arrow_string_eq_sum_probe(case):
         return "pandas_arrow_string_eq_sum_semantics"
+    if _case_has_arrow_timestamp_loc_slice_probe(case):
+        return "pandas_arrow_timestamp_loc_slice_semantics"
     if _case_contains_special_float(case):
         return "nan_inf_semantics"
     if _case_uses_modulo(case):
@@ -218,6 +220,10 @@ def _case_has_empty_literal_groupby_probe(case: Case) -> bool:
 
 def _case_has_arrow_string_eq_sum_probe(case: Case) -> bool:
     return any(op.get("op") == "arrow_string_eq_sum_probe" for op in case.program.operations)
+
+
+def _case_has_arrow_timestamp_loc_slice_probe(case: Case) -> bool:
+    return any(op.get("op") == "arrow_timestamp_loc_slice_probe" for op in case.program.operations)
 
 
 def _case_uses_modulo(case: Case) -> bool:

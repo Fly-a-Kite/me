@@ -122,6 +122,9 @@ class PandasBackend(Backend):
                 elif kind == "arrow_string_eq_sum_probe":
                     mismatch = _pandas_arrow_string_eq_sum_mismatch(pd)
                     df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
+                elif kind == "arrow_timestamp_loc_slice_probe":
+                    mismatch = _pandas_arrow_timestamp_loc_slice_mismatch(pd)
+                    df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":
@@ -203,3 +206,20 @@ def _pandas_arrow_string_eq_sum_mismatch(pd) -> bool:
     except AttributeError:
         return True
     return int(observed) != 1
+
+
+def _pandas_arrow_timestamp_loc_slice_mismatch(pd) -> bool:
+    values = pd.Series(["2015-07-01 00:00:00"])
+    frame = (
+        values.astype("timestamp[ns][pyarrow]")
+        .dt.tz_localize("UTC")
+        .rename("event_time")
+        .to_frame()
+        .set_index("event_time")
+        .sort_index()
+    )
+    try:
+        observed = frame.loc["2015":]
+    except TypeError:
+        return True
+    return len(observed) != 1

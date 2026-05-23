@@ -190,6 +190,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "pandas_index_bool_result_type",
         "polars_empty_literal_groupby_semantics",
         "pandas_arrow_string_eq_sum_semantics",
+        "pandas_arrow_timestamp_loc_slice_semantics",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -821,6 +822,20 @@ def test_generate_case_pandas_arrow_string_eq_sum_semantics_profile_is_supported
     assert "pattern:pandas_arrow_string_eq_sum_semantics" in features
     assert "pandas:arrow-string-eq-sum" in features
     assert case.metadata["source_issue"] == "https://github.com/pandas-dev/pandas/issues/63458"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_pandas_arrow_timestamp_loc_slice_semantics_profile_is_supported_and_valid():
+    case = generate_case(143, profile="pandas_arrow_timestamp_loc_slice_semantics")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000143-pandas-arrow-timestamp-loc-slice-semantics"
+    assert case.program.operations == [
+        {"op": "arrow_timestamp_loc_slice_probe", "as": "arrow_timestamp_loc_slice_mismatch"}
+    ]
+    assert "pattern:pandas_arrow_timestamp_loc_slice_semantics" in features
+    assert "pandas:arrow-timestamp-loc-slice" in features
+    assert case.metadata["source_issue"] == "https://github.com/pandas-dev/pandas/issues/63526"
     assert validate_case_program(case) == []
 
 

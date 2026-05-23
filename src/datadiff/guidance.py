@@ -109,6 +109,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "pandas_arrow_string_eq_sum_semantics": {"pattern:pandas_arrow_string_eq_sum_semantics"},
     "arrow_string_eq_sum_probe": {"op:arrow_string_eq_sum_probe"},
     "arrow_string_reduction": {"pandas:arrow-string-eq-sum", "arrow:string-bool-reduction"},
+    "pandas_arrow_timestamp_loc_slice_semantics": {"pattern:pandas_arrow_timestamp_loc_slice_semantics"},
+    "arrow_timestamp_loc_slice_probe": {"op:arrow_timestamp_loc_slice_probe"},
+    "arrow_timestamp_indexing": {"pandas:arrow-timestamp-loc-slice", "arrow:timestamp-index-slice"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -206,6 +209,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_index_bool_probe = False
     has_empty_literal_groupby_probe = False
     has_arrow_string_eq_sum_probe = False
+    has_arrow_timestamp_loc_slice_probe = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -328,6 +332,11 @@ def extract_case_features(case: Case) -> set[str]:
             features.add("arrow:string-bool-reduction")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_arrow_string_eq_sum_probe = True
+        elif kind == "arrow_timestamp_loc_slice_probe":
+            features.add("pandas:arrow-timestamp-loc-slice")
+            features.add("arrow:timestamp-index-slice")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_arrow_timestamp_loc_slice_probe = True
         elif kind == "select":
             width = len(op.get("columns", []))
             features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
@@ -481,6 +490,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:polars_empty_literal_groupby_semantics")
     if has_arrow_string_eq_sum_probe:
         features.add("pattern:pandas_arrow_string_eq_sum_semantics")
+    if has_arrow_timestamp_loc_slice_probe:
+        features.add("pattern:pandas_arrow_timestamp_loc_slice_semantics")
     return features
 
 
@@ -1121,6 +1132,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "arrow_timestamp_loc_slice_probe":
+            score, op_buckets, samples = _arrow_timestamp_loc_slice_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "select":
             cols = [str(column) for column in op.get("columns", []) if str(column) in samples]
             samples = {column: samples[column] for column in unique_preserve_order(cols)}
@@ -1613,6 +1629,12 @@ def _arrow_string_eq_sum_frontier_score(op: dict[str, Any]) -> tuple[float, list
     return 0.90, buckets, {alias: [False]} if alias else {}
 
 
+def _arrow_timestamp_loc_slice_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    buckets = ["pandas:arrow-timestamp-loc-slice", "arrow:timestamp-index-slice"]
+    return 0.90, buckets, {alias: [False]} if alias else {}
+
+
 def _groupby_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
     keys = [str(key) for key in op.get("keys", []) if str(key) in samples]
     buckets: list[str] = []
@@ -2002,6 +2024,11 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("polars_empty_literal_groupby_semantics")
     if "pattern:pandas_arrow_string_eq_sum_semantics" in features or "op:arrow_string_eq_sum_probe" in features:
         roots.add("pandas_arrow_string_eq_sum_semantics")
+    if (
+        "pattern:pandas_arrow_timestamp_loc_slice_semantics" in features
+        or "op:arrow_timestamp_loc_slice_probe" in features
+    ):
+        roots.add("pandas_arrow_timestamp_loc_slice_semantics")
     if features & {
         "pattern:null_groupby_topk",
         "pattern:null_agg_topk",

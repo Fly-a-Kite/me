@@ -490,6 +490,17 @@ def validate_case_program(case: Case) -> list[str]:
                 col_types = {alias: "bool"}
                 numeric = set()
                 strings = set()
+        elif kind == "arrow_timestamp_loc_slice_probe":
+            alias = str(op.get("as", ""))
+            if not alias:
+                errors.append(f"op {idx}: arrow_timestamp_loc_slice_probe output alias is empty")
+            elif is_reserved_output_name(alias):
+                errors.append(f"op {idx}: arrow_timestamp_loc_slice_probe output alias {alias!r} is reserved")
+            if alias:
+                available = {alias}
+                col_types = {alias: "bool"}
+                numeric = set()
+                strings = set()
         elif kind == "select":
             cols = list(op.get("columns", []))
             missing = [col for col in cols if col not in available]
@@ -922,6 +933,10 @@ def _reference_result(case: Case) -> NormalizedResult | None:
                 columns = [alias]
                 rows = [{alias: False}]
             elif kind == "arrow_string_eq_sum_probe":
+                alias = str(op["as"])
+                columns = [alias]
+                rows = [{alias: False}]
+            elif kind == "arrow_timestamp_loc_slice_probe":
                 alias = str(op["as"])
                 columns = [alias]
                 rows = [{alias: False}]

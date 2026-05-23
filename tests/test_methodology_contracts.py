@@ -128,6 +128,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     pandas_index_bool_result_type = _preset_config("pandas_index_bool_result_type")
     polars_empty_literal_groupby_semantics = _preset_config("polars_empty_literal_groupby_semantics")
     pandas_arrow_string_eq_sum_semantics = _preset_config("pandas_arrow_string_eq_sum_semantics")
+    pandas_arrow_timestamp_loc_slice_semantics = _preset_config("pandas_arrow_timestamp_loc_slice_semantics")
 
     assert null_groupby.generator_profile == "null_groupby_topk"
     assert {"groupby", "nulls", "sort_limit"}.issubset(null_groupby.guidance_targets)
@@ -230,6 +231,13 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert pandas_arrow_string_eq_sum_semantics.generator_profile == "pandas_arrow_string_eq_sum_semantics"
     assert {"arrow_string_eq_sum_probe", "arrow_string_reduction", "strings"}.issubset(
         pandas_arrow_string_eq_sum_semantics.guidance_targets
+    )
+    assert (
+        pandas_arrow_timestamp_loc_slice_semantics.generator_profile
+        == "pandas_arrow_timestamp_loc_slice_semantics"
+    )
+    assert {"arrow_timestamp_loc_slice_probe", "arrow_timestamp_indexing", "sort_limit"}.issubset(
+        pandas_arrow_timestamp_loc_slice_semantics.guidance_targets
     )
 
 

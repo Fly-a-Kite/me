@@ -179,6 +179,13 @@ def test_classify_operation_combo_tracks_pandas_arrow_string_eq_sum_semantics_ri
     assert "pandas_arrow_string_eq_sum_semantics" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_pandas_arrow_timestamp_loc_slice_semantics_risk():
+    combo = classify_operation_combo([{"op": "arrow_timestamp_loc_slice_probe"}])
+
+    assert combo["template"] == "arrow_timestamp_loc_slice_probe"
+    assert "pandas_arrow_timestamp_loc_slice_semantics" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

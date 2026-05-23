@@ -131,6 +131,9 @@ class PyArrowBackend(Backend):
                     elif kind == "arrow_string_eq_sum_probe":
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [False]})
+                    elif kind == "arrow_timestamp_loc_slice_probe":
+                        current_cols = [op["as"]]
+                        current = pa.Table.from_pydict({op["as"]: [False]})
                     elif kind == "select":
                         current_cols = list(op["columns"])
                         current = current.select(current_cols)
