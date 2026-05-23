@@ -9,6 +9,7 @@ from datadiff.mutator import (
     _append_window_avg_probe,
     _append_struct_distinct_probe,
     _append_bit_compare_probe,
+    _append_round_even_probe,
     _append_boolean_predicate_filter_probe,
     _append_grouped_topk_probe,
     _append_order_projection_probe,
@@ -101,6 +102,7 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_window_avg_probe" in MUTATION_OPERATOR_NAMES
     assert "append_struct_distinct_probe" in MUTATION_OPERATOR_NAMES
     assert "append_bit_compare_probe" in MUTATION_OPERATOR_NAMES
+    assert "append_round_even_probe" in MUTATION_OPERATOR_NAMES
     assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
 
 
@@ -333,6 +335,22 @@ def test_append_bit_compare_probe_mutation_stays_valid():
     assert detail.startswith("append_bit_compare_probe:")
     assert operations[-1] == {"op": "bit_compare_probe", "as": "bit_compare_mismatch"}
     case = Case("case-mut-bit-compare", 1, [table], Program("prog-mut-bit-compare", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_round_even_probe_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int")],
+        [{"id": 0, "x": 2}],
+    )
+    operations = [{"op": "select", "columns": ["id"]}]
+
+    detail = _append_round_even_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_round_even_probe:")
+    assert operations[-1] == {"op": "round_even_probe", "as": "round_even_mismatch"}
+    case = Case("case-mut-round-even", 1, [table], Program("prog-mut-round-even", 1, operations))
     assert validate_case_program(case) == []
 
 

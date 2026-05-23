@@ -129,6 +129,10 @@ def _bit_compare_probe_sql(op: dict) -> str:
     return f"SELECT NOT (('0'::bit < '10101010'::bit) IS TRUE) AS {_quote(op['as'])}"
 
 
+def _round_even_probe_sql(op: dict) -> str:
+    return f"SELECT NOT (round_even(2.675::DOUBLE, 2) = 2.67::DOUBLE) AS {_quote(op['as'])}"
+
+
 class DuckDBBackend(Backend):
     name = "duckdb"
     persistent_storage = False
@@ -317,6 +321,13 @@ class DuckDBBackend(Backend):
                 elif kind == "bit_compare_probe":
                     ctes = []
                     relation = add_step(_bit_compare_probe_sql(op))
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "round_even_probe":
+                    ctes = []
+                    relation = add_step(_round_even_probe_sql(op))
                     current_cols = [op["as"]]
                     visible_cols = [op["as"]]
                     hidden_order_cols = []

@@ -119,6 +119,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     window_avg_rows_frame = _preset_config("window_avg_rows_frame")
     struct_distinct_unnest = _preset_config("struct_distinct_unnest")
     bit_compare_unequal_length = _preset_config("bit_compare_unequal_length")
+    round_even_float_scale = _preset_config("round_even_float_scale")
 
     assert null_groupby.generator_profile == "null_groupby_topk"
     assert {"groupby", "nulls", "sort_limit"}.issubset(null_groupby.guidance_targets)
@@ -188,6 +189,8 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert {"struct_distinct_probe", "struct_unnest"}.issubset(struct_distinct_unnest.guidance_targets)
     assert bit_compare_unequal_length.generator_profile == "bit_compare_unequal_length"
     assert {"bit_compare_probe", "bit_ordering"}.issubset(bit_compare_unequal_length.guidance_targets)
+    assert round_even_float_scale.generator_profile == "round_even_float_scale"
+    assert {"round_even_probe", "rounding", "numeric"}.issubset(round_even_float_scale.guidance_targets)
 
 
 def test_methodology_seeded_fault_suites_support_sensitivity_evaluation():

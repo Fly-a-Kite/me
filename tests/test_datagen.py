@@ -57,6 +57,9 @@ def _assert_program_columns_are_valid(case):
         elif op["op"] == "bit_compare_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
+        elif op["op"] == "round_even_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
         elif op["op"] == "groupby":
             assert set(op["keys"]).issubset(known_cols)
             assert len(op["keys"]) == len(set(op["keys"]))
@@ -157,6 +160,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "window_avg_rows_frame",
         "struct_distinct_unnest",
         "bit_compare_unequal_length",
+        "round_even_float_scale",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -676,6 +680,18 @@ def test_generate_case_bit_compare_unequal_length_profile_is_supported_and_valid
     assert "pattern:bit_compare_unequal_length" in features
     assert "bit:unequal-length" in features
     assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/22527"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_round_even_float_scale_profile_is_supported_and_valid():
+    case = generate_case(134, profile="round_even_float_scale")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000134-round-even-float-scale"
+    assert case.program.operations == [{"op": "round_even_probe", "as": "round_even_mismatch"}]
+    assert "pattern:round_even_float_scale" in features
+    assert "numeric:round-even" in features
+    assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/19491"
     assert validate_case_program(case) == []
 
 

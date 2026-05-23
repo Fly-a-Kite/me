@@ -48,6 +48,7 @@ GeneratorProfile = Literal[
     "window_avg_rows_frame",
     "struct_distinct_unnest",
     "bit_compare_unequal_length",
+    "round_even_float_scale",
 ]
 
 
@@ -498,6 +499,9 @@ def _available_columns_after_operations(
         elif kind == "bit_compare_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "round_even_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "groupby":
             available = unique_preserve_order(
                 [str(key) for key in op.get("keys", [])]
@@ -805,6 +809,17 @@ def repair_operations(
             strings = set()
             order_pending = False
             pending_order_columns = set()
+        elif kind == "round_even_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "round_even_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "select":
             cols = unique_preserve_order([c for c in op["columns"] if c in available])
             if not cols:
@@ -1074,6 +1089,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_struct_distinct_unnest_case(seed)
     if profile == "bit_compare_unequal_length" and type_aware:
         return generate_bit_compare_unequal_length_case(seed)
+    if profile == "round_even_float_scale" and type_aware:
+        return generate_round_even_float_scale_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -1157,6 +1174,8 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
             seed,
             "bit_compare_unequal_length",
         )
+    if seed % 103 == 69:
+        return _as_bughunt_mixed_case(generate_round_even_float_scale_case(seed), seed, "round_even_float_scale")
     return None
 
 
@@ -2856,6 +2875,32 @@ def generate_bit_compare_unequal_length_case(seed: int) -> Case:
             "source_issue": "https://github.com/duckdb/duckdb/issues/22527",
             "expected_bit_compare_mismatch": False,
             "expected_bit_less": True,
+        },
+    )
+
+
+def generate_round_even_float_scale_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("round_even_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-round-even-float-scale",
+        seed,
+        [{"op": "round_even_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-round-even-float-scale",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "round_even_float_scale",
+            "source_issue": "https://github.com/duckdb/duckdb/issues/19491",
+            "expected_round_even_mismatch": False,
+            "expected_round_even_value": 2.67,
         },
     )
 

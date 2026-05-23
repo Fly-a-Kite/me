@@ -56,6 +56,7 @@ def test_target_descriptions_capture_methodology_axes():
     assert "op:window_avg_probe" in specs[0]["capabilities"]
     assert "op:struct_distinct_probe" in specs[0]["capabilities"]
     assert "op:bit_compare_probe" in specs[0]["capabilities"]
+    assert "op:round_even_probe" in specs[0]["capabilities"]
 
 
 def test_list_target_suites_includes_core():
@@ -77,6 +78,7 @@ def test_list_target_suites_includes_core():
     assert "op:window_avg_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:struct_distinct_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:bit_compare_probe" in suites["latest_all_engines"]["common_capabilities"]
+    assert "op:round_even_probe" in suites["latest_all_engines"]["common_capabilities"]
 
 
 def test_target_capability_matrix_and_intersection():

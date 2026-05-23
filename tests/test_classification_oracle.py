@@ -875,6 +875,55 @@ def test_classification_reference_understands_bit_compare_probe():
     assert classification.implicated_backends == ["duckdb"]
 
 
+def test_validate_case_accepts_round_even_probe():
+    valid = Case(
+        "case-round-even-probe",
+        44,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-round-even-probe", 44, [{"op": "round_even_probe", "as": "round_even_mismatch"}]),
+    )
+    bad_alias = Case(
+        "case-round-even-probe-alias",
+        45,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-round-even-probe-alias", 45, [{"op": "round_even_probe", "as": "where"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_round_even_probe():
+    case = Case(
+        "case-round-even-reference",
+        46,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-round-even-reference", 46, [{"op": "round_even_probe", "as": "round_even_mismatch"}]),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "round_even_float_scale",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["round_even_mismatch"], [[False]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["round_even_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "round_even_float_scale"},
+        ["pandas", "duckdb"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["duckdb"]
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

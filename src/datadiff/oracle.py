@@ -74,6 +74,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "struct_distinct_unnest"
     if _case_has_bit_compare_probe(case):
         return "bit_compare_unequal_length"
+    if _case_has_round_even_probe(case):
+        return "round_even_float_scale"
     if _case_contains_special_float(case):
         return "nan_inf_semantics"
     if _case_uses_modulo(case):
@@ -164,6 +166,10 @@ def _case_has_struct_distinct_probe(case: Case) -> bool:
 
 def _case_has_bit_compare_probe(case: Case) -> bool:
     return any(op.get("op") == "bit_compare_probe" for op in case.program.operations)
+
+
+def _case_has_round_even_probe(case: Case) -> bool:
+    return any(op.get("op") == "round_even_probe" for op in case.program.operations)
 
 
 def _case_uses_modulo(case: Case) -> bool:

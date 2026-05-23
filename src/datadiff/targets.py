@@ -36,6 +36,7 @@ COMMON_DSL_CAPABILITIES: tuple[str, ...] = (
     "op:window_avg_probe",
     "op:struct_distinct_probe",
     "op:bit_compare_probe",
+    "op:round_even_probe",
     "op:groupby",
     "op:aggregate",
     "op:join",

@@ -116,6 +116,13 @@ def test_classify_operation_combo_tracks_bit_compare_unequal_length_risk():
     assert "bit_compare_unequal_length" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_round_even_float_scale_risk():
+    combo = classify_operation_combo([{"op": "round_even_probe"}])
+
+    assert combo["template"] == "round_even_probe"
+    assert "round_even_float_scale" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

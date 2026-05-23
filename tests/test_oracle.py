@@ -338,6 +338,21 @@ def test_oracle_classifies_bit_compare_unequal_length():
     assert findings[0].root_cause == "bit_compare_unequal_length"
 
 
+def test_oracle_classifies_round_even_float_scale():
+    case = generate_case(370026, profile="round_even_float_scale")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["round_even_mismatch"], [[False]]),
+            "duckdb": NormalizedResult("duckdb", "ok", ["round_even_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "round_even_float_scale"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",
