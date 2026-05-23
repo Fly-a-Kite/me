@@ -1,4 +1,5 @@
 from datadiff.filtering import evaluate_filter_predicate, sql_filter_condition
+from datadiff.tuple_logic import evaluate_tuple_absence
 
 
 def test_truth_filter_comparator_matches_sql_three_valued_logic():
@@ -41,6 +42,15 @@ def test_range_filter_uses_closed_numeric_bounds():
     assert evaluate_filter_predicate(2, "range_closed", [-1, 1]) is False
     assert evaluate_filter_predicate(None, "range_closed", [-1, 1]) is False
     assert sql_filter_condition('q."x"', "(-1, 1)", "range_closed") == 'q."x" BETWEEN -1 AND 1'
+
+
+def test_tuple_absence_filter_uses_sql_row_value_not_in_truth_table():
+    right_rows = [{"a": 1, "b": 1}, {"a": None, "b": 4}]
+
+    assert evaluate_tuple_absence({"a": 2, "b": 2}, ["a", "b"], right_rows, ["a", "b"]) is True
+    assert evaluate_tuple_absence({"a": 1, "b": 1}, ["a", "b"], right_rows, ["a", "b"]) is False
+    assert evaluate_tuple_absence({"a": 3, "b": None}, ["a", "b"], right_rows, ["a", "b"]) is False
+    assert evaluate_tuple_absence({"a": None, "b": 4}, ["a", "b"], right_rows, ["a", "b"]) is False
 
 
 def test_null_predicate_filters_are_explicit_null_checks():

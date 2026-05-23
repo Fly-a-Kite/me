@@ -52,6 +52,13 @@ def test_classify_operation_combo_tracks_post_topk_filter_pushdown_risk():
     assert "topk_filter_pushdown" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_tuple_absence_null_filter_risk():
+    combo = classify_operation_combo([{"op": "tuple_absence_filter"}, {"op": "select"}])
+
+    assert combo["template"] == "tuple_absence_filter_select"
+    assert "tuple_absence_null_filter" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

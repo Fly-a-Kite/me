@@ -64,6 +64,12 @@ def _agg_expr(column: str, func: str) -> str:
     return f"{sql_func}({_quote(column)})"
 
 
+def _tuple_absence_native_condition(op: dict) -> str:
+    left_sql = ", ".join(f"q.{_quote(column)}" for column in op["columns"])
+    right_sql = ", ".join(_quote(column) for column in op["right_columns"])
+    return f"({left_sql}) NOT IN (SELECT {right_sql} FROM {_quote(op['table'])})"
+
+
 class DuckDBBackend(Backend):
     name = "duckdb"
     persistent_storage = False
@@ -176,6 +182,8 @@ class DuckDBBackend(Backend):
                 elif kind == "filter":
                     condition = sql_filter_condition(f"q.{_quote(op['column'])}", _lit(op["value"]), op["cmp"])
                     relation = add_step(f"SELECT * FROM {relation} q WHERE {condition}")
+                elif kind == "tuple_absence_filter":
+                    relation = add_step(f"SELECT * FROM {relation} q WHERE {_tuple_absence_native_condition(op)}")
                 elif kind == "select":
                     cols = list(op["columns"])
                     projection = select_with_pending_order(cols)

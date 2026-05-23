@@ -113,6 +113,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "null_predicate_filter",
         "boolean_predicate_filter",
         "post_topk_range_filter",
+        "tuple_absence_filter",
         "wide_offset_topk",
         "join_null_key_topk",
         "empty_filter_groupby",
@@ -491,6 +492,24 @@ def test_generate_case_post_topk_range_filter_profile_is_supported_and_valid():
     assert "pattern:range_filter" in features
     assert "filter:range-closed" in features
     assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/26803"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_tuple_absence_filter_profile_is_supported_and_valid():
+    case = generate_case(125, profile="tuple_absence_filter")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000125-tuple-absence-filter"
+    assert [op["op"] for op in case.program.operations] == ["tuple_absence_filter", "select", "sort"]
+    assert case.program.operations[0] == {
+        "op": "tuple_absence_filter",
+        "columns": ["a", "b"],
+        "table": "t1",
+        "right_columns": ["a", "b"],
+    }
+    assert "pattern:tuple_absence_filter" in features
+    assert "filter:tuple-absence" in features
+    assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/22418"
     assert validate_case_program(case) == []
 
 

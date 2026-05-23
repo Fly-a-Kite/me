@@ -9,6 +9,7 @@ from datadiff.mutator import (
     _append_order_projection_probe,
     _append_range_filter_probe,
     _append_truth_filter_probe,
+    _append_tuple_absence_filter_probe,
     _available_columns,
     _random_operation,
     mutate_case,
@@ -83,6 +84,7 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_truth_filter" in MUTATION_OPERATOR_NAMES
     assert "append_boolean_predicate_filter" in MUTATION_OPERATOR_NAMES
     assert "append_range_filter" in MUTATION_OPERATOR_NAMES
+    assert "append_tuple_absence_filter" in MUTATION_OPERATOR_NAMES
     assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
 
 
@@ -156,6 +158,29 @@ def test_append_range_filter_mutation_stays_valid():
     assert operations[-1]["cmp"] == "range_closed"
     assert len(operations[-1]["value"]) == 2
     case = Case("case-mut-range-filter", 1, [table], Program("prog-mut-range-filter", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_tuple_absence_filter_mutation_stays_valid():
+    left = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+        [{"id": 0, "x": 2, "s": "b"}, {"id": 1, "x": None, "s": "a"}],
+    )
+    right = TableData(
+        "t1",
+        [ColumnSpec("id", "int"), ColumnSpec("j", "int"), ColumnSpec("tag", "str")],
+        [{"id": 0, "j": None, "tag": "b"}],
+    )
+    operations = [{"op": "select", "columns": ["id", "x", "s"]}]
+
+    detail = _append_tuple_absence_filter_probe([left, right], operations, random.Random(1))
+
+    assert detail.startswith("append_tuple_absence_filter:")
+    assert operations[-1]["op"] == "tuple_absence_filter"
+    assert len(operations[-1]["columns"]) == 2
+    assert operations[-1]["table"] == "t1"
+    case = Case("case-mut-tuple-filter", 1, [left, right], Program("prog-mut-tuple-filter", 1, operations))
     assert validate_case_program(case) == []
 
 

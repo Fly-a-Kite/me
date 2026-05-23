@@ -235,7 +235,7 @@ def _join_filter_pushdown_variants(case: Case) -> list[MetamorphicVariant]:
         between_mutated: set[str] = set()
         for filter_idx in range(idx + 1, len(ops)):
             candidate = ops[filter_idx]
-            if candidate.get("op") in {"groupby", "limit", "offset", "join"}:
+            if candidate.get("op") in {"groupby", "limit", "offset", "join", "tuple_absence_filter"}:
                 break
             if candidate.get("op") == "mutate":
                 between_mutated.add(str(candidate.get("column", "")))

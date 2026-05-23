@@ -69,6 +69,12 @@ def _agg_expr(column: str, func: str) -> str:
     return f"{sql_func}({_quote(column)})"
 
 
+def _tuple_absence_native_condition(op: dict[str, Any]) -> str:
+    left_sql = ", ".join(f"q.{_quote(column)}" for column in op["columns"])
+    right_sql = ", ".join(_quote(column) for column in op["right_columns"])
+    return f"({left_sql}) NOT IN (SELECT {right_sql} FROM {_quote(op['table'])})"
+
+
 class SQLiteBackend(Backend):
     name = "sqlite"
 
@@ -160,6 +166,11 @@ class SQLiteBackend(Backend):
                     query = (
                         f"SELECT * FROM ({query}) q "
                         f"WHERE {condition}"
+                    )
+                elif kind == "tuple_absence_filter":
+                    query = (
+                        f"SELECT * FROM ({query}) q "
+                        f"WHERE {_tuple_absence_native_condition(op)}"
                     )
                 elif kind == "select":
                     cols = list(op["columns"])

@@ -6,6 +6,7 @@ from typing import Any
 from datadiff.backends.base import Backend, BackendResult
 from datadiff.dsl import Program, TableData, normalize_sort_keys
 from datadiff.filtering import evaluate_filter_predicate
+from datadiff.tuple_logic import evaluate_tuple_absence
 
 
 class PandasBackend(Backend):
@@ -49,6 +50,16 @@ class PandasBackend(Backend):
                     comparator = op["cmp"]
                     series = df[col]
                     mask = series.map(lambda value: evaluate_filter_predicate(value, comparator, val)).astype(bool)
+                    df = df[mask]
+                elif kind == "tuple_absence_filter":
+                    right = frames[op["table"]]
+                    right_rows = right[list(op["right_columns"])].to_dict("records")
+                    left_columns = list(op["columns"])
+                    right_columns = list(op["right_columns"])
+                    mask = [
+                        evaluate_tuple_absence(row, left_columns, right_rows, right_columns)
+                        for row in df.to_dict("records")
+                    ]
                     df = df[mask]
                 elif kind == "select":
                     df = df[list(op["columns"])]

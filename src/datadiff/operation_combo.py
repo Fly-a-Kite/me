@@ -2,7 +2,18 @@ from __future__ import annotations
 
 from typing import Any
 
-CANONICAL_OPERATION_ORDER = ("join", "filter", "mutate", "groupby", "aggregate", "select", "sort", "offset", "limit")
+CANONICAL_OPERATION_ORDER = (
+    "join",
+    "filter",
+    "tuple_absence_filter",
+    "mutate",
+    "groupby",
+    "aggregate",
+    "select",
+    "sort",
+    "offset",
+    "limit",
+)
 
 HIGH_FREQUENCY_COMBOS = {
     "filter_select",
@@ -78,6 +89,8 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("join_filter_pushdown")
     if "filter" in op_set and "mutate" in op_set:
         risks.append("filter_mutate_dependency")
+    if "tuple_absence_filter" in op_set:
+        risks.append("tuple_absence_null_filter")
     if "groupby" in op_set:
         risks.append("groupby_aggregation")
     if "aggregate" in op_set:

@@ -203,6 +203,21 @@ def test_oracle_classifies_post_topk_filter_pushdown():
     assert findings[0].root_cause == "topk_filter_pushdown"
 
 
+def test_oracle_classifies_tuple_absence_null_filter():
+    case = generate_case(370017, profile="tuple_absence_filter")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["a", "b", "payload", "row_id"], [[2, 2, "survivor", 1]]),
+            "duckdb": NormalizedResult("duckdb", "ok", ["a", "b", "payload", "row_id"], []),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "tuple_absence_null_filter"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

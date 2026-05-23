@@ -9,6 +9,7 @@ from datadiff.dsl import Case, normalize_sort_keys
 from datadiff.filtering import evaluate_filter_predicate, parse_filter_comparator
 from datadiff.operation_combo import classify_operation_combo
 from datadiff.reward import online_case_reward
+from datadiff.tuple_logic import evaluate_tuple_absence
 from datadiff.util import unique_preserve_order
 
 TARGET_ALIASES: dict[str, set[str]] = {
@@ -54,6 +55,8 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "boolean_predicate": {"filter:boolean-predicate"},
     "post_topk_range_filter": {"pattern:post_topk_range_filter"},
     "range_filter": {"filter:range-closed"},
+    "tuple_absence_filter": {"pattern:tuple_absence_filter"},
+    "tuple_absence": {"filter:tuple-absence"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -133,6 +136,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_null_predicate_filter = False
     has_boolean_predicate_filter = False
     has_range_filter = False
+    has_tuple_absence_filter = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -160,6 +164,9 @@ def extract_case_features(case: Case) -> set[str]:
             if parsed is not None and parsed.truth_test is not None:
                 features.add("filter:truth-test")
                 features.add(f"filter:truth:{parsed.truth_test}")
+        elif kind == "tuple_absence_filter":
+            features.add("filter:tuple-absence")
+            has_tuple_absence_filter = True
         elif kind == "select":
             width = len(op.get("columns", []))
             features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
@@ -277,6 +284,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:range_filter")
     if has_range_filter and _has_post_topk_filter_pattern(case.program.operations):
         features.add("pattern:post_topk_range_filter")
+    if has_tuple_absence_filter:
+        features.add("pattern:tuple_absence_filter")
     return features
 
 
@@ -809,6 +818,12 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             samples = _filter_output_samples(samples, op)
+        elif kind == "tuple_absence_filter":
+            right = table_by_name.get(str(op.get("table", "")))
+            score, op_buckets = _tuple_absence_frontier_score(samples, right, op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            samples = _tuple_absence_output_samples(samples, right, op)
         elif kind == "join":
             right = table_by_name.get(str(op.get("table", "")))
             score, op_buckets = _join_frontier_score(samples, right, op)
@@ -981,6 +996,60 @@ def _filter_mask(values: list[Any], op: dict[str, Any]) -> list[bool]:
         except Exception:
             mask.append(False)
     return mask
+
+
+def _tuple_absence_frontier_score(
+    samples: dict[str, list[Any]],
+    right: Any,
+    op: dict[str, Any],
+) -> tuple[float, list[str]]:
+    buckets = ["filter:tuple-absence"]
+    left_columns = [str(column) for column in op.get("columns", [])]
+    right_columns = [str(column) for column in op.get("right_columns", [])]
+    if right is None or not left_columns or len(left_columns) != len(right_columns):
+        return 0.0, buckets
+    rows = _rows_from_samples(samples)
+    right_rows = list(getattr(right, "rows", []))
+    if _tuple_absence_has_nulls(rows, left_columns) or _tuple_absence_has_nulls(right_rows, right_columns):
+        buckets.append("filter:null-aware")
+        buckets.append("tuple_absence:null")
+    mask = [
+        evaluate_tuple_absence(row, left_columns, right_rows, right_columns)
+        for row in rows
+    ]
+    passed = sum(1 for keep in mask if keep)
+    if passed == 0:
+        buckets.append("tuple_absence:empty-output")
+    elif passed == len(mask):
+        buckets.append("tuple_absence:all-pass")
+    else:
+        buckets.append("tuple_absence:partial-output")
+    return min(1.0, 0.40 + 0.25 * int("tuple_absence:null" in buckets) + 0.20 * int("tuple_absence:partial-output" in buckets)), buckets
+
+
+def _tuple_absence_output_samples(
+    samples: dict[str, list[Any]],
+    right: Any,
+    op: dict[str, Any],
+) -> dict[str, list[Any]]:
+    left_columns = [str(column) for column in op.get("columns", [])]
+    right_columns = [str(column) for column in op.get("right_columns", [])]
+    if right is None or not left_columns or len(left_columns) != len(right_columns):
+        return samples
+    rows = _rows_from_samples(samples)
+    right_rows = list(getattr(right, "rows", []))
+    mask = [
+        evaluate_tuple_absence(row, left_columns, right_rows, right_columns)
+        for row in rows
+    ]
+    return {
+        name: [value for value, keep in zip(column_values, mask) if keep]
+        for name, column_values in samples.items()
+    }
+
+
+def _tuple_absence_has_nulls(rows: list[dict[str, Any]], columns: list[str]) -> bool:
+    return any(row.get(column) is None for row in rows for column in columns)
 
 
 def _join_frontier_score(
@@ -1363,6 +1432,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("boolean_null_filter")
     if "pattern:post_topk_range_filter" in features:
         roots.add("topk_filter_pushdown")
+    if "pattern:tuple_absence_filter" in features:
+        roots.add("tuple_absence_null_filter")
     if features & {
         "pattern:null_groupby_topk",
         "pattern:null_agg_topk",

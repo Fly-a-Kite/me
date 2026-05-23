@@ -552,6 +552,38 @@ def test_validate_case_accepts_typed_range_filter():
     assert any("lower bound must be <= upper bound" in error for error in validate_case_program(invalid_order))
 
 
+def test_validate_case_accepts_tuple_absence_filter():
+    valid = Case(
+        "case-tuple-absence",
+        18,
+        [
+            TableData("t0", [ColumnSpec("a", "int"), ColumnSpec("b", "int")], [{"a": 1, "b": 1}]),
+            TableData("t1", [ColumnSpec("a", "int"), ColumnSpec("b", "int")], [{"a": None, "b": 4}]),
+        ],
+        Program(
+            "prog-tuple-absence",
+            18,
+            [{"op": "tuple_absence_filter", "columns": ["a", "b"], "table": "t1", "right_columns": ["a", "b"]}],
+        ),
+    )
+    invalid_type = Case(
+        "case-tuple-absence-type",
+        19,
+        [
+            TableData("t0", [ColumnSpec("a", "int"), ColumnSpec("b", "int")], [{"a": 1, "b": 1}]),
+            TableData("t1", [ColumnSpec("a", "int"), ColumnSpec("s", "str")], [{"a": 1, "s": "x"}]),
+        ],
+        Program(
+            "prog-tuple-absence-type",
+            19,
+            [{"op": "tuple_absence_filter", "columns": ["a", "b"], "table": "t1", "right_columns": ["a", "s"]}],
+        ),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("tuple absence type mismatch" in error for error in validate_case_program(invalid_type))
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

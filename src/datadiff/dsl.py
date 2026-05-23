@@ -71,7 +71,7 @@ class Program:
 
     @property
     def order_sensitive(self) -> bool:
-        row_order_preserving = {"filter", "select", "mutate", "limit", "offset"}
+        row_order_preserving = {"filter", "tuple_absence_filter", "select", "mutate", "limit", "offset"}
         for op in reversed(self.operations):
             kind = op.get("op")
             if kind == "sort":

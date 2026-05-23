@@ -264,6 +264,48 @@ def _append_range_filter_probe(tables: list[TableData], operations: list[dict[st
     return f"append_range_filter:{column}:{values[0]}:{values[1]}"
 
 
+def _append_tuple_absence_filter_probe(
+    tables: list[TableData],
+    operations: list[dict[str, Any]],
+    rnd: random.Random,
+) -> str:
+    if len(tables) < 2:
+        return "append_tuple_absence_filter:no-right-table"
+    available = _available_columns(tables, operations)
+    right = rnd.choice(tables[1:])
+    right_columns = [column.name for column in right.columns]
+    pairs = [
+        (left, right_column)
+        for left in available
+        for right_column in right_columns
+        if _column_type(tables, left) == right.column_type(right_column)
+    ]
+    left_seen: set[str] = set()
+    right_seen: set[str] = set()
+    chosen: list[tuple[str, str]] = []
+    for left, right_column in rnd.sample(pairs, k=len(pairs)):
+        if left in left_seen or right_column in right_seen:
+            continue
+        chosen.append((left, right_column))
+        left_seen.add(left)
+        right_seen.add(right_column)
+        if len(chosen) == 2:
+            break
+    if len(chosen) < 2:
+        return "append_tuple_absence_filter:no-compatible-pairs"
+    left_columns = [left for left, _ in chosen]
+    selected_right_columns = [right_column for _, right_column in chosen]
+    operations.append(
+        {
+            "op": "tuple_absence_filter",
+            "columns": left_columns,
+            "table": right.name,
+            "right_columns": selected_right_columns,
+        }
+    )
+    return f"append_tuple_absence_filter:{','.join(left_columns)}:{right.name}:{','.join(selected_right_columns)}"
+
+
 def _append_grouped_topk_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
     if not tables:
         return "append_grouped_topk:none"
@@ -485,6 +527,7 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_truth_filter", _append_truth_filter_probe),
     MutationOperator("append_boolean_predicate_filter", _append_boolean_predicate_filter_probe),
     MutationOperator("append_range_filter", _append_range_filter_probe),
+    MutationOperator("append_tuple_absence_filter", _append_tuple_absence_filter_probe),
     MutationOperator("append_grouped_topk", _append_grouped_topk_probe),
     MutationOperator("drop_op", _drop_operation),
     MutationOperator("tweak_op", _tweak_random_operation),

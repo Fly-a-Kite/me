@@ -210,6 +210,7 @@ def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
         "null_predicate_filter",
         "boolean_predicate_filter",
         "post_topk_range_filter",
+        "tuple_absence_filter",
     ]
     for profile in profiles:
         for seed in range(50):

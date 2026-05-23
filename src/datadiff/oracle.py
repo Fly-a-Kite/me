@@ -70,6 +70,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "outer_join_truth_filter"
     if _case_has_post_topk_filter(case):
         return "topk_filter_pushdown"
+    if _case_has_tuple_absence_filter(case):
+        return "tuple_absence_null_filter"
     if any(op in {"groupby", "aggregate"} for op in ops):
         return "groupby_aggregation"
     if any(op == "join" for op in ops):
@@ -150,6 +152,10 @@ def _case_has_post_topk_filter(case: Case) -> bool:
             if any(later.get("op") == "filter" for later in ops[topk_idx + 1 :]):
                 return True
     return False
+
+
+def _case_has_tuple_absence_filter(case: Case) -> bool:
+    return any(op.get("op") == "tuple_absence_filter" for op in case.program.operations)
 
 
 def _case_has_grouped_topk_null_sort_key(case: Case) -> bool:

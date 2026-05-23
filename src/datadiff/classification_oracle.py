@@ -10,6 +10,7 @@ from datadiff.filtering import evaluate_filter_predicate, filter_comparator_supp
 from datadiff.identifiers import is_reserved_output_name
 from datadiff.normalizer import NormalizedResult, _norm_value
 from datadiff.oracle import Finding
+from datadiff.tuple_logic import evaluate_tuple_absence
 from datadiff.util import unique_preserve_order
 
 
@@ -231,6 +232,33 @@ def validate_case_program(case: Case) -> list[str]:
                 literal_error = _filter_literal_error(column_type, op.get("cmp"), op.get("value"))
                 if literal_error:
                     errors.append(f"op {idx}: {literal_error}")
+        elif kind == "tuple_absence_filter":
+            right = tables.get(str(op.get("table", "")))
+            columns = list(op.get("columns", []))
+            right_columns = list(op.get("right_columns", []))
+            if right is None:
+                errors.append(f"op {idx}: unknown tuple absence table {op.get('table')!r}")
+                continue
+            right_types = {column.name: column.type for column in right.columns}
+            if not columns:
+                errors.append(f"op {idx}: tuple absence filter has no columns")
+            if len(columns) != len(right_columns):
+                errors.append(f"op {idx}: tuple absence column count mismatch")
+            if len(unique_preserve_order(columns)) != len(columns):
+                errors.append(f"op {idx}: tuple absence filter contains duplicate left columns")
+            missing = [column for column in columns if column not in available]
+            if missing:
+                errors.append(f"op {idx}: tuple absence columns unavailable: {missing}")
+            missing_right = [column for column in right_columns if column not in right_types]
+            if missing_right:
+                errors.append(f"op {idx}: tuple absence right columns unavailable: {missing_right}")
+            for left, right_column in zip(columns, right_columns):
+                left_type = col_types.get(str(left))
+                right_type = right_types.get(str(right_column))
+                if left_type is not None and right_type is not None and left_type != right_type:
+                    errors.append(
+                        f"op {idx}: tuple absence type mismatch {left!r}:{left_type} vs {right_column!r}:{right_type}"
+                    )
         elif kind == "select":
             cols = list(op.get("columns", []))
             missing = [col for col in cols if col not in available]
@@ -566,6 +594,15 @@ def _reference_result(case: Case) -> NormalizedResult | None:
                 columns.extend(right_columns)
             elif kind == "filter":
                 rows = [row for row in rows if _reference_compare(row.get(op["column"]), op["cmp"], op.get("value"))]
+            elif kind == "tuple_absence_filter":
+                right = tables[str(op["table"])]
+                left_columns = list(op["columns"])
+                right_columns = list(op["right_columns"])
+                rows = [
+                    row
+                    for row in rows
+                    if evaluate_tuple_absence(row, left_columns, right.rows, right_columns)
+                ]
             elif kind == "select":
                 columns = list(op["columns"])
                 rows = [{column: row.get(column) for column in columns} for row in rows]

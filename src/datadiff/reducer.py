@@ -117,7 +117,7 @@ def _can_remove_operation(ops: list[dict], idx: int) -> bool:
 
 
 def _program_references_table(ops: list[dict], table_name: str) -> bool:
-    return any(op.get("op") == "join" and op.get("table") == table_name for op in ops)
+    return any(op.get("op") in {"join", "tuple_absence_filter"} and op.get("table") == table_name for op in ops)
 
 
 def _preserves_target(

@@ -39,6 +39,7 @@ GeneratorProfile = Literal[
     "null_predicate_filter",
     "boolean_predicate_filter",
     "post_topk_range_filter",
+    "tuple_absence_filter",
 ]
 
 
@@ -604,6 +605,27 @@ def repair_operations(
             if not _filter_literal_is_valid(column_type, op.get("cmp"), op.get("value")):
                 continue
             repaired.append(op)
+        elif kind == "tuple_absence_filter":
+            right = table_by_name.get(str(op.get("table", "")))
+            columns = unique_preserve_order([str(column) for column in op.get("columns", [])])
+            right_columns = [str(column) for column in op.get("right_columns", [])]
+            if right is None or not columns or len(columns) != len(right_columns):
+                continue
+            right_types = {column.name: column.type for column in right.columns}
+            if any(column not in available for column in columns):
+                continue
+            if any(column not in right_types for column in right_columns):
+                continue
+            if any(col_types.get(left) != right_types.get(right_col) for left, right_col in zip(columns, right_columns)):
+                continue
+            repaired.append(
+                {
+                    "op": "tuple_absence_filter",
+                    "columns": columns,
+                    "table": right.name,
+                    "right_columns": right_columns,
+                }
+            )
         elif kind == "select":
             cols = unique_preserve_order([c for c in op["columns"] if c in available])
             if not cols:
@@ -840,6 +862,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_boolean_predicate_filter_case(seed)
     if profile == "post_topk_range_filter" and type_aware:
         return generate_post_topk_range_filter_case(seed)
+    if profile == "tuple_absence_filter" and type_aware:
+        return generate_tuple_absence_filter_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -893,6 +917,8 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         return _as_bughunt_mixed_case(generate_post_topk_range_filter_case(seed), seed, "post_topk_range_filter")
     if selector == 56:
         return _as_bughunt_mixed_case(generate_unique_count_groupby_case(seed), seed, "unique_count_groupby")
+    if selector == 57:
+        return _as_bughunt_mixed_case(generate_tuple_absence_filter_case(seed), seed, "tuple_absence_filter")
     if selector == 53:
         return _as_bughunt_mixed_case(generate_topk_resort_case(seed), seed, "topk_resort")
     if selector == 58:
@@ -2279,6 +2305,57 @@ def generate_post_topk_range_filter_case(seed: int) -> Case:
             "source_issue": "https://github.com/pola-rs/polars/issues/26803",
             "source_issue_alt": "https://github.com/duckdb/duckdb/issues/22075",
             "limit": limit_n,
+        },
+    )
+
+
+def generate_tuple_absence_filter_case(seed: int) -> Case:
+    left_rows = [
+        {"row_id": 0, "a": 1, "b": 1, "payload": "matched"},
+        {"row_id": 1, "a": 2, "b": 2, "payload": "survivor"},
+        {"row_id": 2, "a": 3, "b": None, "payload": "unknown-left"},
+        {"row_id": 3, "a": None, "b": 4, "payload": "unknown-both"},
+    ]
+    if seed % 2:
+        left_rows.append({"row_id": 4, "a": 5, "b": 4, "payload": "definite-false"})
+    left = TableData(
+        "t0",
+        [
+            ColumnSpec("row_id", "int", nullable=False),
+            ColumnSpec("a", "int", nullable=True),
+            ColumnSpec("b", "int", nullable=True),
+            ColumnSpec("payload", "str", nullable=True),
+        ],
+        left_rows,
+    )
+    right = TableData(
+        "t1",
+        [
+            ColumnSpec("a", "int", nullable=True),
+            ColumnSpec("b", "int", nullable=True),
+        ],
+        [
+            {"a": 1, "b": 1},
+            {"a": None, "b": 4},
+        ],
+    )
+    program = Program(
+        f"prog-{seed:08d}-tuple-absence-filter",
+        seed,
+        [
+            {"op": "tuple_absence_filter", "columns": ["a", "b"], "table": "t1", "right_columns": ["a", "b"]},
+            {"op": "select", "columns": ["row_id", "a", "b", "payload"]},
+            {"op": "sort", "keys": [{"column": "row_id", "ascending": True, "nulls": "last"}]},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-tuple-absence-filter",
+        seed=seed,
+        tables=[left, right],
+        program=program,
+        metadata={
+            "generator_profile": "tuple_absence_filter",
+            "source_issue": "https://github.com/duckdb/duckdb/issues/22418",
         },
     )
 

@@ -53,6 +53,23 @@ def _agg_expr(column: str, func: str) -> str:
     return f"{sql_func}({_quote(column)})"
 
 
+def _tuple_absence_safe_condition(op: dict[str, Any]) -> str:
+    definite_inequalities = [
+        (
+            f"q.{_quote(left)} IS NOT NULL AND r.{_quote(right)} IS NOT NULL "
+            f"AND q.{_quote(left)} <> r.{_quote(right)}"
+        )
+        for left, right in zip(op["columns"], op["right_columns"])
+    ]
+    row_equality_is_not_false = "NOT (" + " OR ".join(definite_inequalities) + ")"
+    return (
+        "NOT EXISTS ("
+        f"SELECT 1 FROM {_quote(op['table'])} r "
+        f"WHERE {row_equality_is_not_false}"
+        ")"
+    )
+
+
 class DataFusionBackend(Backend):
     name = "datafusion"
 
@@ -146,6 +163,11 @@ class DataFusionBackend(Backend):
                     query = (
                         f"SELECT * FROM ({query}) q "
                         f"WHERE {condition}"
+                    )
+                elif kind == "tuple_absence_filter":
+                    query = (
+                        f"SELECT * FROM ({query}) q "
+                        f"WHERE {_tuple_absence_safe_condition(op)}"
                     )
                 elif kind == "select":
                     cols = list(op["columns"])

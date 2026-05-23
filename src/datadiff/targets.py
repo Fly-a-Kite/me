@@ -22,6 +22,7 @@ COMMON_DSL_CAPABILITIES: tuple[str, ...] = (
     "table:single",
     "table:multi",
     "op:filter",
+    "op:tuple_absence_filter",
     "op:select",
     "op:sort",
     "op:limit",

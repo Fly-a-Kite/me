@@ -6,6 +6,7 @@ import warnings
 from datadiff.backends.base import Backend, BackendResult
 from datadiff.dsl import Program, TableData, normalize_sort_keys
 from datadiff.filtering import parse_filter_comparator
+from datadiff.tuple_logic import evaluate_tuple_absence
 
 
 class PolarsBackend(Backend):
@@ -56,6 +57,9 @@ class PolarsBackend(Backend):
                         )
                         expr = _polars_filter_expr(col, op["cmp"], val)
                     df = df.filter(expr)
+                elif kind == "tuple_absence_filter":
+                    mask = _tuple_absence_mask(pl, df, frames[op["table"]], op)
+                    df = df.filter(mask)
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -184,6 +188,11 @@ class PolarsLazyBackend(PolarsBackend):
                         )
                         expr = _polars_filter_expr(col, op["cmp"], val)
                     lf = lf.filter(expr)
+                elif kind == "tuple_absence_filter":
+                    left_df = lf.collect()
+                    right_df = frames[op["table"]].collect()
+                    mask = _tuple_absence_mask(pl, left_df, right_df, op)
+                    lf = left_df.filter(mask).lazy()
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))
                 elif kind == "sort":
@@ -276,6 +285,17 @@ def _polars_dtype(pl, kind: str):
     if kind == "bool":
         return pl.Boolean
     return pl.Utf8
+
+
+def _tuple_absence_mask(pl, df, right_df, op: dict):
+    left_columns = list(op["columns"])
+    right_columns = list(op["right_columns"])
+    right_rows = right_df.select(right_columns).to_dicts()
+    mask = [
+        evaluate_tuple_absence(row, left_columns, right_rows, right_columns)
+        for row in df.to_dicts()
+    ]
+    return pl.Series("__datadiff_tuple_absence", mask, dtype=pl.Boolean)
 
 
 def _polars_filter_expr(col, comparator: str, value):

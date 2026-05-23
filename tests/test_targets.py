@@ -47,6 +47,7 @@ def test_target_descriptions_capture_methodology_axes():
     assert [spec["family"] for spec in specs] == ["dataframe", "embedded_sql"]
     assert all(spec["adapter"] for spec in specs)
     assert "op:join" in specs[0]["capabilities"]
+    assert "op:tuple_absence_filter" in specs[0]["capabilities"]
 
 
 def test_list_target_suites_includes_core():

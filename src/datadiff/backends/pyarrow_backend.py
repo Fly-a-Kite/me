@@ -7,6 +7,7 @@ from typing import Any
 from datadiff.backends.base import Backend, BackendResult
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
 from datadiff.filtering import parse_filter_comparator
+from datadiff.tuple_logic import evaluate_tuple_absence
 
 
 class PyArrowBackend(Backend):
@@ -56,6 +57,16 @@ class PyArrowBackend(Backend):
                     elif kind == "filter":
                         mask = _comparison_mask(pa, pc, current[op["column"]], op["cmp"], op["value"])
                         current = current.filter(mask)
+                    elif kind == "tuple_absence_filter":
+                        right_rows = arrow_tables[op["table"]].select(list(op["right_columns"])).to_pylist()
+                        left_columns = list(op["columns"])
+                        right_columns = list(op["right_columns"])
+                        rows = [
+                            row
+                            for row in current.to_pylist()
+                            if evaluate_tuple_absence(row, left_columns, right_rows, right_columns)
+                        ]
+                        current = pa.Table.from_pylist(rows, schema=current.schema)
                     elif kind == "select":
                         current_cols = list(op["columns"])
                         current = current.select(current_cols)
