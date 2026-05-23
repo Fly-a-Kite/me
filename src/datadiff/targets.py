@@ -34,6 +34,7 @@ COMMON_DSL_CAPABILITIES: tuple[str, ...] = (
     "op:group_quantile_probe",
     "op:scalar_subquery_probe",
     "op:window_avg_probe",
+    "op:struct_distinct_probe",
     "op:groupby",
     "op:aggregate",
     "op:join",

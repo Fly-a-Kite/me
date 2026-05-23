@@ -308,6 +308,21 @@ def test_oracle_classifies_window_avg_rows_frame():
     assert findings[0].root_cause == "window_avg_rows_frame"
 
 
+def test_oracle_classifies_struct_distinct_unnest():
+    case = generate_case(370024, profile="struct_distinct_unnest")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["struct_distinct_mismatch"], [[False]]),
+            "duckdb": NormalizedResult("duckdb", "ok", ["struct_distinct_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "struct_distinct_unnest"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

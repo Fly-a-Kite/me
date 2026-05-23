@@ -54,6 +54,7 @@ def test_target_descriptions_capture_methodology_axes():
     assert "op:group_quantile_probe" in specs[0]["capabilities"]
     assert "op:scalar_subquery_probe" in specs[0]["capabilities"]
     assert "op:window_avg_probe" in specs[0]["capabilities"]
+    assert "op:struct_distinct_probe" in specs[0]["capabilities"]
 
 
 def test_list_target_suites_includes_core():
@@ -73,6 +74,7 @@ def test_list_target_suites_includes_core():
     assert "op:group_quantile_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:scalar_subquery_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:window_avg_probe" in suites["latest_all_engines"]["common_capabilities"]
+    assert "op:struct_distinct_probe" in suites["latest_all_engines"]["common_capabilities"]
 
 
 def test_target_capability_matrix_and_intersection():

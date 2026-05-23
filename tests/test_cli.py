@@ -251,6 +251,7 @@ def test_cli_parses_order_sensitive_bug_hunt_profiles():
         "group_quantile_key_probe",
         "scalar_subquery_double_parentheses",
         "window_avg_rows_frame",
+        "struct_distinct_unnest",
     ]:
         args = parser.parse_args(["fuzz", "--profile", profile])
         assert args.cmd == "fuzz"
@@ -468,6 +469,9 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("window_avg_rows_frame").generator_profile == "window_avg_rows_frame"
     assert _preset_config("window_avg_rows_frame").guidance_targets[0] == "window_avg_rows_frame"
     assert _preset_config("window_avg_rows_frame_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("struct_distinct_unnest").generator_profile == "struct_distinct_unnest"
+    assert _preset_config("struct_distinct_unnest").guidance_targets[0] == "struct_distinct_unnest"
+    assert _preset_config("struct_distinct_unnest_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("join_null_sort").generator_profile == "join_null_sort"
     assert _preset_config("join_null_sort").guidance_targets[0] == "join_null_sort"
     assert _preset_config("join_null_sort_metamorphic").enable_metamorphic_oracle is True
@@ -547,6 +551,7 @@ def test_cli_parses_non_datafusion_live_presets():
         "group_quantile_key_probe",
         "scalar_subquery_double_parentheses",
         "window_avg_rows_frame",
+        "struct_distinct_unnest",
     }.issubset(arrow.guidance_targets)
     assert arrow.enable_local_source_scheduler is True
 

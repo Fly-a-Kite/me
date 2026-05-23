@@ -102,6 +102,13 @@ def test_classify_operation_combo_tracks_window_avg_rows_frame_risk():
     assert "window_avg_rows_frame" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_struct_distinct_unnest_risk():
+    combo = classify_operation_combo([{"op": "struct_distinct_probe"}])
+
+    assert combo["template"] == "struct_distinct_probe"
+    assert "struct_distinct_unnest" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

@@ -117,6 +117,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     group_quantile_key_probe = _preset_config("group_quantile_key_probe")
     scalar_subquery_double_parentheses = _preset_config("scalar_subquery_double_parentheses")
     window_avg_rows_frame = _preset_config("window_avg_rows_frame")
+    struct_distinct_unnest = _preset_config("struct_distinct_unnest")
 
     assert null_groupby.generator_profile == "null_groupby_topk"
     assert {"groupby", "nulls", "sort_limit"}.issubset(null_groupby.guidance_targets)
@@ -182,6 +183,8 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     )
     assert window_avg_rows_frame.generator_profile == "window_avg_rows_frame"
     assert {"window_avg_probe", "window_frame", "numeric"}.issubset(window_avg_rows_frame.guidance_targets)
+    assert struct_distinct_unnest.generator_profile == "struct_distinct_unnest"
+    assert {"struct_distinct_probe", "struct_unnest"}.issubset(struct_distinct_unnest.guidance_targets)
 
 
 def test_methodology_seeded_fault_suites_support_sensitivity_evaluation():

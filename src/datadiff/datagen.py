@@ -46,6 +46,7 @@ GeneratorProfile = Literal[
     "group_quantile_key_probe",
     "scalar_subquery_double_parentheses",
     "window_avg_rows_frame",
+    "struct_distinct_unnest",
 ]
 
 
@@ -490,6 +491,9 @@ def _available_columns_after_operations(
         elif kind == "window_avg_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "struct_distinct_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "groupby":
             available = unique_preserve_order(
                 [str(key) for key in op.get("keys", [])]
@@ -775,6 +779,17 @@ def repair_operations(
             strings = set()
             order_pending = False
             pending_order_columns = set()
+        elif kind == "struct_distinct_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "struct_distinct_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "select":
             cols = unique_preserve_order([c for c in op["columns"] if c in available])
             if not cols:
@@ -1040,6 +1055,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_scalar_subquery_double_parentheses_case(seed)
     if profile == "window_avg_rows_frame" and type_aware:
         return generate_window_avg_rows_frame_case(seed)
+    if profile == "struct_distinct_unnest" and type_aware:
+        return generate_struct_distinct_unnest_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -1115,6 +1132,8 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         )
     if seed % 89 == 66:
         return _as_bughunt_mixed_case(generate_window_avg_rows_frame_case(seed), seed, "window_avg_rows_frame")
+    if seed % 97 == 67:
+        return _as_bughunt_mixed_case(generate_struct_distinct_unnest_case(seed), seed, "struct_distinct_unnest")
     return None
 
 
@@ -2762,6 +2781,32 @@ def generate_window_avg_rows_frame_case(seed: int) -> Case:
             "source_issue": "https://github.com/pola-rs/polars/issues/26065",
             "expected_window_avg_mismatch": False,
             "expected_window_avg_values": [10.0, 15.0, 20.0, 25.0, 30.0],
+        },
+    )
+
+
+def generate_struct_distinct_unnest_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("struct_distinct_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-struct-distinct-unnest",
+        seed,
+        [{"op": "struct_distinct_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-struct-distinct-unnest",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "struct_distinct_unnest",
+            "source_issue": "https://github.com/duckdb/duckdb/issues/17278",
+            "expected_struct_distinct_mismatch": False,
+            "expected_rows": [["0", "0"], ["0", "1"]],
         },
     )
 

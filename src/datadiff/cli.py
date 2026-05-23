@@ -101,6 +101,8 @@ LIVE_BUGHUNT_TARGETS = [
     "scalar_subquery_probe",
     "window_avg_rows_frame",
     "window_avg_probe",
+    "struct_distinct_unnest",
+    "struct_distinct_probe",
     "wide_offset_topk",
     "empty_filter_groupby",
     "expressions",
@@ -146,6 +148,8 @@ LIVE_ARROW_TARGETS = [
     "scalar_subquery_probe",
     "window_avg_rows_frame",
     "window_avg_probe",
+    "struct_distinct_unnest",
+    "struct_distinct_probe",
     "wide_offset_topk",
     "empty_filter_groupby",
     "expressions",
@@ -190,6 +194,8 @@ LIVE_POLARS_LAZY_TARGETS = [
     "scalar_subquery_probe",
     "window_avg_rows_frame",
     "window_avg_probe",
+    "struct_distinct_unnest",
+    "struct_distinct_probe",
     "empty_filter_groupby",
     "expressions",
 ]
@@ -232,6 +238,8 @@ LIVE_EMBEDDED_SQL_TARGETS = [
     "scalar_subquery_probe",
     "window_avg_rows_frame",
     "window_avg_probe",
+    "struct_distinct_unnest",
+    "struct_distinct_probe",
     "wide_offset_topk",
     "empty_filter_groupby",
     "casts",
@@ -278,6 +286,8 @@ LIVE_CROSS_FAMILY_TARGETS = [
     "scalar_subquery_probe",
     "window_avg_rows_frame",
     "window_avg_probe",
+    "struct_distinct_unnest",
+    "struct_distinct_probe",
     "wide_offset_topk",
     "empty_filter_groupby",
     "expressions",
@@ -1991,6 +2001,24 @@ def _preset_config(name: str) -> ExperimentConfig:
             guidance_targets=["window_avg_rows_frame", "window_avg_probe", "window_frame", "numeric"],
             metamorphic_variant_limit=2,
         )
+    if name == "struct_distinct_unnest":
+        return ExperimentConfig(
+            generator_profile="struct_distinct_unnest",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=["struct_distinct_unnest", "struct_distinct_probe", "struct_unnest"],
+            metamorphic_variant_limit=0,
+        )
+    if name == "struct_distinct_unnest_metamorphic":
+        return ExperimentConfig(
+            generator_profile="struct_distinct_unnest",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=["struct_distinct_unnest", "struct_distinct_probe", "struct_unnest"],
+            metamorphic_variant_limit=2,
+        )
     if name == "live_datafusion":
         return _live_bughunt_config(
             guidance_targets=list(LIVE_BUGHUNT_TARGETS),
@@ -2540,6 +2568,7 @@ def _experiment_job_weight(job: dict) -> float:
         "group_quantile_key_probe": 1.0,
         "scalar_subquery_double_parentheses": 1.0,
         "window_avg_rows_frame": 1.0,
+        "struct_distinct_unnest": 1.0,
         "common": 1.0,
     }.get(config.generator_profile, 1.0)
     guidance_multiplier = 1.0 + 0.03 * max(0, int(config.guidance_candidate_pool) - 1)
@@ -2651,7 +2680,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_fuzz.add_argument("--duration", default=None, help="wall-clock budget such as 10s, 5m, 24h")
     p_fuzz.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_fuzz)
-    p_fuzz.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "set_membership_filter", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "running_sum_precision", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame"], default="common")
+    p_fuzz.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "set_membership_filter", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "running_sum_precision", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest"], default="common")
     add_guidance_flags(p_fuzz, default_strategy="random", default_candidate_pool=8)
     add_ablation_flags(p_fuzz)
     add_paper_journal_flags(p_fuzz)
@@ -2662,7 +2691,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_long.add_argument("--duration", default="24h", help="wall-clock budget such as 10m, 24h, 2d")
     p_long.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_long)
-    p_long.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "set_membership_filter", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "running_sum_precision", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame"], default="common")
+    p_long.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "set_membership_filter", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "running_sum_precision", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest"], default="common")
     add_guidance_flags(p_long, default_strategy="guided", default_candidate_pool=8)
     p_long.add_argument("--case-log", default=None, help="optional JSONL path for generated test cases")
     p_long.add_argument("--checkpoint-interval", default="60s", help="checkpoint write interval")

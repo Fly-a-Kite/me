@@ -110,6 +110,21 @@ def _scalar_subquery_probe_sql(op: dict) -> str:
     )
 
 
+def _struct_distinct_probe_sql(op: dict) -> str:
+    return (
+        "WITH got AS ("
+        "SELECT DISTINCT unnest(s) "
+        "FROM (SELECT {'a':'0','b':'0'} AS s UNION ALL SELECT {'a':'0','b':'1'})"
+        ") "
+        "SELECT NOT ("
+        "COUNT(*) = 2 "
+        "AND SUM(CASE WHEN a = '0' AND b = '0' THEN 1 ELSE 0 END) = 1 "
+        "AND SUM(CASE WHEN a = '0' AND b = '1' THEN 1 ELSE 0 END) = 1"
+        f") AS {_quote(op['as'])} "
+        "FROM got"
+    )
+
+
 class DuckDBBackend(Backend):
     name = "duckdb"
     persistent_storage = False
@@ -284,6 +299,13 @@ class DuckDBBackend(Backend):
                 elif kind == "window_avg_probe":
                     ctes = []
                     relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "struct_distinct_probe":
+                    ctes = []
+                    relation = add_step(_struct_distinct_probe_sql(op))
                     current_cols = [op["as"]]
                     visible_cols = [op["as"]]
                     hidden_order_cols = []

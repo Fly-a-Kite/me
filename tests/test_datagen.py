@@ -51,6 +51,9 @@ def _assert_program_columns_are_valid(case):
         elif op["op"] == "window_avg_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
+        elif op["op"] == "struct_distinct_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
         elif op["op"] == "groupby":
             assert set(op["keys"]).issubset(known_cols)
             assert len(op["keys"]) == len(set(op["keys"]))
@@ -149,6 +152,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "group_quantile_key_probe",
         "scalar_subquery_double_parentheses",
         "window_avg_rows_frame",
+        "struct_distinct_unnest",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -644,6 +648,18 @@ def test_generate_case_window_avg_rows_frame_profile_is_supported_and_valid():
     assert "pattern:window_avg_rows_frame" in features
     assert "window:rows-frame" in features
     assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/26065"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_struct_distinct_unnest_profile_is_supported_and_valid():
+    case = generate_case(132, profile="struct_distinct_unnest")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000132-struct-distinct-unnest"
+    assert case.program.operations == [{"op": "struct_distinct_probe", "as": "struct_distinct_mismatch"}]
+    assert "pattern:struct_distinct_unnest" in features
+    assert "struct:unnest" in features
+    assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/17278"
     assert validate_case_program(case) == []
 
 
