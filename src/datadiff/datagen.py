@@ -56,6 +56,7 @@ GeneratorProfile = Literal[
     "polars_float_wrap_numerical_semantics",
     "pandas_index_bool_result_type",
     "polars_empty_literal_groupby_semantics",
+    "pandas_arrow_string_eq_sum_semantics",
 ]
 
 
@@ -530,6 +531,9 @@ def _available_columns_after_operations(
         elif kind == "empty_literal_groupby_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "arrow_string_eq_sum_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "groupby":
             available = unique_preserve_order(
                 [str(key) for key in op.get("keys", [])]
@@ -925,6 +929,17 @@ def repair_operations(
             strings = set()
             order_pending = False
             pending_order_columns = set()
+        elif kind == "arrow_string_eq_sum_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "arrow_string_eq_sum_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "select":
             cols = unique_preserve_order([c for c in op["columns"] if c in available])
             if not cols:
@@ -1210,6 +1225,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_pandas_index_bool_result_type_case(seed)
     if profile == "polars_empty_literal_groupby_semantics" and type_aware:
         return generate_polars_empty_literal_groupby_semantics_case(seed)
+    if profile == "pandas_arrow_string_eq_sum_semantics" and type_aware:
+        return generate_pandas_arrow_string_eq_sum_semantics_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -1336,6 +1353,12 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
             generate_polars_empty_literal_groupby_semantics_case(seed),
             seed,
             "polars_empty_literal_groupby_semantics",
+        )
+    if seed % 149 == 78:
+        return _as_bughunt_mixed_case(
+            generate_pandas_arrow_string_eq_sum_semantics_case(seed),
+            seed,
+            "pandas_arrow_string_eq_sum_semantics",
         )
     return None
 
@@ -3244,6 +3267,32 @@ def generate_polars_empty_literal_groupby_semantics_case(seed: int) -> Case:
             "source_issue": "https://github.com/pola-rs/polars/issues/23870",
             "expected_empty_literal_groupby_mismatch": False,
             "expected_empty_literal_groupby_rows": 0,
+        },
+    )
+
+
+def generate_pandas_arrow_string_eq_sum_semantics_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("arrow_string_eq_sum_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-pandas-arrow-string-eq-sum-semantics",
+        seed,
+        [{"op": "arrow_string_eq_sum_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-pandas-arrow-string-eq-sum-semantics",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "pandas_arrow_string_eq_sum_semantics",
+            "source_issue": "https://github.com/pandas-dev/pandas/issues/63458",
+            "expected_arrow_string_eq_sum_mismatch": False,
+            "expected_arrow_string_eq_sum_value": 1,
         },
     )
 

@@ -261,6 +261,7 @@ def test_cli_parses_order_sensitive_bug_hunt_profiles():
         "polars_float_wrap_numerical_semantics",
         "pandas_index_bool_result_type",
         "polars_empty_literal_groupby_semantics",
+        "pandas_arrow_string_eq_sum_semantics",
     ]:
         args = parser.parse_args(["fuzz", "--profile", profile])
         assert args.cmd == "fuzz"
@@ -511,6 +512,12 @@ def test_cli_parses_targeted_guided_experiment_presets():
         == "polars_empty_literal_groupby_semantics"
     )
     assert _preset_config("polars_empty_literal_groupby_semantics_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("pandas_arrow_string_eq_sum_semantics").generator_profile == "pandas_arrow_string_eq_sum_semantics"
+    assert (
+        _preset_config("pandas_arrow_string_eq_sum_semantics").guidance_targets[0]
+        == "pandas_arrow_string_eq_sum_semantics"
+    )
+    assert _preset_config("pandas_arrow_string_eq_sum_semantics_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("join_null_sort").generator_profile == "join_null_sort"
     assert _preset_config("join_null_sort").guidance_targets[0] == "join_null_sort"
     assert _preset_config("join_null_sort_metamorphic").enable_metamorphic_oracle is True
@@ -600,6 +607,7 @@ def test_cli_parses_non_datafusion_live_presets():
         "polars_float_wrap_numerical_semantics",
         "pandas_index_bool_result_type",
         "polars_empty_literal_groupby_semantics",
+        "pandas_arrow_string_eq_sum_semantics",
     }.issubset(arrow.guidance_targets)
     assert arrow.enable_local_source_scheduler is True
 

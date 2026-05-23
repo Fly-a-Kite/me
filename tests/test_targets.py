@@ -64,6 +64,7 @@ def test_target_descriptions_capture_methodology_axes():
     assert "op:float_wrap_probe" in specs[0]["capabilities"]
     assert "op:index_bool_probe" in specs[0]["capabilities"]
     assert "op:empty_literal_groupby_probe" in specs[0]["capabilities"]
+    assert "op:arrow_string_eq_sum_probe" in specs[0]["capabilities"]
 
 
 def test_list_target_suites_includes_core():
@@ -93,6 +94,7 @@ def test_list_target_suites_includes_core():
     assert "op:float_wrap_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:index_bool_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:empty_literal_groupby_probe" in suites["latest_all_engines"]["common_capabilities"]
+    assert "op:arrow_string_eq_sum_probe" in suites["latest_all_engines"]["common_capabilities"]
 
 
 def test_target_capability_matrix_and_intersection():

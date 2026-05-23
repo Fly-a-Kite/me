@@ -507,6 +507,17 @@ def _append_empty_literal_groupby_probe(
     return f"append_empty_literal_groupby_probe:out={alias}"
 
 
+def _append_arrow_string_eq_sum_probe(
+    tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random
+) -> str:
+    if not tables:
+        return "append_arrow_string_eq_sum_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("arrow_string_eq_sum_mismatch", used=set(available))
+    operations.append({"op": "arrow_string_eq_sum_probe", "as": alias})
+    return f"append_arrow_string_eq_sum_probe:out={alias}"
+
+
 def _append_grouped_topk_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
     if not tables:
         return "append_grouped_topk:none"
@@ -729,6 +740,9 @@ def _available_columns(tables: list[TableData], operations: list[dict[str, Any]]
         elif op.get("op") == "empty_literal_groupby_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif op.get("op") == "arrow_string_eq_sum_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif op.get("op") == "groupby":
             available = unique_preserve_order(list(op.get("keys", [])) + [agg["as"] for agg in op.get("aggs", [])])
         elif op.get("op") == "aggregate":
@@ -770,6 +784,8 @@ def _column_type(tables: list[TableData], name: str) -> str:
     if name == "index_bool_mismatch" or name.startswith("index_bool_mismatch_"):
         return "bool"
     if name == "empty_literal_groupby_mismatch" or name.startswith("empty_literal_groupby_mismatch_"):
+        return "bool"
+    if name == "arrow_string_eq_sum_mismatch" or name.startswith("arrow_string_eq_sum_mismatch_"):
         return "bool"
     return "float" if name.startswith(("m_", "sum_", "min_", "max_", "run_")) else "int"
 
@@ -826,6 +842,7 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_float_wrap_probe", _append_float_wrap_probe),
     MutationOperator("append_index_bool_probe", _append_index_bool_probe),
     MutationOperator("append_empty_literal_groupby_probe", _append_empty_literal_groupby_probe),
+    MutationOperator("append_arrow_string_eq_sum_probe", _append_arrow_string_eq_sum_probe),
     MutationOperator("append_grouped_topk", _append_grouped_topk_probe),
     MutationOperator("drop_op", _drop_operation),
     MutationOperator("tweak_op", _tweak_random_operation),

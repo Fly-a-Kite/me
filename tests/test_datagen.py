@@ -189,6 +189,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "polars_float_wrap_numerical_semantics",
         "pandas_index_bool_result_type",
         "polars_empty_literal_groupby_semantics",
+        "pandas_arrow_string_eq_sum_semantics",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -806,6 +807,20 @@ def test_generate_case_polars_empty_literal_groupby_semantics_profile_is_support
     assert "pattern:polars_empty_literal_groupby_semantics" in features
     assert "polars:empty-literal-groupby" in features
     assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/23870"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_pandas_arrow_string_eq_sum_semantics_profile_is_supported_and_valid():
+    case = generate_case(142, profile="pandas_arrow_string_eq_sum_semantics")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000142-pandas-arrow-string-eq-sum-semantics"
+    assert case.program.operations == [
+        {"op": "arrow_string_eq_sum_probe", "as": "arrow_string_eq_sum_mismatch"}
+    ]
+    assert "pattern:pandas_arrow_string_eq_sum_semantics" in features
+    assert "pandas:arrow-string-eq-sum" in features
+    assert case.metadata["source_issue"] == "https://github.com/pandas-dev/pandas/issues/63458"
     assert validate_case_program(case) == []
 
 

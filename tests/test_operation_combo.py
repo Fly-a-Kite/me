@@ -172,6 +172,13 @@ def test_classify_operation_combo_tracks_polars_empty_literal_groupby_semantics_
     assert "polars_empty_literal_groupby_semantics" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_pandas_arrow_string_eq_sum_semantics_risk():
+    combo = classify_operation_combo([{"op": "arrow_string_eq_sum_probe"}])
+
+    assert combo["template"] == "arrow_string_eq_sum_probe"
+    assert "pandas_arrow_string_eq_sum_semantics" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

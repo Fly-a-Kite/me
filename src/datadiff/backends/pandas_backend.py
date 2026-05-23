@@ -119,6 +119,9 @@ class PandasBackend(Backend):
                     df = pd.DataFrame([{op["as"]: not isinstance(observed, pd.Index)}], columns=[op["as"]])
                 elif kind == "empty_literal_groupby_probe":
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
+                elif kind == "arrow_string_eq_sum_probe":
+                    mismatch = _pandas_arrow_string_eq_sum_mismatch(pd)
+                    df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":
@@ -191,3 +194,12 @@ class PandasBackend(Backend):
             return BackendResult(self.name, "ok", data=df, duration_ms=(time.perf_counter()-start)*1000)
         except Exception as exc:  # noqa: BLE001
             return BackendResult(self.name, "error", error_type=type(exc).__name__, error=str(exc), duration_ms=(time.perf_counter()-start)*1000)
+
+
+def _pandas_arrow_string_eq_sum_mismatch(pd) -> bool:
+    values = pd.array(["a"], dtype="string[pyarrow]")
+    try:
+        observed = (values == values).sum()
+    except AttributeError:
+        return True
+    return int(observed) != 1

@@ -460,6 +460,21 @@ def test_oracle_classifies_polars_empty_literal_groupby_semantics():
     assert findings[0].root_cause == "polars_empty_literal_groupby_semantics"
 
 
+def test_oracle_classifies_pandas_arrow_string_eq_sum_semantics():
+    case = generate_case(370034, profile="pandas_arrow_string_eq_sum_semantics")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["arrow_string_eq_sum_mismatch"], [[False]]),
+            "pandas": NormalizedResult("pandas", "ok", ["arrow_string_eq_sum_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "pandas_arrow_string_eq_sum_semantics"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

@@ -22,6 +22,7 @@ CANONICAL_OPERATION_ORDER = (
     "float_wrap_probe",
     "index_bool_probe",
     "empty_literal_groupby_probe",
+    "arrow_string_eq_sum_probe",
     "groupby",
     "aggregate",
     "select",
@@ -139,6 +140,8 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("pandas_index_bool_result_type")
     if "empty_literal_groupby_probe" in op_set:
         risks.append("polars_empty_literal_groupby_semantics")
+    if "arrow_string_eq_sum_probe" in op_set:
+        risks.append("pandas_arrow_string_eq_sum_semantics")
     if "groupby" in op_set:
         risks.append("groupby_aggregation")
     if "aggregate" in op_set:

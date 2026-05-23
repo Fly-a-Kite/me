@@ -1285,6 +1285,63 @@ def test_classification_reference_understands_empty_literal_groupby_probe():
     assert classification.implicated_backends == ["polars", "polars_lazy"]
 
 
+def test_validate_case_accepts_arrow_string_eq_sum_probe():
+    valid = Case(
+        "case-arrow-string-eq-sum-probe",
+        68,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-arrow-string-eq-sum-probe",
+            68,
+            [{"op": "arrow_string_eq_sum_probe", "as": "arrow_string_eq_sum_mismatch"}],
+        ),
+    )
+    bad_alias = Case(
+        "case-arrow-string-eq-sum-probe-alias",
+        69,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-arrow-string-eq-sum-probe-alias", 69, [{"op": "arrow_string_eq_sum_probe", "as": "where"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_arrow_string_eq_sum_probe():
+    case = Case(
+        "case-arrow-string-eq-sum-reference",
+        70,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-arrow-string-eq-sum-reference",
+            70,
+            [{"op": "arrow_string_eq_sum_probe", "as": "arrow_string_eq_sum_mismatch"}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "pandas_arrow_string_eq_sum_semantics",
+        "confidence": "high",
+        "suspicious_backends": ["pandas"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["arrow_string_eq_sum_mismatch"], [[False]]),
+        "pandas": NormalizedResult("pandas", "ok", ["arrow_string_eq_sum_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "pandas_arrow_string_eq_sum_semantics"},
+        ["reference", "pandas"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["pandas"]
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",
