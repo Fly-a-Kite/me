@@ -6,6 +6,7 @@ from typing import Any
 from datadiff.backends.base import Backend, BackendResult
 from datadiff.dsl import Program, TableData, normalize_sort_keys
 from datadiff.filtering import evaluate_filter_predicate
+from datadiff.running import sort_rows_for_running, stable_running_sum_values
 from datadiff.tuple_logic import evaluate_tuple_absence
 
 
@@ -61,6 +62,12 @@ class PandasBackend(Backend):
                         for row in df.to_dict("records")
                     ]
                     df = df[mask]
+                elif kind == "running_sum":
+                    columns = [column for column in df.columns if column != op["column"]] + [op["column"]]
+                    rows = sort_rows_for_running(df.to_dict("records"), normalize_sort_keys({"keys": op["order_by"]}))
+                    values = stable_running_sum_values(rows, op["source"])
+                    rows = [{**row, op["column"]: value} for row, value in zip(rows, values)]
+                    df = pd.DataFrame(rows, columns=columns)
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":

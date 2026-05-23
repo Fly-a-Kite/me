@@ -70,6 +70,19 @@ def _tuple_absence_safe_condition(op: dict[str, Any]) -> str:
     )
 
 
+def _running_sum_projection(cols: list[str], op: dict[str, Any]) -> tuple[str, list[str]]:
+    kept_cols = [col for col in cols if col != op["column"]]
+    select_parts = [f"q.{_quote(col)}" for col in kept_cols]
+    order_sql = _order_clause(normalize_sort_keys({"keys": op["order_by"]}))
+    expr_sql = (
+        f"SUM(CAST(q.{_quote(op['source'])} AS DOUBLE)) OVER ("
+        f"ORDER BY {order_sql} ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"
+        f") AS {_quote(op['column'])}"
+    )
+    select_parts.append(expr_sql)
+    return ", ".join(select_parts), kept_cols + [op["column"]]
+
+
 class DataFusionBackend(Backend):
     name = "datafusion"
 
@@ -169,6 +182,13 @@ class DataFusionBackend(Backend):
                         f"SELECT * FROM ({query}) q "
                         f"WHERE {_tuple_absence_safe_condition(op)}"
                     )
+                elif kind == "running_sum":
+                    drop_hidden_order_cols()
+                    order_keys = normalize_sort_keys({"keys": op["order_by"]})
+                    projection, current_cols = _running_sum_projection(current_cols, op)
+                    query = f"SELECT {projection} FROM ({query}) q"
+                    visible_cols = [col for col in visible_cols if col != op["column"]] + [op["column"]]
+                    pending_order = order_keys
                 elif kind == "select":
                     cols = list(op["columns"])
                     projection = select_with_pending_order(cols)

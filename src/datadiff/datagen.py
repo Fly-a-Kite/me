@@ -40,6 +40,7 @@ GeneratorProfile = Literal[
     "boolean_predicate_filter",
     "post_topk_range_filter",
     "tuple_absence_filter",
+    "running_sum_precision",
 ]
 
 
@@ -465,6 +466,10 @@ def _available_columns_after_operations(
             column = str(op.get("column", ""))
             if column:
                 available = [existing for existing in available if existing != column] + [column]
+        elif kind == "running_sum":
+            column = str(op.get("column", ""))
+            if column:
+                available = [existing for existing in available if existing != column] + [column]
         elif kind == "groupby":
             available = unique_preserve_order(
                 [str(key) for key in op.get("keys", [])]
@@ -626,6 +631,35 @@ def repair_operations(
                     "right_columns": right_columns,
                 }
             )
+        elif kind == "running_sum":
+            source = str(op.get("source", ""))
+            column = str(op.get("column", ""))
+            if source not in available or source not in numeric:
+                continue
+            if not column or is_reserved_output_name(column):
+                continue
+            try:
+                order_keys = normalize_sort_keys({"keys": op.get("order_by", [])})
+            except ValueError:
+                continue
+            order_keys = _dedupe_sort_keys([key for key in order_keys if key.column in available])
+            if not order_keys:
+                continue
+            repaired.append(
+                {
+                    "op": "running_sum",
+                    "source": source,
+                    "column": column,
+                    "order_by": [key.to_dict() for key in order_keys],
+                    "input_dtype": op.get("input_dtype", "float64"),
+                }
+            )
+            available.add(column)
+            col_types[column] = "float"
+            numeric.add(column)
+            strings.discard(column)
+            order_pending = True
+            pending_order_columns = {key.column for key in order_keys}
         elif kind == "select":
             cols = unique_preserve_order([c for c in op["columns"] if c in available])
             if not cols:
@@ -864,6 +898,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_post_topk_range_filter_case(seed)
     if profile == "tuple_absence_filter" and type_aware:
         return generate_tuple_absence_filter_case(seed)
+    if profile == "running_sum_precision" and type_aware:
+        return generate_running_sum_precision_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -923,6 +959,8 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         return _as_bughunt_mixed_case(generate_topk_resort_case(seed), seed, "topk_resort")
     if selector == 58:
         return _as_bughunt_mixed_case(generate_join_ordered_agg_topk_case(seed), seed, "join_ordered_agg_topk")
+    if selector == 59:
+        return _as_bughunt_mixed_case(generate_running_sum_precision_case(seed), seed, "running_sum_precision")
     return None
 
 
@@ -2356,6 +2394,53 @@ def generate_tuple_absence_filter_case(seed: int) -> Case:
         metadata={
             "generator_profile": "tuple_absence_filter",
             "source_issue": "https://github.com/duckdb/duckdb/issues/22418",
+        },
+    )
+
+
+def generate_running_sum_precision_case(seed: int) -> Case:
+    row_count = 20_000
+    increment = 0.0005
+    rows = [{"row_id": idx, "x": increment} for idx in range(row_count)]
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("row_id", "int", nullable=False),
+            ColumnSpec("x", "float", nullable=False),
+        ],
+        rows,
+    )
+    program = Program(
+        f"prog-{seed:08d}-running-sum-precision",
+        seed,
+        [
+            {
+                "op": "running_sum",
+                "source": "x",
+                "column": "run_x",
+                "order_by": [{"column": "row_id", "ascending": True, "nulls": "last"}],
+                "input_dtype": "float32",
+            },
+            {
+                "op": "sort",
+                "keys": [{"column": "row_id", "ascending": False, "nulls": "last"}],
+            },
+            {"op": "limit", "n": 1},
+            {"op": "select", "columns": ["row_id", "run_x"]},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-running-sum-precision",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "running_sum_precision",
+            "source_issue": "https://github.com/pola-rs/polars/issues/27662",
+            "source_issue_alt": "https://github.com/pola-rs/polars/issues/26800",
+            "row_count": row_count,
+            "increment": increment,
+            "expected_total": row_count * increment,
         },
     )
 

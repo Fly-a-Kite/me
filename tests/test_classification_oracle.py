@@ -584,6 +584,58 @@ def test_validate_case_accepts_tuple_absence_filter():
     assert any("tuple absence type mismatch" in error for error in validate_case_program(invalid_type))
 
 
+def test_validate_case_accepts_running_sum():
+    valid = Case(
+        "case-running-sum",
+        20,
+        [TableData("t0", [ColumnSpec("row_id", "int"), ColumnSpec("x", "float")], [{"row_id": 0, "x": 0.5}])],
+        Program(
+            "prog-running-sum",
+            20,
+            [
+                {
+                    "op": "running_sum",
+                    "source": "x",
+                    "column": "run_x",
+                    "order_by": [{"column": "row_id", "ascending": True, "nulls": "last"}],
+                    "input_dtype": "float32",
+                }
+            ],
+        ),
+    )
+    invalid_type = Case(
+        "case-running-sum-type",
+        21,
+        [TableData("t0", [ColumnSpec("row_id", "int"), ColumnSpec("s", "str")], [{"row_id": 0, "s": "x"}])],
+        Program(
+            "prog-running-sum-type",
+            21,
+            [
+                {
+                    "op": "running_sum",
+                    "source": "s",
+                    "column": "run_s",
+                    "order_by": [{"column": "row_id", "ascending": True, "nulls": "last"}],
+                }
+            ],
+        ),
+    )
+    invalid_order = Case(
+        "case-running-sum-order",
+        22,
+        [TableData("t0", [ColumnSpec("x", "float")], [{"x": 0.5}])],
+        Program(
+            "prog-running-sum-order",
+            22,
+            [{"op": "running_sum", "source": "x", "column": "run_x", "order_by": []}],
+        ),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("not numeric" in error for error in validate_case_program(invalid_type))
+    assert any("has no order_by" in error for error in validate_case_program(invalid_order))
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

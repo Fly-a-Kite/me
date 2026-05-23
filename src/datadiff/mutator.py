@@ -306,6 +306,35 @@ def _append_tuple_absence_filter_probe(
     return f"append_tuple_absence_filter:{','.join(left_columns)}:{right.name}:{','.join(selected_right_columns)}"
 
 
+def _append_running_sum_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
+    if not tables:
+        return "append_running_sum:none"
+    available = _available_columns(tables, operations)
+    numeric_columns = [column for column in available if _column_type(tables, column) in {"int", "float"}]
+    if not numeric_columns or not available:
+        return "append_running_sum:no-numeric-column"
+    source = rnd.choice(numeric_columns)
+    order_column = rnd.choice(available)
+    used = set(available)
+    output_column = make_safe_output_name(f"run_{source}", used=used)
+    operations.append(
+        {
+            "op": "running_sum",
+            "source": source,
+            "column": output_column,
+            "order_by": [
+                {
+                    "column": order_column,
+                    "ascending": rnd.choice([True, False]),
+                    "nulls": rnd.choice(["first", "last"]),
+                }
+            ],
+            "input_dtype": "float32" if _column_type(tables, source) == "float" or rnd.random() < 0.5 else "float64",
+        }
+    )
+    return f"append_running_sum:{source}:order={order_column}:out={output_column}"
+
+
 def _append_grouped_topk_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
     if not tables:
         return "append_grouped_topk:none"
@@ -481,6 +510,8 @@ def _available_columns(tables: list[TableData], operations: list[dict[str, Any]]
             available = [c for c in unique_preserve_order(op.get("columns", [])) if c in available]
         elif op.get("op") == "mutate":
             available.append(op["column"])
+        elif op.get("op") == "running_sum":
+            available.append(op["column"])
         elif op.get("op") == "groupby":
             available = unique_preserve_order(list(op.get("keys", [])) + [agg["as"] for agg in op.get("aggs", [])])
         elif op.get("op") == "aggregate":
@@ -493,7 +524,7 @@ def _column_type(tables: list[TableData], name: str) -> str:
         for col in table.columns:
             if col.name == name:
                 return col.type
-    return "float" if name.startswith(("m_", "sum_", "min_", "max_")) else "int"
+    return "float" if name.startswith(("m_", "sum_", "min_", "max_", "run_")) else "int"
 
 
 def _literal_for_type(typ: str, rnd: random.Random) -> Any:
@@ -528,6 +559,7 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_boolean_predicate_filter", _append_boolean_predicate_filter_probe),
     MutationOperator("append_range_filter", _append_range_filter_probe),
     MutationOperator("append_tuple_absence_filter", _append_tuple_absence_filter_probe),
+    MutationOperator("append_running_sum", _append_running_sum_probe),
     MutationOperator("append_grouped_topk", _append_grouped_topk_probe),
     MutationOperator("drop_op", _drop_operation),
     MutationOperator("tweak_op", _tweak_random_operation),

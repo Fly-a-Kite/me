@@ -59,6 +59,14 @@ def test_classify_operation_combo_tracks_tuple_absence_null_filter_risk():
     assert "tuple_absence_null_filter" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_running_sum_precision_risk():
+    combo = classify_operation_combo([{"op": "running_sum"}, {"op": "sort"}, {"op": "limit"}])
+
+    assert combo["template"] == "running_sum_sort_limit"
+    assert "running_sum_precision" in combo["correctness_risks"]
+    assert combo["has_sort_limit"] is True
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

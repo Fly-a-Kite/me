@@ -218,6 +218,21 @@ def test_oracle_classifies_tuple_absence_null_filter():
     assert findings[0].root_cause == "tuple_absence_null_filter"
 
 
+def test_oracle_classifies_running_sum_precision():
+    case = generate_case(370018, profile="running_sum_precision")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["row_id", "run_x"], [[19999, 10]]),
+            "polars": NormalizedResult("polars", "ok", ["row_id", "run_x"], [[19999, 10.0003185272]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "running_sum_precision"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

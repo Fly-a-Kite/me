@@ -28,6 +28,7 @@ COMMON_DSL_CAPABILITIES: tuple[str, ...] = (
     "op:limit",
     "op:offset",
     "op:mutate",
+    "op:running_sum",
     "op:groupby",
     "op:aggregate",
     "op:join",

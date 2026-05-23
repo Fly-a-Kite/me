@@ -10,6 +10,7 @@ from datadiff.filtering import evaluate_filter_predicate, filter_comparator_supp
 from datadiff.identifiers import is_reserved_output_name
 from datadiff.normalizer import NormalizedResult, _norm_value
 from datadiff.oracle import Finding
+from datadiff.running import sort_rows_for_running, stable_running_sum_values
 from datadiff.tuple_logic import evaluate_tuple_absence
 from datadiff.util import unique_preserve_order
 
@@ -259,6 +260,35 @@ def validate_case_program(case: Case) -> list[str]:
                     errors.append(
                         f"op {idx}: tuple absence type mismatch {left!r}:{left_type} vs {right_column!r}:{right_type}"
                     )
+        elif kind == "running_sum":
+            source = str(op.get("source", ""))
+            column = str(op.get("column", ""))
+            if source not in available:
+                errors.append(f"op {idx}: running_sum source {source!r} is unavailable")
+            elif source not in numeric:
+                errors.append(f"op {idx}: running_sum source {source!r} is not numeric")
+            if not column:
+                errors.append(f"op {idx}: running_sum output column is empty")
+            elif is_reserved_output_name(column):
+                errors.append(f"op {idx}: running_sum output column {column!r} is reserved")
+            try:
+                order_keys = normalize_sort_keys({"keys": op.get("order_by", [])})
+            except ValueError as exc:
+                errors.append(f"op {idx}: invalid running_sum order_by: {exc}")
+                order_keys = []
+            order_columns = [key.column for key in order_keys]
+            missing_order = [key for key in order_columns if key not in available]
+            if missing_order:
+                errors.append(f"op {idx}: running_sum order_by columns unavailable: {missing_order}")
+            if not order_columns:
+                errors.append(f"op {idx}: running_sum has no order_by columns")
+            if len(unique_preserve_order(order_columns)) != len(order_columns):
+                errors.append(f"op {idx}: running_sum order_by contains duplicate columns")
+            if column:
+                available.add(column)
+                col_types[column] = "float"
+                numeric.add(column)
+                strings.discard(column)
         elif kind == "select":
             cols = list(op.get("columns", []))
             missing = [col for col in cols if col not in available]
@@ -603,6 +633,13 @@ def _reference_result(case: Case) -> NormalizedResult | None:
                     for row in rows
                     if evaluate_tuple_absence(row, left_columns, right.rows, right_columns)
                 ]
+            elif kind == "running_sum":
+                sort_keys = normalize_sort_keys({"keys": op["order_by"]})
+                rows = sort_rows_for_running(rows, sort_keys)
+                column = str(op["column"])
+                values = stable_running_sum_values(rows, str(op["source"]))
+                rows = [{**row, column: value} for row, value in zip(rows, values)]
+                columns = [name for name in columns if name != column] + [column]
             elif kind == "select":
                 columns = list(op["columns"])
                 rows = [{column: row.get(column) for column in columns} for row in rows]

@@ -60,6 +60,13 @@ class PolarsBackend(Backend):
                 elif kind == "tuple_absence_filter":
                     mask = _tuple_absence_mask(pl, df, frames[op["table"]], op)
                     df = df.filter(mask)
+                elif kind == "running_sum":
+                    keys = normalize_sort_keys({"keys": op["order_by"]})
+                    df = df.sort(
+                        [key.column for key in keys],
+                        descending=[not key.ascending for key in keys],
+                        nulls_last=[key.nulls == "last" for key in keys],
+                    ).with_columns(_polars_running_sum_expr(pl, op))
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -193,6 +200,13 @@ class PolarsLazyBackend(PolarsBackend):
                     right_df = frames[op["table"]].collect()
                     mask = _tuple_absence_mask(pl, left_df, right_df, op)
                     lf = left_df.filter(mask).lazy()
+                elif kind == "running_sum":
+                    keys = normalize_sort_keys({"keys": op["order_by"]})
+                    lf = lf.sort(
+                        [key.column for key in keys],
+                        descending=[not key.ascending for key in keys],
+                        nulls_last=[key.nulls == "last" for key in keys],
+                    ).with_columns(_polars_running_sum_expr(pl, op))
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))
                 elif kind == "sort":
@@ -296,6 +310,15 @@ def _tuple_absence_mask(pl, df, right_df, op: dict):
         for row in df.to_dicts()
     ]
     return pl.Series("__datadiff_tuple_absence", mask, dtype=pl.Boolean)
+
+
+def _polars_running_sum_expr(pl, op: dict):
+    source = pl.col(op["source"])
+    if op.get("input_dtype") == "float32":
+        source = source.cast(pl.Float32)
+    else:
+        source = source.cast(pl.Float64)
+    return source.cum_sum().alias(op["column"])
 
 
 def _polars_filter_expr(col, comparator: str, value):

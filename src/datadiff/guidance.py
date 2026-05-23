@@ -9,6 +9,7 @@ from datadiff.dsl import Case, normalize_sort_keys
 from datadiff.filtering import evaluate_filter_predicate, parse_filter_comparator
 from datadiff.operation_combo import classify_operation_combo
 from datadiff.reward import online_case_reward
+from datadiff.running import sort_rows_for_running, stable_running_sum_values
 from datadiff.tuple_logic import evaluate_tuple_absence
 from datadiff.util import unique_preserve_order
 
@@ -57,6 +58,8 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "range_filter": {"filter:range-closed"},
     "tuple_absence_filter": {"pattern:tuple_absence_filter"},
     "tuple_absence": {"filter:tuple-absence"},
+    "running_sum_precision": {"pattern:running_sum_precision"},
+    "running_sum": {"op:running_sum"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -137,6 +140,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_boolean_predicate_filter = False
     has_range_filter = False
     has_tuple_absence_filter = False
+    has_running_sum_precision = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -167,6 +171,14 @@ def extract_case_features(case: Case) -> set[str]:
         elif kind == "tuple_absence_filter":
             features.add("filter:tuple-absence")
             has_tuple_absence_filter = True
+        elif kind == "running_sum":
+            source = str(op.get("source", ""))
+            input_dtype = str(op.get("input_dtype", "float64"))
+            features.add(f"running:{input_dtype}")
+            features.add(f"running_source_type:{available_types.get(source, 'derived')}")
+            if input_dtype == "float32":
+                has_running_sum_precision = True
+            available_types[str(op.get("column", "derived"))] = "float"
         elif kind == "select":
             width = len(op.get("columns", []))
             features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
@@ -286,6 +298,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:post_topk_range_filter")
     if has_tuple_absence_filter:
         features.add("pattern:tuple_absence_filter")
+    if has_running_sum_precision or _has_running_sum_precision_pattern(case.program.operations):
+        features.add("pattern:running_sum_precision")
     return features
 
 
@@ -626,7 +640,7 @@ def _guidance_reward(row: dict[str, Any]) -> float:
 def _finding_feature_weight(feature: str, online_weights: OnlineFeatureWeights | None = None) -> float:
     if feature.startswith(("op:", "opseq:")):
         base = 1.0
-    elif feature.startswith(("agg:", "cmp:", "expr:", "mutate:", "join:", "filter:", "filter_type:", "cast_to:", "combo:")):
+    elif feature.startswith(("agg:", "cmp:", "expr:", "mutate:", "join:", "filter:", "filter_type:", "cast_to:", "combo:", "running:")):
         base = 0.75
     elif feature.startswith(("has:", "type:", "nullable:")):
         base = 0.35
@@ -672,7 +686,7 @@ def _saturation_feature_weight(feature: str, online_weights: OnlineFeatureWeight
         base = 1.0
     elif feature.startswith("op:"):
         base = 0.9
-    elif feature.startswith(("agg:", "cmp:", "expr:", "mutate:", "join:", "filter_type:", "cast_to:", "combo:")):
+    elif feature.startswith(("agg:", "cmp:", "expr:", "mutate:", "join:", "filter_type:", "cast_to:", "combo:", "running:")):
         base = 0.65
     elif feature.startswith(("has:", "type:", "nullable:")):
         base = 0.15
@@ -704,6 +718,8 @@ def _is_path_feature(feature: str) -> bool:
             "agg:",
             "op_count:",
             "groupby:",
+            "running:",
+            "running_source_type:",
             "combo:",
             "combo_frequency:",
             "combo_risk:",
@@ -722,6 +738,8 @@ def _path_feature_weight(feature: str, online_weights: OnlineFeatureWeights | No
         base = 1.1
     elif feature.startswith("combo_frequency:"):
         base = 0.8
+    elif feature.startswith(("running:", "running_source_type:")):
+        base = 1.0
     elif feature.startswith(("join:", "agg:", "expr:", "mutate:", "cmp:", "filter:", "group_key_type:")):
         base = 0.9
     elif feature.startswith(("filter_type:", "select_width:", "sort:", "limit:", "offset:", "cast_to:", "arith:")):
@@ -749,6 +767,8 @@ def _is_data_sensitivity_feature(feature: str) -> bool:
         "filter:empty-output",
         "offset:row-boundary",
         "offset:large",
+        "running:long",
+        "running:small-increment",
     }
 
 
@@ -761,6 +781,8 @@ def _data_feature_weight(feature: str, online_weights: OnlineFeatureWeights | No
         base = 1.5
     elif feature.startswith("offset:"):
         base = 1.1
+    elif feature in {"running:long", "running:small-increment"}:
+        base = 1.4
     elif feature in {"has:special_float", "has:null", "has:unicode_string"}:
         base = 1.8
     elif feature in {"has:fractional_float", "has:negative_number", "has:empty_string", "has:space_string"}:
@@ -831,6 +853,10 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             buckets.extend(op_buckets)
             if right is not None:
                 samples = _join_output_samples(samples, right, op)
+        elif kind == "running_sum":
+            score, op_buckets, samples = _running_sum_frontier_score(samples, op)
+            scores.append(score)
+            buckets.extend(op_buckets)
         elif kind == "select":
             cols = [str(column) for column in op.get("columns", []) if str(column) in samples]
             samples = {column: samples[column] for column in unique_preserve_order(cols)}
@@ -1143,6 +1169,46 @@ def _samples_from_rows(rows: list[dict[str, Any]], columns: list[str]) -> dict[s
     }
 
 
+def _running_sum_frontier_score(
+    samples: dict[str, list[Any]],
+    op: dict[str, Any],
+) -> tuple[float, list[str], dict[str, list[Any]]]:
+    source = str(op.get("source", ""))
+    column = str(op.get("column", ""))
+    values = samples.get(source, [])
+    buckets: list[str] = []
+    if not source or not column or source not in samples:
+        return 0.0, buckets, samples
+    try:
+        sort_keys = normalize_sort_keys({"keys": op.get("order_by", [])})
+    except ValueError:
+        return 0.0, buckets, samples
+
+    rows = sort_rows_for_running(_rows_from_samples(samples), sort_keys)
+    running_values = stable_running_sum_values(rows, source)
+    out_rows = [{**row, column: value} for row, value in zip(rows, running_values)]
+    out_columns = [name for name in samples if name != column] + [column]
+
+    input_dtype = str(op.get("input_dtype", "float64"))
+    buckets.append("running:ordered")
+    buckets.append(f"running:{input_dtype}")
+    if len(values) >= 10_000:
+        buckets.append("running:long")
+    numeric_values = _numeric_values(values)
+    if numeric_values and max(abs(value) for value in numeric_values) <= 0.001:
+        buckets.append("running:small-increment")
+    if any(value is None for value in values):
+        buckets.append("running:null-source")
+    score = (
+        0.35
+        + 0.25 * int(input_dtype == "float32")
+        + 0.20 * int("running:long" in buckets)
+        + 0.15 * int("running:small-increment" in buckets)
+        + 0.05 * int("running:null-source" in buckets)
+    )
+    return min(1.0, score), buckets, _samples_from_rows(out_rows, out_columns)
+
+
 def _groupby_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
     keys = [str(key) for key in op.get("keys", []) if str(key) in samples]
     buckets: list[str] = []
@@ -1434,6 +1500,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("topk_filter_pushdown")
     if "pattern:tuple_absence_filter" in features:
         roots.add("tuple_absence_null_filter")
+    if "pattern:running_sum_precision" in features or "op:running_sum" in features:
+        roots.add("running_sum_precision")
     if features & {
         "pattern:null_groupby_topk",
         "pattern:null_agg_topk",
@@ -1687,6 +1755,13 @@ def _has_post_topk_filter_pattern(ops: list[dict[str, Any]]) -> bool:
             if any(later.get("op") == "filter" for later in ops[topk_idx + 1 :]):
                 return True
     return False
+
+
+def _has_running_sum_precision_pattern(ops: list[dict[str, Any]]) -> bool:
+    return any(
+        op.get("op") == "running_sum" and op.get("input_dtype") == "float32"
+        for op in ops
+    )
 
 
 def _has_join_ordered_agg_topk_pattern(ops: list[dict[str, Any]]) -> bool:

@@ -70,6 +70,19 @@ def _tuple_absence_native_condition(op: dict) -> str:
     return f"({left_sql}) NOT IN (SELECT {right_sql} FROM {_quote(op['table'])})"
 
 
+def _running_sum_projection(cols: list[str], op: dict) -> tuple[str, list[str]]:
+    kept_cols = [col for col in cols if col != op["column"]]
+    select_parts = [f"q.{_quote(col)}" for col in kept_cols]
+    order_sql = _order_clause(normalize_sort_keys({"keys": op["order_by"]}))
+    expr_sql = (
+        f"SUM(CAST(q.{_quote(op['source'])} AS DOUBLE)) OVER ("
+        f"ORDER BY {order_sql} ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"
+        f") AS {_quote(op['column'])}"
+    )
+    select_parts.append(expr_sql)
+    return ", ".join(select_parts), kept_cols + [op["column"]]
+
+
 class DuckDBBackend(Backend):
     name = "duckdb"
     persistent_storage = False
@@ -184,6 +197,13 @@ class DuckDBBackend(Backend):
                     relation = add_step(f"SELECT * FROM {relation} q WHERE {condition}")
                 elif kind == "tuple_absence_filter":
                     relation = add_step(f"SELECT * FROM {relation} q WHERE {_tuple_absence_native_condition(op)}")
+                elif kind == "running_sum":
+                    drop_hidden_order_cols()
+                    order_keys = normalize_sort_keys({"keys": op["order_by"]})
+                    projection, current_cols = _running_sum_projection(current_cols, op)
+                    relation = add_step(f"SELECT {projection} FROM {relation} q")
+                    visible_cols = [col for col in visible_cols if col != op["column"]] + [op["column"]]
+                    pending_order = order_keys
                 elif kind == "select":
                     cols = list(op["columns"])
                     projection = select_with_pending_order(cols)

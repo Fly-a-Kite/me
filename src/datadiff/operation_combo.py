@@ -7,6 +7,7 @@ CANONICAL_OPERATION_ORDER = (
     "filter",
     "tuple_absence_filter",
     "mutate",
+    "running_sum",
     "groupby",
     "aggregate",
     "select",
@@ -91,6 +92,8 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("filter_mutate_dependency")
     if "tuple_absence_filter" in op_set:
         risks.append("tuple_absence_null_filter")
+    if "running_sum" in op_set:
+        risks.append("running_sum_precision")
     if "groupby" in op_set:
         risks.append("groupby_aggregation")
     if "aggregate" in op_set:

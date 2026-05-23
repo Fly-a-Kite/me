@@ -34,6 +34,7 @@ GeneratorProfile = Literal[
     "boolean_predicate_filter",
     "post_topk_range_filter",
     "tuple_absence_filter",
+    "running_sum_precision",
 ]
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]

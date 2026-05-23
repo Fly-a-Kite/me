@@ -28,6 +28,11 @@ def _assert_program_columns_are_valid(case):
             assert op["expr"]["source"] in known_cols
             assert not is_reserved_output_name(op["column"])
             known_cols.add(op["column"])
+        elif op["op"] == "running_sum":
+            assert op["source"] in known_cols
+            assert all(key["column"] in known_cols for key in op["order_by"])
+            assert not is_reserved_output_name(op["column"])
+            known_cols.add(op["column"])
         elif op["op"] == "groupby":
             assert set(op["keys"]).issubset(known_cols)
             assert len(op["keys"]) == len(set(op["keys"]))
@@ -120,6 +125,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "ordered_groupby_sort",
         "topk_resort",
         "join_ordered_agg_topk",
+        "running_sum_precision",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -510,6 +516,25 @@ def test_generate_case_tuple_absence_filter_profile_is_supported_and_valid():
     assert "pattern:tuple_absence_filter" in features
     assert "filter:tuple-absence" in features
     assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/22418"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_running_sum_precision_profile_is_supported_and_valid():
+    case = generate_case(126, profile="running_sum_precision")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000126-running-sum-precision"
+    assert [op["op"] for op in case.program.operations] == ["running_sum", "sort", "limit", "select"]
+    assert case.program.operations[0] == {
+        "op": "running_sum",
+        "source": "x",
+        "column": "run_x",
+        "order_by": [{"column": "row_id", "ascending": True, "nulls": "last"}],
+        "input_dtype": "float32",
+    }
+    assert "pattern:running_sum_precision" in features
+    assert "running:float32" in features
+    assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/27662"
     assert validate_case_program(case) == []
 
 
