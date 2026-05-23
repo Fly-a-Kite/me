@@ -38,6 +38,7 @@ GeneratorProfile = Literal[
     "set_membership_filter",
     "null_predicate_filter",
     "boolean_predicate_filter",
+    "post_topk_range_filter",
 ]
 
 
@@ -165,6 +166,23 @@ def _literal_list_for_column(rnd: random.Random, table: TableData, col: str) -> 
     selected = values[: rnd.randint(1, max(1, min(3, len(values))))]
     fallback = _literal_list_for_type(rnd, typ)
     return unique_preserve_order([*selected, *fallback])[:3]
+
+
+def _literal_range_for_column(rnd: random.Random, table: TableData, col: str) -> list[Any]:
+    typ = table.column_type(col)
+    values = [
+        row.get(col)
+        for row in table.rows
+        if isinstance(row.get(col), (int, float))
+        and not isinstance(row.get(col), bool)
+        and not (isinstance(row.get(col), float) and math.isnan(row.get(col)))
+    ]
+    fallback = _literal_list_for_type(rnd, typ)
+    pool = unique_preserve_order([*values, *fallback])
+    if len(pool) < 2:
+        pool = [*_literal_list_for_type(rnd, typ), *_literal_list_for_type(rnd, typ)]
+    lower, upper = sorted(rnd.sample(pool, 2))
+    return [lower, upper]
 
 
 def _literal_for_type(rnd: random.Random, typ: str) -> Any:
@@ -314,10 +332,14 @@ def generate_program(
                     rnd.choice(["bool_is_true", "bool_is_not_true", "bool_is_false", "bool_is_not_false"]),
                     *cmp_ops,
                 ]
+            if bughunt_profile and typ in {"int", "float"} and rnd.random() < 0.20:
+                cmp_ops = ["range_closed", *cmp_ops]
             base_cols = {c.name for c in table.columns}
             cmp = rnd.choice(cmp_ops)
             if cmp == "in_set":
                 value = _literal_list_for_column(rnd, table, col) if col in base_cols else _literal_list_for_type(rnd, typ)
+            elif cmp == "range_closed":
+                value = _literal_range_for_column(rnd, table, col) if col in base_cols else sorted(rnd.sample(_literal_list_for_type(rnd, typ), 2))
             elif cmp in {"is_null", "is_not_null", "bool_is_true", "bool_is_not_true", "bool_is_false", "bool_is_not_false"}:
                 value = None
             else:
@@ -746,6 +768,12 @@ def _filter_literal_is_valid(column_type: str, comparator: Any, value: Any) -> b
         if not isinstance(value, list) or not value or any(item is None for item in value):
             return False
         return all(_filter_literal_is_valid(column_type, "==", item) for item in value)
+    if parsed is not None and parsed.base == "range_closed":
+        if not isinstance(value, list) or len(value) != 2 or any(item is None for item in value):
+            return False
+        if not all(_filter_literal_is_valid(column_type, "==", item) for item in value):
+            return False
+        return value[0] <= value[1]
     if comparator in {"is_null", "is_not_null"}:
         return value is None
     if parsed is not None and parsed.base == "bool_predicate":
@@ -810,6 +838,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_null_predicate_filter_case(seed)
     if profile == "boolean_predicate_filter" and type_aware:
         return generate_boolean_predicate_filter_case(seed)
+    if profile == "post_topk_range_filter" and type_aware:
+        return generate_post_topk_range_filter_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -859,6 +889,8 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         return _as_bughunt_mixed_case(generate_null_predicate_filter_case(seed), seed, "null_predicate_filter")
     if selector == 54:
         return _as_bughunt_mixed_case(generate_boolean_predicate_filter_case(seed), seed, "boolean_predicate_filter")
+    if selector == 55:
+        return _as_bughunt_mixed_case(generate_post_topk_range_filter_case(seed), seed, "post_topk_range_filter")
     if selector == 56:
         return _as_bughunt_mixed_case(generate_unique_count_groupby_case(seed), seed, "unique_count_groupby")
     if selector == 53:
@@ -2186,6 +2218,67 @@ def generate_boolean_predicate_filter_case(seed: int) -> Case:
             "predicate": predicate,
             "source_issue": "https://github.com/pola-rs/polars/issues/8516",
             "source_issue_alt": "https://github.com/apache/datafusion/issues/22441",
+        },
+    )
+
+
+def generate_post_topk_range_filter_case(seed: int) -> Case:
+    limit_n = 6 if seed % 2 == 0 else 7
+    rows = [
+        {"id": 0, "g": "top", "score": 100, "x": -5, "flag": True},
+        {"id": 1, "g": "top", "score": 95, "x": 7, "flag": False},
+        {"id": 2, "g": "keep", "score": 90, "x": 1, "flag": None},
+        {"id": 3, "g": "top", "score": 85, "x": None, "flag": True},
+        {"id": 4, "g": "keep", "score": 80, "x": 2, "flag": False},
+        {"id": 5, "g": "top", "score": 75, "x": -3, "flag": None},
+        {"id": 6, "g": "late", "score": 70, "x": 0, "flag": True},
+        {"id": 7, "g": "late", "score": 65, "x": 2, "flag": False},
+        {"id": 8, "g": "late", "score": 60, "x": 1, "flag": None},
+        {"id": 9, "g": None, "score": None, "x": 1, "flag": True},
+    ]
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("score", "int", nullable=True),
+            ColumnSpec("x", "int", nullable=True),
+            ColumnSpec("flag", "bool", nullable=True),
+        ],
+        rows,
+    )
+    program = Program(
+        f"prog-{seed:08d}-post-topk-range-filter",
+        seed,
+        [
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "score", "ascending": False, "nulls": "last"},
+                    {"column": "id", "ascending": True, "nulls": "last"},
+                ],
+            },
+            {"op": "limit", "n": limit_n},
+            {"op": "filter", "column": "x", "cmp": "range_closed", "value": [0, 2]},
+            {"op": "select", "columns": ["id", "g", "score", "x"]},
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "id", "ascending": True, "nulls": "last"},
+                ],
+            },
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-post-topk-range-filter",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "post_topk_range_filter",
+            "source_issue": "https://github.com/pola-rs/polars/issues/26803",
+            "source_issue_alt": "https://github.com/duckdb/duckdb/issues/22075",
+            "limit": limit_n,
         },
     )
 

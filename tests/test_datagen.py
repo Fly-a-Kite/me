@@ -112,6 +112,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "set_membership_filter",
         "null_predicate_filter",
         "boolean_predicate_filter",
+        "post_topk_range_filter",
         "wide_offset_topk",
         "join_null_key_topk",
         "empty_filter_groupby",
@@ -477,6 +478,20 @@ def test_generate_case_boolean_predicate_filter_profile_is_supported_and_valid()
         assert validate_case_program(case) == []
 
     assert predicates == {"bool_is_true", "bool_is_not_true", "bool_is_false", "bool_is_not_false"}
+
+
+def test_generate_case_post_topk_range_filter_profile_is_supported_and_valid():
+    case = generate_case(124, profile="post_topk_range_filter")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000124-post-topk-range-filter"
+    assert [op["op"] for op in case.program.operations] == ["sort", "limit", "filter", "select", "sort"]
+    assert case.program.operations[2] == {"op": "filter", "column": "x", "cmp": "range_closed", "value": [0, 2]}
+    assert "pattern:post_topk_range_filter" in features
+    assert "pattern:range_filter" in features
+    assert "filter:range-closed" in features
+    assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/26803"
+    assert validate_case_program(case) == []
 
 
 def test_repair_operations_keeps_safe_string_aggregations_only():

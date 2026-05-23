@@ -8,6 +8,7 @@ from typing import Any
 BASE_FILTER_COMPARATORS = (">", ">=", "<", "<=", "==", "!=")
 SET_FILTER_COMPARATORS = ("in_set",)
 NULL_FILTER_COMPARATORS = ("is_null", "is_not_null")
+RANGE_FILTER_COMPARATORS = ("range_closed",)
 BOOLEAN_FILTER_COMPARATORS = (
     "bool_is_true",
     "bool_is_not_true",
@@ -50,6 +51,7 @@ FILTER_COMPARATORS = frozenset(
     + TRUTH_FILTER_COMPARATORS
     + SET_FILTER_COMPARATORS
     + NULL_FILTER_COMPARATORS
+    + RANGE_FILTER_COMPARATORS
     + BOOLEAN_FILTER_COMPARATORS
 )
 
@@ -67,6 +69,8 @@ def parse_filter_comparator(raw: Any) -> FilterComparator | None:
     if comparator in SET_FILTER_COMPARATORS:
         return FilterComparator(comparator)
     if comparator in NULL_FILTER_COMPARATORS:
+        return FilterComparator(comparator)
+    if comparator in RANGE_FILTER_COMPARATORS:
         return FilterComparator(comparator)
     if comparator in BOOLEAN_FILTER_COMPARATORS:
         return FilterComparator("bool_predicate", comparator.removeprefix("bool_"))
@@ -91,6 +95,8 @@ def filter_comparator_supports_type(column_type: str, raw: Any) -> bool:
         return parsed.truth_test is None and column_type in {"int", "float", "str", "bool"}
     if parsed.base in NULL_FILTER_COMPARATORS:
         return parsed.truth_test is None and column_type in {"int", "float", "str", "bool"}
+    if parsed.base in RANGE_FILTER_COMPARATORS:
+        return parsed.truth_test is None and column_type in {"int", "float"}
     if parsed.base == "bool_predicate":
         return column_type == "bool" and parsed.truth_test in TRUTH_TESTS
     if column_type in {"str", "bool"}:
@@ -112,6 +118,9 @@ def evaluate_filter_predicate(left: Any, raw: Any, right: Any) -> bool:
         return _is_nullish_scalar(left)
     if parsed.base == "is_not_null":
         return not _is_nullish_scalar(left)
+    if parsed.base == "range_closed":
+        lower, upper = _range_bounds(right)
+        return _compare_three_valued(left, ">=", lower) is True and _compare_three_valued(left, "<=", upper) is True
     if parsed.base == "bool_predicate":
         return _apply_truth_test(_bool_three_valued(left), parsed.truth_test or "")
     comparison = _compare_three_valued(left, parsed.base, right)
@@ -130,6 +139,9 @@ def sql_filter_condition(column_sql: str, literal_sql: str, raw: Any) -> str:
         return f"{column_sql} IS NULL"
     if parsed.base == "is_not_null":
         return f"{column_sql} IS NOT NULL"
+    if parsed.base == "range_closed":
+        lower_sql, upper_sql = _range_bounds_sql(literal_sql)
+        return f"{column_sql} BETWEEN {lower_sql} AND {upper_sql}"
     if parsed.base == "bool_predicate":
         truth_test = parsed.truth_test
         if truth_test == "is_true":
@@ -183,6 +195,22 @@ def _compare_three_valued(left: Any, comparator: str, right: Any) -> bool | None
     except Exception:
         return None
     raise ValueError(comparator)
+
+
+def _range_bounds(value: Any) -> tuple[Any, Any]:
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        raise ValueError("range_closed literal must contain exactly two bounds")
+    return value[0], value[1]
+
+
+def _range_bounds_sql(literal_sql: str) -> tuple[str, str]:
+    text = literal_sql.strip()
+    if text.startswith("(") and text.endswith(")"):
+        text = text[1:-1]
+    parts = [part.strip() for part in text.split(",", 1)]
+    if len(parts) != 2 or not all(parts):
+        raise ValueError("range_closed SQL literal must contain exactly two bounds")
+    return parts[0], parts[1]
 
 
 def _is_nullish_scalar(value: Any) -> bool:

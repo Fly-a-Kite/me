@@ -44,6 +44,14 @@ def test_classify_operation_combo_prioritizes_common_topk_over_empty_program():
     assert empty["template"] == "empty"
 
 
+def test_classify_operation_combo_tracks_post_topk_filter_pushdown_risk():
+    combo = classify_operation_combo([{"op": "sort"}, {"op": "limit"}, {"op": "filter"}])
+
+    assert combo["has_sort_limit"] is True
+    assert "topk_ordering" in combo["correctness_risks"]
+    assert "topk_filter_pushdown" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

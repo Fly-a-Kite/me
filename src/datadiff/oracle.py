@@ -68,6 +68,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "float_group_key_instability"
     if _case_has_outer_join_truth_filter(case):
         return "outer_join_truth_filter"
+    if _case_has_post_topk_filter(case):
+        return "topk_filter_pushdown"
     if any(op in {"groupby", "aggregate"} for op in ops):
         return "groupby_aggregation"
     if any(op == "join" for op in ops):
@@ -134,6 +136,19 @@ def _case_has_outer_join_truth_filter(case: Case) -> bool:
                 return True
         elif op.get("op") in {"groupby", "aggregate"}:
             after_left_join = False
+    return False
+
+
+def _case_has_post_topk_filter(case: Case) -> bool:
+    ops = case.program.operations
+    for sort_idx, op in enumerate(ops):
+        if op.get("op") != "sort":
+            continue
+        for topk_idx in range(sort_idx + 1, len(ops)):
+            if ops[topk_idx].get("op") not in {"limit", "offset"}:
+                continue
+            if any(later.get("op") == "filter" for later in ops[topk_idx + 1 :]):
+                return True
     return False
 
 

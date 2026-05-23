@@ -7,6 +7,7 @@ from datadiff.mutator import (
     _append_boolean_predicate_filter_probe,
     _append_grouped_topk_probe,
     _append_order_projection_probe,
+    _append_range_filter_probe,
     _append_truth_filter_probe,
     _available_columns,
     _random_operation,
@@ -81,6 +82,7 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_order_projection" in MUTATION_OPERATOR_NAMES
     assert "append_truth_filter" in MUTATION_OPERATOR_NAMES
     assert "append_boolean_predicate_filter" in MUTATION_OPERATOR_NAMES
+    assert "append_range_filter" in MUTATION_OPERATOR_NAMES
     assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
 
 
@@ -136,6 +138,24 @@ def test_append_boolean_predicate_filter_mutation_stays_valid():
     assert operations[-1]["cmp"].startswith("bool_is_")
     assert operations[-1]["value"] is None
     case = Case("case-mut-bool-filter", 1, [table], Program("prog-mut-bool-filter", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_range_filter_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+        [{"id": 0, "x": 2, "s": "b"}, {"id": 1, "x": None, "s": "a"}],
+    )
+    operations = [{"op": "select", "columns": ["id", "x"]}]
+
+    detail = _append_range_filter_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_range_filter:")
+    assert operations[-1]["op"] == "filter"
+    assert operations[-1]["cmp"] == "range_closed"
+    assert len(operations[-1]["value"]) == 2
+    case = Case("case-mut-range-filter", 1, [table], Program("prog-mut-range-filter", 1, operations))
     assert validate_case_program(case) == []
 
 

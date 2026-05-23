@@ -88,9 +88,23 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("grouped_topk")
     if "sort" in op_set and bool({"offset", "limit"} & op_set):
         risks.append("topk_ordering")
+    if _has_post_topk_filter_sequence(sequence):
+        risks.append("topk_filter_pushdown")
     if "select" in op_set and ("sort" in op_set or "limit" in op_set or "offset" in op_set):
         risks.append("projection_ordering")
     return risks
+
+
+def _has_post_topk_filter_sequence(sequence: list[str]) -> bool:
+    for sort_idx, op in enumerate(sequence):
+        if op != "sort":
+            continue
+        for topk_idx in range(sort_idx + 1, len(sequence)):
+            if sequence[topk_idx] not in {"limit", "offset"}:
+                continue
+            if "filter" in sequence[topk_idx + 1:]:
+                return True
+    return False
 
 
 def _priority_score(frequency_bucket: str, correctness_risks: list[str], operation_count: int) -> float:

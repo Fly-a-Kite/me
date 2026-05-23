@@ -527,6 +527,31 @@ def test_validate_case_accepts_typed_set_membership_filter():
     assert any("not compatible with int column" in error for error in validate_case_program(invalid_type))
 
 
+def test_validate_case_accepts_typed_range_filter():
+    valid = Case(
+        "case-range-filter",
+        13,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}, {"x": None}])],
+        Program("prog-range-filter", 13, [{"op": "filter", "column": "x", "cmp": "range_closed", "value": [0, 2]}]),
+    )
+    invalid_type = Case(
+        "case-range-filter-type",
+        14,
+        [TableData("t0", [ColumnSpec("s", "str")], [{"s": "alpha"}])],
+        Program("prog-range-filter-type", 14, [{"op": "filter", "column": "s", "cmp": "range_closed", "value": ["a", "z"]}]),
+    )
+    invalid_order = Case(
+        "case-range-filter-order",
+        15,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-range-filter-order", 15, [{"op": "filter", "column": "x", "cmp": "range_closed", "value": [2, 0]}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("not supported for str filter" in error for error in validate_case_program(invalid_type))
+    assert any("lower bound must be <= upper bound" in error for error in validate_case_program(invalid_order))
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

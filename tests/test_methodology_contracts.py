@@ -109,6 +109,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     set_membership_filter = _preset_config("set_membership_filter")
     null_predicate_filter = _preset_config("null_predicate_filter")
     boolean_predicate_filter = _preset_config("boolean_predicate_filter")
+    post_topk_range_filter = _preset_config("post_topk_range_filter")
 
     assert null_groupby.generator_profile == "null_groupby_topk"
     assert {"groupby", "nulls", "sort_limit"}.issubset(null_groupby.guidance_targets)
@@ -156,6 +157,8 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert {"filter", "null_predicate", "aggregation", "sort_limit"}.issubset(null_predicate_filter.guidance_targets)
     assert boolean_predicate_filter.generator_profile == "boolean_predicate_filter"
     assert {"filter", "boolean_predicate", "truth_filter", "aggregation", "sort_limit"}.issubset(boolean_predicate_filter.guidance_targets)
+    assert post_topk_range_filter.generator_profile == "post_topk_range_filter"
+    assert {"filter", "range_filter", "sort_limit", "topk"}.issubset(post_topk_range_filter.guidance_targets)
 
 
 def test_methodology_seeded_fault_suites_support_sensitivity_evaluation():

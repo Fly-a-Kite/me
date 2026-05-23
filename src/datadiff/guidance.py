@@ -52,10 +52,12 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "null_predicate": {"filter:null-predicate"},
     "boolean_predicate_filter": {"pattern:boolean_predicate_filter"},
     "boolean_predicate": {"filter:boolean-predicate"},
+    "post_topk_range_filter": {"pattern:post_topk_range_filter"},
+    "range_filter": {"filter:range-closed"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
-    "topk": {"combo_risk:topk_ordering", "combo_risk:grouped_topk"},
+    "topk": {"combo_risk:topk_ordering", "combo_risk:grouped_topk", "combo_risk:topk_filter_pushdown"},
     "expressions": {"expr:add_const", "expr:arith_const", "expr:string_length", "expr:string_lower", "expr:cast"},
     "casts": {"expr:cast"},
 }
@@ -130,6 +132,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_set_membership_filter = False
     has_null_predicate_filter = False
     has_boolean_predicate_filter = False
+    has_range_filter = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -151,6 +154,9 @@ def extract_case_features(case: Case) -> set[str]:
                 features.add("filter:boolean-predicate")
                 features.add(f"filter:boolean-predicate:{parsed.truth_test}")
                 has_boolean_predicate_filter = True
+            if parsed is not None and parsed.base == "range_closed":
+                features.add("filter:range-closed")
+                has_range_filter = True
             if parsed is not None and parsed.truth_test is not None:
                 features.add("filter:truth-test")
                 features.add(f"filter:truth:{parsed.truth_test}")
@@ -267,6 +273,10 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:null_predicate_filter")
     if has_boolean_predicate_filter:
         features.add("pattern:boolean_predicate_filter")
+    if has_range_filter:
+        features.add("pattern:range_filter")
+    if has_range_filter and _has_post_topk_filter_pattern(case.program.operations):
+        features.add("pattern:post_topk_range_filter")
     return features
 
 
@@ -899,6 +909,8 @@ def _filter_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) ->
     if parsed is not None and parsed.base == "bool_predicate":
         buckets.append("filter:boolean-predicate")
         buckets.append(f"filter:boolean-predicate:{parsed.truth_test}")
+    if parsed is not None and parsed.base == "range_closed":
+        buckets.append("filter:range-closed")
     if parsed is not None and parsed.truth_test is not None:
         buckets.append("filter:truth-test")
         buckets.append(f"filter:truth:{parsed.truth_test}")
@@ -1349,6 +1361,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("outer_join_truth_filter")
     if "pattern:boolean_predicate_filter" in features:
         roots.add("boolean_null_filter")
+    if "pattern:post_topk_range_filter" in features:
+        roots.add("topk_filter_pushdown")
     if features & {
         "pattern:null_groupby_topk",
         "pattern:null_agg_topk",
@@ -1584,13 +1598,24 @@ def _has_topk_resort_pattern(ops: list[dict[str, Any]]) -> bool:
             idx for idx, op in enumerate(ops[first_sort_idx + 1 :], start=first_sort_idx + 1)
             if op.get("op") == "limit"
         )
-        next(
-            idx for idx, op in enumerate(ops[limit_idx + 1 :], start=limit_idx + 1)
-            if op.get("op") in {"sort", "offset"}
-        )
+        next_op = ops[limit_idx + 1]
     except StopIteration:
         return False
-    return True
+    except IndexError:
+        return False
+    return next_op.get("op") in {"sort", "offset"}
+
+
+def _has_post_topk_filter_pattern(ops: list[dict[str, Any]]) -> bool:
+    for sort_idx, op in enumerate(ops):
+        if op.get("op") != "sort":
+            continue
+        for topk_idx in range(sort_idx + 1, len(ops)):
+            if ops[topk_idx].get("op") not in {"limit", "offset"}:
+                continue
+            if any(later.get("op") == "filter" for later in ops[topk_idx + 1 :]):
+                return True
+    return False
 
 
 def _has_join_ordered_agg_topk_pattern(ops: list[dict[str, Any]]) -> bool:

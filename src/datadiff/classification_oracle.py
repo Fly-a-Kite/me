@@ -491,6 +491,18 @@ def _filter_literal_error(column_type: str, comparator: Any, value: Any) -> str:
             if item_error:
                 return item_error
         return ""
+    if parsed is not None and parsed.base == "range_closed":
+        if not isinstance(value, list) or len(value) != 2:
+            return f"filter literal {value!r} must contain two bounds for range_closed"
+        if any(item is None for item in value):
+            return "range_closed filter bounds must not contain NULL"
+        for item in value:
+            item_error = _scalar_filter_literal_error(column_type, item)
+            if item_error:
+                return item_error
+        if value[0] > value[1]:
+            return "range_closed lower bound must be <= upper bound"
+        return ""
     if parsed is not None and parsed.base in {"is_null", "is_not_null"}:
         return "" if value is None else f"filter literal {value!r} must be NULL for {parsed.base}"
     if parsed is not None and parsed.base == "bool_predicate":

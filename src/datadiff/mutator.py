@@ -251,6 +251,19 @@ def _append_boolean_predicate_filter_probe(
     return f"append_boolean_predicate_filter:{column}:{comparator}"
 
 
+def _append_range_filter_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
+    if not tables:
+        return "append_range_filter:none"
+    available = _available_columns(tables, operations)
+    numeric_columns = [column for column in available if _column_type(tables, column) in {"int", "float"}]
+    if not numeric_columns:
+        return "append_range_filter:no-numeric-column"
+    column = rnd.choice(numeric_columns)
+    values = sorted(rnd.sample(_literal_list_for_type(_column_type(tables, column), rnd), 2))
+    operations.append({"op": "filter", "column": column, "cmp": "range_closed", "value": values})
+    return f"append_range_filter:{column}:{values[0]}:{values[1]}"
+
+
 def _append_grouped_topk_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
     if not tables:
         return "append_grouped_topk:none"
@@ -323,8 +336,12 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
             cmp = rnd.choice(["is_null", "is_not_null"])
         if typ == "bool" and rnd.random() < 0.25:
             cmp = rnd.choice(["bool_is_true", "bool_is_not_true", "bool_is_false", "bool_is_not_false"])
+        if typ in {"int", "float"} and rnd.random() < 0.18:
+            cmp = "range_closed"
         if cmp == "in_set":
             value = _literal_list_for_type(typ, rnd)
+        elif cmp == "range_closed":
+            value = sorted(rnd.sample(_literal_list_for_type(typ, rnd), 2))
         elif cmp in {"is_null", "is_not_null", "bool_is_true", "bool_is_not_true", "bool_is_false", "bool_is_not_false"}:
             value = None
         else:
@@ -467,6 +484,7 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_order_projection", _append_order_projection_probe),
     MutationOperator("append_truth_filter", _append_truth_filter_probe),
     MutationOperator("append_boolean_predicate_filter", _append_boolean_predicate_filter_probe),
+    MutationOperator("append_range_filter", _append_range_filter_probe),
     MutationOperator("append_grouped_topk", _append_grouped_topk_probe),
     MutationOperator("drop_op", _drop_operation),
     MutationOperator("tweak_op", _tweak_random_operation),

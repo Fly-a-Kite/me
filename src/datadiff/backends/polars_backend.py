@@ -290,6 +290,9 @@ def _polars_filter_expr(col, comparator: str, value):
         expr = col.is_not_null()
     elif parsed.base == "bool_predicate":
         expr = col
+    elif parsed.base == "range_closed":
+        lower, upper = value
+        expr = (col >= lower) & (col <= upper)
     elif parsed.base == ">":
         expr = col > value
     elif parsed.base == ">=":

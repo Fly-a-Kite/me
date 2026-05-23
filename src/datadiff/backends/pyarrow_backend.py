@@ -118,6 +118,9 @@ def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):
         return pc.invert(pc.is_null(array))
     if parsed.base == "bool_predicate":
         return _apply_boolean_truth_test(pc, array, parsed.truth_test)
+    if parsed.base == "range_closed":
+        lower, upper = value
+        return pc.and_(pc.greater_equal(array, lower), pc.less_equal(array, upper))
     scalar = value
     if scalar is None:
         mask = pa.array([None] * len(array), type=pa.bool_())

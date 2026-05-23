@@ -35,6 +35,14 @@ def test_set_membership_filter_uses_two_valued_null_safe_semantics():
     assert sql_filter_condition('q."s"', "('alpha', '中文')", "in_set") == 'q."s" IN (\'alpha\', \'中文\')'
 
 
+def test_range_filter_uses_closed_numeric_bounds():
+    assert evaluate_filter_predicate(0, "range_closed", [-1, 1]) is True
+    assert evaluate_filter_predicate(-1, "range_closed", [-1, 1]) is True
+    assert evaluate_filter_predicate(2, "range_closed", [-1, 1]) is False
+    assert evaluate_filter_predicate(None, "range_closed", [-1, 1]) is False
+    assert sql_filter_condition('q."x"', "(-1, 1)", "range_closed") == 'q."x" BETWEEN -1 AND 1'
+
+
 def test_null_predicate_filters_are_explicit_null_checks():
     assert evaluate_filter_predicate(None, "is_null", None) is True
     assert evaluate_filter_predicate("alpha", "is_null", None) is False

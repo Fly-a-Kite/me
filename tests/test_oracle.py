@@ -183,6 +183,26 @@ def test_oracle_classifies_outer_join_truth_filter_before_plain_join():
     assert findings[0].root_cause == "outer_join_truth_filter"
 
 
+def test_oracle_classifies_post_topk_filter_pushdown():
+    case = generate_case(370000, profile="post_topk_range_filter")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["id", "score", "x"], [[2, 90, 1], [4, 80, 2]]),
+            "datafusion": NormalizedResult(
+                "datafusion",
+                "ok",
+                ["id", "score", "x"],
+                [[2, 90, 1], [4, 80, 2], [6, 70, 0], [7, 65, 2], [8, 60, 1], [9, None, 1]],
+            ),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "topk_filter_pushdown"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",
