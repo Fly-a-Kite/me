@@ -76,6 +76,8 @@ class PandasBackend(Backend):
                         nulls=str(op.get("nulls", "last")),
                     )
                     df = pd.DataFrame([{op["as"]: ok}], columns=[op["as"]])
+                elif kind == "random_case_probe":
+                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":

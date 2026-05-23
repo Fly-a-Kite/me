@@ -8,6 +8,7 @@ from datadiff.mutator import (
     _append_grouped_topk_probe,
     _append_order_projection_probe,
     _append_range_filter_probe,
+    _append_random_case_probe,
     _append_running_sum_probe,
     _append_sortedness_check_probe,
     _append_truth_filter_probe,
@@ -89,6 +90,7 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_tuple_absence_filter" in MUTATION_OPERATOR_NAMES
     assert "append_running_sum" in MUTATION_OPERATOR_NAMES
     assert "append_sortedness_check" in MUTATION_OPERATOR_NAMES
+    assert "append_random_case_probe" in MUTATION_OPERATOR_NAMES
     assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
 
 
@@ -219,6 +221,23 @@ def test_append_sortedness_check_mutation_stays_valid():
     assert [op["op"] for op in operations[-2:]] == ["sort", "sortedness_check"]
     assert operations[-1]["as"].startswith("sorted_ok_")
     case = Case("case-mut-sortedness", 1, [table], Program("prog-mut-sortedness", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_random_case_probe_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int")],
+        [{"id": 0, "x": 2}],
+    )
+    operations = [{"op": "select", "columns": ["id"]}]
+
+    detail = _append_random_case_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_random_case_probe:")
+    assert operations[-1]["op"] == "random_case_probe"
+    assert operations[-1]["as"] == "unexpected_else_seen"
+    case = Case("case-mut-random-case", 1, [table], Program("prog-mut-random-case", 1, operations))
     assert validate_case_program(case) == []
 
 

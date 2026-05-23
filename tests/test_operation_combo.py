@@ -74,6 +74,13 @@ def test_classify_operation_combo_tracks_sortedness_null_placement_risk():
     assert "sortedness_null_placement" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_random_case_subject_risk():
+    combo = classify_operation_combo([{"op": "random_case_probe"}])
+
+    assert combo["template"] == "random_case_probe"
+    assert "simple_case_random_subject" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

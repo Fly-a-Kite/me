@@ -113,6 +113,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     tuple_absence_filter = _preset_config("tuple_absence_filter")
     running_sum_precision = _preset_config("running_sum_precision")
     sortedness_null_placement = _preset_config("sortedness_null_placement")
+    simple_case_random_subject = _preset_config("simple_case_random_subject")
 
     assert null_groupby.generator_profile == "null_groupby_topk"
     assert {"groupby", "nulls", "sort_limit"}.issubset(null_groupby.guidance_targets)
@@ -168,6 +169,8 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert {"running_sum", "numeric", "sort_limit"}.issubset(running_sum_precision.guidance_targets)
     assert sortedness_null_placement.generator_profile == "sortedness_null_placement"
     assert {"sortedness", "nulls", "sort_limit"}.issubset(sortedness_null_placement.guidance_targets)
+    assert simple_case_random_subject.generator_profile == "simple_case_random_subject"
+    assert {"random_case_probe", "case_expression"}.issubset(simple_case_random_subject.guidance_targets)
 
 
 def test_methodology_seeded_fault_suites_support_sensitivity_evaluation():

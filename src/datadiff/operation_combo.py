@@ -8,6 +8,7 @@ CANONICAL_OPERATION_ORDER = (
     "tuple_absence_filter",
     "mutate",
     "running_sum",
+    "random_case_probe",
     "groupby",
     "aggregate",
     "select",
@@ -97,6 +98,8 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("running_sum_precision")
     if "sortedness_check" in op_set:
         risks.append("sortedness_null_placement")
+    if "random_case_probe" in op_set:
+        risks.append("simple_case_random_subject")
     if "groupby" in op_set:
         risks.append("groupby_aggregation")
     if "aggregate" in op_set:

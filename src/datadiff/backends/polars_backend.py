@@ -72,6 +72,8 @@ class PolarsBackend(Backend):
                     series = df.get_column(op["column"])
                     ok = _polars_is_sorted(series, op)
                     df = pl.DataFrame({op["as"]: [ok]})
+                elif kind == "random_case_probe":
+                    df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -216,6 +218,8 @@ class PolarsLazyBackend(PolarsBackend):
                     series = lf.collect().get_column(op["column"])
                     ok = _polars_is_sorted(series, op)
                     lf = pl.DataFrame({op["as"]: [ok]}).lazy()
+                elif kind == "random_case_probe":
+                    lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))
                 elif kind == "sort":

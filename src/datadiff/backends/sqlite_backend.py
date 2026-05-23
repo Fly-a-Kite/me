@@ -219,6 +219,13 @@ class SQLiteBackend(Backend):
                     column_types[op["as"]] = "bool"
                     hidden_order_cols = []
                     pending_order = None
+                elif kind == "random_case_probe":
+                    query = f"SELECT 0 AS {_quote(op['as'])}"
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    column_types[op["as"]] = "bool"
+                    hidden_order_cols = []
+                    pending_order = None
                 elif kind == "select":
                     cols = list(op["columns"])
                     projection = select_with_pending_order(cols)

@@ -84,6 +84,19 @@ def _running_sum_projection(cols: list[str], op: dict) -> tuple[str, list[str]]:
     return ", ".join(select_parts), kept_cols + [op["column"]]
 
 
+def _random_case_probe_sql(op: dict) -> str:
+    rows = int(op.get("rows", 100_000))
+    branches = int(op.get("branches", 3))
+    when_sql = " ".join(f"WHEN {idx} THEN 'branch_{idx}'" for idx in range(branches))
+    return (
+        f"SELECT (COUNT(*) > 0) AS {_quote(op['as'])} FROM ("
+        f"SELECT CASE CAST(FLOOR(random() * {branches}) AS INTEGER) "
+        f"{when_sql} ELSE 'unexpected_else' END AS result "
+        f"FROM generate_series(1, {rows})"
+        f") q WHERE result = 'unexpected_else'"
+    )
+
+
 class DuckDBBackend(Backend):
     name = "duckdb"
     persistent_storage = False
@@ -230,6 +243,13 @@ class DuckDBBackend(Backend):
                     con.register(materialized_name, pd.DataFrame({op["as"]: [ok]}))
                     ctes = []
                     relation = _quote(materialized_name)
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "random_case_probe":
+                    ctes = []
+                    relation = add_step(_random_case_probe_sql(op))
                     current_cols = [op["as"]]
                     visible_cols = [op["as"]]
                     hidden_order_cols = []

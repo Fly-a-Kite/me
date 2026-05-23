@@ -248,6 +248,21 @@ def test_oracle_classifies_sortedness_null_placement():
     assert findings[0].root_cause == "sortedness_null_placement"
 
 
+def test_oracle_classifies_simple_case_random_subject():
+    case = generate_case(370020, profile="simple_case_random_subject")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["unexpected_else_seen"], [[False]]),
+            "duckdb": NormalizedResult("duckdb", "ok", ["unexpected_else_seen"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "simple_case_random_subject"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

@@ -42,6 +42,7 @@ GeneratorProfile = Literal[
     "tuple_absence_filter",
     "running_sum_precision",
     "sortedness_null_placement",
+    "simple_case_random_subject",
 ]
 
 
@@ -474,6 +475,9 @@ def _available_columns_after_operations(
         elif kind == "sortedness_check":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "random_case_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "groupby":
             available = unique_preserve_order(
                 [str(key) for key in op.get("keys", [])]
@@ -682,6 +686,31 @@ def repair_operations(
                     "as": alias,
                     "ascending": ascending,
                     "nulls": nulls,
+                }
+            )
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
+        elif kind == "random_case_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            try:
+                row_count = int(op.get("rows", 100_000))
+                branch_count = int(op.get("branches", 3))
+            except (TypeError, ValueError):
+                continue
+            if row_count <= 0 or branch_count <= 0 or branch_count > 16:
+                continue
+            repaired.append(
+                {
+                    "op": "random_case_probe",
+                    "as": alias,
+                    "rows": row_count,
+                    "branches": branch_count,
                 }
             )
             available = {alias}
@@ -932,6 +961,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_running_sum_precision_case(seed)
     if profile == "sortedness_null_placement" and type_aware:
         return generate_sortedness_null_placement_case(seed)
+    if profile == "simple_case_random_subject" and type_aware:
+        return generate_simple_case_random_subject_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -995,6 +1026,8 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         return _as_bughunt_mixed_case(generate_running_sum_precision_case(seed), seed, "running_sum_precision")
     if seed % 71 == 60:
         return _as_bughunt_mixed_case(generate_sortedness_null_placement_case(seed), seed, "sortedness_null_placement")
+    if seed % 73 == 61:
+        return _as_bughunt_mixed_case(generate_simple_case_random_subject_case(seed), seed, "simple_case_random_subject")
     return None
 
 
@@ -2521,6 +2554,40 @@ def generate_sortedness_null_placement_case(seed: int) -> Case:
             "generator_profile": "sortedness_null_placement",
             "source_issue": "https://github.com/pola-rs/polars/issues/26993",
             "expected_sortedness": False,
+        },
+    )
+
+
+def generate_simple_case_random_subject_case(seed: int) -> Case:
+    row_count = 100_000
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("unexpected_else_seen", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-simple-case-random-subject",
+        seed,
+        [
+            {
+                "op": "random_case_probe",
+                "as": alias,
+                "rows": row_count,
+                "branches": 3,
+            }
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-simple-case-random-subject",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "simple_case_random_subject",
+            "source_issue": "https://github.com/duckdb/duckdb/issues/22576",
+            "row_count": row_count,
+            "expected_unexpected_else_seen": False,
         },
     )
 

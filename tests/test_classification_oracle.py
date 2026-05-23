@@ -696,6 +696,42 @@ def test_validate_case_accepts_sortedness_check():
     assert any("nulls must be 'first' or 'last'" in error for error in validate_case_program(bad_nulls))
 
 
+def test_validate_case_accepts_random_case_probe():
+    valid = Case(
+        "case-random-case-probe",
+        28,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-random-case-probe",
+            28,
+            [{"op": "random_case_probe", "as": "unexpected_else_seen", "rows": 100_000, "branches": 3}],
+        ),
+    )
+    bad_alias = Case(
+        "case-random-case-probe-alias",
+        29,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-random-case-probe-alias", 29, [{"op": "random_case_probe", "as": "where"}]),
+    )
+    bad_rows = Case(
+        "case-random-case-probe-rows",
+        30,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-random-case-probe-rows", 30, [{"op": "random_case_probe", "as": "ok", "rows": 0}]),
+    )
+    bad_branches = Case(
+        "case-random-case-probe-branches",
+        31,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-random-case-probe-branches", 31, [{"op": "random_case_probe", "as": "ok", "branches": 17}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+    assert any("rows must be positive" in error for error in validate_case_program(bad_rows))
+    assert any("branches must be between" in error for error in validate_case_program(bad_branches))
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

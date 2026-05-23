@@ -64,6 +64,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "running_sum": {"op:running_sum"},
     "sortedness_null_placement": {"pattern:sortedness_null_placement"},
     "sortedness": {"op:sortedness_check"},
+    "simple_case_random_subject": {"pattern:simple_case_random_subject"},
+    "random_case_probe": {"op:random_case_probe"},
+    "case_expression": {"op:random_case_probe"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -146,6 +149,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_tuple_absence_filter = False
     has_running_sum_precision = False
     has_sortedness_check = False
+    has_random_case_probe = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -192,6 +196,12 @@ def extract_case_features(case: Case) -> set[str]:
             features.add(f"sortedness_source_type:{available_types.get(column, 'derived')}")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_sortedness_check = True
+        elif kind == "random_case_probe":
+            features.add("case_expr:simple")
+            features.add("case_expr:random-subject")
+            features.add(_bucket("case_probe_rows", int(op.get("rows", 0)), [(1000, "small"), (10000, "medium")], "large"))
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_random_case_probe = True
         elif kind == "select":
             width = len(op.get("columns", []))
             features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
@@ -315,6 +325,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:running_sum_precision")
     if has_sortedness_check and _has_sortedness_null_placement_pattern(case.program.operations):
         features.add("pattern:sortedness_null_placement")
+    if has_random_case_probe:
+        features.add("pattern:simple_case_random_subject")
     return features
 
 
@@ -880,6 +892,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "random_case_probe":
+            score, op_buckets, samples = _random_case_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "select":
             cols = [str(column) for column in op.get("columns", []) if str(column) in samples]
             samples = {column: samples[column] for column in unique_preserve_order(cols)}
@@ -1265,6 +1282,21 @@ def _sortedness_frontier_score(
     return min(1.0, score), buckets, {alias: [ok]} if alias else samples
 
 
+def _random_case_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    row_count = int(op.get("rows", 0))
+    branch_count = int(op.get("branches", 0))
+    buckets = [
+        "case_expr:simple",
+        "case_expr:random-subject",
+        _bucket("case_probe_rows", row_count, [(1000, "small"), (10000, "medium")], "large"),
+    ]
+    if branch_count >= 3:
+        buckets.append("case_expr:multi-branch")
+    score = 0.55 + 0.25 * int(row_count >= 10_000) + 0.10 * int(branch_count >= 3)
+    return min(1.0, score), buckets, {alias: [False]} if alias else {}
+
+
 def _groupby_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
     keys = [str(key) for key in op.get("keys", []) if str(key) in samples]
     buckets: list[str] = []
@@ -1624,6 +1656,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("running_sum_precision")
     if "pattern:sortedness_null_placement" in features or "op:sortedness_check" in features:
         roots.add("sortedness_null_placement")
+    if "pattern:simple_case_random_subject" in features or "op:random_case_probe" in features:
+        roots.add("simple_case_random_subject")
     if features & {
         "pattern:null_groupby_topk",
         "pattern:null_agg_topk",

@@ -213,6 +213,7 @@ def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
         "tuple_absence_filter",
         "running_sum_precision",
         "sortedness_null_placement",
+        "simple_case_random_subject",
     ]
     for profile in profiles:
         for seed in range(50):
