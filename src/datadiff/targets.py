@@ -41,6 +41,7 @@ COMMON_DSL_CAPABILITIES: tuple[str, ...] = (
     "op:uint64_isin_probe",
     "op:tuple_anti_null_probe",
     "op:sparse_mask_probe",
+    "op:float_wrap_probe",
     "op:groupby",
     "op:aggregate",
     "op:join",

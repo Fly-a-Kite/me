@@ -47,6 +47,7 @@ GeneratorProfile = Literal[
     "pandas_uint64_isin_precision",
     "duckdb_tuple_anti_null_semantics",
     "pandas_sparse_array_mask_semantics",
+    "polars_float_wrap_numerical_semantics",
 ]
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]

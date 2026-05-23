@@ -72,6 +72,9 @@ def _assert_program_columns_are_valid(case):
         elif op["op"] == "sparse_mask_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
+        elif op["op"] == "float_wrap_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
         elif op["op"] == "groupby":
             assert set(op["keys"]).issubset(known_cols)
             assert len(op["keys"]) == len(set(op["keys"]))
@@ -177,6 +180,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "pandas_uint64_isin_precision",
         "duckdb_tuple_anti_null_semantics",
         "pandas_sparse_array_mask_semantics",
+        "polars_float_wrap_numerical_semantics",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -756,6 +760,18 @@ def test_generate_case_pandas_sparse_array_mask_semantics_profile_is_supported_a
     assert "pattern:pandas_sparse_array_mask_semantics" in features
     assert "pandas:sparse-mask" in features
     assert case.metadata["source_issue"] == "https://github.com/pandas-dev/pandas/issues/45284"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_polars_float_wrap_numerical_semantics_profile_is_supported_and_valid():
+    case = generate_case(139, profile="polars_float_wrap_numerical_semantics")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000139-polars-float-wrap-numerical-semantics"
+    assert case.program.operations == [{"op": "float_wrap_probe", "as": "float_wrap_mismatch"}]
+    assert "pattern:polars_float_wrap_numerical_semantics" in features
+    assert "polars:wrap-numerical" in features
+    assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/18546"
     assert validate_case_program(case) == []
 
 

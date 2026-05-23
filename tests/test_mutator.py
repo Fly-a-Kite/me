@@ -14,6 +14,7 @@ from datadiff.mutator import (
     _append_uint64_isin_probe,
     _append_tuple_anti_null_probe,
     _append_sparse_mask_probe,
+    _append_float_wrap_probe,
     _append_boolean_predicate_filter_probe,
     _append_grouped_topk_probe,
     _append_order_projection_probe,
@@ -111,6 +112,7 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_uint64_isin_probe" in MUTATION_OPERATOR_NAMES
     assert "append_tuple_anti_null_probe" in MUTATION_OPERATOR_NAMES
     assert "append_sparse_mask_probe" in MUTATION_OPERATOR_NAMES
+    assert "append_float_wrap_probe" in MUTATION_OPERATOR_NAMES
     assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
 
 
@@ -423,6 +425,22 @@ def test_append_sparse_mask_probe_mutation_stays_valid():
     assert detail.startswith("append_sparse_mask_probe:")
     assert operations[-1] == {"op": "sparse_mask_probe", "as": "sparse_mask_mismatch"}
     case = Case("case-mut-sparse-mask", 1, [table], Program("prog-mut-sparse-mask", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_float_wrap_probe_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int")],
+        [{"id": 0, "x": 2}],
+    )
+    operations = [{"op": "select", "columns": ["id"]}]
+
+    detail = _append_float_wrap_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_float_wrap_probe:")
+    assert operations[-1] == {"op": "float_wrap_probe", "as": "float_wrap_mismatch"}
+    case = Case("case-mut-float-wrap", 1, [table], Program("prog-mut-float-wrap", 1, operations))
     assert validate_case_program(case) == []
 
 

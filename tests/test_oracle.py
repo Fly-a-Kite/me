@@ -413,6 +413,22 @@ def test_oracle_classifies_pandas_sparse_array_mask_semantics():
     assert findings[0].root_cause == "pandas_sparse_array_mask_semantics"
 
 
+def test_oracle_classifies_polars_float_wrap_numerical_semantics():
+    case = generate_case(370031, profile="polars_float_wrap_numerical_semantics")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["float_wrap_mismatch"], [[False]]),
+            "polars": NormalizedResult("polars", "ok", ["float_wrap_mismatch"], [[True]]),
+            "polars_lazy": NormalizedResult("polars_lazy", "ok", ["float_wrap_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "polars_float_wrap_numerical_semantics"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

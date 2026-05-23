@@ -84,6 +84,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "duckdb_tuple_anti_null_semantics"
     if _case_has_sparse_mask_probe(case):
         return "pandas_sparse_array_mask_semantics"
+    if _case_has_float_wrap_probe(case):
+        return "polars_float_wrap_numerical_semantics"
     if _case_contains_special_float(case):
         return "nan_inf_semantics"
     if _case_uses_modulo(case):
@@ -194,6 +196,10 @@ def _case_has_tuple_anti_null_probe(case: Case) -> bool:
 
 def _case_has_sparse_mask_probe(case: Case) -> bool:
     return any(op.get("op") == "sparse_mask_probe" for op in case.program.operations)
+
+
+def _case_has_float_wrap_probe(case: Case) -> bool:
+    return any(op.get("op") == "float_wrap_probe" for op in case.program.operations)
 
 
 def _case_uses_modulo(case: Case) -> bool:

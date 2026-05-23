@@ -98,6 +98,9 @@ class PolarsBackend(Backend):
                     df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "sparse_mask_probe":
                     df = pl.DataFrame({op["as"]: [False]})
+                elif kind == "float_wrap_probe":
+                    mismatch = _polars_float_wrap_mismatch(pl, lazy=False)
+                    df = pl.DataFrame({op["as"]: [mismatch]})
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -266,6 +269,9 @@ class PolarsLazyBackend(PolarsBackend):
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "sparse_mask_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "float_wrap_probe":
+                    mismatch = _polars_float_wrap_mismatch(pl, lazy=True)
+                    lf = pl.DataFrame({op["as"]: [mismatch]}).lazy()
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))
                 elif kind == "sort":
@@ -468,6 +474,22 @@ def _polars_series_rtruediv_mismatch(pl) -> bool:
         actual is None or not math.isclose(float(actual), want, rel_tol=0.0, abs_tol=1e-12)
         for actual, want in zip(observed, expected)
     )
+
+
+def _polars_float_wrap_mismatch(pl, *, lazy: bool) -> bool:
+    expected = [100, 44]
+    frame = pl.DataFrame({"float_value": [100.0, 300.0], "int_value": [100, 300]})
+    if lazy:
+        frame = frame.lazy()
+    result = frame.with_columns(
+        wrapped_float=pl.col("float_value").cast(pl.UInt8, wrap_numerical=True),
+        wrapped_int=pl.col("int_value").cast(pl.UInt8, wrap_numerical=True),
+    )
+    if lazy:
+        result = result.collect()
+    observed_float = result.get_column("wrapped_float").to_list()
+    observed_int = result.get_column("wrapped_int").to_list()
+    return observed_float != expected or observed_int != expected
 
 
 def _polars_filter_expr(col, comparator: str, value):

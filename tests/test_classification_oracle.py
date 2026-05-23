@@ -1128,6 +1128,56 @@ def test_classification_reference_understands_sparse_mask_probe():
     assert classification.implicated_backends == ["pandas"]
 
 
+def test_validate_case_accepts_float_wrap_probe():
+    valid = Case(
+        "case-float-wrap-probe",
+        59,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-float-wrap-probe", 59, [{"op": "float_wrap_probe", "as": "float_wrap_mismatch"}]),
+    )
+    bad_alias = Case(
+        "case-float-wrap-probe-alias",
+        60,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-float-wrap-probe-alias", 60, [{"op": "float_wrap_probe", "as": "where"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_float_wrap_probe():
+    case = Case(
+        "case-float-wrap-reference",
+        61,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-float-wrap-reference", 61, [{"op": "float_wrap_probe", "as": "float_wrap_mismatch"}]),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "polars_float_wrap_numerical_semantics",
+        "confidence": "high",
+        "suspicious_backends": ["polars", "polars_lazy"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["float_wrap_mismatch"], [[False]]),
+        "polars": NormalizedResult("polars", "ok", ["float_wrap_mismatch"], [[True]]),
+        "polars_lazy": NormalizedResult("polars_lazy", "ok", ["float_wrap_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "polars_float_wrap_numerical_semantics"},
+        ["reference", "polars", "polars_lazy"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["polars", "polars_lazy"]
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

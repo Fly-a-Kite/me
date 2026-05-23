@@ -112,6 +112,8 @@ class PandasBackend(Backend):
                         left != right for left, right in zip(observed, expected)
                     )
                     df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
+                elif kind == "float_wrap_probe":
+                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":

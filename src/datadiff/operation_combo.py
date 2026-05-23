@@ -19,6 +19,7 @@ CANONICAL_OPERATION_ORDER = (
     "uint64_isin_probe",
     "tuple_anti_null_probe",
     "sparse_mask_probe",
+    "float_wrap_probe",
     "groupby",
     "aggregate",
     "select",
@@ -130,6 +131,8 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("duckdb_tuple_anti_null_semantics")
     if "sparse_mask_probe" in op_set:
         risks.append("pandas_sparse_array_mask_semantics")
+    if "float_wrap_probe" in op_set:
+        risks.append("polars_float_wrap_numerical_semantics")
     if "groupby" in op_set:
         risks.append("groupby_aggregation")
     if "aggregate" in op_set:
