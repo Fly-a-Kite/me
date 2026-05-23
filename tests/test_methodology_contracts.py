@@ -104,6 +104,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     topk_resort = _preset_config("topk_resort")
     join_ordered_agg_topk = _preset_config("join_ordered_agg_topk")
     global_null_aggregate = _preset_config("global_null_aggregate")
+    string_count_groupby = _preset_config("string_count_groupby")
 
     assert null_groupby.generator_profile == "null_groupby_topk"
     assert {"groupby", "nulls", "sort_limit"}.issubset(null_groupby.guidance_targets)
@@ -141,6 +142,8 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert {"join", "groupby", "aggregation", "sort_limit", "topk"}.issubset(join_ordered_agg_topk.guidance_targets)
     assert global_null_aggregate.generator_profile == "global_null_aggregate"
     assert {"global_aggregation", "aggregation", "nulls", "sort_limit"}.issubset(global_null_aggregate.guidance_targets)
+    assert string_count_groupby.generator_profile == "string_count_groupby"
+    assert {"groupby", "strings", "nulls", "aggregation", "sort_limit"}.issubset(string_count_groupby.guidance_targets)
 
 
 def test_methodology_seeded_fault_suites_support_sensitivity_evaluation():

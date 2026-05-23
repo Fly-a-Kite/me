@@ -314,7 +314,7 @@ def validate_case_program(case: Case) -> list[str]:
                 col = agg.get("column")
                 if col not in available:
                     errors.append(f"op {idx}: aggregation column {col!r} is unavailable")
-                if col not in numeric:
+                if agg.get("func") != "count" and col not in numeric:
                     errors.append(f"op {idx}: aggregation column {col!r} is not numeric")
                 if agg.get("func") not in {"sum", "min", "max", "count"}:
                     errors.append(f"op {idx}: unsupported aggregation {agg.get('func')!r}")
@@ -339,7 +339,7 @@ def validate_case_program(case: Case) -> list[str]:
                 col = agg.get("column")
                 if col not in available:
                     errors.append(f"op {idx}: aggregation column {col!r} is unavailable")
-                if col not in numeric:
+                if agg.get("func") != "count" and col not in numeric:
                     errors.append(f"op {idx}: aggregation column {col!r} is not numeric")
                 if agg.get("func") not in {"sum", "min", "max", "count"}:
                     errors.append(f"op {idx}: unsupported aggregation {agg.get('func')!r}")

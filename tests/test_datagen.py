@@ -107,6 +107,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
     assert {
         "join_null_truth_filter",
         "global_null_aggregate",
+        "string_count_groupby",
         "wide_offset_topk",
         "join_null_key_topk",
         "empty_filter_groupby",
@@ -396,6 +397,39 @@ def test_generate_case_global_null_aggregate_profile_is_supported_and_valid():
 
     assert empty_case.metadata["empty_input"] is True
     assert all_null_case.metadata["empty_input"] is False
+
+
+def test_generate_case_string_count_groupby_profile_is_supported_and_valid():
+    case = generate_case(123, profile="string_count_groupby")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000123-string-count-groupby"
+    assert [op["op"] for op in case.program.operations] == ["groupby", "sort", "limit"]
+    assert "pattern:string_count_groupby" in features
+    assert "agg:count:str" in features
+    assert "groupby:null-key" in features
+    assert validate_case_program(case) == []
+
+
+def test_repair_operations_keeps_count_on_string_columns_only():
+    case = generate_case(123, profile="string_count_groupby")
+
+    repaired = repair_operations(
+        case.tables[0],
+        [
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [
+                    {"column": "s", "func": "count", "as": "count_s"},
+                    {"column": "s", "func": "sum", "as": "sum_s"},
+                    {"column": "x", "func": "sum", "as": "sum_x"},
+                ],
+            }
+        ],
+    )
+
+    assert [agg["as"] for agg in repaired[0]["aggs"]] == ["count_s", "sum_x"]
 
 
 def test_bughunt_profile_biases_toward_multi_table_and_deeper_programs():

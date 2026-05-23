@@ -27,6 +27,7 @@ GeneratorProfile = Literal[
     "topk_resort",
     "join_ordered_agg_topk",
     "global_null_aggregate",
+    "string_count_groupby",
 ]
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]

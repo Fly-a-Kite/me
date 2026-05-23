@@ -43,6 +43,7 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "topk_resort": {"pattern:topk_resort"},
     "join_ordered_agg_topk": {"pattern:join_ordered_agg_topk"},
     "global_null_aggregate": {"pattern:global_null_aggregate"},
+    "string_count_groupby": {"pattern:string_count_groupby"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -116,6 +117,7 @@ def extract_case_features(case: Case) -> set[str]:
 
     op_names = []
     available_types = {column.name: column.type for column in table.columns}
+    has_string_count_groupby = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -168,11 +170,20 @@ def extract_case_features(case: Case) -> set[str]:
             for key in op.get("keys", []):
                 features.add(f"group_key_type:{available_types.get(key, 'derived')}")
             for agg in op.get("aggs", []):
+                source_type = available_types.get(str(agg.get("column", "")), "derived")
                 features.add(f"agg:{agg.get('func', 'unknown')}")
+                features.add(f"agg_source_type:{source_type}")
+                if agg.get("func") == "count" and source_type == "str":
+                    features.add("agg:count:str")
+                    has_string_count_groupby = True
                 available_types[str(agg.get("as", "derived"))] = "float"
         elif kind == "aggregate":
             for agg in op.get("aggs", []):
+                source_type = available_types.get(str(agg.get("column", "")), "derived")
                 features.add(f"agg:{agg.get('func', 'unknown')}")
+                features.add(f"agg_source_type:{source_type}")
+                if agg.get("func") == "count" and source_type == "str":
+                    features.add("agg:count:str")
                 available_types[str(agg.get("as", "derived"))] = "float"
     if op_names:
         features.add("opseq:" + ">".join(op_names))
@@ -214,6 +225,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:join_ordered_agg_topk")
     if _has_global_null_aggregate_pattern(case.program.operations, frontier_buckets):
         features.add("pattern:global_null_aggregate")
+    if has_string_count_groupby:
+        features.add("pattern:string_count_groupby")
     return features
 
 

@@ -33,6 +33,7 @@ GeneratorProfile = Literal[
     "topk_resort",
     "join_ordered_agg_topk",
     "global_null_aggregate",
+    "string_count_groupby",
 ]
 
 
@@ -591,7 +592,11 @@ def repair_operations(
                 pending_order_columns = set()
         elif kind == "groupby":
             keys = unique_preserve_order([k for k in op["keys"] if k in available])
-            aggs = [a for a in op["aggs"] if a["column"] in available and a["column"] in numeric]
+            aggs = [
+                a
+                for a in op["aggs"]
+                if a["column"] in available and (a["func"] == "count" or a["column"] in numeric)
+            ]
             unique_aggs: list[dict[str, Any]] = []
             seen_aliases: set[str] = set()
             for agg in aggs:
@@ -613,7 +618,11 @@ def repair_operations(
             order_pending = False
             pending_order_columns = set()
         elif kind == "aggregate":
-            aggs = [a for a in op["aggs"] if a["column"] in available and a["column"] in numeric]
+            aggs = [
+                a
+                for a in op["aggs"]
+                if a["column"] in available and (a["func"] == "count" or a["column"] in numeric)
+            ]
             unique_aggs = []
             seen_aliases: set[str] = set()
             for agg in aggs:
@@ -743,6 +752,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_join_ordered_agg_topk_case(seed)
     if profile == "global_null_aggregate" and type_aware:
         return generate_global_null_aggregate_case(seed)
+    if profile == "string_count_groupby" and type_aware:
+        return generate_string_count_groupby_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -784,6 +795,8 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         return _as_bughunt_mixed_case(generate_ordered_groupby_sort_case(seed), seed, "ordered_groupby_sort")
     if selector == 40:
         return _as_bughunt_mixed_case(generate_join_null_key_topk_case(seed), seed, "join_null_key_topk")
+    if selector == 47:
+        return _as_bughunt_mixed_case(generate_string_count_groupby_case(seed), seed, "string_count_groupby")
     if selector == 53:
         return _as_bughunt_mixed_case(generate_topk_resort_case(seed), seed, "topk_resort")
     if selector == 58:
@@ -1814,6 +1827,60 @@ def generate_global_null_aggregate_case(seed: int) -> Case:
         tables=[table],
         program=program,
         metadata={"generator_profile": "global_null_aggregate", "empty_input": empty_input},
+    )
+
+
+def generate_string_count_groupby_case(seed: int) -> Case:
+    rows = [
+        {"id": 0, "g": "alpha", "s": "A", "x": 1},
+        {"id": 1, "g": "alpha", "s": None, "x": 2},
+        {"id": 2, "g": "alpha", "s": "", "x": None},
+        {"id": 3, "g": "beta", "s": "space value", "x": -1},
+        {"id": 4, "g": "beta", "s": "中文", "x": 0},
+        {"id": 5, "g": None, "s": None, "x": 5},
+        {"id": 6, "g": None, "s": "delta", "x": None},
+        {"id": 7, "g": "gamma", "s": None, "x": 3},
+    ]
+    if seed % 2:
+        rows.append({"id": 8, "g": "gamma", "s": "", "x": -3})
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("s", "str", nullable=True),
+            ColumnSpec("x", "int", nullable=True),
+        ],
+        rows,
+    )
+    program = Program(
+        f"prog-{seed:08d}-string-count-groupby",
+        seed,
+        [
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [
+                    {"column": "s", "func": "count", "as": "count_s"},
+                    {"column": "x", "func": "sum", "as": "sum_x"},
+                ],
+            },
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "count_s", "ascending": False, "nulls": "last"},
+                    {"column": "g", "ascending": True, "nulls": "first"},
+                ],
+            },
+            {"op": "limit", "n": 4},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-string-count-groupby",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={"generator_profile": "string_count_groupby"},
     )
 
 

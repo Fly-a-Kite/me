@@ -516,6 +516,44 @@ def test_validate_case_rejects_groupby_alias_that_collides_with_key():
     assert any("aliases collide with keys" in error for error in errors)
 
 
+def test_validate_case_allows_count_on_string_columns_only():
+    count_string = Case(
+        "case-count-string",
+        8,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("g", "str"), ColumnSpec("s", "str"), ColumnSpec("x", "int")],
+                [{"g": "a", "s": "alpha", "x": 1}, {"g": "a", "s": None, "x": 2}],
+            )
+        ],
+        Program(
+            "prog-count-string",
+            8,
+            [{"op": "groupby", "keys": ["g"], "aggs": [{"column": "s", "func": "count", "as": "count_s"}]}],
+        ),
+    )
+    sum_string = Case(
+        "case-sum-string",
+        9,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("g", "str"), ColumnSpec("s", "str")],
+                [{"g": "a", "s": "alpha"}],
+            )
+        ],
+        Program(
+            "prog-sum-string",
+            9,
+            [{"op": "groupby", "keys": ["g"], "aggs": [{"column": "s", "func": "sum", "as": "sum_s"}]}],
+        ),
+    )
+
+    assert validate_case_program(count_string) == []
+    assert any("not numeric" in error for error in validate_case_program(sum_string))
+
+
 def test_validate_case_rejects_reserved_output_aliases():
     groupby_case = Case(
         "case-groupby-reserved-alias",
