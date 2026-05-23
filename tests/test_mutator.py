@@ -4,6 +4,7 @@ from datadiff.classification_oracle import validate_case_program
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.mutator import (
     MUTATION_OPERATOR_NAMES,
+    _append_group_quantile_probe,
     _append_boolean_predicate_filter_probe,
     _append_grouped_topk_probe,
     _append_order_projection_probe,
@@ -91,6 +92,7 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_running_sum" in MUTATION_OPERATOR_NAMES
     assert "append_sortedness_check" in MUTATION_OPERATOR_NAMES
     assert "append_random_case_probe" in MUTATION_OPERATOR_NAMES
+    assert "append_group_quantile_probe" in MUTATION_OPERATOR_NAMES
     assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
 
 
@@ -238,6 +240,27 @@ def test_append_random_case_probe_mutation_stays_valid():
     assert operations[-1]["op"] == "random_case_probe"
     assert operations[-1]["as"] == "unexpected_else_seen"
     case = Case("case-mut-random-case", 1, [table], Program("prog-mut-random-case", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_group_quantile_probe_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int")],
+        [{"id": 0, "x": 2}],
+    )
+    operations = [{"op": "select", "columns": ["id"]}]
+
+    detail = _append_group_quantile_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_group_quantile_probe:")
+    assert operations[-1] == {
+        "op": "group_quantile_probe",
+        "as": "quantile_key_mismatch",
+        "values": [1, 2, 3],
+        "quantiles": [0.0, 0.5, 1.0],
+    }
+    case = Case("case-mut-group-quantile", 1, [table], Program("prog-mut-group-quantile", 1, operations))
     assert validate_case_program(case) == []
 
 

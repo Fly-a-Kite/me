@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import time
 import warnings
 
@@ -74,6 +75,9 @@ class PolarsBackend(Backend):
                     df = pl.DataFrame({op["as"]: [ok]})
                 elif kind == "random_case_probe":
                     df = pl.DataFrame({op["as"]: [False]})
+                elif kind == "group_quantile_probe":
+                    mismatch = _polars_group_quantile_key_mismatch(pl, op, lazy=False)
+                    df = pl.DataFrame({op["as"]: [mismatch]})
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -220,6 +224,9 @@ class PolarsLazyBackend(PolarsBackend):
                     lf = pl.DataFrame({op["as"]: [ok]}).lazy()
                 elif kind == "random_case_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "group_quantile_probe":
+                    mismatch = _polars_group_quantile_key_mismatch(pl, op, lazy=True)
+                    lf = pl.DataFrame({op["as"]: [mismatch]}).lazy()
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))
                 elif kind == "sort":
@@ -350,6 +357,37 @@ def _polars_is_sorted(series, op: dict) -> bool:
             ascending=ascending,
             nulls=nulls,
         )
+
+
+def _polars_group_quantile_key_mismatch(pl, op: dict, *, lazy: bool) -> bool:
+    values = [float(value) for value in op.get("values", [1, 2, 3])]
+    quantiles = [float(value) for value in op.get("quantiles", [0.0, 0.5, 1.0])]
+    expected = [_nearest_quantile(values, quantile) for quantile in quantiles]
+    value_frame = pl.DataFrame({"x": values})
+    quantile_frame = pl.DataFrame({"q": quantiles})
+    if lazy:
+        value_frame = value_frame.lazy()
+        quantile_frame = quantile_frame.lazy()
+    result = (
+        value_frame.join(quantile_frame, how="cross")
+        .group_by("q")
+        .agg(pl.col("x").quantile(pl.col("q").first()).alias("observed_quantile"))
+        .sort("q")
+    )
+    if lazy:
+        result = result.collect()
+    observed = result.get_column("observed_quantile").to_list()
+    return len(observed) != len(expected) or any(
+        actual is None or not math.isclose(float(actual), want, rel_tol=0.0, abs_tol=1e-12)
+        for actual, want in zip(observed, expected)
+    )
+
+
+def _nearest_quantile(values: list[float], quantile: float) -> float:
+    sorted_values = sorted(values)
+    index = int(math.floor(quantile * (len(sorted_values) - 1) + 0.5))
+    index = max(0, min(index, len(sorted_values) - 1))
+    return float(sorted_values[index])
 
 
 def _polars_filter_expr(col, comparator: str, value):

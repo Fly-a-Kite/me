@@ -248,6 +248,7 @@ def test_cli_parses_order_sensitive_bug_hunt_profiles():
         "running_sum_precision",
         "sortedness_null_placement",
         "simple_case_random_subject",
+        "group_quantile_key_probe",
     ]:
         args = parser.parse_args(["fuzz", "--profile", profile])
         assert args.cmd == "fuzz"
@@ -456,6 +457,9 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("simple_case_random_subject").generator_profile == "simple_case_random_subject"
     assert _preset_config("simple_case_random_subject").guidance_targets[0] == "simple_case_random_subject"
     assert _preset_config("simple_case_random_subject_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("group_quantile_key_probe").generator_profile == "group_quantile_key_probe"
+    assert _preset_config("group_quantile_key_probe").guidance_targets[0] == "group_quantile_key_probe"
+    assert _preset_config("group_quantile_key_probe_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("join_null_sort").generator_profile == "join_null_sort"
     assert _preset_config("join_null_sort").guidance_targets[0] == "join_null_sort"
     assert _preset_config("join_null_sort_metamorphic").enable_metamorphic_oracle is True
@@ -532,6 +536,7 @@ def test_cli_parses_non_datafusion_live_presets():
         "running_sum_precision",
         "sortedness_null_placement",
         "simple_case_random_subject",
+        "group_quantile_key_probe",
     }.issubset(arrow.guidance_targets)
     assert arrow.enable_local_source_scheduler is True
 

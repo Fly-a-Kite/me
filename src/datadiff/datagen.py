@@ -43,6 +43,7 @@ GeneratorProfile = Literal[
     "running_sum_precision",
     "sortedness_null_placement",
     "simple_case_random_subject",
+    "group_quantile_key_probe",
 ]
 
 
@@ -478,6 +479,9 @@ def _available_columns_after_operations(
         elif kind == "random_case_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "group_quantile_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "groupby":
             available = unique_preserve_order(
                 [str(key) for key in op.get("keys", [])]
@@ -719,6 +723,28 @@ def repair_operations(
             strings = set()
             order_pending = False
             pending_order_columns = set()
+        elif kind == "group_quantile_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            values = op.get("values", [1, 2, 3])
+            quantiles = op.get("quantiles", [0.0, 0.5, 1.0])
+            if not _valid_quantile_probe_values(values, quantiles):
+                continue
+            repaired.append(
+                {
+                    "op": "group_quantile_probe",
+                    "as": alias,
+                    "values": list(values),
+                    "quantiles": list(quantiles),
+                }
+            )
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "select":
             cols = unique_preserve_order([c for c in op["columns"] if c in available])
             if not cols:
@@ -904,6 +930,21 @@ def _filter_literal_is_valid(column_type: str, comparator: Any, value: Any) -> b
     return False
 
 
+def _valid_quantile_probe_values(values: Any, quantiles: Any) -> bool:
+    if not isinstance(values, list) or not isinstance(quantiles, list):
+        return False
+    if len(values) < 2 or len(quantiles) < 2:
+        return False
+    if any(not isinstance(value, (int, float)) or isinstance(value, bool) for value in values):
+        return False
+    return all(
+        isinstance(quantile, (int, float))
+        and not isinstance(quantile, bool)
+        and 0.0 <= float(quantile) <= 1.0
+        for quantile in quantiles
+    )
+
+
 def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile = "common") -> Case:
     if profile == "bughunt" and type_aware:
         mixed = _bughunt_issue_inspired_case(seed)
@@ -963,6 +1004,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_sortedness_null_placement_case(seed)
     if profile == "simple_case_random_subject" and type_aware:
         return generate_simple_case_random_subject_case(seed)
+    if profile == "group_quantile_key_probe" and type_aware:
+        return generate_group_quantile_key_probe_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -1028,6 +1071,8 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         return _as_bughunt_mixed_case(generate_sortedness_null_placement_case(seed), seed, "sortedness_null_placement")
     if seed % 73 == 61:
         return _as_bughunt_mixed_case(generate_simple_case_random_subject_case(seed), seed, "simple_case_random_subject")
+    if seed % 79 == 63:
+        return _as_bughunt_mixed_case(generate_group_quantile_key_probe_case(seed), seed, "group_quantile_key_probe")
     return None
 
 
@@ -2588,6 +2633,41 @@ def generate_simple_case_random_subject_case(seed: int) -> Case:
             "source_issue": "https://github.com/duckdb/duckdb/issues/22576",
             "row_count": row_count,
             "expected_unexpected_else_seen": False,
+        },
+    )
+
+
+def generate_group_quantile_key_probe_case(seed: int) -> Case:
+    values = [1, 2, 3]
+    quantiles = [0.0, 0.5, 1.0]
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("quantile_key_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-group-quantile-key-probe",
+        seed,
+        [
+            {
+                "op": "group_quantile_probe",
+                "as": alias,
+                "values": values,
+                "quantiles": quantiles,
+            }
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-group-quantile-key-probe",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "group_quantile_key_probe",
+            "source_issue": "https://github.com/pola-rs/polars/issues/25888",
+            "expected_quantiles": [1.0, 2.0, 3.0],
+            "expected_quantile_key_mismatch": False,
         },
     )
 

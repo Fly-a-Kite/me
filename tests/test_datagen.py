@@ -40,6 +40,11 @@ def _assert_program_columns_are_valid(case):
         elif op["op"] == "random_case_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
+        elif op["op"] == "group_quantile_probe":
+            assert not is_reserved_output_name(op["as"])
+            assert op["values"] == [1, 2, 3]
+            assert op["quantiles"] == [0.0, 0.5, 1.0]
+            known_cols = {op["as"]}
         elif op["op"] == "groupby":
             assert set(op["keys"]).issubset(known_cols)
             assert len(op["keys"]) == len(set(op["keys"]))
@@ -135,6 +140,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "running_sum_precision",
         "sortedness_null_placement",
         "simple_case_random_subject",
+        "group_quantile_key_probe",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -587,6 +593,25 @@ def test_generate_case_simple_case_random_subject_profile_is_supported_and_valid
     assert "pattern:simple_case_random_subject" in features
     assert "case_expr:random-subject" in features
     assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/22576"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_group_quantile_key_probe_profile_is_supported_and_valid():
+    case = generate_case(129, profile="group_quantile_key_probe")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000129-group-quantile-key-probe"
+    assert case.program.operations == [
+        {
+            "op": "group_quantile_probe",
+            "as": "quantile_key_mismatch",
+            "values": [1, 2, 3],
+            "quantiles": [0.0, 0.5, 1.0],
+        }
+    ]
+    assert "pattern:group_quantile_key_probe" in features
+    assert "quantile:dynamic-key" in features
+    assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/25888"
     assert validate_case_program(case) == []
 
 

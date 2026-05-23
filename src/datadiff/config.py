@@ -37,6 +37,7 @@ GeneratorProfile = Literal[
     "running_sum_precision",
     "sortedness_null_placement",
     "simple_case_random_subject",
+    "group_quantile_key_probe",
 ]
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]

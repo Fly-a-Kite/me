@@ -732,6 +732,46 @@ def test_validate_case_accepts_random_case_probe():
     assert any("branches must be between" in error for error in validate_case_program(bad_branches))
 
 
+def test_validate_case_accepts_group_quantile_probe():
+    valid = Case(
+        "case-group-quantile-probe",
+        32,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-group-quantile-probe",
+            32,
+            [
+                {
+                    "op": "group_quantile_probe",
+                    "as": "quantile_key_mismatch",
+                    "values": [1, 2, 3],
+                    "quantiles": [0.0, 0.5, 1.0],
+                }
+            ],
+        ),
+    )
+    bad_alias = Case(
+        "case-group-quantile-probe-alias",
+        33,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-group-quantile-probe-alias", 33, [{"op": "group_quantile_probe", "as": "where"}]),
+    )
+    bad_values = Case(
+        "case-group-quantile-probe-values",
+        34,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-group-quantile-probe-values",
+            34,
+            [{"op": "group_quantile_probe", "as": "ok", "values": [1], "quantiles": [0.0, 1.1]}],
+        ),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+    assert any("numeric values and quantiles" in error for error in validate_case_program(bad_values))
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

@@ -81,6 +81,13 @@ def test_classify_operation_combo_tracks_random_case_subject_risk():
     assert "simple_case_random_subject" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_group_quantile_key_expression_risk():
+    combo = classify_operation_combo([{"op": "group_quantile_probe"}])
+
+    assert combo["template"] == "group_quantile_probe"
+    assert "group_quantile_key_expression" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

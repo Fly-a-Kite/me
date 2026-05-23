@@ -254,6 +254,13 @@ class DuckDBBackend(Backend):
                     visible_cols = [op["as"]]
                     hidden_order_cols = []
                     pending_order = None
+                elif kind == "group_quantile_probe":
+                    ctes = []
+                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
                 elif kind == "select":
                     cols = list(op["columns"])
                     projection = select_with_pending_order(cols)

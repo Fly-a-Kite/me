@@ -332,6 +332,21 @@ def validate_case_program(case: Case) -> list[str]:
                 col_types = {alias: "bool"}
                 numeric = set()
                 strings = set()
+        elif kind == "group_quantile_probe":
+            alias = str(op.get("as", ""))
+            if not alias:
+                errors.append(f"op {idx}: group_quantile_probe output alias is empty")
+            elif is_reserved_output_name(alias):
+                errors.append(f"op {idx}: group_quantile_probe output alias {alias!r} is reserved")
+            values = op.get("values", [])
+            quantiles = op.get("quantiles", [])
+            if not _valid_group_quantile_values(values, quantiles):
+                errors.append(f"op {idx}: group_quantile_probe requires numeric values and quantiles in [0, 1]")
+            if alias:
+                available = {alias}
+                col_types = {alias: "bool"}
+                numeric = set()
+                strings = set()
         elif kind == "select":
             cols = list(op.get("columns", []))
             missing = [col for col in cols if col not in available]
@@ -578,6 +593,21 @@ def _mutate_output_type(
     return None
 
 
+def _valid_group_quantile_values(values: Any, quantiles: Any) -> bool:
+    if not isinstance(values, list) or not isinstance(quantiles, list):
+        return False
+    if len(values) < 2 or len(quantiles) < 2:
+        return False
+    if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in values):
+        return False
+    return all(
+        not isinstance(quantile, bool)
+        and isinstance(quantile, (int, float))
+        and 0.0 <= float(quantile) <= 1.0
+        for quantile in quantiles
+    )
+
+
 def _filter_literal_error(column_type: str, comparator: Any, value: Any) -> str:
     if not filter_comparator_supports_type(column_type, comparator):
         return f"comparator {comparator!r} is not supported for {column_type} filter"
@@ -693,6 +723,10 @@ def _reference_result(case: Case) -> NormalizedResult | None:
                 columns = [alias]
                 rows = [{alias: ok}]
             elif kind == "random_case_probe":
+                alias = str(op["as"])
+                columns = [alias]
+                rows = [{alias: False}]
+            elif kind == "group_quantile_probe":
                 alias = str(op["as"])
                 columns = [alias]
                 rows = [{alias: False}]

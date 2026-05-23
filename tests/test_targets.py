@@ -51,6 +51,7 @@ def test_target_descriptions_capture_methodology_axes():
     assert "op:running_sum" in specs[0]["capabilities"]
     assert "op:sortedness_check" in specs[0]["capabilities"]
     assert "op:random_case_probe" in specs[0]["capabilities"]
+    assert "op:group_quantile_probe" in specs[0]["capabilities"]
 
 
 def test_list_target_suites_includes_core():
@@ -67,6 +68,7 @@ def test_list_target_suites_includes_core():
     assert "op:running_sum" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:sortedness_check" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:random_case_probe" in suites["latest_all_engines"]["common_capabilities"]
+    assert "op:group_quantile_probe" in suites["latest_all_engines"]["common_capabilities"]
 
 
 def test_target_capability_matrix_and_intersection():

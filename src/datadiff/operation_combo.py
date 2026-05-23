@@ -9,6 +9,7 @@ CANONICAL_OPERATION_ORDER = (
     "mutate",
     "running_sum",
     "random_case_probe",
+    "group_quantile_probe",
     "groupby",
     "aggregate",
     "select",
@@ -100,6 +101,8 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("sortedness_null_placement")
     if "random_case_probe" in op_set:
         risks.append("simple_case_random_subject")
+    if "group_quantile_probe" in op_set:
+        risks.append("group_quantile_key_expression")
     if "groupby" in op_set:
         risks.append("groupby_aggregation")
     if "aggregate" in op_set:

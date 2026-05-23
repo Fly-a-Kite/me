@@ -263,6 +263,21 @@ def test_oracle_classifies_simple_case_random_subject():
     assert findings[0].root_cause == "simple_case_random_subject"
 
 
+def test_oracle_classifies_group_quantile_key_expression():
+    case = generate_case(370021, profile="group_quantile_key_probe")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["quantile_key_mismatch"], [[False]]),
+            "polars": NormalizedResult("polars", "ok", ["quantile_key_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "group_quantile_key_expression"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

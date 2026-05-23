@@ -67,6 +67,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "simple_case_random_subject": {"pattern:simple_case_random_subject"},
     "random_case_probe": {"op:random_case_probe"},
     "case_expression": {"op:random_case_probe"},
+    "group_quantile_key_probe": {"pattern:group_quantile_key_probe"},
+    "group_quantile_probe": {"op:group_quantile_probe"},
+    "dynamic_quantile": {"quantile:dynamic-key"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -150,6 +153,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_running_sum_precision = False
     has_sortedness_check = False
     has_random_case_probe = False
+    has_group_quantile_probe = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -202,6 +206,11 @@ def extract_case_features(case: Case) -> set[str]:
             features.add(_bucket("case_probe_rows", int(op.get("rows", 0)), [(1000, "small"), (10000, "medium")], "large"))
             available_types = {str(op.get("as", "derived")): "bool"}
             has_random_case_probe = True
+        elif kind == "group_quantile_probe":
+            features.add("quantile:dynamic-key")
+            features.add(_bucket("quantile_probe_values", len(op.get("values", [])), [(2, "tiny"), (4, "small")], "medium"))
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_group_quantile_probe = True
         elif kind == "select":
             width = len(op.get("columns", []))
             features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
@@ -327,6 +336,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:sortedness_null_placement")
     if has_random_case_probe:
         features.add("pattern:simple_case_random_subject")
+    if has_group_quantile_probe:
+        features.add("pattern:group_quantile_key_probe")
     return features
 
 
@@ -897,6 +908,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "group_quantile_probe":
+            score, op_buckets, samples = _group_quantile_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "select":
             cols = [str(column) for column in op.get("columns", []) if str(column) in samples]
             samples = {column: samples[column] for column in unique_preserve_order(cols)}
@@ -1297,6 +1313,20 @@ def _random_case_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], d
     return min(1.0, score), buckets, {alias: [False]} if alias else {}
 
 
+def _group_quantile_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    values = list(op.get("values", []))
+    quantiles = list(op.get("quantiles", []))
+    buckets = [
+        "quantile:dynamic-key",
+        _bucket("quantile_probe_values", len(values), [(2, "tiny"), (4, "small")], "medium"),
+    ]
+    if len(set(quantiles)) > 1:
+        buckets.append("quantile:multi-probability")
+    score = 0.55 + 0.25 * int("quantile:multi-probability" in buckets) + 0.10 * int(len(values) >= 3)
+    return min(1.0, score), buckets, {alias: [False]} if alias else {}
+
+
 def _groupby_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
     keys = [str(key) for key in op.get("keys", []) if str(key) in samples]
     buckets: list[str] = []
@@ -1658,6 +1688,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("sortedness_null_placement")
     if "pattern:simple_case_random_subject" in features or "op:random_case_probe" in features:
         roots.add("simple_case_random_subject")
+    if "pattern:group_quantile_key_probe" in features or "op:group_quantile_probe" in features:
+        roots.add("group_quantile_key_expression")
     if features & {
         "pattern:null_groupby_topk",
         "pattern:null_agg_topk",
