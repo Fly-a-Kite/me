@@ -218,6 +218,7 @@ def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
         "scalar_subquery_double_parentheses",
         "window_avg_rows_frame",
         "struct_distinct_unnest",
+        "bit_compare_unequal_length",
     ]
     for profile in profiles:
         for seed in range(50):

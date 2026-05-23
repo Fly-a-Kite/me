@@ -826,6 +826,55 @@ def test_validate_case_accepts_struct_distinct_probe():
     assert any("reserved" in error for error in validate_case_program(bad_alias))
 
 
+def test_validate_case_accepts_bit_compare_probe():
+    valid = Case(
+        "case-bit-compare-probe",
+        41,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-bit-compare-probe", 41, [{"op": "bit_compare_probe", "as": "bit_compare_mismatch"}]),
+    )
+    bad_alias = Case(
+        "case-bit-compare-probe-alias",
+        42,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-bit-compare-probe-alias", 42, [{"op": "bit_compare_probe", "as": "where"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_bit_compare_probe():
+    case = Case(
+        "case-bit-compare-reference",
+        43,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-bit-compare-reference", 43, [{"op": "bit_compare_probe", "as": "bit_compare_mismatch"}]),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "bit_compare_unequal_length",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["bit_compare_mismatch"], [[False]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["bit_compare_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "bit_compare_unequal_length"},
+        ["pandas", "duckdb"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["duckdb"]
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

@@ -125,6 +125,10 @@ def _struct_distinct_probe_sql(op: dict) -> str:
     )
 
 
+def _bit_compare_probe_sql(op: dict) -> str:
+    return f"SELECT NOT (('0'::bit < '10101010'::bit) IS TRUE) AS {_quote(op['as'])}"
+
+
 class DuckDBBackend(Backend):
     name = "duckdb"
     persistent_storage = False
@@ -306,6 +310,13 @@ class DuckDBBackend(Backend):
                 elif kind == "struct_distinct_probe":
                     ctes = []
                     relation = add_step(_struct_distinct_probe_sql(op))
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "bit_compare_probe":
+                    ctes = []
+                    relation = add_step(_bit_compare_probe_sql(op))
                     current_cols = [op["as"]]
                     visible_cols = [op["as"]]
                     hidden_order_cols = []

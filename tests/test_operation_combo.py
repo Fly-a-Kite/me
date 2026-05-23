@@ -109,6 +109,13 @@ def test_classify_operation_combo_tracks_struct_distinct_unnest_risk():
     assert "struct_distinct_unnest" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_bit_compare_unequal_length_risk():
+    combo = classify_operation_combo([{"op": "bit_compare_probe"}])
+
+    assert combo["template"] == "bit_compare_probe"
+    assert "bit_compare_unequal_length" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

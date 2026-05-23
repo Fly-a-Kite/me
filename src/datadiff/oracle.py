@@ -72,6 +72,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "window_avg_rows_frame"
     if _case_has_struct_distinct_probe(case):
         return "struct_distinct_unnest"
+    if _case_has_bit_compare_probe(case):
+        return "bit_compare_unequal_length"
     if _case_contains_special_float(case):
         return "nan_inf_semantics"
     if _case_uses_modulo(case):
@@ -158,6 +160,10 @@ def _case_has_window_avg_probe(case: Case) -> bool:
 
 def _case_has_struct_distinct_probe(case: Case) -> bool:
     return any(op.get("op") == "struct_distinct_probe" for op in case.program.operations)
+
+
+def _case_has_bit_compare_probe(case: Case) -> bool:
+    return any(op.get("op") == "bit_compare_probe" for op in case.program.operations)
 
 
 def _case_uses_modulo(case: Case) -> bool:

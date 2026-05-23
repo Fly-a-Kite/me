@@ -47,6 +47,7 @@ GeneratorProfile = Literal[
     "scalar_subquery_double_parentheses",
     "window_avg_rows_frame",
     "struct_distinct_unnest",
+    "bit_compare_unequal_length",
 ]
 
 
@@ -494,6 +495,9 @@ def _available_columns_after_operations(
         elif kind == "struct_distinct_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "bit_compare_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "groupby":
             available = unique_preserve_order(
                 [str(key) for key in op.get("keys", [])]
@@ -790,6 +794,17 @@ def repair_operations(
             strings = set()
             order_pending = False
             pending_order_columns = set()
+        elif kind == "bit_compare_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "bit_compare_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "select":
             cols = unique_preserve_order([c for c in op["columns"] if c in available])
             if not cols:
@@ -1057,6 +1072,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_window_avg_rows_frame_case(seed)
     if profile == "struct_distinct_unnest" and type_aware:
         return generate_struct_distinct_unnest_case(seed)
+    if profile == "bit_compare_unequal_length" and type_aware:
+        return generate_bit_compare_unequal_length_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
@@ -1134,6 +1151,12 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         return _as_bughunt_mixed_case(generate_window_avg_rows_frame_case(seed), seed, "window_avg_rows_frame")
     if seed % 97 == 67:
         return _as_bughunt_mixed_case(generate_struct_distinct_unnest_case(seed), seed, "struct_distinct_unnest")
+    if seed % 101 == 68:
+        return _as_bughunt_mixed_case(
+            generate_bit_compare_unequal_length_case(seed),
+            seed,
+            "bit_compare_unequal_length",
+        )
     return None
 
 
@@ -2807,6 +2830,32 @@ def generate_struct_distinct_unnest_case(seed: int) -> Case:
             "source_issue": "https://github.com/duckdb/duckdb/issues/17278",
             "expected_struct_distinct_mismatch": False,
             "expected_rows": [["0", "0"], ["0", "1"]],
+        },
+    )
+
+
+def generate_bit_compare_unequal_length_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("bit_compare_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-bit-compare-unequal-length",
+        seed,
+        [{"op": "bit_compare_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-bit-compare-unequal-length",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "bit_compare_unequal_length",
+            "source_issue": "https://github.com/duckdb/duckdb/issues/22527",
+            "expected_bit_compare_mismatch": False,
+            "expected_bit_less": True,
         },
     )
 

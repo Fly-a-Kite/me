@@ -85,6 +85,8 @@ class PolarsBackend(Backend):
                     df = pl.DataFrame({op["as"]: [mismatch]})
                 elif kind == "struct_distinct_probe":
                     df = pl.DataFrame({op["as"]: [False]})
+                elif kind == "bit_compare_probe":
+                    df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
                 elif kind == "sort":
@@ -240,6 +242,8 @@ class PolarsLazyBackend(PolarsBackend):
                     mismatch = _polars_sql_window_avg_mismatch(pl)
                     lf = pl.DataFrame({op["as"]: [mismatch]}).lazy()
                 elif kind == "struct_distinct_probe":
+                    lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "bit_compare_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))

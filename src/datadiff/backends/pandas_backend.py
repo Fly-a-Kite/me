@@ -86,6 +86,8 @@ class PandasBackend(Backend):
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "struct_distinct_probe":
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
+                elif kind == "bit_compare_probe":
+                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":

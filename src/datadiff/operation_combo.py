@@ -13,6 +13,7 @@ CANONICAL_OPERATION_ORDER = (
     "scalar_subquery_probe",
     "window_avg_probe",
     "struct_distinct_probe",
+    "bit_compare_probe",
     "groupby",
     "aggregate",
     "select",
@@ -112,6 +113,8 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("window_avg_rows_frame")
     if "struct_distinct_probe" in op_set:
         risks.append("struct_distinct_unnest")
+    if "bit_compare_probe" in op_set:
+        risks.append("bit_compare_unequal_length")
     if "groupby" in op_set:
         risks.append("groupby_aggregation")
     if "aggregate" in op_set:

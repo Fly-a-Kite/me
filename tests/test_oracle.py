@@ -323,6 +323,21 @@ def test_oracle_classifies_struct_distinct_unnest():
     assert findings[0].root_cause == "struct_distinct_unnest"
 
 
+def test_oracle_classifies_bit_compare_unequal_length():
+    case = generate_case(370025, profile="bit_compare_unequal_length")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["bit_compare_mismatch"], [[False]]),
+            "duckdb": NormalizedResult("duckdb", "ok", ["bit_compare_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "bit_compare_unequal_length"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

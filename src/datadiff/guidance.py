@@ -79,6 +79,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "struct_distinct_unnest": {"pattern:struct_distinct_unnest"},
     "struct_distinct_probe": {"op:struct_distinct_probe"},
     "struct_unnest": {"struct:unnest"},
+    "bit_compare_unequal_length": {"pattern:bit_compare_unequal_length"},
+    "bit_compare_probe": {"op:bit_compare_probe"},
+    "bit_ordering": {"bit:unequal-length", "comparison:bit-order"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -166,6 +169,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_scalar_subquery_probe = False
     has_window_avg_probe = False
     has_struct_distinct_probe = False
+    has_bit_compare_probe = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -238,6 +242,11 @@ def extract_case_features(case: Case) -> set[str]:
             features.add("struct:distinct")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_struct_distinct_probe = True
+        elif kind == "bit_compare_probe":
+            features.add("bit:unequal-length")
+            features.add("comparison:bit-order")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_bit_compare_probe = True
         elif kind == "select":
             width = len(op.get("columns", []))
             features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
@@ -371,6 +380,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:window_avg_rows_frame")
     if has_struct_distinct_probe:
         features.add("pattern:struct_distinct_unnest")
+    if has_bit_compare_probe:
+        features.add("pattern:bit_compare_unequal_length")
     return features
 
 
@@ -961,6 +972,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "bit_compare_probe":
+            score, op_buckets, samples = _bit_compare_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "select":
             cols = [str(column) for column in op.get("columns", []) if str(column) in samples]
             samples = {column: samples[column] for column in unique_preserve_order(cols)}
@@ -1393,6 +1409,12 @@ def _struct_distinct_frontier_score(op: dict[str, Any]) -> tuple[float, list[str
     return 0.90, buckets, {alias: [False]} if alias else {}
 
 
+def _bit_compare_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    buckets = ["bit:unequal-length", "comparison:bit-order"]
+    return 0.90, buckets, {alias: [False]} if alias else {}
+
+
 def _groupby_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
     keys = [str(key) for key in op.get("keys", []) if str(key) in samples]
     buckets: list[str] = []
@@ -1762,6 +1784,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("window_avg_rows_frame")
     if "pattern:struct_distinct_unnest" in features or "op:struct_distinct_probe" in features:
         roots.add("struct_distinct_unnest")
+    if "pattern:bit_compare_unequal_length" in features or "op:bit_compare_probe" in features:
+        roots.add("bit_compare_unequal_length")
     if features & {
         "pattern:null_groupby_topk",
         "pattern:null_agg_topk",

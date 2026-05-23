@@ -54,6 +54,9 @@ def _assert_program_columns_are_valid(case):
         elif op["op"] == "struct_distinct_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
+        elif op["op"] == "bit_compare_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
         elif op["op"] == "groupby":
             assert set(op["keys"]).issubset(known_cols)
             assert len(op["keys"]) == len(set(op["keys"]))
@@ -153,6 +156,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "scalar_subquery_double_parentheses",
         "window_avg_rows_frame",
         "struct_distinct_unnest",
+        "bit_compare_unequal_length",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -660,6 +664,18 @@ def test_generate_case_struct_distinct_unnest_profile_is_supported_and_valid():
     assert "pattern:struct_distinct_unnest" in features
     assert "struct:unnest" in features
     assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/17278"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_bit_compare_unequal_length_profile_is_supported_and_valid():
+    case = generate_case(133, profile="bit_compare_unequal_length")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000133-bit-compare-unequal-length"
+    assert case.program.operations == [{"op": "bit_compare_probe", "as": "bit_compare_mismatch"}]
+    assert "pattern:bit_compare_unequal_length" in features
+    assert "bit:unequal-length" in features
+    assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/22527"
     assert validate_case_program(case) == []
 
 
