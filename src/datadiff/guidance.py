@@ -50,6 +50,8 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "casts": {"expr:cast"},
 }
 
+PATTERN_TARGET_WEIGHT = 6.0
+
 
 def parse_guidance_targets(value: str | list[str] | tuple[str, ...] | None) -> list[str]:
     if value is None:
@@ -67,6 +69,12 @@ def extract_case_features(case: Case) -> set[str]:
     features: set[str] = set()
     table = case.tables[0]
     features.add("tables:multi" if len(case.tables) > 1 else "tables:single")
+    generator_profile = str(case.metadata.get("generator_profile", "")).strip()
+    if generator_profile:
+        features.add(f"generator_profile:{generator_profile}")
+    mixed_generator_profile = str(case.metadata.get("mixed_generator_profile", "")).strip()
+    if mixed_generator_profile:
+        features.add(f"mixed_generator_profile:{mixed_generator_profile}")
     row_count = len(table.rows)
     col_count = len(table.columns)
     features.add(_bucket("rows", row_count, [(0, "empty"), (3, "tiny"), (10, "small"), (20, "medium")], "large"))
@@ -316,7 +324,17 @@ class GuidanceState:
             decision.pruned_candidate_count = pruned
         targeted = [decision for decision in contributing if decision.matched_targets]
         if targeted:
-            return max(targeted, key=lambda decision: (len(decision.matched_targets), decision.score, -decision.case.seed))
+            return max(
+                targeted,
+                key=lambda decision: (
+                    decision.score_breakdown.get("target_template_matches", 0.0),
+                    decision.score_breakdown.get("specific_target_matches", 0.0),
+                    decision.score_breakdown.get("target_priority", float(len(decision.matched_targets))),
+                    len(decision.matched_targets),
+                    decision.score,
+                    -decision.case.seed,
+                ),
+            )
         return max(contributing, key=lambda decision: (decision.score, -decision.case.seed))
 
     def record_result(self, case: Case, row: dict[str, Any]) -> None:
@@ -335,10 +353,13 @@ class GuidanceState:
     def _score_case(self, case: Case, candidate_count: int) -> GuidanceDecision:
         features = extract_case_features(case)
         matched_targets = _matched_targets(features, self.targets)
+        target_priority = _target_match_priority(matched_targets)
+        target_template_matches = _target_template_match_count(features, matched_targets)
+        specific_target_matches = _specific_target_count(matched_targets)
         path_coverage_proxy = _path_coverage_proxy(features, self.feature_counts, self.online_weights)
         data_sensitivity = _data_sensitivity_score(features, self.feature_counts, self.online_weights)
         frontier_conformance, frontier_buckets = _frontier_conformance(case, self.frontier_bucket_counts)
-        target_bonus = 3.0 * len(matched_targets)
+        target_bonus = 3.0 * target_priority
         finding_yield_bonus = (
             sum(
                 _bounded_finding_signal(self.finding_feature_counts[f])
@@ -405,6 +426,9 @@ class GuidanceState:
                 "data_sensitivity": data_sensitivity,
                 "frontier_conformance": frontier_conformance,
                 "target_bonus": target_bonus,
+                "target_priority": target_priority,
+                "target_template_matches": float(target_template_matches),
+                "specific_target_matches": float(specific_target_matches),
                 "finding_yield_bonus": finding_yield_bonus,
                 "combo_priority": combo_priority,
                 "contribution_potential": contribution_potential,
@@ -439,6 +463,32 @@ def _matched_targets(features: set[str], targets: list[str]) -> list[str]:
         if features & required:
             matched.append(target)
     return matched
+
+
+def _target_match_priority(matched_targets: list[str]) -> float:
+    return sum(_target_match_weight(target) for target in matched_targets)
+
+
+def _target_template_match_count(features: set[str], matched_targets: list[str]) -> int:
+    return sum(
+        1
+        for target in matched_targets
+        if f"generator_profile:{target}" in features or f"mixed_generator_profile:{target}" in features
+    )
+
+
+def _target_match_weight(target: str) -> float:
+    if _is_specific_target(target):
+        return PATTERN_TARGET_WEIGHT
+    return 1.0
+
+
+def _specific_target_count(matched_targets: list[str]) -> int:
+    return sum(1 for target in matched_targets if _is_specific_target(target))
+
+
+def _is_specific_target(target: str) -> bool:
+    return any(feature.startswith("pattern:") for feature in TARGET_ALIASES.get(target, {target}))
 
 
 def _bucket(prefix: str, value: int, limits: list[tuple[int, str]], fallback: str) -> str:

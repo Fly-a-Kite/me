@@ -400,6 +400,76 @@ def test_guidance_keeps_target_priority_under_saturation():
     assert decision.score_breakdown["target_bonus"] == 3.0
 
 
+def test_guidance_prioritizes_specific_pattern_target_over_generic_target_count():
+    generic_case = _case(
+        1,
+        [
+            {"op": "filter", "column": "x", "cmp": ">=", "value": 0},
+            {"op": "mutate", "column": "m_0", "expr": {"kind": "add_const", "source": "x", "value": 1}},
+            {"op": "groupby", "keys": ["g"], "aggs": [{"column": "m_0", "func": "sum", "as": "sum_m_0"}]},
+            {"op": "sort", "columns": ["sum_m_0"], "ascending": True},
+            {"op": "limit", "n": 2},
+        ],
+    )
+    pattern_case = generate_case(20, profile="bughunt")
+    guidance_targets = [
+        "common_workflow",
+        "operation_combo",
+        "topk",
+        "join",
+        "join_null_key_topk",
+        "groupby",
+        "mutate",
+        "filter",
+        "nulls",
+        "aggregation",
+        "sort_limit",
+        "expressions",
+    ]
+    guidance = GuidanceState(targets=guidance_targets)
+
+    generic_decision = guidance.choose_case([generic_case])
+    pattern_decision = guidance.choose_case([pattern_case])
+    decision = guidance.choose_case([generic_case, pattern_case])
+
+    assert "join_null_key_topk" in pattern_decision.matched_targets
+    assert len(generic_decision.matched_targets) > len(pattern_decision.matched_targets)
+    assert decision.case is pattern_case
+    assert decision.score_breakdown["specific_target_matches"] == 1.0
+    assert decision.score_breakdown["target_priority"] > generic_decision.score_breakdown["target_priority"]
+
+
+def test_guidance_prioritizes_issue_template_over_organic_pattern_match():
+    template_case = generate_case(260020, profile="bughunt")
+    organic_case = generate_case(260026, profile="bughunt")
+    guidance_targets = [
+        "common_workflow",
+        "operation_combo",
+        "topk",
+        "join",
+        "join_null_key_topk",
+        "groupby",
+        "mutate",
+        "filter",
+        "nulls",
+        "aggregation",
+        "sort_limit",
+        "expressions",
+    ]
+    guidance = GuidanceState(targets=guidance_targets)
+
+    template_decision = guidance.choose_case([template_case])
+    organic_decision = guidance.choose_case([organic_case])
+    decision = guidance.choose_case([organic_case, template_case])
+
+    assert template_case.metadata["mixed_generator_profile"] == "join_null_key_topk"
+    assert "join_null_key_topk" in template_decision.matched_targets
+    assert "join_null_key_topk" in organic_decision.matched_targets
+    assert organic_decision.score_breakdown["target_template_matches"] == 0.0
+    assert template_decision.score_breakdown["target_template_matches"] == 1.0
+    assert decision.case is template_case
+
+
 def test_guidance_uses_data_sensitivity_and_path_coverage_breakdown():
     simple_case = _case(1, [{"op": "select", "columns": ["id"]}])
     sensitive_case = _case(

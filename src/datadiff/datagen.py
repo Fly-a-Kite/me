@@ -704,6 +704,10 @@ def _filter_literal_is_valid(column_type: str, comparator: Any, value: Any) -> b
 
 
 def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile = "common") -> Case:
+    if profile == "bughunt" and type_aware:
+        mixed = _bughunt_issue_inspired_case(seed)
+        if mixed is not None:
+            return mixed
     if profile == "null_groupby_topk" and type_aware:
         return generate_null_groupby_topk_case(seed)
     if profile == "null_agg_topk" and type_aware:
@@ -761,6 +765,28 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
     )
     suffix = "-bughunt" if profile == "bughunt" else "-bughunt-no-groupby" if profile == "bughunt_no_groupby" else ""
     return Case(case_id=f"case-{seed:08d}{suffix}", seed=seed, tables=[table] + extra_tables, program=program)
+
+
+def _bughunt_issue_inspired_case(seed: int) -> Case | None:
+    selector = seed % 20
+    if selector == 0:
+        return _as_bughunt_mixed_case(generate_join_null_key_topk_case(seed), seed, "join_null_key_topk")
+    if selector == 11:
+        return _as_bughunt_mixed_case(generate_empty_filter_groupby_case(seed), seed, "empty_filter_groupby")
+    return None
+
+
+def _as_bughunt_mixed_case(case: Case, seed: int, mixed_profile: str) -> Case:
+    metadata = dict(case.metadata)
+    metadata["generator_profile"] = "bughunt"
+    metadata["mixed_generator_profile"] = mixed_profile
+    return Case(
+        case_id=f"case-{seed:08d}-bughunt-{mixed_profile.replace('_', '-')}",
+        seed=seed,
+        tables=case.tables,
+        program=case.program,
+        metadata=metadata,
+    )
 
 
 def generate_null_groupby_topk_case(seed: int) -> Case:

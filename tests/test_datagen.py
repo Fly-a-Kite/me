@@ -97,6 +97,16 @@ def test_bughunt_profile_covers_per_column_sort_null_order():
     assert all(validate_case_program(case) == [] for case in cases)
 
 
+def test_bughunt_profile_mixes_issue_inspired_templates():
+    cases = [generate_case(seed, profile="bughunt") for seed in range(40)]
+    features = [extract_case_features(case) for case in cases]
+
+    assert any("pattern:join_null_key_topk" in item for item in features)
+    assert any("pattern:empty_filter_groupby" in item for item in features)
+    assert all(validate_case_program(case) == [] for case in cases)
+    assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
+
+
 def test_generate_case_bughunt_no_groupby_profile_is_supported_and_valid():
     case = generate_case(123, profile="bughunt_no_groupby")
     assert case.case_id == "case-00000123-bughunt-no-groupby"
