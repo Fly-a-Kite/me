@@ -928,6 +928,28 @@ def test_run_fuzz_records_duration_and_feedback():
     assert all("stored_in_feedback_corpus" in row for row in rows)
 
 
+def test_feedback_storage_skips_calibration_probe_cases():
+    probe_case = Case(
+        "case-probe-feedback",
+        1,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-probe-feedback",
+            1,
+            [{"op": "dataset_isin_all_match_probe", "as": "dataset_isin_all_match_mismatch"}],
+        ),
+    )
+    ordinary_case = Case(
+        "case-ordinary-feedback",
+        2,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-ordinary-feedback", 2, [{"op": "filter", "column": "x", "cmp": ">", "value": 0}]),
+    )
+
+    assert runner_module._feedback_storage_decision(probe_case) == (False, "calibration_probe_case")
+    assert runner_module._feedback_storage_decision(ordinary_case) == (True, "")
+
+
 def test_run_fuzz_can_persist_generated_cases_and_checkpoint(tmp_path):
     case_log = tmp_path / "generated.cases.jsonl"
     run_file = run_fuzz(

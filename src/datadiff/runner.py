@@ -18,7 +18,7 @@ from datadiff.feedback import FeedbackState
 from datadiff.guidance import GuidanceState
 from datadiff.metamorphic import build_metamorphic_variants, evaluate_metamorphic_variants
 from datadiff.normalizer import normalize_result
-from datadiff.oracle import evaluate_case
+from datadiff.oracle import PROBE_ROOTS, evaluate_case
 from datadiff.operation_combo import classify_operation_combo
 from datadiff.preflight import preflight_case
 from datadiff.quality_oracles import evaluate_quality_oracles
@@ -164,6 +164,8 @@ def _compact_log_row(row: dict[str, Any], log_level: str) -> dict[str, Any]:
         "is_new_behavior": row.get("is_new_behavior", False),
         "stored_in_feedback_corpus": row.get("stored_in_feedback_corpus", False),
         "feedback_corpus_persisted": row.get("feedback_corpus_persisted", False),
+        "feedback_eligible": row.get("feedback_eligible", True),
+        "feedback_skip_reason": row.get("feedback_skip_reason", ""),
     }
     if log_level == "compact":
         out["normalized"] = _normalized_summary(row.get("normalized", {}))
@@ -196,6 +198,15 @@ def behavior_signature(row: dict[str, Any]) -> str:
     }
     raw = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()
     return hashlib.sha256(raw).hexdigest()[:16]
+
+
+CALIBRATION_PROBE_OPS = frozenset(op for op in PROBE_ROOTS if op.endswith("_probe"))
+
+
+def _feedback_storage_decision(case: Case) -> tuple[bool, str]:
+    if any(str(op.get("op", "")) in CALIBRATION_PROBE_OPS for op in case.program.operations):
+        return False, "calibration_probe_case"
+    return True, ""
 
 
 def _execute_case(
@@ -544,8 +555,16 @@ def run_fuzz(
         row["is_new_behavior"] = sig not in seen
         seen.add(sig)
         if feedback is not None:
-            row["stored_in_feedback_corpus"] = feedback.record(case, sig, bool(row["findings"]))
-            row["feedback_corpus_persisted"] = feedback.last_persisted_to_disk
+            feedback_eligible, feedback_skip_reason = _feedback_storage_decision(case)
+            row["feedback_eligible"] = feedback_eligible
+            row["feedback_skip_reason"] = feedback_skip_reason
+            if feedback_eligible:
+                row["stored_in_feedback_corpus"] = feedback.record(case, sig, bool(row["findings"]))
+                row["feedback_corpus_persisted"] = feedback.last_persisted_to_disk
+            else:
+                feedback.last_persisted_to_disk = False
+                row["stored_in_feedback_corpus"] = False
+                row["feedback_corpus_persisted"] = False
             reward_signals = row_reward_signals(row)
             row["source_reward"] = feedback.record_candidate_result(
                 selected_meta["source"],
@@ -560,6 +579,8 @@ def run_fuzz(
         else:
             row["stored_in_feedback_corpus"] = False
             row["feedback_corpus_persisted"] = False
+            row["feedback_eligible"] = False
+            row["feedback_skip_reason"] = "feedback_disabled"
             row["source_reward"] = None
             row["source_scheduler"] = []
         if guidance is not None:
