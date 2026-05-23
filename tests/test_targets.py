@@ -59,6 +59,7 @@ def test_target_descriptions_capture_methodology_axes():
     assert "op:round_even_probe" in specs[0]["capabilities"]
     assert "op:series_rtruediv_probe" in specs[0]["capabilities"]
     assert "op:uint64_isin_probe" in specs[0]["capabilities"]
+    assert "op:tuple_anti_null_probe" in specs[0]["capabilities"]
 
 
 def test_list_target_suites_includes_core():
@@ -83,6 +84,7 @@ def test_list_target_suites_includes_core():
     assert "op:round_even_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:series_rtruediv_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:uint64_isin_probe" in suites["latest_all_engines"]["common_capabilities"]
+    assert "op:tuple_anti_null_probe" in suites["latest_all_engines"]["common_capabilities"]
 
 
 def test_target_capability_matrix_and_intersection():

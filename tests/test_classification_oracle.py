@@ -1030,6 +1030,55 @@ def test_classification_reference_understands_uint64_isin_probe():
     assert classification.implicated_backends == ["pandas"]
 
 
+def test_validate_case_accepts_tuple_anti_null_probe():
+    valid = Case(
+        "case-tuple-anti-null-probe",
+        53,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-tuple-anti-null-probe", 53, [{"op": "tuple_anti_null_probe", "as": "tuple_anti_null_mismatch"}]),
+    )
+    bad_alias = Case(
+        "case-tuple-anti-null-probe-alias",
+        54,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-tuple-anti-null-probe-alias", 54, [{"op": "tuple_anti_null_probe", "as": "where"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_tuple_anti_null_probe():
+    case = Case(
+        "case-tuple-anti-null-reference",
+        55,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-tuple-anti-null-reference", 55, [{"op": "tuple_anti_null_probe", "as": "tuple_anti_null_mismatch"}]),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "duckdb_tuple_anti_null_semantics",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["tuple_anti_null_mismatch"], [[False]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["tuple_anti_null_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "duckdb_tuple_anti_null_semantics"},
+        ["reference", "duckdb"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["duckdb"]
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",

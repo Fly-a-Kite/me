@@ -122,6 +122,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     round_even_float_scale = _preset_config("round_even_float_scale")
     series_rtruediv_operand_order = _preset_config("series_rtruediv_operand_order")
     pandas_uint64_isin_precision = _preset_config("pandas_uint64_isin_precision")
+    duckdb_tuple_anti_null_semantics = _preset_config("duckdb_tuple_anti_null_semantics")
 
     assert null_groupby.generator_profile == "null_groupby_topk"
     assert {"groupby", "nulls", "sort_limit"}.issubset(null_groupby.guidance_targets)
@@ -200,6 +201,10 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert pandas_uint64_isin_precision.generator_profile == "pandas_uint64_isin_precision"
     assert {"uint64_isin_probe", "unsigned_membership", "numeric"}.issubset(
         pandas_uint64_isin_precision.guidance_targets
+    )
+    assert duckdb_tuple_anti_null_semantics.generator_profile == "duckdb_tuple_anti_null_semantics"
+    assert {"tuple_anti_null_probe", "tuple_null_membership", "nulls"}.issubset(
+        duckdb_tuple_anti_null_semantics.guidance_targets
     )
 
 

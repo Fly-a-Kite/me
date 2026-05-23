@@ -133,6 +133,26 @@ def _round_even_probe_sql(op: dict) -> str:
     return f"SELECT NOT (round_even(2.675::DOUBLE, 2) = 2.67::DOUBLE) AS {_quote(op['as'])}"
 
 
+def _tuple_anti_null_probe_sql(op: dict) -> str:
+    return (
+        "WITH t_a(i, j) AS (VALUES (1, 1), (2, 2), (3, NULL), (NULL, 4)), "
+        "t_b(i, j) AS (VALUES (1, 1), (NULL, 4)), "
+        "got(bucket, row_count) AS ("
+        "SELECT 'truthy', COUNT(*) FROM t_a WHERE ((i, j) NOT IN (SELECT i, j FROM t_b)) "
+        "UNION ALL "
+        "SELECT 'falsy', COUNT(*) FROM t_a WHERE NOT (((i, j) NOT IN (SELECT i, j FROM t_b))) "
+        "UNION ALL "
+        "SELECT 'nullish', COUNT(*) FROM t_a WHERE (((i, j) NOT IN (SELECT i, j FROM t_b))) IS NULL"
+        ") "
+        "SELECT NOT ("
+        "SUM(CASE WHEN bucket = 'truthy' THEN row_count ELSE 0 END) = 1 "
+        "AND SUM(CASE WHEN bucket = 'falsy' THEN row_count ELSE 0 END) = 1 "
+        "AND SUM(CASE WHEN bucket = 'nullish' THEN row_count ELSE 0 END) = 2"
+        f") AS {_quote(op['as'])} "
+        "FROM got"
+    )
+
+
 class DuckDBBackend(Backend):
     name = "duckdb"
     persistent_storage = False
@@ -342,6 +362,13 @@ class DuckDBBackend(Backend):
                 elif kind == "uint64_isin_probe":
                     ctes = []
                     relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "tuple_anti_null_probe":
+                    ctes = []
+                    relation = add_step(_tuple_anti_null_probe_sql(op))
                     current_cols = [op["as"]]
                     visible_cols = [op["as"]]
                     hidden_order_cols = []

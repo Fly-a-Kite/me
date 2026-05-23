@@ -383,6 +383,21 @@ def test_oracle_classifies_pandas_uint64_isin_precision():
     assert findings[0].root_cause == "pandas_uint64_isin_precision"
 
 
+def test_oracle_classifies_duckdb_tuple_anti_null_semantics():
+    case = generate_case(370029, profile="duckdb_tuple_anti_null_semantics")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["tuple_anti_null_mismatch"], [[False]]),
+            "duckdb": NormalizedResult("duckdb", "ok", ["tuple_anti_null_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "duckdb_tuple_anti_null_semantics"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

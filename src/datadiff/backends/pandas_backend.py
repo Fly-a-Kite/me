@@ -99,6 +99,8 @@ class PandasBackend(Backend):
                         np.array([635554097106142079])
                     ).iloc[0]
                     df = pd.DataFrame([{op["as"]: bool(observed)}], columns=[op["as"]])
+                elif kind == "tuple_anti_null_probe":
+                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":

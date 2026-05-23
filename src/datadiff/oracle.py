@@ -80,6 +80,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "series_rtruediv_operand_order"
     if _case_has_uint64_isin_probe(case):
         return "pandas_uint64_isin_precision"
+    if _case_has_tuple_anti_null_probe(case):
+        return "duckdb_tuple_anti_null_semantics"
     if _case_contains_special_float(case):
         return "nan_inf_semantics"
     if _case_uses_modulo(case):
@@ -182,6 +184,10 @@ def _case_has_series_rtruediv_probe(case: Case) -> bool:
 
 def _case_has_uint64_isin_probe(case: Case) -> bool:
     return any(op.get("op") == "uint64_isin_probe" for op in case.program.operations)
+
+
+def _case_has_tuple_anti_null_probe(case: Case) -> bool:
+    return any(op.get("op") == "tuple_anti_null_probe" for op in case.program.operations)
 
 
 def _case_uses_modulo(case: Case) -> bool:

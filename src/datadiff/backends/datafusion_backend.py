@@ -270,6 +270,12 @@ class DataFusionBackend(Backend):
                     visible_cols = [op["as"]]
                     hidden_order_cols = []
                     pending_order = None
+                elif kind == "tuple_anti_null_probe":
+                    query = f"SELECT false AS {_quote(op['as'])}"
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
                 elif kind == "select":
                     cols = list(op["columns"])
                     projection = select_with_pending_order(cols)

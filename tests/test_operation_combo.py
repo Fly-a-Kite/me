@@ -137,6 +137,13 @@ def test_classify_operation_combo_tracks_pandas_uint64_isin_precision_risk():
     assert "pandas_uint64_isin_precision" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_duckdb_tuple_anti_null_semantics_risk():
+    combo = classify_operation_combo([{"op": "tuple_anti_null_probe"}])
+
+    assert combo["template"] == "tuple_anti_null_probe"
+    assert "duckdb_tuple_anti_null_semantics" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():
     combo = classify_operation_combo(
         [

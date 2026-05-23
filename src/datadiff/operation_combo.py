@@ -17,6 +17,7 @@ CANONICAL_OPERATION_ORDER = (
     "round_even_probe",
     "series_rtruediv_probe",
     "uint64_isin_probe",
+    "tuple_anti_null_probe",
     "groupby",
     "aggregate",
     "select",
@@ -124,6 +125,8 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("series_rtruediv_operand_order")
     if "uint64_isin_probe" in op_set:
         risks.append("pandas_uint64_isin_precision")
+    if "tuple_anti_null_probe" in op_set:
+        risks.append("duckdb_tuple_anti_null_semantics")
     if "groupby" in op_set:
         risks.append("groupby_aggregation")
     if "aggregate" in op_set:
