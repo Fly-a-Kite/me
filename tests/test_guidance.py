@@ -223,6 +223,7 @@ def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
         "series_rtruediv_operand_order",
         "pandas_uint64_isin_precision",
         "duckdb_tuple_anti_null_semantics",
+        "pandas_sparse_array_mask_semantics",
     ]
     for profile in profiles:
         for seed in range(50):

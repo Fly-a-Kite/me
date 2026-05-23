@@ -69,6 +69,9 @@ def _assert_program_columns_are_valid(case):
         elif op["op"] == "tuple_anti_null_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
+        elif op["op"] == "sparse_mask_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
         elif op["op"] == "groupby":
             assert set(op["keys"]).issubset(known_cols)
             assert len(op["keys"]) == len(set(op["keys"]))
@@ -173,6 +176,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "series_rtruediv_operand_order",
         "pandas_uint64_isin_precision",
         "duckdb_tuple_anti_null_semantics",
+        "pandas_sparse_array_mask_semantics",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -740,6 +744,18 @@ def test_generate_case_duckdb_tuple_anti_null_semantics_profile_is_supported_and
     assert "pattern:duckdb_tuple_anti_null_semantics" in features
     assert "duckdb:tuple-anti-null" in features
     assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/22418"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_pandas_sparse_array_mask_semantics_profile_is_supported_and_valid():
+    case = generate_case(138, profile="pandas_sparse_array_mask_semantics")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000138-pandas-sparse-array-mask-semantics"
+    assert case.program.operations == [{"op": "sparse_mask_probe", "as": "sparse_mask_mismatch"}]
+    assert "pattern:pandas_sparse_array_mask_semantics" in features
+    assert "pandas:sparse-mask" in features
+    assert case.metadata["source_issue"] == "https://github.com/pandas-dev/pandas/issues/45284"
     assert validate_case_program(case) == []
 
 

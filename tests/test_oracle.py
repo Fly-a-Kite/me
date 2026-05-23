@@ -398,6 +398,21 @@ def test_oracle_classifies_duckdb_tuple_anti_null_semantics():
     assert findings[0].root_cause == "duckdb_tuple_anti_null_semantics"
 
 
+def test_oracle_classifies_pandas_sparse_array_mask_semantics():
+    case = generate_case(370030, profile="pandas_sparse_array_mask_semantics")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["sparse_mask_mismatch"], [[False]]),
+            "pandas": NormalizedResult("pandas", "ok", ["sparse_mask_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "pandas_sparse_array_mask_semantics"
+
+
 def test_oracle_classifies_grouped_topk_null_sort_key():
     case = Case(
         "case-null-agg-topk",

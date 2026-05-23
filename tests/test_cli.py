@@ -257,6 +257,7 @@ def test_cli_parses_order_sensitive_bug_hunt_profiles():
         "series_rtruediv_operand_order",
         "pandas_uint64_isin_precision",
         "duckdb_tuple_anti_null_semantics",
+        "pandas_sparse_array_mask_semantics",
     ]:
         args = parser.parse_args(["fuzz", "--profile", profile])
         assert args.cmd == "fuzz"
@@ -492,6 +493,9 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("duckdb_tuple_anti_null_semantics").generator_profile == "duckdb_tuple_anti_null_semantics"
     assert _preset_config("duckdb_tuple_anti_null_semantics").guidance_targets[0] == "duckdb_tuple_anti_null_semantics"
     assert _preset_config("duckdb_tuple_anti_null_semantics_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("pandas_sparse_array_mask_semantics").generator_profile == "pandas_sparse_array_mask_semantics"
+    assert _preset_config("pandas_sparse_array_mask_semantics").guidance_targets[0] == "pandas_sparse_array_mask_semantics"
+    assert _preset_config("pandas_sparse_array_mask_semantics_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("join_null_sort").generator_profile == "join_null_sort"
     assert _preset_config("join_null_sort").guidance_targets[0] == "join_null_sort"
     assert _preset_config("join_null_sort_metamorphic").enable_metamorphic_oracle is True
@@ -577,6 +581,7 @@ def test_cli_parses_non_datafusion_live_presets():
         "series_rtruediv_operand_order",
         "pandas_uint64_isin_precision",
         "duckdb_tuple_anti_null_semantics",
+        "pandas_sparse_array_mask_semantics",
     }.issubset(arrow.guidance_targets)
     assert arrow.enable_local_source_scheduler is True
 

@@ -101,6 +101,17 @@ class PandasBackend(Backend):
                     df = pd.DataFrame([{op["as"]: bool(observed)}], columns=[op["as"]])
                 elif kind == "tuple_anti_null_probe":
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
+                elif kind == "sparse_mask_probe":
+                    import numpy as np
+
+                    sparse = pd.arrays.SparseArray([1, 2, 3, 4, np.nan, np.nan], fill_value=np.nan)
+                    mask = sparse > [3, 3, 4, 1, 0, 0]
+                    observed = sparse[mask].to_numpy().tolist()
+                    expected = [4.0]
+                    mismatch = len(observed) != len(expected) or any(
+                        left != right for left, right in zip(observed, expected)
+                    )
+                    df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":

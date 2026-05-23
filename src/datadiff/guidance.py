@@ -94,6 +94,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "duckdb_tuple_anti_null_semantics": {"pattern:duckdb_tuple_anti_null_semantics"},
     "tuple_anti_null_probe": {"op:tuple_anti_null_probe"},
     "tuple_null_membership": {"duckdb:tuple-anti-null", "nulls:ternary-membership"},
+    "pandas_sparse_array_mask_semantics": {"pattern:pandas_sparse_array_mask_semantics"},
+    "sparse_mask_probe": {"op:sparse_mask_probe"},
+    "sparse_masking": {"pandas:sparse-mask", "mask:sparse-array"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -186,6 +189,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_series_rtruediv_probe = False
     has_uint64_isin_probe = False
     has_tuple_anti_null_probe = False
+    has_sparse_mask_probe = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -283,6 +287,11 @@ def extract_case_features(case: Case) -> set[str]:
             features.add("nulls:ternary-membership")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_tuple_anti_null_probe = True
+        elif kind == "sparse_mask_probe":
+            features.add("pandas:sparse-mask")
+            features.add("mask:sparse-array")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_sparse_mask_probe = True
         elif kind == "select":
             width = len(op.get("columns", []))
             features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
@@ -426,6 +435,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:pandas_uint64_isin_precision")
     if has_tuple_anti_null_probe:
         features.add("pattern:duckdb_tuple_anti_null_semantics")
+    if has_sparse_mask_probe:
+        features.add("pattern:pandas_sparse_array_mask_semantics")
     return features
 
 
@@ -1041,6 +1052,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "sparse_mask_probe":
+            score, op_buckets, samples = _sparse_mask_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "select":
             cols = [str(column) for column in op.get("columns", []) if str(column) in samples]
             samples = {column: samples[column] for column in unique_preserve_order(cols)}
@@ -1503,6 +1519,12 @@ def _tuple_anti_null_frontier_score(op: dict[str, Any]) -> tuple[float, list[str
     return 0.90, buckets, {alias: [False]} if alias else {}
 
 
+def _sparse_mask_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    buckets = ["pandas:sparse-mask", "mask:sparse-array"]
+    return 0.90, buckets, {alias: [False]} if alias else {}
+
+
 def _groupby_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
     keys = [str(key) for key in op.get("keys", []) if str(key) in samples]
     buckets: list[str] = []
@@ -1882,6 +1904,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("pandas_uint64_isin_precision")
     if "pattern:duckdb_tuple_anti_null_semantics" in features or "op:tuple_anti_null_probe" in features:
         roots.add("duckdb_tuple_anti_null_semantics")
+    if "pattern:pandas_sparse_array_mask_semantics" in features or "op:sparse_mask_probe" in features:
+        roots.add("pandas_sparse_array_mask_semantics")
     if features & {
         "pattern:null_groupby_topk",
         "pattern:null_agg_topk",

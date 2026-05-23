@@ -1079,6 +1079,55 @@ def test_classification_reference_understands_tuple_anti_null_probe():
     assert classification.implicated_backends == ["duckdb"]
 
 
+def test_validate_case_accepts_sparse_mask_probe():
+    valid = Case(
+        "case-sparse-mask-probe",
+        56,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-sparse-mask-probe", 56, [{"op": "sparse_mask_probe", "as": "sparse_mask_mismatch"}]),
+    )
+    bad_alias = Case(
+        "case-sparse-mask-probe-alias",
+        57,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-sparse-mask-probe-alias", 57, [{"op": "sparse_mask_probe", "as": "where"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_sparse_mask_probe():
+    case = Case(
+        "case-sparse-mask-reference",
+        58,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-sparse-mask-reference", 58, [{"op": "sparse_mask_probe", "as": "sparse_mask_mismatch"}]),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "pandas_sparse_array_mask_semantics",
+        "confidence": "high",
+        "suspicious_backends": ["pandas"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["sparse_mask_mismatch"], [[False]]),
+        "pandas": NormalizedResult("pandas", "ok", ["sparse_mask_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "pandas_sparse_array_mask_semantics"},
+        ["reference", "pandas"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["pandas"]
+
+
 def test_validate_case_accepts_explicit_null_predicate_filter():
     valid = Case(
         "case-null-predicate",
