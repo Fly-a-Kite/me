@@ -1,0 +1,136 @@
+{
+  "datafusion": {
+    "backend": "datafusion",
+    "columns": [
+      "count_j",
+      "min_y",
+      "nunique_z"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        7,
+        0,
+        2
+      ],
+      [
+        11,
+        0,
+        1
+      ],
+      [
+        10,
+        0,
+        1
+      ],
+      [
+        7,
+        0,
+        1
+      ],
+      [
+        1,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        1
+      ]
+    ],
+    "status": "ok"
+  },
+  "duckdb": {
+    "backend": "duckdb",
+    "columns": [
+      "count_j",
+      "min_y",
+      "nunique_z"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        5,
+        0.5,
+        2
+      ],
+      [
+        9,
+        0.5,
+        1
+      ],
+      [
+        8,
+        0.5,
+        1
+      ],
+      [
+        5,
+        0.5,
+        1
+      ],
+      [
+        0,
+        0.5,
+        1
+      ],
+      [
+        0,
+        0.5,
+        1
+      ]
+    ],
+    "status": "ok"
+  },
+  "pandas": {
+    "backend": "pandas",
+    "columns": [
+      "count_j",
+      "min_y",
+      "nunique_z"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        5,
+        0.5,
+        2
+      ],
+      [
+        9,
+        0.5,
+        1
+      ],
+      [
+        8,
+        0.5,
+        1
+      ],
+      [
+        5,
+        0.5,
+        1
+      ],
+      [
+        0,
+        0.5,
+        1
+      ],
+      [
+        0,
+        0.5,
+        1
+      ]
+    ],
+    "status": "ok"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "artifact": "bugs/bug_72710816fcc5d0d4",
+  "backends": [
+    "pandas",
+    "duckdb",
+    "datafusion"
+  ],
+  "case_id": "case-00141204-bughunt",
+  "documentation_refs": [],
+  "false_positive_reasons": [],
+  "features": {
+    "contains_inf": false,
+    "contains_nan": false,
+    "contains_non_ascii_string": false,
+    "contains_null": false,
+    "operation_sequence": [
+      "join",
+      "mutate",
+      "filter"
+    ],
+    "uses_filter": true,
+    "uses_groupby": false,
+    "uses_limit": false,
+    "uses_modulo": false,
+    "uses_mutate": true,
+    "uses_offset": false,
+    "uses_sort": false,
+    "uses_string_lower": false
+  },
+  "generator_profile": "bughunt",
+  "operations": 3,
+  "original_kinds": [
+    "semantic_output_mismatch"
+  ],
+  "paper_status": "candidate_bug_needs_external_confirmation",
+  "recommendation": [
+    "Minimize the artifact and create a backend-specific reproduction script.",
+    "Check documentation and release notes, then submit an upstream issue.",
+    "Count as confirmed only after maintainer acknowledgement, fix, or clear spec violation."
+  ],
+  "reduced": true,
+  "reproduced_kinds": [
+    "semantic_output_mismatch"
+  ],
+  "reproduced_roots": [
+    "outer_join_truth_filter"
+  ],
+  "rows": 1,
+  "seed": 141204,
+  "suspicious_backends": [
+    "datafusion"
+  ],
+  "triage_confidence": "high",
+  "verdict": "candidate_implementation_bug"
+}

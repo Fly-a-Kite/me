@@ -212,6 +212,142 @@ def test_datafusion_grouped_topk_null_sort_key_is_candidate_bug():
 
 
 @pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in DATAFUSION_BACKENDS),
+    reason="datafusion comparison backends are not installed",
+)
+def test_datafusion_groupby_limit_offset_is_candidate_bug():
+    case = Case(
+        "case-datafusion-groupby-limit-offset",
+        22234,
+        [
+            TableData("t0", [ColumnSpec("id", "int", nullable=False)], [{"id": 0}, {"id": 1}]),
+            TableData(
+                "t1",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("j", "int", nullable=True),
+                ],
+                [{"id": 1, "j": 1}],
+            ),
+        ],
+        Program(
+            "prog-datafusion-groupby-limit-offset",
+            22234,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+                {
+                    "op": "groupby",
+                    "keys": ["id"],
+                    "aggs": [
+                        {"column": "j", "func": "nunique", "as": "nunique_j"},
+                        {"column": "id", "func": "count", "as": "count_id"},
+                    ],
+                },
+                {
+                    "op": "sort",
+                    "keys": [
+                        {"column": "id", "ascending": False, "nulls": "last"},
+                        {"column": "count_id", "ascending": False, "nulls": "last"},
+                        {"column": "nunique_j", "ascending": False, "nulls": "last"},
+                    ],
+                },
+                {"op": "limit", "n": 8},
+                {
+                    "op": "sort",
+                    "keys": [
+                        {"column": "id", "ascending": False, "nulls": "last"},
+                        {"column": "count_id", "ascending": False, "nulls": "last"},
+                        {"column": "nunique_j", "ascending": True, "nulls": "last"},
+                    ],
+                },
+                {"op": "offset", "n": 1},
+            ],
+        ),
+    )
+
+    result = run_loaded_case(
+        case,
+        DATAFUSION_BACKENDS,
+        config=ExperimentConfig(),
+        save_artifact=False,
+    )
+
+    assert result["status"] == "bug"
+    assert result["normalized"]["pandas"]["rows"] == [[1, 0, 0]]
+    assert result["normalized"]["duckdb"]["rows"] == [[1, 0, 0]]
+    assert result["normalized"]["datafusion"]["rows"] == []
+    assert result["findings"][0]["root_cause"] == "groupby_aggregation"
+    assert result["findings"][0]["suspicious_backends"] == ["datafusion"]
+
+    report = build_triage_report(
+        case,
+        original_findings=[{"kind": "semantic_output_mismatch"}],
+        reproduced_findings=result["findings"],
+        config=ExperimentConfig().to_dict(),
+        backends=DATAFUSION_BACKENDS,
+    )
+    assert report["verdict"] == "candidate_implementation_bug"
+
+
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in DATAFUSION_BACKENDS),
+    reason="datafusion comparison backends are not installed",
+)
+def test_datafusion_negative_zero_truth_filter_is_candidate_bug():
+    case = Case(
+        "case-datafusion-negative-zero-truth-filter",
+        141204,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("y", "float", nullable=True),
+                ],
+                [{"id": 1, "y": 0.0}],
+            ),
+            TableData("t1", [ColumnSpec("id", "int", nullable=False)], [{"id": 18}]),
+        ],
+        Program(
+            "prog-datafusion-negative-zero-truth-filter",
+            141204,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+                {
+                    "op": "mutate",
+                    "column": "m_0",
+                    "expr": {"kind": "arith_const", "op": "mul", "source": "y", "value": -1},
+                },
+                {"op": "filter", "column": "m_0", "cmp": "ge_is_not_true", "value": 0.0},
+            ],
+        ),
+    )
+
+    result = run_loaded_case(
+        case,
+        DATAFUSION_BACKENDS,
+        config=ExperimentConfig(),
+        save_artifact=False,
+    )
+
+    assert result["status"] == "bug"
+    assert result["normalized"]["pandas"]["rows"] == []
+    assert result["normalized"]["duckdb"]["rows"] == []
+    assert result["normalized"]["datafusion"]["rows"] == [[1, 0, 0]]
+    assert result["findings"][0]["root_cause"] == "outer_join_truth_filter"
+    assert result["findings"][0]["suspicious_backends"] == ["datafusion"]
+
+    report = build_triage_report(
+        case,
+        original_findings=[{"kind": "semantic_output_mismatch"}],
+        reproduced_findings=result["findings"],
+        config=ExperimentConfig().to_dict(),
+        backends=DATAFUSION_BACKENDS,
+    )
+    assert report["verdict"] == "candidate_implementation_bug"
+
+
+@pytest.mark.skipif(
     any(importlib.util.find_spec(name) is None for name in PYARROW_BACKENDS),
     reason="pyarrow comparison backends are not installed",
 )

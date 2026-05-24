@@ -1,0 +1,124 @@
+{
+  "case_id": "case-00022234-bughunt",
+  "program": {
+    "operations": [
+      {
+        "how": "left",
+        "left_on": "id",
+        "op": "join",
+        "right_on": "id",
+        "table": "t1"
+      },
+      {
+        "aggs": [
+          {
+            "as": "nunique_j",
+            "column": "j",
+            "func": "nunique"
+          },
+          {
+            "as": "count_id",
+            "column": "id",
+            "func": "count"
+          }
+        ],
+        "keys": [
+          "id"
+        ],
+        "op": "groupby"
+      },
+      {
+        "keys": [
+          {
+            "ascending": false,
+            "column": "id",
+            "nulls": "last"
+          },
+          {
+            "ascending": false,
+            "column": "count_id",
+            "nulls": "last"
+          },
+          {
+            "ascending": false,
+            "column": "nunique_j",
+            "nulls": "last"
+          }
+        ],
+        "op": "sort"
+      },
+      {
+        "n": 8,
+        "op": "limit"
+      },
+      {
+        "keys": [
+          {
+            "ascending": false,
+            "column": "id",
+            "nulls": "last"
+          },
+          {
+            "ascending": false,
+            "column": "count_id",
+            "nulls": "last"
+          },
+          {
+            "ascending": true,
+            "column": "nunique_j",
+            "nulls": "last"
+          }
+        ],
+        "op": "sort"
+      },
+      {
+        "n": 1,
+        "op": "offset"
+      }
+    ],
+    "program_id": "prog-00022234",
+    "seed": 22234
+  },
+  "seed": 22234,
+  "tables": [
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "type": "int"
+        }
+      ],
+      "name": "t0",
+      "rows": [
+        {
+          "id": 0
+        },
+        {
+          "id": 1
+        }
+      ]
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "type": "int"
+        },
+        {
+          "name": "j",
+          "nullable": true,
+          "type": "int"
+        }
+      ],
+      "name": "t1",
+      "rows": [
+        {
+          "id": 1,
+          "j": 1
+        }
+      ]
+    }
+  ]
+}

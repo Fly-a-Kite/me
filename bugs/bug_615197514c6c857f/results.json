@@ -1,0 +1,23 @@
+{
+  "datafusion": {
+    "backend": "datafusion",
+    "duration_ms": 9.966897006961517,
+    "error": "",
+    "error_type": "",
+    "status": "ok"
+  },
+  "duckdb": {
+    "backend": "duckdb",
+    "duration_ms": 28.433211002266034,
+    "error": "",
+    "error_type": "",
+    "status": "ok"
+  },
+  "pandas": {
+    "backend": "pandas",
+    "duration_ms": 6.446186001994647,
+    "error": "",
+    "error_type": "",
+    "status": "ok"
+  }
+}

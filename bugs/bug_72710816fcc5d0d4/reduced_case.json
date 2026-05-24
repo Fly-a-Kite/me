@@ -1,0 +1,71 @@
+{
+  "case_id": "case-00141204-bughunt",
+  "program": {
+    "operations": [
+      {
+        "how": "left",
+        "left_on": "id",
+        "op": "join",
+        "right_on": "id",
+        "table": "t1"
+      },
+      {
+        "column": "m_0",
+        "expr": {
+          "kind": "arith_const",
+          "op": "mul",
+          "source": "y",
+          "value": -1
+        },
+        "op": "mutate"
+      },
+      {
+        "cmp": "ge_is_not_true",
+        "column": "m_0",
+        "op": "filter",
+        "value": 0.0
+      }
+    ],
+    "program_id": "prog-00141204",
+    "seed": 141204
+  },
+  "seed": 141204,
+  "tables": [
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "type": "int"
+        },
+        {
+          "name": "y",
+          "nullable": true,
+          "type": "float"
+        }
+      ],
+      "name": "t0",
+      "rows": [
+        {
+          "id": 1,
+          "y": 0.0
+        }
+      ]
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "type": "int"
+        }
+      ],
+      "name": "t1",
+      "rows": [
+        {
+          "id": 18
+        }
+      ]
+    }
+  ]
+}

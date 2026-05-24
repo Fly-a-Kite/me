@@ -1,0 +1,337 @@
+{
+  "case_id": "case-00022234-bughunt",
+  "program": {
+    "operations": [
+      {
+        "how": "left",
+        "left_on": "id",
+        "op": "join",
+        "right_on": "id",
+        "table": "t1"
+      },
+      {
+        "column": "m_0",
+        "expr": {
+          "kind": "string_length",
+          "source": "tag"
+        },
+        "op": "mutate"
+      },
+      {
+        "cmp": "<=",
+        "column": "z",
+        "op": "filter",
+        "value": 1.0
+      },
+      {
+        "aggs": [
+          {
+            "as": "nunique_j",
+            "column": "j",
+            "func": "nunique"
+          },
+          {
+            "as": "count_id",
+            "column": "id",
+            "func": "count"
+          }
+        ],
+        "keys": [
+          "id"
+        ],
+        "op": "groupby"
+      },
+      {
+        "keys": [
+          {
+            "ascending": false,
+            "column": "id",
+            "nulls": "last"
+          },
+          {
+            "ascending": false,
+            "column": "count_id",
+            "nulls": "last"
+          },
+          {
+            "ascending": false,
+            "column": "nunique_j",
+            "nulls": "last"
+          }
+        ],
+        "op": "sort"
+      },
+      {
+        "n": 8,
+        "op": "limit"
+      },
+      {
+        "keys": [
+          {
+            "ascending": false,
+            "column": "id",
+            "nulls": "last"
+          },
+          {
+            "ascending": false,
+            "column": "count_id",
+            "nulls": "last"
+          },
+          {
+            "ascending": true,
+            "column": "nunique_j",
+            "nulls": "last"
+          }
+        ],
+        "op": "sort"
+      },
+      {
+        "columns": [
+          "count_id"
+        ],
+        "op": "select"
+      },
+      {
+        "n": 1,
+        "op": "offset"
+      }
+    ],
+    "program_id": "prog-00022234",
+    "seed": 22234
+  },
+  "seed": 22234,
+  "tables": [
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "type": "int"
+        },
+        {
+          "name": "g",
+          "nullable": true,
+          "type": "str"
+        },
+        {
+          "name": "x",
+          "nullable": true,
+          "type": "int"
+        },
+        {
+          "name": "y",
+          "nullable": true,
+          "type": "float"
+        },
+        {
+          "name": "flag",
+          "nullable": true,
+          "type": "bool"
+        },
+        {
+          "name": "s",
+          "nullable": true,
+          "type": "str"
+        }
+      ],
+      "name": "t0",
+      "rows": [
+        {
+          "flag": true,
+          "g": null,
+          "id": 0,
+          "s": "lYMVfew",
+          "x": null,
+          "y": 0.0
+        },
+        {
+          "flag": false,
+          "g": "δelta",
+          "id": 1,
+          "s": "a",
+          "x": -2,
+          "y": 0.0
+        },
+        {
+          "flag": false,
+          "g": null,
+          "id": 1,
+          "s": "khbRb",
+          "x": 1,
+          "y": 1.0
+        },
+        {
+          "flag": true,
+          "g": "space value",
+          "id": 1,
+          "s": null,
+          "x": -2,
+          "y": null
+        },
+        {
+          "flag": false,
+          "g": "中文",
+          "id": 0,
+          "s": "gamma",
+          "x": 10,
+          "y": -1.0
+        },
+        {
+          "flag": true,
+          "g": null,
+          "id": 0,
+          "s": "Coju",
+          "x": null,
+          "y": 28.796
+        },
+        {
+          "flag": false,
+          "g": "Rcsi",
+          "id": 1,
+          "s": "",
+          "x": 2,
+          "y": 30.948
+        },
+        {
+          "flag": false,
+          "g": "IghGGkmQ",
+          "id": 1,
+          "s": "yTWJcN",
+          "x": null,
+          "y": -0.5
+        },
+        {
+          "flag": null,
+          "g": "VNKewz",
+          "id": 1,
+          "s": "kaO",
+          "x": -1,
+          "y": null
+        }
+      ]
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "type": "int"
+        },
+        {
+          "name": "j",
+          "nullable": true,
+          "type": "int"
+        },
+        {
+          "name": "z",
+          "nullable": true,
+          "type": "float"
+        },
+        {
+          "name": "tag",
+          "nullable": true,
+          "type": "str"
+        }
+      ],
+      "name": "t1",
+      "rows": [
+        {
+          "id": 0,
+          "j": 10,
+          "tag": "a",
+          "z": 0.5
+        },
+        {
+          "id": 2,
+          "j": 1,
+          "tag": "beta",
+          "z": 1.0
+        },
+        {
+          "id": 2,
+          "j": null,
+          "tag": "lqu",
+          "z": -0.5
+        },
+        {
+          "id": 0,
+          "j": -1,
+          "tag": "space value",
+          "z": -1.0
+        },
+        {
+          "id": 0,
+          "j": 1,
+          "tag": "I",
+          "z": 1.0
+        },
+        {
+          "id": 0,
+          "j": -2,
+          "tag": "",
+          "z": -0.5
+        },
+        {
+          "id": 6,
+          "j": -10,
+          "tag": "Iyf",
+          "z": 0.5
+        },
+        {
+          "id": 2,
+          "j": -66,
+          "tag": "A",
+          "z": null
+        },
+        {
+          "id": 2,
+          "j": 0,
+          "tag": "gamma",
+          "z": null
+        },
+        {
+          "id": 0,
+          "j": 1,
+          "tag": null,
+          "z": 1.0
+        },
+        {
+          "id": 0,
+          "j": null,
+          "tag": "δelta",
+          "z": 0.5
+        },
+        {
+          "id": 11,
+          "j": null,
+          "tag": "space value",
+          "z": -26.113
+        },
+        {
+          "id": 0,
+          "j": 1,
+          "tag": "a",
+          "z": -0.5
+        },
+        {
+          "id": 3,
+          "j": -96,
+          "tag": "",
+          "z": -33.712
+        },
+        {
+          "id": 2,
+          "j": -11,
+          "tag": "gamma",
+          "z": -1.0
+        },
+        {
+          "id": 1,
+          "j": 1,
+          "tag": "tag_1",
+          "z": 1.0
+        }
+      ]
+    }
+  ]
+}

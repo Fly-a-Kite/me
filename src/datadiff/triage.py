@@ -118,9 +118,16 @@ def write_triage_artifact(bug_dir: Path, report: dict[str, Any]) -> tuple[Path, 
 
 def write_standalone_reproducer(bug_dir: Path, report: dict[str, Any] | None = None) -> Path:
     roots = set((report or {}).get("reproduced_roots", []))
+    suspicious = set((report or {}).get("suspicious_backends", []))
     if "grouped_topk_null_sort_key" in roots:
         path = bug_dir / "standalone_datafusion_groupby_null_sortkey_limit.py"
         content = _standalone_datafusion_groupby_null_sortkey_reproducer()
+    elif "groupby_aggregation" in roots and "datafusion" in suspicious:
+        path = bug_dir / "standalone_datafusion_groupby_limit_offset.py"
+        content = _standalone_datafusion_groupby_limit_offset_reproducer()
+    elif "outer_join_truth_filter" in roots and "datafusion" in suspicious:
+        path = bug_dir / "standalone_datafusion_negative_zero_truth_filter.py"
+        content = _standalone_datafusion_negative_zero_truth_filter_reproducer()
     elif "reverse_division_operand_order" in roots:
         path = bug_dir / "standalone_polars_reverse_division_columns.py"
         content = _standalone_polars_reverse_division_columns_reproducer()
@@ -138,8 +145,10 @@ def write_standalone_reproducer(bug_dir: Path, report: dict[str, Any] | None = N
 def supports_standalone_reproducer(report: dict[str, Any]) -> bool:
     features = report.get("features", {})
     roots = set(report.get("reproduced_roots", []))
+    suspicious = set(report.get("suspicious_backends", []))
     return (
         bool(roots & {"grouped_topk_null_sort_key"})
+        or bool(roots & {"groupby_aggregation", "outer_join_truth_filter"} and suspicious & {"datafusion"})
         or bool(roots & {"reverse_division_operand_order", "tuple_absence_null_filter"})
         or report.get("generator_profile") == "edge_float"
         or bool(features.get("contains_nan"))
@@ -404,6 +413,126 @@ def main() -> None:
 
     assert len(control) == 1, "control query should return the grouped NULL aggregate"
     assert failing_rows == 1, "DataFusion dropped the group whose aggregate sort key is NULL"
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+def _standalone_datafusion_groupby_limit_offset_reproducer() -> str:
+    return '''#!/usr/bin/env python3
+"""Standalone reproduction for DataFusion groupby ORDER/LIMIT/OFFSET row loss.
+
+This script does not import DataDiffFuzz. It builds a two-row grouped result,
+applies an inner ordered LIMIT followed by an outer ORDER BY/OFFSET, and
+compares the expected second row with DataFusion's observed empty result.
+"""
+
+from __future__ import annotations
+
+import datafusion
+import pyarrow as pa
+from datafusion import SessionContext
+
+
+def _register(ctx: SessionContext, name: str, rows: list[dict], schema: pa.Schema) -> None:
+    batch = pa.RecordBatch.from_pylist(rows, schema=schema)
+    ctx.register_record_batches(name, [[batch]])
+
+
+def main() -> None:
+    ctx = SessionContext()
+    _register(ctx, "t0", [{"id": 0}, {"id": 1}], pa.schema([pa.field("id", pa.int64())]))
+    _register(
+        ctx,
+        "t1",
+        [{"id": 1, "j": 1}],
+        pa.schema([pa.field("id", pa.int64()), pa.field("j", pa.int64(), nullable=True)]),
+    )
+
+    base = (
+        "SELECT t0.id, COUNT(t0.id) AS count_id, COUNT(DISTINCT j) AS nunique_j "
+        "FROM t0 LEFT JOIN t1 ON t0.id = t1.id GROUP BY t0.id"
+    )
+    control_query = (
+        f"SELECT * FROM ({base}) q "
+        "ORDER BY id DESC NULLS LAST, count_id DESC NULLS LAST, nunique_j ASC NULLS LAST OFFSET 1"
+    )
+    failing_query = (
+        f"SELECT * FROM (SELECT * FROM ({base}) q "
+        "ORDER BY id DESC NULLS LAST, count_id DESC NULLS LAST, nunique_j DESC NULLS LAST LIMIT 8) q2 "
+        "ORDER BY id DESC NULLS LAST, count_id DESC NULLS LAST, nunique_j ASC NULLS LAST OFFSET 1"
+    )
+
+    print(f"datafusion={getattr(datafusion, '__version__', 'unknown')}")
+    print(f"pyarrow={pa.__version__}")
+    control = ctx.sql(control_query).to_pandas()
+    failing = ctx.sql(failing_query).to_pandas()
+    print("control:")
+    print(control)
+    print("with inner limit:")
+    print(failing)
+
+    assert len(control) == 1 and control.iloc[0]["id"] == 0
+    assert len(failing) == 1 and failing.iloc[0]["id"] == 0, (
+        "DataFusion dropped the second grouped row after inner ORDER BY/LIMIT "
+        "and outer ORDER BY/OFFSET."
+    )
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+def _standalone_datafusion_negative_zero_truth_filter_reproducer() -> str:
+    return '''#!/usr/bin/env python3
+"""Standalone reproduction for DataFusion negative-zero truth filtering.
+
+This script does not import DataDiffFuzz. It shows that DataFusion evaluates
+(-0.0 >= 0.0) as false, so an IS NOT TRUE filter keeps a row that should be
+removed under the common numeric semantics used by Python and DuckDB.
+"""
+
+from __future__ import annotations
+
+import datafusion
+import duckdb
+import pyarrow as pa
+from datafusion import SessionContext
+
+
+def main() -> None:
+    expected_cmp = (-0.0 >= 0.0)
+    duck_cmp = duckdb.connect(database=":memory:").execute("SELECT (-0.0 >= 0.0)").fetchone()[0]
+
+    ctx = SessionContext()
+    batch = pa.RecordBatch.from_pylist(
+        [{"id": 1, "y": 0.0}],
+        schema=pa.schema([pa.field("id", pa.int64()), pa.field("y", pa.float64(), nullable=True)]),
+    )
+    ctx.register_record_batches("t0", [[batch]])
+
+    diagnostic = ctx.sql("SELECT id, y * -1 AS m_0, (y * -1) >= 0.0 AS cmp FROM t0").to_pandas()
+    filtered = ctx.sql(
+        "SELECT id, y * -1 AS m_0 FROM t0 "
+        "WHERE NOT (((y * -1) >= 0.0) IS TRUE)"
+    ).to_pandas()
+
+    print(f"datafusion={getattr(datafusion, '__version__', 'unknown')}")
+    print(f"pyarrow={pa.__version__}")
+    print(f"duckdb={duckdb.__version__}")
+    print(f"python comparison: {expected_cmp!r}")
+    print(f"duckdb comparison: {duck_cmp!r}")
+    print("datafusion diagnostic:")
+    print(diagnostic)
+    print("datafusion filtered rows:")
+    print(filtered)
+
+    assert expected_cmp is True and duck_cmp is True
+    assert bool(diagnostic.iloc[0]["cmp"]) is True, "DataFusion evaluated -0.0 >= 0.0 as false"
+    assert len(filtered) == 0, "DataFusion kept a row that should not pass IS NOT TRUE"
 
 
 if __name__ == "__main__":

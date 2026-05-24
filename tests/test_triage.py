@@ -93,6 +93,22 @@ def test_standalone_reproducer_supports_known_root_causes():
     ) is True
     assert supports_standalone_reproducer(
         {
+            "generator_profile": "bughunt",
+            "features": {"contains_nan": False, "contains_inf": False},
+            "reproduced_roots": ["groupby_aggregation"],
+            "suspicious_backends": ["datafusion"],
+        }
+    ) is True
+    assert supports_standalone_reproducer(
+        {
+            "generator_profile": "bughunt",
+            "features": {"contains_nan": False, "contains_inf": False},
+            "reproduced_roots": ["outer_join_truth_filter"],
+            "suspicious_backends": ["datafusion"],
+        }
+    ) is True
+    assert supports_standalone_reproducer(
+        {
             "generator_profile": "common",
             "features": {"contains_nan": False, "contains_inf": False},
             "reproduced_roots": ["reverse_division_operand_order"],
@@ -133,6 +149,36 @@ def test_write_datafusion_standalone_reproducer_for_grouped_topk(tmp_path):
     text = path.read_text(encoding="utf-8")
     assert "ORDER BY min_x ASC NULLS LAST LIMIT 20" in text
     assert "DataFusion dropped the group" in text
+
+
+def test_write_datafusion_standalone_reproducer_for_groupby_limit_offset(tmp_path):
+    path = write_standalone_reproducer(
+        tmp_path,
+        {
+            "reproduced_roots": ["groupby_aggregation"],
+            "suspicious_backends": ["datafusion"],
+        },
+    )
+
+    assert path.name == "standalone_datafusion_groupby_limit_offset.py"
+    text = path.read_text(encoding="utf-8")
+    assert "COUNT(DISTINCT j)" in text
+    assert "outer ORDER BY/OFFSET" in text
+
+
+def test_write_datafusion_standalone_reproducer_for_negative_zero_truth_filter(tmp_path):
+    path = write_standalone_reproducer(
+        tmp_path,
+        {
+            "reproduced_roots": ["outer_join_truth_filter"],
+            "suspicious_backends": ["datafusion"],
+        },
+    )
+
+    assert path.name == "standalone_datafusion_negative_zero_truth_filter.py"
+    text = path.read_text(encoding="utf-8")
+    assert "-0.0 >= 0.0" in text
+    assert "IS NOT TRUE" in text
 
 
 def test_write_polars_standalone_reproducer_for_reverse_division(tmp_path):

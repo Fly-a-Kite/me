@@ -1,0 +1,40 @@
+{
+  "datafusion": {
+    "backend": "datafusion",
+    "columns": [
+      "count_id"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [],
+    "status": "ok"
+  },
+  "duckdb": {
+    "backend": "duckdb",
+    "columns": [
+      "count_id"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        21
+      ]
+    ],
+    "status": "ok"
+  },
+  "pandas": {
+    "backend": "pandas",
+    "columns": [
+      "count_id"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        21
+      ]
+    ],
+    "status": "ok"
+  }
+}

@@ -1,0 +1,29 @@
+[
+  {
+    "confidence": "high",
+    "discovery_origin": "organic",
+    "documentation_refs": [],
+    "evidence": "Backends returned different canonical tables; mismatch_class=row_count; shapes={'pandas': (1, 1), 'duckdb': (1, 1), 'datafusion': (0, 1)}",
+    "false_positive": false,
+    "false_positive_reason": "",
+    "finding_id": "finding-615197514c6c857f",
+    "kind": "semantic_output_mismatch",
+    "mismatch_class": "row_count",
+    "oracle": "differential",
+    "paper_status": "candidate_bug_needs_external_confirmation",
+    "recommendation": [
+      "Minimize the case and include the DSL reference output in the artifact.",
+      "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+    ],
+    "root_cause": "groupby_aggregation",
+    "severity": "critical",
+    "signature": "615197514c6c857f",
+    "source_issue": "",
+    "suspicious_backends": [
+      "datafusion"
+    ],
+    "triage_confidence": "high",
+    "triage_evidence": "Independent DSL reference agrees with ['duckdb', 'pandas'] and disagrees with ['datafusion'].",
+    "triage_verdict": "candidate_implementation_bug"
+  }
+]
