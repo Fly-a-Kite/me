@@ -17,6 +17,12 @@ from datadiff.config import (
 )
 from datadiff.dsl import Case
 from datadiff.experiment_analysis import analyze_experiment
+from datadiff.final_readiness import (
+    DEFAULT_A_LEVEL_READINESS_POLICY,
+    ReadinessPolicy,
+    ReadinessThresholds,
+    analyze_final_readiness,
+)
 from datadiff.fixture_replay import build_fixture_replay_case, load_fixture_replay_spec
 from datadiff.historical import list_historical_bugs
 from datadiff.normalizer import NormalizedResult
@@ -866,6 +872,37 @@ def cmd_analyze_ablation_audit(args: argparse.Namespace) -> int:
     )
     print(f"ablation audit markdown: {md_path}")
     print(f"ablation audit csv:      {csv_path}")
+    return 0
+
+
+def cmd_final_readiness(args: argparse.Namespace) -> int:
+    manifests = [Path(path) for path in getattr(args, "manifest", [])]
+    required_live_suites = (
+        tuple(_parse_presets(args.required_live_suites))
+        if args.required_live_suites
+        else DEFAULT_A_LEVEL_READINESS_POLICY.required_live_suites
+    )
+    required_live_families = (
+        tuple(_parse_presets(args.required_live_families))
+        if args.required_live_families
+        else DEFAULT_A_LEVEL_READINESS_POLICY.required_live_families
+    )
+    policy = ReadinessPolicy(
+        required_live_suites=required_live_suites,
+        required_live_families=required_live_families,
+        confirmed_live_paper_statuses=DEFAULT_A_LEVEL_READINESS_POLICY.confirmed_live_paper_statuses,
+    )
+    thresholds = ReadinessThresholds(
+        min_live_cases_per_suite=max(0, int(args.min_live_cases_per_suite)),
+        min_live_duration_hours=max(0.0, float(args.min_live_duration_hours)),
+        min_live_candidate_families=max(0, int(args.min_live_candidate_families)),
+        min_confirmed_live_families=max(0, int(args.min_confirmed_live_families)),
+        min_historical_confirmed=max(0, int(args.min_historical_confirmed)),
+        require_seeded=not bool(args.no_require_seeded),
+    )
+    md_path, json_path = analyze_final_readiness(manifests or None, thresholds=thresholds, policy=policy)
+    print(f"final readiness markdown: {md_path}")
+    print(f"final readiness json:     {json_path}")
     return 0
 
 
@@ -3724,6 +3761,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="recompute experiment summary findings with the current oracle before auditing",
     )
     p_ablation_audit.set_defaults(func=cmd_analyze_ablation_audit)
+
+    p_final_ready = sub.add_parser(
+        "final-readiness",
+        help="audit final experiment breadth, depth, replay policy, and bug evidence readiness",
+    )
+    p_final_ready.add_argument(
+        "--manifest",
+        action="append",
+        default=[],
+        help="experiment manifest to include; may be repeated; defaults to all runs/experiment-*.json",
+    )
+    p_final_ready.add_argument("--min-live-cases-per-suite", type=int, default=1)
+    p_final_ready.add_argument("--min-live-duration-hours", type=float, default=24.0)
+    p_final_ready.add_argument("--min-live-candidate-families", type=int, default=1)
+    p_final_ready.add_argument("--min-confirmed-live-families", type=int, default=1)
+    p_final_ready.add_argument("--min-historical-confirmed", type=int, default=2)
+    p_final_ready.add_argument(
+        "--required-live-suites",
+        default=",".join(DEFAULT_A_LEVEL_READINESS_POLICY.required_live_suites),
+        help="comma-separated live target suites required by the top-level experiment policy",
+    )
+    p_final_ready.add_argument(
+        "--required-live-families",
+        default=",".join(DEFAULT_A_LEVEL_READINESS_POLICY.required_live_families),
+        help="comma-separated backend families required by the top-level experiment policy",
+    )
+    p_final_ready.add_argument("--no-require-seeded", action="store_true")
+    p_final_ready.set_defaults(func=cmd_final_readiness)
 
     p_pattern_variants = sub.add_parser(
         "analyze-pattern-variants",

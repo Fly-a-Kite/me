@@ -295,6 +295,9 @@ candidate bug cases/s。它们是方法学敏感度实验，不能作为真实�
 - `reports/experiment-analysis-*.md`: baseline 对比分析，包含提升倍数、candidate bug cases/s、
   median first candidate 等论文表格指标
 - `reports/experiment-analysis-*.csv`: 上述分析的机器可读 CSV
+- `reports/final-readiness-*.md` / `.json`: A 会最终实验 readiness 审计，检查 live 广度、
+  24h 深度、fresh/replay 隔离、latest confirmed bug、historical replay 和 seeded sensitivity 证据
+  （这些是上层实验 policy；审计逻辑只读取 manifest/run log，不改变底层执行语义）
 
 清理历史 feedback corpus 时先 dry-run：
 

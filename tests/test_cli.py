@@ -896,6 +896,44 @@ def test_cli_parses_analyze_seeded_sensitivity_command():
     assert args.manifest == "runs/experiment-seeded.json"
 
 
+def test_cli_parses_final_readiness_command():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "final-readiness",
+            "--manifest",
+            "runs/experiment-a.json",
+            "--manifest",
+            "runs/experiment-b.json",
+            "--min-live-cases-per-suite",
+            "100",
+            "--min-live-duration-hours",
+            "1",
+            "--min-live-candidate-families",
+            "2",
+            "--min-confirmed-live-families",
+            "1",
+            "--min-historical-confirmed",
+            "2",
+            "--required-live-suites",
+            "datafusion_cross,arrow_cross",
+            "--required-live-families",
+            "dataframe,query_engine",
+            "--no-require-seeded",
+        ]
+    )
+    assert args.cmd == "final-readiness"
+    assert args.manifest == ["runs/experiment-a.json", "runs/experiment-b.json"]
+    assert args.min_live_cases_per_suite == 100
+    assert args.min_live_duration_hours == 1.0
+    assert args.min_live_candidate_families == 2
+    assert args.min_confirmed_live_families == 1
+    assert args.min_historical_confirmed == 2
+    assert args.required_live_suites == "datafusion_cross,arrow_cross"
+    assert args.required_live_families == "dataframe,query_engine"
+    assert args.no_require_seeded is True
+
+
 def test_cli_parses_analyze_ablation_audit_command():
     parser = build_parser()
     args = parser.parse_args(

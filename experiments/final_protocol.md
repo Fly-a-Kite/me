@@ -129,6 +129,28 @@ For seeded runs:
 .venv/bin/datadiff analyze-seeded-sensitivity --manifest runs/experiment-*.json
 ```
 
+Before claiming that the final experiment satisfies the paper target, run the readiness audit over
+the live, historical, and seeded manifests:
+
+```bash
+.venv/bin/datadiff final-readiness \
+  --manifest runs/experiment-live-datafusion.json \
+  --manifest runs/experiment-live-polars.json \
+  --manifest runs/experiment-live-arrow.json \
+  --manifest runs/experiment-live-embedded-sql.json \
+  --manifest runs/experiment-live-cross-family.json \
+  --manifest runs/experiment-historical.json \
+  --manifest runs/experiment-seeded.json
+```
+
+The audit is intentionally strict by default: it checks all five live suites, 24h
+depth per live suite, fresh replay-policy isolation, confirmed latest-version bug
+evidence, confirmed historical replay evidence, and seeded sensitivity evidence.
+Those requirements are top-layer policy inputs to the audit (`--required-live-suites`,
+`--required-live-families`, and threshold flags). The audit engine itself only reads
+manifests/run logs and evaluates the supplied policy; it does not change generation,
+execution, normalization, or oracle behavior.
+
 ## Paper Wording
 
 Use "candidate bug family" for unconfirmed latest-version findings. Use "confirmed bug" only after maintainer acknowledgement, fix, or clear spec violation. Use seeded results only for sensitivity and ablation claims.
