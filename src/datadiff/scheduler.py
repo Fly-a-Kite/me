@@ -86,9 +86,22 @@ class SourceArmState:
 
 
 class LocalSourceScheduler:
-    def __init__(self, *, exploration_weight: float = 0.5, min_feedback_share: float = 0.12) -> None:
+    def __init__(
+        self,
+        *,
+        exploration_weight: float = 0.5,
+        min_feedback_share: float = 0.12,
+        enable_family_saturation: bool = True,
+        family_saturation_threshold: int = 8,
+        saturated_family_reward: float = 0.02,
+        known_saturated_bug_families: list[str] | None = None,
+    ) -> None:
         self.exploration_weight = max(0.0, float(exploration_weight))
         self.min_feedback_share = min(0.5, max(0.0, float(min_feedback_share)))
+        self.enable_family_saturation = bool(enable_family_saturation)
+        self.family_saturation_threshold = max(0, int(family_saturation_threshold))
+        self.saturated_family_reward = max(0.0, float(saturated_family_reward))
+        self.known_saturated_bug_families = _unique_nonempty(known_saturated_bug_families or [])
         self.total_pulls = 0
         self.candidate_bug_families: Counter[str] = Counter()
         self.candidate_bug_signatures: Counter[str] = Counter()
@@ -128,7 +141,13 @@ class LocalSourceScheduler:
         if candidate_bug:
             if family_keys:
                 candidate_bug_reward = sum(
-                    _candidate_family_reward(self.candidate_bug_families[family]) for family in family_keys
+                    _candidate_family_reward(
+                        self._previous_family_hits(family),
+                        enable_family_saturation=self.enable_family_saturation,
+                        family_saturation_threshold=self.family_saturation_threshold,
+                        saturated_family_reward=self.saturated_family_reward,
+                    )
+                    for family in family_keys
                 )
                 if signature_keys and all(self.candidate_bug_signatures[signature] > 0 for signature in signature_keys):
                     candidate_bug_reward *= 0.5
@@ -154,6 +173,15 @@ class LocalSourceScheduler:
         self.candidate_bug_signatures.update(signature_keys)
         self.total_pulls += 1
         return reward
+
+    def _previous_family_hits(self, family: str) -> int:
+        previous_hits = self.candidate_bug_families[family]
+        if self.enable_family_saturation and _family_key_matches_known_family(
+            family,
+            self.known_saturated_bug_families,
+        ):
+            previous_hits = max(previous_hits, self.family_saturation_threshold)
+        return previous_hits
 
     def snapshot(self) -> list[dict[str, Any]]:
         return [
@@ -443,12 +471,37 @@ def _suspicious_key(finding: dict[str, Any]) -> str:
     return suspicious_key(finding)
 
 
-def _candidate_family_reward(previous_hits: int) -> float:
+def _candidate_family_reward(
+    previous_hits: int,
+    *,
+    enable_family_saturation: bool = True,
+    family_saturation_threshold: int = 8,
+    saturated_family_reward: float = 0.02,
+) -> float:
+    if enable_family_saturation and family_saturation_threshold > 0 and previous_hits >= family_saturation_threshold:
+        return max(0.0, saturated_family_reward)
     if previous_hits <= 0:
         return 4.0
     if previous_hits <= 2:
         return 1.25
     return max(0.15, 0.75 / math.sqrt(previous_hits))
+
+
+def _family_key_matches_known_family(candidate_family: str, known_saturated_bug_families: list[str]) -> bool:
+    candidate_root, candidate_backends = _split_family_key(candidate_family)
+    for known_family in known_saturated_bug_families:
+        known_root, known_backends = _split_family_key(known_family)
+        if known_root != candidate_root:
+            continue
+        if not known_backends or not candidate_backends or known_backends & candidate_backends:
+            return True
+    return False
+
+
+def _split_family_key(family_key: str) -> tuple[str, set[str]]:
+    root, _, backend_part = str(family_key).partition("@")
+    backends = {backend.strip() for backend in backend_part.split(",") if backend.strip()}
+    return root.strip(), backends
 
 
 def _unique_nonempty(values: list[str]) -> list[str]:

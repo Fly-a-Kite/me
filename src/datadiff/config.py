@@ -66,6 +66,15 @@ GeneratorProfile = Literal[
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]
 
+DEFAULT_KNOWN_SATURATED_BUG_FAMILIES = [
+    "groupby_aggregation@datafusion",
+    "grouped_topk_null_sort_key@datafusion",
+    "outer_join_truth_filter@datafusion",
+    "topk_filter_pushdown@datafusion",
+    "reverse_division_operand_order@polars",
+    "tuple_absence_null_filter@duckdb",
+]
+
 
 @dataclass(slots=True)
 class ExperimentConfig:
@@ -89,6 +98,13 @@ class ExperimentConfig:
     guidance_strategy: GuidanceStrategy = "random"
     guidance_candidate_pool: int = 1
     guidance_targets: list[str] = field(default_factory=list)
+    enable_family_saturation: bool = True
+    family_saturation_threshold: int = 8
+    family_saturation_penalty: float = 1.25
+    saturated_family_reward: float = 0.02
+    known_saturated_bug_families: list[str] = field(default_factory=list)
+    issue_replay_saturation_threshold: int = 1
+    issue_replay_saturation_penalty: float = 1.0
     metamorphic_variant_limit: int = 4
     log_level: LogLevel = "compact"
 

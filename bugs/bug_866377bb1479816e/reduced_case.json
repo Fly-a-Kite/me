@@ -1,0 +1,169 @@
+{
+  "case_id": "case-00100081-bughunt-mut-100630",
+  "metadata": {
+    "candidate_source": "feedback_mutation",
+    "mutation": {
+      "changed": true,
+      "detail": "append:sort",
+      "operator": "append_op"
+    },
+    "seed_lineage": {
+      "depth": 1,
+      "mutation_seed": 100630,
+      "parent_case_id": "case-00100081-bughunt",
+      "parent_seed": 100081,
+      "root_seed": 100081
+    }
+  },
+  "program": {
+    "operations": [
+      {
+        "how": "left",
+        "left_on": "id",
+        "op": "join",
+        "right_on": "id",
+        "table": "t1"
+      },
+      {
+        "column": "m_0",
+        "expr": {
+          "kind": "arith_const",
+          "op": "mul",
+          "source": "z",
+          "value": 10
+        },
+        "op": "mutate"
+      },
+      {
+        "cmp": "le_is_not_false",
+        "column": "m_0",
+        "op": "filter",
+        "value": 0.5
+      },
+      {
+        "ascending": true,
+        "columns": [
+          "tag",
+          "flag",
+          "g",
+          "id",
+          "j",
+          "m_0",
+          "s",
+          "x",
+          "y",
+          "z"
+        ],
+        "op": "sort"
+      },
+      {
+        "n": 2,
+        "op": "offset"
+      },
+      {
+        "ascending": true,
+        "columns": [
+          "z"
+        ],
+        "op": "sort"
+      }
+    ],
+    "program_id": "prog-00100081-mut-100630",
+    "seed": 100630
+  },
+  "seed": 100630,
+  "tables": [
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "type": "int"
+        },
+        {
+          "name": "g",
+          "nullable": true,
+          "type": "str"
+        },
+        {
+          "name": "x",
+          "nullable": true,
+          "type": "int"
+        },
+        {
+          "name": "y",
+          "nullable": true,
+          "type": "float"
+        },
+        {
+          "name": "flag",
+          "nullable": true,
+          "type": "bool"
+        },
+        {
+          "name": "s",
+          "nullable": true,
+          "type": "str"
+        }
+      ],
+      "name": "t0",
+      "rows": [
+        {
+          "flag": null,
+          "g": "alpha",
+          "id": 2,
+          "s": "中文",
+          "x": 0,
+          "y": 0.5
+        },
+        {
+          "flag": false,
+          "g": "M",
+          "id": 0,
+          "s": "中文",
+          "x": 2,
+          "y": -1.0
+        }
+      ]
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "type": "int"
+        },
+        {
+          "name": "j",
+          "nullable": true,
+          "type": "int"
+        },
+        {
+          "name": "z",
+          "nullable": true,
+          "type": "float"
+        },
+        {
+          "name": "tag",
+          "nullable": true,
+          "type": "str"
+        }
+      ],
+      "name": "t1",
+      "rows": [
+        {
+          "id": 2,
+          "j": -10,
+          "tag": null,
+          "z": 0.0
+        },
+        {
+          "id": 2,
+          "j": -2,
+          "tag": "beta",
+          "z": -1.0
+        }
+      ]
+    }
+  ]
+}

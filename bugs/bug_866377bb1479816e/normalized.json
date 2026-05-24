@@ -1,0 +1,233 @@
+{
+  "datafusion": {
+    "backend": "datafusion",
+    "columns": [
+      "z"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        -0.5
+      ],
+      [
+        -0.5
+      ],
+      [
+        -0.5
+      ],
+      [
+        -0.5
+      ],
+      [
+        -0.5
+      ],
+      [
+        0
+      ],
+      [
+        0
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ]
+    ],
+    "status": "ok"
+  },
+  "duckdb": {
+    "backend": "duckdb",
+    "columns": [
+      "z"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        -1
+      ],
+      [
+        -0.5
+      ],
+      [
+        -0.5
+      ],
+      [
+        -0.5
+      ],
+      [
+        -0.5
+      ],
+      [
+        -0.5
+      ],
+      [
+        0
+      ],
+      [
+        0
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ]
+    ],
+    "status": "ok"
+  },
+  "pandas": {
+    "backend": "pandas",
+    "columns": [
+      "z"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        -1
+      ],
+      [
+        -0.5
+      ],
+      [
+        -0.5
+      ],
+      [
+        -0.5
+      ],
+      [
+        -0.5
+      ],
+      [
+        -0.5
+      ],
+      [
+        0
+      ],
+      [
+        0
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ],
+      [
+        null
+      ]
+    ],
+    "status": "ok"
+  }
+}

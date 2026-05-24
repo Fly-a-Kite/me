@@ -123,11 +123,19 @@ def write_standalone_reproducer(bug_dir: Path, report: dict[str, Any] | None = N
         path = bug_dir / "standalone_datafusion_groupby_null_sortkey_limit.py"
         content = _standalone_datafusion_groupby_null_sortkey_reproducer()
     elif "groupby_aggregation" in roots and "datafusion" in suspicious:
-        path = bug_dir / "standalone_datafusion_groupby_limit_offset.py"
-        content = _standalone_datafusion_groupby_limit_offset_reproducer()
+        if _is_datafusion_sort_offset_groupby_aggregation(report or {}):
+            path = bug_dir / "standalone_datafusion_sort_offset_groupby_aggregation.py"
+            content = _standalone_datafusion_sort_offset_groupby_aggregation_reproducer()
+        else:
+            path = bug_dir / "standalone_datafusion_groupby_limit_offset.py"
+            content = _standalone_datafusion_groupby_limit_offset_reproducer()
     elif "outer_join_truth_filter" in roots and "datafusion" in suspicious:
-        path = bug_dir / "standalone_datafusion_negative_zero_truth_filter.py"
-        content = _standalone_datafusion_negative_zero_truth_filter_reproducer()
+        if _is_datafusion_truth_filter_offset(report or {}):
+            path = bug_dir / "standalone_datafusion_truth_filter_offset.py"
+            content = _standalone_datafusion_truth_filter_offset_reproducer()
+        else:
+            path = bug_dir / "standalone_datafusion_negative_zero_truth_filter.py"
+            content = _standalone_datafusion_negative_zero_truth_filter_reproducer()
     elif "reverse_division_operand_order" in roots:
         path = bug_dir / "standalone_polars_reverse_division_columns.py"
         content = _standalone_polars_reverse_division_columns_reproducer()
@@ -154,6 +162,26 @@ def supports_standalone_reproducer(report: dict[str, Any]) -> bool:
         or bool(features.get("contains_nan"))
         or bool(features.get("contains_inf"))
         or bool(roots & {"nan_inf_semantics"})
+    )
+
+
+def _is_datafusion_sort_offset_groupby_aggregation(report: dict[str, Any]) -> bool:
+    features = report.get("features", {})
+    sequence = list(features.get("operation_sequence", []))
+    if "offset" not in sequence or "groupby" not in sequence:
+        return False
+    return sequence.index("offset") < sequence.index("groupby") and not bool(features.get("uses_limit"))
+
+
+def _is_datafusion_truth_filter_offset(report: dict[str, Any]) -> bool:
+    features = report.get("features", {})
+    sequence = list(features.get("operation_sequence", []))
+    return (
+        "filter" in sequence
+        and "offset" in sequence
+        and sequence.index("filter") < sequence.index("offset")
+        and not bool(features.get("uses_groupby"))
+        and not bool(features.get("uses_limit"))
     )
 
 
@@ -420,6 +448,110 @@ if __name__ == "__main__":
 '''
 
 
+def _standalone_datafusion_sort_offset_groupby_aggregation_reproducer() -> str:
+    return '''#!/usr/bin/env python3
+"""Standalone reproduction for DataFusion sort/OFFSET before GROUP BY aggregation.
+
+This script does not import DataDiffFuzz. It orders a left-join result, keeps
+only the final row with OFFSET, then groups that single-row input. DataFusion
+53.0.0 groups and aggregates a different row than the ordered/OFFSET input
+selects.
+"""
+
+from __future__ import annotations
+
+import datafusion
+import pandas as pd
+import pyarrow as pa
+from datafusion import SessionContext
+
+
+def _register(ctx: SessionContext, name: str, rows: list[dict], schema: pa.Schema) -> None:
+    batch = pa.RecordBatch.from_pylist(rows, schema=schema)
+    ctx.register_record_batches(name, [[batch]])
+
+
+def main() -> None:
+    ctx = SessionContext()
+    _register(
+        ctx,
+        "t0",
+        [
+            {"flag": True, "g": None, "id": 1, "s": "sszMgRQI", "x": -85, "y": -0.5},
+            {"flag": True, "g": "Vk", "id": 0, "s": "A", "x": None, "y": -1.0},
+            {"flag": False, "g": "A", "id": 0, "s": "sutAXn", "x": -2, "y": -0.5},
+        ],
+        pa.schema(
+            [
+                pa.field("flag", pa.bool_()),
+                pa.field("g", pa.string()),
+                pa.field("id", pa.int64()),
+                pa.field("s", pa.string()),
+                pa.field("x", pa.int64(), nullable=True),
+                pa.field("y", pa.float64()),
+            ]
+        ),
+    )
+    _register(
+        ctx,
+        "t1",
+        [
+            {"id": 0, "j": -2, "tag": "NANtwaaW", "z": None},
+            {"id": 0, "j": -1, "tag": None, "z": 0.5},
+            {"id": 0, "j": 10, "tag": "zh", "z": 0.5},
+            {"id": 1, "j": -10, "tag": None, "z": -0.5},
+            {"id": 0, "j": 10, "tag": "VbSl", "z": -1.0},
+            {"id": 1, "j": -10, "tag": "GBkrEvBt", "z": 1.0},
+            {"id": 0, "j": -1, "tag": "", "z": -0.5},
+        ],
+        pa.schema(
+            [
+                pa.field("id", pa.int64()),
+                pa.field("j", pa.int64()),
+                pa.field("tag", pa.string()),
+                pa.field("z", pa.float64(), nullable=True),
+            ]
+        ),
+    )
+
+    query = """
+    WITH joined AS (
+      SELECT
+        t0.flag, t0.g, t0.id, t0.s, t0.x, t0.y,
+        t1.j, t1.tag, t1.z, t1.z + 2 AS m_0
+      FROM t0 LEFT JOIN t1 ON t0.id = t1.id
+    ),
+    offset_rows AS (
+      SELECT * FROM joined
+      ORDER BY
+        z ASC NULLS LAST, flag ASC NULLS LAST, g ASC NULLS LAST,
+        id ASC NULLS LAST, j ASC NULLS LAST, m_0 ASC NULLS LAST,
+        s ASC NULLS LAST, tag ASC NULLS LAST, x ASC NULLS LAST,
+        y ASC NULLS LAST
+      OFFSET 11
+    )
+    SELECT flag, MIN(m_0) AS min_m_0, SUM(x) AS sum_x, SUM(y) AS sum_y
+    FROM offset_rows GROUP BY flag
+    """
+
+    print(f"datafusion={getattr(datafusion, '__version__', 'unknown')}")
+    print(f"pyarrow={pa.__version__}")
+    result = ctx.sql(query).to_pandas()
+    print(result)
+
+    assert len(result) == 1
+    row = result.iloc[0]
+    assert bool(row["flag"]) is True
+    assert pd.isna(row["min_m_0"])
+    assert pd.isna(row["sum_x"])
+    assert float(row["sum_y"]) == -1.0
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
 def _standalone_datafusion_groupby_limit_offset_reproducer() -> str:
     return '''#!/usr/bin/env python3
 """Standalone reproduction for DataFusion groupby ORDER/LIMIT/OFFSET row loss.
@@ -479,6 +611,113 @@ def main() -> None:
         "DataFusion dropped the second grouped row after inner ORDER BY/LIMIT "
         "and outer ORDER BY/OFFSET."
     )
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+def _standalone_datafusion_truth_filter_offset_reproducer() -> str:
+    return '''#!/usr/bin/env python3
+"""Standalone reproduction for DataFusion truth filter plus OFFSET.
+
+This script does not import DataDiffFuzz. It uses the SQL shape emitted by the
+DataFusion adapter for a left join, arithmetic mutation, truth-tested filter,
+ordered OFFSET, and final sort. DataFusion 53.0.0 returns a different row than
+the one selected by the filtered ordered input.
+"""
+
+from __future__ import annotations
+
+import datafusion
+import pandas as pd
+import pyarrow as pa
+from datafusion import SessionContext
+
+
+def _register(ctx: SessionContext, name: str, rows: list[dict], schema: pa.Schema) -> None:
+    batch = pa.RecordBatch.from_pylist(rows, schema=schema)
+    ctx.register_record_batches(name, [[batch]])
+
+
+def main() -> None:
+    ctx = SessionContext()
+    _register(
+        ctx,
+        "t0",
+        [
+            {"id": 2, "g": "alpha", "x": 0, "y": 0.5, "flag": None, "s": "zh"},
+            {"id": 0, "g": "M", "x": 2, "y": -1.0, "flag": False, "s": "zh"},
+        ],
+        pa.schema(
+            [
+                pa.field("id", pa.int64(), nullable=False),
+                pa.field("g", pa.string()),
+                pa.field("x", pa.int64()),
+                pa.field("y", pa.float64()),
+                pa.field("flag", pa.bool_()),
+                pa.field("s", pa.string()),
+            ]
+        ),
+    )
+    _register(
+        ctx,
+        "t1",
+        [
+            {"id": 2, "j": -10, "z": 0.0, "tag": None},
+            {"id": 2, "j": -2, "z": -1.0, "tag": "beta"},
+        ],
+        pa.schema(
+            [
+                pa.field("id", pa.int64(), nullable=False),
+                pa.field("j", pa.int64()),
+                pa.field("z", pa.float64()),
+                pa.field("tag", pa.string()),
+            ]
+        ),
+    )
+
+    query = """
+    SELECT
+      q."id", q."g", q."x", q."y", q."flag",
+      q."s", q."j", q."z", q."tag", q."m_0"
+    FROM (
+      SELECT * FROM (
+        SELECT * FROM (
+          SELECT
+            q."id", q."g", q."x", q."y", q."flag", q."s",
+            q."j", q."z", q."tag", q."z" * 10 AS "m_0"
+          FROM (
+            SELECT q.*, r."j" AS "j", r."z" AS "z", r."tag" AS "tag"
+            FROM (SELECT * FROM "t0") q
+            LEFT JOIN "t1" r ON q."id" = r."id"
+          ) q
+        ) q
+        WHERE NOT ((q."m_0" <= 0.5) IS FALSE)
+      ) q
+      ORDER BY
+        "tag" ASC NULLS LAST, "flag" ASC NULLS LAST, "g" ASC NULLS LAST,
+        "id" ASC NULLS LAST, "j" ASC NULLS LAST, "m_0" ASC NULLS LAST,
+        "s" ASC NULLS LAST, "x" ASC NULLS LAST, "y" ASC NULLS LAST,
+        "z" ASC NULLS LAST
+      OFFSET 2
+    ) q
+    ORDER BY "z" ASC NULLS LAST
+    """
+
+    print(f"datafusion={getattr(datafusion, '__version__', 'unknown')}")
+    print(f"pyarrow={pa.__version__}")
+    result = ctx.sql(query).to_pandas()
+    print(result)
+
+    assert len(result) == 1
+    row = result.iloc[0]
+    assert int(row["id"]) == 2
+    assert pd.isna(row["flag"])
+    assert int(row["j"]) == -10
+    assert float(row["z"]) == 0.0
+    assert float(row["m_0"]) == 0.0
 
 
 if __name__ == "__main__":

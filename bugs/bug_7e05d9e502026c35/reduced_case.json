@@ -1,0 +1,216 @@
+{
+  "case_id": "case-00095328-bughunt-mut-95415",
+  "metadata": {
+    "candidate_source": "feedback_mutation",
+    "mutation": {
+      "changed": true,
+      "detail": "shuffle_rows:t0",
+      "operator": "shuffle_rows"
+    },
+    "seed_lineage": {
+      "depth": 1,
+      "mutation_seed": 95415,
+      "parent_case_id": "case-00095328-bughunt",
+      "parent_seed": 95328,
+      "root_seed": 95328
+    }
+  },
+  "program": {
+    "operations": [
+      {
+        "how": "left",
+        "left_on": "id",
+        "op": "join",
+        "right_on": "id",
+        "table": "t1"
+      },
+      {
+        "column": "m_0",
+        "expr": {
+          "kind": "add_const",
+          "source": "z",
+          "value": 2
+        },
+        "op": "mutate"
+      },
+      {
+        "ascending": true,
+        "columns": [
+          "z",
+          "flag",
+          "g",
+          "id",
+          "j",
+          "m_0",
+          "s",
+          "tag",
+          "x",
+          "y"
+        ],
+        "op": "sort"
+      },
+      {
+        "n": 11,
+        "op": "offset"
+      },
+      {
+        "aggs": [
+          {
+            "as": "sum_y",
+            "column": "y",
+            "func": "sum"
+          },
+          {
+            "as": "min_m_0",
+            "column": "m_0",
+            "func": "min"
+          },
+          {
+            "as": "sum_x",
+            "column": "x",
+            "func": "sum"
+          }
+        ],
+        "keys": [
+          "flag"
+        ],
+        "op": "groupby"
+      }
+    ],
+    "program_id": "prog-00095328-mut-95415",
+    "seed": 95415
+  },
+  "seed": 95415,
+  "tables": [
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "type": "int"
+        },
+        {
+          "name": "g",
+          "nullable": true,
+          "type": "str"
+        },
+        {
+          "name": "x",
+          "nullable": true,
+          "type": "int"
+        },
+        {
+          "name": "y",
+          "nullable": true,
+          "type": "float"
+        },
+        {
+          "name": "flag",
+          "nullable": true,
+          "type": "bool"
+        },
+        {
+          "name": "s",
+          "nullable": true,
+          "type": "str"
+        }
+      ],
+      "name": "t0",
+      "rows": [
+        {
+          "flag": true,
+          "g": null,
+          "id": 1,
+          "s": "sszMgRQI",
+          "x": -85,
+          "y": -0.5
+        },
+        {
+          "flag": true,
+          "g": "Vk",
+          "id": 0,
+          "s": "A",
+          "x": null,
+          "y": -1.0
+        },
+        {
+          "flag": false,
+          "g": "A",
+          "id": 0,
+          "s": "sutAXn",
+          "x": -2,
+          "y": -0.5
+        }
+      ]
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "type": "int"
+        },
+        {
+          "name": "j",
+          "nullable": true,
+          "type": "int"
+        },
+        {
+          "name": "z",
+          "nullable": true,
+          "type": "float"
+        },
+        {
+          "name": "tag",
+          "nullable": true,
+          "type": "str"
+        }
+      ],
+      "name": "t1",
+      "rows": [
+        {
+          "id": 0,
+          "j": -2,
+          "tag": "NANtwaaW",
+          "z": null
+        },
+        {
+          "id": 0,
+          "j": -1,
+          "tag": null,
+          "z": 0.5
+        },
+        {
+          "id": 0,
+          "j": 10,
+          "tag": "中文",
+          "z": 0.5
+        },
+        {
+          "id": 1,
+          "j": -10,
+          "tag": null,
+          "z": -0.5
+        },
+        {
+          "id": 0,
+          "j": 10,
+          "tag": "VbSl",
+          "z": -1.0
+        },
+        {
+          "id": 1,
+          "j": -10,
+          "tag": "GBkrEvBt",
+          "z": 1.0
+        },
+        {
+          "id": 0,
+          "j": -1,
+          "tag": "",
+          "z": -0.5
+        }
+      ]
+    }
+  ]
+}

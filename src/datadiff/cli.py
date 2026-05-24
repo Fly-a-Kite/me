@@ -10,7 +10,7 @@ from pathlib import Path
 
 from datadiff.ablation_audit import analyze_ablation_audit
 from datadiff.classification_oracle import classify_finding
-from datadiff.config import ExperimentConfig
+from datadiff.config import DEFAULT_KNOWN_SATURATED_BUG_FAMILIES, ExperimentConfig
 from datadiff.dsl import Case
 from datadiff.experiment_analysis import analyze_experiment
 from datadiff.fixture_replay import build_fixture_replay_case, load_fixture_replay_spec
@@ -477,6 +477,15 @@ def _config_from_args(args: argparse.Namespace) -> ExperimentConfig:
         guidance_strategy=getattr(args, "strategy", "random"),
         guidance_candidate_pool=max(1, int(getattr(args, "candidate_pool", 1))),
         guidance_targets=parse_guidance_targets(getattr(args, "targets", "")),
+        enable_family_saturation=not bool(getattr(args, "disable_family_saturation", False)),
+        family_saturation_threshold=max(1, int(getattr(args, "family_saturation_threshold", 8))),
+        family_saturation_penalty=max(0.0, float(getattr(args, "family_saturation_penalty", 1.25))),
+        saturated_family_reward=max(0.0, float(getattr(args, "saturated_family_reward", 0.02))),
+        known_saturated_bug_families=parse_guidance_targets(
+            getattr(args, "known_saturated_bug_families", "")
+        ),
+        issue_replay_saturation_threshold=max(1, int(getattr(args, "issue_replay_saturation_threshold", 1))),
+        issue_replay_saturation_penalty=max(0.0, float(getattr(args, "issue_replay_saturation_penalty", 1.0))),
         metamorphic_variant_limit=max(0, int(getattr(args, "metamorphic_variant_limit", 4))),
         log_level=getattr(args, "log_level", "compact"),
     )
@@ -551,6 +560,46 @@ def add_guidance_flags(
             "comma-separated guided targets such as groupby,filter,mutate,sort_limit,"
             "nulls,strings,numeric,edge_float,aggregation,join,running_sum,sortedness,expressions,casts"
         ),
+    )
+    parser.add_argument(
+        "--disable-family-saturation",
+        action="store_true",
+        help="disable repeated candidate bug family downweighting in guided selection and online rewards",
+    )
+    parser.add_argument(
+        "--family-saturation-threshold",
+        type=int,
+        default=8,
+        help="candidate bug family hit count where guidance starts treating the family as saturated",
+    )
+    parser.add_argument(
+        "--family-saturation-penalty",
+        type=float,
+        default=1.25,
+        help="score penalty scale for predicted cases in saturated candidate bug families",
+    )
+    parser.add_argument(
+        "--saturated-family-reward",
+        type=float,
+        default=0.02,
+        help="online reward assigned to a candidate bug family after saturation",
+    )
+    parser.add_argument(
+        "--known-saturated-bug-families",
+        default="",
+        help="comma-separated root@backend families already considered saturated before this run",
+    )
+    parser.add_argument(
+        "--issue-replay-saturation-threshold",
+        type=int,
+        default=1,
+        help="issue-replay family hit count where guidance starts downweighting repeated replay probes",
+    )
+    parser.add_argument(
+        "--issue-replay-saturation-penalty",
+        type=float,
+        default=1.0,
+        help="score penalty scale for predicted cases in saturated issue-replay families",
     )
 
 
@@ -1485,6 +1534,7 @@ def _live_bughunt_config(
     local_source_exploration_weight: float = 0.40,
     metamorphic: bool = False,
     metamorphic_variant_limit: int = 4,
+    known_saturated_bug_families: list[str] | None = None,
 ) -> ExperimentConfig:
     return ExperimentConfig(
         generator_profile=generator_profile,
@@ -1496,6 +1546,9 @@ def _live_bughunt_config(
         enable_local_source_scheduler=True,
         local_source_exploration_weight=local_source_exploration_weight,
         metamorphic_variant_limit=metamorphic_variant_limit,
+        known_saturated_bug_families=list(
+            known_saturated_bug_families or DEFAULT_KNOWN_SATURATED_BUG_FAMILIES
+        ),
     )
 
 

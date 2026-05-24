@@ -697,6 +697,128 @@ def test_guidance_moves_off_repeated_bughunt_template_findings():
     assert decision.case is alternate_template
 
 
+def test_guidance_family_saturation_demotes_known_specific_family():
+    saturated_case = _case(
+        70,
+        [
+            {
+                "op": "mutate",
+                "column": "ratio",
+                "expr": {"kind": "reverse_division_columns", "source": "x", "numerator": 1.0},
+            }
+        ],
+    )
+    fresh_case = _case(71, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}])
+    guidance = GuidanceState(
+        targets=["polars_reverse_division_columns", "filter"],
+        active_backends=["polars"],
+        known_saturated_bug_families=["reverse_division_operand_order@polars"],
+    )
+
+    saturated_decision = guidance.choose_case([saturated_case])
+    decision = guidance.choose_case([saturated_case, fresh_case])
+
+    assert "pattern:polars_reverse_division_columns" in saturated_decision.features
+    assert saturated_decision.score_breakdown["family_saturation_active"] == 1.0
+    assert saturated_decision.score_breakdown["family_saturation_penalty"] < 0.0
+    assert decision.case is fresh_case
+
+
+def test_guidance_family_saturation_demotes_runtime_repeated_family():
+    saturated_case = _case(
+        72,
+        [
+            {
+                "op": "mutate",
+                "column": "ratio",
+                "expr": {"kind": "reverse_division_columns", "source": "x", "numerator": 1.0},
+            }
+        ],
+    )
+    fresh_case = _case(73, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}])
+    guidance = GuidanceState(
+        targets=["polars_reverse_division_columns", "filter"],
+        active_backends=["polars"],
+        family_saturation_threshold=3,
+    )
+    for idx in range(3):
+        guidance.record_result(
+            saturated_case,
+            {
+                "findings": [
+                    {
+                        "root_cause": "reverse_division_operand_order",
+                        "triage_verdict": "candidate_implementation_bug",
+                        "suspicious_backends": ["polars"],
+                        "signature": f"sig-runtime-{idx}",
+                    }
+                ],
+                "preflight": {"valid": True, "fallback_used": False},
+            },
+        )
+
+    saturated_decision = guidance.choose_case([saturated_case])
+    decision = guidance.choose_case([saturated_case, fresh_case])
+
+    assert saturated_decision.score_breakdown["family_saturation_active"] == 1.0
+    assert saturated_decision.score_breakdown["family_saturation_penalty"] < 0.0
+    assert decision.case is fresh_case
+
+
+def test_guidance_reward_strongly_discounts_known_saturated_candidate_bug_family():
+    row = {
+        "findings": [
+            {
+                "root_cause": "reverse_division_operand_order",
+                "triage_verdict": "candidate_implementation_bug",
+                "suspicious_backends": ["polars"],
+                "signature": "sig-reverse-division",
+            }
+        ],
+        "preflight": {"valid": True, "fallback_used": False},
+    }
+
+    reward = _guidance_reward(
+        row,
+        known_saturated_bug_families=["reverse_division_operand_order@polars"],
+    )
+
+    assert 0.0 < reward < 0.05
+
+
+def test_guidance_issue_replay_saturation_demotes_repeated_replay_family():
+    replay_case = generate_case(2159, profile="scalar_subquery_double_parentheses")
+    fresh_case = _case(74, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}])
+    guidance = GuidanceState(
+        targets=["scalar_subquery_double_parentheses", "filter"],
+        active_backends=["duckdb"],
+        issue_replay_saturation_threshold=2,
+    )
+    for idx in range(2):
+        guidance.record_result(
+            replay_case,
+            {
+                "findings": [
+                    {
+                        "root_cause": "scalar_subquery_double_parentheses",
+                        "triage_verdict": "candidate_implementation_bug",
+                        "suspicious_backends": ["duckdb"],
+                        "signature": f"sig-replay-{idx}",
+                        "discovery_origin": "issue_replay",
+                    }
+                ],
+                "preflight": {"valid": True, "fallback_used": False},
+            },
+        )
+
+    replay_decision = guidance.choose_case([replay_case])
+    decision = guidance.choose_case([replay_case, fresh_case])
+
+    assert replay_decision.score_breakdown["issue_replay_saturation_active"] == 1.0
+    assert replay_decision.score_breakdown["issue_replay_saturation_penalty"] < 0.0
+    assert decision.case is fresh_case
+
+
 def test_guidance_frontier_conformance_prefers_boundary_case():
     simple_case = _case(1, [{"op": "select", "columns": ["id"]}])
     boundary_case = _case(2, [{"op": "filter", "column": "x", "cmp": "==", "value": 1}])

@@ -675,6 +675,14 @@ def test_cli_parses_live_datafusion_presets():
     assert live.guidance_candidate_pool == 12
     assert live.enable_local_source_scheduler is True
     assert live.local_source_exploration_weight == 0.35
+    assert live.enable_family_saturation is True
+    assert live.family_saturation_threshold == 8
+    assert live.issue_replay_saturation_threshold == 1
+    assert live.issue_replay_saturation_penalty == 1.0
+    assert "groupby_aggregation@datafusion" in live.known_saturated_bug_families
+    assert "grouped_topk_null_sort_key@datafusion" in live.known_saturated_bug_families
+    assert "outer_join_truth_filter@datafusion" in live.known_saturated_bug_families
+    assert "topk_filter_pushdown@datafusion" in live.known_saturated_bug_families
     assert {"common_workflow", "operation_combo", "topk", "join", "groupby", "join_null_key_topk"}.issubset(live.guidance_targets)
 
     metamorphic = _preset_config("live_datafusion_metamorphic")
@@ -741,12 +749,14 @@ def test_cli_parses_non_datafusion_live_presets():
         "polars_reverse_division_columns",
     }.issubset(polars_lazy.guidance_targets)
     assert polars_lazy.local_source_exploration_weight == 0.45
+    assert "reverse_division_operand_order@polars" in polars_lazy.known_saturated_bug_families
 
     embedded_sql = _preset_config("live_embedded_sql")
     assert embedded_sql.generator_profile == "bughunt"
     assert {"join", "filter", "groupby", "aggregation", "casts", "row_value_absence_filter"}.issubset(
         embedded_sql.guidance_targets
     )
+    assert "tuple_absence_null_filter@duckdb" in embedded_sql.known_saturated_bug_families
 
     cross_family = _preset_config("live_cross_family")
     assert cross_family.generator_profile == "bughunt"

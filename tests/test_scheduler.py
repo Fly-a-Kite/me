@@ -81,6 +81,26 @@ def test_local_source_scheduler_discounts_repeated_candidate_bug_family():
     assert snapshot["generated"]["candidate_bug_signature_count"] == 2
 
 
+def test_local_source_scheduler_downweights_known_saturated_family():
+    scheduler = LocalSourceScheduler(
+        exploration_weight=0.0,
+        known_saturated_bug_families=["topk_filter_pushdown@datafusion"],
+    )
+
+    reward = scheduler.record_result(
+        "generated",
+        has_finding=True,
+        is_new_behavior=False,
+        preflight_valid=True,
+        fallback_used=False,
+        candidate_bug=True,
+        candidate_bug_families=["topk_filter_pushdown@datafusion"],
+        candidate_bug_signatures=["sig-a"],
+    )
+
+    assert 0.0 < reward < 0.05
+
+
 def test_local_source_scheduler_keeps_feedback_mutation_sampling_floor():
     scheduler = LocalSourceScheduler(exploration_weight=0.0, min_feedback_share=0.20)
 

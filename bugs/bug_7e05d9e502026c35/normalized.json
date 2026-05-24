@@ -1,0 +1,80 @@
+{
+  "datafusion": {
+    "backend": "datafusion",
+    "columns": [
+      "flag",
+      "min_m_0",
+      "sum_x",
+      "sum_y"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        true,
+        1,
+        -89,
+        70.378
+      ],
+      [
+        false,
+        1,
+        18,
+        -2
+      ]
+    ],
+    "status": "ok"
+  },
+  "duckdb": {
+    "backend": "duckdb",
+    "columns": [
+      "flag",
+      "min_m_0",
+      "sum_x",
+      "sum_y"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        true,
+        2.5,
+        -91,
+        106.817
+      ],
+      [
+        false,
+        12,
+        20,
+        -1.5
+      ]
+    ],
+    "status": "ok"
+  },
+  "pandas": {
+    "backend": "pandas",
+    "columns": [
+      "flag",
+      "min_m_0",
+      "sum_x",
+      "sum_y"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        true,
+        2.5,
+        -91,
+        106.817
+      ],
+      [
+        false,
+        12,
+        20,
+        -1.5
+      ]
+    ],
+    "status": "ok"
+  }
+}

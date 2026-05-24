@@ -166,6 +166,25 @@ def test_write_datafusion_standalone_reproducer_for_groupby_limit_offset(tmp_pat
     assert "outer ORDER BY/OFFSET" in text
 
 
+def test_write_datafusion_standalone_reproducer_for_sort_offset_groupby_aggregation(tmp_path):
+    path = write_standalone_reproducer(
+        tmp_path,
+        {
+            "reproduced_roots": ["groupby_aggregation"],
+            "suspicious_backends": ["datafusion"],
+            "features": {
+                "operation_sequence": ["join", "mutate", "sort", "offset", "groupby"],
+                "uses_limit": False,
+            },
+        },
+    )
+
+    assert path.name == "standalone_datafusion_sort_offset_groupby_aggregation.py"
+    text = path.read_text(encoding="utf-8")
+    assert "OFFSET 11" in text
+    assert "MIN(m_0)" in text
+
+
 def test_write_datafusion_standalone_reproducer_for_negative_zero_truth_filter(tmp_path):
     path = write_standalone_reproducer(
         tmp_path,
@@ -179,6 +198,27 @@ def test_write_datafusion_standalone_reproducer_for_negative_zero_truth_filter(t
     text = path.read_text(encoding="utf-8")
     assert "-0.0 >= 0.0" in text
     assert "IS NOT TRUE" in text
+
+
+def test_write_datafusion_standalone_reproducer_for_truth_filter_offset(tmp_path):
+    path = write_standalone_reproducer(
+        tmp_path,
+        {
+            "reproduced_roots": ["outer_join_truth_filter"],
+            "suspicious_backends": ["datafusion"],
+            "features": {
+                "operation_sequence": ["join", "mutate", "filter", "sort", "offset", "sort"],
+                "uses_filter": True,
+                "uses_groupby": False,
+                "uses_limit": False,
+            },
+        },
+    )
+
+    assert path.name == "standalone_datafusion_truth_filter_offset.py"
+    text = path.read_text(encoding="utf-8")
+    assert "NOT ((q.\"m_0\" <= 0.5) IS FALSE)" in text
+    assert "OFFSET 2" in text
 
 
 def test_write_polars_standalone_reproducer_for_reverse_division(tmp_path):

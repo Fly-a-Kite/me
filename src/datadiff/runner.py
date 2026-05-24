@@ -88,6 +88,14 @@ def _guidance_summary(guidance: dict[str, Any]) -> dict[str, Any]:
         "online_weight_mean": guidance.get("score_breakdown", {}).get("online_weight_mean", 1.0),
         "online_weight_max": guidance.get("score_breakdown", {}).get("online_weight_max", 1.0),
         "online_weight_updates": guidance.get("score_breakdown", {}).get("online_weight_updates", 0.0),
+        "family_saturation_penalty": guidance.get("score_breakdown", {}).get("family_saturation_penalty", 0.0),
+        "family_saturation_active": guidance.get("score_breakdown", {}).get("family_saturation_active", 0.0),
+        "issue_replay_saturation_penalty": guidance.get("score_breakdown", {}).get(
+            "issue_replay_saturation_penalty", 0.0
+        ),
+        "issue_replay_saturation_active": guidance.get("score_breakdown", {}).get(
+            "issue_replay_saturation_active", 0.0
+        ),
     }
 
 
@@ -352,7 +360,13 @@ def run_fuzz(
             persist_to_disk=config.persist_feedback_corpus,
             max_persisted=config.feedback_persist_limit,
             source_scheduler=(
-                LocalSourceScheduler(exploration_weight=config.local_source_exploration_weight)
+                LocalSourceScheduler(
+                    exploration_weight=config.local_source_exploration_weight,
+                    enable_family_saturation=config.enable_family_saturation,
+                    family_saturation_threshold=config.family_saturation_threshold,
+                    saturated_family_reward=config.saturated_family_reward,
+                    known_saturated_bug_families=config.known_saturated_bug_families,
+                )
                 if config.enable_local_source_scheduler
                 else None
             ),
@@ -362,7 +376,21 @@ def run_fuzz(
     )
     guided = config.guidance_strategy == "guided"
     candidate_pool = max(1, config.guidance_candidate_pool if guided else 1)
-    guidance = GuidanceState(config.guidance_targets) if guided else None
+    guidance = (
+        GuidanceState(
+            targets=config.guidance_targets,
+            enable_family_saturation=config.enable_family_saturation,
+            family_saturation_threshold=config.family_saturation_threshold,
+            family_saturation_penalty=config.family_saturation_penalty,
+            saturated_family_reward=config.saturated_family_reward,
+            known_saturated_bug_families=config.known_saturated_bug_families,
+            issue_replay_saturation_threshold=config.issue_replay_saturation_threshold,
+            issue_replay_saturation_penalty=config.issue_replay_saturation_penalty,
+            active_backends=list(backends),
+        )
+        if guided
+        else None
+    )
     started = time.perf_counter()
     last_checkpoint = started
     last_progress = started

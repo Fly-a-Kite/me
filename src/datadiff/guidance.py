@@ -13,6 +13,7 @@ from datadiff.reward import (
     candidate_bug_family_keys,
     candidate_bug_signatures,
     is_candidate_bug_finding,
+    issue_replay_candidate_bug_family_keys,
     row_reward_signals,
 )
 from datadiff.running import sort_rows_for_running, stable_running_sum_values
@@ -728,9 +729,18 @@ class GuidanceState:
     finding_feature_counts: Counter[str] = field(default_factory=Counter)
     root_cause_counts: Counter[str] = field(default_factory=Counter)
     candidate_bug_family_counts: Counter[str] = field(default_factory=Counter)
+    issue_replay_family_counts: Counter[str] = field(default_factory=Counter)
     candidate_bug_signature_counts: Counter[str] = field(default_factory=Counter)
     frontier_bucket_counts: Counter[str] = field(default_factory=Counter)
     online_weights: OnlineFeatureWeights = field(default_factory=OnlineFeatureWeights)
+    enable_family_saturation: bool = True
+    family_saturation_threshold: int = 8
+    family_saturation_penalty: float = 1.25
+    saturated_family_reward: float = 0.02
+    known_saturated_bug_families: list[str] = field(default_factory=list)
+    issue_replay_saturation_threshold: int = 1
+    issue_replay_saturation_penalty: float = 1.0
+    active_backends: list[str] = field(default_factory=list)
 
     def choose_case(self, candidates: list[Case]) -> GuidanceDecision:
         if not candidates:
@@ -745,6 +755,13 @@ class GuidanceState:
             decision.pruned_candidate_count = pruned
         targeted = [decision for decision in contributing if decision.matched_targets]
         if targeted:
+            unsaturated_targeted = [
+                decision for decision in targeted if not _decision_has_family_saturation(decision)
+            ]
+            if unsaturated_targeted:
+                targeted = unsaturated_targeted
+            elif len(targeted) < len(contributing):
+                return max(contributing, key=lambda decision: (decision.score, -decision.case.seed))
             return max(targeted, key=_targeted_decision_key)
         return max(contributing, key=lambda decision: (decision.score, -decision.case.seed))
 
@@ -760,6 +777,10 @@ class GuidanceState:
                 root_cause_counts=self.root_cause_counts,
                 candidate_bug_family_counts=self.candidate_bug_family_counts,
                 candidate_bug_signature_counts=self.candidate_bug_signature_counts,
+                enable_family_saturation=self.enable_family_saturation,
+                family_saturation_threshold=self.family_saturation_threshold,
+                saturated_family_reward=self.saturated_family_reward,
+                known_saturated_bug_families=self.known_saturated_bug_families,
             ),
         )
         findings = row.get("findings") or []
@@ -769,6 +790,7 @@ class GuidanceState:
                 root = str(finding.get("root_cause", "unknown"))
                 self.root_cause_counts[root] += 1
             self.candidate_bug_family_counts.update(candidate_bug_family_keys(findings))
+            self.issue_replay_family_counts.update(issue_replay_candidate_bug_family_keys(findings))
             self.candidate_bug_signature_counts.update(candidate_bug_signatures(findings))
 
     def _score_case(self, case: Case, candidate_count: int) -> GuidanceDecision:
@@ -805,14 +827,52 @@ class GuidanceState:
             for f in features
             if f.startswith("mixed_generator_profile:")
         )
+        predicted_roots = _predicted_roots(features)
         root_saturation_penalty = sum(
-            _root_saturation(self.root_cause_counts[root]) for root in _predicted_roots(features)
+            _root_saturation(self.root_cause_counts[root]) for root in predicted_roots
         )
+        family_saturation_penalty = 0.0
+        family_saturation_active = False
+        issue_replay_saturation_penalty = 0.0
+        issue_replay_saturation_active = False
+        if self.enable_family_saturation:
+            family_saturation_penalty = _predicted_family_saturation_penalty(
+                predicted_roots,
+                candidate_bug_family_counts=self.candidate_bug_family_counts,
+                known_saturated_bug_families=self.known_saturated_bug_families,
+                active_backends=self.active_backends,
+                threshold=self.family_saturation_threshold,
+                penalty_weight=self.family_saturation_penalty,
+            )
+            family_saturation_active = _has_predicted_saturated_family(
+                predicted_roots,
+                candidate_bug_family_counts=self.candidate_bug_family_counts,
+                known_saturated_bug_families=self.known_saturated_bug_families,
+                active_backends=self.active_backends,
+                threshold=self.family_saturation_threshold,
+            )
+            issue_replay_saturation_penalty = _predicted_family_saturation_penalty(
+                predicted_roots,
+                candidate_bug_family_counts=self.issue_replay_family_counts,
+                known_saturated_bug_families=[],
+                active_backends=self.active_backends,
+                threshold=self.issue_replay_saturation_threshold,
+                penalty_weight=self.issue_replay_saturation_penalty,
+            )
+            issue_replay_saturation_active = _has_predicted_saturated_family(
+                predicted_roots,
+                candidate_bug_family_counts=self.issue_replay_family_counts,
+                known_saturated_bug_families=[],
+                active_backends=self.active_backends,
+                threshold=self.issue_replay_saturation_threshold,
+            )
         if matched_targets:
             saturation_multiplier = 0.35 if specific_target_matches else 0.85
             feature_saturation_penalty *= saturation_multiplier
             root_saturation_penalty *= saturation_multiplier
             profile_saturation_penalty *= saturation_multiplier
+            family_saturation_penalty *= saturation_multiplier
+            issue_replay_saturation_penalty *= saturation_multiplier
         contribution_potential = _contribution_potential(
             features,
             frontier_buckets,
@@ -841,7 +901,13 @@ class GuidanceState:
             + finding_yield_bonus
             + combo_priority
         )
-        score -= feature_saturation_penalty + root_saturation_penalty + profile_saturation_penalty
+        score -= (
+            feature_saturation_penalty
+            + root_saturation_penalty
+            + profile_saturation_penalty
+            + family_saturation_penalty
+            + issue_replay_saturation_penalty
+        )
         return GuidanceDecision(
             case=case,
             score=score,
@@ -868,6 +934,12 @@ class GuidanceState:
                 "feature_saturation_penalty": -feature_saturation_penalty,
                 "root_saturation_penalty": -root_saturation_penalty,
                 "profile_saturation_penalty": -profile_saturation_penalty,
+                "family_saturation_penalty": -family_saturation_penalty,
+                "family_saturation_active": (
+                    1.0 if (family_saturation_active or issue_replay_saturation_active) else 0.0
+                ),
+                "issue_replay_saturation_penalty": -issue_replay_saturation_penalty,
+                "issue_replay_saturation_active": 1.0 if issue_replay_saturation_active else 0.0,
             },
         )
 
@@ -893,6 +965,10 @@ def _targeted_decision_key(decision: GuidanceDecision) -> tuple[float, float, fl
     if specific_matches > 0.0:
         return (1.0, specific_matches, target_priority, decision.score, -decision.case.seed)
     return (0.0, decision.score, target_priority, float(len(decision.matched_targets)), -decision.case.seed)
+
+
+def _decision_has_family_saturation(decision: GuidanceDecision) -> bool:
+    return decision.score_breakdown.get("family_saturation_active", 0.0) > 0.0
 
 
 def _matched_targets(features: set[str], targets: list[str]) -> list[str]:
@@ -980,6 +1056,83 @@ def _root_saturation(count: int) -> float:
     return math.log1p(count - 6) * 0.45
 
 
+def _predicted_family_saturation_penalty(
+    predicted_roots: set[str],
+    *,
+    candidate_bug_family_counts: Counter[str],
+    known_saturated_bug_families: list[str],
+    active_backends: list[str],
+    threshold: int,
+    penalty_weight: float,
+) -> float:
+    if threshold <= 0 or penalty_weight <= 0.0:
+        return 0.0
+    return sum(
+        _family_saturation(
+            _predicted_family_hit_count(
+                root,
+                candidate_bug_family_counts=candidate_bug_family_counts,
+                known_saturated_bug_families=known_saturated_bug_families,
+                active_backends=active_backends,
+                threshold=threshold,
+            ),
+            threshold=threshold,
+            penalty_weight=penalty_weight,
+        )
+        for root in predicted_roots
+    )
+
+
+def _has_predicted_saturated_family(
+    predicted_roots: set[str],
+    *,
+    candidate_bug_family_counts: Counter[str],
+    known_saturated_bug_families: list[str],
+    active_backends: list[str],
+    threshold: int,
+) -> bool:
+    if threshold <= 0:
+        return False
+    return any(
+        _predicted_family_hit_count(
+            root,
+            candidate_bug_family_counts=candidate_bug_family_counts,
+            known_saturated_bug_families=known_saturated_bug_families,
+            active_backends=active_backends,
+            threshold=threshold,
+        )
+        >= threshold
+        for root in predicted_roots
+    )
+
+
+def _predicted_family_hit_count(
+    root: str,
+    *,
+    candidate_bug_family_counts: Counter[str],
+    known_saturated_bug_families: list[str],
+    active_backends: list[str],
+    threshold: int,
+) -> int:
+    dynamic_hits = sum(
+        count
+        for family_key, count in candidate_bug_family_counts.items()
+        if _family_key_matches_root_backend(family_key, root, active_backends)
+    )
+    known_hits = (
+        threshold
+        if _known_family_matches_root_backend(root, known_saturated_bug_families, active_backends)
+        else 0
+    )
+    return max(dynamic_hits, known_hits)
+
+
+def _family_saturation(count: int, *, threshold: int, penalty_weight: float) -> float:
+    if count < threshold:
+        return 0.0
+    return max(0.0, penalty_weight) * (1.0 + math.log1p(count - threshold))
+
+
 def _profile_saturation(count: int) -> float:
     if count <= 3:
         return 0.0
@@ -992,15 +1145,26 @@ def _guidance_reward(
     root_cause_counts: Counter[str] | None = None,
     candidate_bug_family_counts: Counter[str] | None = None,
     candidate_bug_signature_counts: Counter[str] | None = None,
+    enable_family_saturation: bool = True,
+    family_saturation_threshold: int = 8,
+    saturated_family_reward: float = 0.02,
+    known_saturated_bug_families: list[str] | None = None,
 ) -> float:
     findings = row.get("findings") or []
     signals = row_reward_signals(row)
+    root_counts = Counter(root_cause_counts or {})
+    family_counts = Counter(candidate_bug_family_counts or {})
+    signature_counts = Counter(candidate_bug_signature_counts or {})
     reward = (
         _candidate_bug_guidance_reward(
             findings,
-            root_cause_counts=root_cause_counts or Counter(),
-            candidate_bug_family_counts=candidate_bug_family_counts or Counter(),
-            candidate_bug_signature_counts=candidate_bug_signature_counts or Counter(),
+            root_cause_counts=root_counts,
+            candidate_bug_family_counts=family_counts,
+            candidate_bug_signature_counts=signature_counts,
+            enable_family_saturation=enable_family_saturation,
+            family_saturation_threshold=family_saturation_threshold,
+            saturated_family_reward=saturated_family_reward,
+            known_saturated_bug_families=known_saturated_bug_families or [],
         )
         + 0.20 * signals["semantic_divergence_count"]
         + (0.5 if row.get("is_new_behavior") else 0.0)
@@ -1021,6 +1185,10 @@ def _candidate_bug_guidance_reward(
     root_cause_counts: Counter[str],
     candidate_bug_family_counts: Counter[str],
     candidate_bug_signature_counts: Counter[str],
+    enable_family_saturation: bool,
+    family_saturation_threshold: int,
+    saturated_family_reward: float,
+    known_saturated_bug_families: list[str],
 ) -> float:
     families = candidate_bug_family_keys(findings)
     signatures = candidate_bug_signatures(findings)
@@ -1029,7 +1197,17 @@ def _candidate_bug_guidance_reward(
         for family in families:
             root = family.split("@", 1)[0]
             previous_hits = max(candidate_bug_family_counts[family], root_cause_counts[root])
-            reward += _candidate_bug_novelty_reward(previous_hits)
+            if enable_family_saturation and _family_key_matches_known_family(
+                family,
+                known_saturated_bug_families,
+            ):
+                previous_hits = max(previous_hits, family_saturation_threshold)
+            reward += _candidate_bug_novelty_reward(
+                previous_hits,
+                enable_family_saturation=enable_family_saturation,
+                family_saturation_threshold=family_saturation_threshold,
+                saturated_family_reward=saturated_family_reward,
+            )
         if signatures:
             duplicate_signatures = sum(1 for signature in signatures if candidate_bug_signature_counts[signature] > 0)
             if duplicate_signatures == len(signatures):
@@ -1042,11 +1220,24 @@ def _candidate_bug_guidance_reward(
         if not is_candidate_bug_finding(finding):
             continue
         root = str(finding.get("root_cause", "unknown"))
-        reward += _candidate_bug_novelty_reward(root_cause_counts[root])
+        reward += _candidate_bug_novelty_reward(
+            root_cause_counts[root],
+            enable_family_saturation=enable_family_saturation,
+            family_saturation_threshold=family_saturation_threshold,
+            saturated_family_reward=saturated_family_reward,
+        )
     return reward
 
 
-def _candidate_bug_novelty_reward(previous_hits: int) -> float:
+def _candidate_bug_novelty_reward(
+    previous_hits: int,
+    *,
+    enable_family_saturation: bool = True,
+    family_saturation_threshold: int = 8,
+    saturated_family_reward: float = 0.02,
+) -> float:
+    if enable_family_saturation and family_saturation_threshold > 0 and previous_hits >= family_saturation_threshold:
+        return max(0.0, saturated_family_reward)
     if previous_hits <= 0:
         return 4.0
     if previous_hits <= 2:
@@ -1054,6 +1245,54 @@ def _candidate_bug_novelty_reward(previous_hits: int) -> float:
     if previous_hits <= 8:
         return 0.75 / math.sqrt(previous_hits)
     return 0.10
+
+
+def _known_family_matches_root_backend(
+    root: str,
+    known_saturated_bug_families: list[str],
+    active_backends: list[str],
+) -> bool:
+    return any(
+        _family_key_matches_root_backend(family_key, root, active_backends)
+        for family_key in known_saturated_bug_families
+    )
+
+
+def _family_key_matches_root_backend(
+    family_key: str,
+    root: str,
+    active_backends: list[str],
+) -> bool:
+    family_root, family_backends = _split_family_key(family_key)
+    return family_root == root and _family_backends_active(family_backends, active_backends)
+
+
+def _family_key_matches_known_family(candidate_family: str, known_saturated_bug_families: list[str]) -> bool:
+    candidate_root, candidate_backends = _split_family_key(candidate_family)
+    for known_family in known_saturated_bug_families:
+        known_root, known_backends = _split_family_key(known_family)
+        if known_root != candidate_root:
+            continue
+        if not known_backends or not candidate_backends or known_backends & candidate_backends:
+            return True
+    return False
+
+
+def _family_backends_active(family_backends: set[str], active_backends: list[str]) -> bool:
+    active = {str(backend).strip() for backend in active_backends if str(backend).strip()}
+    if not active or not family_backends or family_backends == {"unknown"}:
+        return True
+    return bool(family_backends & active)
+
+
+def _split_family_key(family_key: str) -> tuple[str, set[str]]:
+    root, _, backend_part = str(family_key).partition("@")
+    backends = {
+        backend.strip()
+        for backend in backend_part.split(",")
+        if backend.strip()
+    }
+    return root.strip(), backends
 
 
 def _finding_feature_weight(feature: str, online_weights: OnlineFeatureWeights | None = None) -> float:
@@ -2314,6 +2553,13 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("round_even_float_scale")
     if "pattern:series_rtruediv_operand_order" in features or "op:series_rtruediv_probe" in features:
         roots.add("series_rtruediv_operand_order")
+    if features & {
+        "pattern:polars_reverse_division_columns",
+        "expr:reverse_division_columns",
+        "series:reverse-division",
+        "arithmetic:reverse-division",
+    }:
+        roots.add("reverse_division_operand_order")
     if "pattern:pandas_uint64_isin_precision" in features or "op:uint64_isin_probe" in features:
         roots.add("pandas_uint64_isin_precision")
     if "pattern:duckdb_tuple_anti_null_semantics" in features or "op:tuple_anti_null_probe" in features:

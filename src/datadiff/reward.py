@@ -65,6 +65,18 @@ def candidate_bug_family_keys(findings: list[dict[str, Any]]) -> Counter[str]:
     return keys
 
 
+def issue_replay_candidate_bug_family_keys(findings: list[dict[str, Any]]) -> Counter[str]:
+    keys: Counter[str] = Counter()
+    for finding in findings:
+        if not is_candidate_bug_finding(finding) or not is_issue_replay_finding(finding):
+            continue
+        root = str(finding.get("root_cause", "unknown"))
+        if root.startswith("metamorphic_"):
+            continue
+        keys[f"{root}@{suspicious_key(finding)}"] += 1
+    return keys
+
+
 def candidate_bug_signatures(findings: list[dict[str, Any]]) -> Counter[str]:
     signatures: Counter[str] = Counter()
     for finding in findings:
