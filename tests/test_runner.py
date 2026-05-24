@@ -1132,6 +1132,40 @@ def test_run_fuzz_fresh_policy_filters_replay_profile(tmp_path):
     assert meta["replay_bug_filter"]["filtered_candidates"] > 0
 
 
+def test_run_fuzz_fresh_bughunt_uses_generation_time_replay_gate(tmp_path):
+    case_log = tmp_path / "fresh-bughunt.cases.jsonl"
+    config = ExperimentConfig(generator_profile="bughunt", enable_replay_bug=False)
+
+    run_file = run_fuzz(cases=1, seed=20, backends=[], config=config, case_log_file=case_log)
+
+    row = read_jsonl(run_file)[0]
+    case_log_row = read_jsonl(case_log)[0]
+    meta = load_json(run_meta_path(run_file))
+    assert meta["config"]["generator_profile"] == "bughunt"
+    assert meta["effective_generator_profile"] == "bughunt_fresh"
+    assert meta["replay_bug_filter"]["filtered_candidates"] == 0
+    assert row["case"].get("metadata", {}).get("mixed_generator_profile") != "wide_offset_topk"
+    assert row["replay_filter"]["filtered_before_candidate"] == 0
+    assert case_log_row["case"].get("metadata", {}).get("mixed_generator_profile") != "wide_offset_topk"
+
+
+def test_run_fuzz_custom_replay_source_gate_keeps_requested_generator_profile(tmp_path):
+    case_log = tmp_path / "custom-source-gate.cases.jsonl"
+    config = ExperimentConfig(
+        generator_profile="bughunt",
+        enable_replay_bug=False,
+        replay_bug_source_issues=[],
+    )
+
+    run_file = run_fuzz(cases=1, seed=20, backends=[], config=config, case_log_file=case_log)
+
+    case_log_row = read_jsonl(case_log)[0]
+    meta = load_json(run_meta_path(run_file))
+    assert meta["effective_generator_profile"] == "bughunt"
+    assert meta["replay_bug_filter"]["filtered_candidates"] == 0
+    assert case_log_row["case"]["metadata"]["mixed_generator_profile"] == "wide_offset_topk"
+
+
 def test_run_fuzz_replay_policy_allows_replay_profile(tmp_path):
     case_log = tmp_path / "replay.cases.jsonl"
     config = ExperimentConfig(

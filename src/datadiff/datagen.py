@@ -15,6 +15,7 @@ GeneratorProfile = Literal[
     "edge_float",
     "workflow",
     "bughunt",
+    "bughunt_fresh",
     "bughunt_no_groupby",
     "null_groupby_topk",
     "null_agg_topk",
@@ -73,7 +74,11 @@ GeneratorProfile = Literal[
 
 
 def _is_bughunt_profile(profile: GeneratorProfile) -> bool:
-    return profile in {"bughunt", "bughunt_no_groupby"}
+    return profile in {"bughunt", "bughunt_fresh", "bughunt_no_groupby"}
+
+
+def _bughunt_allows_groupby(profile: GeneratorProfile) -> bool:
+    return profile in {"bughunt", "bughunt_fresh"}
 
 
 def _rand_str(rnd: random.Random) -> str | None:
@@ -265,7 +270,7 @@ def generate_program(
             "offset",
             "select",
         ]
-        if profile == "bughunt":
+        if _bughunt_allows_groupby(profile):
             op_pool.extend(["groupby", "groupby"])
     if extra_tables:
         op_pool.extend(["join", "join"] if bughunt_profile else ["join"])
@@ -304,7 +309,7 @@ def generate_program(
             elif "filter" not in emitted_ops and comparable_cols and len(ops) >= 2 and remaining > 2:
                 op = "filter"
             elif (
-                profile == "bughunt"
+                _bughunt_allows_groupby(profile)
                 and
                 "groupby" not in emitted_ops
                 and numeric_cols
@@ -1288,6 +1293,10 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         mixed = _bughunt_issue_inspired_case(seed)
         if mixed is not None:
             return mixed
+    if profile == "bughunt_fresh" and type_aware:
+        mixed = _bughunt_fresh_issue_inspired_case(seed)
+        if mixed is not None:
+            return mixed
     if profile == "null_groupby_topk" and type_aware:
         return generate_null_groupby_topk_case(seed)
     if profile == "null_agg_topk" and type_aware:
@@ -1421,7 +1430,15 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         extra_tables=extra_tables,
         profile=profile,
     )
-    suffix = "-bughunt" if profile == "bughunt" else "-bughunt-no-groupby" if profile == "bughunt_no_groupby" else ""
+    suffix = (
+        "-bughunt"
+        if profile == "bughunt"
+        else "-bughunt-fresh"
+        if profile == "bughunt_fresh"
+        else "-bughunt-no-groupby"
+        if profile == "bughunt_no_groupby"
+        else ""
+    )
     return Case(case_id=f"case-{seed:08d}{suffix}", seed=seed, tables=[table] + extra_tables, program=program)
 
 
@@ -1604,6 +1621,21 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
             "pyarrow_groupby_filter_cast_membership",
         )
     return None
+
+
+def _bughunt_fresh_issue_inspired_case(seed: int) -> Case | None:
+    mixed = _bughunt_issue_inspired_case(seed)
+    if mixed is None:
+        return None
+    from datadiff.case_policy import replay_bug_filter_reason
+    from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES
+
+    skip_reason = replay_bug_filter_reason(
+        mixed,
+        enable_replay_bug=False,
+        replay_bug_source_issues=DEFAULT_REPLAY_BUG_SOURCE_ISSUES,
+    )
+    return None if skip_reason else mixed
 
 
 def _bughunt_no_groupby_issue_inspired_case(seed: int) -> Case | None:

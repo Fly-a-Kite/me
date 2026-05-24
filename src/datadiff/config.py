@@ -9,6 +9,7 @@ GeneratorProfile = Literal[
     "edge_float",
     "workflow",
     "bughunt",
+    "bughunt_fresh",
     "bughunt_no_groupby",
     "null_groupby_topk",
     "null_agg_topk",

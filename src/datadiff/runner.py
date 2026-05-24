@@ -11,7 +11,7 @@ from datadiff.backends import make_backend
 from datadiff.backends.base import Backend
 from datadiff.case_policy import replay_bug_filter_reason
 from datadiff.classification_oracle import annotate_findings
-from datadiff.config import ExperimentConfig
+from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES, ExperimentConfig
 from datadiff.datagen import generate_case
 from datadiff.dsl import Case
 from datadiff.env import collect_environment
@@ -254,6 +254,22 @@ def _replay_bug_filter_reason(case_item: Case, config: ExperimentConfig) -> str:
     )
 
 
+def _effective_generator_profile(config: ExperimentConfig) -> str:
+    if (
+        not config.enable_replay_bug
+        and config.generator_profile == "bughunt"
+        and _uses_default_replay_source_gate(config)
+    ):
+        return "bughunt_fresh"
+    return config.generator_profile
+
+
+def _uses_default_replay_source_gate(config: ExperimentConfig) -> bool:
+    default_sources = {str(source).strip().rstrip("/") for source in DEFAULT_REPLAY_BUG_SOURCE_ISSUES}
+    configured_sources = {str(source).strip().rstrip("/") for source in config.replay_bug_source_issues}
+    return default_sources.issubset(configured_sources)
+
+
 def _execute_case(
     case: Case,
     backends: list[str],
@@ -432,6 +448,7 @@ def run_fuzz(
     replay_filtered_candidate_count = 0
     replay_filter_fallback_count = 0
     quality_oracle_counts: dict[str, int] = {}
+    effective_generator_profile = _effective_generator_profile(config)
 
     def snapshot(status: str) -> dict[str, Any]:
         elapsed_s = time.perf_counter() - started
@@ -467,6 +484,7 @@ def run_fuzz(
                 "candidate_pool": candidate_pool,
                 "targets": config.guidance_targets,
             },
+            "effective_generator_profile": effective_generator_profile,
             "backends": backends,
             "targets": target_specs,
             "common_capabilities": target_common_capabilities,
@@ -505,7 +523,7 @@ def run_fuzz(
                 generated = generate_case(
                     case_seed,
                     type_aware=config.enable_type_aware_generation,
-                    profile=config.generator_profile,
+                    profile=effective_generator_profile,
                 )
                 selected = feedback.choose_case(case_seed, generated) if feedback is not None else generated
                 source = getattr(feedback, "last_candidate_source", "generated") if feedback is not None else "generated"
