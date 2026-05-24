@@ -224,6 +224,8 @@ def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
         "global_null_aggregate",
         "string_count_groupby",
         "unique_count_groupby",
+        "bool_null_groupby_agg",
+        "large_int_filter_groupby",
         "set_membership_filter",
         "null_predicate_filter",
         "boolean_predicate_filter",
@@ -231,6 +233,8 @@ def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
         "tuple_absence_filter",
         "row_value_absence_filter",
         "running_sum_precision",
+        "partitioned_running_sum",
+        "path_basename_keyed_pick",
         "sortedness_null_placement",
         "simple_case_random_subject",
         "group_quantile_key_probe",
@@ -239,6 +243,8 @@ def test_guidance_generated_target_profiles_stay_aligned_with_patterns():
         "struct_distinct_unnest",
         "bit_compare_unequal_length",
         "round_even_float_scale",
+        "duckdb_float_literal_precision",
+        "polars_timestamp_precision_filter",
         "series_rtruediv_operand_order",
         "pandas_uint64_isin_precision",
         "duckdb_tuple_anti_null_semantics",
@@ -337,6 +343,19 @@ def test_guidance_recognizes_empty_filter_groupby_pattern():
     assert "filter:empty-output" in features
     assert "pattern:empty_filter_groupby" in features
     assert decision.matched_targets == ["empty_filter_groupby"]
+
+
+def test_guidance_recognizes_csv_long_numeric_roundtrip_pattern():
+    case = generate_case(153, profile="csv_long_numeric_roundtrip")
+    guidance = GuidanceState(targets=["csv_long_numeric_roundtrip", "csv_numeric_inference"])
+
+    features = extract_case_features(case)
+    decision = guidance.choose_case([case])
+
+    assert "csv:long-numeric-roundtrip" in features
+    assert "csv:numeric-inference" in features
+    assert "pattern:csv_long_numeric_roundtrip" in features
+    assert decision.matched_targets == ["csv_long_numeric_roundtrip", "csv_numeric_inference"]
 
 
 def test_guidance_uses_actual_left_join_output_for_sort_null_order():
@@ -905,7 +924,7 @@ def test_guidance_family_saturation_demotes_runtime_repeated_family():
     assert decision.case is fresh_case
 
 
-def test_guidance_reward_strongly_discounts_known_saturated_candidate_bug_family():
+def test_guidance_reward_excludes_known_saturated_candidate_bug_family():
     row = {
         "findings": [
             {
@@ -923,7 +942,7 @@ def test_guidance_reward_strongly_discounts_known_saturated_candidate_bug_family
         known_saturated_bug_families=["reverse_division_operand_order@polars"],
     )
 
-    assert 0.0 < reward < 0.05
+    assert reward < 0.0
 
 
 def test_guidance_issue_replay_saturation_demotes_repeated_replay_family():
@@ -975,6 +994,8 @@ def test_guidance_global_issue_replay_saturation_demotes_distinct_replay_probe()
         "window_avg_rows_frame",
         "bit_compare_unequal_length",
         "round_even_float_scale",
+        "duckdb_float_literal_precision",
+        "polars_timestamp_precision_filter",
     ]
     for idx, root in enumerate(replay_roots):
         guidance.record_result(
@@ -996,7 +1017,7 @@ def test_guidance_global_issue_replay_saturation_demotes_distinct_replay_probe()
     replay_decision = guidance.choose_case([replay_case])
     decision = guidance.choose_case([replay_case, fresh_case])
 
-    assert guidance.issue_replay_count == 4
+    assert guidance.issue_replay_count == len(replay_roots)
     assert replay_decision.score_breakdown["issue_replay_global_saturation_active"] == 1.0
     assert replay_decision.score_breakdown["issue_replay_global_saturation_penalty"] < 0.0
     assert replay_decision.score_breakdown["issue_replay_saturation_active"] == 1.0
@@ -1038,6 +1059,116 @@ def test_guidance_issue_inspired_source_saturation_demotes_repeated_source_issue
     assert inspired_decision.score_breakdown["issue_inspired_source_saturation_active"] == 1.0
     assert inspired_decision.score_breakdown["issue_inspired_source_saturation_penalty"] < 0.0
     assert decision.case is fresh_case
+
+
+def test_guidance_issue_inspired_source_saturation_tracks_executed_cases_without_findings():
+    repeated_case = _case(79, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}])
+    repeated_case.metadata["source_issue"] = "https://github.com/pola-rs/polars/issues/27726"
+    fresh_case = _case(80, [{"op": "mutate", "column": "m_0", "expr": {"kind": "add_const", "source": "x", "value": 1}}])
+    guidance = GuidanceState(
+        targets=["filter"],
+        issue_inspired_source_saturation_threshold=2,
+        issue_inspired_source_saturation_penalty=1.25,
+    )
+    for _ in range(2):
+        guidance.record_result(
+            repeated_case,
+            {
+                "findings": [],
+                "preflight": {"valid": True, "fallback_used": False},
+            },
+        )
+
+    repeated_decision = guidance.choose_case([repeated_case])
+    decision = guidance.choose_case([repeated_case, fresh_case])
+
+    assert guidance.issue_inspired_source_counts["https://github.com/pola-rs/polars/issues/27726"] == 2
+    assert repeated_decision.score_breakdown["issue_inspired_source_saturation_active"] == 1.0
+    assert repeated_decision.score_breakdown["issue_inspired_source_saturation_penalty"] < 0.0
+    assert decision.case is fresh_case
+
+
+def test_guidance_profile_saturation_tracks_executed_issue_focus_templates_without_findings():
+    repeated_case = _case(81, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}])
+    repeated_case.metadata.update(
+        {
+            "generator_profile": "issue_focus",
+            "mixed_generator_profile": "set_membership_filter",
+        }
+    )
+    fresh_case = _case(82, [{"op": "filter", "column": "x", "cmp": "!=", "value": 0}])
+    fresh_case.metadata.update(
+        {
+            "generator_profile": "issue_focus",
+            "mixed_generator_profile": "null_predicate_filter",
+        }
+    )
+    guidance = GuidanceState(targets=["set_membership_filter", "null_predicate_filter", "filter"])
+    for _ in range(5):
+        guidance.record_result(
+            repeated_case,
+            {
+                "findings": [],
+                "preflight": {"valid": True, "fallback_used": False},
+            },
+        )
+
+    repeated_decision = guidance.choose_case([repeated_case])
+    decision = guidance.choose_case([repeated_case, fresh_case])
+
+    assert guidance.feature_counts["mixed_generator_profile:set_membership_filter"] == 5
+    assert repeated_decision.score_breakdown["profile_saturation_active"] == 1.0
+    assert repeated_decision.score_breakdown["profile_saturation_penalty"] < 0.0
+    assert decision.case is fresh_case
+
+
+def test_guidance_profile_saturation_breaks_ties_between_targeted_profiles():
+    repeated_case = _case(
+        83,
+        [
+            {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+            {"op": "sort", "columns": ["x", "g", "id"], "ascending": True},
+            {"op": "groupby", "keys": ["g"], "aggs": [{"column": "x", "func": "count", "as": "count_x"}]},
+            {"op": "select", "columns": ["g", "count_x"]},
+            {"op": "sort", "columns": ["count_x", "g"], "ascending": False},
+            {"op": "limit", "n": 3},
+        ],
+    )
+    repeated_case.metadata.update(
+        {
+            "generator_profile": "issue_focus",
+            "mixed_generator_profile": "join_ordered_agg_topk",
+        }
+    )
+    less_repeated_case = _case(84, [{"op": "filter", "column": "g", "cmp": "in_set", "value": ["alpha"]}])
+    less_repeated_case.metadata.update(
+        {
+            "generator_profile": "issue_focus",
+            "mixed_generator_profile": "set_membership_filter",
+        }
+    )
+    guidance = GuidanceState(
+        targets=["join_ordered_agg_topk", "set_membership_filter", "join", "filter", "groupby", "sort_limit"]
+    )
+    for _ in range(20):
+        guidance.record_result(repeated_case, {"findings": [], "preflight": {"valid": True, "fallback_used": False}})
+    for _ in range(4):
+        guidance.record_result(
+            less_repeated_case,
+            {"findings": [], "preflight": {"valid": True, "fallback_used": False}},
+        )
+
+    repeated_decision = guidance.choose_case([repeated_case])
+    less_repeated_decision = guidance.choose_case([less_repeated_case])
+    decision = guidance.choose_case([repeated_case, less_repeated_case])
+
+    assert repeated_decision.score_breakdown["profile_saturation_active"] == 1.0
+    assert less_repeated_decision.score_breakdown["profile_saturation_active"] == 1.0
+    assert (
+        repeated_decision.score_breakdown["profile_saturation_penalty"]
+        < less_repeated_decision.score_breakdown["profile_saturation_penalty"]
+    )
+    assert decision.case is less_repeated_case
 
 
 def test_guidance_frontier_conformance_prefers_boundary_case():

@@ -44,7 +44,7 @@ def test_default_final_plan_includes_only_confirmed_historical_specs():
     historical = [command for command in commands if command.track == "historical"]
     assert [command.name for command in historical] == ["duckdb-22075", "duckdb-22656"]
     assert all(command.count_as_real_bugs for command in historical)
-    assert sum(1 for command in commands if command.track == "live") == 5
+    assert sum(1 for command in commands if command.track == "live") == 11
     assert sum(1 for command in commands if command.track == "seeded") == 1
 
 
@@ -89,8 +89,15 @@ def test_live_and_seeded_commands_record_evidence_mode():
     commands = module.build_plan(_args())
     by_track = {command.track: command for command in commands if command.track == "seeded"}
     live = [command for command in commands if command.track == "live"]
+    live_names = {command.name for command in live}
 
     assert live
+    assert "datafusion_cross:live_datafusion_fresh" in live_names
+    assert "latest_no_datafusion:live_cross_family" in live_names
+    assert "polars_cross:live_polars_issue_focus" in live_names
+    assert "embedded_sql_cross:live_duckdb_issue_focus" in live_names
+    assert "arrow_cross:live_arrow_issue_focus" in live_names
+    assert "latest_no_datafusion:live_issue_focus" in live_names
     assert all("--evidence-mode" in command.command and "live" in command.command for command in live)
     assert all("--run-theme" in command.command and "--paper-notes" in command.command for command in live)
     assert "--evidence-mode" in by_track["seeded"].command

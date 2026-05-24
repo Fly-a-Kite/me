@@ -1,4 +1,5 @@
-from datadiff.case_policy import case_discovery_origin
+from datadiff.case_policy import case_discovery_origin, replay_bug_filter_reason
+from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES
 from datadiff.datagen import generate_case, repair_operations
 from datadiff.classification_oracle import validate_case_program
 from datadiff.dsl import sort_columns
@@ -34,6 +35,11 @@ def _assert_program_columns_are_valid(case):
             assert all(key["column"] in known_cols for key in op["order_by"])
             assert not is_reserved_output_name(op["column"])
             known_cols.add(op["column"])
+        elif op["op"] == "row_number_filter":
+            assert all(column in known_cols for column in op.get("partition_by", []))
+            assert all(key["column"] in known_cols for key in op["order_by"])
+            assert op["cmp"] in {"==", "<", "<="}
+            assert op["value"] > 0
         elif op["op"] == "sortedness_check":
             assert op["column"] in known_cols
             assert not is_reserved_output_name(op["as"])
@@ -89,6 +95,15 @@ def _assert_program_columns_are_valid(case):
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
         elif op["op"] == "eval_inplace_alias_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
+        elif op["op"] == "bool_reduction_skipna_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
+        elif op["op"] == "dataset_isin_all_match_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
+        elif op["op"] == "run_end_null_compute_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
         elif op["op"] == "large_string_partition_probe":
@@ -200,6 +215,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "wide_offset_topk",
         "join_null_key_topk",
         "empty_filter_groupby",
+        "partitioned_running_sum",
         "ordered_groupby_sort",
         "topk_resort",
         "join_ordered_agg_topk",
@@ -212,6 +228,8 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "struct_distinct_unnest",
         "bit_compare_unequal_length",
         "round_even_float_scale",
+        "duckdb_float_literal_precision",
+        "polars_timestamp_precision_filter",
         "series_rtruediv_operand_order",
         "polars_reverse_division_columns",
         "pandas_uint64_isin_precision",
@@ -230,6 +248,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "pyarrow_large_string_partition_schema_semantics",
         "pyarrow_hash_pivot_wider_order_semantics",
         "polars_rolling_mean_by_null_count_semantics",
+        "csv_long_numeric_roundtrip",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
     assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
@@ -241,6 +260,29 @@ def test_generate_case_bughunt_no_groupby_profile_is_supported_and_valid():
     assert case.program.operations
     assert all(op["op"] != "groupby" for op in case.program.operations)
     assert validate_case_program(case) == []
+
+
+def test_generate_case_issue_focus_profile_is_policy_gated_and_valid():
+    cases = [generate_case(seed, profile="issue_focus") for seed in range(45)]
+    mixed_profiles = {case.metadata.get("mixed_generator_profile") for case in cases}
+
+    assert {"empty_filter_groupby", "row_value_absence_filter", "polars_reverse_division_columns"}.issubset(
+        mixed_profiles
+    )
+    filter_reasons = set()
+    for case in cases:
+        assert case.metadata["generator_profile"] == "issue_focus"
+        assert case.case_id.startswith(f"case-{case.seed:08d}-issue-focus-")
+        assert validate_case_program(case) == []
+        filter_reasons.add(
+            replay_bug_filter_reason(
+                case,
+                enable_replay_bug=False,
+                replay_bug_source_issues=DEFAULT_REPLAY_BUG_SOURCE_ISSUES,
+            )
+        )
+    assert "" in filter_reasons
+    assert {"known_replay_source_issue", "issue_replay_probe"}.issubset(filter_reasons)
 
 
 def test_bughunt_no_groupby_profile_excludes_groupby_without_type_aware_generation():
@@ -542,6 +584,37 @@ def test_generate_case_unique_count_groupby_profile_is_supported_and_valid():
     assert validate_case_program(case) == []
 
 
+def test_generate_case_bool_null_groupby_agg_profile_is_supported_and_valid():
+    case = generate_case(123, profile="bool_null_groupby_agg")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000123-bool-null-groupby-agg"
+    assert [op["op"] for op in case.program.operations] == ["groupby", "sort", "limit"]
+    assert "pattern:bool_null_groupby_agg" in features
+    assert "agg:boolean" in features
+    assert "agg:any:bool" in features
+    assert "agg:all:bool" in features
+    assert "agg:min:bool" in features
+    assert "agg:max:bool" in features
+    assert "groupby:null-key" in features
+    assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/26671"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_large_int_filter_groupby_profile_is_supported_and_valid():
+    case = generate_case(123, profile="large_int_filter_groupby")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000123-large-int-filter-groupby"
+    assert [op["op"] for op in case.program.operations] == ["filter", "groupby", "sort", "limit"]
+    assert "pattern:large_int_filter_groupby" in features
+    assert "int:large-magnitude" in features
+    assert "filter:set-membership" in features or "filter:range-closed" in features or "cmp:!=" in features
+    assert "groupby:null-key" in features
+    assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/27726"
+    assert validate_case_program(case) == []
+
+
 def test_generate_case_set_membership_filter_profile_is_supported_and_valid():
     case = generate_case(123, profile="set_membership_filter")
     features = extract_case_features(case)
@@ -678,6 +751,43 @@ def test_generate_case_running_sum_precision_profile_is_supported_and_valid():
     assert validate_case_program(case) == []
 
 
+def test_generate_case_partitioned_running_sum_profile_is_supported_and_valid():
+    case = generate_case(126, profile="partitioned_running_sum")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000126-partitioned-running-sum"
+    assert [op["op"] for op in case.program.operations] == ["running_sum", "sort", "select"]
+    assert case.program.operations[0]["partition_by"] == ["grp"]
+    assert "pattern:partitioned_running_sum" in features
+    assert "running:partitioned" in features
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_path_basename_keyed_pick_profile_is_supported_and_valid():
+    case = generate_case(107, profile="path_basename_keyed_pick")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000107-path-basename-keyed-pick"
+    assert [op["op"] for op in case.program.operations] == [
+        "mutate",
+        "row_number_filter",
+        "sort",
+        "select",
+    ]
+    assert case.program.operations[0]["expr"] == {"kind": "string_basename", "source": "path_value"}
+    assert case.program.operations[1]["partition_by"] == ["grp"]
+    assert case.program.operations[1]["order_by"] == [
+        {"column": "pick_key", "ascending": True, "nulls": "last"}
+    ]
+    assert case.program.order_sensitive is True
+    assert case_discovery_origin(case) == "issue_replay"
+    assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/22849"
+    assert "pattern:path_basename_keyed_pick" in features
+    assert "expr:string_basename" in features
+    assert "op:row_number_filter" in features
+    assert validate_case_program(case) == []
+
+
 def test_generate_case_sortedness_null_placement_profile_is_supported_and_valid():
     case = generate_case(127, profile="sortedness_null_placement")
     features = extract_case_features(case)
@@ -797,6 +907,38 @@ def test_generate_case_round_even_float_scale_profile_is_supported_and_valid():
     assert "pattern:round_even_float_scale" in features
     assert "numeric:round-even" in features
     assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/19491"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_duckdb_float_literal_precision_profile_is_supported_and_valid():
+    case = generate_case(135, profile="duckdb_float_literal_precision")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000135-duckdb-float-literal-precision"
+    assert case.program.operations == [
+        {
+            "op": "float_literal_precision_probe",
+            "as": "float_literal_precision_mismatch",
+            "literal": "0.41000000000000003",
+        }
+    ]
+    assert "pattern:duckdb_float_literal_precision" in features
+    assert "float:literal-cast-consistency" in features
+    assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/22837"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_polars_timestamp_precision_filter_profile_is_supported_and_valid():
+    case = generate_case(136, profile="polars_timestamp_precision_filter")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000136-polars-timestamp-precision-filter"
+    assert case.program.operations == [
+        {"op": "timestamp_precision_filter_probe", "as": "timestamp_precision_filter_mismatch"}
+    ]
+    assert "pattern:polars_timestamp_precision_filter" in features
+    assert "timestamp:precision-filter" in features
+    assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/27726"
     assert validate_case_program(case) == []
 
 
@@ -992,6 +1134,20 @@ def test_generate_case_pandas_eval_inplace_aliasing_semantics_profile_is_support
     assert validate_case_program(case) == []
 
 
+def test_generate_case_pandas_bool_reduction_skipna_semantics_profile_is_supported_and_valid():
+    case = generate_case(151, profile="pandas_bool_reduction_skipna_semantics")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000151-pandas-bool-reduction-skipna-semantics"
+    assert case.program.operations == [
+        {"op": "bool_reduction_skipna_probe", "as": "bool_reduction_skipna_mismatch"}
+    ]
+    assert "pattern:pandas_bool_reduction_skipna_semantics" in features
+    assert "pandas:bool-reduction-skipna" in features
+    assert case.metadata["source_issue"] == "https://github.com/pandas-dev/pandas/issues/65710"
+    assert validate_case_program(case) == []
+
+
 def test_generate_case_pyarrow_dataset_isin_all_match_semantics_profile_is_supported_and_valid():
     case = generate_case(145, profile="pyarrow_dataset_isin_all_match_semantics")
     features = extract_case_features(case)
@@ -1003,6 +1159,20 @@ def test_generate_case_pyarrow_dataset_isin_all_match_semantics_profile_is_suppo
     assert "pattern:pyarrow_dataset_isin_all_match_semantics" in features
     assert "pyarrow:dataset-isin-all-match" in features
     assert case.metadata["source_issue"] == "https://github.com/apache/arrow/issues/46183"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_pyarrow_run_end_null_compute_semantics_profile_is_supported_and_valid():
+    case = generate_case(146, profile="pyarrow_run_end_null_compute_semantics")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000146-pyarrow-run-end-null-compute-semantics"
+    assert case.program.operations == [
+        {"op": "run_end_null_compute_probe", "as": "run_end_null_compute_mismatch"}
+    ]
+    assert "pattern:pyarrow_run_end_null_compute_semantics" in features
+    assert "pyarrow:run-end-null-compute" in features
+    assert case.metadata["source_issue"] == "https://github.com/apache/arrow/issues/49889"
     assert validate_case_program(case) == []
 
 
@@ -1045,6 +1215,20 @@ def test_generate_case_polars_rolling_mean_by_null_count_semantics_profile_is_su
     assert "pattern:polars_rolling_mean_by_null_count_semantics" in features
     assert "polars:rolling-mean-by-null-count" in features
     assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/27661"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_csv_long_numeric_roundtrip_profile_is_supported_and_fresh_safe():
+    case = generate_case(153, profile="csv_long_numeric_roundtrip")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000153-csv-long-numeric-roundtrip"
+    assert case.program.operations[0]["op"] == "csv_long_numeric_roundtrip_probe"
+    assert case.program.operations[0]["as"] == "csv_long_numeric_roundtrip_mismatch"
+    assert case.program.operations[0]["values"]
+    assert "pattern:csv_long_numeric_roundtrip" in features
+    assert "csv:long-numeric-roundtrip" in features
+    assert "source_issue" not in case.metadata
     assert validate_case_program(case) == []
 
 

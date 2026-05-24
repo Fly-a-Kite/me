@@ -67,6 +67,27 @@ def test_classify_operation_combo_tracks_running_sum_precision_risk():
     assert combo["has_sort_limit"] is True
 
 
+def test_classify_operation_combo_tracks_partitioned_running_sum_risk():
+    combo = classify_operation_combo([{"op": "running_sum", "partition_by": ["g"]}, {"op": "sort"}])
+
+    assert combo["template"] == "running_sum_sort"
+    assert "partitioned_running_sum" in combo["correctness_risks"]
+
+
+def test_classify_operation_combo_tracks_path_projection_keyed_pick_risk():
+    combo = classify_operation_combo(
+        [
+            {"op": "mutate", "expr": {"kind": "string_basename", "source": "path_value"}},
+            {"op": "row_number_filter"},
+            {"op": "select"},
+        ]
+    )
+
+    assert combo["template"] == "mutate_row_number_filter_select"
+    assert "keyed_row_pick" in combo["correctness_risks"]
+    assert "path_projection_keyed_pick" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_sortedness_null_placement_risk():
     combo = classify_operation_combo([{"op": "sort"}, {"op": "sortedness_check"}])
 
@@ -121,6 +142,20 @@ def test_classify_operation_combo_tracks_round_even_float_scale_risk():
 
     assert combo["template"] == "round_even_probe"
     assert "round_even_float_scale" in combo["correctness_risks"]
+
+
+def test_classify_operation_combo_tracks_duckdb_float_literal_precision_risk():
+    combo = classify_operation_combo([{"op": "float_literal_precision_probe"}])
+
+    assert combo["template"] == "float_literal_precision_probe"
+    assert "duckdb_float_literal_precision" in combo["correctness_risks"]
+
+
+def test_classify_operation_combo_tracks_polars_timestamp_precision_filter_risk():
+    combo = classify_operation_combo([{"op": "timestamp_precision_filter_probe"}])
+
+    assert combo["template"] == "timestamp_precision_filter_probe"
+    assert "polars_timestamp_precision_filter" in combo["correctness_risks"]
 
 
 def test_classify_operation_combo_tracks_series_rtruediv_operand_order_risk():
@@ -214,11 +249,25 @@ def test_classify_operation_combo_tracks_pandas_eval_inplace_aliasing_risk():
     assert "pandas_eval_inplace_aliasing_semantics" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_pandas_bool_reduction_skipna_semantics_risk():
+    combo = classify_operation_combo([{"op": "bool_reduction_skipna_probe"}])
+
+    assert combo["template"] == "bool_reduction_skipna_probe"
+    assert "pandas_bool_reduction_skipna_semantics" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_pyarrow_dataset_isin_all_match_semantics_risk():
     combo = classify_operation_combo([{"op": "dataset_isin_all_match_probe"}])
 
     assert combo["template"] == "dataset_isin_all_match_probe"
     assert "pyarrow_dataset_isin_all_match_semantics" in combo["correctness_risks"]
+
+
+def test_classify_operation_combo_tracks_pyarrow_run_end_null_compute_semantics_risk():
+    combo = classify_operation_combo([{"op": "run_end_null_compute_probe"}])
+
+    assert combo["template"] == "run_end_null_compute_probe"
+    assert "pyarrow_run_end_null_compute_semantics" in combo["correctness_risks"]
 
 
 def test_classify_operation_combo_tracks_pyarrow_large_string_partition_schema_risk():
@@ -240,6 +289,13 @@ def test_classify_operation_combo_tracks_polars_rolling_mean_by_null_count_seman
 
     assert combo["template"] == "rolling_mean_by_null_count_probe"
     assert "polars_rolling_mean_by_null_count_semantics" in combo["correctness_risks"]
+
+
+def test_classify_operation_combo_tracks_csv_long_numeric_roundtrip_risk():
+    combo = classify_operation_combo([{"op": "csv_long_numeric_roundtrip_probe"}])
+
+    assert combo["template"] == "csv_long_numeric_roundtrip_probe"
+    assert "csv_long_numeric_roundtrip" in combo["correctness_risks"]
 
 
 def test_classify_operation_combo_tracks_global_aggregation_pipeline():

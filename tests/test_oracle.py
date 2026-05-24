@@ -153,6 +153,31 @@ def test_oracle_classifies_groupby_after_join_as_aggregation():
     assert findings[0].root_cause == "groupby_aggregation"
 
 
+def test_oracle_classifies_csv_long_numeric_roundtrip_probe():
+    case = generate_case(153, profile="csv_long_numeric_roundtrip")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult(
+                "reference",
+                "ok",
+                ["csv_long_numeric_roundtrip_mismatch"],
+                [[False]],
+            ),
+            "duckdb": NormalizedResult(
+                "duckdb",
+                "ok",
+                ["csv_long_numeric_roundtrip_mismatch"],
+                [[True]],
+            ),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "csv_long_numeric_roundtrip"
+
+
 def test_oracle_classifies_outer_join_truth_filter_before_plain_join():
     case = Case(
         "case-outer-join-truth-filter",
@@ -452,6 +477,36 @@ def test_oracle_classifies_round_even_float_scale():
     assert findings[0].root_cause == "round_even_float_scale"
 
 
+def test_oracle_classifies_duckdb_float_literal_precision():
+    case = generate_case(370027, profile="duckdb_float_literal_precision")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["float_literal_precision_mismatch"], [[False]]),
+            "duckdb": NormalizedResult("duckdb", "ok", ["float_literal_precision_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "duckdb_float_literal_precision"
+
+
+def test_oracle_classifies_polars_timestamp_precision_filter():
+    case = generate_case(370028, profile="polars_timestamp_precision_filter")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["timestamp_precision_filter_mismatch"], [[False]]),
+            "polars": NormalizedResult("polars", "ok", ["timestamp_precision_filter_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "polars_timestamp_precision_filter"
+
+
 def test_oracle_classifies_series_rtruediv_operand_order():
     case = generate_case(370027, profile="series_rtruediv_operand_order")
 
@@ -465,6 +520,88 @@ def test_oracle_classifies_series_rtruediv_operand_order():
 
     assert findings
     assert findings[0].root_cause == "series_rtruediv_operand_order"
+
+
+def test_oracle_classifies_reverse_division_before_later_filter():
+    case = Case(
+        "case-reverse-division-filter",
+        1,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("group_code", "int"),
+                    ColumnSpec("numerator_value", "float"),
+                    ColumnSpec("divisor_value", "float"),
+                ],
+                [{"group_code": 1, "numerator_value": 4.0, "divisor_value": 5.0}],
+            )
+        ],
+        Program(
+            "prog-reverse-division-filter",
+            1,
+            [
+                {
+                    "op": "mutate",
+                    "column": "ratio_value",
+                    "expr": {
+                        "kind": "reverse_division_columns",
+                        "numerator": "numerator_value",
+                        "source": "divisor_value",
+                    },
+                },
+                {"op": "select", "columns": ["group_code", "ratio_value"]},
+                {"op": "filter", "column": "group_code", "cmp": "range_closed", "value": [-1, 2]},
+            ],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["group_code", "ratio_value"], [[1, 1.25]]),
+            "polars": NormalizedResult("polars", "ok", ["group_code", "ratio_value"], [[1, 0.8]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "reverse_division_operand_order"
+
+
+def test_oracle_classifies_tuple_absence_before_outer_join_truth_filter():
+    case = Case(
+        "case-tuple-absence-after-left-join",
+        1,
+        [
+            TableData("t0", [ColumnSpec("id", "int"), ColumnSpec("s", "str")], [{"id": 1, "s": "a"}]),
+            TableData("t1", [ColumnSpec("id", "int"), ColumnSpec("tag", "str")], [{"id": None, "tag": None}]),
+        ],
+        Program(
+            "prog-tuple-absence-after-left-join",
+            1,
+            [
+                {"op": "join", "table": "t1", "how": "left", "left_on": "id", "right_on": "id"},
+                {"op": "filter", "column": "id", "cmp": "gt_is_not_true", "value": 1},
+                {
+                    "op": "tuple_absence_filter",
+                    "columns": ["s", "id"],
+                    "table": "t1",
+                    "right_columns": ["tag", "id"],
+                },
+            ],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["id", "s"], [[1, "a"]]),
+            "duckdb": NormalizedResult("duckdb", "ok", ["id", "s"], []),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "tuple_absence_null_filter"
 
 
 def test_oracle_classifies_pandas_uint64_isin_precision():

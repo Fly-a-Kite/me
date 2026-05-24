@@ -1,4 +1,5 @@
 from datadiff.classification_oracle import annotate_findings, classify_finding, validate_case_program
+from datadiff.datagen import generate_case
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.normalizer import NormalizedResult
 from datadiff.oracle import Finding
@@ -106,6 +107,37 @@ def test_validate_case_program_accepts_and_rejects_offset():
     assert "non-integer offset" in validate_case_program(invalid)[0]
 
 
+def test_validate_case_program_accepts_and_rejects_row_number_filter_and_basename_expr():
+    valid = _case(
+        [
+            {"op": "mutate", "column": "base_s", "expr": {"kind": "string_basename", "source": "s"}},
+            {
+                "op": "row_number_filter",
+                "partition_by": ["s"],
+                "order_by": [{"column": "x", "ascending": True, "nulls": "last"}],
+                "cmp": "==",
+                "value": 1,
+            },
+        ]
+    )
+    missing_order = _case(
+        [
+            {
+                "op": "row_number_filter",
+                "partition_by": ["s"],
+                "order_by": [{"column": "missing", "ascending": True, "nulls": "last"}],
+                "cmp": "==",
+                "value": 1,
+            }
+        ]
+    )
+    bad_expr = _case([{"op": "mutate", "column": "base_x", "expr": {"kind": "string_basename", "source": "x"}}])
+
+    assert validate_case_program(valid) == []
+    assert "row_number_filter order_by columns unavailable" in validate_case_program(missing_order)[0]
+    assert "invalid mutate expression" in validate_case_program(bad_expr)[0]
+
+
 def test_classification_marks_normalizer_error_false_positive():
     case = _case([{"op": "filter", "column": "x", "cmp": ">", "value": 0}])
     finding = {
@@ -180,6 +212,114 @@ def test_classification_uses_ordered_reference_for_order_sensitive_mismatch():
     assert classification.false_positive is False
     assert classification.false_positive_reason == ""
     assert classification.implicated_backends == ["duckdb"]
+
+
+def test_classification_excludes_order_sensitive_sort_tie_order_noise():
+    case = Case(
+        "case-sort-tie-order",
+        42,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+                [{"x": 1, "s": "a"}, {"x": 1, "s": "b"}],
+            )
+        ],
+        Program(
+            "prog-sort-tie-order",
+            42,
+            [{"op": "sort", "columns": ["x"], "ascending": True}, {"op": "select", "columns": ["s"]}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "ordering_or_limit",
+        "confidence": "medium",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["s"], [["a"], ["b"]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["s"], [["b"], ["a"]]),
+    }
+
+    classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "common"}, ["pandas", "duckdb"])
+
+    assert classification.verdict == "normalizer_false_positive"
+    assert classification.false_positive is True
+    assert classification.false_positive_reason == "sort_tie_order_underconstrained"
+
+
+def test_classification_excludes_limit_before_any_defined_order():
+    case = Case(
+        "case-limit-before-order",
+        43,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+                [{"x": 1, "s": "a"}, {"x": 2, "s": "b"}],
+            )
+        ],
+        Program(
+            "prog-limit-before-order",
+            43,
+            [{"op": "limit", "n": 1}, {"op": "sort", "columns": ["x"], "ascending": True}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "ordering_or_limit",
+        "confidence": "high",
+        "suspicious_backends": ["sqlite"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["x", "s"], [[1, "a"]]),
+        "sqlite": NormalizedResult("sqlite", "ok", ["x", "s"], [[2, "b"]]),
+    }
+
+    classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "common"}, ["pandas", "sqlite"])
+
+    assert classification.verdict == "generator_false_positive"
+    assert classification.false_positive is True
+    assert classification.false_positive_reason == "limit_offset_order_underconstrained"
+
+
+def test_classification_excludes_groupby_limit_without_order():
+    case = Case(
+        "case-groupby-limit-no-order",
+        44,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+                [{"x": 1, "s": "a"}, {"x": 2, "s": "b"}],
+            )
+        ],
+        Program(
+            "prog-groupby-limit-no-order",
+            44,
+            [
+                {"op": "groupby", "keys": ["x"], "aggs": [{"column": "x", "func": "min", "as": "min_x"}]},
+                {"op": "limit", "n": 1},
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "groupby_aggregation",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["min_x", "x"], [[1, 1]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["min_x", "x"], [[2, 2]]),
+    }
+
+    classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "common"}, ["pandas", "duckdb"])
+
+    assert classification.verdict == "generator_false_positive"
+    assert classification.false_positive is True
+    assert classification.false_positive_reason == "limit_offset_order_underconstrained"
 
 
 def test_classification_marks_nan_semantics_as_documented_divergence():
@@ -462,6 +602,34 @@ def test_classification_reference_understands_join_null_key_topk():
     assert classification.implicated_backends == ["datafusion"]
 
 
+def test_classification_reference_understands_csv_long_numeric_roundtrip_probe():
+    case = generate_case(153, profile="csv_long_numeric_roundtrip")
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "csv_long_numeric_roundtrip",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["csv_long_numeric_roundtrip_mismatch"], [[False]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["csv_long_numeric_roundtrip_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "csv_long_numeric_roundtrip"},
+        ["pandas", "duckdb"],
+    )
+
+    assert validate_case_program(case) == []
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["duckdb"]
+    assert "Independent DSL reference" in classification.evidence
+
+
 def test_classification_marks_modulo_as_expected_semantic_divergence_before_reference():
     case = Case(
         "case-mod",
@@ -637,7 +805,13 @@ def test_validate_case_accepts_running_sum():
     valid = Case(
         "case-running-sum",
         20,
-        [TableData("t0", [ColumnSpec("row_id", "int"), ColumnSpec("x", "float")], [{"row_id": 0, "x": 0.5}])],
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("row_id", "int"), ColumnSpec("g", "str"), ColumnSpec("x", "float")],
+                [{"row_id": 0, "g": "a", "x": 0.5}],
+            )
+        ],
         Program(
             "prog-running-sum",
             20,
@@ -646,6 +820,7 @@ def test_validate_case_accepts_running_sum():
                     "op": "running_sum",
                     "source": "x",
                     "column": "run_x",
+                    "partition_by": ["g"],
                     "order_by": [{"column": "row_id", "ascending": True, "nulls": "last"}],
                     "input_dtype": "float32",
                 }
@@ -679,10 +854,29 @@ def test_validate_case_accepts_running_sum():
             [{"op": "running_sum", "source": "x", "column": "run_x", "order_by": []}],
         ),
     )
+    invalid_partition = Case(
+        "case-running-sum-partition",
+        23,
+        [TableData("t0", [ColumnSpec("row_id", "int"), ColumnSpec("x", "float")], [{"row_id": 0, "x": 0.5}])],
+        Program(
+            "prog-running-sum-partition",
+            23,
+            [
+                {
+                    "op": "running_sum",
+                    "source": "x",
+                    "column": "run_x",
+                    "partition_by": ["missing"],
+                    "order_by": [{"column": "row_id", "ascending": True, "nulls": "last"}],
+                }
+            ],
+        ),
+    )
 
     assert validate_case_program(valid) == []
     assert any("not numeric" in error for error in validate_case_program(invalid_type))
     assert any("has no order_by" in error for error in validate_case_program(invalid_order))
+    assert any("partition_by columns unavailable" in error for error in validate_case_program(invalid_partition))
 
 
 def test_validate_case_accepts_sortedness_check():
@@ -1692,6 +1886,63 @@ def test_classification_reference_understands_dataset_isin_all_match_probe():
     assert classification.implicated_backends == ["pyarrow"]
 
 
+def test_validate_case_accepts_run_end_null_compute_probe():
+    valid = Case(
+        "case-run-end-null-compute-probe",
+        95,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-run-end-null-compute-probe",
+            95,
+            [{"op": "run_end_null_compute_probe", "as": "run_end_null_compute_mismatch"}],
+        ),
+    )
+    bad_alias = Case(
+        "case-run-end-null-compute-probe-alias",
+        96,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program("prog-run-end-null-compute-probe-alias", 96, [{"op": "run_end_null_compute_probe", "as": "where"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_run_end_null_compute_probe():
+    case = Case(
+        "case-run-end-null-compute-reference",
+        97,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-run-end-null-compute-reference",
+            97,
+            [{"op": "run_end_null_compute_probe", "as": "run_end_null_compute_mismatch"}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "pyarrow_run_end_null_compute_semantics",
+        "confidence": "high",
+        "suspicious_backends": ["pyarrow"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["run_end_null_compute_mismatch"], [[False]]),
+        "pyarrow": NormalizedResult("pyarrow", "ok", ["run_end_null_compute_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "pyarrow_run_end_null_compute_semantics"},
+        ["reference", "pyarrow"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["pyarrow"]
+
+
 def test_validate_case_accepts_eval_inplace_alias_probe():
     valid = Case(
         "case-eval-inplace-alias-probe",
@@ -1746,6 +1997,67 @@ def test_classification_reference_understands_eval_inplace_alias_probe():
         normalized,
         {},
         {"generator_profile": "pandas_eval_inplace_aliasing_semantics"},
+        ["reference", "pandas"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["pandas"]
+
+
+def test_validate_case_accepts_bool_reduction_skipna_probe():
+    valid = Case(
+        "case-bool-reduction-skipna-probe",
+        92,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-bool-reduction-skipna-probe",
+            92,
+            [{"op": "bool_reduction_skipna_probe", "as": "bool_reduction_skipna_mismatch"}],
+        ),
+    )
+    bad_alias = Case(
+        "case-bool-reduction-skipna-probe-alias",
+        93,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-bool-reduction-skipna-probe-alias",
+            93,
+            [{"op": "bool_reduction_skipna_probe", "as": "where"}],
+        ),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_bool_reduction_skipna_probe():
+    case = Case(
+        "case-bool-reduction-skipna-reference",
+        94,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-bool-reduction-skipna-reference",
+            94,
+            [{"op": "bool_reduction_skipna_probe", "as": "bool_reduction_skipna_mismatch"}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "pandas_bool_reduction_skipna_semantics",
+        "confidence": "high",
+        "suspicious_backends": ["pandas"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["bool_reduction_skipna_mismatch"], [[False]]),
+        "pandas": NormalizedResult("pandas", "ok", ["bool_reduction_skipna_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "pandas_bool_reduction_skipna_semantics"},
         ["reference", "pandas"],
     )
 
@@ -2085,6 +2397,128 @@ def test_validate_case_allows_count_and_nunique_on_string_columns_only():
     assert validate_case_program(count_string) == []
     assert validate_case_program(nunique_string) == []
     assert any("not numeric" in error for error in validate_case_program(sum_string))
+
+
+def test_validate_case_allows_mean_on_numeric_columns_only():
+    mean_numeric = Case(
+        "case-mean-numeric",
+        108,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("g", "str"), ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+                [{"g": "a", "x": 1, "s": "one"}, {"g": "a", "x": 3, "s": "two"}],
+            )
+        ],
+        Program(
+            "prog-mean-numeric",
+            108,
+            [{"op": "groupby", "keys": ["g"], "aggs": [{"column": "x", "func": "mean", "as": "mean_x"}]}],
+        ),
+    )
+    mean_string = Case(
+        "case-mean-string",
+        109,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("g", "str"), ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+                [{"g": "a", "x": 1, "s": "one"}, {"g": "a", "x": 3, "s": "two"}],
+            )
+        ],
+        Program(
+            "prog-mean-string",
+            109,
+            [{"op": "groupby", "keys": ["g"], "aggs": [{"column": "s", "func": "mean", "as": "mean_s"}]}],
+        ),
+    )
+
+    assert validate_case_program(mean_numeric) == []
+    assert any("not numeric" in error for error in validate_case_program(mean_string))
+
+
+def test_validate_case_allows_any_and_all_on_bool_columns_only():
+    bool_case = Case(
+        "case-bool-any-all",
+        11,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("g", "str"), ColumnSpec("flag", "bool"), ColumnSpec("x", "int")],
+                [{"g": "a", "flag": True, "x": 1}, {"g": "a", "flag": None, "x": 2}],
+            )
+        ],
+        Program(
+            "prog-bool-any-all",
+            11,
+            [
+                {
+                    "op": "groupby",
+                    "keys": ["g"],
+                    "aggs": [
+                        {"column": "flag", "func": "any", "as": "flag_any"},
+                        {"column": "flag", "func": "all", "as": "flag_all"},
+                    ],
+                }
+            ],
+        ),
+    )
+    int_case = Case(
+        "case-int-any",
+        12,
+        [TableData("t0", [ColumnSpec("g", "str"), ColumnSpec("x", "int")], [{"g": "a", "x": 1}])],
+        Program(
+            "prog-int-any",
+            12,
+            [{"op": "groupby", "keys": ["g"], "aggs": [{"column": "x", "func": "any", "as": "x_any"}]}],
+        ),
+    )
+
+    assert validate_case_program(bool_case) == []
+    assert any("not numeric" in error for error in validate_case_program(int_case))
+
+
+def test_classification_reference_understands_bool_any_all_all_null_input():
+    case = Case(
+        "case-bool-any-all-reference",
+        13,
+        [TableData("t0", [ColumnSpec("flag", "bool")], [{"flag": None}, {"flag": None}])],
+        Program(
+            "prog-bool-any-all-reference",
+            13,
+            [
+                {
+                    "op": "aggregate",
+                    "aggs": [
+                        {"column": "flag", "func": "any", "as": "any_flag"},
+                        {"column": "flag", "func": "all", "as": "all_flag"},
+                    ],
+                }
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "groupby_aggregation",
+        "confidence": "medium",
+        "suspicious_backends": ["sqlite"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["all_flag", "any_flag"], [[None, None]]),
+        "sqlite": NormalizedResult("sqlite", "ok", ["all_flag", "any_flag"], [[False, False]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "bool_null_groupby_agg"},
+        ["pandas", "sqlite"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["sqlite"]
 
 
 def test_validate_case_rejects_reserved_output_aliases():

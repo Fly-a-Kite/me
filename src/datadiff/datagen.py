@@ -5,6 +5,7 @@ import random
 import string
 from typing import Any, Literal
 
+from .csv_roundtrip import DEFAULT_LONG_NUMERIC_CSV_VALUES, csv_long_numeric_values
 from .dsl import Case, ColumnSpec, Program, SortKey, TableData, normalize_sort_keys
 from .filtering import filter_comparator_supports_type, parse_filter_comparator
 from .identifiers import is_reserved_output_name, make_safe_output_name
@@ -17,6 +18,7 @@ GeneratorProfile = Literal[
     "bughunt",
     "bughunt_fresh",
     "bughunt_no_groupby",
+    "issue_focus",
     "null_groupby_topk",
     "null_agg_topk",
     "filter_null_agg_topk",
@@ -36,6 +38,8 @@ GeneratorProfile = Literal[
     "global_null_aggregate",
     "string_count_groupby",
     "unique_count_groupby",
+    "bool_null_groupby_agg",
+    "large_int_filter_groupby",
     "set_membership_filter",
     "pyarrow_groupby_filter_cast_membership",
     "null_predicate_filter",
@@ -44,6 +48,8 @@ GeneratorProfile = Literal[
     "tuple_absence_filter",
     "row_value_absence_filter",
     "running_sum_precision",
+    "partitioned_running_sum",
+    "path_basename_keyed_pick",
     "sortedness_null_placement",
     "simple_case_random_subject",
     "group_quantile_key_probe",
@@ -52,6 +58,8 @@ GeneratorProfile = Literal[
     "struct_distinct_unnest",
     "bit_compare_unequal_length",
     "round_even_float_scale",
+    "duckdb_float_literal_precision",
+    "polars_timestamp_precision_filter",
     "series_rtruediv_operand_order",
     "polars_reverse_division_columns",
     "pandas_uint64_isin_precision",
@@ -66,19 +74,42 @@ GeneratorProfile = Literal[
     "pandas_arrow_timestamp_loc_slice_semantics",
     "pandas_arrow_timestamp_index_attr_semantics",
     "pandas_eval_inplace_aliasing_semantics",
+    "pandas_bool_reduction_skipna_semantics",
     "pyarrow_dataset_isin_all_match_semantics",
+    "pyarrow_run_end_null_compute_semantics",
     "pyarrow_large_string_partition_schema_semantics",
     "pyarrow_hash_pivot_wider_order_semantics",
     "polars_rolling_mean_by_null_count_semantics",
+    "csv_long_numeric_roundtrip",
 ]
 
 
 def _is_bughunt_profile(profile: GeneratorProfile) -> bool:
-    return profile in {"bughunt", "bughunt_fresh", "bughunt_no_groupby"}
+    return profile in {"bughunt", "bughunt_fresh", "bughunt_no_groupby", "issue_focus"}
 
 
 def _bughunt_allows_groupby(profile: GeneratorProfile) -> bool:
-    return profile in {"bughunt", "bughunt_fresh"}
+    return profile in {"bughunt", "bughunt_fresh", "issue_focus"}
+
+
+def _aggregate_accepts_type(source_type: str, func: str, is_numeric_column: bool) -> bool:
+    if func in {"count", "nunique"}:
+        return True
+    if func in {"any", "all"}:
+        return source_type == "bool"
+    if func in {"min", "max"} and source_type == "bool":
+        return True
+    return is_numeric_column
+
+
+def _aggregate_output_type(source_type: str, func: str) -> str:
+    if func in {"count", "nunique"}:
+        return "int"
+    if func in {"any", "all"}:
+        return "bool"
+    if func == "mean":
+        return "float"
+    return source_type
 
 
 def _rand_str(rnd: random.Random) -> str | None:
@@ -255,6 +286,7 @@ def generate_program(
     col_types = {c.name: c.type for c in table.columns}
     numeric_cols = table.numeric_columns()
     string_cols = [c.name for c in table.columns if c.type == "str"]
+    bool_cols = [c.name for c in table.columns if c.type == "bool"]
     comparable_cols = table.comparable_columns()
 
     op_pool = ["filter", "select", "sort", "limit", "offset", "mutate", "groupby"]
@@ -312,7 +344,7 @@ def generate_program(
                 _bughunt_allows_groupby(profile)
                 and
                 "groupby" not in emitted_ops
-                and numeric_cols
+                and (numeric_cols or bool_cols)
                 and len(ops) >= 3
                 and (remaining <= 3 or rnd.random() < 0.65)
             ):
@@ -345,6 +377,8 @@ def generate_program(
                         numeric_cols.append(col.name)
                     if col.type == "str":
                         string_cols.append(col.name)
+                    if col.type == "bool":
+                        bool_cols.append(col.name)
 
         elif op == "filter" and comparable_cols and not grouped:
             col = rnd.choice(comparable_cols)
@@ -388,6 +422,7 @@ def generate_program(
             available_cols = cols
             numeric_cols = [c for c in numeric_cols if c in available_cols]
             string_cols = [c for c in string_cols if c in available_cols]
+            bool_cols = [c for c in bool_cols if c in available_cols]
             comparable_cols = [c for c in comparable_cols if c in available_cols]
 
         elif op == "sort" and available_cols:
@@ -413,24 +448,40 @@ def generate_program(
             if out_type == "str":
                 string_cols.append(new_col)
 
-        elif op == "groupby" and numeric_cols and available_cols and not grouped:
+        elif op == "groupby" and (numeric_cols or bool_cols) and available_cols and not grouped:
             keys = [rnd.choice(available_cols)]
             # Avoid grouping by float columns for common-subset stability.
             key_candidates = [c for c in available_cols if col_types.get(c) in {"int", "str", "bool"}]
             if key_candidates:
                 key_count = 1 if len(key_candidates) == 1 or rnd.random() < 0.8 else 2
                 keys = sorted(rnd.sample(key_candidates, key_count))
-            agg_count = rnd.randint(1, min(3, len(numeric_cols)))
+            agg_candidates = list(numeric_cols)
+            if bughunt_profile:
+                agg_candidates.extend(c for c in bool_cols if c not in agg_candidates)
+            if not agg_candidates:
+                continue
+            agg_count = rnd.randint(1, min(3, len(agg_candidates)))
             aggs = []
             used_aliases = set()
-            for val in rnd.sample(numeric_cols, agg_count):
-                func = rnd.choice(["sum", "min", "max", "count", "nunique"])
+            for val in rnd.sample(agg_candidates, agg_count):
+                if col_types.get(val) == "bool":
+                    func = rnd.choice(["any", "all", "min", "max", "count", "nunique"])
+                else:
+                    func = rnd.choice(["sum", "mean", "min", "max", "count", "nunique"])
                 alias = make_safe_output_name(f"{func}_{val}", used=used_aliases | set(keys))
                 used_aliases.add(alias)
                 aggs.append({"column": val, "func": func, "as": alias})
             ops.append({"op": "groupby", "keys": keys, "aggs": aggs})
             available_cols = keys + [a["as"] for a in aggs]
-            numeric_cols = [a["as"] for a in aggs]
+            numeric_cols = []
+            bool_cols = []
+            for agg in aggs:
+                output_type = _aggregate_output_type(col_types.get(agg["column"], "float"), agg["func"])
+                col_types[agg["as"]] = output_type
+                if output_type in {"int", "float"}:
+                    numeric_cols.append(agg["as"])
+                if output_type == "bool":
+                    bool_cols.append(agg["as"])
             string_cols = [c for c in keys if col_types.get(c) == "str"]
             comparable_cols = available_cols
             grouped = True
@@ -527,6 +578,12 @@ def _available_columns_after_operations(
         elif kind == "round_even_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "float_literal_precision_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
+        elif kind == "timestamp_precision_filter_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "series_rtruediv_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
@@ -569,6 +626,9 @@ def _available_columns_after_operations(
         elif kind == "dataset_isin_all_match_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif kind == "run_end_null_compute_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif kind == "large_string_partition_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
@@ -576,6 +636,9 @@ def _available_columns_after_operations(
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
         elif kind == "rolling_mean_by_null_count_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
+        elif kind == "csv_long_numeric_roundtrip_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
         elif kind == "groupby":
@@ -661,7 +724,9 @@ def _generate_type_oblivious_operation(
         }
     numeric_cols = table.numeric_columns()
     agg_col = rnd.choice(numeric_cols or available_cols)
-    func = rnd.choice(["sum", "min", "max", "count", "nunique"] if agg_col in numeric_cols else ["count", "nunique"])
+    func = rnd.choice(
+        ["sum", "mean", "min", "max", "count", "nunique"] if agg_col in numeric_cols else ["count", "nunique"]
+    )
     alias = make_safe_output_name(f"{func}_{agg_col}", used={col})
     return {"op": "groupby", "keys": [col], "aggs": [{"column": agg_col, "func": func, "as": alias}]}
 
@@ -746,6 +811,10 @@ def repair_operations(
                 continue
             if not column or is_reserved_output_name(column):
                 continue
+            partition_by = unique_preserve_order(
+                [str(partition_column) for partition_column in op.get("partition_by", []) or []]
+            )
+            partition_by = [partition_column for partition_column in partition_by if partition_column in available]
             try:
                 order_keys = normalize_sort_keys({"keys": op.get("order_by", [])})
             except ValueError:
@@ -753,21 +822,53 @@ def repair_operations(
             order_keys = _dedupe_sort_keys([key for key in order_keys if key.column in available])
             if not order_keys:
                 continue
-            repaired.append(
-                {
-                    "op": "running_sum",
-                    "source": source,
-                    "column": column,
-                    "order_by": [key.to_dict() for key in order_keys],
-                    "input_dtype": op.get("input_dtype", "float64"),
-                }
-            )
+            repaired_op = {
+                "op": "running_sum",
+                "source": source,
+                "column": column,
+                "order_by": [key.to_dict() for key in order_keys],
+                "input_dtype": op.get("input_dtype", "float64"),
+            }
+            if partition_by:
+                repaired_op["partition_by"] = partition_by
+            repaired.append(repaired_op)
             available.add(column)
             col_types[column] = "float"
             numeric.add(column)
             strings.discard(column)
             order_pending = True
             pending_order_columns = {key.column for key in order_keys}
+        elif kind == "row_number_filter":
+            partition_by = unique_preserve_order(
+                [str(partition_column) for partition_column in op.get("partition_by", []) or []]
+            )
+            partition_by = [partition_column for partition_column in partition_by if partition_column in available]
+            try:
+                order_keys = normalize_sort_keys({"keys": op.get("order_by", [])})
+            except ValueError:
+                continue
+            order_keys = _dedupe_sort_keys([key for key in order_keys if key.column in available])
+            if not order_keys:
+                continue
+            comparator = str(op.get("cmp", "=="))
+            if comparator not in {"==", "<", "<="}:
+                continue
+            try:
+                value = int(op.get("value", 1))
+            except (TypeError, ValueError):
+                continue
+            if value <= 0:
+                continue
+            repaired_op = {
+                "op": "row_number_filter",
+                "partition_by": partition_by,
+                "order_by": [key.to_dict() for key in order_keys],
+                "cmp": comparator,
+                "value": value,
+            }
+            repaired.append(repaired_op)
+            order_pending = True
+            pending_order_columns = {key.column for key in order_keys} | set(partition_by)
         elif kind == "sortedness_check":
             column = str(op.get("column", ""))
             alias = str(op.get("as", ""))
@@ -890,6 +991,29 @@ def repair_operations(
             if not alias or is_reserved_output_name(alias):
                 continue
             repaired.append({"op": "round_even_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
+        elif kind == "float_literal_precision_probe":
+            alias = str(op.get("as", ""))
+            literal = str(op.get("literal", ""))
+            if not alias or is_reserved_output_name(alias) or not _valid_float_literal_text(literal):
+                continue
+            repaired.append({"op": "float_literal_precision_probe", "as": alias, "literal": literal})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
+        elif kind == "timestamp_precision_filter_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "timestamp_precision_filter_probe", "as": alias})
             available = {alias}
             col_types = {alias: "bool"}
             numeric = set()
@@ -1039,11 +1163,33 @@ def repair_operations(
             strings = set()
             order_pending = False
             pending_order_columns = set()
+        elif kind == "bool_reduction_skipna_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "bool_reduction_skipna_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "dataset_isin_all_match_probe":
             alias = str(op.get("as", ""))
             if not alias or is_reserved_output_name(alias):
                 continue
             repaired.append({"op": "dataset_isin_all_match_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
+        elif kind == "run_end_null_compute_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "run_end_null_compute_probe", "as": alias})
             available = {alias}
             col_types = {alias: "bool"}
             numeric = set()
@@ -1077,6 +1223,22 @@ def repair_operations(
             if not alias or is_reserved_output_name(alias):
                 continue
             repaired.append({"op": "rolling_mean_by_null_count_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
+        elif kind == "csv_long_numeric_roundtrip_probe":
+            alias = str(op.get("as", ""))
+            if not alias or is_reserved_output_name(alias):
+                continue
+            values = [str(value).strip() for value in op.get("values", []) or []]
+            values = [value for value in values if value and value.isdigit()]
+            repaired_op = {"op": "csv_long_numeric_roundtrip_probe", "as": alias}
+            if values:
+                repaired_op["values"] = values
+            repaired.append(repaired_op)
             available = {alias}
             col_types = {alias: "bool"}
             numeric = set()
@@ -1135,7 +1297,12 @@ def repair_operations(
             aggs = [
                 a
                 for a in op["aggs"]
-                if a["column"] in available and (a["func"] in {"count", "nunique"} or a["column"] in numeric)
+                if a["column"] in available
+                and _aggregate_accepts_type(
+                    col_types.get(str(a["column"]), "derived"),
+                    str(a["func"]),
+                    a["column"] in numeric,
+                )
             ]
             unique_aggs: list[dict[str, Any]] = []
             seen_aliases: set[str] = set()
@@ -1151,17 +1318,27 @@ def repair_operations(
             repaired.append({**op, "keys": keys, "aggs": aggs})
             available = set(keys) | {a["as"] for a in aggs}
             numeric = {k for k in keys if col_types.get(k) in {"int", "float"}}
-            numeric |= {a["as"] for a in aggs}
             strings = {k for k in keys if col_types.get(k) == "str"}
             for agg in aggs:
-                col_types[agg["as"]] = "int" if agg["func"] in {"count", "nunique"} else col_types.get(agg["column"], "float")
+                output_type = _aggregate_output_type(
+                    col_types.get(str(agg["column"]), "float"),
+                    str(agg["func"]),
+                )
+                col_types[agg["as"]] = output_type
+                if output_type in {"int", "float"}:
+                    numeric.add(agg["as"])
             order_pending = False
             pending_order_columns = set()
         elif kind == "aggregate":
             aggs = [
                 a
                 for a in op["aggs"]
-                if a["column"] in available and (a["func"] in {"count", "nunique"} or a["column"] in numeric)
+                if a["column"] in available
+                and _aggregate_accepts_type(
+                    col_types.get(str(a["column"]), "derived"),
+                    str(a["func"]),
+                    a["column"] in numeric,
+                )
             ]
             unique_aggs = []
             seen_aliases: set[str] = set()
@@ -1175,10 +1352,16 @@ def repair_operations(
                 continue
             repaired.append({**op, "aggs": unique_aggs})
             available = {a["as"] for a in unique_aggs}
-            numeric = set(available)
+            numeric = set()
             strings = set()
             for agg in unique_aggs:
-                col_types[agg["as"]] = "int" if agg["func"] in {"count", "nunique"} else col_types.get(agg["column"], "float")
+                output_type = _aggregate_output_type(
+                    col_types.get(str(agg["column"]), "float"),
+                    str(agg["func"]),
+                )
+                col_types[agg["as"]] = output_type
+                if output_type in {"int", "float"}:
+                    numeric.add(agg["as"])
             order_pending = False
             pending_order_columns = set()
     return repaired
@@ -1241,6 +1424,8 @@ def _mutate_output_type(
         return "int" if src in strings else None
     if kind == "string_lower":
         return "str" if src in strings else None
+    if kind == "string_basename":
+        return "str" if src in strings else None
     return None
 
 
@@ -1288,13 +1473,23 @@ def _valid_quantile_probe_values(values: Any, quantiles: Any) -> bool:
     )
 
 
+def _valid_float_literal_text(value: Any) -> bool:
+    text = str(value or "").strip()
+    if not text or not any(ch.isdigit() for ch in text):
+        return False
+    allowed = set("0123456789+-.eE")
+    if any(ch not in allowed for ch in text):
+        return False
+    try:
+        float(text)
+    except ValueError:
+        return False
+    return True
+
+
 def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile = "common") -> Case:
     if profile == "bughunt" and type_aware:
         mixed = _bughunt_issue_inspired_case(seed)
-        if mixed is not None:
-            return mixed
-    if profile == "bughunt_fresh" and type_aware:
-        mixed = _bughunt_fresh_issue_inspired_case(seed)
         if mixed is not None:
             return mixed
     if profile == "null_groupby_topk" and type_aware:
@@ -1335,6 +1530,10 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_string_count_groupby_case(seed)
     if profile == "unique_count_groupby" and type_aware:
         return generate_unique_count_groupby_case(seed)
+    if profile == "bool_null_groupby_agg" and type_aware:
+        return generate_bool_null_groupby_agg_case(seed)
+    if profile == "large_int_filter_groupby" and type_aware:
+        return generate_large_int_filter_groupby_case(seed)
     if profile == "set_membership_filter" and type_aware:
         return generate_set_membership_filter_case(seed)
     if profile == "pyarrow_groupby_filter_cast_membership" and type_aware:
@@ -1351,6 +1550,10 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_row_value_absence_filter_case(seed)
     if profile == "running_sum_precision" and type_aware:
         return generate_running_sum_precision_case(seed)
+    if profile == "partitioned_running_sum" and type_aware:
+        return generate_partitioned_running_sum_case(seed)
+    if profile == "path_basename_keyed_pick" and type_aware:
+        return generate_path_basename_keyed_pick_case(seed)
     if profile == "sortedness_null_placement" and type_aware:
         return generate_sortedness_null_placement_case(seed)
     if profile == "simple_case_random_subject" and type_aware:
@@ -1367,6 +1570,10 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_bit_compare_unequal_length_case(seed)
     if profile == "round_even_float_scale" and type_aware:
         return generate_round_even_float_scale_case(seed)
+    if profile == "duckdb_float_literal_precision" and type_aware:
+        return generate_duckdb_float_literal_precision_case(seed)
+    if profile == "polars_timestamp_precision_filter" and type_aware:
+        return generate_polars_timestamp_precision_filter_case(seed)
     if profile == "series_rtruediv_operand_order" and type_aware:
         return generate_series_rtruediv_operand_order_case(seed)
     if profile == "polars_reverse_division_columns" and type_aware:
@@ -1395,20 +1602,28 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_pandas_arrow_timestamp_index_attr_semantics_case(seed)
     if profile == "pandas_eval_inplace_aliasing_semantics" and type_aware:
         return generate_pandas_eval_inplace_aliasing_semantics_case(seed)
+    if profile == "pandas_bool_reduction_skipna_semantics" and type_aware:
+        return generate_pandas_bool_reduction_skipna_semantics_case(seed)
     if profile == "pyarrow_dataset_isin_all_match_semantics" and type_aware:
         return generate_pyarrow_dataset_isin_all_match_semantics_case(seed)
+    if profile == "pyarrow_run_end_null_compute_semantics" and type_aware:
+        return generate_pyarrow_run_end_null_compute_semantics_case(seed)
     if profile == "pyarrow_large_string_partition_schema_semantics" and type_aware:
         return generate_pyarrow_large_string_partition_schema_semantics_case(seed)
     if profile == "pyarrow_hash_pivot_wider_order_semantics" and type_aware:
         return generate_pyarrow_hash_pivot_wider_order_semantics_case(seed)
     if profile == "polars_rolling_mean_by_null_count_semantics" and type_aware:
         return generate_polars_rolling_mean_by_null_count_semantics_case(seed)
+    if profile == "csv_long_numeric_roundtrip" and type_aware:
+        return generate_csv_long_numeric_roundtrip_case(seed)
     if profile == "workflow" and type_aware:
         return generate_workflow_case(seed)
     if profile == "bughunt_no_groupby" and type_aware:
         mixed = _bughunt_no_groupby_issue_inspired_case(seed)
         if mixed is not None:
             return mixed
+    if profile == "issue_focus" and type_aware:
+        return _issue_focus_case(seed)
     bughunt_profile = _is_bughunt_profile(profile)
     table = generate_table(
         seed,
@@ -1437,12 +1652,82 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         if profile == "bughunt_fresh"
         else "-bughunt-no-groupby"
         if profile == "bughunt_no_groupby"
+        else "-issue-focus"
+        if profile == "issue_focus"
         else ""
     )
     return Case(case_id=f"case-{seed:08d}{suffix}", seed=seed, tables=[table] + extra_tables, program=program)
 
 
+ISSUE_FOCUS_MIXED_PROFILES = (
+    "null_groupby_topk",
+    "null_agg_topk",
+    "filter_null_agg_topk",
+    "join_null_agg_topk",
+    "empty_filter_groupby",
+    "join_filter_groupby",
+    "join_null_sort",
+    "ordered_groupby_sort",
+    "topk_resort",
+    "join_ordered_agg_topk",
+    "global_null_aggregate",
+    "string_count_groupby",
+    "unique_count_groupby",
+    "bool_null_groupby_agg",
+    "large_int_filter_groupby",
+    "set_membership_filter",
+    "pyarrow_groupby_filter_cast_membership",
+    "null_predicate_filter",
+    "row_value_absence_filter",
+    "path_basename_keyed_pick",
+    "polars_reverse_division_columns",
+    "pandas_bool_reduction_skipna_semantics",
+    "csv_long_numeric_roundtrip",
+)
+
+
+def _issue_focus_case(seed: int) -> Case:
+    issue_case = _bughunt_issue_inspired_case(seed)
+    if issue_case is not None:
+        mixed_profile = str(issue_case.metadata.get("mixed_generator_profile", "issue_inspired"))
+        return _as_bughunt_mixed_case(
+            issue_case,
+            seed,
+            mixed_profile,
+            generator_profile="issue_focus",
+        )
+    start_index = seed % len(ISSUE_FOCUS_MIXED_PROFILES)
+    for offset in range(len(ISSUE_FOCUS_MIXED_PROFILES)):
+        mixed_profile = ISSUE_FOCUS_MIXED_PROFILES[(start_index + offset) % len(ISSUE_FOCUS_MIXED_PROFILES)]
+        case = generate_case(seed + offset, profile=mixed_profile)  # type: ignore[arg-type]
+        return _as_bughunt_mixed_case(
+            case,
+            seed,
+            mixed_profile,
+            generator_profile="issue_focus",
+        )
+    fallback = generate_case(seed, profile="bughunt_fresh")
+    return _as_bughunt_mixed_case(
+        fallback,
+        seed,
+        "bughunt_fresh",
+        generator_profile="issue_focus",
+    )
+
+
 def _bughunt_issue_inspired_case(seed: int) -> Case | None:
+    if seed % 211 == 111:
+        return _as_bughunt_mixed_case(
+            generate_duckdb_float_literal_precision_case(seed),
+            seed,
+            "duckdb_float_literal_precision",
+        )
+    if seed % 227 == 114:
+        return _as_bughunt_mixed_case(
+            generate_polars_timestamp_precision_filter_case(seed),
+            seed,
+            "polars_timestamp_precision_filter",
+        )
     selector = seed % 60
     if selector == 2:
         return _as_bughunt_mixed_case(generate_join_null_truth_filter_case(seed), seed, "join_null_truth_filter")
@@ -1590,11 +1875,23 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
             seed,
             "pandas_eval_inplace_aliasing_semantics",
         )
+    if seed % 193 == 110:
+        return _as_bughunt_mixed_case(
+            generate_pandas_bool_reduction_skipna_semantics_case(seed),
+            seed,
+            "pandas_bool_reduction_skipna_semantics",
+        )
     if seed % 163 == 82:
         return _as_bughunt_mixed_case(
             generate_pyarrow_dataset_isin_all_match_semantics_case(seed),
             seed,
             "pyarrow_dataset_isin_all_match_semantics",
+        )
+    if seed % 197 == 112:
+        return _as_bughunt_mixed_case(
+            generate_pyarrow_run_end_null_compute_semantics_case(seed),
+            seed,
+            "pyarrow_run_end_null_compute_semantics",
         )
     if seed % 173 == 104:
         return _as_bughunt_mixed_case(
@@ -1620,22 +1917,21 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
             seed,
             "pyarrow_groupby_filter_cast_membership",
         )
+    if seed % 223 == 103:
+        return _as_bughunt_mixed_case(generate_partitioned_running_sum_case(seed), seed, "partitioned_running_sum")
+    if seed % 229 == 107:
+        return _as_bughunt_mixed_case(
+            generate_path_basename_keyed_pick_case(seed),
+            seed,
+            "path_basename_keyed_pick",
+        )
+    if seed % 251 == 48:
+        return _as_bughunt_mixed_case(
+            generate_csv_long_numeric_roundtrip_case(seed),
+            seed,
+            "csv_long_numeric_roundtrip",
+        )
     return None
-
-
-def _bughunt_fresh_issue_inspired_case(seed: int) -> Case | None:
-    mixed = _bughunt_issue_inspired_case(seed)
-    if mixed is None:
-        return None
-    from datadiff.case_policy import replay_bug_filter_reason
-    from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES
-
-    skip_reason = replay_bug_filter_reason(
-        mixed,
-        enable_replay_bug=False,
-        replay_bug_source_issues=DEFAULT_REPLAY_BUG_SOURCE_ISSUES,
-    )
-    return None if skip_reason else mixed
 
 
 def _bughunt_no_groupby_issue_inspired_case(seed: int) -> Case | None:
@@ -2801,6 +3097,144 @@ def generate_unique_count_groupby_case(seed: int) -> Case:
     )
 
 
+def generate_bool_null_groupby_agg_case(seed: int) -> Case:
+    rows = [
+        {"id": 0, "g": "alpha", "flag": True, "x": 1},
+        {"id": 1, "g": "alpha", "flag": None, "x": 2},
+        {"id": 2, "g": "alpha", "flag": False, "x": None},
+        {"id": 3, "g": "beta", "flag": None, "x": -1},
+        {"id": 4, "g": "beta", "flag": None, "x": 0},
+        {"id": 5, "g": None, "flag": True, "x": 5},
+        {"id": 6, "g": None, "flag": False, "x": None},
+        {"id": 7, "g": "gamma", "flag": None, "x": 3},
+    ]
+    if seed % 2:
+        rows.append({"id": 8, "g": "gamma", "flag": True, "x": -3})
+    if seed % 3 == 0:
+        rows.append({"id": 9, "g": "delta", "flag": False, "x": 4})
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("flag", "bool", nullable=True),
+            ColumnSpec("x", "int", nullable=True),
+        ],
+        rows,
+    )
+    program = Program(
+        f"prog-{seed:08d}-bool-null-groupby-agg",
+        seed,
+        [
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [
+                    {"column": "flag", "func": "any", "as": "flag_any_value"},
+                    {"column": "flag", "func": "all", "as": "flag_all_value"},
+                    {"column": "flag", "func": "min", "as": "flag_min_value"},
+                    {"column": "flag", "func": "max", "as": "flag_max_value"},
+                    {"column": "flag", "func": "count", "as": "flag_seen_count"},
+                    {"column": "flag", "func": "nunique", "as": "flag_distinct_count"},
+                    {"column": "x", "func": "sum", "as": "x_sum_value"},
+                ],
+            },
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "flag_seen_count", "ascending": False, "nulls": "last"},
+                    {"column": "flag_any_value", "ascending": False, "nulls": "last"},
+                    {"column": "flag_all_value", "ascending": True, "nulls": "last"},
+                    {"column": "flag_min_value", "ascending": True, "nulls": "last"},
+                    {"column": "g", "ascending": True, "nulls": "first"},
+                ],
+            },
+            {"op": "limit", "n": 5},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-bool-null-groupby-agg",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "bool_null_groupby_agg",
+            "source_issue": "https://github.com/pola-rs/polars/issues/26671",
+        },
+    )
+
+
+def generate_large_int_filter_groupby_case(seed: int) -> Case:
+    high = 9_007_199_254_740_992
+    rows = [
+        {"id": 0, "g": "alpha", "x": high - 1, "flag": True},
+        {"id": 1, "g": "alpha", "x": high, "flag": False},
+        {"id": 2, "g": "alpha", "x": high + 1, "flag": None},
+        {"id": 3, "g": "beta", "x": -high + 1, "flag": True},
+        {"id": 4, "g": "beta", "x": -high, "flag": False},
+        {"id": 5, "g": None, "x": 0, "flag": None},
+        {"id": 6, "g": None, "x": 42, "flag": True},
+        {"id": 7, "g": "gamma", "x": None, "flag": False},
+    ]
+    if seed % 2:
+        rows.append({"id": 8, "g": "gamma", "x": high + 3, "flag": True})
+    if seed % 3 == 0:
+        rows.append({"id": 9, "g": "delta", "x": -high - 3, "flag": None})
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("x", "int", nullable=True),
+            ColumnSpec("flag", "bool", nullable=True),
+        ],
+        rows,
+    )
+    filter_mode = seed % 3
+    if filter_mode == 0:
+        filter_op = {"op": "filter", "column": "x", "cmp": "in_set", "value": [high - 1, high + 1, -high, 0]}
+    elif filter_mode == 1:
+        filter_op = {"op": "filter", "column": "x", "cmp": "range_closed", "value": [-high, high]}
+    else:
+        filter_op = {"op": "filter", "column": "x", "cmp": "!=", "value": 42}
+    program = Program(
+        f"prog-{seed:08d}-large-int-filter-groupby",
+        seed,
+        [
+            filter_op,
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [
+                    {"column": "x", "func": "count", "as": "x_seen_count"},
+                    {"column": "x", "func": "min", "as": "x_min_value"},
+                    {"column": "x", "func": "max", "as": "x_max_value"},
+                    {"column": "flag", "func": "count", "as": "flag_seen_count"},
+                ],
+            },
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "x_max_value", "ascending": False, "nulls": "last"},
+                    {"column": "g", "ascending": True, "nulls": "first"},
+                ],
+            },
+            {"op": "limit", "n": 5},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-large-int-filter-groupby",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "large_int_filter_groupby",
+            "source_issue": "https://github.com/pola-rs/polars/issues/27726",
+            "source_issue_alt": "https://github.com/duckdb/duckdb/issues/22676",
+        },
+    )
+
+
 def generate_set_membership_filter_case(seed: int) -> Case:
     rows = [
         {"id": 0, "g": "alpha", "s": "red", "x": 1, "flag": True},
@@ -3252,6 +3686,150 @@ def generate_running_sum_precision_case(seed: int) -> Case:
     )
 
 
+def generate_partitioned_running_sum_case(seed: int) -> Case:
+    rnd = random.Random(seed * 4001 + 17)
+    rows = []
+    row_id = 0
+    for group in ["A", "B", None]:
+        for seq, value in enumerate([1.0, None, 2.5, -0.5], start=1):
+            adjusted = value if value is None else value + (0.25 if group == "B" else 0.0)
+            rows.append({"row_id": row_id, "grp": group, "seq": seq, "x": adjusted})
+            row_id += 1
+    rnd.shuffle(rows)
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("row_id", "int", nullable=False),
+            ColumnSpec("grp", "str", nullable=True),
+            ColumnSpec("seq", "int", nullable=False),
+            ColumnSpec("x", "float", nullable=True),
+        ],
+        rows,
+    )
+    program = Program(
+        f"prog-{seed:08d}-partitioned-running-sum",
+        seed,
+        [
+            {
+                "op": "running_sum",
+                "source": "x",
+                "column": "run_x",
+                "partition_by": ["grp"],
+                "order_by": [
+                    {"column": "seq", "ascending": True, "nulls": "last"},
+                    {"column": "row_id", "ascending": True, "nulls": "last"},
+                ],
+                "input_dtype": "float64",
+            },
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "grp", "ascending": True, "nulls": "last"},
+                    {"column": "seq", "ascending": True, "nulls": "last"},
+                    {"column": "row_id", "ascending": True, "nulls": "last"},
+                ],
+            },
+            {"op": "select", "columns": ["grp", "seq", "run_x"]},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-partitioned-running-sum",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "partitioned_running_sum",
+            "issue_inspiration": "partitioned ROWS-frame cumulative aggregates",
+        },
+    )
+
+
+def generate_path_basename_keyed_pick_case(seed: int) -> Case:
+    rnd = random.Random(seed * 5021 + 31)
+    path_values = [
+        "C:/warehouse/january/report.csv",
+        "/tmp/releases/build.tar",
+        "relative/name.parquet",
+        "plain_name.txt",
+        r"D:\archive\delta.log",
+        None,
+    ]
+    rows = []
+    row_id = 0
+    for group in ["A", "B", None]:
+        for offset, path_value in enumerate(path_values):
+            rows.append(
+                {
+                    "row_id": row_id,
+                    "grp": group,
+                    "pick_key": (offset * 3 + row_id) % 11,
+                    "path_value": path_value,
+                    "payload": row_id % 5,
+                }
+            )
+            row_id += 1
+    rnd.shuffle(rows)
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("row_id", "int", nullable=False),
+            ColumnSpec("grp", "str", nullable=True),
+            ColumnSpec("pick_key", "int", nullable=False),
+            ColumnSpec("path_value", "str", nullable=True),
+            ColumnSpec("payload", "int", nullable=False),
+        ],
+        rows,
+    )
+    basename_column = make_safe_output_name(
+        "path_base_value",
+        used={column.name for column in table.columns},
+    )
+    row_limit_cmp = "<=" if seed % 3 == 0 else "=="
+    row_limit_value = 2 if row_limit_cmp == "<=" else 1
+    pick_keys = [{"column": "pick_key", "ascending": True, "nulls": "last"}]
+    output_sort_keys = [
+        {"column": "pick_key", "ascending": True, "nulls": "last"},
+        {"column": "row_id", "ascending": True, "nulls": "last"},
+    ]
+    program = Program(
+        f"prog-{seed:08d}-path-basename-keyed-pick",
+        seed,
+        [
+            {
+                "op": "mutate",
+                "column": basename_column,
+                "expr": {"kind": "string_basename", "source": "path_value"},
+            },
+            {
+                "op": "row_number_filter",
+                "partition_by": ["grp"],
+                "order_by": pick_keys,
+                "cmp": row_limit_cmp,
+                "value": row_limit_value,
+            },
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "grp", "ascending": True, "nulls": "last"},
+                    *output_sort_keys,
+                ],
+            },
+            {"op": "select", "columns": ["grp", "pick_key", basename_column]},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-path-basename-keyed-pick",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "path_basename_keyed_pick",
+            "source_issue": "https://github.com/duckdb/duckdb/issues/22849",
+            "issue_inspiration": "path-string projection composed with keyed row selection",
+        },
+    )
+
+
 def generate_sortedness_null_placement_case(seed: int) -> Case:
     rows = [
         {"row_id": 0, "x": 3},
@@ -3493,6 +4071,65 @@ def generate_round_even_float_scale_case(seed: int) -> Case:
             "source_issue": "https://github.com/duckdb/duckdb/issues/19491",
             "expected_round_even_mismatch": False,
             "expected_round_even_value": 2.67,
+        },
+    )
+
+
+def generate_duckdb_float_literal_precision_case(seed: int) -> Case:
+    literals = [
+        "0.41000000000000003",
+        "0.9999999999999999",
+        "0.1000000000000000055511151231257827",
+    ]
+    literal = literals[seed % len(literals)]
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("float_literal_precision_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-duckdb-float-literal-precision",
+        seed,
+        [{"op": "float_literal_precision_probe", "as": alias, "literal": literal}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-duckdb-float-literal-precision",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "duckdb_float_literal_precision",
+            "source_issue": "https://github.com/duckdb/duckdb/issues/22837",
+            "issue_inspiration": "decimal float literal and string cast should round identically",
+            "literal": literal,
+            "expected_float_literal_precision_mismatch": False,
+        },
+    )
+
+
+def generate_polars_timestamp_precision_filter_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("timestamp_precision_filter_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-polars-timestamp-precision-filter",
+        seed,
+        [{"op": "timestamp_precision_filter_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-polars-timestamp-precision-filter",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "polars_timestamp_precision_filter",
+            "source_issue": "https://github.com/pola-rs/polars/issues/27726",
+            "issue_inspiration": "timestamp filter should compare us columns and ns literals without lossy downcast",
+            "expected_timestamp_precision_filter_rows": 1,
         },
     )
 
@@ -3878,6 +4515,31 @@ def generate_pandas_eval_inplace_aliasing_semantics_case(seed: int) -> Case:
     )
 
 
+def generate_pandas_bool_reduction_skipna_semantics_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("bool_reduction_skipna_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-pandas-bool-reduction-skipna-semantics",
+        seed,
+        [{"op": "bool_reduction_skipna_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-pandas-bool-reduction-skipna-semantics",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "pandas_bool_reduction_skipna_semantics",
+            "source_issue": "https://github.com/pandas-dev/pandas/issues/65710",
+            "expected_bool_reduction_skipna_mismatch": False,
+        },
+    )
+
+
 def generate_pyarrow_dataset_isin_all_match_semantics_case(seed: int) -> Case:
     table = TableData(
         "t0",
@@ -3900,6 +4562,32 @@ def generate_pyarrow_dataset_isin_all_match_semantics_case(seed: int) -> Case:
             "source_issue": "https://github.com/apache/arrow/issues/46183",
             "expected_dataset_isin_all_match_mismatch": False,
             "expected_dataset_isin_all_match_rows": 1,
+        },
+    )
+
+
+def generate_pyarrow_run_end_null_compute_semantics_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("run_end_null_compute_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-pyarrow-run-end-null-compute-semantics",
+        seed,
+        [{"op": "run_end_null_compute_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-pyarrow-run-end-null-compute-semantics",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "pyarrow_run_end_null_compute_semantics",
+            "source_issue": "https://github.com/apache/arrow/issues/49889",
+            "expected_run_end_null_compute_mismatch": False,
+            "expected_run_end_null_compute_values": [True, None, True, True, True],
         },
     )
 
@@ -3978,6 +4666,38 @@ def generate_polars_rolling_mean_by_null_count_semantics_case(seed: int) -> Case
             "source_issue": "https://github.com/pola-rs/polars/issues/27661",
             "expected_rolling_mean_by_null_count_mismatch": False,
             "expected_rolling_mean_by_null_count_values": [None, 400.5, None],
+        },
+    )
+
+
+def generate_csv_long_numeric_roundtrip_case(seed: int) -> Case:
+    base_values = list(DEFAULT_LONG_NUMERIC_CSV_VALUES)
+    rotation = seed % len(base_values)
+    values = base_values[rotation:] + base_values[:rotation]
+    if seed % 2:
+        values.append(str(10**20 + (seed % 997)))
+    values = csv_long_numeric_values({"values": values})
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("csv_long_numeric_roundtrip_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-csv-long-numeric-roundtrip",
+        seed,
+        [{"op": "csv_long_numeric_roundtrip_probe", "as": alias, "values": values}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-csv-long-numeric-roundtrip",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "csv_long_numeric_roundtrip",
+            "issue_inspiration": "CSV long numeric identifiers should round-trip without lossy inference",
+            "expected_csv_long_numeric_roundtrip_mismatch": False,
+            "expected_csv_values": values,
         },
     )
 

@@ -344,6 +344,7 @@ def _append_running_sum_probe(tables: list[TableData], operations: list[dict[str
         return "append_running_sum:no-numeric-column"
     source = rnd.choice(numeric_columns)
     order_column = rnd.choice(available)
+    order_columns = [order_column] + sorted(column for column in available if column != order_column)
     used = set(available)
     output_column = make_safe_output_name(f"run_{source}", used=used)
     operations.append(
@@ -353,15 +354,16 @@ def _append_running_sum_probe(tables: list[TableData], operations: list[dict[str
             "column": output_column,
             "order_by": [
                 {
-                    "column": order_column,
+                    "column": column,
                     "ascending": rnd.choice([True, False]),
                     "nulls": rnd.choice(["first", "last"]),
                 }
+                for column in order_columns
             ],
             "input_dtype": "float32" if _column_type(tables, source) == "float" or rnd.random() < 0.5 else "float64",
         }
     )
-    return f"append_running_sum:{source}:order={order_column}:out={output_column}"
+    return f"append_running_sum:{source}:order={','.join(order_columns)}:out={output_column}"
 
 
 def _append_sortedness_check_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
@@ -600,6 +602,17 @@ def _append_eval_inplace_alias_probe(
     return f"append_eval_inplace_alias_probe:out={alias}"
 
 
+def _append_bool_reduction_skipna_probe(
+    tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random
+) -> str:
+    if not tables:
+        return "append_bool_reduction_skipna_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("bool_reduction_skipna_mismatch", used=set(available))
+    operations.append({"op": "bool_reduction_skipna_probe", "as": alias})
+    return f"append_bool_reduction_skipna_probe:out={alias}"
+
+
 def _append_dataset_isin_all_match_probe(
     tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random
 ) -> str:
@@ -609,6 +622,17 @@ def _append_dataset_isin_all_match_probe(
     alias = make_safe_output_name("dataset_isin_all_match_mismatch", used=set(available))
     operations.append({"op": "dataset_isin_all_match_probe", "as": alias})
     return f"append_dataset_isin_all_match_probe:out={alias}"
+
+
+def _append_run_end_null_compute_probe(
+    tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random
+) -> str:
+    if not tables:
+        return "append_run_end_null_compute_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("run_end_null_compute_mismatch", used=set(available))
+    operations.append({"op": "run_end_null_compute_probe", "as": alias})
+    return f"append_run_end_null_compute_probe:out={alias}"
 
 
 def _append_large_string_partition_probe(
@@ -741,11 +765,16 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
         if _column_type(tables, c) in {"int", "float"}
         or c.startswith(("m_", "sum_", "min_", "max_", "count_", "nunique_", "uniq_"))
     ]
+    bools = [
+        c
+        for c in available
+        if _column_type(tables, c) == "bool" or c.startswith(("any_", "all_"))
+    ]
     strings = [c for c in available if _column_type(tables, c) == "str"]
     choices = ["filter", "select", "sort", "limit"]
     if numeric or strings:
         choices.append("mutate")
-    if numeric:
+    if numeric or bools:
         choices.append("groupby")
         choices.append("aggregate")
     kind = rnd.choice(choices)
@@ -812,15 +841,21 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
             "column": f"m_{len([o for o in operations if o.get('op') == 'mutate'])}",
             "expr": expr,
         }
-    if kind == "groupby" and numeric:
+    if kind == "groupby" and (numeric or bools):
         keys = [rnd.choice(available)]
-        val = rnd.choice(numeric)
-        func = rnd.choice(["sum", "min", "max", "count", "nunique"])
+        val = rnd.choice(numeric + bools)
+        if val in bools:
+            func = rnd.choice(["any", "all", "min", "max", "count", "nunique"])
+        else:
+            func = rnd.choice(["sum", "min", "max", "count", "nunique"])
         alias = make_safe_output_name(f"{func}_{val}", used=set(keys))
         return {"op": "groupby", "keys": keys, "aggs": [{"column": val, "func": func, "as": alias}]}
-    if kind == "aggregate" and numeric:
-        val = rnd.choice(numeric)
-        func = rnd.choice(["sum", "min", "max", "count", "nunique"])
+    if kind == "aggregate" and (numeric or bools):
+        val = rnd.choice(numeric + bools)
+        if val in bools:
+            func = rnd.choice(["any", "all", "min", "max", "count", "nunique"])
+        else:
+            func = rnd.choice(["sum", "min", "max", "count", "nunique"])
         alias = make_safe_output_name(f"{func}_{val}_all")
         return {"op": "aggregate", "aggs": [{"column": val, "func": func, "as": alias}]}
     return None
@@ -933,6 +968,9 @@ def _available_columns(tables: list[TableData], operations: list[dict[str, Any]]
         elif op.get("op") == "dataset_isin_all_match_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
+        elif op.get("op") == "run_end_null_compute_probe":
+            alias = str(op.get("as", ""))
+            available = [alias] if alias else []
         elif op.get("op") == "large_string_partition_probe":
             alias = str(op.get("as", ""))
             available = [alias] if alias else []
@@ -994,13 +1032,19 @@ def _column_type(tables: list[TableData], name: str) -> str:
         return "bool"
     if name == "eval_inplace_alias_mismatch" or name.startswith("eval_inplace_alias_mismatch_"):
         return "bool"
+    if name == "bool_reduction_skipna_mismatch" or name.startswith("bool_reduction_skipna_mismatch_"):
+        return "bool"
     if name == "dataset_isin_all_match_mismatch" or name.startswith("dataset_isin_all_match_mismatch_"):
+        return "bool"
+    if name == "run_end_null_compute_mismatch" or name.startswith("run_end_null_compute_mismatch_"):
         return "bool"
     if name == "large_string_partition_mismatch" or name.startswith("large_string_partition_mismatch_"):
         return "bool"
     if name == "hash_pivot_wider_mismatch" or name.startswith("hash_pivot_wider_mismatch_"):
         return "bool"
     if name == "rolling_mean_by_null_count_mismatch" or name.startswith("rolling_mean_by_null_count_mismatch_"):
+        return "bool"
+    if name.startswith(("any_", "all_")):
         return "bool"
     return "float" if name.startswith(("m_", "sum_", "min_", "max_", "run_")) else "int"
 
@@ -1064,7 +1108,9 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_arrow_timestamp_loc_slice_probe", _append_arrow_timestamp_loc_slice_probe),
     MutationOperator("append_arrow_timestamp_index_attr_probe", _append_arrow_timestamp_index_attr_probe),
     MutationOperator("append_eval_inplace_alias_probe", _append_eval_inplace_alias_probe),
+    MutationOperator("append_bool_reduction_skipna_probe", _append_bool_reduction_skipna_probe),
     MutationOperator("append_dataset_isin_all_match_probe", _append_dataset_isin_all_match_probe),
+    MutationOperator("append_run_end_null_compute_probe", _append_run_end_null_compute_probe),
     MutationOperator("append_large_string_partition_probe", _append_large_string_partition_probe),
     MutationOperator("append_hash_pivot_wider_probe", _append_hash_pivot_wider_probe),
     MutationOperator("append_rolling_mean_by_null_count_probe", _append_rolling_mean_by_null_count_probe),

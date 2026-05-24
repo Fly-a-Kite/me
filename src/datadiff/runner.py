@@ -19,7 +19,7 @@ from datadiff.feedback import FeedbackState
 from datadiff.guidance import GuidanceState
 from datadiff.metamorphic import build_metamorphic_variants, evaluate_metamorphic_variants
 from datadiff.normalizer import normalize_result
-from datadiff.oracle import PROBE_ROOTS, evaluate_case
+from datadiff.oracle import Finding, PROBE_ROOTS, evaluate_case
 from datadiff.operation_combo import classify_operation_combo
 from datadiff.preflight import preflight_case
 from datadiff.quality_oracles import evaluate_quality_oracles
@@ -89,6 +89,8 @@ def _guidance_summary(guidance: dict[str, Any]) -> dict[str, Any]:
         "online_weight_mean": guidance.get("score_breakdown", {}).get("online_weight_mean", 1.0),
         "online_weight_max": guidance.get("score_breakdown", {}).get("online_weight_max", 1.0),
         "online_weight_updates": guidance.get("score_breakdown", {}).get("online_weight_updates", 0.0),
+        "profile_saturation_penalty": guidance.get("score_breakdown", {}).get("profile_saturation_penalty", 0.0),
+        "profile_saturation_active": guidance.get("score_breakdown", {}).get("profile_saturation_active", 0.0),
         "family_saturation_penalty": guidance.get("score_breakdown", {}).get("family_saturation_penalty", 0.0),
         "family_saturation_active": guidance.get("score_breakdown", {}).get("family_saturation_active", 0.0),
         "issue_replay_saturation_penalty": guidance.get("score_breakdown", {}).get(
@@ -255,19 +257,7 @@ def _replay_bug_filter_reason(case_item: Case, config: ExperimentConfig) -> str:
 
 
 def _effective_generator_profile(config: ExperimentConfig) -> str:
-    if (
-        not config.enable_replay_bug
-        and config.generator_profile == "bughunt"
-        and _uses_default_replay_source_gate(config)
-    ):
-        return "bughunt_fresh"
     return config.generator_profile
-
-
-def _uses_default_replay_source_gate(config: ExperimentConfig) -> bool:
-    default_sources = {str(source).strip().rstrip("/") for source in DEFAULT_REPLAY_BUG_SOURCE_ISSUES}
-    configured_sources = {str(source).strip().rstrip("/") for source in config.replay_bug_source_issues}
-    return default_sources.issubset(configured_sources)
 
 
 def _execute_case(
@@ -337,7 +327,11 @@ def run_loaded_case(
             config=config.to_dict(),
             backends=backends,
         )
+        recheck = _candidate_recheck(case, backends, config, findings)
+    else:
+        recheck = {"enabled": False, "attempts": 0, "reproduced_keys": [], "non_reproduced_keys": []}
 
+    countable_findings = [finding for finding in findings if not finding.false_positive]
     row = {
         "run_at": utc_now(),
         "case": case.to_dict(),
@@ -346,22 +340,102 @@ def run_loaded_case(
         "normalized": {k: v.to_dict() for k, v in normalized.items()},
         "metamorphic": metamorphic_rows,
         "findings": [f.to_dict() for f in findings],
+        "candidate_recheck": recheck,
         "config": config.to_dict(),
         "environment": environment if environment is not None else collect_environment(),
-        "status": "bug" if findings else "ok",
+        "status": "bug" if countable_findings else "ok",
         "duration_ms": (time.perf_counter() - started) * 1000,
     }
     row["behavior_signature"] = behavior_signature(row)
-    if findings and save_artifact and config.enable_artifact:
+    if countable_findings and save_artifact and config.enable_artifact:
         bug_dir = save_bug_artifact(
             case,
             raw_results=raw_results,
             normalized={k: v.to_dict() for k, v in normalized.items()},
-            findings=findings,
+            findings=countable_findings,
             config=config.to_dict(),
         )
         row["bug_dir"] = str(bug_dir)
     return row
+
+
+def _candidate_recheck(
+    case: Case,
+    backends: list[str],
+    config: ExperimentConfig,
+    findings: list[Finding],
+) -> dict[str, Any]:
+    attempts = max(0, int(getattr(config, "candidate_recheck_count", 0)))
+    if attempts <= 0 or not findings:
+        return {"enabled": False, "attempts": 0, "reproduced_keys": [], "non_reproduced_keys": []}
+
+    recheck_config_data = config.to_dict()
+    recheck_config_data["candidate_recheck_count"] = 0
+    recheck_config_data["enable_artifact"] = False
+    recheck_config = ExperimentConfig(**recheck_config_data)
+    original_keys = {_finding_recheck_key(finding.to_dict()) for finding in findings}
+    reproduced_keys: set[tuple[str, str, tuple[str, ...], str]] | None = None
+    attempt_summaries: list[dict[str, Any]] = []
+    for attempt in range(attempts):
+        row = run_loaded_case(
+            case,
+            backends=backends,
+            config=recheck_config,
+            save_artifact=False,
+            backend_instances=None,
+            target_specs=[],
+        )
+        keys = {_finding_recheck_key(finding) for finding in row.get("findings", [])}
+        current_reproduced = original_keys & keys
+        reproduced_keys = current_reproduced if reproduced_keys is None else reproduced_keys & current_reproduced
+        attempt_summaries.append(
+            {
+                "attempt": attempt + 1,
+                "finding_count": len(row.get("findings", []) or []),
+                "reproduced_keys": [_format_recheck_key(key) for key in sorted(current_reproduced)],
+            }
+        )
+    reproduced_keys = reproduced_keys or set()
+    non_reproduced_keys = original_keys - reproduced_keys
+    for finding in findings:
+        key = _finding_recheck_key(finding.to_dict())
+        if key in non_reproduced_keys:
+            _mark_finding_non_reproducible(finding, attempts)
+    return {
+        "enabled": True,
+        "attempts": attempts,
+        "attempt_summaries": attempt_summaries,
+        "reproduced_keys": [_format_recheck_key(key) for key in sorted(reproduced_keys)],
+        "non_reproduced_keys": [_format_recheck_key(key) for key in sorted(non_reproduced_keys)],
+    }
+
+
+def _finding_recheck_key(finding: dict[str, Any]) -> tuple[str, str, tuple[str, ...], str]:
+    return (
+        str(finding.get("kind", "")),
+        str(finding.get("root_cause", "unknown")),
+        tuple(sorted(str(backend) for backend in finding.get("suspicious_backends", []) or [])),
+        str(finding.get("mismatch_class", "")),
+    )
+
+
+def _format_recheck_key(key: tuple[str, str, tuple[str, ...], str]) -> str:
+    kind, root, backends, mismatch = key
+    backend_part = ",".join(backends) or "unknown"
+    suffix = f":{mismatch}" if mismatch else ""
+    return f"{kind}:{root}@{backend_part}{suffix}"
+
+
+def _mark_finding_non_reproducible(finding: Finding, attempts: int) -> None:
+    finding.triage_verdict = "non_reproducible_candidate"
+    finding.paper_status = "exclude_unreproducible_candidate"
+    finding.triage_confidence = "high"
+    finding.false_positive = True
+    finding.false_positive_reason = "candidate_not_reproduced_on_immediate_recheck"
+    finding.triage_evidence = (
+        f"Initial finding did not reproduce in {attempts} immediate fresh recheck run(s); "
+        "exclude it from latest-version bug evidence until a stable reproducer exists."
+    )
 
 
 def run_fuzz(
@@ -398,6 +472,7 @@ def run_fuzz(
         FeedbackState(
             persist_to_disk=config.persist_feedback_corpus,
             max_persisted=config.feedback_persist_limit,
+            max_cases_per_profile=config.feedback_max_cases_per_profile,
             source_scheduler=(
                 LocalSourceScheduler(
                     exploration_weight=config.local_source_exploration_weight,
@@ -651,7 +726,8 @@ def run_fuzz(
             environment=environment,
             target_specs=target_specs,
         )
-        if row["findings"] and config.enable_reducer:
+        countable_row_findings = _countable_row_findings(row)
+        if countable_row_findings and config.enable_reducer:
             from datadiff.reducer import reduce_case
 
             reduced = reduce_case(
@@ -669,8 +745,8 @@ def run_fuzz(
                     generator_profile=config.generator_profile,
                     metamorphic_variant_limit=config.metamorphic_variant_limit,
                 ),
-                target_kinds=[finding["kind"] for finding in row["findings"]],
-                target_roots=[finding.get("root_cause", "unknown") for finding in row["findings"]],
+                target_kinds=[finding["kind"] for finding in countable_row_findings],
+                target_roots=[finding.get("root_cause", "unknown") for finding in countable_row_findings],
             )
             reduced_row = run_loaded_case(
                 reduced,
@@ -689,10 +765,11 @@ def run_fuzz(
                 "reduced_ops": len(reduced.program.operations),
             }
             row = reduced_row
-        if row.get("findings") and row.get("bug_dir"):
+            countable_row_findings = _countable_row_findings(row)
+        if countable_row_findings and row.get("bug_dir"):
             artifact_saved_count += 1
             row["artifact_saved"] = True
-        elif row.get("findings") and config.enable_artifact:
+        elif countable_row_findings and config.enable_artifact:
             row["artifact_saved"] = False
             row["artifact_skipped_reason"] = "artifact_limit_reached"
 
@@ -700,9 +777,23 @@ def run_fuzz(
         row["is_new_behavior"] = sig not in seen
         seen.add(sig)
         if feedback is not None:
-            reward_signals = row_reward_signals(row)
-            row_candidate_families = list(candidate_bug_family_keys(row.get("findings") or []))
-            row_candidate_signatures = list(candidate_bug_signatures(row.get("findings") or []))
+            known_families = config.known_saturated_bug_families
+            reward_signals = row_reward_signals(
+                row,
+                known_saturated_bug_families=known_families,
+            )
+            row_candidate_families = list(
+                candidate_bug_family_keys(
+                    row.get("findings") or [],
+                    known_saturated_bug_families=known_families,
+                )
+            )
+            row_candidate_signatures = list(
+                candidate_bug_signatures(
+                    row.get("findings") or [],
+                    known_saturated_bug_families=known_families,
+                )
+            )
             feedback_eligible, feedback_skip_reason = _feedback_storage_decision(
                 case,
                 candidate_source=selected_meta["source"],
@@ -714,7 +805,7 @@ def run_fuzz(
                 row["stored_in_feedback_corpus"] = feedback.record(
                     case,
                     sig,
-                    bool(row["findings"]),
+                    bool(row_candidate_families) or bool(reward_signals["semantic_divergence"]),
                     candidate_bug_families=row_candidate_families,
                 )
                 row["feedback_corpus_persisted"] = feedback.last_persisted_to_disk
@@ -726,7 +817,7 @@ def run_fuzz(
                 row["feedback_record_skip_reason"] = ""
             row["source_reward"] = feedback.record_candidate_result(
                 selected_meta["source"],
-                has_finding=bool(row["findings"]),
+                has_finding=bool(row_candidate_families) or bool(reward_signals["semantic_divergence"]),
                 is_new_behavior=bool(row["is_new_behavior"]),
                 preflight=preflight_row,
                 candidate_bug=bool(reward_signals["candidate_bug"]),
@@ -807,6 +898,15 @@ def run_fuzz(
     if progress_callback is not None:
         progress_callback(meta)
     return run_file
+
+
+def _countable_row_findings(row: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        finding
+        for finding in row.get("findings", []) or []
+        if not bool(finding.get("false_positive"))
+        and finding.get("triage_verdict") not in {"generator_false_positive", "normalizer_false_positive"}
+    ]
 
 
 def _artifact_budget_available(config: ExperimentConfig, saved_count: int) -> bool:

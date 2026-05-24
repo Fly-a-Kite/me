@@ -8,6 +8,9 @@ def test_replay_policy_is_shared_across_target_projects():
         "datafusion_setop_all_duplicate_count",
         "duckdb_tuple_anti_null_semantics",
         "polars_rolling_mean_by_null_count_semantics",
+        "path_basename_keyed_pick",
+        "duckdb_float_literal_precision",
+        "polars_timestamp_precision_filter",
     ]
 
     for offset, profile in enumerate(profiles):
@@ -73,6 +76,28 @@ def test_replay_policy_allows_organic_fresh_cases():
         replay_bug_filter_reason(
             case,
             enable_replay_bug=False,
+            replay_bug_source_issues=DEFAULT_REPLAY_BUG_SOURCE_ISSUES,
+        )
+        == ""
+    )
+
+
+def test_replay_policy_blocks_path_basename_keyed_pick_known_source_by_default():
+    case = generate_case(107, profile="path_basename_keyed_pick")
+
+    assert case_discovery_origin(case) == "issue_replay"
+    assert (
+        replay_bug_filter_reason(
+            case,
+            enable_replay_bug=False,
+            replay_bug_source_issues=DEFAULT_REPLAY_BUG_SOURCE_ISSUES,
+        )
+        == "issue_replay_probe"
+    )
+    assert (
+        replay_bug_filter_reason(
+            case,
+            enable_replay_bug=True,
             replay_bug_source_issues=DEFAULT_REPLAY_BUG_SOURCE_ISSUES,
         )
         == ""

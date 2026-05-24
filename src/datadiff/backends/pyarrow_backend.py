@@ -5,11 +5,23 @@ from contextlib import contextmanager
 from typing import Any
 
 from datadiff.backends.base import Backend, BackendResult
+from datadiff.csv_roundtrip import (
+    csv_long_numeric_roundtrip_mismatch,
+    csv_long_numeric_values,
+    long_numeric_csv_path,
+)
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
 from datadiff.filtering import parse_filter_comparator
-from datadiff.running import sort_rows_for_running, stable_running_sum_values
+from datadiff.pathing import path_basename
+from datadiff.running import (
+    running_sum_partition_columns,
+    running_sum_sort_keys,
+    sort_rows_for_running,
+    stable_running_sum_values,
+)
 from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
+from datadiff.windowing import row_number_filter_rows
 
 
 class PyArrowBackend(Backend):
@@ -29,6 +41,7 @@ class PyArrowBackend(Backend):
             with _suppress_native_stderr():
                 import pyarrow as pa
                 import pyarrow.compute as pc
+                import pyarrow.csv as pacsv
 
                 table_by_name = {table.name: table for table in tables}
                 arrow_tables = {table.name: self._to_table(table) for table in tables}
@@ -69,9 +82,12 @@ class PyArrowBackend(Backend):
                             if evaluate_tuple_absence(row, left_columns, right_rows, right_columns)
                         ]
                         current = pa.Table.from_pylist(rows, schema=current.schema)
+                    elif kind == "row_number_filter":
+                        rows = row_number_filter_rows(current.to_pylist(), op)
+                        current = pa.Table.from_pylist(rows, schema=current.schema)
                     elif kind == "running_sum":
-                        rows = sort_rows_for_running(current.to_pylist(), normalize_sort_keys({"keys": op["order_by"]}))
-                        values = stable_running_sum_values(rows, op["source"])
+                        rows = sort_rows_for_running(current.to_pylist(), running_sum_sort_keys(op))
+                        values = stable_running_sum_values(rows, op["source"], running_sum_partition_columns(op))
                         rows = [{**row, op["column"]: value} for row, value in zip(rows, values)]
                         current_cols = [col for col in current_cols if col != op["column"]] + [op["column"]]
                         fields = [
@@ -105,6 +121,12 @@ class PyArrowBackend(Backend):
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [False]})
                     elif kind == "round_even_probe":
+                        current_cols = [op["as"]]
+                        current = pa.Table.from_pydict({op["as"]: [False]})
+                    elif kind == "float_literal_precision_probe":
+                        current_cols = [op["as"]]
+                        current = pa.Table.from_pydict({op["as"]: [False]})
+                    elif kind == "timestamp_precision_filter_probe":
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [False]})
                     elif kind == "series_rtruediv_probe":
@@ -146,9 +168,15 @@ class PyArrowBackend(Backend):
                     elif kind == "eval_inplace_alias_probe":
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [False]})
+                    elif kind == "bool_reduction_skipna_probe":
+                        current_cols = [op["as"]]
+                        current = pa.Table.from_pydict({op["as"]: [False]})
                     elif kind == "dataset_isin_all_match_probe":
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [_pyarrow_dataset_isin_all_match_mismatch(pa)]})
+                    elif kind == "run_end_null_compute_probe":
+                        current_cols = [op["as"]]
+                        current = pa.Table.from_pydict({op["as"]: [_pyarrow_run_end_null_compute_mismatch(pa)]})
                     elif kind == "large_string_partition_probe":
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [_pyarrow_large_string_partition_mismatch(pa)]})
@@ -158,6 +186,14 @@ class PyArrowBackend(Backend):
                     elif kind == "rolling_mean_by_null_count_probe":
                         current_cols = [op["as"]]
                         current = pa.Table.from_pydict({op["as"]: [False]})
+                    elif kind == "csv_long_numeric_roundtrip_probe":
+                        expected_values = csv_long_numeric_values(op)
+                        with long_numeric_csv_path(expected_values) as csv_path:
+                            observed_table = pacsv.read_csv(csv_path)
+                            observed_values = observed_table.column("value").to_pylist()
+                        mismatch = csv_long_numeric_roundtrip_mismatch(observed_values, expected_values)
+                        current_cols = [op["as"]]
+                        current = pa.Table.from_pydict({op["as"]: [mismatch]})
                     elif kind == "select":
                         current_cols = list(op["columns"])
                         current = current.select(current_cols)
@@ -219,6 +255,20 @@ def _pyarrow_dataset_isin_all_match_mismatch(pa) -> bool:
         pq.write_to_dataset(expected, tmpdir)
         observed = ds.dataset(tmpdir).filter(filter_expr).to_table()
     return observed.to_pydict() != expected.to_pydict()
+
+
+def _pyarrow_run_end_null_compute_mismatch(pa) -> bool:
+    import pyarrow.compute as pc
+
+    run_ends = pa.array([1, 2, 4, 5], type=pa.int16())
+    values = pa.array([True, None, False, True], type=pa.bool_())
+    encoded = pa.RunEndEncodedArray.from_arrays(run_ends, values)
+    expected = [True, None, True, True, True]
+    try:
+        observed = pc.true_unless_null(encoded).to_pylist()
+    except Exception:  # noqa: BLE001
+        return True
+    return observed != expected
 
 
 def _pyarrow_large_string_partition_mismatch(pa) -> bool:
@@ -376,6 +426,13 @@ def _eval_expr(pc, table: Any, expr: dict[str, Any]):
         return pc.utf8_length(source)
     if expr["kind"] == "string_lower":
         return pc.utf8_lower(source)
+    if expr["kind"] == "string_basename":
+        import pyarrow as pa
+
+        return pa.array([
+            path_basename(value)
+            for value in source.to_pylist()
+        ], type=pa.string())
     raise ValueError(expr["kind"])
 
 
@@ -386,6 +443,12 @@ def _global_aggregate(pc, array: Any, func: str) -> Any:
         return pc.count_distinct(array).as_py()
     if func == "sum":
         return pc.sum(array).as_py()
+    if func == "mean":
+        return pc.mean(array).as_py()
+    if func == "any":
+        return pc.any(array).as_py()
+    if func == "all":
+        return pc.all(array).as_py()
     if func == "min":
         return pc.min(array).as_py()
     if func == "max":

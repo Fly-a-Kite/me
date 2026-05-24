@@ -4,6 +4,10 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from datadiff.reward import (
+    candidate_bug_family_keys,
+    is_rewardable_candidate_bug_finding,
+)
 from datadiff.util import (
     JsonlWriter,
     REPORTS_DIR,
@@ -27,14 +31,15 @@ def build_run_journal_entry(run_file: Path, context: dict[str, Any] | None = Non
     rows = read_jsonl(run_file) if run_file.exists() else []
     meta_path = run_meta_path(run_file)
     meta = load_json(meta_path) if meta_path.exists() else {}
+    config = meta.get("config", {}) if isinstance(meta.get("config", {}), dict) else {}
+    known_bug_families = list(config.get("known_saturated_bug_families", []) or [])
     findings = [finding for row in rows for finding in row.get("findings", [])]
-    candidate_families = _candidate_bug_family_keys(findings)
+    candidate_families = _candidate_bug_family_keys(findings, known_bug_families)
     semantic_divergences = sum(_is_semantic_divergence(finding) for finding in findings)
     false_positives = sum(_is_false_positive(finding) for finding in findings)
     target_specs = meta.get("targets", [])
     target_families = Counter(target.get("family", "unknown") for target in target_specs)
     target_layers = Counter(target.get("layer", "unknown") for target in target_specs)
-    config = meta.get("config", {}) if isinstance(meta.get("config", {}), dict) else {}
     replay_filter = (
         meta.get("replay_bug_filter", {}) if isinstance(meta.get("replay_bug_filter", {}), dict) else {}
     )
@@ -96,7 +101,12 @@ def build_run_journal_entry(run_file: Path, context: dict[str, Any] | None = Non
             "raw_findings": len(findings),
             "bug_triggering_cases": sum(1 for row in rows if row.get("findings")),
             "candidate_bug_cases": sum(
-                1 for row in rows if any(_is_candidate_bug_finding(finding) for finding in row.get("findings", []))
+                1
+                for row in rows
+                if any(
+                    is_rewardable_candidate_bug_finding(finding, known_bug_families)
+                    for finding in row.get("findings", [])
+                )
             ),
             "candidate_bug_families": dict(candidate_families),
             "candidate_bug_family_count": len(candidate_families),
@@ -105,9 +115,15 @@ def build_run_journal_entry(run_file: Path, context: dict[str, Any] | None = Non
             "new_behavior_cases": int(meta.get("new_behavior_cases", sum(1 for row in rows if row.get("is_new_behavior")))),
             "saved_artifacts": int(meta.get("saved_artifacts", sum(1 for row in rows if row.get("bug_dir")))),
             "first_finding_case_index": _first_case_index(rows, lambda finding: True),
-            "first_candidate_bug_case_index": _first_case_index(rows, _is_candidate_bug_finding),
-            "first_candidate_bug_elapsed_s": _first_case_elapsed_s(rows, _is_candidate_bug_finding),
-            "candidate_family_first_seen": _candidate_family_first_seen(rows),
+            "first_candidate_bug_case_index": _first_case_index(
+                rows,
+                lambda finding: is_rewardable_candidate_bug_finding(finding, known_bug_families),
+            ),
+            "first_candidate_bug_elapsed_s": _first_case_elapsed_s(
+                rows,
+                lambda finding: is_rewardable_candidate_bug_finding(finding, known_bug_families),
+            ),
+            "candidate_family_first_seen": _candidate_family_first_seen(rows, known_bug_families),
             "preflight": meta.get("preflight", {}),
             "quality_oracles": meta.get("quality_oracles", {}),
         },
@@ -228,32 +244,24 @@ def _counting_policy(evidence_mode: str) -> str:
     return "Count candidate families separately from maintainer-confirmed or fixed bugs."
 
 
-def _candidate_bug_family_keys(findings: list[dict[str, Any]]) -> Counter[str]:
-    keys: Counter[str] = Counter()
-    root_by_suspicious: dict[str, str] = {}
-    for finding in findings:
-        if not _is_candidate_bug_finding(finding):
-            continue
-        root = str(finding.get("root_cause", "unknown"))
-        suspicious = _suspicious_key(finding)
-        if not root.startswith("metamorphic_"):
-            root_by_suspicious.setdefault(suspicious, root)
-    for finding in findings:
-        if not _is_candidate_bug_finding(finding):
-            continue
-        root = str(finding.get("root_cause", "unknown"))
-        suspicious = _suspicious_key(finding)
-        if root.startswith("metamorphic_") and suspicious in root_by_suspicious:
-            root = root_by_suspicious[suspicious]
-        keys[f"{root}@{suspicious}"] += 1
-    return keys
+def _candidate_bug_family_keys(
+    findings: list[dict[str, Any]],
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
+) -> Counter[str]:
+    return candidate_bug_family_keys(
+        findings,
+        known_saturated_bug_families=known_saturated_bug_families,
+    )
 
 
-def _candidate_family_first_seen(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+def _candidate_family_first_seen(
+    rows: list[dict[str, Any]],
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
+) -> dict[str, dict[str, Any]]:
     first_seen: dict[str, dict[str, Any]] = {}
     for fallback_idx, row in enumerate(rows):
         case = row.get("case", {})
-        for family in _candidate_bug_family_keys(row.get("findings", [])):
+        for family in _candidate_bug_family_keys(row.get("findings", []), known_saturated_bug_families):
             first_seen.setdefault(
                 family,
                 {
@@ -288,10 +296,6 @@ def _last_elapsed_s(rows: list[dict[str, Any]]) -> float:
     return float(elapsed) if elapsed is not None else 0.0
 
 
-def _is_candidate_bug_finding(finding: dict[str, Any]) -> bool:
-    return finding.get("triage_verdict") == "candidate_implementation_bug" and not finding.get("false_positive")
-
-
 def _is_false_positive(finding: dict[str, Any]) -> bool:
     if finding.get("false_positive"):
         return True
@@ -303,10 +307,6 @@ def _is_semantic_divergence(finding: dict[str, Any]) -> bool:
         "documented_semantic_divergence",
         "expected_semantic_divergence",
     }
-
-
-def _suspicious_key(finding: dict[str, Any]) -> str:
-    return ",".join(sorted(finding.get("suspicious_backends", []) or [])) or "unknown"
 
 
 def _environment_summary(environment: dict[str, Any]) -> dict[str, Any]:

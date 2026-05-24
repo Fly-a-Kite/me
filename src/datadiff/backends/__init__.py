@@ -5,7 +5,7 @@ from datadiff.backends.datafusion_backend import DataFusionBackend
 from datadiff.backends.duckdb_backend import DuckDBBackend, DuckDBPersistentBackend
 from datadiff.backends.faulty_backend import FaultyPandasBackend
 from datadiff.backends.pandas_backend import PandasBackend
-from datadiff.backends.polars_backend import PolarsBackend, PolarsLazyBackend
+from datadiff.backends.polars_backend import PolarsBackend, PolarsLazyBackend, PolarsStreamingBackend
 from datadiff.backends.pyarrow_backend import PyArrowBackend
 from datadiff.backends.sqlite_backend import SQLiteBackend
 
@@ -17,6 +17,8 @@ def make_backend(name: str) -> Backend:
         return PolarsBackend()
     if name == "polars_lazy":
         return PolarsLazyBackend()
+    if name == "polars_streaming":
+        return PolarsStreamingBackend()
     if name == "pyarrow":
         return PyArrowBackend()
     if name == "duckdb":

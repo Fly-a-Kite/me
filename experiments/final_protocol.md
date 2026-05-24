@@ -28,16 +28,23 @@ Goal: discover new real backend bugs in the latest released versions.
 Run one fixed 24h discovery campaign per target suite and seed:
 
 - `datafusion_cross` with `live_datafusion`
+- `datafusion_cross` with `live_datafusion_fresh`
 - `dataframe_lazy` with `live_polars_lazy`
 - `arrow_cross` with `live_arrow`
 - `embedded_sql` with `live_embedded_sql`
 - `latest_all_engines` with `live_cross_family`
+- `latest_no_datafusion` with `live_cross_family`
+- `polars_cross` with `live_polars_issue_focus`
+- `embedded_sql_cross` with `live_duckdb_issue_focus`
+- `arrow_cross` with `live_arrow_issue_focus`
+- `latest_no_datafusion` with `live_issue_focus`
 
 Report:
 
 - executed cases
 - raw findings
 - candidate bug cases
+- rewardable candidate families after excluding known saturated/submitted families
 - unique candidate bug families
 - maintainer-confirmed/fixed bug families
 - time to first candidate bug family
@@ -47,6 +54,10 @@ Report:
 Family key: `root_cause + suspicious_backends`.
 
 Fresh live runs must keep `enable_replay_bug=false`. A candidate whose source issue or replay probe matches the known replay policy can still influence the written method description, but it is not executed or counted in fresh latest-version discovery. This prevents already submitted issues from inflating new-bug evidence.
+
+Issue-focus live runs use the bottom-layer `issue_focus` generator profile. It rotates semantic sketches derived from issue classes and records source metadata, but it does not decide freshness. Exact known/submitted replay probes are excluded by the same middle-layer replay filter unless the replay switch is explicitly enabled.
+
+Live presets also enable middle-layer candidate recheck. A finding must reproduce across the configured immediate recheck attempts to remain a rewardable candidate; otherwise it is kept as diagnostic noise with `non_reproducible_candidate` status and excluded from bug evidence. Single-case fresh issue-focus intentionally excludes sequence-state sketches such as `float_group_key` and broad NaN/Inf boundary profiles such as `edge_float`; those belong in separate sequence or boundary-semantics experiments before they can count.
 
 ### 2. Historical Replay
 

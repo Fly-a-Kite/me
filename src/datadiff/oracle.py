@@ -63,24 +63,28 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
     probe_root = _last_probe_root(case)
     if probe_root is not None:
         return probe_root
+    if _case_has_path_projection_keyed_pick(case):
+        return "path_projection_keyed_pick"
     if _case_has_running_sum(case):
         return "running_sum_precision"
     if _case_contains_special_float(case):
         return "nan_inf_semantics"
     if _case_uses_modulo(case):
         return "arithmetic_expression"
+    if _case_has_reverse_division_columns(case):
+        return "reverse_division_operand_order"
     if _case_has_grouped_topk_null_sort_key(case):
         return "grouped_topk_null_sort_key"
     if _case_has_float_group_key_instability(case, normalized):
         return "float_group_key_instability"
     if _case_has_negative_zero_comparison(case):
         return "negative_zero_comparison"
+    if _case_has_tuple_absence_filter(case):
+        return "tuple_absence_null_filter"
     if _case_has_outer_join_truth_filter(case):
         return "outer_join_truth_filter"
     if _case_has_post_topk_filter(case):
         return "topk_filter_pushdown"
-    if _case_has_tuple_absence_filter(case):
-        return "tuple_absence_null_filter"
     if _case_has_joined_order_offset_projection(case):
         return "joined_order_offset_projection"
     if _case_has_ordered_topk_projection(case):
@@ -99,8 +103,6 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         }
         if kinds & {"string_length", "string_lower"}:
             return "string_expression"
-        if "reverse_division_columns" in kinds:
-            return "reverse_division_operand_order"
         if "cast" in kinds:
             return "type_cast"
         return "arithmetic_expression"
@@ -131,6 +133,8 @@ PROBE_ROOTS = {
     "struct_distinct_probe": "struct_distinct_unnest",
     "bit_compare_probe": "bit_compare_unequal_length",
     "round_even_probe": "round_even_float_scale",
+    "float_literal_precision_probe": "duckdb_float_literal_precision",
+    "timestamp_precision_filter_probe": "polars_timestamp_precision_filter",
     "series_rtruediv_probe": "series_rtruediv_operand_order",
     "uint64_isin_probe": "pandas_uint64_isin_precision",
     "tuple_anti_null_probe": "duckdb_tuple_anti_null_semantics",
@@ -144,10 +148,13 @@ PROBE_ROOTS = {
     "arrow_timestamp_loc_slice_probe": "pandas_arrow_timestamp_loc_slice_semantics",
     "arrow_timestamp_index_attr_probe": "pandas_arrow_timestamp_index_attr_semantics",
     "eval_inplace_alias_probe": "pandas_eval_inplace_aliasing_semantics",
+    "bool_reduction_skipna_probe": "pandas_bool_reduction_skipna_semantics",
     "dataset_isin_all_match_probe": "pyarrow_dataset_isin_all_match_semantics",
+    "run_end_null_compute_probe": "pyarrow_run_end_null_compute_semantics",
     "large_string_partition_probe": "pyarrow_large_string_partition_schema_semantics",
     "hash_pivot_wider_probe": "pyarrow_hash_pivot_wider_order_semantics",
     "rolling_mean_by_null_count_probe": "polars_rolling_mean_by_null_count_semantics",
+    "csv_long_numeric_roundtrip_probe": "csv_long_numeric_roundtrip",
 }
 
 
@@ -172,6 +179,15 @@ def _case_contains_special_float(case: Case) -> bool:
 
 def _case_has_running_sum(case: Case) -> bool:
     return any(op.get("op") == "running_sum" for op in case.program.operations)
+
+
+def _case_has_path_projection_keyed_pick(case: Case) -> bool:
+    has_basename = any(
+        op.get("op") == "mutate" and op.get("expr", {}).get("kind") == "string_basename"
+        for op in case.program.operations
+    )
+    has_keyed_pick = any(op.get("op") == "row_number_filter" for op in case.program.operations)
+    return has_basename and has_keyed_pick
 
 
 def _case_has_sortedness_check(case: Case) -> bool:
@@ -275,6 +291,13 @@ def _case_uses_modulo(case: Case) -> bool:
         op.get("op") == "mutate"
         and op.get("expr", {}).get("kind") == "arith_const"
         and op.get("expr", {}).get("op") == "mod"
+        for op in case.program.operations
+    )
+
+
+def _case_has_reverse_division_columns(case: Case) -> bool:
+    return any(
+        op.get("op") == "mutate" and op.get("expr", {}).get("kind") == "reverse_division_columns"
         for op in case.program.operations
     )
 
@@ -592,6 +615,8 @@ def _expr_output_type(expr: dict[str, Any], col_types: dict[str, str]) -> str | 
         return "int" if source_type == "str" else None
     if kind == "string_lower":
         return "str" if source_type == "str" else None
+    if kind == "string_basename":
+        return "str" if source_type == "str" else None
     return None
 
 
@@ -657,6 +682,10 @@ def _eval_expr_samples(samples: dict[str, list[Any]], expr: dict[str, Any]) -> l
                 out.append(len(value) if isinstance(value, str) else None)
             elif kind == "string_lower":
                 out.append(value.lower() if isinstance(value, str) else None)
+            elif kind == "string_basename":
+                text = str(value)
+                slash = max(text.rfind("/"), text.rfind("\\"))
+                out.append(text[slash + 1 :] if slash >= 0 else text)
             else:
                 out.append(None)
         except Exception:
@@ -691,6 +720,10 @@ def _groupby_output_samples(samples: dict[str, list[Any]], op: dict[str, Any]) -
                 values.append(len(set(non_null)))
             elif not non_null:
                 values.append(None)
+            elif func == "any":
+                values.append(any(bool(value) for value in non_null))
+            elif func == "all":
+                values.append(all(bool(value) for value in non_null))
             elif func == "sum":
                 values.append(sum(non_null))
             elif func == "min":

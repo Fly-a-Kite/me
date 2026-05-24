@@ -75,6 +75,7 @@ class Program:
             "filter",
             "tuple_absence_filter",
             "running_sum",
+            "row_number_filter",
             "select",
             "mutate",
             "limit",
@@ -82,7 +83,7 @@ class Program:
         }
         for op in reversed(self.operations):
             kind = op.get("op")
-            if kind in {"sort", "running_sum", "sortedness_check"}:
+            if kind in {"sort", "running_sum", "row_number_filter", "sortedness_check"}:
                 return True
             if kind in row_order_preserving:
                 continue

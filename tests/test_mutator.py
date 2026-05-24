@@ -322,6 +322,7 @@ def test_append_running_sum_mutation_stays_valid():
     assert detail.startswith("append_running_sum:")
     assert operations[-1]["op"] == "running_sum"
     assert operations[-1]["column"].startswith("run_")
+    assert [key["column"] for key in operations[-1]["order_by"]] == ["row_id", "x"]
     case = Case("case-mut-running-sum", 1, [table], Program("prog-mut-running-sum", 1, operations))
     assert validate_case_program(case) == []
 

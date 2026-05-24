@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from datadiff.case_policy import case_discovery_origin, replay_bug_filter_reason
 from datadiff.cli import _preset_config
 from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES
@@ -16,7 +18,10 @@ CORE_METHOD_CAPABILITIES = {
     "expr:arith_const",
     "expr:string_lower",
     "agg:min",
+    "agg:mean",
     "agg:count",
+    "agg:any",
+    "agg:all",
     "nulls",
 }
 
@@ -40,6 +45,8 @@ def test_methodology_cross_family_suites_keep_common_dsl_contract():
         "datafusion_cross": resolve_target_backends(target_suite="datafusion_cross"),
         "arrow_cross": resolve_target_backends(target_suite="arrow_cross"),
         "latest_all_engines": resolve_target_backends(target_suite="latest_all_engines"),
+        "latest_no_datafusion": resolve_target_backends(target_suite="latest_no_datafusion"),
+        "embedded_sql_cross": resolve_target_backends(target_suite="embedded_sql_cross"),
     }
 
     for suite, backends in suites.items():
@@ -63,6 +70,17 @@ def test_methodology_latest_live_suite_covers_all_real_targets():
     assert live.enable_normalizer is True
     assert live.enable_local_source_scheduler is True
     assert {"operation_combo", "join", "filter", "groupby", "sort_limit", "topk"}.issubset(live.guidance_targets)
+
+    focus = _preset_config("live_issue_focus")
+    assert focus.generator_profile == "issue_focus"
+    assert focus.enable_replay_bug is False
+    assert {
+        "row_value_absence_filter",
+        "polars_reverse_division_columns",
+        "join_filter_groupby",
+        "pandas_bool_reduction_skipna_semantics",
+        "csv_long_numeric_roundtrip",
+    }.issubset(focus.guidance_targets)
 
 
 def test_methodology_experiment_presets_cover_required_ablation_axes():
@@ -103,6 +121,8 @@ def test_methodology_fresh_and_replay_share_case_policy_gate():
         "datafusion_setop_all_duplicate_count",
         "duckdb_tuple_anti_null_semantics",
         "polars_rolling_mean_by_null_count_semantics",
+        "pandas_bool_reduction_skipna_semantics",
+        "pyarrow_run_end_null_compute_semantics",
     ]
     for seed, profile in enumerate(replay_profiles, start=137):
         case = generate_case(seed, profile=profile)
@@ -124,12 +144,55 @@ def test_methodology_fresh_and_replay_share_case_policy_gate():
             == ""
         )
 
+    fresh_policy_rejections = []
+    for seed in range(20):
+        fresh_case = generate_case(seed, profile="issue_focus")
+        reason = replay_bug_filter_reason(
+            fresh_case,
+            enable_replay_bug=False,
+            replay_bug_source_issues=DEFAULT_REPLAY_BUG_SOURCE_ISSUES,
+        )
+        if reason:
+            fresh_policy_rejections.append(reason)
+
+    assert {"known_replay_source_issue", "issue_replay_probe"}.issubset(set(fresh_policy_rejections))
+
+
+def test_methodology_bottom_layer_does_not_import_middle_policy_modules():
+    repo_root = Path(__file__).resolve().parents[1]
+    bottom_layer_paths = [
+        repo_root / "src/datadiff/datagen.py",
+        repo_root / "src/datadiff/csv_roundtrip.py",
+        repo_root / "src/datadiff/dsl.py",
+        repo_root / "src/datadiff/normalizer.py",
+        repo_root / "src/datadiff/oracle.py",
+        repo_root / "src/datadiff/pathing.py",
+        repo_root / "src/datadiff/windowing.py",
+        repo_root / "src/datadiff/running.py",
+    ]
+    bottom_layer_paths.extend((repo_root / "src/datadiff/backends").glob("*.py"))
+    forbidden_imports = (
+        "datadiff.case_policy",
+        "datadiff.config",
+        "datadiff.guidance",
+        "datadiff.scheduler",
+        "datadiff.final_readiness",
+        "datadiff.reporter",
+        "datadiff.reward",
+        "datadiff.targets",
+    )
+
+    for path in bottom_layer_paths:
+        source = path.read_text(encoding="utf-8")
+        assert not any(forbidden in source for forbidden in forbidden_imports), path
+
 
 def test_methodology_replay_source_gate_spans_historical_projects():
     required_sources = {
         "https://github.com/apache/datafusion/issues/22190",
         "https://github.com/duckdb/duckdb/issues/22075",
         "https://github.com/duckdb/duckdb/issues/22656",
+        "https://github.com/duckdb/duckdb/issues/22837",
         "https://github.com/apache/arrow/issues/42231",
     }
 
@@ -157,6 +220,8 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     global_null_aggregate = _preset_config("global_null_aggregate")
     string_count_groupby = _preset_config("string_count_groupby")
     unique_count_groupby = _preset_config("unique_count_groupby")
+    bool_null_groupby_agg = _preset_config("bool_null_groupby_agg")
+    large_int_filter_groupby = _preset_config("large_int_filter_groupby")
     set_membership_filter = _preset_config("set_membership_filter")
     null_predicate_filter = _preset_config("null_predicate_filter")
     boolean_predicate_filter = _preset_config("boolean_predicate_filter")
@@ -164,6 +229,8 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     tuple_absence_filter = _preset_config("tuple_absence_filter")
     row_value_absence_filter = _preset_config("row_value_absence_filter")
     running_sum_precision = _preset_config("running_sum_precision")
+    partitioned_running_sum = _preset_config("partitioned_running_sum")
+    path_basename_keyed_pick = _preset_config("path_basename_keyed_pick")
     sortedness_null_placement = _preset_config("sortedness_null_placement")
     simple_case_random_subject = _preset_config("simple_case_random_subject")
     group_quantile_key_probe = _preset_config("group_quantile_key_probe")
@@ -172,6 +239,8 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     struct_distinct_unnest = _preset_config("struct_distinct_unnest")
     bit_compare_unequal_length = _preset_config("bit_compare_unequal_length")
     round_even_float_scale = _preset_config("round_even_float_scale")
+    duckdb_float_literal_precision = _preset_config("duckdb_float_literal_precision")
+    polars_timestamp_precision_filter = _preset_config("polars_timestamp_precision_filter")
     series_rtruediv_operand_order = _preset_config("series_rtruediv_operand_order")
     pandas_uint64_isin_precision = _preset_config("pandas_uint64_isin_precision")
     duckdb_tuple_anti_null_semantics = _preset_config("duckdb_tuple_anti_null_semantics")
@@ -185,7 +254,9 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     pandas_arrow_timestamp_loc_slice_semantics = _preset_config("pandas_arrow_timestamp_loc_slice_semantics")
     pandas_arrow_timestamp_index_attr_semantics = _preset_config("pandas_arrow_timestamp_index_attr_semantics")
     pandas_eval_inplace_aliasing_semantics = _preset_config("pandas_eval_inplace_aliasing_semantics")
+    pandas_bool_reduction_skipna_semantics = _preset_config("pandas_bool_reduction_skipna_semantics")
     pyarrow_dataset_isin_all_match_semantics = _preset_config("pyarrow_dataset_isin_all_match_semantics")
+    pyarrow_run_end_null_compute_semantics = _preset_config("pyarrow_run_end_null_compute_semantics")
     pyarrow_large_string_partition_schema_semantics = _preset_config(
         "pyarrow_large_string_partition_schema_semantics"
     )
@@ -193,6 +264,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
         "pyarrow_hash_pivot_wider_order_semantics"
     )
     polars_rolling_mean_by_null_count_semantics = _preset_config("polars_rolling_mean_by_null_count_semantics")
+    csv_long_numeric_roundtrip = _preset_config("csv_long_numeric_roundtrip")
 
     assert null_groupby.generator_profile == "null_groupby_topk"
     assert {"groupby", "nulls", "sort_limit"}.issubset(null_groupby.guidance_targets)
@@ -234,6 +306,14 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert {"groupby", "strings", "nulls", "aggregation", "sort_limit"}.issubset(string_count_groupby.guidance_targets)
     assert unique_count_groupby.generator_profile == "unique_count_groupby"
     assert {"groupby", "strings", "unique_count", "aggregation", "sort_limit"}.issubset(unique_count_groupby.guidance_targets)
+    assert bool_null_groupby_agg.generator_profile == "bool_null_groupby_agg"
+    assert {"groupby", "nulls", "boolean_aggregation", "bool_any_all", "aggregation", "sort_limit"}.issubset(
+        bool_null_groupby_agg.guidance_targets
+    )
+    assert large_int_filter_groupby.generator_profile == "large_int_filter_groupby"
+    assert {"filter", "groupby", "large_integer", "numeric", "aggregation", "sort_limit"}.issubset(
+        large_int_filter_groupby.guidance_targets
+    )
     assert set_membership_filter.generator_profile == "set_membership_filter"
     assert {"filter", "strings", "set_membership", "aggregation", "sort_limit"}.issubset(set_membership_filter.guidance_targets)
     assert null_predicate_filter.generator_profile == "null_predicate_filter"
@@ -250,6 +330,11 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     )
     assert running_sum_precision.generator_profile == "running_sum_precision"
     assert {"running_sum", "numeric", "sort_limit"}.issubset(running_sum_precision.guidance_targets)
+    assert partitioned_running_sum.generator_profile == "partitioned_running_sum"
+    assert {"running_sum_partitioned", "running_sum", "numeric"}.issubset(partitioned_running_sum.guidance_targets)
+    assert path_basename_keyed_pick.generator_profile == "path_basename_keyed_pick"
+    assert {"path_projection", "keyed_row_pick", "strings"}.issubset(path_basename_keyed_pick.guidance_targets)
+    assert _preset_config("path_basename_keyed_pick_replay").enable_replay_bug is True
     assert sortedness_null_placement.generator_profile == "sortedness_null_placement"
     assert {"sortedness", "nulls", "sort_limit"}.issubset(sortedness_null_placement.guidance_targets)
     assert simple_case_random_subject.generator_profile == "simple_case_random_subject"
@@ -268,6 +353,14 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert {"bit_compare_probe", "bit_ordering"}.issubset(bit_compare_unequal_length.guidance_targets)
     assert round_even_float_scale.generator_profile == "round_even_float_scale"
     assert {"round_even_probe", "rounding", "numeric"}.issubset(round_even_float_scale.guidance_targets)
+    assert duckdb_float_literal_precision.generator_profile == "duckdb_float_literal_precision"
+    assert {"float_literal_precision_probe", "float_literal_precision", "numeric"}.issubset(
+        duckdb_float_literal_precision.guidance_targets
+    )
+    assert polars_timestamp_precision_filter.generator_profile == "polars_timestamp_precision_filter"
+    assert {"timestamp_precision_filter_probe", "timestamp_precision_filter", "casts"}.issubset(
+        polars_timestamp_precision_filter.guidance_targets
+    )
     assert series_rtruediv_operand_order.generator_profile == "series_rtruediv_operand_order"
     assert {"series_rtruediv_probe", "reverse_division", "numeric"}.issubset(
         series_rtruediv_operand_order.guidance_targets
@@ -326,9 +419,17 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert {"eval_inplace_alias_probe", "eval_inplace_aliasing", "mutate"}.issubset(
         pandas_eval_inplace_aliasing_semantics.guidance_targets
     )
+    assert pandas_bool_reduction_skipna_semantics.generator_profile == "pandas_bool_reduction_skipna_semantics"
+    assert {"bool_reduction_skipna_probe", "bool_reduction_skipna", "nulls"}.issubset(
+        pandas_bool_reduction_skipna_semantics.guidance_targets
+    )
     assert pyarrow_dataset_isin_all_match_semantics.generator_profile == "pyarrow_dataset_isin_all_match_semantics"
     assert {"dataset_isin_all_match_probe", "dataset_membership_filter", "filter"}.issubset(
         pyarrow_dataset_isin_all_match_semantics.guidance_targets
+    )
+    assert pyarrow_run_end_null_compute_semantics.generator_profile == "pyarrow_run_end_null_compute_semantics"
+    assert {"run_end_null_compute_probe", "run_end_null_compute", "nulls"}.issubset(
+        pyarrow_run_end_null_compute_semantics.guidance_targets
     )
     assert (
         pyarrow_large_string_partition_schema_semantics.generator_profile
@@ -350,6 +451,10 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     )
     assert {"rolling_mean_by_null_count_probe", "rolling_temporal_nulls", "nulls"}.issubset(
         polars_rolling_mean_by_null_count_semantics.guidance_targets
+    )
+    assert csv_long_numeric_roundtrip.generator_profile == "csv_long_numeric_roundtrip"
+    assert {"csv_long_numeric_roundtrip_probe", "csv_numeric_inference", "numeric"}.issubset(
+        csv_long_numeric_roundtrip.guidance_targets
     )
 
 

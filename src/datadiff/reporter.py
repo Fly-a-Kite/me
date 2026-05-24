@@ -9,6 +9,13 @@ from datadiff.config import ExperimentConfig
 from datadiff.dsl import Case
 from datadiff.normalizer import NormalizedResult
 from datadiff.oracle import evaluate_case
+from datadiff.reward import (
+    candidate_bug_family_keys as reward_candidate_bug_family_keys,
+    is_candidate_bug_finding as reward_is_candidate_bug_finding,
+    is_issue_replay_finding as reward_is_issue_replay_finding,
+    is_known_saturated_candidate_bug_finding as reward_is_known_saturated_candidate_bug_finding,
+    is_rewardable_candidate_bug_finding as reward_is_rewardable_candidate_bug_finding,
+)
 from datadiff.util import REPORTS_DIR, RUNS_DIR, ensure_dirs, jsonl_log_stem, load_json, read_jsonl, run_meta_path
 
 
@@ -44,6 +51,8 @@ def write_report(run_file: Path | None = None, csv_limit: int | None = None) -> 
     examples: dict[str, list[dict]] = defaultdict(list)
     meta_path = run_meta_path(run_file)
     meta = load_json(meta_path) if meta_path.exists() else {}
+    meta_config = meta.get("config", {}) if isinstance(meta.get("config", {}), dict) else {}
+    known_bug_families = list(meta_config.get("known_saturated_bug_families", []) or [])
     target_specs = meta.get("targets") or (rows[0].get("targets", []) if rows else [])
     target_families = Counter(target.get("family", "unknown") for target in target_specs)
     target_layers = Counter(target.get("layer", "unknown") for target in target_specs)
@@ -60,7 +69,7 @@ def write_report(run_file: Path | None = None, csv_limit: int | None = None) -> 
             quality_oracle_verdicts[f"{oracle.get('name', 'unknown')}:{oracle.get('verdict', 'unknown')}"] += 1
             outcome = "passed" if oracle.get("passed") else "failed"
             quality_oracle_pass_fail[f"{oracle.get('name', 'unknown')}:{outcome}"] += 1
-        candidate_bug_families.update(_candidate_bug_family_keys(row.get("findings", [])))
+        candidate_bug_families.update(_candidate_bug_family_keys(row.get("findings", []), known_bug_families))
         for finding in row.get("findings", []):
             finding_kinds[finding["kind"]] += 1
             root_causes[finding.get("root_cause", "unknown")] += 1
@@ -294,6 +303,7 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
         meta_path = run_meta_path(run_file)
         meta = load_json(meta_path) if meta_path.exists() else {}
         meta_config = meta.get("config", {}) if isinstance(meta.get("config", {}), dict) else {}
+        known_bug_families = list(meta_config.get("known_saturated_bug_families", []) or [])
         replay_filter = (
             meta.get("replay_bug_filter", {}) if isinstance(meta.get("replay_bug_filter", {}), dict) else {}
         )
@@ -307,10 +317,15 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
         issue_replay_candidate_count = sum(
             1 for finding in findings if _is_candidate_bug_finding(finding) and _is_issue_replay_finding(finding)
         )
-        rewardable_candidate_count = sum(1 for finding in findings if _is_rewardable_candidate_bug_finding(finding))
+        known_saturated_candidate_count = sum(
+            1 for finding in findings if _is_known_saturated_candidate_bug_finding(finding, known_bug_families)
+        )
+        rewardable_candidate_count = sum(
+            1 for finding in findings if _is_rewardable_candidate_bug_finding(finding, known_bug_families)
+        )
         candidate_bug_families = Counter()
         for row in run_rows:
-            candidate_bug_families.update(_candidate_bug_family_keys(row.get("findings", [])))
+            candidate_bug_families.update(_candidate_bug_family_keys(row.get("findings", []), known_bug_families))
         target_families = Counter(target.get("family", "unknown") for target in meta.get("targets", []))
         total = len(run_rows)
         bug_cases = sum(1 for row in run_rows if row.get("findings"))
@@ -377,6 +392,7 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
                 "candidate_implementation_bug_count": triage_verdicts["candidate_implementation_bug"],
                 "rewardable_candidate_implementation_bug_count": rewardable_candidate_count,
                 "issue_replay_candidate_bug_count": issue_replay_candidate_count,
+                "known_saturated_candidate_bug_count": known_saturated_candidate_count,
                 "documented_semantic_divergence_count": triage_verdicts["documented_semantic_divergence"],
                 "expected_semantic_divergence_count": triage_verdicts["expected_semantic_divergence"],
                 "semantic_divergence_needs_confirmation_count": triage_verdicts[
@@ -421,8 +437,8 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
         "",
         "## Runs",
         "",
-        "| target suite | preset | seed | batch | arm | reward | cases | findings | candidate bugs | rewardable candidates | issue replays | candidate case % | first candidate | first candidate s | discovery AUC | semantic divs | false positives | new behavior % | cases/s | data sensitivity | path proxy | frontier | contribution | pruned % | roots | triage | origins |",
-        "|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|",
+        "| target suite | preset | seed | batch | arm | reward | cases | findings | candidate bugs | rewardable candidates | issue replays | known families | candidate case % | first candidate | first candidate s | discovery AUC | semantic divs | false positives | new behavior % | cases/s | data sensitivity | path proxy | frontier | contribution | pruned % | roots | triage | origins |",
+        "|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|",
     ]
     for row in rows:
         semantic_divergence_count = (
@@ -433,7 +449,7 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
         false_positive_count = row["generator_false_positive_count"] + row["normalizer_false_positive_count"]
         lines.append(
             "| {target_suite} | {preset} | {seed} | {batch_index} | {schedule_arm_id} | {scheduler_reward} | {cases} | {findings} | "
-            "{candidate_implementation_bug_count} | {rewardable_candidate_implementation_bug_count} | {issue_replay_candidate_bug_count} | {candidate_bug_case_rate} | "
+            "{candidate_implementation_bug_count} | {rewardable_candidate_implementation_bug_count} | {issue_replay_candidate_bug_count} | {known_saturated_candidate_bug_count} | {candidate_bug_case_rate} | "
             "{first_candidate_bug_case_index} | {first_candidate_bug_elapsed_s} | {candidate_bug_discovery_auc} | {semantic_divergence_count} | "
             "{false_positive_count} | {new_behavior_rate} | {throughput_cases_s} | {avg_data_sensitivity} | "
             "{avg_path_coverage_proxy} | {avg_frontier_conformance} | "
@@ -464,14 +480,14 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
             "",
             "## Aggregates",
             "",
-            "| target suite | preset | runs | cases | findings | candidate bugs | rewardable candidates | issue replays | candidate case % | candidate cases/s | median first candidate | median first s | avg discovery AUC | avg reward | semantic divs | false positives | avg new behavior % | avg cases/s | avg data sensitivity | avg path proxy |",
-            "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+            "| target suite | preset | runs | cases | findings | candidate bugs | rewardable candidates | issue replays | known families | candidate case % | candidate cases/s | median first candidate | median first s | avg discovery AUC | avg reward | semantic divs | false positives | avg new behavior % | avg cases/s | avg data sensitivity | avg path proxy |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         ]
     )
     for row in aggregate_rows:
         lines.append(
             "| {target_suite} | {preset} | {runs} | {cases} | {findings} | "
-            "{candidate_implementation_bug_count} | {rewardable_candidate_implementation_bug_count} | {issue_replay_candidate_bug_count} | {candidate_bug_case_rate} | "
+            "{candidate_implementation_bug_count} | {rewardable_candidate_implementation_bug_count} | {issue_replay_candidate_bug_count} | {known_saturated_candidate_bug_count} | {candidate_bug_case_rate} | "
             "{candidate_bug_cases_per_s} | {median_first_candidate_bug_case_index} | "
             "{median_first_candidate_bug_elapsed_s} | {avg_candidate_bug_discovery_auc} | {avg_scheduler_reward} | "
             "{semantic_divergence_count} | {false_positive_count} | {avg_new_behavior_rate} | "
@@ -619,6 +635,7 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
                 "candidate_implementation_bug_count",
                 "rewardable_candidate_implementation_bug_count",
                 "issue_replay_candidate_bug_count",
+                "known_saturated_candidate_bug_count",
                 "documented_semantic_divergence_count",
                 "expected_semantic_divergence_count",
                 "semantic_divergence_needs_confirmation_count",
@@ -646,6 +663,7 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
                 "candidate_implementation_bug_count",
                 "rewardable_candidate_implementation_bug_count",
                 "issue_replay_candidate_bug_count",
+                "known_saturated_candidate_bug_count",
                 "candidate_bug_cases",
                 "candidate_bug_case_rate",
                 "candidate_bug_cases_per_s",
@@ -755,50 +773,36 @@ def _normalized_from_mapping(mapping: dict) -> dict[str, NormalizedResult]:
     return out
 
 
-def _candidate_bug_family_keys(findings: list[dict]) -> Counter:
-    keys: Counter = Counter()
-    root_by_suspicious: dict[str, str] = {}
-    for finding in findings:
-        if not _is_rewardable_candidate_bug_finding(finding):
-            continue
-        root = str(finding.get("root_cause", "unknown"))
-        if root.startswith("metamorphic_"):
-            continue
-        suspicious = _suspicious_key(finding)
-        root_by_suspicious.setdefault(suspicious, root)
-    for finding in findings:
-        if not _is_rewardable_candidate_bug_finding(finding):
-            continue
-        root = str(finding.get("root_cause", "unknown"))
-        suspicious = _suspicious_key(finding)
-        if root.startswith("metamorphic_") and suspicious in root_by_suspicious:
-            root = root_by_suspicious[suspicious]
-        keys[f"{root}@{suspicious}"] += 1
-    return keys
+def _candidate_bug_family_keys(
+    findings: list[dict],
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
+) -> Counter:
+    return reward_candidate_bug_family_keys(
+        findings,
+        known_saturated_bug_families=known_saturated_bug_families,
+    )
 
 
 def _is_candidate_bug_finding(finding: dict) -> bool:
-    if finding.get("triage_verdict") != "candidate_implementation_bug":
-        return False
-    if finding.get("false_positive"):
-        return False
-    return True
+    return reward_is_candidate_bug_finding(finding)
 
 
 def _is_issue_replay_finding(finding: dict) -> bool:
-    return str(finding.get("discovery_origin", "")).strip() == "issue_replay"
+    return reward_is_issue_replay_finding(finding)
 
 
-def _is_rewardable_candidate_bug_finding(finding: dict) -> bool:
-    return _is_candidate_bug_finding(finding) and not _is_issue_replay_finding(finding)
+def _is_known_saturated_candidate_bug_finding(
+    finding: dict,
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
+) -> bool:
+    return reward_is_known_saturated_candidate_bug_finding(finding, known_saturated_bug_families)
 
 
-def _candidate_bug_family_key(finding: dict) -> str:
-    return next(iter(_candidate_bug_family_keys([finding])), "")
-
-
-def _suspicious_key(finding: dict) -> str:
-    return ",".join(sorted(finding.get("suspicious_backends", []) or [])) or "unknown"
+def _is_rewardable_candidate_bug_finding(
+    finding: dict,
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
+) -> bool:
+    return reward_is_rewardable_candidate_bug_finding(finding, known_saturated_bug_families)
 
 
 def _fmt_float(value) -> str:
@@ -884,6 +888,9 @@ def _aggregate_experiment_rows(rows: list[dict]) -> list[dict]:
         issue_replay_candidate_count = sum(
             int(row.get("issue_replay_candidate_bug_count", 0) or 0) for row in items
         )
+        known_saturated_candidate_count = sum(
+            int(row.get("known_saturated_candidate_bug_count", 0) or 0) for row in items
+        )
         family_counter = Counter()
         for row in items:
             family_counter.update(_parse_counter_summary(str(row.get("top_candidate_bug_families", ""))))
@@ -913,6 +920,7 @@ def _aggregate_experiment_rows(rows: list[dict]) -> list[dict]:
                 "candidate_implementation_bug_count": candidate_count,
                 "rewardable_candidate_implementation_bug_count": rewardable_candidate_count,
                 "issue_replay_candidate_bug_count": issue_replay_candidate_count,
+                "known_saturated_candidate_bug_count": known_saturated_candidate_count,
                 "candidate_bug_families": len(family_counter),
                 "top_candidate_bug_families": _counter_summary(family_counter),
                 "candidate_bug_cases": candidate_bug_cases,

@@ -110,6 +110,192 @@ def test_final_readiness_reports_missing_a_level_evidence(tmp_path):
     assert gates["seeded_sensitivity"]["passed"] is False
 
 
+def test_final_readiness_counts_legacy_historical_replay_without_run_replay_flag(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="legacy-historical-duckdb-22075",
+        evidence_mode="historical",
+        target_suite="cross_family",
+        preset="join_groupby_stress",
+        seed=22075,
+        known_bug_id="duckdb-22075",
+        config={},
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=1,
+            require_seeded=False,
+        ),
+    )
+
+    assert audit["summary"]["historical_confirmed_bug_ids"] == ["duckdb-22075"]
+    assert audit["runs"][0]["enable_replay_bug"] is True
+
+
+def test_final_readiness_does_not_default_legacy_manifest_to_live(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="legacy-with-candidate",
+        evidence_mode=None,
+        target_suite="datafusion_cross",
+        preset="old_live_datafusion",
+        seed=7,
+        findings=[
+            {
+                "triage_verdict": "candidate_implementation_bug",
+                "root_cause": "legacy_candidate",
+                "suspicious_backends": ["datafusion"],
+                "discovery_origin": "organic",
+            }
+        ],
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_seeded=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=("datafusion_cross",), required_live_families=("query_engine",)),
+    )
+
+    assert audit["summary"]["live_runs"] == 0
+    assert audit["summary"]["ignored_evidence_runs"] == 1
+    assert audit["summary"]["rewardable_live_candidate_families"] == {}
+    assert audit["gates"][0]["name"] == "live_suite_breadth"
+    assert audit["gates"][0]["passed"] is False
+
+
+def test_final_readiness_counts_only_fresh_policy_live_runs_as_latest_evidence(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="live-without-replay-filter",
+        evidence_mode="live",
+        target_suite="datafusion_cross",
+        preset="old_live_datafusion",
+        seed=9,
+        findings=[
+            {
+                "triage_verdict": "candidate_implementation_bug",
+                "root_cause": "stale_candidate",
+                "suspicious_backends": ["datafusion"],
+                "discovery_origin": "organic",
+            }
+        ],
+        config={"enable_replay_bug": False},
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_seeded=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=("datafusion_cross",), required_live_families=("query_engine",)),
+    )
+
+    assert audit["summary"]["explicit_live_runs"] == 1
+    assert audit["summary"]["live_runs"] == 0
+    assert audit["summary"]["replay_policy_rejected_live_runs"] == 1
+    assert audit["summary"]["rewardable_live_candidate_families"] == {}
+    assert audit["gates"][0]["name"] == "live_suite_breadth"
+    assert audit["gates"][0]["passed"] is False
+
+
+def test_final_readiness_rejects_seeded_suite_as_latest_evidence(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="seeded-mislabeled-live",
+        evidence_mode="live",
+        target_suite="seeded_filter",
+        preset="guided_filter",
+        seed=8,
+        findings=[
+            {
+                "triage_verdict": "candidate_implementation_bug",
+                "root_cause": "filter_predicate",
+                "suspicious_backends": ["buggy_filter"],
+                "discovery_origin": "organic",
+            }
+        ],
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_seeded=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=("seeded_filter",), required_live_families=("seeded_fault",)),
+    )
+
+    assert audit["summary"]["live_runs"] == 0
+    assert audit["summary"]["seeded_runs"] == 0
+    assert audit["summary"]["ignored_evidence_runs"] == 1
+    assert audit["summary"]["rewardable_live_candidate_families"] == {}
+
+
+def test_final_readiness_excludes_known_saturated_live_families_from_latest_evidence(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="live-known-family",
+        evidence_mode="live",
+        target_suite="datafusion_cross",
+        preset="live_datafusion",
+        seed=1,
+        findings=[
+            {
+                "triage_verdict": "candidate_implementation_bug",
+                "root_cause": "grouped_topk_null_sort_key",
+                "suspicious_backends": ["datafusion"],
+                "discovery_origin": "organic",
+                "paper_status": "confirmed_bug",
+            }
+        ],
+        config={
+            "enable_replay_bug": False,
+            "known_saturated_bug_families": ["grouped_topk_null_sort_key@datafusion"],
+        },
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_seeded=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=("datafusion_cross",), required_live_families=("query_engine",)),
+    )
+
+    assert audit["summary"]["known_saturated_live_candidate_families"] == {
+        "grouped_topk_null_sort_key@datafusion": 1
+    }
+    assert audit["summary"]["rewardable_live_candidate_families"] == {}
+    assert audit["summary"]["confirmed_live_candidate_families"] == {}
+
+
 def test_final_readiness_policy_keeps_top_level_requirements_out_of_engine(tmp_path):
     manifest = _write_manifest(
         tmp_path,
@@ -175,7 +361,7 @@ def _write_manifest(
     root: Path,
     *,
     name: str,
-    evidence_mode: str,
+    evidence_mode: str | None,
     target_suite: str,
     preset: str,
     seed: int,
@@ -208,28 +394,26 @@ def _write_manifest(
         run_meta_path(run_file),
     )
     manifest = runs_dir / f"experiment-{name}.json"
-    dump_json(
-        {
-            "evidence_mode": evidence_mode,
-            "target_suite": target_suite,
-            "target_suites": [target_suite],
-            "known_bug_id": known_bug_id,
-            "backends": backends,
-            "targets": describe_targets(backends),
-            "replay_bug_policy": {"enable_replay_bug": evidence_mode == "historical"},
-            "runs": [
-                {
-                    "target_suite": target_suite,
-                    "preset": preset,
-                    "seed": seed,
-                    "evidence_mode": evidence_mode,
-                    "known_bug_id": known_bug_id,
-                    "run_file": str(run_file),
-                    "backends": backends,
-                    "report": "",
-                }
-            ],
-        },
-        manifest,
-    )
+    run_payload = {
+        "target_suite": target_suite,
+        "preset": preset,
+        "seed": seed,
+        "known_bug_id": known_bug_id,
+        "run_file": str(run_file),
+        "backends": backends,
+        "report": "",
+    }
+    manifest_payload = {
+        "target_suite": target_suite,
+        "target_suites": [target_suite],
+        "known_bug_id": known_bug_id,
+        "backends": backends,
+        "targets": describe_targets(backends),
+        "replay_bug_policy": {"enable_replay_bug": evidence_mode == "historical"},
+        "runs": [run_payload],
+    }
+    if evidence_mode is not None:
+        manifest_payload["evidence_mode"] = evidence_mode
+        run_payload["evidence_mode"] = evidence_mode
+    dump_json(manifest_payload, manifest)
     return manifest

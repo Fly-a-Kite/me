@@ -94,6 +94,11 @@ LIVE_BUGHUNT_TARGETS = [
     "global_null_aggregate",
     "string_count_groupby",
     "unique_count_groupby",
+    "bool_null_groupby_agg",
+    "large_int_filter_groupby",
+    "large_integer",
+    "boolean_aggregation",
+    "bool_any_all",
     "set_membership_filter",
     "null_predicate_filter",
     "boolean_predicate_filter",
@@ -101,6 +106,11 @@ LIVE_BUGHUNT_TARGETS = [
     "tuple_absence_filter",
     "running_sum_precision",
     "running_sum",
+    "partitioned_running_sum",
+    "running_sum_partitioned",
+    "path_basename_keyed_pick",
+    "path_projection",
+    "keyed_row_pick",
     "sortedness_null_placement",
     "sortedness",
     "simple_case_random_subject",
@@ -117,6 +127,10 @@ LIVE_BUGHUNT_TARGETS = [
     "bit_compare_probe",
     "round_even_float_scale",
     "round_even_probe",
+    "duckdb_float_literal_precision",
+    "float_literal_precision_probe",
+    "polars_timestamp_precision_filter",
+    "timestamp_precision_filter_probe",
     "series_rtruediv_operand_order",
     "series_rtruediv_probe",
     "polars_reverse_division_columns",
@@ -146,8 +160,14 @@ LIVE_BUGHUNT_TARGETS = [
     "pandas_eval_inplace_aliasing_semantics",
     "eval_inplace_alias_probe",
     "eval_inplace_aliasing",
+    "pandas_bool_reduction_skipna_semantics",
+    "bool_reduction_skipna_probe",
+    "bool_reduction_skipna",
     "pyarrow_dataset_isin_all_match_semantics",
     "dataset_isin_all_match_probe",
+    "pyarrow_run_end_null_compute_semantics",
+    "run_end_null_compute_probe",
+    "run_end_null_compute",
     "pyarrow_large_string_partition_schema_semantics",
     "large_string_partition_probe",
     "pyarrow_hash_pivot_wider_order_semantics",
@@ -155,6 +175,9 @@ LIVE_BUGHUNT_TARGETS = [
     "hash_pivot_wider",
     "polars_rolling_mean_by_null_count_semantics",
     "rolling_mean_by_null_count_probe",
+    "csv_long_numeric_roundtrip",
+    "csv_long_numeric_roundtrip_probe",
+    "csv_numeric_inference",
     "wide_offset_topk",
     "empty_filter_groupby",
     "expressions",
@@ -183,6 +206,11 @@ LIVE_DATAFUSION_FRESH_TARGETS = [
     "setop_all_duplicates",
     "running_sum_precision",
     "running_sum",
+    "partitioned_running_sum",
+    "running_sum_partitioned",
+    "path_basename_keyed_pick",
+    "path_projection",
+    "keyed_row_pick",
     "sortedness_null_placement",
     "sortedness",
 ]
@@ -210,6 +238,11 @@ LIVE_ARROW_TARGETS = [
     "global_null_aggregate",
     "string_count_groupby",
     "unique_count_groupby",
+    "bool_null_groupby_agg",
+    "large_int_filter_groupby",
+    "large_integer",
+    "boolean_aggregation",
+    "bool_any_all",
     "set_membership_filter",
     "pyarrow_groupby_filter_cast_membership",
     "null_predicate_filter",
@@ -218,6 +251,11 @@ LIVE_ARROW_TARGETS = [
     "tuple_absence_filter",
     "running_sum_precision",
     "running_sum",
+    "partitioned_running_sum",
+    "running_sum_partitioned",
+    "path_basename_keyed_pick",
+    "path_projection",
+    "keyed_row_pick",
     "sortedness_null_placement",
     "sortedness",
     "simple_case_random_subject",
@@ -234,6 +272,10 @@ LIVE_ARROW_TARGETS = [
     "bit_compare_probe",
     "round_even_float_scale",
     "round_even_probe",
+    "duckdb_float_literal_precision",
+    "float_literal_precision_probe",
+    "polars_timestamp_precision_filter",
+    "timestamp_precision_filter_probe",
     "series_rtruediv_operand_order",
     "series_rtruediv_probe",
     "pandas_uint64_isin_precision",
@@ -259,8 +301,14 @@ LIVE_ARROW_TARGETS = [
     "pandas_eval_inplace_aliasing_semantics",
     "eval_inplace_alias_probe",
     "eval_inplace_aliasing",
+    "pandas_bool_reduction_skipna_semantics",
+    "bool_reduction_skipna_probe",
+    "bool_reduction_skipna",
     "pyarrow_dataset_isin_all_match_semantics",
     "dataset_isin_all_match_probe",
+    "pyarrow_run_end_null_compute_semantics",
+    "run_end_null_compute_probe",
+    "run_end_null_compute",
     "pyarrow_large_string_partition_schema_semantics",
     "large_string_partition_probe",
     "pyarrow_hash_pivot_wider_order_semantics",
@@ -268,6 +316,9 @@ LIVE_ARROW_TARGETS = [
     "hash_pivot_wider",
     "polars_rolling_mean_by_null_count_semantics",
     "rolling_mean_by_null_count_probe",
+    "csv_long_numeric_roundtrip",
+    "csv_long_numeric_roundtrip_probe",
+    "csv_numeric_inference",
     "wide_offset_topk",
     "empty_filter_groupby",
     "expressions",
@@ -295,6 +346,31 @@ LIVE_POLARS_LAZY_TARGETS = [
     "empty_literal_groupby_probe",
     "polars_rolling_mean_by_null_count_semantics",
     "rolling_mean_by_null_count_probe",
+    "expressions",
+]
+
+LIVE_POLARS_STREAMING_TARGETS = [
+    "common_workflow",
+    "operation_combo",
+    "filter",
+    "truth_filter",
+    "mutate",
+    "groupby",
+    "aggregation",
+    "numeric_mean_aggregate",
+    "global_aggregation",
+    "sort_limit",
+    "topk",
+    "nulls",
+    "numeric",
+    "partitioned_running_sum",
+    "running_sum_partitioned",
+    "running_sum",
+    "path_basename_keyed_pick",
+    "path_projection",
+    "keyed_row_pick",
+    "strings",
+    "casts",
     "expressions",
 ]
 
@@ -328,6 +404,11 @@ LIVE_EMBEDDED_SQL_TARGETS = [
     "row_value_absence",
     "running_sum_precision",
     "running_sum",
+    "partitioned_running_sum",
+    "running_sum_partitioned",
+    "path_basename_keyed_pick",
+    "path_projection",
+    "keyed_row_pick",
     "sortedness_null_placement",
     "sortedness",
     "simple_case_random_subject",
@@ -344,6 +425,10 @@ LIVE_EMBEDDED_SQL_TARGETS = [
     "bit_compare_probe",
     "round_even_float_scale",
     "round_even_probe",
+    "duckdb_float_literal_precision",
+    "float_literal_precision_probe",
+    "polars_timestamp_precision_filter",
+    "timestamp_precision_filter_probe",
     "series_rtruediv_operand_order",
     "series_rtruediv_probe",
     "pandas_uint64_isin_precision",
@@ -369,8 +454,14 @@ LIVE_EMBEDDED_SQL_TARGETS = [
     "pandas_eval_inplace_aliasing_semantics",
     "eval_inplace_alias_probe",
     "eval_inplace_aliasing",
+    "pandas_bool_reduction_skipna_semantics",
+    "bool_reduction_skipna_probe",
+    "bool_reduction_skipna",
     "pyarrow_dataset_isin_all_match_semantics",
     "dataset_isin_all_match_probe",
+    "pyarrow_run_end_null_compute_semantics",
+    "run_end_null_compute_probe",
+    "run_end_null_compute",
     "pyarrow_large_string_partition_schema_semantics",
     "large_string_partition_probe",
     "pyarrow_hash_pivot_wider_order_semantics",
@@ -378,6 +469,9 @@ LIVE_EMBEDDED_SQL_TARGETS = [
     "hash_pivot_wider",
     "polars_rolling_mean_by_null_count_semantics",
     "rolling_mean_by_null_count_probe",
+    "csv_long_numeric_roundtrip",
+    "csv_long_numeric_roundtrip_probe",
+    "csv_numeric_inference",
     "wide_offset_topk",
     "empty_filter_groupby",
     "casts",
@@ -415,6 +509,11 @@ LIVE_CROSS_FAMILY_TARGETS = [
     "tuple_absence_filter",
     "running_sum_precision",
     "running_sum",
+    "partitioned_running_sum",
+    "running_sum_partitioned",
+    "path_basename_keyed_pick",
+    "path_projection",
+    "keyed_row_pick",
     "sortedness_null_placement",
     "sortedness",
     "simple_case_random_subject",
@@ -431,6 +530,10 @@ LIVE_CROSS_FAMILY_TARGETS = [
     "bit_compare_probe",
     "round_even_float_scale",
     "round_even_probe",
+    "duckdb_float_literal_precision",
+    "float_literal_precision_probe",
+    "polars_timestamp_precision_filter",
+    "timestamp_precision_filter_probe",
     "series_rtruediv_operand_order",
     "series_rtruediv_probe",
     "polars_reverse_division_columns",
@@ -457,8 +560,14 @@ LIVE_CROSS_FAMILY_TARGETS = [
     "pandas_eval_inplace_aliasing_semantics",
     "eval_inplace_alias_probe",
     "eval_inplace_aliasing",
+    "pandas_bool_reduction_skipna_semantics",
+    "bool_reduction_skipna_probe",
+    "bool_reduction_skipna",
     "pyarrow_dataset_isin_all_match_semantics",
     "dataset_isin_all_match_probe",
+    "pyarrow_run_end_null_compute_semantics",
+    "run_end_null_compute_probe",
+    "run_end_null_compute",
     "pyarrow_large_string_partition_schema_semantics",
     "large_string_partition_probe",
     "pyarrow_hash_pivot_wider_order_semantics",
@@ -466,9 +575,149 @@ LIVE_CROSS_FAMILY_TARGETS = [
     "hash_pivot_wider",
     "polars_rolling_mean_by_null_count_semantics",
     "rolling_mean_by_null_count_probe",
+    "csv_long_numeric_roundtrip",
+    "csv_long_numeric_roundtrip_probe",
+    "csv_numeric_inference",
     "wide_offset_topk",
     "empty_filter_groupby",
     "expressions",
+]
+
+LIVE_ISSUE_FOCUS_TARGETS = [
+    "common_workflow",
+    "operation_combo",
+    "join",
+    "filter",
+    "mutate",
+    "groupby",
+    "aggregation",
+    "global_aggregation",
+    "sort_limit",
+    "topk",
+    "nulls",
+    "strings",
+    "numeric",
+    "casts",
+    "expressions",
+    "empty_filter_groupby",
+    "join_filter_groupby",
+    "join_null_sort",
+    "ordered_groupby_sort",
+    "topk_resort",
+    "join_ordered_agg_topk",
+    "global_null_aggregate",
+    "string_count_groupby",
+    "unique_count_groupby",
+    "bool_null_groupby_agg",
+    "large_int_filter_groupby",
+    "large_integer",
+    "boolean_aggregation",
+    "bool_any_all",
+    "set_membership_filter",
+    "pyarrow_groupby_filter_cast_membership",
+    "null_predicate_filter",
+    "row_value_absence_filter",
+    "row_value_absence",
+    "polars_reverse_division_columns",
+    "reverse_division",
+    "pandas_bool_reduction_skipna_semantics",
+    "bool_reduction_skipna_probe",
+    "bool_reduction_skipna",
+    "csv_long_numeric_roundtrip",
+    "csv_long_numeric_roundtrip_probe",
+    "csv_numeric_inference",
+]
+
+LIVE_POLARS_ISSUE_FOCUS_TARGETS = [
+    "operation_combo",
+    "filter",
+    "mutate",
+    "groupby",
+    "sort_limit",
+    "topk",
+    "nulls",
+    "numeric",
+    "casts",
+    "expressions",
+    "empty_filter_groupby",
+    "ordered_groupby_sort",
+    "topk_resort",
+    "global_null_aggregate",
+    "bool_null_groupby_agg",
+    "large_int_filter_groupby",
+    "large_integer",
+    "boolean_aggregation",
+    "bool_any_all",
+    "set_membership_filter",
+    "row_value_absence_filter",
+    "row_value_absence",
+    "polars_reverse_division_columns",
+    "reverse_division",
+    "csv_long_numeric_roundtrip",
+    "csv_long_numeric_roundtrip_probe",
+    "csv_numeric_inference",
+]
+
+LIVE_DUCKDB_ISSUE_FOCUS_TARGETS = [
+    "operation_combo",
+    "join",
+    "filter",
+    "mutate",
+    "groupby",
+    "aggregation",
+    "global_aggregation",
+    "sort_limit",
+    "topk",
+    "nulls",
+    "numeric",
+    "casts",
+    "expressions",
+    "join_filter_groupby",
+    "join_null_sort",
+    "ordered_groupby_sort",
+    "topk_resort",
+    "join_ordered_agg_topk",
+    "global_null_aggregate",
+    "bool_null_groupby_agg",
+    "large_int_filter_groupby",
+    "large_integer",
+    "boolean_aggregation",
+    "bool_any_all",
+    "null_predicate_filter",
+    "row_value_absence_filter",
+    "row_value_absence",
+    "csv_long_numeric_roundtrip",
+    "csv_long_numeric_roundtrip_probe",
+    "csv_numeric_inference",
+]
+
+LIVE_ARROW_ISSUE_FOCUS_TARGETS = [
+    "operation_combo",
+    "filter",
+    "groupby",
+    "aggregation",
+    "sort_limit",
+    "topk",
+    "strings",
+    "casts",
+    "nulls",
+    "expressions",
+    "string_count_groupby",
+    "unique_count_groupby",
+    "bool_null_groupby_agg",
+    "large_int_filter_groupby",
+    "large_integer",
+    "boolean_aggregation",
+    "bool_any_all",
+    "set_membership_filter",
+    "pyarrow_groupby_filter_cast_membership",
+    "global_null_aggregate",
+    "null_predicate_filter",
+    "row_value_absence_filter",
+    "row_value_absence",
+    "csv_long_numeric_roundtrip",
+    "csv_long_numeric_roundtrip_probe",
+    "csv_numeric_inference",
 ]
 
 
@@ -547,6 +796,7 @@ def _config_from_args(args: argparse.Namespace) -> ExperimentConfig:
             0.0,
             float(getattr(args, "issue_inspired_source_saturation_penalty", 1.25)),
         ),
+        candidate_recheck_count=max(0, int(getattr(args, "candidate_recheck_count", 0))),
         metamorphic_variant_limit=max(0, int(getattr(args, "metamorphic_variant_limit", 4))),
         log_level=getattr(args, "log_level", "compact"),
     )
@@ -597,6 +847,12 @@ def add_ablation_flags(parser: argparse.ArgumentParser) -> None:
         type=int,
         default=4,
         help="maximum metamorphic variants to execute per base case",
+    )
+    parser.add_argument(
+        "--candidate-recheck-count",
+        type=int,
+        default=0,
+        help="rerun finding cases this many times and mark non-reproduced findings as false positives",
     )
     parser.add_argument(
         "--log-level",
@@ -1664,6 +1920,10 @@ def _live_bughunt_config(
     known_saturated_bug_families: list[str] | None = None,
     replay_bug_source_issues: list[str] | None = None,
     enable_replay_bug: bool = False,
+    family_saturation_threshold: int = 4,
+    family_saturation_penalty: float = 6.0,
+    saturated_family_reward: float = 0.0,
+    candidate_recheck_count: int = 2,
     issue_replay_global_saturation_threshold: int = 2,
     issue_replay_global_saturation_penalty: float = 2.0,
 ) -> ExperimentConfig:
@@ -1678,6 +1938,10 @@ def _live_bughunt_config(
         enable_local_source_scheduler=True,
         local_source_exploration_weight=local_source_exploration_weight,
         metamorphic_variant_limit=metamorphic_variant_limit,
+        family_saturation_threshold=family_saturation_threshold,
+        family_saturation_penalty=family_saturation_penalty,
+        saturated_family_reward=saturated_family_reward,
+        candidate_recheck_count=max(0, int(candidate_recheck_count)),
         known_saturated_bug_families=list(
             known_saturated_bug_families or DEFAULT_KNOWN_SATURATED_BUG_FAMILIES
         ),
@@ -2133,6 +2397,74 @@ def _preset_config(name: str) -> ExperimentConfig:
             guidance_targets=["unique_count_groupby", "unique_count", "groupby", "strings", "nulls", "aggregation", "sort_limit"],
             metamorphic_variant_limit=8,
         )
+    if name == "bool_null_groupby_agg":
+        return ExperimentConfig(
+            generator_profile="bool_null_groupby_agg",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=[
+                "bool_null_groupby_agg",
+                "boolean_aggregation",
+                "bool_any_all",
+                "groupby",
+                "nulls",
+                "aggregation",
+                "sort_limit",
+            ],
+            metamorphic_variant_limit=4,
+        )
+    if name == "bool_null_groupby_agg_metamorphic":
+        return ExperimentConfig(
+            generator_profile="bool_null_groupby_agg",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=[
+                "bool_null_groupby_agg",
+                "boolean_aggregation",
+                "bool_any_all",
+                "groupby",
+                "nulls",
+                "aggregation",
+                "sort_limit",
+            ],
+            metamorphic_variant_limit=8,
+        )
+    if name == "large_int_filter_groupby":
+        return ExperimentConfig(
+            generator_profile="large_int_filter_groupby",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=[
+                "large_int_filter_groupby",
+                "large_integer",
+                "filter",
+                "groupby",
+                "numeric",
+                "aggregation",
+                "sort_limit",
+            ],
+            metamorphic_variant_limit=4,
+        )
+    if name == "large_int_filter_groupby_metamorphic":
+        return ExperimentConfig(
+            generator_profile="large_int_filter_groupby",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=[
+                "large_int_filter_groupby",
+                "large_integer",
+                "filter",
+                "groupby",
+                "numeric",
+                "aggregation",
+                "sort_limit",
+            ],
+            metamorphic_variant_limit=8,
+        )
     if name == "set_membership_filter":
         return ExperimentConfig(
             generator_profile="set_membership_filter",
@@ -2291,6 +2623,65 @@ def _preset_config(name: str) -> ExperimentConfig:
             guidance_targets=["running_sum_precision", "running_sum", "numeric", "sort_limit"],
             metamorphic_variant_limit=4,
         )
+    if name == "partitioned_running_sum":
+        return ExperimentConfig(
+            generator_profile="partitioned_running_sum",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=[
+                "partitioned_running_sum",
+                "running_sum_partitioned",
+                "running_sum",
+                "numeric",
+                "sort_limit",
+            ],
+            metamorphic_variant_limit=2,
+        )
+    if name == "partitioned_running_sum_metamorphic":
+        return ExperimentConfig(
+            generator_profile="partitioned_running_sum",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=[
+                "partitioned_running_sum",
+                "running_sum_partitioned",
+                "running_sum",
+                "numeric",
+                "sort_limit",
+            ],
+            metamorphic_variant_limit=4,
+        )
+    if name == "path_basename_keyed_pick":
+        return ExperimentConfig(
+            generator_profile="path_basename_keyed_pick",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=[
+                "path_basename_keyed_pick",
+                "path_projection",
+                "keyed_row_pick",
+                "strings",
+                "sort_limit",
+            ],
+            metamorphic_variant_limit=2,
+        )
+    if name == "path_basename_keyed_pick_replay":
+        return ExperimentConfig(
+            generator_profile="path_basename_keyed_pick",
+            enable_replay_bug=True,
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=[
+                "path_basename_keyed_pick",
+                "path_projection",
+                "keyed_row_pick",
+                "strings",
+                "sort_limit",
+            ],
+            metamorphic_variant_limit=2,
+        )
     if name == "sortedness_null_placement":
         return ExperimentConfig(
             generator_profile="sortedness_null_placement",
@@ -2433,6 +2824,62 @@ def _preset_config(name: str) -> ExperimentConfig:
             guidance_strategy="guided",
             guidance_candidate_pool=2,
             guidance_targets=["round_even_float_scale", "round_even_probe", "rounding", "numeric"],
+            metamorphic_variant_limit=2,
+        )
+    if name == "duckdb_float_literal_precision":
+        return ExperimentConfig(
+            generator_profile="duckdb_float_literal_precision",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=[
+                "duckdb_float_literal_precision",
+                "float_literal_precision_probe",
+                "float_literal_precision",
+                "numeric",
+            ],
+            metamorphic_variant_limit=0,
+        )
+    if name == "duckdb_float_literal_precision_metamorphic":
+        return ExperimentConfig(
+            generator_profile="duckdb_float_literal_precision",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=[
+                "duckdb_float_literal_precision",
+                "float_literal_precision_probe",
+                "float_literal_precision",
+                "numeric",
+            ],
+            metamorphic_variant_limit=2,
+        )
+    if name == "polars_timestamp_precision_filter":
+        return ExperimentConfig(
+            generator_profile="polars_timestamp_precision_filter",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=[
+                "polars_timestamp_precision_filter",
+                "timestamp_precision_filter_probe",
+                "timestamp_precision_filter",
+                "casts",
+            ],
+            metamorphic_variant_limit=0,
+        )
+    if name == "polars_timestamp_precision_filter_metamorphic":
+        return ExperimentConfig(
+            generator_profile="polars_timestamp_precision_filter",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=[
+                "polars_timestamp_precision_filter",
+                "timestamp_precision_filter_probe",
+                "timestamp_precision_filter",
+                "casts",
+            ],
             metamorphic_variant_limit=2,
         )
     if name == "series_rtruediv_operand_order":
@@ -2853,6 +3300,62 @@ def _preset_config(name: str) -> ExperimentConfig:
             ],
             metamorphic_variant_limit=2,
         )
+    if name == "pandas_bool_reduction_skipna_semantics":
+        return ExperimentConfig(
+            generator_profile="pandas_bool_reduction_skipna_semantics",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=[
+                "pandas_bool_reduction_skipna_semantics",
+                "bool_reduction_skipna_probe",
+                "bool_reduction_skipna",
+                "nulls",
+            ],
+            metamorphic_variant_limit=0,
+        )
+    if name == "pandas_bool_reduction_skipna_semantics_metamorphic":
+        return ExperimentConfig(
+            generator_profile="pandas_bool_reduction_skipna_semantics",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=[
+                "pandas_bool_reduction_skipna_semantics",
+                "bool_reduction_skipna_probe",
+                "bool_reduction_skipna",
+                "nulls",
+            ],
+            metamorphic_variant_limit=2,
+        )
+    if name == "pyarrow_run_end_null_compute_semantics":
+        return ExperimentConfig(
+            generator_profile="pyarrow_run_end_null_compute_semantics",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=[
+                "pyarrow_run_end_null_compute_semantics",
+                "run_end_null_compute_probe",
+                "run_end_null_compute",
+                "nulls",
+            ],
+            metamorphic_variant_limit=0,
+        )
+    if name == "pyarrow_run_end_null_compute_semantics_metamorphic":
+        return ExperimentConfig(
+            generator_profile="pyarrow_run_end_null_compute_semantics",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=[
+                "pyarrow_run_end_null_compute_semantics",
+                "run_end_null_compute_probe",
+                "run_end_null_compute",
+                "nulls",
+            ],
+            metamorphic_variant_limit=2,
+        )
     if name == "pyarrow_large_string_partition_schema_semantics":
         return ExperimentConfig(
             generator_profile="pyarrow_large_string_partition_schema_semantics",
@@ -2937,6 +3440,36 @@ def _preset_config(name: str) -> ExperimentConfig:
             ],
             metamorphic_variant_limit=2,
         )
+    if name == "csv_long_numeric_roundtrip":
+        return ExperimentConfig(
+            generator_profile="csv_long_numeric_roundtrip",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            candidate_recheck_count=2,
+            guidance_targets=[
+                "csv_long_numeric_roundtrip",
+                "csv_long_numeric_roundtrip_probe",
+                "csv_numeric_inference",
+                "numeric",
+            ],
+            metamorphic_variant_limit=0,
+        )
+    if name == "csv_long_numeric_roundtrip_metamorphic":
+        return ExperimentConfig(
+            generator_profile="csv_long_numeric_roundtrip",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            candidate_recheck_count=2,
+            guidance_targets=[
+                "csv_long_numeric_roundtrip",
+                "csv_long_numeric_roundtrip_probe",
+                "csv_numeric_inference",
+                "numeric",
+            ],
+            metamorphic_variant_limit=2,
+        )
     if name == "live_datafusion":
         return _live_bughunt_config(
             guidance_targets=list(LIVE_BUGHUNT_TARGETS),
@@ -2991,6 +3524,19 @@ def _preset_config(name: str) -> ExperimentConfig:
             metamorphic=True,
             metamorphic_variant_limit=8,
         )
+    if name == "live_polars_streaming":
+        return _live_bughunt_config(
+            guidance_targets=list(LIVE_POLARS_STREAMING_TARGETS),
+            local_source_exploration_weight=0.45,
+        )
+    if name == "live_polars_streaming_metamorphic":
+        return _live_bughunt_config(
+            candidate_pool=8,
+            guidance_targets=list(LIVE_POLARS_STREAMING_TARGETS),
+            local_source_exploration_weight=0.45,
+            metamorphic=True,
+            metamorphic_variant_limit=8,
+        )
     if name == "live_embedded_sql":
         return _live_bughunt_config(
             guidance_targets=list(LIVE_EMBEDDED_SQL_TARGETS),
@@ -3014,6 +3560,70 @@ def _preset_config(name: str) -> ExperimentConfig:
             candidate_pool=8,
             guidance_targets=list(LIVE_CROSS_FAMILY_TARGETS),
             local_source_exploration_weight=0.40,
+            metamorphic=True,
+            metamorphic_variant_limit=6,
+        )
+    if name == "live_issue_focus":
+        return _live_bughunt_config(
+            generator_profile="issue_focus",
+            candidate_pool=14,
+            guidance_targets=list(LIVE_ISSUE_FOCUS_TARGETS),
+            local_source_exploration_weight=0.50,
+        )
+    if name == "live_issue_focus_metamorphic":
+        return _live_bughunt_config(
+            generator_profile="issue_focus",
+            candidate_pool=10,
+            guidance_targets=list(LIVE_ISSUE_FOCUS_TARGETS),
+            local_source_exploration_weight=0.50,
+            metamorphic=True,
+            metamorphic_variant_limit=6,
+        )
+    if name == "live_polars_issue_focus":
+        return _live_bughunt_config(
+            generator_profile="issue_focus",
+            candidate_pool=12,
+            guidance_targets=list(LIVE_POLARS_ISSUE_FOCUS_TARGETS),
+            local_source_exploration_weight=0.50,
+        )
+    if name == "live_polars_issue_focus_metamorphic":
+        return _live_bughunt_config(
+            generator_profile="issue_focus",
+            candidate_pool=8,
+            guidance_targets=list(LIVE_POLARS_ISSUE_FOCUS_TARGETS),
+            local_source_exploration_weight=0.50,
+            metamorphic=True,
+            metamorphic_variant_limit=8,
+        )
+    if name == "live_duckdb_issue_focus":
+        return _live_bughunt_config(
+            generator_profile="issue_focus",
+            candidate_pool=12,
+            guidance_targets=list(LIVE_DUCKDB_ISSUE_FOCUS_TARGETS),
+            local_source_exploration_weight=0.50,
+        )
+    if name == "live_duckdb_issue_focus_metamorphic":
+        return _live_bughunt_config(
+            generator_profile="issue_focus",
+            candidate_pool=8,
+            guidance_targets=list(LIVE_DUCKDB_ISSUE_FOCUS_TARGETS),
+            local_source_exploration_weight=0.50,
+            metamorphic=True,
+            metamorphic_variant_limit=8,
+        )
+    if name == "live_arrow_issue_focus":
+        return _live_bughunt_config(
+            generator_profile="issue_focus",
+            candidate_pool=12,
+            guidance_targets=list(LIVE_ARROW_ISSUE_FOCUS_TARGETS),
+            local_source_exploration_weight=0.50,
+        )
+    if name == "live_arrow_issue_focus_metamorphic":
+        return _live_bughunt_config(
+            generator_profile="issue_focus",
+            candidate_pool=8,
+            guidance_targets=list(LIVE_ARROW_ISSUE_FOCUS_TARGETS),
+            local_source_exploration_weight=0.50,
             metamorphic=True,
             metamorphic_variant_limit=6,
         )
@@ -3532,6 +4142,8 @@ def _experiment_job_weight(job: dict) -> float:
         "tuple_absence_filter": 1.2,
         "row_value_absence_filter": 1.2,
         "running_sum_precision": 1.4,
+        "partitioned_running_sum": 1.2,
+        "path_basename_keyed_pick": 1.4,
         "sortedness_null_placement": 1.0,
         "simple_case_random_subject": 1.0,
         "group_quantile_key_probe": 1.0,
@@ -3540,6 +4152,8 @@ def _experiment_job_weight(job: dict) -> float:
         "struct_distinct_unnest": 1.0,
         "bit_compare_unequal_length": 1.0,
         "round_even_float_scale": 1.0,
+        "duckdb_float_literal_precision": 1.0,
+        "polars_timestamp_precision_filter": 1.0,
         "series_rtruediv_operand_order": 1.0,
         "polars_reverse_division_columns": 1.0,
         "pandas_uint64_isin_precision": 1.0,
@@ -3554,10 +4168,13 @@ def _experiment_job_weight(job: dict) -> float:
         "pandas_arrow_timestamp_loc_slice_semantics": 1.0,
         "pandas_arrow_timestamp_index_attr_semantics": 1.0,
         "pandas_eval_inplace_aliasing_semantics": 1.0,
+        "pandas_bool_reduction_skipna_semantics": 1.0,
         "pyarrow_dataset_isin_all_match_semantics": 1.0,
+        "pyarrow_run_end_null_compute_semantics": 1.0,
         "pyarrow_large_string_partition_schema_semantics": 1.0,
         "pyarrow_hash_pivot_wider_order_semantics": 1.0,
         "polars_rolling_mean_by_null_count_semantics": 1.0,
+        "csv_long_numeric_roundtrip": 1.0,
         "common": 1.0,
     }.get(config.generator_profile, 1.0)
     guidance_multiplier = 1.0 + 0.03 * max(0, int(config.guidance_candidate_pool) - 1)
@@ -3673,7 +4290,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_fuzz.add_argument("--duration", default=None, help="wall-clock budget such as 10s, 5m, 24h")
     p_fuzz.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_fuzz)
-    p_fuzz.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "set_membership_filter", "pyarrow_groupby_filter_cast_membership", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "row_value_absence_filter", "running_sum_precision", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest", "bit_compare_unequal_length", "round_even_float_scale", "series_rtruediv_operand_order", "polars_reverse_division_columns", "pandas_uint64_isin_precision", "duckdb_tuple_anti_null_semantics", "datafusion_setop_all_duplicate_count", "duckdb_json_predicate_order_semantics", "pandas_sparse_array_mask_semantics", "polars_float_wrap_numerical_semantics", "pandas_index_bool_result_type", "polars_empty_literal_groupby_semantics", "pandas_arrow_string_eq_sum_semantics", "pandas_arrow_timestamp_loc_slice_semantics", "pandas_arrow_timestamp_index_attr_semantics", "pandas_eval_inplace_aliasing_semantics", "pyarrow_dataset_isin_all_match_semantics", "pyarrow_large_string_partition_schema_semantics", "pyarrow_hash_pivot_wider_order_semantics", "polars_rolling_mean_by_null_count_semantics"], default="common")
+    p_fuzz.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "issue_focus", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "bool_null_groupby_agg", "large_int_filter_groupby", "set_membership_filter", "pyarrow_groupby_filter_cast_membership", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "row_value_absence_filter", "running_sum_precision", "partitioned_running_sum", "path_basename_keyed_pick", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest", "bit_compare_unequal_length", "round_even_float_scale", "duckdb_float_literal_precision", "polars_timestamp_precision_filter", "series_rtruediv_operand_order", "polars_reverse_division_columns", "pandas_uint64_isin_precision", "duckdb_tuple_anti_null_semantics", "datafusion_setop_all_duplicate_count", "duckdb_json_predicate_order_semantics", "pandas_sparse_array_mask_semantics", "polars_float_wrap_numerical_semantics", "pandas_index_bool_result_type", "polars_empty_literal_groupby_semantics", "pandas_arrow_string_eq_sum_semantics", "pandas_arrow_timestamp_loc_slice_semantics", "pandas_arrow_timestamp_index_attr_semantics", "pandas_eval_inplace_aliasing_semantics", "pandas_bool_reduction_skipna_semantics", "pyarrow_dataset_isin_all_match_semantics", "pyarrow_run_end_null_compute_semantics", "pyarrow_large_string_partition_schema_semantics", "pyarrow_hash_pivot_wider_order_semantics", "polars_rolling_mean_by_null_count_semantics", "csv_long_numeric_roundtrip"], default="common")
     add_guidance_flags(p_fuzz, default_strategy="random", default_candidate_pool=8)
     add_ablation_flags(p_fuzz)
     add_paper_journal_flags(p_fuzz)
@@ -3684,7 +4301,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_long.add_argument("--duration", default="24h", help="wall-clock budget such as 10m, 24h, 2d")
     p_long.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_long)
-    p_long.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "set_membership_filter", "pyarrow_groupby_filter_cast_membership", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "row_value_absence_filter", "running_sum_precision", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest", "bit_compare_unequal_length", "round_even_float_scale", "series_rtruediv_operand_order", "polars_reverse_division_columns", "pandas_uint64_isin_precision", "duckdb_tuple_anti_null_semantics", "datafusion_setop_all_duplicate_count", "duckdb_json_predicate_order_semantics", "pandas_sparse_array_mask_semantics", "polars_float_wrap_numerical_semantics", "pandas_index_bool_result_type", "polars_empty_literal_groupby_semantics", "pandas_arrow_string_eq_sum_semantics", "pandas_arrow_timestamp_loc_slice_semantics", "pandas_arrow_timestamp_index_attr_semantics", "pandas_eval_inplace_aliasing_semantics", "pyarrow_dataset_isin_all_match_semantics", "pyarrow_large_string_partition_schema_semantics", "pyarrow_hash_pivot_wider_order_semantics", "polars_rolling_mean_by_null_count_semantics"], default="common")
+    p_long.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "issue_focus", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "bool_null_groupby_agg", "large_int_filter_groupby", "set_membership_filter", "pyarrow_groupby_filter_cast_membership", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "row_value_absence_filter", "running_sum_precision", "partitioned_running_sum", "path_basename_keyed_pick", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest", "bit_compare_unequal_length", "round_even_float_scale", "duckdb_float_literal_precision", "polars_timestamp_precision_filter", "series_rtruediv_operand_order", "polars_reverse_division_columns", "pandas_uint64_isin_precision", "duckdb_tuple_anti_null_semantics", "datafusion_setop_all_duplicate_count", "duckdb_json_predicate_order_semantics", "pandas_sparse_array_mask_semantics", "polars_float_wrap_numerical_semantics", "pandas_index_bool_result_type", "polars_empty_literal_groupby_semantics", "pandas_arrow_string_eq_sum_semantics", "pandas_arrow_timestamp_loc_slice_semantics", "pandas_arrow_timestamp_index_attr_semantics", "pandas_eval_inplace_aliasing_semantics", "pandas_bool_reduction_skipna_semantics", "pyarrow_dataset_isin_all_match_semantics", "pyarrow_run_end_null_compute_semantics", "pyarrow_large_string_partition_schema_semantics", "pyarrow_hash_pivot_wider_order_semantics", "polars_rolling_mean_by_null_count_semantics", "csv_long_numeric_roundtrip"], default="common")
     add_guidance_flags(p_long, default_strategy="guided", default_candidate_pool=8)
     p_long.add_argument("--case-log", default=None, help="optional JSONL path for generated test cases")
     p_long.add_argument("--checkpoint-interval", default="60s", help="checkpoint write interval")

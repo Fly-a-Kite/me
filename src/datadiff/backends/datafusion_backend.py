@@ -7,7 +7,9 @@ from typing import Any
 from datadiff.backends.base import Backend, BackendResult
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
 from datadiff.filtering import sql_filter_condition
+from datadiff.running import running_sum_partition_columns, running_sum_sort_keys
 from datadiff.sortedness import is_sorted_values
+from datadiff.windowing import row_number_order_keys, row_number_partition_columns
 
 
 def _quote(name: str) -> str:
@@ -50,6 +52,12 @@ def _order_clause(sort_keys: list[SortKey]) -> str:
 def _agg_expr(column: str, func: str) -> str:
     if func == "nunique":
         return f"COUNT(DISTINCT {_quote(column)})"
+    if func == "any":
+        return f"BOOL_OR({_quote(column)})"
+    if func == "all":
+        return f"BOOL_AND({_quote(column)})"
+    if func == "mean":
+        return f"AVG({_quote(column)})"
     sql_func = "COUNT" if func == "count" else func.upper()
     return f"{sql_func}({_quote(column)})"
 
@@ -75,13 +83,30 @@ def _running_sum_projection(cols: list[str], op: dict[str, Any]) -> tuple[str, l
     kept_cols = [col for col in cols if col != op["column"]]
     select_parts = [f"q.{_quote(col)}" for col in kept_cols]
     order_sql = _order_clause(normalize_sort_keys({"keys": op["order_by"]}))
+    partition_columns = running_sum_partition_columns(op)
+    partition_sql = ""
+    if partition_columns:
+        partition_sql = "PARTITION BY " + ", ".join(f"q.{_quote(column)}" for column in partition_columns) + " "
     expr_sql = (
         f"SUM(CAST(q.{_quote(op['source'])} AS DOUBLE)) OVER ("
-        f"ORDER BY {order_sql} ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"
+        f"{partition_sql}ORDER BY {order_sql} ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"
         f") AS {_quote(op['column'])}"
     )
     select_parts.append(expr_sql)
     return ", ".join(select_parts), kept_cols + [op["column"]]
+
+
+def _row_number_window_sql(op: dict[str, Any]) -> str:
+    partition_columns = row_number_partition_columns(op)
+    partition_sql = ""
+    if partition_columns:
+        partition_sql = "PARTITION BY " + ", ".join(f"q.{_quote(column)}" for column in partition_columns) + " "
+    return f"{partition_sql}ORDER BY {_order_clause(row_number_order_keys(op))}"
+
+
+def _row_number_filter_condition(op: dict[str, Any], column: str) -> str:
+    comparator = {"==": "=", "<": "<", "<=": "<="}[str(op.get("cmp", "=="))]
+    return f"q.{_quote(column)} {comparator} {int(op.get('value', 1))}"
 
 
 def _setop_all_duplicate_probe_sql(op: dict[str, Any]) -> str:
@@ -222,9 +247,23 @@ class DataFusionBackend(Backend):
                         f"SELECT * FROM ({query}) q "
                         f"WHERE {_tuple_absence_safe_condition(op)}"
                     )
+                elif kind == "row_number_filter":
+                    drop_hidden_order_cols()
+                    ordinal_col = "__datadiff_row_number"
+                    query = (
+                        f"SELECT {visible_projection()} FROM ("
+                        f"SELECT q.*, ROW_NUMBER() OVER ({_row_number_window_sql(op)}) AS {_quote(ordinal_col)} "
+                        f"FROM ({query}) q"
+                        f") q WHERE {_row_number_filter_condition(op, ordinal_col)}"
+                    )
+                    current_cols = list(visible_cols)
+                    pending_order = [
+                        *(SortKey(column, True, "last") for column in row_number_partition_columns(op)),
+                        *row_number_order_keys(op),
+                    ]
                 elif kind == "running_sum":
                     drop_hidden_order_cols()
-                    order_keys = normalize_sort_keys({"keys": op["order_by"]})
+                    order_keys = running_sum_sort_keys(op)
                     projection, current_cols = _running_sum_projection(current_cols, op)
                     query = f"SELECT {projection} FROM ({query}) q"
                     visible_cols = [col for col in visible_cols if col != op["column"]] + [op["column"]]
@@ -281,6 +320,18 @@ class DataFusionBackend(Backend):
                     hidden_order_cols = []
                     pending_order = None
                 elif kind == "round_even_probe":
+                    query = f"SELECT false AS {_quote(op['as'])}"
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "float_literal_precision_probe":
+                    query = f"SELECT false AS {_quote(op['as'])}"
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "timestamp_precision_filter_probe":
                     query = f"SELECT false AS {_quote(op['as'])}"
                     current_cols = [op["as"]]
                     visible_cols = [op["as"]]
@@ -364,7 +415,19 @@ class DataFusionBackend(Backend):
                     visible_cols = [op["as"]]
                     hidden_order_cols = []
                     pending_order = None
+                elif kind == "bool_reduction_skipna_probe":
+                    query = f"SELECT false AS {_quote(op['as'])}"
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
                 elif kind == "dataset_isin_all_match_probe":
+                    query = f"SELECT false AS {_quote(op['as'])}"
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "run_end_null_compute_probe":
                     query = f"SELECT false AS {_quote(op['as'])}"
                     current_cols = [op["as"]]
                     visible_cols = [op["as"]]
@@ -383,6 +446,12 @@ class DataFusionBackend(Backend):
                     hidden_order_cols = []
                     pending_order = None
                 elif kind == "rolling_mean_by_null_count_probe":
+                    query = f"SELECT false AS {_quote(op['as'])}"
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "csv_long_numeric_roundtrip_probe":
                     query = f"SELECT false AS {_quote(op['as'])}"
                     current_cols = [op["as"]]
                     visible_cols = [op["as"]]
@@ -433,6 +502,8 @@ class DataFusionBackend(Backend):
                         expr_sql = f"LENGTH(q.{_quote(expr['source'])})"
                     elif expr["kind"] == "string_lower":
                         expr_sql = f"LOWER(q.{_quote(expr['source'])})"
+                    elif expr["kind"] == "string_basename":
+                        expr_sql = f"regexp_replace(q.{_quote(expr['source'])}, '^.*[\\\\/]', '')"
                     else:
                         raise ValueError(expr["kind"])
                     projection, current_cols = _replace_projection(current_cols, op["column"], expr_sql)

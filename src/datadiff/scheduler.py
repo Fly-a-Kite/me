@@ -11,7 +11,7 @@ from datadiff.reward import (
     NEEDS_CONFIRMATION_VERDICTS,
     SEMANTIC_DIVERGENCE_VERDICTS,
     candidate_bug_family_keys,
-    is_candidate_bug_finding,
+    is_rewardable_candidate_bug_finding,
     suspicious_key,
 )
 from datadiff.util import load_json, read_jsonl, run_meta_path
@@ -381,6 +381,8 @@ def summarize_batch_run(run_file: Path) -> BatchObservation:
     rows = read_jsonl(run_file)
     meta_path = run_meta_path(run_file)
     meta = load_json(meta_path) if meta_path.exists() else {}
+    config = meta.get("config", {}) if isinstance(meta.get("config", {}), dict) else {}
+    known_families = list(config.get("known_saturated_bug_families", []) or [])
     findings = 0
     candidate_bug_cases = 0
     candidate_bug_families: Counter[str] = Counter()
@@ -392,9 +394,11 @@ def summarize_batch_run(run_file: Path) -> BatchObservation:
         row_findings = row.get("findings", [])
         findings += len(row_findings)
         new_behavior_cases += int(bool(row.get("is_new_behavior")))
-        if any(is_candidate_bug_finding(finding) for finding in row_findings):
+        if any(is_rewardable_candidate_bug_finding(finding, known_families) for finding in row_findings):
             candidate_bug_cases += 1
-        candidate_bug_families.update(candidate_bug_family_keys(row_findings))
+        candidate_bug_families.update(
+            candidate_bug_family_keys(row_findings, known_saturated_bug_families=known_families)
+        )
         for finding in row_findings:
             verdict = str(finding.get("triage_verdict", "unclassified"))
             if verdict in SEMANTIC_DIVERGENCE_VERDICTS:
@@ -403,7 +407,7 @@ def summarize_batch_run(run_file: Path) -> BatchObservation:
                 false_positive_count += 1
             if verdict in NEEDS_CONFIRMATION_VERDICTS:
                 needs_confirmation_count += 1
-    first_candidate_idx, first_candidate_elapsed_s = _first_candidate_bug_position(rows)
+    first_candidate_idx, first_candidate_elapsed_s = _first_candidate_bug_position(rows, known_families)
     return BatchObservation(
         cases=len(rows),
         elapsed_s=float(meta.get("elapsed_s", 0.0) or 0.0),
@@ -417,7 +421,7 @@ def summarize_batch_run(run_file: Path) -> BatchObservation:
         new_behavior_cases=new_behavior_cases,
         first_candidate_bug_case_index=first_candidate_idx,
         first_candidate_bug_elapsed_s=first_candidate_elapsed_s,
-        candidate_bug_discovery_auc=_candidate_bug_discovery_auc(rows),
+        candidate_bug_discovery_auc=_candidate_bug_discovery_auc(rows, known_families),
     )
 
 
@@ -516,15 +520,24 @@ def _unique_nonempty(values: list[str]) -> list[str]:
     return out
 
 
-def _first_candidate_bug_position(rows: list[dict[str, Any]]) -> tuple[int | None, float | None]:
+def _first_candidate_bug_position(
+    rows: list[dict[str, Any]],
+    known_saturated_bug_families: list[str],
+) -> tuple[int | None, float | None]:
     for idx, row in enumerate(rows):
-        if any(is_candidate_bug_finding(finding) for finding in row.get("findings", [])):
+        if any(
+            is_rewardable_candidate_bug_finding(finding, known_saturated_bug_families)
+            for finding in row.get("findings", [])
+        ):
             elapsed = row.get("elapsed_s")
             return int(row.get("case_index", idx)), float(elapsed) if elapsed not in (None, "") else None
     return None, None
 
 
-def _candidate_bug_discovery_auc(rows: list[dict[str, Any]]) -> float:
+def _candidate_bug_discovery_auc(
+    rows: list[dict[str, Any]],
+    known_saturated_bug_families: list[str] | None = None,
+) -> float:
     if not rows:
         return 0.0
     cumulative = 0
@@ -532,7 +545,12 @@ def _candidate_bug_discovery_auc(rows: list[dict[str, Any]]) -> float:
     total = 0
     per_row = []
     for row in rows:
-        hit = int(any(is_candidate_bug_finding(finding) for finding in row.get("findings", [])))
+        hit = int(
+            any(
+                is_rewardable_candidate_bug_finding(finding, known_saturated_bug_families)
+                for finding in row.get("findings", [])
+            )
+        )
         per_row.append(hit)
         total += hit
     if total == 0:

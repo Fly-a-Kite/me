@@ -278,7 +278,10 @@ def test_write_experiment_summary_aggregates_triage_verdicts(tmp_path, monkeypat
     assert row["candidate_bug_discovery_auc"] == "1.0"
     assert "candidate_implementation_bug:1" in row["top_triage_verdicts"]
     assert "## Aggregates" in md
-    assert "| core | edge_float | 1 | 4 | 4 | 1 | 1 | 0 | 25.0% | 5.00 | 0 | 0.1 | 1.00 | 0.00 | 2 | 1 |" in md
+    assert (
+        "| core | edge_float | 1 | 4 | 4 | 1 | 1 | 0 | 0 | 25.0% | "
+        "5.00 | 0 | 0.1 | 1.00 | 0.00 | 2 | 1 |"
+    ) in md
     assert aggregate_row["candidate_bug_case_rate"] == "0.25"
     assert aggregate_row["candidate_bug_cases_per_s"] == "5.0"
     assert aggregate_row["median_first_candidate_bug_case_index"] == "0.0"
@@ -440,6 +443,77 @@ def test_write_experiment_summary_separates_issue_replay_candidates(tmp_path, mo
     assert aggregate_row["rewardable_candidate_implementation_bug_count"] == "1"
     assert "rewardable candidates" in md
     assert "Replay bug policy: enable_replay_bug=false, source_issues=2" in md
+
+
+def test_write_experiment_summary_excludes_known_saturated_families_from_rewardable_count(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(reporter, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(reporter, "REPORTS_DIR", reports_dir)
+    run_file = runs_dir / "run-known-family.jsonl.gz"
+    append_jsonl(
+        {
+            "status": "bug",
+            "case_index": 0,
+            "case": {"case_id": "case-0", "seed": 0, "program": {"operations": []}},
+            "findings": [
+                {
+                    "kind": "semantic_output_mismatch",
+                    "root_cause": "grouped_topk_null_sort_key",
+                    "triage_verdict": "candidate_implementation_bug",
+                    "suspicious_backends": ["datafusion"],
+                    "signature": "known-sig",
+                    "discovery_origin": "organic",
+                }
+            ],
+            "behavior_signature": "sig-0",
+            "backend_status": {},
+            "quality_oracles": [],
+        },
+        run_file,
+    )
+    dump_json(
+        {
+            "elapsed_s": 0.1,
+            "throughput_cases_s": 10.0,
+            "backends": [],
+            "targets": [],
+            "common_capabilities": [],
+            "config": {
+                "enable_replay_bug": False,
+                "known_saturated_bug_families": ["grouped_topk_null_sort_key@datafusion"],
+            },
+            "replay_bug_filter": {"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        },
+        run_meta_path(run_file),
+    )
+    manifest = runs_dir / "experiment-known-family.json"
+    dump_json(
+        {
+            "presets": ["live_datafusion"],
+            "seeds": [1],
+            "backends": [],
+            "target_suite": "datafusion_cross",
+            "targets": [],
+            "common_capabilities": [],
+            "runs": [{"preset": "live_datafusion", "seed": 1, "run_file": str(run_file), "report": ""}],
+        },
+        manifest,
+    )
+
+    _, csv_path = reporter.write_experiment_summary(manifest)
+    row = next(csv.DictReader(csv_path.open(encoding="utf-8")))
+    aggregate_row = next(
+        csv.DictReader((reports_dir / "experiment-summary-experiment-known-family-aggregates.csv").open(encoding="utf-8"))
+    )
+
+    assert row["candidate_implementation_bug_count"] == "1"
+    assert row["known_saturated_candidate_bug_count"] == "1"
+    assert row["rewardable_candidate_implementation_bug_count"] == "0"
+    assert row["candidate_bug_families"] == "0"
+    assert row["top_candidate_bug_families"] == "none"
+    assert aggregate_row["known_saturated_candidate_bug_count"] == "1"
+    assert aggregate_row["rewardable_candidate_implementation_bug_count"] == "0"
 
 
 def test_write_experiment_summary_includes_adaptive_schedule_fields(tmp_path, monkeypatch):

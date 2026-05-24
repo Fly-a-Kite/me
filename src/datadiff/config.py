@@ -11,6 +11,7 @@ GeneratorProfile = Literal[
     "bughunt",
     "bughunt_fresh",
     "bughunt_no_groupby",
+    "issue_focus",
     "null_groupby_topk",
     "null_agg_topk",
     "filter_null_agg_topk",
@@ -30,6 +31,8 @@ GeneratorProfile = Literal[
     "global_null_aggregate",
     "string_count_groupby",
     "unique_count_groupby",
+    "bool_null_groupby_agg",
+    "large_int_filter_groupby",
     "set_membership_filter",
     "pyarrow_groupby_filter_cast_membership",
     "null_predicate_filter",
@@ -38,6 +41,8 @@ GeneratorProfile = Literal[
     "tuple_absence_filter",
     "row_value_absence_filter",
     "running_sum_precision",
+    "partitioned_running_sum",
+    "path_basename_keyed_pick",
     "sortedness_null_placement",
     "simple_case_random_subject",
     "group_quantile_key_probe",
@@ -46,6 +51,8 @@ GeneratorProfile = Literal[
     "struct_distinct_unnest",
     "bit_compare_unequal_length",
     "round_even_float_scale",
+    "duckdb_float_literal_precision",
+    "polars_timestamp_precision_filter",
     "series_rtruediv_operand_order",
     "polars_reverse_division_columns",
     "pandas_uint64_isin_precision",
@@ -60,10 +67,13 @@ GeneratorProfile = Literal[
     "pandas_arrow_timestamp_loc_slice_semantics",
     "pandas_arrow_timestamp_index_attr_semantics",
     "pandas_eval_inplace_aliasing_semantics",
+    "pandas_bool_reduction_skipna_semantics",
     "pyarrow_dataset_isin_all_match_semantics",
+    "pyarrow_run_end_null_compute_semantics",
     "pyarrow_large_string_partition_schema_semantics",
     "pyarrow_hash_pivot_wider_order_semantics",
     "polars_rolling_mean_by_null_count_semantics",
+    "csv_long_numeric_roundtrip",
 ]
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]
@@ -90,6 +100,8 @@ DEFAULT_REPLAY_BUG_SOURCE_ISSUES = [
     "https://github.com/duckdb/duckdb/issues/11261",
     "https://github.com/duckdb/duckdb/issues/22075",
     "https://github.com/duckdb/duckdb/issues/22656",
+    "https://github.com/duckdb/duckdb/issues/22837",
+    "https://github.com/duckdb/duckdb/issues/22849",
     "https://github.com/apache/arrow/issues/42231",
 ]
 
@@ -108,6 +120,7 @@ class ExperimentConfig:
     enable_preflight_repair: bool = True
     persist_feedback_corpus: bool = False
     feedback_persist_limit: int = 4096
+    feedback_max_cases_per_profile: int = 6
     enable_local_source_scheduler: bool = False
     local_source_exploration_weight: float = 0.5
     compress_run_log: bool = True
@@ -131,6 +144,7 @@ class ExperimentConfig:
     issue_replay_global_saturation_penalty: float = 1.5
     issue_inspired_source_saturation_threshold: int = 3
     issue_inspired_source_saturation_penalty: float = 1.25
+    candidate_recheck_count: int = 0
     metamorphic_variant_limit: int = 4
     log_level: LogLevel = "compact"
 

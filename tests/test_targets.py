@@ -14,7 +14,10 @@ from datadiff.targets import (
 def test_resolve_target_suite_to_backends():
     assert resolve_target_backends(target_suite="dataframe") == ["pandas", "polars"]
     assert resolve_target_backends(target_suite="dataframe_lazy") == ["polars", "polars_lazy"]
+    assert resolve_target_backends(target_suite="polars_cross") == ["pandas", "polars", "polars_lazy"]
+    assert resolve_target_backends(target_suite="polars_streaming_cross") == ["polars_lazy", "polars_streaming"]
     assert resolve_target_backends(target_suite="embedded_sql") == ["duckdb", "sqlite"]
+    assert resolve_target_backends(target_suite="embedded_sql_cross") == ["pandas", "duckdb", "sqlite"]
     assert resolve_target_backends(target_suite="duckdb_storage_cross") == ["pandas", "duckdb_persistent"]
     assert resolve_target_backends(target_suite="cross_family") == ["pandas", "duckdb"]
     assert resolve_target_backends(target_suite="lazy_cross_family") == ["pandas", "polars_lazy", "duckdb"]
@@ -29,6 +32,14 @@ def test_resolve_target_suite_to_backends():
         "duckdb",
         "sqlite",
         "datafusion",
+    ]
+    assert resolve_target_backends(target_suite="latest_no_datafusion") == [
+        "pandas",
+        "pyarrow",
+        "polars",
+        "polars_lazy",
+        "duckdb",
+        "sqlite",
     ]
     assert resolve_target_backends(target_suite="seeded_filter") == ["pandas", "buggy_filter"]
 
@@ -48,6 +59,7 @@ def test_target_descriptions_capture_methodology_axes():
     assert all(spec["adapter"] for spec in specs)
     assert "op:join" in specs[0]["capabilities"]
     assert "op:tuple_absence_filter" in specs[0]["capabilities"]
+    assert "op:row_number_filter" in specs[0]["capabilities"]
     assert "op:running_sum" in specs[0]["capabilities"]
     assert "op:sortedness_check" in specs[0]["capabilities"]
     assert "op:random_case_probe" in specs[0]["capabilities"]
@@ -57,6 +69,8 @@ def test_target_descriptions_capture_methodology_axes():
     assert "op:struct_distinct_probe" in specs[0]["capabilities"]
     assert "op:bit_compare_probe" in specs[0]["capabilities"]
     assert "op:round_even_probe" in specs[0]["capabilities"]
+    assert "op:float_literal_precision_probe" in specs[0]["capabilities"]
+    assert "op:timestamp_precision_filter_probe" in specs[0]["capabilities"]
     assert "op:series_rtruediv_probe" in specs[0]["capabilities"]
     assert "op:uint64_isin_probe" in specs[0]["capabilities"]
     assert "op:tuple_anti_null_probe" in specs[0]["capabilities"]
@@ -70,18 +84,28 @@ def test_target_descriptions_capture_methodology_axes():
     assert "op:arrow_timestamp_loc_slice_probe" in specs[0]["capabilities"]
     assert "op:arrow_timestamp_index_attr_probe" in specs[0]["capabilities"]
     assert "op:eval_inplace_alias_probe" in specs[0]["capabilities"]
+    assert "op:bool_reduction_skipna_probe" in specs[0]["capabilities"]
     assert "op:dataset_isin_all_match_probe" in specs[0]["capabilities"]
+    assert "op:run_end_null_compute_probe" in specs[0]["capabilities"]
     assert "op:large_string_partition_probe" in specs[0]["capabilities"]
     assert "op:hash_pivot_wider_probe" in specs[0]["capabilities"]
     assert "op:rolling_mean_by_null_count_probe" in specs[0]["capabilities"]
+    assert "op:csv_long_numeric_roundtrip_probe" in specs[0]["capabilities"]
+    assert "expr:string_basename" in specs[0]["capabilities"]
+    assert "agg:any" in specs[0]["capabilities"]
+    assert "agg:all" in specs[0]["capabilities"]
+    assert "agg:nunique" in specs[0]["capabilities"]
 
 
 def test_list_target_suites_includes_core():
     suites = {suite["suite"]: suite for suite in list_target_suites()}
     assert suites["core"]["backends"] == ["pandas", "polars", "duckdb", "sqlite"]
     assert suites["core_lazy"]["families"] == ["dataframe", "embedded_sql"]
+    assert suites["polars_cross"]["families"] == ["dataframe"]
+    assert suites["embedded_sql_cross"]["families"] == ["dataframe", "embedded_sql"]
     assert suites["datafusion_cross"]["families"] == ["dataframe", "embedded_sql", "query_engine"]
     assert suites["latest_all_engines"]["families"] == ["arrow", "dataframe", "embedded_sql", "query_engine"]
+    assert suites["latest_no_datafusion"]["families"] == ["arrow", "dataframe", "embedded_sql"]
     assert suites["cross_family"]["families"] == ["dataframe", "embedded_sql"]
     assert suites["duckdb_storage_cross"]["families"] == ["dataframe", "embedded_sql"]
     assert suites["dataframe_lazy"]["families"] == ["dataframe"]
@@ -96,6 +120,8 @@ def test_list_target_suites_includes_core():
     assert "op:struct_distinct_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:bit_compare_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:round_even_probe" in suites["latest_all_engines"]["common_capabilities"]
+    assert "op:float_literal_precision_probe" in suites["latest_all_engines"]["common_capabilities"]
+    assert "op:timestamp_precision_filter_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:series_rtruediv_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:uint64_isin_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:tuple_anti_null_probe" in suites["latest_all_engines"]["common_capabilities"]
@@ -109,10 +135,17 @@ def test_list_target_suites_includes_core():
     assert "op:arrow_timestamp_loc_slice_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:arrow_timestamp_index_attr_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:eval_inplace_alias_probe" in suites["latest_all_engines"]["common_capabilities"]
+    assert "op:bool_reduction_skipna_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:dataset_isin_all_match_probe" in suites["latest_all_engines"]["common_capabilities"]
+    assert "op:run_end_null_compute_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:large_string_partition_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:hash_pivot_wider_probe" in suites["latest_all_engines"]["common_capabilities"]
     assert "op:rolling_mean_by_null_count_probe" in suites["latest_all_engines"]["common_capabilities"]
+    assert "op:csv_long_numeric_roundtrip_probe" in suites["latest_all_engines"]["common_capabilities"]
+    assert "op:row_number_filter" in suites["latest_all_engines"]["common_capabilities"]
+    assert "expr:string_basename" in suites["latest_all_engines"]["common_capabilities"]
+    assert "agg:any" in suites["latest_all_engines"]["common_capabilities"]
+    assert "agg:all" in suites["latest_all_engines"]["common_capabilities"]
 
 
 def test_target_capability_matrix_and_intersection():
@@ -140,6 +173,12 @@ def test_polars_lazy_target_is_described():
     spec = describe_targets(["polars_lazy"])[0]
     assert spec["family"] == "dataframe"
     assert spec["layer"] == "python_dataframe_lazy"
+
+
+def test_polars_streaming_target_is_described():
+    spec = describe_targets(["polars_streaming"])[0]
+    assert spec["family"] == "dataframe"
+    assert spec["layer"] == "python_dataframe_streaming"
 
 
 def test_datafusion_target_is_described():

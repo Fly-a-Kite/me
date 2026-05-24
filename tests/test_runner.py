@@ -6,6 +6,8 @@ import pytest
 from datadiff.config import ExperimentConfig
 from datadiff.datagen import generate_case
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
+from datadiff.normalizer import NormalizedResult
+from datadiff.oracle import Finding
 from datadiff import runner as runner_module
 from datadiff.runner import run_fuzz, run_loaded_case
 from datadiff.targets import resolve_target_backends
@@ -16,7 +18,22 @@ REQUIRED_BACKENDS = ["pandas", "polars", "duckdb", "sqlite"]
 SQL_ORDER_BACKENDS = ["pandas", "duckdb", "sqlite"]
 DATAFUSION_BACKENDS = ["pandas", "duckdb", "datafusion"]
 PYARROW_BACKENDS = ["pandas", "duckdb", "pyarrow"]
+BOOL_AGG_BACKENDS = ["pandas", "polars", "polars_lazy", "duckdb", "sqlite", "pyarrow", "datafusion"]
+BOOL_AGG_BACKEND_PACKAGES = ["pandas", "polars", "duckdb", "pyarrow", "datafusion"]
+MEAN_AGG_BACKENDS = [
+    "pandas",
+    "polars",
+    "polars_lazy",
+    "polars_streaming",
+    "duckdb",
+    "sqlite",
+    "pyarrow",
+    "datafusion",
+]
+MEAN_AGG_BACKEND_PACKAGES = ["pandas", "polars", "duckdb", "pyarrow", "datafusion"]
 LATEST_ALL_ENGINE_PACKAGES = ["pandas", "pyarrow", "polars", "duckdb", "datafusion"]
+PATH_KEYED_PICK_BACKENDS = ["pandas", "sqlite", "pyarrow", "polars", "polars_lazy", "datafusion"]
+PATH_KEYED_PICK_PACKAGES = ["pandas", "pyarrow", "polars", "datafusion"]
 
 
 @pytest.mark.skipif(
@@ -30,6 +47,318 @@ def test_run_loaded_case_smoke():
     assert set(row["normalized"]) == set(REQUIRED_BACKENDS)
     assert row["status"] in {"ok", "bug"}
     assert row["behavior_signature"]
+
+
+@pytest.mark.skipif(
+    any(name != "sqlite" and importlib.util.find_spec(name) is None for name in SQL_ORDER_BACKENDS),
+    reason="data backends are not installed",
+)
+def test_run_loaded_case_supports_large_int64_values_in_duckdb():
+    case = generate_case(123, profile="large_int_filter_groupby")
+    row = run_loaded_case(case, SQL_ORDER_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    assert row["normalized"]["duckdb"]["status"] == "ok"
+
+
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in BOOL_AGG_BACKEND_PACKAGES),
+    reason="bool aggregation backends are not installed",
+)
+def test_run_loaded_case_supports_bool_any_all_aggregate_semantics():
+    case = generate_case(123, profile="bool_null_groupby_agg")
+    row = run_loaded_case(case, BOOL_AGG_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    assert row["normalized"]["sqlite"]["status"] == "ok"
+
+
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in MEAN_AGG_BACKEND_PACKAGES),
+    reason="mean aggregation backends are not installed",
+)
+def test_run_loaded_case_supports_mean_aggregate_semantics():
+    case = Case(
+        "case-mean-aggregate",
+        4,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("g", "str"),
+                    ColumnSpec("x", "int"),
+                ],
+                [
+                    {"g": "a", "x": 1},
+                    {"g": "a", "x": 3},
+                    {"g": "b", "x": None},
+                ],
+            )
+        ],
+        Program(
+            "prog-mean-aggregate",
+            4,
+            [
+                {"op": "groupby", "keys": ["g"], "aggs": [{"column": "x", "func": "mean", "as": "mean_x"}]},
+                {"op": "sort", "columns": ["g"], "ascending": True},
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, MEAN_AGG_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    assert row["normalized"]["polars_streaming"]["status"] == "ok"
+    assert ["a", 2.0] in row["normalized"]["sqlite"]["rows"]
+    assert ["b", None] in row["normalized"]["sqlite"]["rows"]
+
+
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in MEAN_AGG_BACKEND_PACKAGES),
+    reason="partitioned running-sum backends are not installed",
+)
+def test_run_loaded_case_supports_partitioned_running_sum_semantics():
+    case = generate_case(126, profile="partitioned_running_sum")
+
+    row = run_loaded_case(case, MEAN_AGG_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    assert row["normalized"]["polars_streaming"]["status"] == "ok"
+    assert row["normalized"]["duckdb"]["rows"] == row["normalized"]["sqlite"]["rows"]
+
+
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in PATH_KEYED_PICK_PACKAGES),
+    reason="path keyed-pick backends are not installed",
+)
+def test_run_loaded_case_supports_path_basename_keyed_pick_semantics_without_duckdb():
+    case = generate_case(107, profile="path_basename_keyed_pick")
+    row = run_loaded_case(case, PATH_KEYED_PICK_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    assert row["normalized"]["sqlite"]["rows"] == row["normalized"]["datafusion"]["rows"]
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("pandas") is None or importlib.util.find_spec("duckdb") is None,
+    reason="pandas/duckdb backends are not installed",
+)
+def test_run_loaded_case_flags_duckdb_path_projection_keyed_pick_candidate():
+    case = generate_case(107, profile="path_basename_keyed_pick")
+    config = ExperimentConfig(enable_artifact=False, enable_replay_bug=True)
+    row = run_loaded_case(case, ["pandas", "sqlite", "duckdb"], config=config, save_artifact=False)
+
+    assert row["status"] == "bug"
+    assert row["findings"]
+    finding = row["findings"][0]
+    assert finding["root_cause"] == "path_projection_keyed_pick"
+    assert finding["suspicious_backends"] == ["duckdb"]
+    assert finding["triage_verdict"] == "candidate_implementation_bug"
+    assert finding["discovery_origin"] == "issue_replay"
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("pandas") is None or importlib.util.find_spec("duckdb") is None,
+    reason="pandas/duckdb backends are not installed",
+)
+def test_run_loaded_case_flags_duckdb_float_literal_precision_candidate():
+    case = generate_case(135, profile="duckdb_float_literal_precision")
+    config = ExperimentConfig(enable_artifact=False, enable_replay_bug=True)
+    row = run_loaded_case(case, ["pandas", "sqlite", "duckdb"], config=config, save_artifact=False)
+
+    assert row["status"] == "bug"
+    assert row["findings"]
+    finding = row["findings"][0]
+    assert finding["root_cause"] == "duckdb_float_literal_precision"
+    assert finding["suspicious_backends"] == ["duckdb"]
+    assert finding["triage_verdict"] == "candidate_implementation_bug"
+    assert finding["discovery_origin"] == "issue_replay"
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("pandas") is None or importlib.util.find_spec("polars") is None,
+    reason="pandas/polars backends are not installed",
+)
+def test_run_loaded_case_flags_polars_timestamp_precision_filter_candidate():
+    case = generate_case(136, profile="polars_timestamp_precision_filter")
+    config = ExperimentConfig(enable_artifact=False, enable_replay_bug=True)
+    row = run_loaded_case(case, ["pandas", "polars", "polars_lazy"], config=config, save_artifact=False)
+
+    assert row["status"] == "bug"
+    assert row["findings"]
+    finding = row["findings"][0]
+    assert finding["root_cause"] == "polars_timestamp_precision_filter"
+    assert finding["suspicious_backends"] == ["polars", "polars_lazy"]
+    assert finding["triage_verdict"] == "candidate_implementation_bug"
+    assert finding["discovery_origin"] == "issue_replay"
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("pandas") is None or importlib.util.find_spec("duckdb") is None,
+    reason="pandas/duckdb backends are not installed",
+)
+def test_run_loaded_case_classifies_bool_reduction_skipna_probe_when_backend_mismatches(monkeypatch):
+    from datadiff.backends import pandas_backend
+
+    monkeypatch.setattr(pandas_backend, "_pandas_bool_reduction_skipna_mismatch", lambda pd: True)
+    case = generate_case(151, profile="pandas_bool_reduction_skipna_semantics")
+
+    row = run_loaded_case(case, ["pandas", "duckdb", "sqlite"], save_artifact=False)
+
+    assert row["status"] == "bug"
+    assert row["findings"]
+    assert row["findings"][0]["root_cause"] == "pandas_bool_reduction_skipna_semantics"
+    assert row["findings"][0]["suspicious_backends"] == ["pandas"]
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("pyarrow") is None,
+    reason="pyarrow backend is not installed",
+)
+def test_run_loaded_case_detects_pyarrow_run_end_null_compute_probe():
+    case = generate_case(146, profile="pyarrow_run_end_null_compute_semantics")
+
+    row = run_loaded_case(case, ["pyarrow", "duckdb", "sqlite"], save_artifact=False)
+
+    assert row["status"] == "bug"
+    assert row["findings"]
+    assert row["findings"][0]["root_cause"] == "pyarrow_run_end_null_compute_semantics"
+    assert row["findings"][0]["suspicious_backends"] == ["pyarrow"]
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("pandas") is None or importlib.util.find_spec("polars") is None,
+    reason="pandas/polars backends are not installed",
+)
+def test_run_loaded_case_preserves_polars_large_ints_through_normalizer():
+    case = Case(
+        "case-polars-large-int-groupby",
+        1,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("g", "str"),
+                    ColumnSpec("x", "int"),
+                    ColumnSpec("flag", "bool"),
+                ],
+                [
+                    {"id": 0, "g": "alpha", "x": 9007199254740991, "flag": True},
+                    {"id": 1, "g": "alpha", "x": 9007199254740992, "flag": False},
+                    {"id": 2, "g": "alpha", "x": 9007199254740993, "flag": None},
+                    {"id": 3, "g": "beta", "x": -9007199254740991, "flag": True},
+                    {"id": 4, "g": "beta", "x": -9007199254740992, "flag": False},
+                    {"id": 5, "g": None, "x": 0, "flag": None},
+                    {"id": 6, "g": None, "x": 42, "flag": True},
+                    {"id": 7, "g": "gamma", "x": None, "flag": False},
+                    {"id": 9, "g": "delta", "x": -9007199254740995, "flag": None},
+                ],
+            )
+        ],
+        Program(
+            "prog-polars-large-int-groupby",
+            1,
+            [
+                {
+                    "op": "groupby",
+                    "keys": ["g"],
+                    "aggs": [
+                        {"column": "x", "func": "count", "as": "x_seen_count"},
+                        {"column": "x", "func": "min", "as": "x_min_value"},
+                        {"column": "x", "func": "max", "as": "x_max_value"},
+                        {"column": "flag", "func": "count", "as": "flag_seen_count"},
+                    ],
+                },
+                {
+                    "op": "sort",
+                    "keys": [
+                        {"column": "x_max_value", "ascending": False, "nulls": "last"},
+                        {"column": "g", "ascending": True, "nulls": "first"},
+                        {"column": "flag_seen_count", "ascending": True, "nulls": "last"},
+                        {"column": "x_min_value", "ascending": True, "nulls": "last"},
+                        {"column": "x_seen_count", "ascending": True, "nulls": "last"},
+                    ],
+                },
+                {"op": "limit", "n": 5},
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, ["pandas", "polars", "polars_lazy"], save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    expected_alpha = [2, "alpha", 9007199254740993, 9007199254740991, 3]
+    expected_delta = [0, "delta", -9007199254740995, -9007199254740995, 1]
+    for backend in ["pandas", "polars", "polars_lazy"]:
+        assert expected_alpha in row["normalized"][backend]["rows"]
+        assert expected_delta in row["normalized"][backend]["rows"]
+
+
+def test_run_loaded_case_recheck_marks_non_reproducible_candidate(monkeypatch):
+    case = Case(
+        "case-flaky",
+        1,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-flaky", 1, [{"op": "select", "columns": ["x"]}]),
+    )
+    calls = {"evaluate": 0}
+
+    def fake_execute_case(*args, **kwargs):
+        return {}, {
+            "left": NormalizedResult("left", "ok", ["x"], [[1]]),
+            "right": NormalizedResult("right", "ok", ["x"], [[1]]),
+        }
+
+    def fake_evaluate_case(*args, **kwargs):
+        calls["evaluate"] += 1
+        if calls["evaluate"] == 1:
+            return [
+                Finding(
+                    finding_id="finding-flaky",
+                    kind="semantic_output_mismatch",
+                    severity="critical",
+                    suspicious_backends=["right"],
+                    evidence="first pass only",
+                    signature="flaky",
+                    root_cause="filter_predicate",
+                    mismatch_class="row_count",
+                )
+            ]
+        return []
+
+    def fake_annotate_findings(case, findings, **kwargs):
+        for finding in findings:
+            finding.triage_verdict = "candidate_implementation_bug"
+            finding.paper_status = "candidate_bug_needs_external_confirmation"
+            finding.triage_confidence = "high"
+
+    monkeypatch.setattr(runner_module, "_execute_case", fake_execute_case)
+    monkeypatch.setattr(runner_module, "evaluate_case", fake_evaluate_case)
+    monkeypatch.setattr(runner_module, "annotate_findings", fake_annotate_findings)
+
+    row = run_loaded_case(
+        case,
+        ["left", "right"],
+        config=ExperimentConfig(candidate_recheck_count=1),
+        save_artifact=False,
+        target_specs=[],
+    )
+
+    assert row["status"] == "ok"
+    assert row["candidate_recheck"]["enabled"] is True
+    assert row["candidate_recheck"]["non_reproduced_keys"] == [
+        "semantic_output_mismatch:filter_predicate@right:row_count"
+    ]
+    assert row["findings"][0]["triage_verdict"] == "non_reproducible_candidate"
+    assert row["findings"][0]["false_positive"] is True
+    assert row["findings"][0]["false_positive_reason"] == "candidate_not_reproduced_on_immediate_recheck"
 
 
 @pytest.mark.skipif(
@@ -1100,6 +1429,8 @@ def test_run_fuzz_records_guidance_metadata(tmp_path):
     assert "path_coverage_proxy" in row["guidance"]
     assert "combo_priority" in row["guidance"]
     assert "online_weight_mean" in row["guidance"]
+    assert "profile_saturation_penalty" in row["guidance"]
+    assert "profile_saturation_active" in row["guidance"]
     assert "issue_replay_global_saturation_penalty" in row["guidance"]
     assert "issue_replay_global_saturation_active" in row["guidance"]
     assert "issue_inspired_source_saturation_penalty" in row["guidance"]
@@ -1142,10 +1473,11 @@ def test_run_fuzz_fresh_bughunt_uses_generation_time_replay_gate(tmp_path):
     case_log_row = read_jsonl(case_log)[0]
     meta = load_json(run_meta_path(run_file))
     assert meta["config"]["generator_profile"] == "bughunt"
-    assert meta["effective_generator_profile"] == "bughunt_fresh"
-    assert meta["replay_bug_filter"]["filtered_candidates"] == 0
+    assert meta["effective_generator_profile"] == "bughunt"
+    assert meta["replay_bug_filter"]["filtered_candidates"] > 0
     assert row["case"].get("metadata", {}).get("mixed_generator_profile") != "wide_offset_topk"
-    assert row["replay_filter"]["filtered_before_candidate"] == 0
+    assert row["replay_filter"]["filtered_before_candidate"] > 0
+    assert row["replay_filter"]["last_skip_reason"] == "known_replay_source_issue"
     assert case_log_row["case"].get("metadata", {}).get("mixed_generator_profile") != "wide_offset_topk"
 
 

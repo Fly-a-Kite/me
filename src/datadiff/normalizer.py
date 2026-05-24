@@ -67,15 +67,22 @@ def _to_pandas(data: Any):
     import pandas as pd
     if data is None:
         return pd.DataFrame()
-    # Polars can convert through Arrow, but that path may require optional
-    # dependencies. For normalization, rows/columns are enough.
-    if hasattr(data, "rows") and hasattr(data, "columns"):
-        return pd.DataFrame(data.rows(named=True), columns=list(data.columns))
     if hasattr(data, "to_pandas"):
         return data.to_pandas()
     if hasattr(data, "to_pandas_dataframe"):
         return data.to_pandas_dataframe()
     return data
+
+
+def _native_rows_and_columns(data: Any) -> tuple[list[str], list[list[Any]]] | None:
+    if not hasattr(data, "rows") or not hasattr(data, "columns"):
+        return None
+    columns = [str(column) for column in list(data.columns)]
+    try:
+        native_rows = data.rows(named=False)
+    except TypeError:
+        native_rows = data.rows()
+    return columns, [list(row_values) for row_values in native_rows]
 
 
 def normalize_result(result: BackendResult, program: Program, enable_normalizer: bool = True) -> NormalizedResult:
@@ -89,13 +96,18 @@ def normalize_result(result: BackendResult, program: Program, enable_normalizer:
             error=result.error[:500],
         )
     try:
-        df = _to_pandas(result.data)
-        original_columns = [str(c) for c in list(df.columns)]
+        native_table = _native_rows_and_columns(result.data)
+        if native_table is None:
+            df = _to_pandas(result.data)
+            original_columns = [str(c) for c in list(df.columns)]
+            raw_rows = [[row.iloc[idx] for idx in range(len(original_columns))] for _, row in df.iterrows()]
+        else:
+            original_columns, raw_rows = native_table
         column_positions = sorted(enumerate(original_columns), key=lambda item: (item[1], item[0]))
         columns = [name for _, name in column_positions]
         rows: list[list[Any]] = []
-        for _, row in df.iterrows():
-            rows.append([_norm_value(row.iloc[idx]) for idx, _ in column_positions])
+        for raw_row in raw_rows:
+            rows.append([_norm_value(raw_row[idx]) for idx, _ in column_positions])
         if enable_normalizer and not program.order_sensitive:
             # SQL/DataFrame backends differ on stable ordering for ties and on
             # whether intermediate order is observable. The default oracle is

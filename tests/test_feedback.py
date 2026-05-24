@@ -68,6 +68,28 @@ def test_feedback_record_caps_candidate_bug_family_storage():
     assert len(state.interesting_cases) == 2
 
 
+def test_feedback_record_caps_nonfinding_profile_storage():
+    state = FeedbackState(max_cases_per_profile=2)
+
+    first = _case(1)
+    first.metadata["mixed_generator_profile"] = "join_ordered_agg_topk"
+    second = _case(2)
+    second.metadata["mixed_generator_profile"] = "join_ordered_agg_topk"
+    third = _case(3)
+    third.metadata["mixed_generator_profile"] = "join_ordered_agg_topk"
+    finding_case = _case(4)
+    finding_case.metadata["mixed_generator_profile"] = "join_ordered_agg_topk"
+
+    assert state.record(first, "0000000000000001", False)
+    assert state.record(second, "0000000000000002", False)
+    assert not state.record(third, "0000000000000003", False)
+    assert state.last_record_skip_reason == "profile_saturated"
+    assert state.record(finding_case, "0000000000000004", True)
+
+    assert state.stored_profiles["join_ordered_agg_topk"] == 3
+    assert len(state.interesting_cases) == 3
+
+
 def test_feedback_source_scheduler_prefers_productive_mutations():
     scheduler = LocalSourceScheduler(exploration_weight=0.0)
     state = FeedbackState(source_scheduler=scheduler, interesting_cases=[_case(1)])

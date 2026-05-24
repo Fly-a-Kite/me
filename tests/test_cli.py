@@ -246,6 +246,25 @@ def test_cli_parses_float_group_key_profile():
     assert args.profile == "float_group_key"
 
 
+def test_cli_parses_issue_focus_profile():
+    parser = build_parser()
+    args = parser.parse_args(["fuzz", "--profile", "issue_focus"])
+    assert args.cmd == "fuzz"
+    assert args.profile == "issue_focus"
+
+    args = parser.parse_args(["longrun", "--profile", "issue_focus"])
+    assert args.cmd == "longrun"
+    assert args.profile == "issue_focus"
+
+    args = parser.parse_args(["fuzz", "--profile", "bool_null_groupby_agg"])
+    assert args.cmd == "fuzz"
+    assert args.profile == "bool_null_groupby_agg"
+
+    args = parser.parse_args(["fuzz", "--profile", "large_int_filter_groupby"])
+    assert args.cmd == "fuzz"
+    assert args.profile == "large_int_filter_groupby"
+
+
 def test_cli_parses_join_null_sort_profile():
     parser = build_parser()
     args = parser.parse_args(["fuzz", "--profile", "join_null_sort"])
@@ -272,6 +291,8 @@ def test_cli_parses_order_sensitive_bug_hunt_profiles():
         "post_topk_range_filter",
         "tuple_absence_filter",
         "running_sum_precision",
+        "partitioned_running_sum",
+        "path_basename_keyed_pick",
         "sortedness_null_placement",
         "simple_case_random_subject",
         "group_quantile_key_probe",
@@ -280,6 +301,8 @@ def test_cli_parses_order_sensitive_bug_hunt_profiles():
         "struct_distinct_unnest",
         "bit_compare_unequal_length",
         "round_even_float_scale",
+        "duckdb_float_literal_precision",
+        "polars_timestamp_precision_filter",
         "series_rtruediv_operand_order",
         "pandas_uint64_isin_precision",
         "duckdb_tuple_anti_null_semantics",
@@ -296,6 +319,7 @@ def test_cli_parses_order_sensitive_bug_hunt_profiles():
         "pyarrow_large_string_partition_schema_semantics",
         "pyarrow_hash_pivot_wider_order_semantics",
         "polars_rolling_mean_by_null_count_semantics",
+        "csv_long_numeric_roundtrip",
     ]:
         args = parser.parse_args(["fuzz", "--profile", profile])
         assert args.cmd == "fuzz"
@@ -510,6 +534,13 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("running_sum_precision").generator_profile == "running_sum_precision"
     assert _preset_config("running_sum_precision").guidance_targets[0] == "running_sum_precision"
     assert _preset_config("running_sum_precision_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("partitioned_running_sum").generator_profile == "partitioned_running_sum"
+    assert _preset_config("partitioned_running_sum").guidance_targets[0] == "partitioned_running_sum"
+    assert _preset_config("partitioned_running_sum_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("path_basename_keyed_pick").generator_profile == "path_basename_keyed_pick"
+    assert _preset_config("path_basename_keyed_pick").guidance_targets[0] == "path_basename_keyed_pick"
+    assert _preset_config("path_basename_keyed_pick_replay").enable_replay_bug is True
+    assert _preset_config("path_basename_keyed_pick_replay").guidance_targets[0] == "path_basename_keyed_pick"
     assert _preset_config("sortedness_null_placement").generator_profile == "sortedness_null_placement"
     assert _preset_config("sortedness_null_placement").guidance_targets[0] == "sortedness_null_placement"
     assert _preset_config("sortedness_null_placement_metamorphic").enable_metamorphic_oracle is True
@@ -534,6 +565,12 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("round_even_float_scale").generator_profile == "round_even_float_scale"
     assert _preset_config("round_even_float_scale").guidance_targets[0] == "round_even_float_scale"
     assert _preset_config("round_even_float_scale_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("duckdb_float_literal_precision").generator_profile == "duckdb_float_literal_precision"
+    assert _preset_config("duckdb_float_literal_precision").guidance_targets[0] == "duckdb_float_literal_precision"
+    assert _preset_config("duckdb_float_literal_precision_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("polars_timestamp_precision_filter").generator_profile == "polars_timestamp_precision_filter"
+    assert _preset_config("polars_timestamp_precision_filter").guidance_targets[0] == "polars_timestamp_precision_filter"
+    assert _preset_config("polars_timestamp_precision_filter_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("series_rtruediv_operand_order").generator_profile == "series_rtruediv_operand_order"
     assert _preset_config("series_rtruediv_operand_order").guidance_targets[0] == "series_rtruediv_operand_order"
     assert _preset_config("series_rtruediv_operand_order_metamorphic").enable_metamorphic_oracle is True
@@ -610,6 +647,15 @@ def test_cli_parses_targeted_guided_experiment_presets():
     )
     assert _preset_config("pandas_eval_inplace_aliasing_semantics_metamorphic").enable_metamorphic_oracle is True
     assert (
+        _preset_config("pandas_bool_reduction_skipna_semantics").generator_profile
+        == "pandas_bool_reduction_skipna_semantics"
+    )
+    assert (
+        _preset_config("pandas_bool_reduction_skipna_semantics").guidance_targets[0]
+        == "pandas_bool_reduction_skipna_semantics"
+    )
+    assert _preset_config("pandas_bool_reduction_skipna_semantics_metamorphic").enable_metamorphic_oracle is True
+    assert (
         _preset_config("pyarrow_dataset_isin_all_match_semantics").generator_profile
         == "pyarrow_dataset_isin_all_match_semantics"
     )
@@ -618,6 +664,15 @@ def test_cli_parses_targeted_guided_experiment_presets():
         == "pyarrow_dataset_isin_all_match_semantics"
     )
     assert _preset_config("pyarrow_dataset_isin_all_match_semantics_metamorphic").enable_metamorphic_oracle is True
+    assert (
+        _preset_config("pyarrow_run_end_null_compute_semantics").generator_profile
+        == "pyarrow_run_end_null_compute_semantics"
+    )
+    assert (
+        _preset_config("pyarrow_run_end_null_compute_semantics").guidance_targets[0]
+        == "pyarrow_run_end_null_compute_semantics"
+    )
+    assert _preset_config("pyarrow_run_end_null_compute_semantics_metamorphic").enable_metamorphic_oracle is True
     assert (
         _preset_config("pyarrow_large_string_partition_schema_semantics").generator_profile
         == "pyarrow_large_string_partition_schema_semantics"
@@ -645,6 +700,10 @@ def test_cli_parses_targeted_guided_experiment_presets():
         == "polars_rolling_mean_by_null_count_semantics"
     )
     assert _preset_config("polars_rolling_mean_by_null_count_semantics_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("csv_long_numeric_roundtrip").generator_profile == "csv_long_numeric_roundtrip"
+    assert _preset_config("csv_long_numeric_roundtrip").guidance_targets[0] == "csv_long_numeric_roundtrip"
+    assert _preset_config("csv_long_numeric_roundtrip").candidate_recheck_count == 2
+    assert _preset_config("csv_long_numeric_roundtrip_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("join_null_sort").generator_profile == "join_null_sort"
     assert _preset_config("join_null_sort").guidance_targets[0] == "join_null_sort"
     assert _preset_config("join_null_sort_metamorphic").enable_metamorphic_oracle is True
@@ -694,7 +753,10 @@ def test_cli_parses_live_datafusion_presets():
     assert live.enable_local_source_scheduler is True
     assert live.local_source_exploration_weight == 0.35
     assert live.enable_family_saturation is True
-    assert live.family_saturation_threshold == 8
+    assert live.family_saturation_threshold == 4
+    assert live.family_saturation_penalty == 6.0
+    assert live.saturated_family_reward == 0.0
+    assert live.candidate_recheck_count == 2
     assert live.issue_replay_saturation_threshold == 1
     assert live.issue_replay_saturation_penalty == 1.0
     assert live.issue_replay_global_saturation_threshold == 2
@@ -729,6 +791,9 @@ def test_cli_parses_live_datafusion_presets():
     assert fresh.guidance_strategy == "guided"
     assert fresh.enable_local_source_scheduler is True
     assert fresh.local_source_exploration_weight == 0.45
+    assert fresh.family_saturation_threshold == 4
+    assert fresh.family_saturation_penalty == 6.0
+    assert fresh.saturated_family_reward == 0.0
     assert fresh.issue_replay_global_saturation_threshold == 2
     assert fresh.issue_replay_global_saturation_penalty == 2.0
     assert "groupby" not in fresh.guidance_targets
@@ -781,6 +846,8 @@ def test_cli_parses_non_datafusion_live_presets():
         "struct_distinct_unnest",
         "bit_compare_unequal_length",
         "round_even_float_scale",
+        "duckdb_float_literal_precision",
+        "polars_timestamp_precision_filter",
         "series_rtruediv_operand_order",
         "pandas_uint64_isin_precision",
         "duckdb_tuple_anti_null_semantics",
@@ -793,6 +860,7 @@ def test_cli_parses_non_datafusion_live_presets():
         "pandas_arrow_timestamp_loc_slice_semantics",
         "pandas_arrow_timestamp_index_attr_semantics",
         "pandas_eval_inplace_aliasing_semantics",
+        "pandas_bool_reduction_skipna_semantics",
         "pyarrow_dataset_isin_all_match_semantics",
         "pyarrow_large_string_partition_schema_semantics",
         "pyarrow_hash_pivot_wider_order_semantics",
@@ -817,6 +885,16 @@ def test_cli_parses_non_datafusion_live_presets():
     assert polars_lazy.issue_replay_global_saturation_penalty == 2.0
     assert "reverse_division_operand_order@polars" in polars_lazy.known_saturated_bug_families
 
+    polars_streaming = _preset_config("live_polars_streaming")
+    assert polars_streaming.generator_profile == "bughunt"
+    assert {
+        "groupby",
+        "aggregation",
+        "numeric_mean_aggregate",
+        "sort_limit",
+    }.issubset(polars_streaming.guidance_targets)
+    assert polars_streaming.local_source_exploration_weight == 0.45
+
     embedded_sql = _preset_config("live_embedded_sql")
     assert embedded_sql.generator_profile == "bughunt"
     assert {"join", "filter", "groupby", "aggregation", "casts", "row_value_absence_filter"}.issubset(
@@ -839,13 +917,69 @@ def test_cli_parses_non_datafusion_live_presets():
     assert cross_family.issue_replay_global_saturation_threshold == 2
     assert cross_family.issue_replay_global_saturation_penalty == 2.0
 
+    issue_focus = _preset_config("live_issue_focus")
+    assert issue_focus.generator_profile == "issue_focus"
+    assert issue_focus.enable_replay_bug is False
+    assert issue_focus.candidate_recheck_count == 2
+    assert issue_focus.guidance_candidate_pool == 14
+    assert {
+        "row_value_absence_filter",
+        "polars_reverse_division_columns",
+        "join_filter_groupby",
+        "bool_null_groupby_agg",
+        "large_int_filter_groupby",
+        "pandas_bool_reduction_skipna_semantics",
+        "bool_reduction_skipna_probe",
+    }.issubset(
+        issue_focus.guidance_targets
+    )
+
+    polars_issue = _preset_config("live_polars_issue_focus")
+    assert polars_issue.generator_profile == "issue_focus"
+    assert {
+        "empty_filter_groupby",
+        "polars_reverse_division_columns",
+        "topk_resort",
+        "boolean_aggregation",
+        "bool_any_all",
+        "large_integer",
+        "csv_long_numeric_roundtrip",
+        "csv_numeric_inference",
+    }.issubset(
+        polars_issue.guidance_targets
+    )
+
+    duckdb_issue = _preset_config("live_duckdb_issue_focus")
+    assert duckdb_issue.generator_profile == "issue_focus"
+    assert {"row_value_absence_filter", "null_predicate_filter", "join_filter_groupby"}.issubset(
+        duckdb_issue.guidance_targets
+    )
+
+    arrow_issue = _preset_config("live_arrow_issue_focus")
+    assert arrow_issue.generator_profile == "issue_focus"
+    assert {
+        "pyarrow_groupby_filter_cast_membership",
+        "unique_count_groupby",
+        "bool_null_groupby_agg",
+        "bool_any_all",
+        "large_int_filter_groupby",
+        "strings",
+    }.issubset(
+        arrow_issue.guidance_targets
+    )
+
 
 def test_cli_parses_non_datafusion_live_metamorphic_presets():
     for preset in [
         "live_arrow_metamorphic",
         "live_polars_lazy_metamorphic",
+        "live_polars_streaming_metamorphic",
         "live_embedded_sql_metamorphic",
         "live_cross_family_metamorphic",
+        "live_issue_focus_metamorphic",
+        "live_polars_issue_focus_metamorphic",
+        "live_duckdb_issue_focus_metamorphic",
+        "live_arrow_issue_focus_metamorphic",
     ]:
         config = _preset_config(preset)
         assert config.enable_metamorphic_oracle is True

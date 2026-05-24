@@ -6,6 +6,12 @@ from pathlib import Path
 from typing import Any
 
 from datadiff.historical import list_historical_bugs
+from datadiff.reward import (
+    candidate_bug_family_key,
+    is_issue_replay_finding,
+    is_known_saturated_candidate_bug_finding,
+    is_rewardable_candidate_bug_finding,
+)
 from datadiff.targets import TARGETS, TARGET_SUITES
 from datadiff.util import REPORTS_DIR, RUNS_DIR, dump_json, ensure_dirs, load_json, read_jsonl, run_meta_path, utc_now
 
@@ -21,6 +27,7 @@ class ReadinessPolicy:
         "arrow_cross",
         "embedded_sql",
         "latest_all_engines",
+        "latest_no_datafusion",
     )
     required_live_families: tuple[str, ...] = ("arrow", "dataframe", "embedded_sql", "query_engine")
     confirmed_live_paper_statuses: tuple[str, ...] = (
@@ -32,6 +39,7 @@ class ReadinessPolicy:
 
 
 DEFAULT_A_LEVEL_READINESS_POLICY = ReadinessPolicy()
+EVIDENCE_MODES = {"live", "historical", "seeded"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,19 +81,24 @@ def build_final_readiness(
     policy = policy or DEFAULT_A_LEVEL_READINESS_POLICY
     manifests = [_load_manifest(path) for path in manifest_files]
     runs = [run for manifest in manifests for run in _manifest_runs(manifest, policy=policy)]
-    live_runs = [run for run in runs if run["evidence_mode"] == "live"]
+    explicit_live_runs = [run for run in runs if run["evidence_mode"] == "live"]
+    live_runs = [run for run in explicit_live_runs if _fresh_replay_policy_ok(run)]
+    replay_policy_rejected_live_runs = [run for run in explicit_live_runs if not _fresh_replay_policy_ok(run)]
     historical_runs = [run for run in runs if run["evidence_mode"] == "historical"]
     seeded_runs = [run for run in runs if run["evidence_mode"] == "seeded"]
+    ignored_runs = [run for run in runs if run["evidence_mode"] not in EVIDENCE_MODES]
 
     live_by_suite = _live_suite_summary(live_runs)
     live_families = sorted({family for run in live_runs for family in run["target_families"]})
     rewardable_live_families = Counter()
     confirmed_live_families = Counter()
     issue_replay_live_families = Counter()
+    known_saturated_live_families = Counter()
     for run in live_runs:
         rewardable_live_families.update(run["rewardable_candidate_families"])
         confirmed_live_families.update(run["confirmed_candidate_families"])
         issue_replay_live_families.update(run["issue_replay_candidate_families"])
+        known_saturated_live_families.update(run["known_saturated_candidate_families"])
 
     historical_confirmed = _historical_confirmed_runs(historical_runs)
     gates = _readiness_gates(
@@ -108,19 +121,25 @@ def build_final_readiness(
         "gates": gates,
         "summary": {
             "live_runs": len(live_runs),
+            "explicit_live_runs": len(explicit_live_runs),
+            "replay_policy_rejected_live_runs": len(replay_policy_rejected_live_runs),
             "historical_runs": len(historical_runs),
             "seeded_runs": len(seeded_runs),
+            "ignored_evidence_runs": len(ignored_runs),
             "live_suites": sorted(live_by_suite),
             "live_families": live_families,
             "rewardable_live_candidate_families": dict(sorted(rewardable_live_families.items())),
             "confirmed_live_candidate_families": dict(sorted(confirmed_live_families.items())),
             "issue_replay_live_candidate_families": dict(sorted(issue_replay_live_families.items())),
+            "known_saturated_live_candidate_families": dict(sorted(known_saturated_live_families.items())),
             "historical_confirmed_bug_ids": sorted(historical_confirmed),
             "total_live_cases": sum(item["cases"] for item in live_by_suite.values()),
             "total_live_elapsed_s": sum(item["elapsed_s"] for item in live_by_suite.values()),
         },
         "live_suites": live_by_suite,
         "runs": live_runs + historical_runs + seeded_runs,
+        "ignored_runs": ignored_runs,
+        "replay_policy_rejected_live_runs": replay_policy_rejected_live_runs,
     }
 
 
@@ -137,7 +156,7 @@ def _load_manifest(path: Path) -> dict[str, Any]:
 
 
 def _manifest_runs(manifest: dict[str, Any], *, policy: ReadinessPolicy) -> list[dict[str, Any]]:
-    manifest_mode = str(manifest.get("evidence_mode", "live") or "live")
+    manifest_mode = _normalize_evidence_mode(manifest.get("evidence_mode", ""))
     manifest_replay_policy = (
         manifest.get("replay_bug_policy", {}) if isinstance(manifest.get("replay_bug_policy", {}), dict) else {}
     )
@@ -148,12 +167,25 @@ def _manifest_runs(manifest: dict[str, Any], *, policy: ReadinessPolicy) -> list
         meta_path = run_meta_path(run_file)
         meta = load_json(meta_path) if meta_path.is_file() else {}
         config = meta.get("config", {}) if isinstance(meta.get("config", {}), dict) else {}
+        known_bug_families = list(config.get("known_saturated_bug_families", []) or [])
         replay_filter = (
             meta.get("replay_bug_filter", {}) if isinstance(meta.get("replay_bug_filter", {}), dict) else {}
         )
-        evidence_mode = str(run.get("evidence_mode", manifest_mode) or manifest_mode)
         target_suite = str(run.get("target_suite", manifest.get("target_suite", "")) or "")
         target_families = _target_families(run, manifest, meta)
+        evidence_mode = _normalize_evidence_mode(run.get("evidence_mode", manifest_mode))
+        if evidence_mode == "live" and _has_seeded_target(target_suite, target_families):
+            evidence_mode = "unknown"
+        run_enable_replay_bug = (
+            bool(config.get("enable_replay_bug"))
+            if "enable_replay_bug" in config
+            else evidence_mode == "historical"
+        )
+        manifest_enable_replay_bug = (
+            bool(manifest_replay_policy.get("enable_replay_bug"))
+            if "enable_replay_bug" in manifest_replay_policy
+            else evidence_mode == "historical"
+        )
         findings = [finding for row in rows for finding in row.get("findings", [])]
         out.append(
             {
@@ -170,16 +202,40 @@ def _manifest_runs(manifest: dict[str, Any], *, policy: ReadinessPolicy) -> list
                 "duration_s": meta.get("duration_s"),
                 "findings": len(findings),
                 "target_families": target_families,
-                "enable_replay_bug": bool(config.get("enable_replay_bug", False)),
-                "manifest_enable_replay_bug": bool(manifest_replay_policy.get("enable_replay_bug", False)),
+                "enable_replay_bug": run_enable_replay_bug,
+                "manifest_enable_replay_bug": manifest_enable_replay_bug,
                 "replay_filter_enabled": replay_filter.get("enabled", ""),
                 "replay_filter_filtered_candidates": int(replay_filter.get("filtered_candidates", 0) or 0),
-                "rewardable_candidate_families": _candidate_family_counter(findings, rewardable=True),
-                "confirmed_candidate_families": _candidate_family_counter(findings, confirmed=True, policy=policy),
+                "known_saturated_bug_families": known_bug_families,
+                "rewardable_candidate_families": _candidate_family_counter(
+                    findings,
+                    rewardable=True,
+                    known_saturated_bug_families=known_bug_families,
+                ),
+                "confirmed_candidate_families": _candidate_family_counter(
+                    findings,
+                    confirmed=True,
+                    known_saturated_bug_families=known_bug_families,
+                    policy=policy,
+                ),
                 "issue_replay_candidate_families": _candidate_family_counter(findings, issue_replay=True),
+                "known_saturated_candidate_families": _candidate_family_counter(
+                    findings,
+                    known_saturated=True,
+                    known_saturated_bug_families=known_bug_families,
+                ),
             }
         )
     return out
+
+
+def _normalize_evidence_mode(value: Any) -> str:
+    mode = str(value or "").strip()
+    return mode if mode in EVIDENCE_MODES else "unknown"
+
+
+def _has_seeded_target(target_suite: str, target_families: list[str]) -> bool:
+    return target_suite.startswith("seeded_") or "seeded_fault" in set(target_families)
 
 
 def _target_families(run: dict[str, Any], manifest: dict[str, Any], meta: dict[str, Any]) -> list[str]:
@@ -199,6 +255,8 @@ def _candidate_family_counter(
     rewardable: bool = False,
     confirmed: bool = False,
     issue_replay: bool = False,
+    known_saturated: bool = False,
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
     policy: ReadinessPolicy | None = None,
 ) -> Counter[str]:
     policy = policy or DEFAULT_A_LEVEL_READINESS_POLICY
@@ -207,25 +265,25 @@ def _candidate_family_counter(
     for finding in findings:
         if str(finding.get("triage_verdict", "")) != "candidate_implementation_bug":
             continue
-        discovery_origin = str(finding.get("discovery_origin", "") or "")
-        if rewardable and discovery_origin == "issue_replay":
+        if rewardable and not is_rewardable_candidate_bug_finding(finding, known_saturated_bug_families):
             continue
         if confirmed and str(finding.get("paper_status", "")) not in confirmed_statuses:
             continue
-        if issue_replay and discovery_origin != "issue_replay":
+        if confirmed and is_known_saturated_candidate_bug_finding(finding, known_saturated_bug_families):
+            continue
+        if issue_replay and not is_issue_replay_finding(finding):
+            continue
+        if known_saturated and not is_known_saturated_candidate_bug_finding(
+            finding,
+            known_saturated_bug_families,
+        ):
             continue
         counter[_candidate_family_key(finding)] += 1
     return counter
 
 
 def _candidate_family_key(finding: dict[str, Any]) -> str:
-    root = str(finding.get("root_cause", "unknown") or "unknown")
-    suspicious = finding.get("suspicious_backends", [])
-    if isinstance(suspicious, list) and suspicious:
-        suffix = ",".join(sorted(str(item) for item in suspicious))
-    else:
-        suffix = "unknown"
-    return f"{root}@{suffix}"
+    return candidate_bug_family_key(finding)
 
 
 def _live_suite_summary(live_runs: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -384,9 +442,12 @@ def _render_markdown(audit: dict[str, Any]) -> str:
             "## Summary",
             "",
             f"- Live runs: `{summary['live_runs']}`; live cases: `{summary['total_live_cases']}`; live elapsed_s: `{summary['total_live_elapsed_s']:.3f}`",
+            f"- Explicit live runs: `{summary['explicit_live_runs']}`; replay-policy rejected live runs: `{summary['replay_policy_rejected_live_runs']}`",
+            f"- Ignored evidence runs: `{summary['ignored_evidence_runs']}`",
             f"- Live suites: `{', '.join(summary['live_suites']) or 'none'}`",
             f"- Live families: `{', '.join(summary['live_families']) or 'none'}`",
             f"- Rewardable latest candidate families: `{len(summary['rewardable_live_candidate_families'])}`",
+            f"- Known/saturated latest candidate families: `{len(summary['known_saturated_live_candidate_families'])}`",
             f"- Confirmed latest candidate families: `{len(summary['confirmed_live_candidate_families'])}`",
             f"- Historical confirmed replay ids: `{', '.join(summary['historical_confirmed_bug_ids']) or 'none'}`",
             "",

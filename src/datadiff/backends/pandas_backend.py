@@ -4,11 +4,36 @@ import time
 from typing import Any
 
 from datadiff.backends.base import Backend, BackendResult
+from datadiff.csv_roundtrip import (
+    csv_long_numeric_roundtrip_mismatch,
+    csv_long_numeric_values,
+    long_numeric_csv_path,
+)
 from datadiff.dsl import Program, TableData, normalize_sort_keys
 from datadiff.filtering import evaluate_filter_predicate
-from datadiff.running import sort_rows_for_running, stable_running_sum_values
+from datadiff.pathing import path_basename
+from datadiff.running import (
+    running_sum_partition_columns,
+    running_sum_sort_keys,
+    sort_rows_for_running,
+    stable_running_sum_values,
+)
 from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
+from datadiff.windowing import row_number_filter_rows
+
+
+def _bool_reduction(values: Any, func: str) -> bool | None:
+    import pandas as pd
+
+    valid = [bool(value) for value in values if not pd.isna(value)]
+    if not valid:
+        return None
+    if func == "any":
+        return any(valid)
+    if func == "all":
+        return all(valid)
+    raise ValueError(func)
 
 
 class PandasBackend(Backend):
@@ -16,7 +41,18 @@ class PandasBackend(Backend):
 
     def _to_df(self, table: TableData):
         import pandas as pd
-        return pd.DataFrame(table.rows, columns=[c.name for c in table.columns])
+        data = {}
+        for column in table.columns:
+            values = [row.get(column.name) for row in table.rows]
+            if column.type == "int":
+                data[column.name] = pd.array(values, dtype="Int64")
+            elif column.type == "bool":
+                data[column.name] = pd.array(values, dtype="boolean")
+            elif column.type == "str":
+                data[column.name] = pd.array(values, dtype="string")
+            else:
+                data[column.name] = values
+        return pd.DataFrame(data, columns=[c.name for c in table.columns])
 
     def run(self, tables: list[TableData], program: Program, timeout_s: float = 5.0) -> BackendResult:
         start = time.perf_counter()
@@ -51,8 +87,16 @@ class PandasBackend(Backend):
                     val = op["value"]
                     comparator = op["cmp"]
                     series = df[col]
-                    mask = series.map(lambda value: evaluate_filter_predicate(value, comparator, val)).astype(bool)
-                    df = df[mask]
+                    column_values = _predicate_values(series)
+                    keep_mask = pd.Series(
+                        [
+                            evaluate_filter_predicate(column_value, comparator, val)
+                            for column_value in column_values
+                        ],
+                        index=df.index,
+                        dtype=bool,
+                    )
+                    df = df.loc[keep_mask]
                 elif kind == "tuple_absence_filter":
                     right = frames[op["table"]]
                     right_rows = right[list(op["right_columns"])].to_dict("records")
@@ -67,10 +111,13 @@ class PandasBackend(Backend):
                         dtype=bool,
                     )
                     df = df.loc[keep_mask]
+                elif kind == "row_number_filter":
+                    rows = row_number_filter_rows(df.to_dict("records"), op)
+                    df = pd.DataFrame(rows, columns=list(df.columns))
                 elif kind == "running_sum":
                     columns = [column for column in df.columns if column != op["column"]] + [op["column"]]
-                    rows = sort_rows_for_running(df.to_dict("records"), normalize_sort_keys({"keys": op["order_by"]}))
-                    values = stable_running_sum_values(rows, op["source"])
+                    rows = sort_rows_for_running(df.to_dict("records"), running_sum_sort_keys(op))
+                    values = stable_running_sum_values(rows, op["source"], running_sum_partition_columns(op))
                     rows = [{**row, op["column"]: value} for row, value in zip(rows, values)]
                     df = pd.DataFrame(rows, columns=columns)
                 elif kind == "sortedness_check":
@@ -93,6 +140,10 @@ class PandasBackend(Backend):
                 elif kind == "bit_compare_probe":
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "round_even_probe":
+                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
+                elif kind == "float_literal_precision_probe":
+                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
+                elif kind == "timestamp_precision_filter_probe":
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "series_rtruediv_probe":
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
@@ -139,7 +190,12 @@ class PandasBackend(Backend):
                 elif kind == "eval_inplace_alias_probe":
                     mismatch = _pandas_eval_inplace_alias_mismatch(pd)
                     df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
+                elif kind == "bool_reduction_skipna_probe":
+                    mismatch = _pandas_bool_reduction_skipna_mismatch(pd)
+                    df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
                 elif kind == "dataset_isin_all_match_probe":
+                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
+                elif kind == "run_end_null_compute_probe":
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "large_string_partition_probe":
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
@@ -147,6 +203,12 @@ class PandasBackend(Backend):
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "rolling_mean_by_null_count_probe":
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
+                elif kind == "csv_long_numeric_roundtrip_probe":
+                    expected_values = csv_long_numeric_values(op)
+                    with long_numeric_csv_path(expected_values) as csv_path:
+                        observed_values = pd.read_csv(csv_path)["value"].tolist()
+                    mismatch = csv_long_numeric_roundtrip_mismatch(observed_values, expected_values)
+                    df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
                 elif kind == "select":
                     df = df[list(op["columns"])]
                 elif kind == "sort":
@@ -185,6 +247,8 @@ class PandasBackend(Backend):
                         df[op["column"]] = df[expr["source"]].str.len()
                     elif expr["kind"] == "string_lower":
                         df[op["column"]] = df[expr["source"]].str.lower()
+                    elif expr["kind"] == "string_basename":
+                        df[op["column"]] = df[expr["source"]].map(path_basename)
                     else:
                         raise ValueError(expr["kind"])
                 elif kind == "groupby":
@@ -197,6 +261,8 @@ class PandasBackend(Backend):
                             series = group[col].count().rename(alias)
                         elif func == "nunique":
                             series = group[col].nunique(dropna=True).rename(alias)
+                        elif func in {"any", "all"}:
+                            series = group[col].agg(lambda values, current_func=func: _bool_reduction(values, current_func)).rename(alias)
                         elif func == "sum":
                             series = group[col].sum(min_count=1).rename(alias)
                         else:
@@ -211,6 +277,8 @@ class PandasBackend(Backend):
                             values[alias] = int(df[col].count())
                         elif func == "nunique":
                             values[alias] = int(df[col].nunique(dropna=True))
+                        elif func in {"any", "all"}:
+                            values[alias] = _bool_reduction(df[col], func)
                         elif func == "sum":
                             values[alias] = df[col].sum(min_count=1)
                         else:
@@ -221,6 +289,13 @@ class PandasBackend(Backend):
             return BackendResult(self.name, "ok", data=df, duration_ms=(time.perf_counter()-start)*1000)
         except Exception as exc:  # noqa: BLE001
             return BackendResult(self.name, "error", error_type=type(exc).__name__, error=str(exc), duration_ms=(time.perf_counter()-start)*1000)
+
+
+def _predicate_values(series):
+    array = getattr(series, "array", None)
+    if array is not None:
+        return array.tolist()
+    return series.tolist()
 
 
 def _pandas_arrow_string_eq_sum_mismatch(pd) -> bool:
@@ -274,3 +349,19 @@ def _pandas_eval_inplace_alias_mismatch(pd) -> bool:
     frame.eval("nums2 = nums", inplace=True)
     frame.loc[[True, False, True], "nums2"] = 0
     return not np.array_equal(frame["nums"].to_numpy(), original)
+
+
+def _pandas_bool_reduction_skipna_mismatch(pd) -> bool:
+    frame = pd.DataFrame(
+        {
+            "has_signal": pd.array([True, pd.NA], dtype="boolean"),
+            "all_missing": pd.array([pd.NA, pd.NA], dtype="boolean"),
+        }
+    )
+    for reducer in ("any", "all"):
+        for axis in (0, None):
+            try:
+                getattr(frame, reducer)(axis=axis, skipna=False)
+            except (TypeError, ValueError):
+                return True
+    return False

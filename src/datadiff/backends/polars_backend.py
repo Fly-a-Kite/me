@@ -5,10 +5,46 @@ import time
 import warnings
 
 from datadiff.backends.base import Backend, BackendResult
+from datadiff.csv_roundtrip import (
+    csv_long_numeric_roundtrip_mismatch,
+    csv_long_numeric_values,
+    long_numeric_csv_path,
+)
 from datadiff.dsl import Program, TableData, normalize_sort_keys
 from datadiff.filtering import parse_filter_comparator
+from datadiff.running import running_sum_sort_keys
 from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
+from datadiff.windowing import row_number_filter_rows
+
+
+def _polars_agg_expr(pl, column: str, func: str, alias: str):
+    if func == "count":
+        return pl.col(column).count().alias(alias)
+    if func == "nunique":
+        return pl.col(column).drop_nulls().n_unique().alias(alias)
+    if func == "sum":
+        return (
+            pl.when(pl.col(column).count() == 0)
+            .then(None)
+            .otherwise(pl.col(column).sum())
+            .alias(alias)
+        )
+    if func == "any":
+        return (
+            pl.when(pl.col(column).count() == 0)
+            .then(None)
+            .otherwise(pl.col(column).max())
+            .alias(alias)
+        )
+    if func == "all":
+        return (
+            pl.when(pl.col(column).count() == 0)
+            .then(None)
+            .otherwise(pl.col(column).min())
+            .alias(alias)
+        )
+    return getattr(pl.col(column), func)().alias(alias)
 
 
 class PolarsBackend(Backend):
@@ -62,8 +98,10 @@ class PolarsBackend(Backend):
                 elif kind == "tuple_absence_filter":
                     mask = _tuple_absence_mask(pl, df, frames[op["table"]], op)
                     df = df.filter(mask)
+                elif kind == "row_number_filter":
+                    df = _polars_row_number_filter(pl, df, op)
                 elif kind == "running_sum":
-                    keys = normalize_sort_keys({"keys": op["order_by"]})
+                    keys = running_sum_sort_keys(op)
                     df = df.sort(
                         [key.column for key in keys],
                         descending=[not key.ascending for key in keys],
@@ -89,6 +127,11 @@ class PolarsBackend(Backend):
                     df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "round_even_probe":
                     df = pl.DataFrame({op["as"]: [False]})
+                elif kind == "float_literal_precision_probe":
+                    df = pl.DataFrame({op["as"]: [False]})
+                elif kind == "timestamp_precision_filter_probe":
+                    mismatch = _polars_timestamp_precision_filter_mismatch(pl)
+                    df = pl.DataFrame({op["as"]: [mismatch]})
                 elif kind == "series_rtruediv_probe":
                     mismatch = _polars_series_rtruediv_mismatch(pl)
                     df = pl.DataFrame({op["as"]: [mismatch]})
@@ -118,7 +161,11 @@ class PolarsBackend(Backend):
                     df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "eval_inplace_alias_probe":
                     df = pl.DataFrame({op["as"]: [False]})
+                elif kind == "bool_reduction_skipna_probe":
+                    df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "dataset_isin_all_match_probe":
+                    df = pl.DataFrame({op["as"]: [False]})
+                elif kind == "run_end_null_compute_probe":
                     df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "large_string_partition_probe":
                     df = pl.DataFrame({op["as"]: [False]})
@@ -126,6 +173,9 @@ class PolarsBackend(Backend):
                     df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "rolling_mean_by_null_count_probe":
                     mismatch = _polars_rolling_mean_by_null_count_mismatch(pl, lazy=False)
+                    df = pl.DataFrame({op["as"]: [mismatch]})
+                elif kind == "csv_long_numeric_roundtrip_probe":
+                    mismatch = _polars_csv_long_numeric_roundtrip_mismatch(pl, op, lazy=False)
                     df = pl.DataFrame({op["as"]: [mismatch]})
                 elif kind == "select":
                     df = df.select(list(op["columns"]))
@@ -171,6 +221,10 @@ class PolarsBackend(Backend):
                         )
                     elif expr["kind"] == "string_lower":
                         df = df.with_columns(pl.col(expr["source"]).str.to_lowercase().alias(op["column"]))
+                    elif expr["kind"] == "string_basename":
+                        df = df.with_columns(
+                            pl.col(expr["source"]).str.replace(r"^.*[\\/]", "").alias(op["column"])
+                        )
                     else:
                         raise ValueError(expr["kind"])
                 elif kind == "groupby":
@@ -178,37 +232,13 @@ class PolarsBackend(Backend):
                     aggs = []
                     for agg in op["aggs"]:
                         col, func, alias = agg["column"], agg["func"], agg["as"]
-                        if func == "count":
-                            aggs.append(pl.col(col).count().alias(alias))
-                        elif func == "nunique":
-                            aggs.append(pl.col(col).drop_nulls().n_unique().alias(alias))
-                        elif func == "sum":
-                            aggs.append(
-                                pl.when(pl.col(col).count() == 0)
-                                .then(None)
-                                .otherwise(pl.col(col).sum())
-                                .alias(alias)
-                            )
-                        else:
-                            aggs.append(getattr(pl.col(col), func)().alias(alias))
+                        aggs.append(_polars_agg_expr(pl, col, func, alias))
                     df = df.group_by(keys, maintain_order=True).agg(aggs)
                 elif kind == "aggregate":
                     aggs = []
                     for agg in op["aggs"]:
                         col, func, alias = agg["column"], agg["func"], agg["as"]
-                        if func == "count":
-                            aggs.append(pl.col(col).count().alias(alias))
-                        elif func == "nunique":
-                            aggs.append(pl.col(col).drop_nulls().n_unique().alias(alias))
-                        elif func == "sum":
-                            aggs.append(
-                                pl.when(pl.col(col).count() == 0)
-                                .then(None)
-                                .otherwise(pl.col(col).sum())
-                                .alias(alias)
-                            )
-                        else:
-                            aggs.append(getattr(pl.col(col), func)().alias(alias))
+                        aggs.append(_polars_agg_expr(pl, col, func, alias))
                     df = df.select(aggs)
                 else:
                     raise ValueError(kind)
@@ -219,6 +249,12 @@ class PolarsBackend(Backend):
 
 class PolarsLazyBackend(PolarsBackend):
     name = "polars_lazy"
+    collect_engine: str | None = None
+
+    def _collect_lazy_frame(self, lazy_frame):
+        if self.collect_engine is None:
+            return lazy_frame.collect()
+        return lazy_frame.collect(engine=self.collect_engine)
 
     def run(self, tables: list[TableData], program: Program, timeout_s: float = 5.0) -> BackendResult:
         start = time.perf_counter()
@@ -263,8 +299,10 @@ class PolarsLazyBackend(PolarsBackend):
                     right_df = frames[op["table"]].collect()
                     mask = _tuple_absence_mask(pl, left_df, right_df, op)
                     lf = left_df.filter(mask).lazy()
+                elif kind == "row_number_filter":
+                    lf = _polars_row_number_filter(pl, lf.collect(), op).lazy()
                 elif kind == "running_sum":
-                    keys = normalize_sort_keys({"keys": op["order_by"]})
+                    keys = running_sum_sort_keys(op)
                     lf = lf.sort(
                         [key.column for key in keys],
                         descending=[not key.ascending for key in keys],
@@ -290,6 +328,11 @@ class PolarsLazyBackend(PolarsBackend):
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "round_even_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "float_literal_precision_probe":
+                    lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "timestamp_precision_filter_probe":
+                    mismatch = _polars_timestamp_precision_filter_mismatch(pl, collect=self._collect_lazy_frame)
+                    lf = pl.DataFrame({op["as"]: [mismatch]}).lazy()
                 elif kind == "series_rtruediv_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "uint64_isin_probe":
@@ -318,7 +361,11 @@ class PolarsLazyBackend(PolarsBackend):
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "eval_inplace_alias_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "bool_reduction_skipna_probe":
+                    lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "dataset_isin_all_match_probe":
+                    lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "run_end_null_compute_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "large_string_partition_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
@@ -326,6 +373,14 @@ class PolarsLazyBackend(PolarsBackend):
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "rolling_mean_by_null_count_probe":
                     mismatch = _polars_rolling_mean_by_null_count_mismatch(pl, lazy=True)
+                    lf = pl.DataFrame({op["as"]: [mismatch]}).lazy()
+                elif kind == "csv_long_numeric_roundtrip_probe":
+                    mismatch = _polars_csv_long_numeric_roundtrip_mismatch(
+                        pl,
+                        op,
+                        lazy=True,
+                        collect=self._collect_lazy_frame,
+                    )
                     lf = pl.DataFrame({op["as"]: [mismatch]}).lazy()
                 elif kind == "select":
                     lf = lf.select(list(op["columns"]))
@@ -369,6 +424,10 @@ class PolarsLazyBackend(PolarsBackend):
                         )
                     elif expr["kind"] == "string_lower":
                         lf = lf.with_columns(pl.col(expr["source"]).str.to_lowercase().alias(op["column"]))
+                    elif expr["kind"] == "string_basename":
+                        lf = lf.with_columns(
+                            pl.col(expr["source"]).str.replace(r"^.*[\\/]", "").alias(op["column"])
+                        )
                     else:
                         raise ValueError(expr["kind"])
                 elif kind == "groupby":
@@ -376,43 +435,24 @@ class PolarsLazyBackend(PolarsBackend):
                     aggs = []
                     for agg in op["aggs"]:
                         col, func, alias = agg["column"], agg["func"], agg["as"]
-                        if func == "count":
-                            aggs.append(pl.col(col).count().alias(alias))
-                        elif func == "nunique":
-                            aggs.append(pl.col(col).drop_nulls().n_unique().alias(alias))
-                        elif func == "sum":
-                            aggs.append(
-                                pl.when(pl.col(col).count() == 0)
-                                .then(None)
-                                .otherwise(pl.col(col).sum())
-                                .alias(alias)
-                            )
-                        else:
-                            aggs.append(getattr(pl.col(col), func)().alias(alias))
+                        aggs.append(_polars_agg_expr(pl, col, func, alias))
                     lf = lf.group_by(keys).agg(aggs)
                 elif kind == "aggregate":
                     aggs = []
                     for agg in op["aggs"]:
                         col, func, alias = agg["column"], agg["func"], agg["as"]
-                        if func == "count":
-                            aggs.append(pl.col(col).count().alias(alias))
-                        elif func == "nunique":
-                            aggs.append(pl.col(col).drop_nulls().n_unique().alias(alias))
-                        elif func == "sum":
-                            aggs.append(
-                                pl.when(pl.col(col).count() == 0)
-                                .then(None)
-                                .otherwise(pl.col(col).sum())
-                                .alias(alias)
-                            )
-                        else:
-                            aggs.append(getattr(pl.col(col), func)().alias(alias))
+                        aggs.append(_polars_agg_expr(pl, col, func, alias))
                     lf = lf.select(aggs)
                 else:
                     raise ValueError(kind)
-            return BackendResult(self.name, "ok", data=lf.collect(), duration_ms=(time.perf_counter()-start)*1000)
+            return BackendResult(self.name, "ok", data=self._collect_lazy_frame(lf), duration_ms=(time.perf_counter()-start)*1000)
         except Exception as exc:  # noqa: BLE001
             return BackendResult(self.name, "error", error_type=type(exc).__name__, error=str(exc), duration_ms=(time.perf_counter()-start)*1000)
+
+
+class PolarsStreamingBackend(PolarsLazyBackend):
+    name = "polars_streaming"
+    collect_engine = "streaming"
 
 
 def _polars_dtype(pl, kind: str):
@@ -436,13 +476,25 @@ def _tuple_absence_mask(pl, df, right_df, op: dict):
     return pl.Series("__datadiff_tuple_absence", mask, dtype=pl.Boolean)
 
 
+def _polars_row_number_filter(pl, df, op: dict):
+    rows = row_number_filter_rows(df.to_dicts(), op)
+    return pl.DataFrame(rows, schema=df.schema)
+
+
 def _polars_running_sum_expr(pl, op: dict):
     source = pl.col(op["source"])
     if op.get("input_dtype") == "float32":
         source = source.cast(pl.Float32)
     else:
         source = source.cast(pl.Float64)
-    return source.cum_sum().alias(op["column"])
+    partition_columns = [str(column) for column in op.get("partition_by", []) or []]
+    running = source.fill_null(0).cum_sum()
+    non_null_count = source.is_not_null().cum_sum()
+    if partition_columns:
+        running = running.over(partition_columns)
+        non_null_count = non_null_count.over(partition_columns)
+    expr = pl.when(non_null_count == 0).then(None).otherwise(running)
+    return expr.alias(op["column"])
 
 
 def _polars_is_sorted(series, op: dict) -> bool:
@@ -551,6 +603,16 @@ def _polars_float_wrap_mismatch(pl, *, lazy: bool) -> bool:
     return observed_float != expected or observed_int != expected
 
 
+def _polars_timestamp_precision_filter_mismatch(pl, collect=None) -> bool:
+    frame = pl.DataFrame({"ts": [1]}, schema={"ts": pl.Datetime("us")})
+    predicate = pl.col("ts") < pl.lit(1_500, dtype=pl.Datetime("ns"))
+    if collect is None:
+        result = frame.filter(predicate)
+    else:
+        result = collect(frame.lazy().filter(predicate))
+    return result.height != 1
+
+
 def _polars_empty_literal_groupby_mismatch(pl, *, lazy: bool) -> bool:
     frame = pl.DataFrame({})
     if lazy:
@@ -588,6 +650,18 @@ def _polars_rolling_mean_by_null_count_mismatch(pl, *, lazy: bool) -> bool:
     if lazy:
         result = result.collect()
     return result.get_column("observed").to_list() != [None, 400.5, None]
+
+
+def _polars_csv_long_numeric_roundtrip_mismatch(pl, op: dict, *, lazy: bool, collect=None) -> bool:
+    expected_values = csv_long_numeric_values(op)
+    with long_numeric_csv_path(expected_values) as csv_path:
+        if lazy:
+            frame = pl.scan_csv(str(csv_path))
+            frame = collect(frame) if collect is not None else frame.collect()
+        else:
+            frame = pl.read_csv(str(csv_path))
+        observed_values = frame.get_column("value").to_list()
+    return csv_long_numeric_roundtrip_mismatch(observed_values, expected_values)
 
 
 def _polars_filter_expr(col, comparator: str, value):

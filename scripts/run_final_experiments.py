@@ -48,6 +48,11 @@ LIVE_DISCOVERY_SUITES: tuple[tuple[str, str, str], ...] = (
         "Latest-version DataFusion differential discovery against pandas and DuckDB references.",
     ),
     (
+        "datafusion_cross",
+        "live_datafusion_fresh",
+        "Latest-version DataFusion fresh discovery over non-groupby surfaces using the same shared harness.",
+    ),
+    (
         "dataframe_lazy",
         "live_polars_lazy",
         "Latest-version Polars eager/lazy consistency discovery.",
@@ -66,6 +71,31 @@ LIVE_DISCOVERY_SUITES: tuple[tuple[str, str, str], ...] = (
         "latest_all_engines",
         "live_cross_family",
         "Broad latest-version cross-family discovery over every implemented real backend.",
+    ),
+    (
+        "latest_no_datafusion",
+        "live_cross_family",
+        "Broad latest-version cross-family discovery excluding DataFusion to avoid known DataFusion saturation.",
+    ),
+    (
+        "polars_cross",
+        "live_polars_issue_focus",
+        "Latest-version Polars-focused discovery using fresh-safe issue-inspired semantic sketches.",
+    ),
+    (
+        "embedded_sql_cross",
+        "live_duckdb_issue_focus",
+        "Latest-version DuckDB/SQLite/Pandas discovery using fresh-safe issue-inspired SQL sketches.",
+    ),
+    (
+        "arrow_cross",
+        "live_arrow_issue_focus",
+        "Latest-version Arrow/PyArrow discovery using fresh-safe issue-inspired Arrow sketches.",
+    ),
+    (
+        "latest_no_datafusion",
+        "live_issue_focus",
+        "Broad non-DataFusion latest-version discovery over fresh-safe issue-inspired sketches.",
     ),
 )
 

@@ -14,10 +14,16 @@ from datadiff.reward import (
     candidate_bug_family_keys,
     candidate_bug_signatures,
     is_candidate_bug_finding,
+    is_rewardable_candidate_bug_finding,
     issue_replay_candidate_bug_family_keys,
     row_reward_signals,
 )
-from datadiff.running import sort_rows_for_running, stable_running_sum_values
+from datadiff.running import (
+    running_sum_partition_columns,
+    running_sum_sort_keys,
+    sort_rows_for_running,
+    stable_running_sum_values,
+)
 from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
 from datadiff.util import unique_preserve_order
@@ -37,7 +43,19 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "numeric": {"type:int", "type:float", "has:negative_number", "has:fractional_float"},
     "edge_float": {"has:special_float", "has:fractional_float"},
     "empty": {"rows:empty", "op:limit_zero"},
-    "aggregation": {"op:groupby", "op:aggregate", "agg:sum", "agg:min", "agg:max", "agg:count"},
+    "aggregation": {
+        "op:groupby",
+        "op:aggregate",
+        "agg:sum",
+        "agg:mean",
+        "agg:min",
+        "agg:max",
+        "agg:count",
+        "agg:nunique",
+        "agg:any",
+        "agg:all",
+    },
+    "numeric_mean_aggregate": {"agg:mean"},
     "global_aggregation": {"op:aggregate"},
     "null_groupby_topk": {"pattern:null_groupby_topk"},
     "null_agg_topk": {"pattern:null_agg_topk"},
@@ -56,6 +74,11 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "global_null_aggregate": {"pattern:global_null_aggregate"},
     "string_count_groupby": {"pattern:string_count_groupby"},
     "unique_count_groupby": {"pattern:unique_count_groupby"},
+    "bool_null_groupby_agg": {"pattern:bool_null_groupby_agg"},
+    "boolean_aggregation": {"agg:boolean", "agg:min:bool", "agg:max:bool", "agg:any:bool", "agg:all:bool"},
+    "bool_any_all": {"agg:any:bool", "agg:all:bool"},
+    "large_int_filter_groupby": {"pattern:large_int_filter_groupby"},
+    "large_integer": {"int:large-magnitude"},
     "unique_count": {"agg:nunique"},
     "set_membership_filter": {"pattern:set_membership_filter"},
     "set_membership": {"filter:set-membership"},
@@ -75,6 +98,11 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "row_value_absence": {"filter:tuple-absence", "nulls:ternary-membership"},
     "running_sum_precision": {"pattern:running_sum_precision"},
     "running_sum": {"op:running_sum"},
+    "partitioned_running_sum": {"pattern:partitioned_running_sum"},
+    "running_sum_partitioned": {"running:partitioned"},
+    "path_basename_keyed_pick": {"pattern:path_basename_keyed_pick"},
+    "path_projection": {"expr:string_basename"},
+    "keyed_row_pick": {"op:row_number_filter"},
     "sortedness_null_placement": {"pattern:sortedness_null_placement"},
     "sortedness": {"op:sortedness_check"},
     "simple_case_random_subject": {"pattern:simple_case_random_subject"},
@@ -98,6 +126,12 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "round_even_float_scale": {"pattern:round_even_float_scale"},
     "round_even_probe": {"op:round_even_probe"},
     "rounding": {"numeric:round-even", "float:decimal-scale"},
+    "duckdb_float_literal_precision": {"pattern:duckdb_float_literal_precision"},
+    "float_literal_precision_probe": {"op:float_literal_precision_probe"},
+    "float_literal_precision": {"duckdb:float-literal-precision", "float:literal-cast-consistency"},
+    "polars_timestamp_precision_filter": {"pattern:polars_timestamp_precision_filter"},
+    "timestamp_precision_filter_probe": {"op:timestamp_precision_filter_probe"},
+    "timestamp_precision_filter": {"polars:timestamp-precision-filter", "timestamp:precision-filter"},
     "series_rtruediv_operand_order": {"pattern:series_rtruediv_operand_order"},
     "series_rtruediv_probe": {"op:series_rtruediv_probe"},
     "polars_reverse_division_columns": {"pattern:polars_reverse_division_columns"},
@@ -142,9 +176,15 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "pandas_eval_inplace_aliasing_semantics": {"pattern:pandas_eval_inplace_aliasing_semantics"},
     "eval_inplace_alias_probe": {"op:eval_inplace_alias_probe"},
     "eval_inplace_aliasing": {"pandas:eval-inplace-alias", "copy:on-write-alias"},
+    "pandas_bool_reduction_skipna_semantics": {"pattern:pandas_bool_reduction_skipna_semantics"},
+    "bool_reduction_skipna_probe": {"op:bool_reduction_skipna_probe"},
+    "bool_reduction_skipna": {"pandas:bool-reduction-skipna", "nullable-bool:reduction"},
     "pyarrow_dataset_isin_all_match_semantics": {"pattern:pyarrow_dataset_isin_all_match_semantics"},
     "dataset_isin_all_match_probe": {"op:dataset_isin_all_match_probe"},
     "dataset_membership_filter": {"pyarrow:dataset-isin-all-match", "dataset:membership-filter"},
+    "pyarrow_run_end_null_compute_semantics": {"pattern:pyarrow_run_end_null_compute_semantics"},
+    "run_end_null_compute_probe": {"op:run_end_null_compute_probe"},
+    "run_end_null_compute": {"pyarrow:run-end-null-compute", "run_end:null-compute"},
     "pyarrow_large_string_partition_schema_semantics": {"pattern:pyarrow_large_string_partition_schema_semantics"},
     "large_string_partition_probe": {"op:large_string_partition_probe"},
     "large_string_partition": {"pyarrow:large-string-partition", "dataset:partition-schema"},
@@ -154,6 +194,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "polars_rolling_mean_by_null_count_semantics": {"pattern:polars_rolling_mean_by_null_count_semantics"},
     "rolling_mean_by_null_count_probe": {"op:rolling_mean_by_null_count_probe"},
     "rolling_temporal_nulls": {"polars:rolling-mean-by-null-count", "rolling:temporal-min-samples"},
+    "csv_long_numeric_roundtrip": {"pattern:csv_long_numeric_roundtrip"},
+    "csv_long_numeric_roundtrip_probe": {"op:csv_long_numeric_roundtrip_probe"},
+    "csv_numeric_inference": {"csv:long-numeric-roundtrip", "csv:numeric-inference", "numeric:long-identifier"},
     "join": {"op:join", "tables:multi"},
     "common_workflow": {"combo_frequency:high"},
     "operation_combo": {"combo_frequency:high", "combo_frequency:medium"},
@@ -227,6 +270,8 @@ def extract_case_features(case: Case) -> set[str]:
             elif isinstance(value, bool):
                 features.add(f"bool:{str(value).lower()}")
             elif isinstance(value, int):
+                if abs(value) > 2**53:
+                    features.add("int:large-magnitude")
                 if value < 0:
                     features.add("has:negative_number")
                 elif value == 0:
@@ -252,12 +297,17 @@ def extract_case_features(case: Case) -> set[str]:
     available_types = {column.name: column.type for column in table.columns}
     has_string_count_groupby = False
     has_unique_count_groupby = False
+    has_bool_groupby_agg = False
     has_set_membership_filter = False
     has_null_predicate_filter = False
     has_boolean_predicate_filter = False
     has_range_filter = False
     has_tuple_absence_filter = False
     has_running_sum_precision = False
+    has_partitioned_running_sum = False
+    has_path_basename_keyed_pick = False
+    has_string_basename_expr = False
+    has_row_number_filter = False
     has_sortedness_check = False
     has_random_case_probe = False
     has_group_quantile_probe = False
@@ -266,6 +316,8 @@ def extract_case_features(case: Case) -> set[str]:
     has_struct_distinct_probe = False
     has_bit_compare_probe = False
     has_round_even_probe = False
+    has_float_literal_precision_probe = False
+    has_timestamp_precision_filter_probe = False
     has_series_rtruediv_probe = False
     has_uint64_isin_probe = False
     has_tuple_anti_null_probe = False
@@ -279,10 +331,13 @@ def extract_case_features(case: Case) -> set[str]:
     has_arrow_timestamp_loc_slice_probe = False
     has_arrow_timestamp_index_attr_probe = False
     has_eval_inplace_alias_probe = False
+    has_bool_reduction_skipna_probe = False
     has_dataset_isin_all_match_probe = False
+    has_run_end_null_compute_probe = False
     has_large_string_partition_probe = False
     has_hash_pivot_wider_probe = False
     has_rolling_mean_by_null_count_probe = False
+    has_csv_long_numeric_roundtrip_probe = False
     for op in case.program.operations:
         kind = str(op.get("op", "unknown"))
         op_names.append(kind)
@@ -317,11 +372,24 @@ def extract_case_features(case: Case) -> set[str]:
         elif kind == "tuple_absence_filter":
             features.add("filter:tuple-absence")
             has_tuple_absence_filter = True
+        elif kind == "row_number_filter":
+            partition_count = len(op.get("partition_by", []) or [])
+            order_count = len(op.get("order_by", []) or [])
+            features.add("row_pick:keyed")
+            features.add(f"row_pick:cmp:{op.get('cmp', 'unknown')}")
+            features.add(_bucket("row_pick_partition_count", partition_count, [(0, "none"), (1, "one")], "many"))
+            features.add(_bucket("row_pick_order_count", order_count, [(1, "one"), (2, "two")], "many"))
+            has_row_number_filter = True
+            if has_string_basename_expr:
+                has_path_basename_keyed_pick = True
         elif kind == "running_sum":
             source = str(op.get("source", ""))
             input_dtype = str(op.get("input_dtype", "float64"))
             features.add(f"running:{input_dtype}")
             features.add(f"running_source_type:{available_types.get(source, 'derived')}")
+            if op.get("partition_by"):
+                features.add("running:partitioned")
+                has_partitioned_running_sum = True
             if input_dtype == "float32":
                 has_running_sum_precision = True
             available_types[str(op.get("column", "derived"))] = "float"
@@ -369,6 +437,18 @@ def extract_case_features(case: Case) -> set[str]:
             features.add("float:decimal-scale")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_round_even_probe = True
+        elif kind == "float_literal_precision_probe":
+            features.add("duckdb:float-literal-precision")
+            features.add("float:literal-cast-consistency")
+            features.add("float:decimal-literal")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_float_literal_precision_probe = True
+        elif kind == "timestamp_precision_filter_probe":
+            features.add("polars:timestamp-precision-filter")
+            features.add("timestamp:precision-filter")
+            features.add("timestamp:unit-cast")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_timestamp_precision_filter_probe = True
         elif kind == "series_rtruediv_probe":
             features.add("series:reverse-division")
             features.add("arithmetic:operand-order")
@@ -437,11 +517,21 @@ def extract_case_features(case: Case) -> set[str]:
             features.add("copy:on-write-alias")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_eval_inplace_alias_probe = True
+        elif kind == "bool_reduction_skipna_probe":
+            features.add("pandas:bool-reduction-skipna")
+            features.add("nullable-bool:reduction")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_bool_reduction_skipna_probe = True
         elif kind == "dataset_isin_all_match_probe":
             features.add("pyarrow:dataset-isin-all-match")
             features.add("dataset:membership-filter")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_dataset_isin_all_match_probe = True
+        elif kind == "run_end_null_compute_probe":
+            features.add("pyarrow:run-end-null-compute")
+            features.add("run_end:null-compute")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_run_end_null_compute_probe = True
         elif kind == "large_string_partition_probe":
             features.add("pyarrow:large-string-partition")
             features.add("dataset:partition-schema")
@@ -457,6 +547,13 @@ def extract_case_features(case: Case) -> set[str]:
             features.add("rolling:temporal-min-samples")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_rolling_mean_by_null_count_probe = True
+        elif kind == "csv_long_numeric_roundtrip_probe":
+            features.add("csv:long-numeric-roundtrip")
+            features.add("csv:numeric-inference")
+            features.add("numeric:long-identifier")
+            features.add(_bucket("csv_probe_values", len(op.get("values", [])), [(3, "few"), (6, "several")], "many"))
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_csv_long_numeric_roundtrip_probe = True
         elif kind == "select":
             width = len(op.get("columns", []))
             features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
@@ -509,13 +606,25 @@ def extract_case_features(case: Case) -> set[str]:
                 available_types[output_column] = "int"
             elif expr_kind == "string_lower":
                 available_types[output_column] = "str"
+            elif expr_kind == "string_basename":
+                features.add("path:basename")
+                available_types[output_column] = "str"
+                has_string_basename_expr = True
+                if has_row_number_filter:
+                    has_path_basename_keyed_pick = True
         elif kind == "groupby":
             for key in op.get("keys", []):
                 features.add(f"group_key_type:{available_types.get(key, 'derived')}")
             for agg in op.get("aggs", []):
                 source_type = available_types.get(str(agg.get("column", "")), "derived")
-                features.add(f"agg:{agg.get('func', 'unknown')}")
+                func = str(agg.get("func", "unknown"))
+                features.add(f"agg:{func}")
                 features.add(f"agg_source_type:{source_type}")
+                if source_type == "bool":
+                    features.add("agg:boolean")
+                    features.add(f"agg:{func}:bool")
+                    if func in {"min", "max", "count", "nunique", "any", "all"}:
+                        has_bool_groupby_agg = True
                 if agg.get("func") == "count" and source_type == "str":
                     features.add("agg:count:str")
                     has_string_count_groupby = True
@@ -529,8 +638,12 @@ def extract_case_features(case: Case) -> set[str]:
         elif kind == "aggregate":
             for agg in op.get("aggs", []):
                 source_type = available_types.get(str(agg.get("column", "")), "derived")
-                features.add(f"agg:{agg.get('func', 'unknown')}")
+                func = str(agg.get("func", "unknown"))
+                features.add(f"agg:{func}")
                 features.add(f"agg_source_type:{source_type}")
+                if source_type == "bool":
+                    features.add("agg:boolean")
+                    features.add(f"agg:{func}:bool")
                 if agg.get("func") == "count" and source_type == "str":
                     features.add("agg:count:str")
                 if agg.get("func") == "nunique":
@@ -587,6 +700,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:string_count_groupby")
     if has_unique_count_groupby:
         features.add("pattern:unique_count_groupby")
+    if has_bool_groupby_agg:
+        features.add("pattern:bool_null_groupby_agg")
     if has_set_membership_filter:
         features.add("pattern:set_membership_filter")
     if _has_groupby_filter_cast_membership_pattern(case.program.operations):
@@ -603,8 +718,18 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:tuple_absence_filter")
     if generator_profile == "row_value_absence_filter" or mixed_generator_profile == "row_value_absence_filter":
         features.add("pattern:row_value_absence_filter")
+    if generator_profile == "large_int_filter_groupby" or mixed_generator_profile == "large_int_filter_groupby":
+        features.add("pattern:large_int_filter_groupby")
     if has_running_sum_precision or _has_running_sum_precision_pattern(case.program.operations):
         features.add("pattern:running_sum_precision")
+    if has_partitioned_running_sum or generator_profile == "partitioned_running_sum":
+        features.add("pattern:partitioned_running_sum")
+    if (
+        has_path_basename_keyed_pick
+        or generator_profile == "path_basename_keyed_pick"
+        or mixed_generator_profile == "path_basename_keyed_pick"
+    ):
+        features.add("pattern:path_basename_keyed_pick")
     if has_sortedness_check and _has_sortedness_null_placement_pattern(case.program.operations):
         features.add("pattern:sortedness_null_placement")
     if has_random_case_probe:
@@ -621,6 +746,10 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:bit_compare_unequal_length")
     if has_round_even_probe:
         features.add("pattern:round_even_float_scale")
+    if has_float_literal_precision_probe:
+        features.add("pattern:duckdb_float_literal_precision")
+    if has_timestamp_precision_filter_probe:
+        features.add("pattern:polars_timestamp_precision_filter")
     if has_series_rtruediv_probe:
         features.add("pattern:series_rtruediv_operand_order")
     if _has_reverse_division_columns_pattern(case.program.operations):
@@ -649,14 +778,20 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:pandas_arrow_timestamp_index_attr_semantics")
     if has_eval_inplace_alias_probe:
         features.add("pattern:pandas_eval_inplace_aliasing_semantics")
+    if has_bool_reduction_skipna_probe:
+        features.add("pattern:pandas_bool_reduction_skipna_semantics")
     if has_dataset_isin_all_match_probe:
         features.add("pattern:pyarrow_dataset_isin_all_match_semantics")
+    if has_run_end_null_compute_probe:
+        features.add("pattern:pyarrow_run_end_null_compute_semantics")
     if has_large_string_partition_probe:
         features.add("pattern:pyarrow_large_string_partition_schema_semantics")
     if has_hash_pivot_wider_probe:
         features.add("pattern:pyarrow_hash_pivot_wider_order_semantics")
     if has_rolling_mean_by_null_count_probe:
         features.add("pattern:polars_rolling_mean_by_null_count_semantics")
+    if has_csv_long_numeric_roundtrip_probe:
+        features.add("pattern:csv_long_numeric_roundtrip")
     return features
 
 
@@ -796,6 +931,11 @@ class GuidanceState:
         contributing = _prefer_unsaturated_decisions(
             contributing,
             scored,
+            _decision_has_profile_saturation,
+        )
+        contributing = _prefer_unsaturated_decisions(
+            contributing,
+            scored,
             _decision_has_family_saturation,
         )
         pruned = len(scored) - len(contributing)
@@ -825,6 +965,9 @@ class GuidanceState:
     def record_result(self, case: Case, row: dict[str, Any]) -> None:
         features = extract_case_features(case)
         self.feature_counts.update(features)
+        issue_inspired_case_sources = _issue_inspired_case_source_issue_keys(features)
+        if issue_inspired_case_sources:
+            self.issue_inspired_source_counts.update(issue_inspired_case_sources)
         _, frontier_buckets = _frontier_signature(case)
         self.frontier_bucket_counts.update(frontier_buckets)
         self.online_weights.record(
@@ -846,12 +989,23 @@ class GuidanceState:
             for finding in findings:
                 root = str(finding.get("root_cause", "unknown"))
                 self.root_cause_counts[root] += 1
-            self.candidate_bug_family_counts.update(candidate_bug_family_keys(findings))
+            self.candidate_bug_family_counts.update(
+                candidate_bug_family_keys(
+                    findings,
+                    known_saturated_bug_families=self.known_saturated_bug_families,
+                )
+            )
             issue_replay_families = issue_replay_candidate_bug_family_keys(findings)
             self.issue_replay_family_counts.update(issue_replay_families)
             self.issue_replay_count += sum(issue_replay_families.values())
-            self.issue_inspired_source_counts.update(_issue_inspired_candidate_source_issue_keys(findings))
-            self.candidate_bug_signature_counts.update(candidate_bug_signatures(findings))
+            if not issue_inspired_case_sources:
+                self.issue_inspired_source_counts.update(_issue_inspired_candidate_source_issue_keys(findings))
+            self.candidate_bug_signature_counts.update(
+                candidate_bug_signatures(
+                    findings,
+                    known_saturated_bug_families=self.known_saturated_bug_families,
+                )
+            )
 
     def _score_case(self, case: Case, candidate_count: int) -> GuidanceDecision:
         features = extract_case_features(case)
@@ -883,10 +1037,11 @@ class GuidanceState:
             * 0.08
         )
         profile_saturation_penalty = sum(
-            _profile_saturation(self.finding_feature_counts[f])
+            _profile_saturation(self.feature_counts[f])
             for f in features
             if f.startswith("mixed_generator_profile:")
         )
+        profile_saturation_active = profile_saturation_penalty > 0.0
         predicted_roots = _predicted_roots(features)
         root_saturation_penalty = sum(
             _root_saturation(self.root_cause_counts[root]) for root in predicted_roots
@@ -1029,6 +1184,7 @@ class GuidanceState:
                 "feature_saturation_penalty": -feature_saturation_penalty,
                 "root_saturation_penalty": -root_saturation_penalty,
                 "profile_saturation_penalty": -profile_saturation_penalty,
+                "profile_saturation_active": 1.0 if profile_saturation_active else 0.0,
                 "family_saturation_penalty": -family_saturation_penalty,
                 "family_saturation_active": (
                     1.0 if (family_saturation_active or issue_replay_saturation_active_any) else 0.0
@@ -1062,16 +1218,28 @@ class GuidanceState:
         return contribution_potential >= 1.15
 
 
-def _targeted_decision_key(decision: GuidanceDecision) -> tuple[float, float, float, float, int]:
+def _targeted_decision_key(decision: GuidanceDecision) -> tuple[float, ...]:
     specific_matches = decision.score_breakdown.get("specific_target_matches", 0.0)
     target_priority = decision.score_breakdown.get("target_priority", float(len(decision.matched_targets)))
+    profile_penalty = decision.score_breakdown.get("profile_saturation_penalty", 0.0)
     if specific_matches > 0.0:
-        return (1.0, specific_matches, target_priority, decision.score, -decision.case.seed)
-    return (0.0, decision.score, target_priority, float(len(decision.matched_targets)), -decision.case.seed)
+        return (1.0, profile_penalty, specific_matches, target_priority, decision.score, -decision.case.seed)
+    return (
+        0.0,
+        profile_penalty,
+        decision.score,
+        target_priority,
+        float(len(decision.matched_targets)),
+        -decision.case.seed,
+    )
 
 
 def _decision_has_family_saturation(decision: GuidanceDecision) -> bool:
     return decision.score_breakdown.get("family_saturation_active", 0.0) > 0.0
+
+
+def _decision_has_profile_saturation(decision: GuidanceDecision) -> bool:
+    return decision.score_breakdown.get("profile_saturation_active", 0.0) > 0.0
 
 
 def _decision_has_issue_replay_global_saturation(decision: GuidanceDecision) -> bool:
@@ -1263,6 +1431,18 @@ def _issue_inspired_candidate_source_issue_keys(findings: list[dict[str, Any]]) 
     return keys
 
 
+def _issue_inspired_case_source_issue_keys(features: set[str]) -> Counter[str]:
+    keys: Counter[str] = Counter()
+    if "source:issue_inspired" not in features:
+        return keys
+    for feature in features:
+        if feature.startswith("source_issue:"):
+            source_key = _source_issue_key(feature.split(":", 1)[1])
+            if source_key:
+                keys[source_key] += 1
+    return keys
+
+
 def _max_source_issue_hits(features: set[str], *, source_counts: Counter[str]) -> int:
     hits = [
         source_counts[feature.split(":", 1)[1]]
@@ -1300,7 +1480,8 @@ def _guidance_reward(
     known_saturated_bug_families: list[str] | None = None,
 ) -> float:
     findings = row.get("findings") or []
-    signals = row_reward_signals(row)
+    known_families = known_saturated_bug_families or []
+    signals = row_reward_signals(row, known_saturated_bug_families=known_families)
     root_counts = Counter(root_cause_counts or {})
     family_counts = Counter(candidate_bug_family_counts or {})
     signature_counts = Counter(candidate_bug_signature_counts or {})
@@ -1313,7 +1494,7 @@ def _guidance_reward(
             enable_family_saturation=enable_family_saturation,
             family_saturation_threshold=family_saturation_threshold,
             saturated_family_reward=saturated_family_reward,
-            known_saturated_bug_families=known_saturated_bug_families or [],
+            known_saturated_bug_families=known_families,
         )
         + 0.20 * signals["semantic_divergence_count"]
         + (0.5 if row.get("is_new_behavior") else 0.0)
@@ -1339,8 +1520,14 @@ def _candidate_bug_guidance_reward(
     saturated_family_reward: float,
     known_saturated_bug_families: list[str],
 ) -> float:
-    families = candidate_bug_family_keys(findings)
-    signatures = candidate_bug_signatures(findings)
+    families = candidate_bug_family_keys(
+        findings,
+        known_saturated_bug_families=known_saturated_bug_families,
+    )
+    signatures = candidate_bug_signatures(
+        findings,
+        known_saturated_bug_families=known_saturated_bug_families,
+    )
     if families:
         reward = 0.0
         for family in families:
@@ -1366,7 +1553,7 @@ def _candidate_bug_guidance_reward(
         return reward
     reward = 0.0
     for finding in findings:
-        if not is_candidate_bug_finding(finding):
+        if not is_rewardable_candidate_bug_finding(finding, known_saturated_bug_families):
             continue
         root = str(finding.get("root_cause", "unknown"))
         reward += _candidate_bug_novelty_reward(
@@ -1772,8 +1959,18 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "bool_reduction_skipna_probe":
+            score, op_buckets, samples = _bool_reduction_skipna_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "dataset_isin_all_match_probe":
             score, op_buckets, samples = _dataset_isin_all_match_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
+        elif kind == "run_end_null_compute_probe":
+            score, op_buckets, samples = _run_end_null_compute_frontier_score(op)
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
@@ -1789,6 +1986,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             last_sort_op = None
         elif kind == "rolling_mean_by_null_count_probe":
             score, op_buckets, samples = _rolling_mean_by_null_count_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
+        elif kind == "csv_long_numeric_roundtrip_probe":
+            score, op_buckets, samples = _csv_long_numeric_roundtrip_frontier_score(op)
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
@@ -2119,18 +2321,21 @@ def _running_sum_frontier_score(
     if not source or not column or source not in samples:
         return 0.0, buckets, samples
     try:
-        sort_keys = normalize_sort_keys({"keys": op.get("order_by", [])})
+        sort_keys = running_sum_sort_keys(op)
     except ValueError:
         return 0.0, buckets, samples
 
     rows = sort_rows_for_running(_rows_from_samples(samples), sort_keys)
-    running_values = stable_running_sum_values(rows, source)
+    partition_columns = running_sum_partition_columns(op)
+    running_values = stable_running_sum_values(rows, source, partition_columns)
     out_rows = [{**row, column: value} for row, value in zip(rows, running_values)]
     out_columns = [name for name in samples if name != column] + [column]
 
     input_dtype = str(op.get("input_dtype", "float64"))
     buckets.append("running:ordered")
     buckets.append(f"running:{input_dtype}")
+    if partition_columns:
+        buckets.append("running:partitioned")
     if len(values) >= 10_000:
         buckets.append("running:long")
     numeric_values = _numeric_values(values)
@@ -2144,6 +2349,7 @@ def _running_sum_frontier_score(
         + 0.20 * int("running:long" in buckets)
         + 0.15 * int("running:small-increment" in buckets)
         + 0.05 * int("running:null-source" in buckets)
+        + 0.10 * int("running:partitioned" in buckets)
     )
     return min(1.0, score), buckets, _samples_from_rows(out_rows, out_columns)
 
@@ -2320,9 +2526,21 @@ def _eval_inplace_alias_frontier_score(op: dict[str, Any]) -> tuple[float, list[
     return 0.90, buckets, {alias: [False]} if alias else {}
 
 
+def _bool_reduction_skipna_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    buckets = ["pandas:bool-reduction-skipna", "nullable-bool:reduction"]
+    return 0.90, buckets, {alias: [False]} if alias else {}
+
+
 def _dataset_isin_all_match_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
     alias = str(op.get("as", ""))
     buckets = ["pyarrow:dataset-isin-all-match", "dataset:membership-filter"]
+    return 0.90, buckets, {alias: [False]} if alias else {}
+
+
+def _run_end_null_compute_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    buckets = ["pyarrow:run-end-null-compute", "run_end:null-compute"]
     return 0.90, buckets, {alias: [False]} if alias else {}
 
 
@@ -2342,6 +2560,18 @@ def _rolling_mean_by_null_count_frontier_score(op: dict[str, Any]) -> tuple[floa
     alias = str(op.get("as", ""))
     buckets = ["polars:rolling-mean-by-null-count", "rolling:temporal-min-samples"]
     return 0.90, buckets, {alias: [False]} if alias else {}
+
+
+def _csv_long_numeric_roundtrip_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    value_count = len(op.get("values", []) or [])
+    buckets = [
+        "csv:long-numeric-roundtrip",
+        "csv:numeric-inference",
+        "numeric:long-identifier",
+        _bucket("csv_probe_values", value_count, [(3, "few"), (6, "several")], "many"),
+    ]
+    return 0.88, buckets, {alias: [False]} if alias else {}
 
 
 def _groupby_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any]) -> tuple[float, list[str]]:
@@ -2398,8 +2628,14 @@ def _groupby_output_samples(samples: dict[str, list[Any]], op: dict[str, Any]) -
             non_null = [value for value in group_values if value is not None]
             if func == "count":
                 values.append(len(non_null))
+            elif func == "nunique":
+                values.append(len(set(non_null)))
             elif not non_null:
                 values.append(None)
+            elif func == "any":
+                values.append(any(bool(value) for value in non_null))
+            elif func == "all":
+                values.append(all(bool(value) for value in non_null))
             elif func == "sum":
                 values.append(sum(non_null))
             elif func == "min":
@@ -2417,7 +2653,7 @@ def _aggregate_frontier_score(samples: dict[str, list[Any]], op: dict[str, Any])
     if len(op.get("aggs", [])) > 1:
         buckets.append("aggregate:multi-agg")
     for agg in op.get("aggs", []):
-        if agg.get("func") == "count":
+        if agg.get("func") in {"count", "nunique"}:
             continue
         values = samples.get(str(agg.get("column", "")), [])
         if not values:
@@ -2446,7 +2682,7 @@ def _has_null_aggregate_output(
     for idx, key_tuple in enumerate(tuples):
         groups.setdefault(key_tuple, []).append(idx)
     for agg in op.get("aggs", []):
-        if agg.get("func") == "count":
+        if agg.get("func") in {"count", "nunique"}:
             continue
         source_values = samples.get(str(agg.get("column", "")), [])
         for indices in groups.values():
@@ -2725,6 +2961,10 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("bit_compare_unequal_length")
     if "pattern:round_even_float_scale" in features or "op:round_even_probe" in features:
         roots.add("round_even_float_scale")
+    if "pattern:duckdb_float_literal_precision" in features or "op:float_literal_precision_probe" in features:
+        roots.add("duckdb_float_literal_precision")
+    if "pattern:polars_timestamp_precision_filter" in features or "op:timestamp_precision_filter_probe" in features:
+        roots.add("polars_timestamp_precision_filter")
     if "pattern:series_rtruediv_operand_order" in features or "op:series_rtruediv_probe" in features:
         roots.add("series_rtruediv_operand_order")
     if features & {
@@ -2767,8 +3007,12 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("pandas_arrow_timestamp_index_attr_semantics")
     if "pattern:pandas_eval_inplace_aliasing_semantics" in features or "op:eval_inplace_alias_probe" in features:
         roots.add("pandas_eval_inplace_aliasing_semantics")
+    if "pattern:pandas_bool_reduction_skipna_semantics" in features or "op:bool_reduction_skipna_probe" in features:
+        roots.add("pandas_bool_reduction_skipna_semantics")
     if "pattern:pyarrow_dataset_isin_all_match_semantics" in features or "op:dataset_isin_all_match_probe" in features:
         roots.add("pyarrow_dataset_isin_all_match_semantics")
+    if "pattern:pyarrow_run_end_null_compute_semantics" in features or "op:run_end_null_compute_probe" in features:
+        roots.add("pyarrow_run_end_null_compute_semantics")
     if (
         "pattern:pyarrow_large_string_partition_schema_semantics" in features
         or "op:large_string_partition_probe" in features
@@ -2784,6 +3028,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         or "op:rolling_mean_by_null_count_probe" in features
     ):
         roots.add("polars_rolling_mean_by_null_count_semantics")
+    if "pattern:csv_long_numeric_roundtrip" in features or "op:csv_long_numeric_roundtrip_probe" in features:
+        roots.add("csv_long_numeric_roundtrip")
     if features & {
         "pattern:null_groupby_topk",
         "pattern:null_agg_topk",
@@ -2991,6 +3237,8 @@ def _has_join_null_truth_filter_pattern(ops: list[dict[str, Any]]) -> bool:
 def _aggregate_feature_type(source_type: str, func: str) -> str:
     if func in {"count", "nunique"}:
         return "int"
+    if func in {"any", "all"}:
+        return "bool"
     if func in {"min", "max"} and source_type in {"int", "float", "str", "bool"}:
         return source_type
     return "float"

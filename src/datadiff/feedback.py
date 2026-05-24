@@ -16,9 +16,11 @@ class FeedbackState:
     persist_to_disk: bool = False
     max_persisted: int = 4096
     max_cases_per_candidate_family: int = 8
+    max_cases_per_profile: int = 16
     seen_signatures: set[str] = field(default_factory=set)
     interesting_cases: list[Case] = field(default_factory=list)
     stored_candidate_bug_families: Counter[str] = field(default_factory=Counter)
+    stored_profiles: Counter[str] = field(default_factory=Counter)
     persisted_count: int = 0
     last_persisted_to_disk: bool = False
     last_record_skip_reason: str = ""
@@ -74,6 +76,16 @@ class FeedbackState:
         ):
             self.last_record_skip_reason = "candidate_family_saturated"
             return False
+        profile_key = _case_profile_key(case)
+        profile_limit = max(0, int(self.max_cases_per_profile))
+        if (
+            profile_limit
+            and profile_key
+            and not has_finding
+            and self.stored_profiles[profile_key] >= profile_limit
+        ):
+            self.last_record_skip_reason = "profile_saturated"
+            return False
         if len(self.interesting_cases) < self.max_corpus:
             self.interesting_cases.append(case)
         elif has_finding:
@@ -82,6 +94,8 @@ class FeedbackState:
             self.last_record_skip_reason = "corpus_full"
             return False
         self.stored_candidate_bug_families.update(family_keys)
+        if profile_key:
+            self.stored_profiles[profile_key] += 1
         if self.persist_to_disk and self.persisted_count < max(0, self.max_persisted):
             self._write_interesting_case(case, behavior_signature, has_finding)
             self.persisted_count += 1
@@ -158,3 +172,12 @@ def _unique_nonempty(values: list[str]) -> list[str]:
         out.append(item)
         seen.add(item)
     return out
+
+
+def _case_profile_key(case: Case) -> str:
+    metadata = case.metadata if isinstance(case.metadata, dict) else {}
+    for field_name in ("mixed_generator_profile", "generator_profile"):
+        value = str(metadata.get(field_name, "")).strip()
+        if value:
+            return value
+    return ""

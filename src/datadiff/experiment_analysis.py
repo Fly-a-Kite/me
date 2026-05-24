@@ -15,9 +15,12 @@ TARGETED_PRESET_BY_SUITE = {
     "seeded_mutate": "guided_mutate",
     "arrow_cross": "live_arrow",
     "dataframe_lazy": "live_polars_lazy",
+    "polars_cross": "live_polars_issue_focus",
     "embedded_sql": "live_embedded_sql",
+    "embedded_sql_cross": "live_duckdb_issue_focus",
     "datafusion_cross": "live_datafusion",
     "latest_all_engines": "live_cross_family",
+    "latest_no_datafusion": "live_issue_focus",
 }
 
 

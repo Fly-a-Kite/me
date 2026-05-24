@@ -5,16 +5,23 @@ from functools import cmp_to_key
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from datadiff.dsl import Case, SortKey, normalize_sort_keys
+from datadiff.dsl import Case, Program, SortKey, normalize_sort_keys
 from datadiff.filtering import evaluate_filter_predicate, filter_comparator_supports_type, is_filter_comparator, parse_filter_comparator
 from datadiff.identifiers import is_reserved_output_name
 from datadiff.normalizer import NormalizedResult, _norm_value
 from datadiff.case_policy import case_discovery_origin, primary_source_issue
 from datadiff.oracle import Finding
-from datadiff.running import sort_rows_for_running, stable_running_sum_values
+from datadiff.pathing import path_basename
+from datadiff.running import (
+    running_sum_partition_columns,
+    running_sum_sort_keys,
+    sort_rows_for_running,
+    stable_running_sum_values,
+)
 from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
 from datadiff.util import unique_preserve_order
+from datadiff.windowing import row_number_filter_rows
 
 
 @dataclass(slots=True)
@@ -111,17 +118,51 @@ def classify_finding(
             ],
         )
 
-    if _is_order_only_mismatch(normalized) and not case.program.order_sensitive:
+    if _is_order_only_mismatch(normalized):
+        if not case.program.order_sensitive:
+            return Classification(
+                verdict="normalizer_false_positive",
+                paper_status="exclude_normalizer_failure",
+                confidence="high",
+                false_positive=True,
+                false_positive_reason="order_only_normalization_mismatch",
+                evidence="Backends returned the same row multiset, but normalized rows are ordered differently.",
+                recommendation=[
+                    "Do not count this as a backend bug.",
+                    "Fix canonical row ordering or compare normalized outputs as bags for this oracle.",
+                ],
+            )
+        if _is_sort_tie_order_only_mismatch(case):
+            return Classification(
+                verdict="normalizer_false_positive",
+                paper_status="exclude_order_underconstrained_case",
+                confidence="high",
+                false_positive=True,
+                false_positive_reason="sort_tie_order_underconstrained",
+                evidence=(
+                    "Backends returned the same row multiset, but the observable order depends on "
+                    "tie ordering for non-unique sort keys."
+                ),
+                recommendation=[
+                    "Do not count this as a backend bug.",
+                    "Regenerate the case with explicit tie-breaker sort keys before using it as latest-version evidence.",
+                ],
+            )
+
+    if _has_limit_or_offset_without_defined_order(case):
         return Classification(
-            verdict="normalizer_false_positive",
-            paper_status="exclude_normalizer_failure",
+            verdict="generator_false_positive",
+            paper_status="exclude_order_underconstrained_case",
             confidence="high",
             false_positive=True,
-            false_positive_reason="order_only_normalization_mismatch",
-            evidence="Backends returned the same row multiset, but normalized rows are ordered differently.",
+            false_positive_reason="limit_offset_order_underconstrained",
+            evidence=(
+                "The case applies LIMIT/OFFSET before any portable order-defining operation, "
+                "or after an operation that invalidates row order."
+            ),
             recommendation=[
-                "Do not count this as a backend bug.",
-                "Fix canonical row ordering or compare normalized outputs as bags for this oracle.",
+                "Do not count this finding as a backend bug.",
+                "Regenerate the case with an explicit sort or window order before LIMIT/OFFSET.",
             ],
         )
 
@@ -274,6 +315,33 @@ def validate_case_program(case: Case) -> list[str]:
                     errors.append(
                         f"op {idx}: tuple absence type mismatch {left!r}:{left_type} vs {right_column!r}:{right_type}"
                     )
+        elif kind == "row_number_filter":
+            partition_by = [str(column) for column in op.get("partition_by", []) or []]
+            if len(unique_preserve_order(partition_by)) != len(partition_by):
+                errors.append(f"op {idx}: row_number_filter partition_by contains duplicate columns")
+            missing_partition = [column for column in partition_by if column not in available]
+            if missing_partition:
+                errors.append(f"op {idx}: row_number_filter partition_by columns unavailable: {missing_partition}")
+            try:
+                order_keys = normalize_sort_keys({"keys": op.get("order_by", [])})
+            except ValueError as exc:
+                errors.append(f"op {idx}: invalid row_number_filter order_by: {exc}")
+                order_keys = []
+            order_columns = [key.column for key in order_keys]
+            missing_order = [column for column in order_columns if column not in available]
+            if missing_order:
+                errors.append(f"op {idx}: row_number_filter order_by columns unavailable: {missing_order}")
+            if not order_columns:
+                errors.append(f"op {idx}: row_number_filter has no order_by columns")
+            if len(unique_preserve_order(order_columns)) != len(order_columns):
+                errors.append(f"op {idx}: row_number_filter order_by contains duplicate columns")
+            if op.get("cmp") not in {"==", "<", "<="}:
+                errors.append(f"op {idx}: row_number_filter has unsupported comparator {op.get('cmp')!r}")
+            try:
+                if int(op.get("value", 0)) <= 0:
+                    errors.append(f"op {idx}: row_number_filter value must be positive")
+            except (TypeError, ValueError):
+                errors.append(f"op {idx}: row_number_filter value must be an integer")
         elif kind == "running_sum":
             source = str(op.get("source", ""))
             column = str(op.get("column", ""))
@@ -290,6 +358,12 @@ def validate_case_program(case: Case) -> list[str]:
             except ValueError as exc:
                 errors.append(f"op {idx}: invalid running_sum order_by: {exc}")
                 order_keys = []
+            partition_by = [str(column) for column in op.get("partition_by", []) or []]
+            missing_partition = [column for column in partition_by if column not in available]
+            if missing_partition:
+                errors.append(f"op {idx}: running_sum partition_by columns unavailable: {missing_partition}")
+            if len(unique_preserve_order(partition_by)) != len(partition_by):
+                errors.append(f"op {idx}: running_sum partition_by contains duplicate columns")
             order_columns = [key.column for key in order_keys]
             missing_order = [key for key in order_columns if key not in available]
             if missing_order:
@@ -410,6 +484,31 @@ def validate_case_program(case: Case) -> list[str]:
                 errors.append(f"op {idx}: round_even_probe output alias is empty")
             elif is_reserved_output_name(alias):
                 errors.append(f"op {idx}: round_even_probe output alias {alias!r} is reserved")
+            if alias:
+                available = {alias}
+                col_types = {alias: "bool"}
+                numeric = set()
+                strings = set()
+        elif kind == "float_literal_precision_probe":
+            alias = str(op.get("as", ""))
+            literal = str(op.get("literal", ""))
+            if not alias:
+                errors.append(f"op {idx}: float_literal_precision_probe output alias is empty")
+            elif is_reserved_output_name(alias):
+                errors.append(f"op {idx}: float_literal_precision_probe output alias {alias!r} is reserved")
+            if not _valid_float_literal_text(literal):
+                errors.append(f"op {idx}: float_literal_precision_probe literal is invalid")
+            if alias:
+                available = {alias}
+                col_types = {alias: "bool"}
+                numeric = set()
+                strings = set()
+        elif kind == "timestamp_precision_filter_probe":
+            alias = str(op.get("as", ""))
+            if not alias:
+                errors.append(f"op {idx}: timestamp_precision_filter_probe output alias is empty")
+            elif is_reserved_output_name(alias):
+                errors.append(f"op {idx}: timestamp_precision_filter_probe output alias {alias!r} is reserved")
             if alias:
                 available = {alias}
                 col_types = {alias: "bool"}
@@ -558,12 +657,34 @@ def validate_case_program(case: Case) -> list[str]:
                 col_types = {alias: "bool"}
                 numeric = set()
                 strings = set()
+        elif kind == "bool_reduction_skipna_probe":
+            alias = str(op.get("as", ""))
+            if not alias:
+                errors.append(f"op {idx}: bool_reduction_skipna_probe output alias is empty")
+            elif is_reserved_output_name(alias):
+                errors.append(f"op {idx}: bool_reduction_skipna_probe output alias {alias!r} is reserved")
+            if alias:
+                available = {alias}
+                col_types = {alias: "bool"}
+                numeric = set()
+                strings = set()
         elif kind == "dataset_isin_all_match_probe":
             alias = str(op.get("as", ""))
             if not alias:
                 errors.append(f"op {idx}: dataset_isin_all_match_probe output alias is empty")
             elif is_reserved_output_name(alias):
                 errors.append(f"op {idx}: dataset_isin_all_match_probe output alias {alias!r} is reserved")
+            if alias:
+                available = {alias}
+                col_types = {alias: "bool"}
+                numeric = set()
+                strings = set()
+        elif kind == "run_end_null_compute_probe":
+            alias = str(op.get("as", ""))
+            if not alias:
+                errors.append(f"op {idx}: run_end_null_compute_probe output alias is empty")
+            elif is_reserved_output_name(alias):
+                errors.append(f"op {idx}: run_end_null_compute_probe output alias {alias!r} is reserved")
             if alias:
                 available = {alias}
                 col_types = {alias: "bool"}
@@ -597,6 +718,19 @@ def validate_case_program(case: Case) -> list[str]:
                 errors.append(f"op {idx}: rolling_mean_by_null_count_probe output alias is empty")
             elif is_reserved_output_name(alias):
                 errors.append(f"op {idx}: rolling_mean_by_null_count_probe output alias {alias!r} is reserved")
+            if alias:
+                available = {alias}
+                col_types = {alias: "bool"}
+                numeric = set()
+                strings = set()
+        elif kind == "csv_long_numeric_roundtrip_probe":
+            alias = str(op.get("as", ""))
+            if not alias:
+                errors.append(f"op {idx}: csv_long_numeric_roundtrip_probe output alias is empty")
+            elif is_reserved_output_name(alias):
+                errors.append(f"op {idx}: csv_long_numeric_roundtrip_probe output alias {alias!r} is reserved")
+            if not _valid_digit_string_values(op.get("values", [])):
+                errors.append(f"op {idx}: csv_long_numeric_roundtrip_probe requires non-empty digit-string values")
             if alias:
                 available = {alias}
                 col_types = {alias: "bool"}
@@ -686,19 +820,22 @@ def validate_case_program(case: Case) -> list[str]:
                 if col not in available:
                     errors.append(f"op {idx}: aggregation column {col!r} is unavailable")
                 func = agg.get("func")
-                if func not in {"count", "nunique"} and col not in numeric:
+                if not _aggregate_accepts_type(col_types.get(str(col), "derived"), str(func), col in numeric):
                     errors.append(f"op {idx}: aggregation column {col!r} is not numeric")
-                if func not in {"sum", "min", "max", "count", "nunique"}:
+                if func not in {"sum", "mean", "min", "max", "count", "nunique", "any", "all"}:
                     errors.append(f"op {idx}: unsupported aggregation {func!r}")
             available = set(keys) | {str(agg.get("as")) for agg in aggs if agg.get("as")}
             numeric = {key for key in keys if col_types.get(key) in {"int", "float"}}
-            numeric |= {str(agg.get("as")) for agg in aggs if agg.get("as")}
             strings = {key for key in keys if col_types.get(key) == "str"}
             for agg in aggs:
                 if agg.get("as"):
-                    col_types[str(agg["as"])] = (
-                        "int" if agg.get("func") in {"count", "nunique"} else col_types.get(str(agg.get("column")), "float")
+                    output_type = _aggregate_result_type(
+                        col_types.get(str(agg.get("column")), "float"),
+                        str(agg.get("func", "")),
                     )
+                    col_types[str(agg["as"])] = output_type
+                    if output_type in {"int", "float"}:
+                        numeric.add(str(agg["as"]))
         elif kind == "aggregate":
             aggs = list(op.get("aggs", []))
             if not aggs:
@@ -714,18 +851,22 @@ def validate_case_program(case: Case) -> list[str]:
                 if col not in available:
                     errors.append(f"op {idx}: aggregation column {col!r} is unavailable")
                 func = agg.get("func")
-                if func not in {"count", "nunique"} and col not in numeric:
+                if not _aggregate_accepts_type(col_types.get(str(col), "derived"), str(func), col in numeric):
                     errors.append(f"op {idx}: aggregation column {col!r} is not numeric")
-                if func not in {"sum", "min", "max", "count", "nunique"}:
+                if func not in {"sum", "mean", "min", "max", "count", "nunique", "any", "all"}:
                     errors.append(f"op {idx}: unsupported aggregation {func!r}")
             available = {str(agg.get("as")) for agg in aggs if agg.get("as")}
-            numeric = set(available)
+            numeric = set()
             strings = set()
             for agg in aggs:
                 if agg.get("as"):
-                    col_types[str(agg["as"])] = (
-                        "int" if agg.get("func") in {"count", "nunique"} else col_types.get(str(agg.get("column")), "float")
+                    output_type = _aggregate_result_type(
+                        col_types.get(str(agg.get("column")), "float"),
+                        str(agg.get("func", "")),
                     )
+                    col_types[str(agg["as"])] = output_type
+                    if output_type in {"int", "float"}:
+                        numeric.add(str(agg["as"]))
         else:
             errors.append(f"op {idx}: unknown operation {kind!r}")
     return errors
@@ -850,6 +991,8 @@ def _mutate_output_type(
         return "int" if src in strings else None
     if kind == "string_lower":
         return "str" if src in strings else None
+    if kind == "string_basename":
+        return "str" if src in strings else None
     return None
 
 
@@ -865,6 +1008,28 @@ def _valid_group_quantile_values(values: Any, quantiles: Any) -> bool:
         and isinstance(quantile, (int, float))
         and 0.0 <= float(quantile) <= 1.0
         for quantile in quantiles
+    )
+
+
+def _valid_float_literal_text(value: Any) -> bool:
+    text = str(value or "").strip()
+    if not text or not any(ch.isdigit() for ch in text):
+        return False
+    allowed = set("0123456789+-.eE")
+    if any(ch not in allowed for ch in text):
+        return False
+    try:
+        float(text)
+    except ValueError:
+        return False
+    return True
+
+
+def _valid_digit_string_values(values: Any) -> bool:
+    return (
+        isinstance(values, list)
+        and bool(values)
+        and all(isinstance(value, str) and value.isdigit() for value in values)
     )
 
 
@@ -966,11 +1131,13 @@ def _reference_result(case: Case) -> NormalizedResult | None:
                     for row in rows
                     if evaluate_tuple_absence(row, left_columns, right.rows, right_columns)
                 ]
+            elif kind == "row_number_filter":
+                rows = row_number_filter_rows(rows, op)
             elif kind == "running_sum":
-                sort_keys = normalize_sort_keys({"keys": op["order_by"]})
+                sort_keys = running_sum_sort_keys(op)
                 rows = sort_rows_for_running(rows, sort_keys)
                 column = str(op["column"])
-                values = stable_running_sum_values(rows, str(op["source"]))
+                values = stable_running_sum_values(rows, str(op["source"]), running_sum_partition_columns(op))
                 rows = [{**row, column: value} for row, value in zip(rows, values)]
                 columns = [name for name in columns if name != column] + [column]
             elif kind == "sortedness_check":
@@ -1007,6 +1174,14 @@ def _reference_result(case: Case) -> NormalizedResult | None:
                 columns = [alias]
                 rows = [{alias: False}]
             elif kind == "round_even_probe":
+                alias = str(op["as"])
+                columns = [alias]
+                rows = [{alias: False}]
+            elif kind == "float_literal_precision_probe":
+                alias = str(op["as"])
+                columns = [alias]
+                rows = [{alias: False}]
+            elif kind == "timestamp_precision_filter_probe":
                 alias = str(op["as"])
                 columns = [alias]
                 rows = [{alias: False}]
@@ -1062,7 +1237,15 @@ def _reference_result(case: Case) -> NormalizedResult | None:
                 alias = str(op["as"])
                 columns = [alias]
                 rows = [{alias: False}]
+            elif kind == "bool_reduction_skipna_probe":
+                alias = str(op["as"])
+                columns = [alias]
+                rows = [{alias: False}]
             elif kind == "dataset_isin_all_match_probe":
+                alias = str(op["as"])
+                columns = [alias]
+                rows = [{alias: False}]
+            elif kind == "run_end_null_compute_probe":
                 alias = str(op["as"])
                 columns = [alias]
                 rows = [{alias: False}]
@@ -1075,6 +1258,10 @@ def _reference_result(case: Case) -> NormalizedResult | None:
                 columns = [alias]
                 rows = [{alias: False}]
             elif kind == "rolling_mean_by_null_count_probe":
+                alias = str(op["as"])
+                columns = [alias]
+                rows = [{alias: False}]
+            elif kind == "csv_long_numeric_roundtrip_probe":
                 alias = str(op["as"])
                 columns = [alias]
                 rows = [{alias: False}]
@@ -1184,6 +1371,8 @@ def _reference_eval_expr(row: dict[str, Any], expr: dict[str, Any]) -> Any:
         return len(value)
     if kind == "string_lower":
         return value.lower()
+    if kind == "string_basename":
+        return path_basename(value)
     raise ValueError(kind)
 
 
@@ -1195,13 +1384,39 @@ def _reference_aggregate(rows: list[dict[str, Any]], column: str, func: str) -> 
         return len(set(values))
     if not values:
         return None
+    if func == "any":
+        return any(bool(value) for value in values)
+    if func == "all":
+        return all(bool(value) for value in values)
     if func == "sum":
         return sum(values)
+    if func == "mean":
+        return sum(values) / len(values)
     if func == "min":
         return min(values)
     if func == "max":
         return max(values)
     raise ValueError(func)
+
+
+def _aggregate_accepts_type(source_type: str, func: str, is_numeric_column: bool) -> bool:
+    if func in {"count", "nunique"}:
+        return True
+    if func in {"any", "all"}:
+        return source_type == "bool"
+    if func in {"min", "max"} and source_type == "bool":
+        return True
+    return is_numeric_column
+
+
+def _aggregate_result_type(source_type: str, func: str) -> str:
+    if func in {"count", "nunique"}:
+        return "int"
+    if func in {"any", "all"}:
+        return "bool"
+    if func == "mean":
+        return "float"
+    return source_type
 
 
 def _compare_rows(left: dict[str, Any], right: dict[str, Any], sort_keys: list[SortKey]) -> int:
@@ -1317,6 +1532,112 @@ def _stable_rows(rows: list[list[Any]]) -> list[str]:
     import json
 
     return [json.dumps(row, ensure_ascii=False, sort_keys=True) for row in rows]
+
+
+def _is_sort_tie_order_only_mismatch(case: Case) -> bool:
+    op_index = _last_order_defining_operation_index(case)
+    if op_index is None:
+        return False
+    op = case.program.operations[op_index]
+    if op.get("op") != "sort":
+        return False
+    try:
+        sort_keys = normalize_sort_keys(op)
+    except ValueError:
+        return False
+    rows = _reference_rows_before_operation(case, op_index)
+    if rows is None:
+        return False
+    return _rows_have_duplicate_sort_key(rows, sort_keys)
+
+
+def _has_limit_or_offset_without_defined_order(case: Case) -> bool:
+    order_defined = False
+    for op in case.program.operations:
+        kind = op.get("op")
+        if kind in {"sort", "running_sum", "row_number_filter"}:
+            order_defined = True
+            continue
+        if kind == "limit":
+            try:
+                limit = int(op.get("n", 0))
+            except (TypeError, ValueError):
+                limit = 1
+            if limit > 0 and not order_defined:
+                return True
+            continue
+        if kind == "offset":
+            try:
+                offset = int(op.get("n", 0))
+            except (TypeError, ValueError):
+                offset = 1
+            if offset > 0 and not order_defined:
+                return True
+            continue
+        if kind in {
+            "filter",
+            "tuple_absence_filter",
+            "select",
+            "mutate",
+        }:
+            continue
+        if kind == "sortedness_check":
+            order_defined = True
+            continue
+        order_defined = False
+    return False
+
+
+def _last_order_defining_operation_index(case: Case) -> int | None:
+    row_order_preserving = {
+        "filter",
+        "tuple_absence_filter",
+        "running_sum",
+        "row_number_filter",
+        "select",
+        "mutate",
+        "limit",
+        "offset",
+    }
+    for idx in range(len(case.program.operations) - 1, -1, -1):
+        kind = case.program.operations[idx].get("op")
+        if kind in {"sort", "running_sum", "row_number_filter", "sortedness_check"}:
+            return idx
+        if kind in row_order_preserving:
+            continue
+        return None
+    return None
+
+
+def _reference_rows_before_operation(case: Case, op_index: int) -> list[dict[str, Any]] | None:
+    prefix = Case(
+        case_id=f"{case.case_id}-prefix-{op_index}",
+        seed=case.seed,
+        tables=case.tables,
+        program=Program(
+            program_id=f"{case.program.program_id}-prefix-{op_index}",
+            seed=case.program.seed,
+            operations=list(case.program.operations[:op_index]),
+        ),
+        metadata=case.metadata,
+    )
+    reference = _reference_result(prefix)
+    if reference is None or reference.status != "ok":
+        return None
+    return [
+        {column: row[idx] for idx, column in enumerate(reference.columns)}
+        for row in reference.rows
+    ]
+
+
+def _rows_have_duplicate_sort_key(rows: list[dict[str, Any]], sort_keys: list[SortKey]) -> bool:
+    seen: set[str] = set()
+    for row in rows:
+        key = _stable_row_key([row.get(sort_key.column) for sort_key in sort_keys])
+        if key in seen:
+            return True
+        seen.add(key)
+    return False
 
 
 def _result_payload(result: NormalizedResult | dict[str, Any]) -> dict[str, Any]:

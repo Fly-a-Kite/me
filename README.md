@@ -51,9 +51,14 @@ python3 -m venv .venv
 `--target-suite` 是 backend 目标集合选择，当前内置：
 
 - `dataframe`: pandas, polars
+- `polars_cross`: pandas, Polars eager/lazy，用于 Polars 目标族的 cross-reference latest 探索
 - `embedded_sql`: DuckDB, SQLite
+- `embedded_sql_cross`: pandas, DuckDB, SQLite，用于 DuckDB/SQL 目标族的 cross-reference latest 探索
 - `duckdb_storage_cross`: pandas, DuckDB persistent-storage target for storage-aware historical replay
 - `cross_family`: pandas, DuckDB，用于低成本覆盖 DataFrame vs embedded SQL 跨目标族差分
+- `datafusion_cross`: pandas, DuckDB, DataFusion
+- `latest_all_engines`: pandas, PyArrow, Polars eager/lazy, DuckDB, SQLite, DataFusion
+- `latest_no_datafusion`: pandas, PyArrow, Polars eager/lazy, DuckDB, SQLite，用于避开已知 DataFusion 饱和家族后的广谱探索
 - `core` / `all`: pandas, polars, DuckDB, SQLite
 
 显式 `--backends` 会覆盖 `--target-suite`。这让实验方法论可以按目标族横向展开：
@@ -63,7 +68,9 @@ python3 -m venv .venv
 
 Fresh/latest-version 探索和历史/已提交 bug replay 共享同一套 runner、normalizer、oracle 和
 classification。默认 `enable_replay_bug=false`，已知 replay probe 或已提交 source issue 会在执行前
-被过滤，不计入最新版本 bug 探索；需要复现历史或已提交 bug 时显式开启：
+被过滤，不计入最新版本 bug 探索。fresh 报告中的 `rewardable candidates` 和 final readiness
+还会排除 `known_saturated_bug_families`，因此已提交/已知家族仍会保留为复现证据，但不会充当
+新的 latest-version bug 证据；需要复现历史或已提交 bug 时显式开启：
 
 ```bash
 .venv/bin/datadiff longrun --profile datafusion_setop_all_duplicate_count --enable-replay-bug
@@ -71,6 +78,12 @@ classification。默认 `enable_replay_bug=false`，已知 replay probe 或已�
 ```
 
 `*_replay` preset 只打开 replay policy，底层 DSL、执行器、oracle 和中间层 case policy 不变。
+`issue_focus` 生成 profile 是底层通用 issue sketch 轮转，只负责产出 case 与来源 metadata；
+`live_issue_focus`、`live_polars_issue_focus`、`live_duckdb_issue_focus` 和 `live_arrow_issue_focus`
+只在上层改变 target suite 和 guidance targets。是否跳过已知 replay probe 统一由中间层 replay
+filter 判定。
+live preset 默认启用 candidate recheck；不能在即时复查中稳定复现的 finding 会标记为
+`non_reproducible_candidate`，不会进入 rewardable bug 证据。
 
 按时间运行：
 

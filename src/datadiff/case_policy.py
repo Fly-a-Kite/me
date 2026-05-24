@@ -7,7 +7,7 @@ from datadiff.oracle import PROBE_ROOTS
 
 CaseOrigin = Literal["organic", "issue_inspired", "issue_replay"]
 
-ISSUE_REPLAY_OPS = frozenset(PROBE_ROOTS) | {"running_sum", "tuple_absence_filter"}
+ISSUE_REPLAY_OPS = frozenset(PROBE_ROOTS) | {"running_sum", "tuple_absence_filter", "row_number_filter"}
 
 
 def issue_source_key(value: Any) -> str:

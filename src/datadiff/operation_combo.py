@@ -7,6 +7,7 @@ CANONICAL_OPERATION_ORDER = (
     "filter",
     "tuple_absence_filter",
     "mutate",
+    "row_number_filter",
     "running_sum",
     "random_case_probe",
     "group_quantile_probe",
@@ -15,6 +16,8 @@ CANONICAL_OPERATION_ORDER = (
     "struct_distinct_probe",
     "bit_compare_probe",
     "round_even_probe",
+    "float_literal_precision_probe",
+    "timestamp_precision_filter_probe",
     "series_rtruediv_probe",
     "uint64_isin_probe",
     "tuple_anti_null_probe",
@@ -28,10 +31,13 @@ CANONICAL_OPERATION_ORDER = (
     "arrow_timestamp_loc_slice_probe",
     "arrow_timestamp_index_attr_probe",
     "eval_inplace_alias_probe",
+    "bool_reduction_skipna_probe",
     "dataset_isin_all_match_probe",
+    "run_end_null_compute_probe",
     "large_string_partition_probe",
     "hash_pivot_wider_probe",
     "rolling_mean_by_null_count_probe",
+    "csv_long_numeric_roundtrip_probe",
     "groupby",
     "aggregate",
     "select",
@@ -81,7 +87,7 @@ def classify_operation_combo(operations: list[dict[str, Any]]) -> dict[str, Any]
     sequence = [str(op.get("op", "unknown")) for op in operations]
     op_set = set(sequence)
     template = "_".join(op for op in CANONICAL_OPERATION_ORDER if op in op_set) if sequence else "empty"
-    risks = _correctness_risks(sequence)
+    risks = _correctness_risks(operations, sequence)
     frequency_bucket = _frequency_bucket(template)
     priority = _priority_score(frequency_bucket, risks, len(sequence))
     return {
@@ -106,7 +112,7 @@ def _frequency_bucket(template: str) -> str:
     return "exploratory"
 
 
-def _correctness_risks(sequence: list[str]) -> list[str]:
+def _correctness_risks(operations: list[dict[str, Any]], sequence: list[str]) -> list[str]:
     op_set = set(sequence)
     risks = []
     if "join" in op_set:
@@ -117,8 +123,17 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("filter_mutate_dependency")
     if "tuple_absence_filter" in op_set:
         risks.append("tuple_absence_null_filter")
+    if "row_number_filter" in op_set:
+        risks.append("keyed_row_pick")
+    if "row_number_filter" in op_set and any(
+        op.get("op") == "mutate" and op.get("expr", {}).get("kind") == "string_basename"
+        for op in operations
+    ):
+        risks.append("path_projection_keyed_pick")
     if "running_sum" in op_set:
         risks.append("running_sum_precision")
+    if any(op.get("op") == "running_sum" and op.get("partition_by") for op in operations):
+        risks.append("partitioned_running_sum")
     if "sortedness_check" in op_set:
         risks.append("sortedness_null_placement")
     if "random_case_probe" in op_set:
@@ -135,6 +150,10 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("bit_compare_unequal_length")
     if "round_even_probe" in op_set:
         risks.append("round_even_float_scale")
+    if "float_literal_precision_probe" in op_set:
+        risks.append("duckdb_float_literal_precision")
+    if "timestamp_precision_filter_probe" in op_set:
+        risks.append("polars_timestamp_precision_filter")
     if "series_rtruediv_probe" in op_set:
         risks.append("series_rtruediv_operand_order")
     if "uint64_isin_probe" in op_set:
@@ -161,14 +180,20 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("pandas_arrow_timestamp_index_attr_semantics")
     if "eval_inplace_alias_probe" in op_set:
         risks.append("pandas_eval_inplace_aliasing_semantics")
+    if "bool_reduction_skipna_probe" in op_set:
+        risks.append("pandas_bool_reduction_skipna_semantics")
     if "dataset_isin_all_match_probe" in op_set:
         risks.append("pyarrow_dataset_isin_all_match_semantics")
+    if "run_end_null_compute_probe" in op_set:
+        risks.append("pyarrow_run_end_null_compute_semantics")
     if "large_string_partition_probe" in op_set:
         risks.append("pyarrow_large_string_partition_schema_semantics")
     if "hash_pivot_wider_probe" in op_set:
         risks.append("pyarrow_hash_pivot_wider_order_semantics")
     if "rolling_mean_by_null_count_probe" in op_set:
         risks.append("polars_rolling_mean_by_null_count_semantics")
+    if "csv_long_numeric_roundtrip_probe" in op_set:
+        risks.append("csv_long_numeric_roundtrip")
     if "groupby" in op_set:
         risks.append("groupby_aggregation")
     if "aggregate" in op_set:

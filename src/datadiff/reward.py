@@ -28,8 +28,42 @@ def is_issue_replay_finding(finding: dict[str, Any]) -> bool:
     return str(finding.get("discovery_origin", "")).strip() == ISSUE_REPLAY_ORIGIN
 
 
-def is_rewardable_candidate_bug_finding(finding: dict[str, Any]) -> bool:
-    return is_candidate_bug_finding(finding) and not is_issue_replay_finding(finding)
+def candidate_bug_family_key(finding: dict[str, Any]) -> str:
+    root = str(finding.get("root_cause", "unknown"))
+    suspicious = suspicious_key(finding)
+    return f"{root}@{suspicious}"
+
+
+def family_key_matches_known_family(candidate_family: str, known_bug_families: list[str] | tuple[str, ...]) -> bool:
+    candidate_root, candidate_backends = _split_family_key(candidate_family)
+    for known_family in known_bug_families:
+        known_root, known_backends = _split_family_key(known_family)
+        if known_root != candidate_root:
+            continue
+        if not known_backends or not candidate_backends or known_backends & candidate_backends:
+            return True
+    return False
+
+
+def is_known_saturated_candidate_bug_finding(
+    finding: dict[str, Any],
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
+) -> bool:
+    if not is_candidate_bug_finding(finding):
+        return False
+    known_families = known_saturated_bug_families or ()
+    return family_key_matches_known_family(candidate_bug_family_key(finding), known_families)
+
+
+def is_rewardable_candidate_bug_finding(
+    finding: dict[str, Any],
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
+) -> bool:
+    return (
+        is_candidate_bug_finding(finding)
+        and not is_issue_replay_finding(finding)
+        and not is_known_saturated_candidate_bug_finding(finding, known_saturated_bug_families)
+    )
 
 
 def is_semantic_divergence_finding(finding: dict[str, Any]) -> bool:
@@ -44,18 +78,21 @@ def suspicious_key(finding: dict[str, Any]) -> str:
     return ",".join(sorted(finding.get("suspicious_backends", []) or [])) or "unknown"
 
 
-def candidate_bug_family_keys(findings: list[dict[str, Any]]) -> Counter[str]:
+def candidate_bug_family_keys(
+    findings: list[dict[str, Any]],
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
+) -> Counter[str]:
     keys: Counter[str] = Counter()
     root_by_suspicious: dict[str, str] = {}
     for finding in findings:
-        if not is_rewardable_candidate_bug_finding(finding):
+        if not is_rewardable_candidate_bug_finding(finding, known_saturated_bug_families):
             continue
         root = str(finding.get("root_cause", "unknown"))
         if root.startswith("metamorphic_"):
             continue
         root_by_suspicious.setdefault(suspicious_key(finding), root)
     for finding in findings:
-        if not is_rewardable_candidate_bug_finding(finding):
+        if not is_rewardable_candidate_bug_finding(finding, known_saturated_bug_families):
             continue
         root = str(finding.get("root_cause", "unknown"))
         suspicious = suspicious_key(finding)
@@ -77,10 +114,13 @@ def issue_replay_candidate_bug_family_keys(findings: list[dict[str, Any]]) -> Co
     return keys
 
 
-def candidate_bug_signatures(findings: list[dict[str, Any]]) -> Counter[str]:
+def candidate_bug_signatures(
+    findings: list[dict[str, Any]],
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
+) -> Counter[str]:
     signatures: Counter[str] = Counter()
     for finding in findings:
-        if not is_rewardable_candidate_bug_finding(finding):
+        if not is_rewardable_candidate_bug_finding(finding, known_saturated_bug_families):
             continue
         signature = str(finding.get("signature", "")).strip()
         if signature:
@@ -88,11 +128,21 @@ def candidate_bug_signatures(findings: list[dict[str, Any]]) -> Counter[str]:
     return signatures
 
 
-def row_reward_signals(row: dict[str, Any]) -> dict[str, Any]:
+def row_reward_signals(
+    row: dict[str, Any],
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
+) -> dict[str, Any]:
     findings = row.get("findings") or []
-    candidate_bug_count = sum(1 for finding in findings if is_rewardable_candidate_bug_finding(finding))
+    candidate_bug_count = sum(
+        1 for finding in findings if is_rewardable_candidate_bug_finding(finding, known_saturated_bug_families)
+    )
     issue_replay_candidate_bug_count = sum(
         1 for finding in findings if is_candidate_bug_finding(finding) and is_issue_replay_finding(finding)
+    )
+    known_saturated_candidate_bug_count = sum(
+        1
+        for finding in findings
+        if is_known_saturated_candidate_bug_finding(finding, known_saturated_bug_families)
     )
     semantic_divergence_count = sum(1 for finding in findings if is_semantic_divergence_finding(finding))
     false_positive_count = sum(1 for finding in findings if is_false_positive_finding(finding))
@@ -105,6 +155,7 @@ def row_reward_signals(row: dict[str, Any]) -> dict[str, Any]:
         "candidate_bug": candidate_bug_count > 0,
         "candidate_bug_count": candidate_bug_count,
         "issue_replay_candidate_bug_count": issue_replay_candidate_bug_count,
+        "known_saturated_candidate_bug_count": known_saturated_candidate_bug_count,
         "semantic_divergence": semantic_divergence_count > 0,
         "semantic_divergence_count": semantic_divergence_count,
         "false_positive": false_positive_count > 0,
@@ -114,8 +165,11 @@ def row_reward_signals(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def online_case_reward(row: dict[str, Any]) -> float:
-    signals = row_reward_signals(row)
+def online_case_reward(
+    row: dict[str, Any],
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
+) -> float:
+    signals = row_reward_signals(row, known_saturated_bug_families=known_saturated_bug_families)
     preflight = row.get("preflight") or {}
     reward = (
         4.0 * signals["candidate_bug_count"]
@@ -129,3 +183,9 @@ def online_case_reward(row: dict[str, Any]) -> float:
     if reward == 0.0:
         reward -= 0.1
     return reward
+
+
+def _split_family_key(family_key: str) -> tuple[str, set[str]]:
+    root, _, backend_part = str(family_key).partition("@")
+    backends = {backend.strip() for backend in backend_part.split(",") if backend.strip()}
+    return root.strip(), backends

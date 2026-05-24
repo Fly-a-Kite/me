@@ -5,9 +5,16 @@ import time
 import os
 
 from datadiff.backends.base import Backend, BackendResult
+from datadiff.csv_roundtrip import (
+    csv_long_numeric_roundtrip_mismatch,
+    csv_long_numeric_values,
+    long_numeric_csv_path,
+)
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
 from datadiff.filtering import sql_filter_condition
+from datadiff.running import running_sum_partition_columns, running_sum_sort_keys
 from datadiff.sortedness import is_sorted_values
+from datadiff.windowing import row_number_order_keys, row_number_partition_columns
 
 
 def _quote(name: str) -> str:
@@ -36,7 +43,7 @@ def _lit(value):
 
 def _sql_type(kind: str) -> str:
     if kind == "int":
-        return "INTEGER"
+        return "BIGINT"
     if kind == "float":
         return "DOUBLE"
     if kind == "bool":
@@ -61,6 +68,12 @@ def _order_clause(sort_keys: list[SortKey]) -> str:
 def _agg_expr(column: str, func: str) -> str:
     if func == "nunique":
         return f"COUNT(DISTINCT {_quote(column)})"
+    if func == "any":
+        return f"BOOL_OR({_quote(column)})"
+    if func == "all":
+        return f"BOOL_AND({_quote(column)})"
+    if func == "mean":
+        return f"AVG({_quote(column)})"
     sql_func = "COUNT" if func == "count" else func.upper()
     return f"{sql_func}({_quote(column)})"
 
@@ -75,13 +88,30 @@ def _running_sum_projection(cols: list[str], op: dict) -> tuple[str, list[str]]:
     kept_cols = [col for col in cols if col != op["column"]]
     select_parts = [f"q.{_quote(col)}" for col in kept_cols]
     order_sql = _order_clause(normalize_sort_keys({"keys": op["order_by"]}))
+    partition_columns = running_sum_partition_columns(op)
+    partition_sql = ""
+    if partition_columns:
+        partition_sql = "PARTITION BY " + ", ".join(f"q.{_quote(column)}" for column in partition_columns) + " "
     expr_sql = (
         f"SUM(CAST(q.{_quote(op['source'])} AS DOUBLE)) OVER ("
-        f"ORDER BY {order_sql} ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"
+        f"{partition_sql}ORDER BY {order_sql} ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"
         f") AS {_quote(op['column'])}"
     )
     select_parts.append(expr_sql)
     return ", ".join(select_parts), kept_cols + [op["column"]]
+
+
+def _row_number_window_sql(op: dict) -> str:
+    partition_columns = row_number_partition_columns(op)
+    partition_sql = ""
+    if partition_columns:
+        partition_sql = "PARTITION BY " + ", ".join(f"q.{_quote(column)}" for column in partition_columns) + " "
+    return f"{partition_sql}ORDER BY {_order_clause(row_number_order_keys(op))}"
+
+
+def _row_number_condition_sql(op: dict) -> str:
+    comparator = {"==": "=", "<": "<", "<=": "<="}[str(op.get("cmp", "=="))]
+    return f"ROW_NUMBER() OVER ({_row_number_window_sql(op)}) {comparator} {int(op.get('value', 1))}"
 
 
 def _random_case_probe_sql(op: dict) -> str:
@@ -131,6 +161,26 @@ def _bit_compare_probe_sql(op: dict) -> str:
 
 def _round_even_probe_sql(op: dict) -> str:
     return f"SELECT NOT (round_even(2.675::DOUBLE, 2) = 2.67::DOUBLE) AS {_quote(op['as'])}"
+
+
+def _float_literal_text(op: dict) -> str:
+    literal = str(op.get("literal", "")).strip()
+    allowed = set("0123456789+-.eE")
+    if not literal or not any(ch.isdigit() for ch in literal) or any(ch not in allowed for ch in literal):
+        raise ValueError(f"invalid float literal probe value: {literal!r}")
+    float(literal)
+    return literal
+
+
+def _float_literal_precision_probe_sql(op: dict) -> str:
+    literal = _float_literal_text(op)
+    quoted_literal = literal.replace("'", "''")
+    return (
+        "SELECT ("
+        f"printf('%.17g', {literal}) <> "
+        f"printf('%.17g', CAST('{quoted_literal}' AS DOUBLE))"
+        f") AS {_quote(op['as'])}"
+    )
 
 
 def _tuple_anti_null_probe_sql(op: dict) -> str:
@@ -223,6 +273,34 @@ def _duckdb_json_predicate_order_mismatch(con) -> bool:
     return safe_result != expected or reordered_result != expected
 
 
+def _duckdb_csv_long_numeric_roundtrip_mismatch(con, op: dict) -> bool:
+    expected_values = csv_long_numeric_values(op)
+    with long_numeric_csv_path(expected_values) as csv_path:
+        path_sql = str(csv_path).replace("'", "''")
+        observed_values = [
+            row[0]
+            for row in con.execute(
+                f"SELECT CAST(value AS VARCHAR) FROM read_csv_auto('{path_sql}')"
+            ).fetchall()
+        ]
+    return csv_long_numeric_roundtrip_mismatch(observed_values, expected_values)
+
+
+def _table_to_dataframe(pd, table: TableData):
+    data = {}
+    for column in table.columns:
+        values = [row.get(column.name) for row in table.rows]
+        if column.type == "int":
+            data[column.name] = pd.array(values, dtype="Int64")
+        elif column.type == "bool":
+            data[column.name] = pd.array(values, dtype="boolean")
+        elif column.type == "str":
+            data[column.name] = pd.array(values, dtype="string")
+        else:
+            data[column.name] = values
+    return pd.DataFrame(data, columns=[c.name for c in table.columns])
+
+
 class DuckDBBackend(Backend):
     name = "duckdb"
     persistent_storage = False
@@ -243,7 +321,7 @@ class DuckDBBackend(Backend):
             table_by_name = {table.name: table for table in tables}
             current_cols = [c.name for c in tables[0].columns]
             for table in tables:
-                df = pd.DataFrame(table.rows, columns=[c.name for c in table.columns])
+                df = _table_to_dataframe(pd, table)
                 registered_name = f"__datadiff_input_{table.name}"
                 con.register(registered_name, df)
                 col_defs = ", ".join(f"{_quote(c.name)} {_sql_type(c.type)}" for c in table.columns)
@@ -351,9 +429,15 @@ class DuckDBBackend(Backend):
                     relation = add_step(f"SELECT * FROM {relation} q WHERE {condition}")
                 elif kind == "tuple_absence_filter":
                     relation = add_step(f"SELECT * FROM {relation} q WHERE {_tuple_absence_native_condition(op)}")
+                elif kind == "row_number_filter":
+                    relation = add_step(f"SELECT * FROM {relation} q QUALIFY {_row_number_condition_sql(op)}")
+                    pending_order = [
+                        *(SortKey(column, True, "last") for column in row_number_partition_columns(op)),
+                        *row_number_order_keys(op),
+                    ]
                 elif kind == "running_sum":
                     drop_hidden_order_cols()
-                    order_keys = normalize_sort_keys({"keys": op["order_by"]})
+                    order_keys = running_sum_sort_keys(op)
                     projection, current_cols = _running_sum_projection(current_cols, op)
                     relation = add_step(f"SELECT {projection} FROM {relation} q")
                     visible_cols = [col for col in visible_cols if col != op["column"]] + [op["column"]]
@@ -418,6 +502,20 @@ class DuckDBBackend(Backend):
                 elif kind == "round_even_probe":
                     ctes = []
                     relation = add_step(_round_even_probe_sql(op))
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "float_literal_precision_probe":
+                    ctes = []
+                    relation = add_step(_float_literal_precision_probe_sql(op))
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "timestamp_precision_filter_probe":
+                    ctes = []
+                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
                     current_cols = [op["as"]]
                     visible_cols = [op["as"]]
                     hidden_order_cols = []
@@ -516,7 +614,21 @@ class DuckDBBackend(Backend):
                     visible_cols = [op["as"]]
                     hidden_order_cols = []
                     pending_order = None
+                elif kind == "bool_reduction_skipna_probe":
+                    ctes = []
+                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
                 elif kind == "dataset_isin_all_match_probe":
+                    ctes = []
+                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "run_end_null_compute_probe":
                     ctes = []
                     relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
                     current_cols = [op["as"]]
@@ -540,6 +652,16 @@ class DuckDBBackend(Backend):
                 elif kind == "rolling_mean_by_null_count_probe":
                     ctes = []
                     relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "csv_long_numeric_roundtrip_probe":
+                    ctes = []
+                    mismatch = _duckdb_csv_long_numeric_roundtrip_mismatch(con, op)
+                    materialized_name = f"__datadiff_csv_long_numeric_{len(ctes)}"
+                    con.register(materialized_name, pd.DataFrame({op["as"]: [mismatch]}))
+                    relation = _quote(materialized_name)
                     current_cols = [op["as"]]
                     visible_cols = [op["as"]]
                     hidden_order_cols = []
@@ -585,6 +707,8 @@ class DuckDBBackend(Backend):
                         expr_sql = f"LENGTH(q.{_quote(expr['source'])})"
                     elif expr["kind"] == "string_lower":
                         expr_sql = f"LOWER(q.{_quote(expr['source'])})"
+                    elif expr["kind"] == "string_basename":
+                        expr_sql = f"parse_filename(q.{_quote(expr['source'])})"
                     else:
                         raise ValueError(expr["kind"])
                     projection, current_cols = _replace_projection(current_cols, op["column"], expr_sql)
