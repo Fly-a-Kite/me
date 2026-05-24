@@ -628,6 +628,34 @@ def test_datafusion_backend_matches_common_join_groupby_case():
     any(importlib.util.find_spec(name) is None for name in ["pandas", "duckdb", "datafusion", "pyarrow"]),
     reason="datafusion test backends are not installed",
 )
+def test_datafusion_setop_all_duplicate_probe_runs_and_classifies_mismatch():
+    case = generate_case(137, profile="datafusion_setop_all_duplicate_count")
+
+    row = run_loaded_case(
+        case,
+        DATAFUSION_BACKENDS,
+        config=ExperimentConfig(enable_metamorphic_oracle=False),
+        save_artifact=False,
+    )
+
+    assert row["normalized"]["pandas"]["rows"] == [[False]]
+    assert row["normalized"]["duckdb"]["rows"] == [[False]]
+    assert row["normalized"]["datafusion"]["rows"] in ([[False]], [[True]])
+    if row["normalized"]["datafusion"]["rows"] == [[True]]:
+        assert row["status"] == "bug"
+        assert row["findings"]
+        assert row["findings"][0]["root_cause"] == "datafusion_setop_all_duplicate_count"
+        assert row["findings"][0]["triage_verdict"] == "candidate_implementation_bug"
+        assert row["findings"][0]["suspicious_backends"] == ["datafusion"]
+    else:
+        assert row["status"] == "ok"
+        assert row["findings"] == []
+
+
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in ["pandas", "duckdb", "datafusion", "pyarrow"]),
+    reason="datafusion test backends are not installed",
+)
 def test_datafusion_backend_applies_limit_to_sorted_rows():
     case = Case(
         "case-datafusion-sort-limit",

@@ -84,6 +84,34 @@ def _running_sum_projection(cols: list[str], op: dict[str, Any]) -> tuple[str, l
     return ", ".join(select_parts), kept_cols + [op["column"]]
 
 
+def _setop_all_duplicate_probe_sql(op: dict[str, Any]) -> str:
+    return (
+        "WITH except_got AS ("
+        "SELECT * FROM (VALUES ('a'), ('b'), ('b'), ('c'), ('c'), ('c')) AS lhs(v) "
+        "EXCEPT ALL "
+        "SELECT * FROM (VALUES ('b'), ('c')) AS rhs(v)"
+        "), intersect_got AS ("
+        "SELECT * FROM (VALUES ('a'), ('b'), ('b'), ('c'), ('c'), ('c')) AS lhs(v) "
+        "INTERSECT ALL "
+        "SELECT * FROM (VALUES ('b'), ('b'), ('b'), ('c'), ('c')) AS rhs(v)"
+        "), observed(bucket, row_count) AS ("
+        "SELECT 'except_a', COUNT(*) FROM except_got WHERE v = 'a' "
+        "UNION ALL SELECT 'except_b', COUNT(*) FROM except_got WHERE v = 'b' "
+        "UNION ALL SELECT 'except_c', COUNT(*) FROM except_got WHERE v = 'c' "
+        "UNION ALL SELECT 'intersect_b', COUNT(*) FROM intersect_got WHERE v = 'b' "
+        "UNION ALL SELECT 'intersect_c', COUNT(*) FROM intersect_got WHERE v = 'c'"
+        ") "
+        "SELECT NOT ("
+        "SUM(CASE WHEN bucket = 'except_a' THEN row_count ELSE 0 END) = 1 "
+        "AND SUM(CASE WHEN bucket = 'except_b' THEN row_count ELSE 0 END) = 1 "
+        "AND SUM(CASE WHEN bucket = 'except_c' THEN row_count ELSE 0 END) = 2 "
+        "AND SUM(CASE WHEN bucket = 'intersect_b' THEN row_count ELSE 0 END) = 2 "
+        "AND SUM(CASE WHEN bucket = 'intersect_c' THEN row_count ELSE 0 END) = 2"
+        f") AS {_quote(op['as'])} "
+        "FROM observed"
+    )
+
+
 class DataFusionBackend(Backend):
     name = "datafusion"
 
@@ -272,6 +300,12 @@ class DataFusionBackend(Backend):
                     pending_order = None
                 elif kind == "tuple_anti_null_probe":
                     query = f"SELECT false AS {_quote(op['as'])}"
+                    current_cols = [op["as"]]
+                    visible_cols = [op["as"]]
+                    hidden_order_cols = []
+                    pending_order = None
+                elif kind == "setop_all_duplicate_probe":
+                    query = _setop_all_duplicate_probe_sql(op)
                     current_cols = [op["as"]]
                     visible_cols = [op["as"]]
                     hidden_order_cols = []

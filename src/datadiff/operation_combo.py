@@ -18,6 +18,7 @@ CANONICAL_OPERATION_ORDER = (
     "series_rtruediv_probe",
     "uint64_isin_probe",
     "tuple_anti_null_probe",
+    "setop_all_duplicate_probe",
     "json_predicate_order_probe",
     "sparse_mask_probe",
     "float_wrap_probe",
@@ -140,6 +141,8 @@ def _correctness_risks(sequence: list[str]) -> list[str]:
         risks.append("pandas_uint64_isin_precision")
     if "tuple_anti_null_probe" in op_set:
         risks.append("duckdb_tuple_anti_null_semantics")
+    if "setop_all_duplicate_probe" in op_set:
+        risks.append("datafusion_setop_all_duplicate_count")
     if "json_predicate_order_probe" in op_set:
         risks.append("duckdb_json_predicate_order_semantics")
     if "sparse_mask_probe" in op_set:

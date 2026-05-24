@@ -497,6 +497,21 @@ def test_oracle_classifies_duckdb_tuple_anti_null_semantics():
     assert findings[0].root_cause == "duckdb_tuple_anti_null_semantics"
 
 
+def test_oracle_classifies_datafusion_setop_all_duplicate_count():
+    case = generate_case(370030, profile="datafusion_setop_all_duplicate_count")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["setop_all_duplicate_mismatch"], [[False]]),
+            "datafusion": NormalizedResult("datafusion", "ok", ["setop_all_duplicate_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "datafusion_setop_all_duplicate_count"
+
+
 def test_oracle_classifies_duckdb_json_predicate_order_semantics():
     case = generate_case(370040, profile="duckdb_json_predicate_order_semantics")
 

@@ -105,6 +105,8 @@ class PandasBackend(Backend):
                     df = pd.DataFrame([{op["as"]: bool(observed)}], columns=[op["as"]])
                 elif kind == "tuple_anti_null_probe":
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
+                elif kind == "setop_all_duplicate_probe":
+                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "json_predicate_order_probe":
                     df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
                 elif kind == "sparse_mask_probe":

@@ -1128,6 +1128,67 @@ def test_classification_reference_understands_tuple_anti_null_probe():
     assert classification.implicated_backends == ["duckdb"]
 
 
+def test_validate_case_accepts_setop_all_duplicate_probe():
+    valid = Case(
+        "case-setop-all-duplicate-probe",
+        56,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-setop-all-duplicate-probe",
+            56,
+            [{"op": "setop_all_duplicate_probe", "as": "setop_all_duplicate_mismatch"}],
+        ),
+    )
+    bad_alias = Case(
+        "case-setop-all-duplicate-probe-alias",
+        57,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-setop-all-duplicate-probe-alias",
+            57,
+            [{"op": "setop_all_duplicate_probe", "as": "where"}],
+        ),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
+def test_classification_reference_understands_setop_all_duplicate_probe():
+    case = Case(
+        "case-setop-all-duplicate-reference",
+        58,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-setop-all-duplicate-reference",
+            58,
+            [{"op": "setop_all_duplicate_probe", "as": "setop_all_duplicate_mismatch"}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "datafusion_setop_all_duplicate_count",
+        "confidence": "high",
+        "suspicious_backends": ["datafusion"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["setop_all_duplicate_mismatch"], [[False]]),
+        "datafusion": NormalizedResult("datafusion", "ok", ["setop_all_duplicate_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "datafusion_setop_all_duplicate_count"},
+        ["reference", "datafusion"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["datafusion"]
+
+
 def test_validate_case_accepts_json_predicate_order_probe():
     valid = Case(
         "case-json-predicate-order-probe",

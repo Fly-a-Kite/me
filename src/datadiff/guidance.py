@@ -112,6 +112,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "duckdb_tuple_anti_null_semantics": {"pattern:duckdb_tuple_anti_null_semantics"},
     "tuple_anti_null_probe": {"op:tuple_anti_null_probe"},
     "tuple_null_membership": {"duckdb:tuple-anti-null", "nulls:ternary-membership"},
+    "datafusion_setop_all_duplicate_count": {"pattern:datafusion_setop_all_duplicate_count"},
+    "setop_all_duplicate_probe": {"op:setop_all_duplicate_probe"},
+    "setop_all_duplicates": {"sql:setop-all", "setop:duplicate-count"},
     "duckdb_json_predicate_order_semantics": {"pattern:duckdb_json_predicate_order_semantics"},
     "json_predicate_order_probe": {"op:json_predicate_order_probe"},
     "json_predicate_order": {"duckdb:json-predicate-order", "json:predicate-reorder"},
@@ -271,6 +274,7 @@ def extract_case_features(case: Case) -> set[str]:
     has_series_rtruediv_probe = False
     has_uint64_isin_probe = False
     has_tuple_anti_null_probe = False
+    has_setop_all_duplicate_probe = False
     has_json_predicate_order_probe = False
     has_sparse_mask_probe = False
     has_float_wrap_probe = False
@@ -385,6 +389,14 @@ def extract_case_features(case: Case) -> set[str]:
             features.add("nulls:ternary-membership")
             available_types = {str(op.get("as", "derived")): "bool"}
             has_tuple_anti_null_probe = True
+        elif kind == "setop_all_duplicate_probe":
+            features.add("datafusion:setop-all-duplicate-count")
+            features.add("sql:setop-all")
+            features.add("setop:except-all")
+            features.add("setop:intersect-all")
+            features.add("setop:duplicate-count")
+            available_types = {str(op.get("as", "derived")): "bool"}
+            has_setop_all_duplicate_probe = True
         elif kind == "json_predicate_order_probe":
             features.add("duckdb:json-predicate-order")
             features.add("json:predicate-reorder")
@@ -622,6 +634,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:pandas_uint64_isin_precision")
     if has_tuple_anti_null_probe:
         features.add("pattern:duckdb_tuple_anti_null_semantics")
+    if has_setop_all_duplicate_probe:
+        features.add("pattern:datafusion_setop_all_duplicate_count")
     if has_json_predicate_order_probe:
         features.add("pattern:duckdb_json_predicate_order_semantics")
     if has_sparse_mask_probe:
@@ -1713,6 +1727,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "setop_all_duplicate_probe":
+            score, op_buckets, samples = _setop_all_duplicate_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "json_predicate_order_probe":
             score, op_buckets, samples = _json_predicate_order_frontier_score(op)
             scores.append(score)
@@ -2240,6 +2259,18 @@ def _tuple_anti_null_frontier_score(op: dict[str, Any]) -> tuple[float, list[str
     return 0.90, buckets, {alias: [False]} if alias else {}
 
 
+def _setop_all_duplicate_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = str(op.get("as", ""))
+    buckets = [
+        "datafusion:setop-all-duplicate-count",
+        "sql:setop-all",
+        "setop:except-all",
+        "setop:intersect-all",
+        "setop:duplicate-count",
+    ]
+    return 0.95, buckets, {alias: [False]} if alias else {}
+
+
 def _json_predicate_order_frontier_score(op: dict[str, Any]) -> tuple[float, list[str], dict[str, list[Any]]]:
     alias = str(op.get("as", ""))
     buckets = ["duckdb:json-predicate-order", "json:predicate-reorder"]
@@ -2712,6 +2743,11 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("pandas_uint64_isin_precision")
     if "pattern:duckdb_tuple_anti_null_semantics" in features or "op:tuple_anti_null_probe" in features:
         roots.add("duckdb_tuple_anti_null_semantics")
+    if (
+        "pattern:datafusion_setop_all_duplicate_count" in features
+        or "op:setop_all_duplicate_probe" in features
+    ):
+        roots.add("datafusion_setop_all_duplicate_count")
     if "pattern:duckdb_json_predicate_order_semantics" in features or "op:json_predicate_order_probe" in features:
         roots.add("duckdb_json_predicate_order_semantics")
     if "pattern:pandas_sparse_array_mask_semantics" in features or "op:sparse_mask_probe" in features:

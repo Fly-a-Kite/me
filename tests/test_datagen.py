@@ -69,6 +69,9 @@ def _assert_program_columns_are_valid(case):
         elif op["op"] == "tuple_anti_null_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
+        elif op["op"] == "setop_all_duplicate_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
         elif op["op"] == "json_predicate_order_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
@@ -200,6 +203,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "polars_reverse_division_columns",
         "pandas_uint64_isin_precision",
         "duckdb_tuple_anti_null_semantics",
+        "datafusion_setop_all_duplicate_count",
         "duckdb_json_predicate_order_semantics",
         "pandas_sparse_array_mask_semantics",
         "polars_float_wrap_numerical_semantics",
@@ -836,6 +840,21 @@ def test_generate_case_duckdb_tuple_anti_null_semantics_profile_is_supported_and
     assert "pattern:duckdb_tuple_anti_null_semantics" in features
     assert "duckdb:tuple-anti-null" in features
     assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/22418"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_datafusion_setop_all_duplicate_count_profile_is_supported_and_valid():
+    case = generate_case(137, profile="datafusion_setop_all_duplicate_count")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000137-datafusion-setop-all-duplicate-count"
+    assert case.program.operations == [
+        {"op": "setop_all_duplicate_probe", "as": "setop_all_duplicate_mismatch"}
+    ]
+    assert "pattern:datafusion_setop_all_duplicate_count" in features
+    assert "datafusion:setop-all-duplicate-count" in features
+    assert case.metadata["source_issue"] == "https://github.com/apache/datafusion/issues/12956"
+    assert case.metadata["source_issue_alt"] == "https://github.com/apache/datafusion/issues/12955"
     assert validate_case_program(case) == []
 
 

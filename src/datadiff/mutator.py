@@ -498,6 +498,17 @@ def _append_tuple_anti_null_probe(tables: list[TableData], operations: list[dict
     return f"append_tuple_anti_null_probe:out={alias}"
 
 
+def _append_setop_all_duplicate_probe(
+    tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random
+) -> str:
+    if not tables:
+        return "append_setop_all_duplicate_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("setop_all_duplicate_mismatch", used=set(available))
+    operations.append({"op": "setop_all_duplicate_probe", "as": alias})
+    return f"append_setop_all_duplicate_probe:out={alias}"
+
+
 def _append_json_predicate_order_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
     if not tables:
         return "append_json_predicate_order_probe:none"
@@ -1043,6 +1054,7 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_series_rtruediv_probe", _append_series_rtruediv_probe),
     MutationOperator("append_uint64_isin_probe", _append_uint64_isin_probe),
     MutationOperator("append_tuple_anti_null_probe", _append_tuple_anti_null_probe),
+    MutationOperator("append_setop_all_duplicate_probe", _append_setop_all_duplicate_probe),
     MutationOperator("append_json_predicate_order_probe", _append_json_predicate_order_probe),
     MutationOperator("append_sparse_mask_probe", _append_sparse_mask_probe),
     MutationOperator("append_float_wrap_probe", _append_float_wrap_probe),

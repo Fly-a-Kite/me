@@ -134,6 +134,7 @@ PROBE_ROOTS = {
     "series_rtruediv_probe": "series_rtruediv_operand_order",
     "uint64_isin_probe": "pandas_uint64_isin_precision",
     "tuple_anti_null_probe": "duckdb_tuple_anti_null_semantics",
+    "setop_all_duplicate_probe": "datafusion_setop_all_duplicate_count",
     "json_predicate_order_probe": "duckdb_json_predicate_order_semantics",
     "sparse_mask_probe": "pandas_sparse_array_mask_semantics",
     "float_wrap_probe": "polars_float_wrap_numerical_semantics",

@@ -114,6 +114,9 @@ LIVE_BUGHUNT_TARGETS = [
     "uint64_isin_probe",
     "duckdb_tuple_anti_null_semantics",
     "tuple_anti_null_probe",
+    "datafusion_setop_all_duplicate_count",
+    "setop_all_duplicate_probe",
+    "setop_all_duplicates",
     "duckdb_json_predicate_order_semantics",
     "json_predicate_order_probe",
     "pandas_sparse_array_mask_semantics",
@@ -165,6 +168,9 @@ LIVE_DATAFUSION_FRESH_TARGETS = [
     "boolean_predicate_filter",
     "tuple_absence_filter",
     "row_value_absence_filter",
+    "datafusion_setop_all_duplicate_count",
+    "setop_all_duplicate_probe",
+    "setop_all_duplicates",
     "running_sum_precision",
     "running_sum",
     "sortedness_null_placement",
@@ -1599,6 +1605,8 @@ def _live_bughunt_config(
     metamorphic: bool = False,
     metamorphic_variant_limit: int = 4,
     known_saturated_bug_families: list[str] | None = None,
+    issue_replay_global_saturation_threshold: int = 2,
+    issue_replay_global_saturation_penalty: float = 2.0,
 ) -> ExperimentConfig:
     return ExperimentConfig(
         generator_profile=generator_profile,
@@ -1613,6 +1621,8 @@ def _live_bughunt_config(
         known_saturated_bug_families=list(
             known_saturated_bug_families or DEFAULT_KNOWN_SATURATED_BUG_FAMILIES
         ),
+        issue_replay_global_saturation_threshold=issue_replay_global_saturation_threshold,
+        issue_replay_global_saturation_penalty=issue_replay_global_saturation_penalty,
     )
 
 
@@ -2467,6 +2477,34 @@ def _preset_config(name: str) -> ExperimentConfig:
                 "tuple_anti_null_probe",
                 "tuple_null_membership",
                 "nulls",
+            ],
+            metamorphic_variant_limit=2,
+        )
+    if name == "datafusion_setop_all_duplicate_count":
+        return ExperimentConfig(
+            generator_profile="datafusion_setop_all_duplicate_count",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=[
+                "datafusion_setop_all_duplicate_count",
+                "setop_all_duplicate_probe",
+                "setop_all_duplicates",
+                "aggregation",
+            ],
+            metamorphic_variant_limit=0,
+        )
+    if name == "datafusion_setop_all_duplicate_count_metamorphic":
+        return ExperimentConfig(
+            generator_profile="datafusion_setop_all_duplicate_count",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=[
+                "datafusion_setop_all_duplicate_count",
+                "setop_all_duplicate_probe",
+                "setop_all_duplicates",
+                "aggregation",
             ],
             metamorphic_variant_limit=2,
         )
@@ -3422,6 +3460,7 @@ def _experiment_job_weight(job: dict) -> float:
         "polars_reverse_division_columns": 1.0,
         "pandas_uint64_isin_precision": 1.0,
         "duckdb_tuple_anti_null_semantics": 1.0,
+        "datafusion_setop_all_duplicate_count": 1.0,
         "duckdb_json_predicate_order_semantics": 1.0,
         "pandas_sparse_array_mask_semantics": 1.0,
         "polars_float_wrap_numerical_semantics": 1.0,
@@ -3546,7 +3585,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_fuzz.add_argument("--duration", default=None, help="wall-clock budget such as 10s, 5m, 24h")
     p_fuzz.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_fuzz)
-    p_fuzz.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "set_membership_filter", "pyarrow_groupby_filter_cast_membership", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "row_value_absence_filter", "running_sum_precision", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest", "bit_compare_unequal_length", "round_even_float_scale", "series_rtruediv_operand_order", "polars_reverse_division_columns", "pandas_uint64_isin_precision", "duckdb_tuple_anti_null_semantics", "duckdb_json_predicate_order_semantics", "pandas_sparse_array_mask_semantics", "polars_float_wrap_numerical_semantics", "pandas_index_bool_result_type", "polars_empty_literal_groupby_semantics", "pandas_arrow_string_eq_sum_semantics", "pandas_arrow_timestamp_loc_slice_semantics", "pandas_arrow_timestamp_index_attr_semantics", "pandas_eval_inplace_aliasing_semantics", "pyarrow_dataset_isin_all_match_semantics", "pyarrow_large_string_partition_schema_semantics", "pyarrow_hash_pivot_wider_order_semantics", "polars_rolling_mean_by_null_count_semantics"], default="common")
+    p_fuzz.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "set_membership_filter", "pyarrow_groupby_filter_cast_membership", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "row_value_absence_filter", "running_sum_precision", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest", "bit_compare_unequal_length", "round_even_float_scale", "series_rtruediv_operand_order", "polars_reverse_division_columns", "pandas_uint64_isin_precision", "duckdb_tuple_anti_null_semantics", "datafusion_setop_all_duplicate_count", "duckdb_json_predicate_order_semantics", "pandas_sparse_array_mask_semantics", "polars_float_wrap_numerical_semantics", "pandas_index_bool_result_type", "polars_empty_literal_groupby_semantics", "pandas_arrow_string_eq_sum_semantics", "pandas_arrow_timestamp_loc_slice_semantics", "pandas_arrow_timestamp_index_attr_semantics", "pandas_eval_inplace_aliasing_semantics", "pyarrow_dataset_isin_all_match_semantics", "pyarrow_large_string_partition_schema_semantics", "pyarrow_hash_pivot_wider_order_semantics", "polars_rolling_mean_by_null_count_semantics"], default="common")
     add_guidance_flags(p_fuzz, default_strategy="random", default_candidate_pool=8)
     add_ablation_flags(p_fuzz)
     add_paper_journal_flags(p_fuzz)
@@ -3557,7 +3596,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_long.add_argument("--duration", default="24h", help="wall-clock budget such as 10m, 24h, 2d")
     p_long.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_long)
-    p_long.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "set_membership_filter", "pyarrow_groupby_filter_cast_membership", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "row_value_absence_filter", "running_sum_precision", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest", "bit_compare_unequal_length", "round_even_float_scale", "series_rtruediv_operand_order", "polars_reverse_division_columns", "pandas_uint64_isin_precision", "duckdb_tuple_anti_null_semantics", "duckdb_json_predicate_order_semantics", "pandas_sparse_array_mask_semantics", "polars_float_wrap_numerical_semantics", "pandas_index_bool_result_type", "polars_empty_literal_groupby_semantics", "pandas_arrow_string_eq_sum_semantics", "pandas_arrow_timestamp_loc_slice_semantics", "pandas_arrow_timestamp_index_attr_semantics", "pandas_eval_inplace_aliasing_semantics", "pyarrow_dataset_isin_all_match_semantics", "pyarrow_large_string_partition_schema_semantics", "pyarrow_hash_pivot_wider_order_semantics", "polars_rolling_mean_by_null_count_semantics"], default="common")
+    p_long.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "set_membership_filter", "pyarrow_groupby_filter_cast_membership", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "row_value_absence_filter", "running_sum_precision", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest", "bit_compare_unequal_length", "round_even_float_scale", "series_rtruediv_operand_order", "polars_reverse_division_columns", "pandas_uint64_isin_precision", "duckdb_tuple_anti_null_semantics", "datafusion_setop_all_duplicate_count", "duckdb_json_predicate_order_semantics", "pandas_sparse_array_mask_semantics", "polars_float_wrap_numerical_semantics", "pandas_index_bool_result_type", "polars_empty_literal_groupby_semantics", "pandas_arrow_string_eq_sum_semantics", "pandas_arrow_timestamp_loc_slice_semantics", "pandas_arrow_timestamp_index_attr_semantics", "pandas_eval_inplace_aliasing_semantics", "pyarrow_dataset_isin_all_match_semantics", "pyarrow_large_string_partition_schema_semantics", "pyarrow_hash_pivot_wider_order_semantics", "polars_rolling_mean_by_null_count_semantics"], default="common")
     add_guidance_flags(p_long, default_strategy="guided", default_candidate_pool=8)
     p_long.add_argument("--case-log", default=None, help="optional JSONL path for generated test cases")
     p_long.add_argument("--checkpoint-interval", default="60s", help="checkpoint write interval")

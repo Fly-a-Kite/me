@@ -16,6 +16,7 @@ from datadiff.mutator import (
     _append_series_rtruediv_probe,
     _append_uint64_isin_probe,
     _append_tuple_anti_null_probe,
+    _append_setop_all_duplicate_probe,
     _append_json_predicate_order_probe,
     _append_sparse_mask_probe,
     _append_float_wrap_probe,
@@ -170,6 +171,7 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_series_rtruediv_probe" in MUTATION_OPERATOR_NAMES
     assert "append_uint64_isin_probe" in MUTATION_OPERATOR_NAMES
     assert "append_tuple_anti_null_probe" in MUTATION_OPERATOR_NAMES
+    assert "append_setop_all_duplicate_probe" in MUTATION_OPERATOR_NAMES
     assert "append_json_predicate_order_probe" in MUTATION_OPERATOR_NAMES
     assert "append_sparse_mask_probe" in MUTATION_OPERATOR_NAMES
     assert "append_float_wrap_probe" in MUTATION_OPERATOR_NAMES
@@ -504,6 +506,30 @@ def test_append_tuple_anti_null_probe_mutation_stays_valid():
     assert detail.startswith("append_tuple_anti_null_probe:")
     assert operations[-1] == {"op": "tuple_anti_null_probe", "as": "tuple_anti_null_mismatch"}
     case = Case("case-mut-tuple-anti-null", 1, [table], Program("prog-mut-tuple-anti-null", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_setop_all_duplicate_probe_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int")],
+        [{"id": 0, "x": 2}],
+    )
+    operations = [{"op": "select", "columns": ["id"]}]
+
+    detail = _append_setop_all_duplicate_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_setop_all_duplicate_probe:")
+    assert operations[-1] == {
+        "op": "setop_all_duplicate_probe",
+        "as": "setop_all_duplicate_mismatch",
+    }
+    case = Case(
+        "case-mut-setop-all-duplicate",
+        1,
+        [table],
+        Program("prog-mut-setop-all-duplicate", 1, operations),
+    )
     assert validate_case_program(case) == []
 
 

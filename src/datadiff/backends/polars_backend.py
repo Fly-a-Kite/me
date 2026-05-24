@@ -96,6 +96,8 @@ class PolarsBackend(Backend):
                     df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "tuple_anti_null_probe":
                     df = pl.DataFrame({op["as"]: [False]})
+                elif kind == "setop_all_duplicate_probe":
+                    df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "json_predicate_order_probe":
                     df = pl.DataFrame({op["as"]: [False]})
                 elif kind == "sparse_mask_probe":
@@ -293,6 +295,8 @@ class PolarsLazyBackend(PolarsBackend):
                 elif kind == "uint64_isin_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "tuple_anti_null_probe":
+                    lf = pl.DataFrame({op["as"]: [False]}).lazy()
+                elif kind == "setop_all_duplicate_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()
                 elif kind == "json_predicate_order_probe":
                     lf = pl.DataFrame({op["as"]: [False]}).lazy()

@@ -541,6 +541,15 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("duckdb_tuple_anti_null_semantics").generator_profile == "duckdb_tuple_anti_null_semantics"
     assert _preset_config("duckdb_tuple_anti_null_semantics").guidance_targets[0] == "duckdb_tuple_anti_null_semantics"
     assert _preset_config("duckdb_tuple_anti_null_semantics_metamorphic").enable_metamorphic_oracle is True
+    assert (
+        _preset_config("datafusion_setop_all_duplicate_count").generator_profile
+        == "datafusion_setop_all_duplicate_count"
+    )
+    assert (
+        _preset_config("datafusion_setop_all_duplicate_count").guidance_targets[0]
+        == "datafusion_setop_all_duplicate_count"
+    )
+    assert _preset_config("datafusion_setop_all_duplicate_count_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("duckdb_json_predicate_order_semantics").generator_profile == "duckdb_json_predicate_order_semantics"
     assert _preset_config("duckdb_json_predicate_order_semantics").guidance_targets[0] == "duckdb_json_predicate_order_semantics"
     assert _preset_config("duckdb_json_predicate_order_semantics_metamorphic").enable_metamorphic_oracle is True
@@ -679,8 +688,8 @@ def test_cli_parses_live_datafusion_presets():
     assert live.family_saturation_threshold == 8
     assert live.issue_replay_saturation_threshold == 1
     assert live.issue_replay_saturation_penalty == 1.0
-    assert live.issue_replay_global_saturation_threshold == 4
-    assert live.issue_replay_global_saturation_penalty == 1.5
+    assert live.issue_replay_global_saturation_threshold == 2
+    assert live.issue_replay_global_saturation_penalty == 2.0
     assert live.issue_inspired_source_saturation_threshold == 3
     assert live.issue_inspired_source_saturation_penalty == 1.25
     assert "groupby_aggregation@datafusion" in live.known_saturated_bug_families
@@ -690,7 +699,15 @@ def test_cli_parses_live_datafusion_presets():
     assert "ordered_topk_projection@datafusion" in live.known_saturated_bug_families
     assert "outer_join_truth_filter@datafusion" in live.known_saturated_bug_families
     assert "topk_filter_pushdown@datafusion" in live.known_saturated_bug_families
-    assert {"common_workflow", "operation_combo", "topk", "join", "groupby", "join_null_key_topk"}.issubset(live.guidance_targets)
+    assert {
+        "common_workflow",
+        "operation_combo",
+        "topk",
+        "join",
+        "groupby",
+        "join_null_key_topk",
+        "datafusion_setop_all_duplicate_count",
+    }.issubset(live.guidance_targets)
 
     metamorphic = _preset_config("live_datafusion_metamorphic")
     assert metamorphic.enable_metamorphic_oracle is True
@@ -702,10 +719,12 @@ def test_cli_parses_live_datafusion_presets():
     assert fresh.guidance_strategy == "guided"
     assert fresh.enable_local_source_scheduler is True
     assert fresh.local_source_exploration_weight == 0.45
+    assert fresh.issue_replay_global_saturation_threshold == 2
+    assert fresh.issue_replay_global_saturation_penalty == 2.0
     assert "groupby" not in fresh.guidance_targets
     assert "sort_offset" not in fresh.guidance_targets
     assert "wide_offset_topk" not in fresh.guidance_targets
-    assert {"join", "mutate", "filter", "truth_filter", "set_membership_filter"}.issubset(
+    assert {"join", "mutate", "filter", "truth_filter", "set_membership_filter", "setop_all_duplicates"}.issubset(
         fresh.guidance_targets
     )
     assert "joined_order_offset_projection@datafusion" in fresh.known_saturated_bug_families
@@ -765,6 +784,8 @@ def test_cli_parses_non_datafusion_live_presets():
         "polars_rolling_mean_by_null_count_semantics",
     }.issubset(arrow.guidance_targets)
     assert arrow.enable_local_source_scheduler is True
+    assert arrow.issue_replay_global_saturation_threshold == 2
+    assert arrow.issue_replay_global_saturation_penalty == 2.0
 
     polars_lazy = _preset_config("live_polars_lazy")
     assert polars_lazy.generator_profile == "bughunt"
@@ -777,6 +798,8 @@ def test_cli_parses_non_datafusion_live_presets():
         "polars_reverse_division_columns",
     }.issubset(polars_lazy.guidance_targets)
     assert polars_lazy.local_source_exploration_weight == 0.45
+    assert polars_lazy.issue_replay_global_saturation_threshold == 2
+    assert polars_lazy.issue_replay_global_saturation_penalty == 2.0
     assert "reverse_division_operand_order@polars" in polars_lazy.known_saturated_bug_families
 
     embedded_sql = _preset_config("live_embedded_sql")
@@ -785,6 +808,8 @@ def test_cli_parses_non_datafusion_live_presets():
         embedded_sql.guidance_targets
     )
     assert "tuple_absence_null_filter@duckdb" in embedded_sql.known_saturated_bug_families
+    assert embedded_sql.issue_replay_global_saturation_threshold == 2
+    assert embedded_sql.issue_replay_global_saturation_penalty == 2.0
 
     cross_family = _preset_config("live_cross_family")
     assert cross_family.generator_profile == "bughunt"
@@ -796,6 +821,8 @@ def test_cli_parses_non_datafusion_live_presets():
         "topk",
         "pyarrow_groupby_filter_cast_membership",
     }.issubset(cross_family.guidance_targets)
+    assert cross_family.issue_replay_global_saturation_threshold == 2
+    assert cross_family.issue_replay_global_saturation_penalty == 2.0
 
 
 def test_cli_parses_non_datafusion_live_metamorphic_presets():

@@ -49,6 +49,7 @@ GeneratorProfile = Literal[
     "polars_reverse_division_columns",
     "pandas_uint64_isin_precision",
     "duckdb_tuple_anti_null_semantics",
+    "datafusion_setop_all_duplicate_count",
     "duckdb_json_predicate_order_semantics",
     "pandas_sparse_array_mask_semantics",
     "polars_float_wrap_numerical_semantics",

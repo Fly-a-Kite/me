@@ -124,6 +124,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     series_rtruediv_operand_order = _preset_config("series_rtruediv_operand_order")
     pandas_uint64_isin_precision = _preset_config("pandas_uint64_isin_precision")
     duckdb_tuple_anti_null_semantics = _preset_config("duckdb_tuple_anti_null_semantics")
+    datafusion_setop_all_duplicate_count = _preset_config("datafusion_setop_all_duplicate_count")
     duckdb_json_predicate_order_semantics = _preset_config("duckdb_json_predicate_order_semantics")
     pandas_sparse_array_mask_semantics = _preset_config("pandas_sparse_array_mask_semantics")
     polars_float_wrap_numerical_semantics = _preset_config("polars_float_wrap_numerical_semantics")
@@ -227,6 +228,10 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert duckdb_tuple_anti_null_semantics.generator_profile == "duckdb_tuple_anti_null_semantics"
     assert {"tuple_anti_null_probe", "tuple_null_membership", "nulls"}.issubset(
         duckdb_tuple_anti_null_semantics.guidance_targets
+    )
+    assert datafusion_setop_all_duplicate_count.generator_profile == "datafusion_setop_all_duplicate_count"
+    assert {"setop_all_duplicate_probe", "setop_all_duplicates", "aggregation"}.issubset(
+        datafusion_setop_all_duplicate_count.guidance_targets
     )
     assert duckdb_json_predicate_order_semantics.generator_profile == "duckdb_json_predicate_order_semantics"
     assert {"json_predicate_order_probe", "json_predicate_order", "filter"}.issubset(
