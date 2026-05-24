@@ -1352,6 +1352,7 @@ def cmd_replay_fixture(args: argparse.Namespace) -> int:
     run_theme = str(args.run_theme or f"{evidence_mode}-fixture:{known_bug_id or case.case_id}")
     paper_notes = str(args.paper_notes or spec.get("paper_notes") or "")
     config = ExperimentConfig(
+        enable_replay_bug=evidence_mode == "historical",
         enable_artifact=not args.disable_artifact,
         compress_run_log=not args.no_compress_run_log,
         artifact_limit=args.artifact_limit,

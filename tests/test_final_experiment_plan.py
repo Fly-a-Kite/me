@@ -98,6 +98,26 @@ def test_live_and_seeded_commands_record_evidence_mode():
     assert "--run-theme" in by_track["seeded"].command
 
 
+def test_final_plan_explicitly_separates_fresh_and_replay_policy():
+    module = _module()
+
+    commands = module.build_plan(_args())
+    live = [command for command in commands if command.track == "live"]
+    historical = [command for command in commands if command.track == "historical"]
+
+    assert live
+    assert all("--enable-replay-bug" not in command.command for command in live)
+    assert all("--replay-bug-source-issues" in command.command for command in live)
+    assert all(command.replay_bug_policy["enable_replay_bug"] is False for command in live)
+    assert historical
+    assert all("--enable-replay-bug" in command.command for command in historical)
+    assert all(command.replay_bug_policy["enable_replay_bug"] is True for command in historical)
+    assert "https://github.com/duckdb/duckdb/issues/22075" in _flag_value(
+        {command.name: command for command in historical}["duckdb-22075"].command,
+        "--replay-bug-source-issues",
+    )
+
+
 def test_execute_all_is_rejected_for_mixed_environments(capsys):
     module = _module()
 

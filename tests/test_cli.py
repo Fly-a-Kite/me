@@ -1441,6 +1441,7 @@ def test_cli_replay_fixture_records_single_case_run_and_journal(tmp_path, monkey
     assert meta["evidence_mode"] == "historical"
     assert meta["known_bug_id"] == "fixture-test"
     assert meta["fixture_sha256"] == fixture_sha256(fixture_path)
+    assert meta["config"]["enable_replay_bug"] is True
     assert '"known_bug_id": "fixture-test"' in journal
 
 

@@ -7,7 +7,7 @@ import shlex
 import subprocess
 import sys
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Iterable
 
@@ -15,6 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES  # noqa: E402
 from datadiff.historical import list_historical_bugs  # noqa: E402
 from datadiff.util import REPORTS_DIR, utc_now  # noqa: E402
 
@@ -32,6 +33,7 @@ class FinalCommand:
     count_as_real_bugs: bool
     expected_output: str
     notes: str = ""
+    replay_bug_policy: dict[str, object] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -152,6 +154,7 @@ def build_plan(args: argparse.Namespace) -> list[FinalCommand]:
 
 def live_discovery_commands(args: argparse.Namespace) -> list[FinalCommand]:
     commands = []
+    replay_sources = replay_source_issues()
     for suite, preset, purpose in LIVE_DISCOVERY_SUITES:
         cmd = [
             str(DATADIFF),
@@ -170,6 +173,8 @@ def live_discovery_commands(args: argparse.Namespace) -> list[FinalCommand]:
             f"final-live:{suite}:{preset}",
             "--paper-notes",
             purpose,
+            "--replay-bug-source-issues",
+            ",".join(replay_sources),
             "--artifact-limit",
             str(max(0, int(args.artifact_limit))),
             "--log-level",
@@ -189,9 +194,14 @@ def live_discovery_commands(args: argparse.Namespace) -> list[FinalCommand]:
                 count_as_real_bugs=True,
                 expected_output="runs/experiment-*.json plus reports from experiment-summary/analyze-experiment",
                 notes=(
+                    "Fresh/latest mode keeps enable_replay_bug=false and filters known replay probes. "
                     "Run without changing generator/oracle code after inspecting findings. "
                     "Count unique candidate bug families, then separately mark maintainer-confirmed bugs."
                 ),
+                replay_bug_policy={
+                    "enable_replay_bug": False,
+                    "source_issues": replay_sources,
+                },
             )
         )
     return commands
@@ -211,6 +221,7 @@ def historical_replay_commands(args: argparse.Namespace) -> list[FinalCommand]:
             else int(getattr(spec, "default_artifact_limit"))
         )
         log_level = str(getattr(spec, "default_log_level", "") or args.log_level)
+        replay_sources = replay_source_issues(spec.issue_url)
         cmd = [
             str(DATADIFF),
             "experiment",
@@ -228,6 +239,9 @@ def historical_replay_commands(args: argparse.Namespace) -> list[FinalCommand]:
             spec.bug_id,
             "--target-version",
             spec.target_version,
+            "--enable-replay-bug",
+            "--replay-bug-source-issues",
+            ",".join(replay_sources),
             "--run-theme",
             f"final-historical:{spec.bug_id}",
             "--paper-notes",
@@ -252,14 +266,20 @@ def historical_replay_commands(args: argparse.Namespace) -> list[FinalCommand]:
                 expected_output="historical experiment manifest and expected-root detection metrics",
                 notes=(
                     f"status={spec.status}; run inside an environment whose backend version is "
-                    f"{spec.target_version}. {spec.notes}"
+                    f"{spec.target_version}. Replay mode sets enable_replay_bug=true but uses the "
+                    f"same generator/oracle/runner path as fresh mode. {spec.notes}"
                 ).strip(),
+                replay_bug_policy={
+                    "enable_replay_bug": True,
+                    "source_issues": replay_sources,
+                },
             )
         )
     return commands
 
 
 def _historical_fixture_replay_command(spec: object, args: argparse.Namespace) -> FinalCommand:
+    replay_sources = replay_source_issues(str(getattr(spec, "issue_url", "")))
     cmd = [
         str(DATADIFF),
         "replay-fixture",
@@ -295,6 +315,10 @@ def _historical_fixture_replay_command(spec: object, args: argparse.Namespace) -
             f"status={getattr(spec, 'status')}; set {getattr(spec, 'fixture_env')} to the "
             f"external fixture path before execution. {getattr(spec, 'notes')}"
         ).strip(),
+        replay_bug_policy={
+            "enable_replay_bug": True,
+            "source_issues": replay_sources,
+        },
     )
 
 
@@ -333,6 +357,10 @@ def seeded_sensitivity_command(args: argparse.Namespace) -> FinalCommand:
         count_as_real_bugs=False,
         expected_output="seeded-sensitivity report; do not include these in real bug counts",
         notes="Use this to support method validity, not as backend bug evidence.",
+        replay_bug_policy={
+            "enable_replay_bug": False,
+            "source_issues": replay_source_issues(),
+        },
     )
 
 
@@ -351,10 +379,20 @@ def write_plan(commands: Iterable[FinalCommand], args: argparse.Namespace) -> Pa
             "historical_counts": "Historical runs count only confirmed_fixed specs; pending/candidate specs are case studies.",
             "seeded_counts": "Seeded runs measure sensitivity only and do not count as real bugs.",
             "family_key": "root_cause + suspicious_backends",
+            "replay_bug_gate": (
+                "Final live commands explicitly keep enable_replay_bug=false; historical commands "
+                "explicitly enable replay while using the same middle/bottom harness."
+            ),
         },
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
+
+
+def replay_source_issues(*extra_sources: str) -> list[str]:
+    sources = [str(source).strip().rstrip("/") for source in DEFAULT_REPLAY_BUG_SOURCE_ISSUES]
+    sources.extend(str(source).strip().rstrip("/") for source in extra_sources)
+    return sorted({source for source in sources if source})
 
 
 def shell_join(command: list[str]) -> str:
