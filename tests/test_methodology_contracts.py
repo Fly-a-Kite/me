@@ -125,6 +125,17 @@ def test_methodology_fresh_and_replay_share_case_policy_gate():
         )
 
 
+def test_methodology_replay_source_gate_spans_historical_projects():
+    required_sources = {
+        "https://github.com/apache/datafusion/issues/22190",
+        "https://github.com/duckdb/duckdb/issues/22075",
+        "https://github.com/duckdb/duckdb/issues/22656",
+        "https://github.com/apache/arrow/issues/42231",
+    }
+
+    assert required_sources.issubset(set(DEFAULT_REPLAY_BUG_SOURCE_ISSUES))
+
+
 def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     null_groupby = _preset_config("null_groupby_topk")
     null_agg = _preset_config("null_agg_topk")

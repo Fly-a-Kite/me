@@ -85,6 +85,11 @@ DEFAULT_REPLAY_BUG_SOURCE_ISSUES = [
     "https://github.com/apache/datafusion/issues/22441",
     "https://github.com/apache/datafusion/issues/12956",
     "https://github.com/apache/datafusion/issues/12955",
+    "https://github.com/duckdb/duckdb/issues/3015",
+    "https://github.com/duckdb/duckdb/issues/11261",
+    "https://github.com/duckdb/duckdb/issues/22075",
+    "https://github.com/duckdb/duckdb/issues/22656",
+    "https://github.com/apache/arrow/issues/42231",
 ]
 
 

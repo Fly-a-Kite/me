@@ -1706,7 +1706,12 @@ def generate_storage_offset_case(seed: int) -> Case:
         seed=seed,
         tables=[table],
         program=program,
-        metadata={"generator_profile": "storage_offset", "row_count": row_count, "offset": offset},
+        metadata={
+            "generator_profile": "storage_offset",
+            "source_issue": "https://github.com/duckdb/duckdb/issues/22656",
+            "row_count": row_count,
+            "offset": offset,
+        },
     )
 
 

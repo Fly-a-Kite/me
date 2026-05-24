@@ -395,6 +395,7 @@ def test_generate_case_storage_offset_profile_is_supported_and_valid():
     assert even.program.operations[0]["columns"] == ["id"]
     assert even.program.operations[1] == {"op": "offset", "n": 0}
     assert even.metadata["row_count"] == 300_000
+    assert even.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/22656"
     assert len(even.tables[0].rows) == 300_000
     assert odd.program.operations[1] == {"op": "offset", "n": 200_000}
     assert validate_case_program(even) == []

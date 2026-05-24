@@ -46,6 +46,25 @@ def test_replay_policy_blocks_submitted_source_issue_without_project_specific_co
     )
 
 
+def test_replay_policy_blocks_non_datafusion_historical_source_issues():
+    cases = [
+        generate_case(11261, profile="wide_offset_topk"),
+        generate_case(22656, profile="storage_offset"),
+        generate_case(22075, profile="post_topk_range_filter"),
+    ]
+
+    for case in cases:
+        assert case_discovery_origin(case) == "issue_inspired"
+        assert (
+            replay_bug_filter_reason(
+                case,
+                enable_replay_bug=False,
+                replay_bug_source_issues=DEFAULT_REPLAY_BUG_SOURCE_ISSUES,
+            )
+            == "known_replay_source_issue"
+        )
+
+
 def test_replay_policy_allows_organic_fresh_cases():
     case = generate_case(42, profile="row_value_absence_filter")
 
