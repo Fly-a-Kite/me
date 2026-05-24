@@ -1,0 +1,98 @@
+{
+  "datafusion": {
+    "backend": "datafusion",
+    "columns": [
+      "g"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        "alpha"
+      ],
+      [
+        "alpha"
+      ],
+      [
+        "alpha"
+      ],
+      [
+        "alpha"
+      ],
+      [
+        "A"
+      ],
+      [
+        "uc"
+      ],
+      [
+        "uc"
+      ]
+    ],
+    "status": "ok"
+  },
+  "duckdb": {
+    "backend": "duckdb",
+    "columns": [
+      "g"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        "alpha"
+      ],
+      [
+        "alpha"
+      ],
+      [
+        "alpha"
+      ],
+      [
+        "A"
+      ],
+      [
+        "uc"
+      ],
+      [
+        "uc"
+      ],
+      [
+        "uc"
+      ]
+    ],
+    "status": "ok"
+  },
+  "pandas": {
+    "backend": "pandas",
+    "columns": [
+      "g"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        "alpha"
+      ],
+      [
+        "alpha"
+      ],
+      [
+        "alpha"
+      ],
+      [
+        "A"
+      ],
+      [
+        "uc"
+      ],
+      [
+        "uc"
+      ],
+      [
+        "uc"
+      ]
+    ],
+    "status": "ok"
+  }
+}

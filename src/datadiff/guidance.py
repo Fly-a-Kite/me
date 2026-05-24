@@ -9,6 +9,7 @@ from typing import Any
 from datadiff.dsl import Case, normalize_sort_keys
 from datadiff.filtering import evaluate_filter_predicate, parse_filter_comparator
 from datadiff.operation_combo import classify_operation_combo
+from datadiff.oracle import PROBE_ROOTS
 from datadiff.reward import (
     candidate_bug_family_keys,
     candidate_bug_signatures,
@@ -161,6 +162,7 @@ TARGET_ALIASES: dict[str, set[str]] = {
 PATTERN_TARGET_WEIGHT = 8.0
 GENERIC_COMPANION_TARGET_WEIGHT = 0.25
 TEMPLATE_TARGET_BONUS = 3.0
+ISSUE_REPLAY_OPS = frozenset(PROBE_ROOTS) | {"running_sum", "tuple_absence_filter"}
 
 
 def parse_guidance_targets(value: str | list[str] | tuple[str, ...] | None) -> list[str]:
@@ -173,6 +175,15 @@ def parse_guidance_targets(value: str | list[str] | tuple[str, ...] | None) -> l
         if text:
             targets.append(text)
     return targets
+
+
+def _case_source_issue(case: Case) -> str:
+    metadata = case.metadata if isinstance(case.metadata, dict) else {}
+    return str(metadata.get("source_issue") or metadata.get("source_issue_alt") or "").strip()
+
+
+def _uses_issue_replay_ops(op_names: list[str]) -> bool:
+    return any(op_name in ISSUE_REPLAY_OPS for op_name in op_names)
 
 
 def extract_case_features(case: Case) -> set[str]:
@@ -520,6 +531,9 @@ def extract_case_features(case: Case) -> set[str]:
     if op_names:
         features.add("opseq:" + ">".join(op_names))
         features.add(_bucket("op_count", len(op_names), [(1, "one"), (3, "few"), (5, "many")], "deep"))
+    source_issue = _case_source_issue(case)
+    if source_issue:
+        features.add("source:issue_replay" if _uses_issue_replay_ops(op_names) else "source:issue_inspired")
     combo = classify_operation_combo(case.program.operations)
     features.add(f"combo:{combo['template']}")
     features.add(f"combo_frequency:{combo['frequency_bucket']}")
@@ -740,6 +754,9 @@ class GuidanceState:
     known_saturated_bug_families: list[str] = field(default_factory=list)
     issue_replay_saturation_threshold: int = 1
     issue_replay_saturation_penalty: float = 1.0
+    issue_replay_global_saturation_threshold: int = 4
+    issue_replay_global_saturation_penalty: float = 1.5
+    issue_replay_count: int = 0
     active_backends: list[str] = field(default_factory=list)
 
     def choose_case(self, candidates: list[Case]) -> GuidanceDecision:
@@ -749,6 +766,11 @@ class GuidanceState:
         contributing = [decision for decision in scored if self._is_contributing_candidate(decision)]
         if not contributing:
             contributing = [max(scored, key=lambda decision: (decision.score, -decision.case.seed))]
+        non_global_replay_candidates = [
+            decision for decision in contributing if not _decision_has_issue_replay_global_saturation(decision)
+        ]
+        if non_global_replay_candidates:
+            contributing = non_global_replay_candidates
         pruned = len(scored) - len(contributing)
         for decision in contributing:
             decision.contributing_candidate_count = len(contributing)
@@ -761,6 +783,14 @@ class GuidanceState:
             if unsaturated_targeted:
                 targeted = unsaturated_targeted
             elif len(targeted) < len(contributing):
+                unsaturated_contributing = [
+                    decision for decision in contributing if not _decision_has_family_saturation(decision)
+                ]
+                if unsaturated_contributing:
+                    return max(
+                        unsaturated_contributing,
+                        key=lambda decision: (decision.score, -decision.case.seed),
+                    )
                 return max(contributing, key=lambda decision: (decision.score, -decision.case.seed))
             return max(targeted, key=_targeted_decision_key)
         return max(contributing, key=lambda decision: (decision.score, -decision.case.seed))
@@ -790,7 +820,9 @@ class GuidanceState:
                 root = str(finding.get("root_cause", "unknown"))
                 self.root_cause_counts[root] += 1
             self.candidate_bug_family_counts.update(candidate_bug_family_keys(findings))
-            self.issue_replay_family_counts.update(issue_replay_candidate_bug_family_keys(findings))
+            issue_replay_families = issue_replay_candidate_bug_family_keys(findings)
+            self.issue_replay_family_counts.update(issue_replay_families)
+            self.issue_replay_count += sum(issue_replay_families.values())
             self.candidate_bug_signature_counts.update(candidate_bug_signatures(findings))
 
     def _score_case(self, case: Case, candidate_count: int) -> GuidanceDecision:
@@ -835,6 +867,8 @@ class GuidanceState:
         family_saturation_active = False
         issue_replay_saturation_penalty = 0.0
         issue_replay_saturation_active = False
+        issue_replay_global_saturation_penalty = 0.0
+        issue_replay_global_saturation_active = False
         if self.enable_family_saturation:
             family_saturation_penalty = _predicted_family_saturation_penalty(
                 predicted_roots,
@@ -866,6 +900,16 @@ class GuidanceState:
                 active_backends=self.active_backends,
                 threshold=self.issue_replay_saturation_threshold,
             )
+            if "source:issue_replay" in features:
+                issue_replay_global_saturation_penalty = _family_saturation(
+                    self.issue_replay_count,
+                    threshold=self.issue_replay_global_saturation_threshold,
+                    penalty_weight=self.issue_replay_global_saturation_penalty,
+                )
+                issue_replay_global_saturation_active = _is_globally_saturated(
+                    self.issue_replay_count,
+                    threshold=self.issue_replay_global_saturation_threshold,
+                )
         if matched_targets:
             saturation_multiplier = 0.35 if specific_target_matches else 0.85
             feature_saturation_penalty *= saturation_multiplier
@@ -873,6 +917,10 @@ class GuidanceState:
             profile_saturation_penalty *= saturation_multiplier
             family_saturation_penalty *= saturation_multiplier
             issue_replay_saturation_penalty *= saturation_multiplier
+            issue_replay_global_saturation_penalty *= saturation_multiplier
+        issue_replay_saturation_active_any = (
+            issue_replay_saturation_active or issue_replay_global_saturation_active
+        )
         contribution_potential = _contribution_potential(
             features,
             frontier_buckets,
@@ -907,6 +955,7 @@ class GuidanceState:
             + profile_saturation_penalty
             + family_saturation_penalty
             + issue_replay_saturation_penalty
+            + issue_replay_global_saturation_penalty
         )
         return GuidanceDecision(
             case=case,
@@ -936,10 +985,14 @@ class GuidanceState:
                 "profile_saturation_penalty": -profile_saturation_penalty,
                 "family_saturation_penalty": -family_saturation_penalty,
                 "family_saturation_active": (
-                    1.0 if (family_saturation_active or issue_replay_saturation_active) else 0.0
+                    1.0 if (family_saturation_active or issue_replay_saturation_active_any) else 0.0
                 ),
                 "issue_replay_saturation_penalty": -issue_replay_saturation_penalty,
-                "issue_replay_saturation_active": 1.0 if issue_replay_saturation_active else 0.0,
+                "issue_replay_saturation_active": 1.0 if issue_replay_saturation_active_any else 0.0,
+                "issue_replay_global_saturation_penalty": -issue_replay_global_saturation_penalty,
+                "issue_replay_global_saturation_active": (
+                    1.0 if issue_replay_global_saturation_active else 0.0
+                ),
             },
         )
 
@@ -969,6 +1022,10 @@ def _targeted_decision_key(decision: GuidanceDecision) -> tuple[float, float, fl
 
 def _decision_has_family_saturation(decision: GuidanceDecision) -> bool:
     return decision.score_breakdown.get("family_saturation_active", 0.0) > 0.0
+
+
+def _decision_has_issue_replay_global_saturation(decision: GuidanceDecision) -> bool:
+    return decision.score_breakdown.get("issue_replay_global_saturation_active", 0.0) > 0.0
 
 
 def _matched_targets(features: set[str], targets: list[str]) -> list[str]:
@@ -1131,6 +1188,10 @@ def _family_saturation(count: int, *, threshold: int, penalty_weight: float) -> 
     if count < threshold:
         return 0.0
     return max(0.0, penalty_weight) * (1.0 + math.log1p(count - threshold))
+
+
+def _is_globally_saturated(count: int, *, threshold: int) -> bool:
+    return threshold > 0 and count >= threshold
 
 
 def _profile_saturation(count: int) -> float:
@@ -2617,6 +2678,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("groupby_aggregation")
     if "op:join" in features:
         roots.add("join_semantics")
+        if {"op:sort", "op:offset", "op:select"}.issubset(features):
+            roots.add("joined_order_offset_projection")
     if "op:groupby" in features:
         roots.add("float_group_key_instability" if "pattern:float_group_key" in features else "groupby_aggregation")
     if "op:aggregate" in features:

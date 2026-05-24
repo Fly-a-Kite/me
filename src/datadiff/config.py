@@ -105,6 +105,8 @@ class ExperimentConfig:
     known_saturated_bug_families: list[str] = field(default_factory=list)
     issue_replay_saturation_threshold: int = 1
     issue_replay_saturation_penalty: float = 1.0
+    issue_replay_global_saturation_threshold: int = 4
+    issue_replay_global_saturation_penalty: float = 1.5
     metamorphic_variant_limit: int = 4
     log_level: LogLevel = "compact"
 

@@ -1,0 +1,214 @@
+{
+  "case_id": "case-00104257-bughunt-mut-109514",
+  "metadata": {
+    "candidate_source": "feedback_mutation",
+    "mutation": {
+      "changed": true,
+      "detail": "append_order_projection:s:tail=limit",
+      "operator": "append_order_projection"
+    },
+    "seed_lineage": {
+      "depth": 1,
+      "mutation_seed": 109514,
+      "parent_case_id": "case-00104257-bughunt",
+      "parent_seed": 104257,
+      "root_seed": 104257
+    }
+  },
+  "program": {
+    "operations": [
+      {
+        "how": "inner",
+        "left_on": "id",
+        "op": "join",
+        "right_on": "id",
+        "table": "t1"
+      },
+      {
+        "column": "m_0",
+        "expr": {
+          "kind": "add_const",
+          "source": "id",
+          "value": -2
+        },
+        "op": "mutate"
+      },
+      {
+        "keys": [
+          {
+            "ascending": true,
+            "column": "id",
+            "nulls": "first"
+          },
+          {
+            "ascending": true,
+            "column": "flag",
+            "nulls": "last"
+          },
+          {
+            "ascending": true,
+            "column": "g",
+            "nulls": "first"
+          },
+          {
+            "ascending": false,
+            "column": "j",
+            "nulls": "first"
+          },
+          {
+            "ascending": true,
+            "column": "m_0",
+            "nulls": "last"
+          },
+          {
+            "ascending": true,
+            "column": "s",
+            "nulls": "first"
+          },
+          {
+            "ascending": true,
+            "column": "tag",
+            "nulls": "last"
+          },
+          {
+            "ascending": false,
+            "column": "x",
+            "nulls": "first"
+          },
+          {
+            "ascending": false,
+            "column": "y",
+            "nulls": "first"
+          },
+          {
+            "ascending": true,
+            "column": "z",
+            "nulls": "last"
+          }
+        ],
+        "op": "sort"
+      },
+      {
+        "n": 1,
+        "op": "offset"
+      },
+      {
+        "keys": [
+          {
+            "ascending": false,
+            "column": "s",
+            "nulls": "first"
+          },
+          {
+            "ascending": false,
+            "column": "g",
+            "nulls": "first"
+          },
+          {
+            "ascending": true,
+            "column": "j",
+            "nulls": "last"
+          }
+        ],
+        "op": "sort"
+      },
+      {
+        "columns": [
+          "g"
+        ],
+        "op": "select"
+      }
+    ],
+    "program_id": "prog-00104257-mut-109514",
+    "seed": 109514
+  },
+  "seed": 109514,
+  "tables": [
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "type": "int"
+        },
+        {
+          "name": "g",
+          "nullable": true,
+          "type": "str"
+        },
+        {
+          "name": "x",
+          "nullable": true,
+          "type": "int"
+        },
+        {
+          "name": "y",
+          "nullable": true,
+          "type": "float"
+        },
+        {
+          "name": "flag",
+          "nullable": true,
+          "type": "bool"
+        },
+        {
+          "name": "s",
+          "nullable": true,
+          "type": "str"
+        }
+      ],
+      "name": "t0",
+      "rows": [
+        {
+          "flag": true,
+          "g": "filfM",
+          "id": 0,
+          "s": "Iqm",
+          "x": null,
+          "y": -0.5
+        },
+        {
+          "flag": true,
+          "g": "a",
+          "id": 0,
+          "s": "alpha",
+          "x": -1,
+          "y": 1.0
+        }
+      ]
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "type": "int"
+        },
+        {
+          "name": "j",
+          "nullable": true,
+          "type": "int"
+        },
+        {
+          "name": "z",
+          "nullable": true,
+          "type": "float"
+        },
+        {
+          "name": "tag",
+          "nullable": true,
+          "type": "str"
+        }
+      ],
+      "name": "t1",
+      "rows": [
+        {
+          "id": 0,
+          "j": 0,
+          "tag": "A",
+          "z": -39.802
+        }
+      ]
+    }
+  ]
+}

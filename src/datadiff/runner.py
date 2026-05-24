@@ -96,6 +96,12 @@ def _guidance_summary(guidance: dict[str, Any]) -> dict[str, Any]:
         "issue_replay_saturation_active": guidance.get("score_breakdown", {}).get(
             "issue_replay_saturation_active", 0.0
         ),
+        "issue_replay_global_saturation_penalty": guidance.get("score_breakdown", {}).get(
+            "issue_replay_global_saturation_penalty", 0.0
+        ),
+        "issue_replay_global_saturation_active": guidance.get("score_breakdown", {}).get(
+            "issue_replay_global_saturation_active", 0.0
+        ),
     }
 
 
@@ -386,6 +392,8 @@ def run_fuzz(
             known_saturated_bug_families=config.known_saturated_bug_families,
             issue_replay_saturation_threshold=config.issue_replay_saturation_threshold,
             issue_replay_saturation_penalty=config.issue_replay_saturation_penalty,
+            issue_replay_global_saturation_threshold=config.issue_replay_global_saturation_threshold,
+            issue_replay_global_saturation_penalty=config.issue_replay_global_saturation_penalty,
             active_backends=list(backends),
         )
         if guided

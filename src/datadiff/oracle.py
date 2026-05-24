@@ -79,6 +79,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "topk_filter_pushdown"
     if _case_has_tuple_absence_filter(case):
         return "tuple_absence_null_filter"
+    if _case_has_joined_order_offset_projection(case):
+        return "joined_order_offset_projection"
     if any(op in {"groupby", "aggregate"} for op in ops):
         return "groupby_aggregation"
     if any(op == "join" for op in ops):
@@ -296,6 +298,23 @@ def _case_has_post_topk_filter(case: Case) -> bool:
                 continue
             if any(later.get("op") == "filter" for later in ops[topk_idx + 1 :]):
                 return True
+    return False
+
+
+def _case_has_joined_order_offset_projection(case: Case) -> bool:
+    saw_join = False
+    saw_order_after_join = False
+    saw_offset_after_order = False
+    for op in case.program.operations:
+        kind = op.get("op")
+        if kind == "join":
+            saw_join = True
+        elif kind == "sort" and saw_join:
+            saw_order_after_join = True
+        elif kind == "offset" and saw_order_after_join:
+            saw_offset_after_order = True
+        elif kind == "select" and saw_offset_after_order:
+            return True
     return False
 
 

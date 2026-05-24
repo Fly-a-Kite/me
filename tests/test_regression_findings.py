@@ -488,3 +488,88 @@ def test_datafusion_grouped_topk_null_max_sort_key_is_candidate_bug():
     assert result["normalized"]["datafusion"]["rows"] == []
     assert result["findings"][0]["root_cause"] == "grouped_topk_null_sort_key"
     assert result["findings"][0]["suspicious_backends"] == ["datafusion"]
+
+
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in DATAFUSION_BACKENDS),
+    reason="datafusion comparison backends are not installed",
+)
+def test_datafusion_joined_order_offset_projection_is_candidate_bug():
+    case = Case(
+        "case-datafusion-joined-order-offset-projection",
+        109514,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("g", "str", nullable=True),
+                    ColumnSpec("x", "int", nullable=True),
+                    ColumnSpec("y", "float", nullable=True),
+                    ColumnSpec("flag", "bool", nullable=True),
+                    ColumnSpec("s", "str", nullable=True),
+                ],
+                [
+                    {"id": 0, "g": "filfM", "x": None, "y": -0.5, "flag": True, "s": "Iqm"},
+                    {"id": 0, "g": "a", "x": -1, "y": 1.0, "flag": True, "s": "alpha"},
+                ],
+            ),
+            TableData(
+                "t1",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("j", "int", nullable=True),
+                    ColumnSpec("z", "float", nullable=True),
+                    ColumnSpec("tag", "str", nullable=True),
+                ],
+                [{"id": 0, "j": 0, "z": -39.802, "tag": "A"}],
+            ),
+        ],
+        Program(
+            "prog-datafusion-joined-order-offset-projection",
+            109514,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+                {"op": "mutate", "column": "m_0", "expr": {"kind": "add_const", "source": "id", "value": -2}},
+                {
+                    "op": "sort",
+                    "keys": [
+                        {"column": "id", "ascending": True, "nulls": "first"},
+                        {"column": "flag", "ascending": True, "nulls": "last"},
+                        {"column": "g", "ascending": True, "nulls": "first"},
+                        {"column": "j", "ascending": False, "nulls": "first"},
+                        {"column": "m_0", "ascending": True, "nulls": "last"},
+                        {"column": "s", "ascending": True, "nulls": "first"},
+                        {"column": "tag", "ascending": True, "nulls": "last"},
+                        {"column": "x", "ascending": False, "nulls": "first"},
+                        {"column": "y", "ascending": False, "nulls": "first"},
+                        {"column": "z", "ascending": True, "nulls": "last"},
+                    ],
+                },
+                {"op": "offset", "n": 1},
+                {
+                    "op": "sort",
+                    "keys": [
+                        {"column": "s", "ascending": False, "nulls": "first"},
+                        {"column": "g", "ascending": False, "nulls": "first"},
+                        {"column": "j", "ascending": True, "nulls": "last"},
+                    ],
+                },
+                {"op": "select", "columns": ["g"]},
+            ],
+        ),
+    )
+
+    result = run_loaded_case(
+        case,
+        DATAFUSION_BACKENDS,
+        config=ExperimentConfig(),
+        save_artifact=False,
+    )
+
+    assert result["status"] == "bug"
+    assert result["normalized"]["pandas"]["rows"] == [["filfM"]]
+    assert result["normalized"]["duckdb"]["rows"] == [["filfM"]]
+    assert result["normalized"]["datafusion"]["rows"] == [["a"]]
+    assert result["findings"][0]["root_cause"] == "joined_order_offset_projection"
+    assert result["findings"][0]["suspicious_backends"] == ["datafusion"]

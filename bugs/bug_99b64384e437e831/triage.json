@@ -1,0 +1,58 @@
+{
+  "artifact": "bugs/bug_99b64384e437e831",
+  "backends": [
+    "pandas",
+    "duckdb",
+    "datafusion"
+  ],
+  "case_id": "case-00104257-bughunt-mut-109514",
+  "documentation_refs": [],
+  "false_positive_reasons": [],
+  "features": {
+    "contains_inf": false,
+    "contains_nan": false,
+    "contains_non_ascii_string": false,
+    "contains_null": true,
+    "operation_sequence": [
+      "join",
+      "mutate",
+      "sort",
+      "offset",
+      "sort",
+      "select"
+    ],
+    "uses_filter": false,
+    "uses_groupby": false,
+    "uses_limit": false,
+    "uses_modulo": false,
+    "uses_mutate": true,
+    "uses_offset": true,
+    "uses_sort": true,
+    "uses_string_lower": false
+  },
+  "generator_profile": "common",
+  "operations": 6,
+  "original_kinds": [
+    "semantic_output_mismatch"
+  ],
+  "paper_status": "candidate_bug_needs_external_confirmation",
+  "recommendation": [
+    "Minimize the artifact and create a backend-specific reproduction script.",
+    "Check documentation and release notes, then submit an upstream issue.",
+    "Count as confirmed only after maintainer acknowledgement, fix, or clear spec violation."
+  ],
+  "reduced": true,
+  "reproduced_kinds": [
+    "semantic_output_mismatch"
+  ],
+  "reproduced_roots": [
+    "joined_order_offset_projection"
+  ],
+  "rows": 2,
+  "seed": 109514,
+  "suspicious_backends": [
+    "datafusion"
+  ],
+  "triage_confidence": "high",
+  "verdict": "candidate_implementation_bug"
+}

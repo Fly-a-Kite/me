@@ -47,6 +47,21 @@ def test_extract_case_features_tracks_structure_and_values():
     assert "has:empty_string" in features
 
 
+def test_extract_case_features_marks_issue_replay_sources():
+    replay_case = _case(11, [{"op": "scalar_subquery_probe", "as": "probe_ok"}])
+    replay_case.metadata["source_issue"] = "https://github.com/example/project/issues/1"
+    inspired_case = _case(12, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}])
+    inspired_case.metadata["source_issue"] = "https://github.com/example/project/issues/2"
+
+    replay_features = extract_case_features(replay_case)
+    inspired_features = extract_case_features(inspired_case)
+
+    assert "source:issue_replay" in replay_features
+    assert "source:issue_inspired" not in replay_features
+    assert "source:issue_inspired" in inspired_features
+    assert "source:issue_replay" not in inspired_features
+
+
 def test_guidance_prefers_targeted_candidate():
     filter_case = _case(1, [{"op": "filter", "column": "x", "cmp": ">", "value": 0}])
     groupby_case = _case(
@@ -816,6 +831,50 @@ def test_guidance_issue_replay_saturation_demotes_repeated_replay_family():
 
     assert replay_decision.score_breakdown["issue_replay_saturation_active"] == 1.0
     assert replay_decision.score_breakdown["issue_replay_saturation_penalty"] < 0.0
+    assert decision.case is fresh_case
+
+
+def test_guidance_global_issue_replay_saturation_demotes_distinct_replay_probe():
+    replay_case = _case(75, [{"op": "struct_distinct_probe", "as": "probe_ok"}])
+    replay_case.metadata["source_issue"] = "https://github.com/example/project/issues/99"
+    fresh_case = _case(76, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}])
+    guidance = GuidanceState(
+        targets=["struct_distinct_unnest"],
+        active_backends=["duckdb"],
+        issue_replay_saturation_threshold=99,
+        issue_replay_global_saturation_threshold=4,
+        issue_replay_global_saturation_penalty=1.5,
+    )
+    replay_roots = [
+        "scalar_subquery_double_parentheses",
+        "window_avg_rows_frame",
+        "bit_compare_unequal_length",
+        "round_even_float_scale",
+    ]
+    for idx, root in enumerate(replay_roots):
+        guidance.record_result(
+            replay_case,
+            {
+                "findings": [
+                    {
+                        "root_cause": root,
+                        "triage_verdict": "candidate_implementation_bug",
+                        "suspicious_backends": ["duckdb"],
+                        "signature": f"sig-replay-global-{idx}",
+                        "discovery_origin": "issue_replay",
+                    }
+                ],
+                "preflight": {"valid": True, "fallback_used": False},
+            },
+        )
+
+    replay_decision = guidance.choose_case([replay_case])
+    decision = guidance.choose_case([replay_case, fresh_case])
+
+    assert guidance.issue_replay_count == 4
+    assert replay_decision.score_breakdown["issue_replay_global_saturation_active"] == 1.0
+    assert replay_decision.score_breakdown["issue_replay_global_saturation_penalty"] < 0.0
+    assert replay_decision.score_breakdown["issue_replay_saturation_active"] == 1.0
     assert decision.case is fresh_case
 
 

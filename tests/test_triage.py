@@ -109,6 +109,14 @@ def test_standalone_reproducer_supports_known_root_causes():
     ) is True
     assert supports_standalone_reproducer(
         {
+            "generator_profile": "bughunt",
+            "features": {"contains_nan": False, "contains_inf": False},
+            "reproduced_roots": ["joined_order_offset_projection"],
+            "suspicious_backends": ["datafusion"],
+        }
+    ) is True
+    assert supports_standalone_reproducer(
+        {
             "generator_profile": "common",
             "features": {"contains_nan": False, "contains_inf": False},
             "reproduced_roots": ["reverse_division_operand_order"],
@@ -219,6 +227,22 @@ def test_write_datafusion_standalone_reproducer_for_truth_filter_offset(tmp_path
     text = path.read_text(encoding="utf-8")
     assert "NOT ((q.\"m_0\" <= 0.5) IS FALSE)" in text
     assert "OFFSET 2" in text
+
+
+def test_write_datafusion_standalone_reproducer_for_joined_order_offset_projection(tmp_path):
+    path = write_standalone_reproducer(
+        tmp_path,
+        {
+            "reproduced_roots": ["joined_order_offset_projection"],
+            "suspicious_backends": ["datafusion"],
+        },
+    )
+
+    assert path.name == "standalone_datafusion_joined_order_offset_projection.py"
+    text = path.read_text(encoding="utf-8")
+    assert "OFFSET 1" in text
+    assert "__datadiff_order_0_0" in text
+    assert "DataFusion returned the row that OFFSET should skip" in text
 
 
 def test_write_polars_standalone_reproducer_for_reverse_division(tmp_path):

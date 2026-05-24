@@ -486,6 +486,14 @@ def _config_from_args(args: argparse.Namespace) -> ExperimentConfig:
         ),
         issue_replay_saturation_threshold=max(1, int(getattr(args, "issue_replay_saturation_threshold", 1))),
         issue_replay_saturation_penalty=max(0.0, float(getattr(args, "issue_replay_saturation_penalty", 1.0))),
+        issue_replay_global_saturation_threshold=max(
+            1,
+            int(getattr(args, "issue_replay_global_saturation_threshold", 4)),
+        ),
+        issue_replay_global_saturation_penalty=max(
+            0.0,
+            float(getattr(args, "issue_replay_global_saturation_penalty", 1.5)),
+        ),
         metamorphic_variant_limit=max(0, int(getattr(args, "metamorphic_variant_limit", 4))),
         log_level=getattr(args, "log_level", "compact"),
     )
@@ -600,6 +608,18 @@ def add_guidance_flags(
         type=float,
         default=1.0,
         help="score penalty scale for predicted cases in saturated issue-replay families",
+    )
+    parser.add_argument(
+        "--issue-replay-global-saturation-threshold",
+        type=int,
+        default=4,
+        help="total issue-replay candidate bug count where guidance starts downweighting replay probes",
+    )
+    parser.add_argument(
+        "--issue-replay-global-saturation-penalty",
+        type=float,
+        default=1.5,
+        help="score penalty scale for replay probes after the global replay budget is saturated",
     )
 
 
