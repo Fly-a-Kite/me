@@ -61,6 +61,17 @@ python3 -m venv .venv
 `datadiff targets --json` 会输出 target registry、suite 和能力矩阵，便于在论文 artifact 中说明
 每一组实验共同覆盖了哪些 DSL 能力，例如 `op:join`、`op:groupby`、`expr:string_lower`。
 
+Fresh/latest-version 探索和历史/已提交 bug replay 共享同一套 runner、normalizer、oracle 和
+classification。默认 `enable_replay_bug=false`，已知 replay probe 或已提交 source issue 会在执行前
+被过滤，不计入最新版本 bug 探索；需要复现历史或已提交 bug 时显式开启：
+
+```bash
+.venv/bin/datadiff longrun --profile datafusion_setop_all_duplicate_count --enable-replay-bug
+.venv/bin/datadiff experiment --presets live_datafusion_replay --evidence-mode historical
+```
+
+`*_replay` preset 只打开 replay policy，底层 DSL、执行器、oracle 和中间层 case policy 不变。
+
 按时间运行：
 
 ```bash

@@ -79,6 +79,14 @@ DEFAULT_KNOWN_SATURATED_BUG_FAMILIES = [
     "tuple_absence_null_filter@duckdb",
 ]
 
+DEFAULT_REPLAY_BUG_SOURCE_ISSUES = [
+    "https://github.com/apache/datafusion/issues/22190",
+    "https://github.com/apache/datafusion/issues/22489",
+    "https://github.com/apache/datafusion/issues/22441",
+    "https://github.com/apache/datafusion/issues/12956",
+    "https://github.com/apache/datafusion/issues/12955",
+]
+
 
 @dataclass(slots=True)
 class ExperimentConfig:
@@ -87,6 +95,7 @@ class ExperimentConfig:
     enable_differential_oracle: bool = True
     enable_metamorphic_oracle: bool = False
     enable_feedback: bool = True
+    enable_replay_bug: bool = False
     enable_reducer: bool = False
     enable_artifact: bool = True
     enable_preflight_validation: bool = True
@@ -107,6 +116,9 @@ class ExperimentConfig:
     family_saturation_penalty: float = 1.25
     saturated_family_reward: float = 0.02
     known_saturated_bug_families: list[str] = field(default_factory=list)
+    replay_bug_source_issues: list[str] = field(
+        default_factory=lambda: list(DEFAULT_REPLAY_BUG_SOURCE_ISSUES)
+    )
     issue_replay_saturation_threshold: int = 1
     issue_replay_saturation_penalty: float = 1.0
     issue_replay_global_saturation_threshold: int = 4

@@ -1,4 +1,7 @@
+from datadiff.case_policy import case_discovery_origin, replay_bug_filter_reason
 from datadiff.cli import _preset_config
+from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES
+from datadiff.datagen import generate_case
 from datadiff.targets import TARGETS, common_capabilities, resolve_target_backends
 
 
@@ -83,6 +86,43 @@ def test_methodology_experiment_presets_cover_required_ablation_axes():
     assert guided.guidance_candidate_pool > 1
     assert guided_join.generator_profile == "bughunt_no_groupby"
     assert "join" in guided_join.guidance_targets
+
+
+def test_methodology_fresh_and_replay_share_case_policy_gate():
+    fresh = _preset_config("live_datafusion")
+    replay = _preset_config("live_datafusion_replay")
+
+    assert fresh.enable_replay_bug is False
+    assert replay.enable_replay_bug is True
+    assert replay.generator_profile == fresh.generator_profile
+    assert replay.guidance_targets == fresh.guidance_targets
+    assert replay.guidance_strategy == fresh.guidance_strategy
+    assert replay.guidance_candidate_pool == fresh.guidance_candidate_pool
+
+    replay_profiles = [
+        "datafusion_setop_all_duplicate_count",
+        "duckdb_tuple_anti_null_semantics",
+        "polars_rolling_mean_by_null_count_semantics",
+    ]
+    for seed, profile in enumerate(replay_profiles, start=137):
+        case = generate_case(seed, profile=profile)
+        assert case_discovery_origin(case) == "issue_replay"
+        assert (
+            replay_bug_filter_reason(
+                case,
+                enable_replay_bug=False,
+                replay_bug_source_issues=DEFAULT_REPLAY_BUG_SOURCE_ISSUES,
+            )
+            == "issue_replay_probe"
+        )
+        assert (
+            replay_bug_filter_reason(
+                case,
+                enable_replay_bug=True,
+                replay_bug_source_issues=DEFAULT_REPLAY_BUG_SOURCE_ISSUES,
+            )
+            == ""
+        )
 
 
 def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():

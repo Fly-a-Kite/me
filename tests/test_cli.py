@@ -25,6 +25,7 @@ def test_cli_parses_fuzz_ablation_flags():
             "edge_float",
             "--disable-normalizer",
             "--disable-feedback",
+            "--enable-replay-bug",
             "--disable-preflight-repair",
             "--persist-feedback-corpus",
             "--feedback-persist-limit",
@@ -45,6 +46,7 @@ def test_cli_parses_fuzz_ablation_flags():
     assert args.profile == "edge_float"
     assert args.disable_normalizer is True
     assert args.disable_feedback is True
+    assert args.enable_replay_bug is True
     assert args.disable_preflight_repair is True
     assert args.persist_feedback_corpus is True
     assert args.feedback_persist_limit == 12
@@ -80,12 +82,15 @@ def test_cli_parses_guided_fuzz_options():
             "12",
             "--targets",
             "groupby,nulls",
+            "--replay-bug-source-issues",
+            "https://github.com/example/project/issues/1",
         ]
     )
     assert args.cmd == "fuzz"
     assert args.strategy == "guided"
     assert args.candidate_pool == 12
     assert args.targets == "groupby,nulls"
+    assert args.replay_bug_source_issues == "https://github.com/example/project/issues/1"
 
 
 def test_cli_parses_workflow_profile():
@@ -549,6 +554,9 @@ def test_cli_parses_targeted_guided_experiment_presets():
         _preset_config("datafusion_setop_all_duplicate_count").guidance_targets[0]
         == "datafusion_setop_all_duplicate_count"
     )
+    replay = _preset_config("datafusion_setop_all_duplicate_count_replay")
+    assert replay.generator_profile == "datafusion_setop_all_duplicate_count"
+    assert replay.enable_replay_bug is True
     assert _preset_config("datafusion_setop_all_duplicate_count_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("duckdb_json_predicate_order_semantics").generator_profile == "duckdb_json_predicate_order_semantics"
     assert _preset_config("duckdb_json_predicate_order_semantics").guidance_targets[0] == "duckdb_json_predicate_order_semantics"
@@ -680,6 +688,7 @@ def test_cli_parses_bughunt_experiment_presets():
 def test_cli_parses_live_datafusion_presets():
     live = _preset_config("live_datafusion")
     assert live.generator_profile == "bughunt"
+    assert live.enable_replay_bug is False
     assert live.guidance_strategy == "guided"
     assert live.guidance_candidate_pool == 12
     assert live.enable_local_source_scheduler is True
@@ -716,6 +725,7 @@ def test_cli_parses_live_datafusion_presets():
 
     fresh = _preset_config("live_datafusion_fresh")
     assert fresh.generator_profile == "bughunt_no_groupby"
+    assert fresh.enable_replay_bug is False
     assert fresh.guidance_strategy == "guided"
     assert fresh.enable_local_source_scheduler is True
     assert fresh.local_source_exploration_weight == 0.45
@@ -736,6 +746,11 @@ def test_cli_parses_live_datafusion_presets():
     assert fresh_metamorphic.enable_metamorphic_oracle is True
     assert fresh_metamorphic.oracle_mode == "both"
     assert fresh_metamorphic.metamorphic_variant_limit == 6
+
+    replay = _preset_config("live_datafusion_replay")
+    assert replay.generator_profile == "bughunt"
+    assert replay.enable_replay_bug is True
+    assert replay.guidance_targets == live.guidance_targets
 
 
 def test_cli_parses_non_datafusion_live_presets():
@@ -1049,11 +1064,16 @@ def test_cli_experiment_parses_evidence_mode_flags():
             "datafusion-22190",
             "--target-version",
             "pre-fix-sha",
+            "--enable-replay-bug",
+            "--replay-bug-source-issues",
+            "https://github.com/apache/datafusion/issues/22190",
         ]
     )
     assert args.evidence_mode == "historical"
     assert args.known_bug_id == "datafusion-22190"
     assert args.target_version == "pre-fix-sha"
+    assert args.enable_replay_bug is True
+    assert args.replay_bug_source_issues == "https://github.com/apache/datafusion/issues/22190"
 
 
 def test_cli_parses_paper_run_journal_flags():
@@ -1142,6 +1162,42 @@ def test_run_experiment_job_preserves_live_preset_source_scheduler(monkeypatch):
     assert captured["enable_local_source_scheduler"] is True
     assert captured["local_source_exploration_weight"] == 0.35
     assert captured["guidance_candidate_pool"] == 12
+
+
+def test_run_experiment_job_propagates_replay_policy(monkeypatch):
+    captured = {}
+
+    def fake_run_fuzz(*, cases, seed, backends, config, duration_s):
+        captured["enable_replay_bug"] = config.enable_replay_bug
+        captured["replay_bug_source_issues"] = config.replay_bug_source_issues
+        return Path("runs/fake-replay.jsonl")
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    cli._run_experiment_job(
+        {
+            "order": 0,
+            "target_suite": "datafusion_cross",
+            "backends": ["pandas", "duckdb", "datafusion"],
+            "preset": "live_datafusion",
+            "seed": 1,
+            "cases": 1,
+            "duration_s": None,
+            "log_level": "compact",
+            "compress_run_log": True,
+            "artifact_limit": None,
+            "metamorphic_variant_limit": None,
+            "enable_replay_bug": True,
+            "replay_bug_source_issues": ["https://github.com/apache/datafusion/issues/22190"],
+            "enable_local_source_scheduler": False,
+            "local_source_exploration_weight": 0.5,
+            "skip_run_reports": True,
+        }
+    )
+
+    assert captured["enable_replay_bug"] is True
+    assert captured["replay_bug_source_issues"] == ["https://github.com/apache/datafusion/issues/22190"]
 
 
 def test_cli_experiment_static_manifest_records_local_source_scheduler(tmp_path, monkeypatch, capsys):

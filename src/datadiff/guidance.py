@@ -9,7 +9,7 @@ from typing import Any
 from datadiff.dsl import Case, normalize_sort_keys
 from datadiff.filtering import evaluate_filter_predicate, parse_filter_comparator
 from datadiff.operation_combo import classify_operation_combo
-from datadiff.oracle import PROBE_ROOTS
+from datadiff.case_policy import case_discovery_origin, issue_source_key
 from datadiff.reward import (
     candidate_bug_family_keys,
     candidate_bug_signatures,
@@ -165,7 +165,6 @@ TARGET_ALIASES: dict[str, set[str]] = {
 PATTERN_TARGET_WEIGHT = 8.0
 GENERIC_COMPANION_TARGET_WEIGHT = 0.25
 TEMPLATE_TARGET_BONUS = 3.0
-ISSUE_REPLAY_OPS = frozenset(PROBE_ROOTS) | {"running_sum", "tuple_absence_filter"}
 
 
 def parse_guidance_targets(value: str | list[str] | tuple[str, ...] | None) -> list[str]:
@@ -186,11 +185,7 @@ def _case_source_issue(case: Case) -> str:
 
 
 def _source_issue_key(value: Any) -> str:
-    return str(value or "").strip().rstrip("/")
-
-
-def _uses_issue_replay_ops(op_names: list[str]) -> bool:
-    return any(op_name in ISSUE_REPLAY_OPS for op_name in op_names)
+    return issue_source_key(value)
 
 
 def extract_case_features(case: Case) -> set[str]:
@@ -550,7 +545,7 @@ def extract_case_features(case: Case) -> set[str]:
     source_issue = _case_source_issue(case)
     if source_issue:
         features.add(f"source_issue:{_source_issue_key(source_issue)}")
-        features.add("source:issue_replay" if _uses_issue_replay_ops(op_names) else "source:issue_inspired")
+        features.add(f"source:{case_discovery_origin(case)}")
     combo = classify_operation_combo(case.program.operations)
     features.add(f"combo:{combo['template']}")
     features.add(f"combo_frequency:{combo['frequency_bucket']}")

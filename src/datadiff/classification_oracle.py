@@ -9,7 +9,8 @@ from datadiff.dsl import Case, SortKey, normalize_sort_keys
 from datadiff.filtering import evaluate_filter_predicate, filter_comparator_supports_type, is_filter_comparator, parse_filter_comparator
 from datadiff.identifiers import is_reserved_output_name
 from datadiff.normalizer import NormalizedResult, _norm_value
-from datadiff.oracle import PROBE_ROOTS, Finding
+from datadiff.case_policy import case_discovery_origin, primary_source_issue
+from datadiff.oracle import Finding
 from datadiff.running import sort_rows_for_running, stable_running_sum_values
 from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
@@ -195,21 +196,12 @@ def classify_finding(
     )
 
 
-ISSUE_REPLAY_OPS = frozenset(PROBE_ROOTS) | {"running_sum", "tuple_absence_filter"}
-
-
 def _source_issue(case: Case) -> str:
-    metadata = case.metadata if isinstance(case.metadata, dict) else {}
-    return str(metadata.get("source_issue") or metadata.get("source_issue_alt") or "").strip()
+    return primary_source_issue(case)
 
 
 def _discovery_origin(case: Case) -> str:
-    if not _source_issue(case):
-        return "organic"
-    ops = {str(op.get("op", "")) for op in case.program.operations}
-    if ops & ISSUE_REPLAY_OPS:
-        return "issue_replay"
-    return "issue_inspired"
+    return case_discovery_origin(case)
 
 
 def validate_case_program(case: Case) -> list[str]:

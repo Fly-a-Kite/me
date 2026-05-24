@@ -9,6 +9,7 @@ from typing import Any, Callable
 from datadiff.artifact import save_bug_artifact
 from datadiff.backends import make_backend
 from datadiff.backends.base import Backend
+from datadiff.case_policy import replay_bug_filter_reason
 from datadiff.classification_oracle import annotate_findings
 from datadiff.config import ExperimentConfig
 from datadiff.datagen import generate_case
@@ -187,6 +188,7 @@ def _compact_log_row(row: dict[str, Any], log_level: str) -> dict[str, Any]:
         "feedback_eligible": row.get("feedback_eligible", True),
         "feedback_skip_reason": row.get("feedback_skip_reason", ""),
         "feedback_record_skip_reason": row.get("feedback_record_skip_reason", ""),
+        "replay_filter": row.get("replay_filter", {}),
     }
     if log_level == "compact":
         out["normalized"] = _normalized_summary(row.get("normalized", {}))
@@ -225,6 +227,7 @@ CALIBRATION_PROBE_OPS = frozenset(PROBE_ROOTS) | {
     "running_sum",
     "tuple_absence_filter",
 }
+REPLAY_FILTER_EXTRA_ATTEMPTS_PER_CANDIDATE = 20
 
 
 def _feedback_storage_decision(
@@ -241,6 +244,14 @@ def _feedback_storage_decision(
     if any(str(op.get("op", "")) in CALIBRATION_PROBE_OPS for op in case.program.operations):
         return False, "calibration_probe_case"
     return True, ""
+
+
+def _replay_bug_filter_reason(case_item: Case, config: ExperimentConfig) -> str:
+    return replay_bug_filter_reason(
+        case_item,
+        enable_replay_bug=config.enable_replay_bug,
+        replay_bug_source_issues=config.replay_bug_source_issues,
+    )
 
 
 def _execute_case(
@@ -418,6 +429,8 @@ def run_fuzz(
     preflight_repaired_count = 0
     preflight_fallback_count = 0
     preflight_invalid_count = 0
+    replay_filtered_candidate_count = 0
+    replay_filter_fallback_count = 0
     quality_oracle_counts: dict[str, int] = {}
 
     def snapshot(status: str) -> dict[str, Any]:
@@ -440,6 +453,11 @@ def run_fuzz(
                 "repaired_cases": preflight_repaired_count,
                 "fallback_cases": preflight_fallback_count,
                 "invalid_cases": preflight_invalid_count,
+            },
+            "replay_bug_filter": {
+                "enabled": not config.enable_replay_bug,
+                "filtered_candidates": replay_filtered_candidate_count,
+                "fallback_candidates": replay_filter_fallback_count,
             },
             "quality_oracles": quality_oracle_counts,
             "seed": seed,
@@ -473,28 +491,66 @@ def run_fuzz(
         if duration_s is not None and executed > 0 and (time.perf_counter() - started) >= duration_s:
             break
         candidate_seed_start = next_seed
+        candidate_seed_cursor = candidate_seed_start
         candidates: list[Case] = []
         candidate_meta: dict[int, dict[str, Any]] = {}
         for offset in range(candidate_pool):
-            case_seed = candidate_seed_start + offset
-            generated = generate_case(
-                case_seed,
-                type_aware=config.enable_type_aware_generation,
-                profile=config.generator_profile,
-            )
-            selected = feedback.choose_case(case_seed, generated) if feedback is not None else generated
-            source = getattr(feedback, "last_candidate_source", "generated") if feedback is not None else "generated"
-            metadata = (
-                getattr(feedback, "last_candidate_metadata", None)
-                if feedback is not None
-                else None
-            ) or selected.metadata or _generated_candidate_metadata(generated)
-            preflight = preflight_case(
-                selected,
-                enable_validation=config.enable_preflight_validation,
-                enable_repair=config.enable_preflight_repair,
-            )
-            candidate = preflight.case
+            skipped_replay_candidates = 0
+            replay_skip_reason = ""
+            last_replay_skip_reason = ""
+            replay_fallback_used = False
+            while True:
+                case_seed = candidate_seed_cursor
+                candidate_seed_cursor += 1
+                generated = generate_case(
+                    case_seed,
+                    type_aware=config.enable_type_aware_generation,
+                    profile=config.generator_profile,
+                )
+                selected = feedback.choose_case(case_seed, generated) if feedback is not None else generated
+                source = getattr(feedback, "last_candidate_source", "generated") if feedback is not None else "generated"
+                metadata = (
+                    getattr(feedback, "last_candidate_metadata", None)
+                    if feedback is not None
+                    else None
+                ) or selected.metadata or _generated_candidate_metadata(generated)
+                preflight = preflight_case(
+                    selected,
+                    enable_validation=config.enable_preflight_validation,
+                    enable_repair=config.enable_preflight_repair,
+                )
+                candidate = preflight.case
+                replay_skip_reason = _replay_bug_filter_reason(candidate, config)
+                if not replay_skip_reason:
+                    break
+                last_replay_skip_reason = replay_skip_reason
+                replay_filtered_candidate_count += 1
+                skipped_replay_candidates += 1
+                if skipped_replay_candidates <= REPLAY_FILTER_EXTRA_ATTEMPTS_PER_CANDIDATE:
+                    continue
+                replay_fallback_used = True
+                replay_filter_fallback_count += 1
+                case_seed = candidate_seed_cursor
+                candidate_seed_cursor += 1
+                generated = generate_case(
+                    case_seed,
+                    type_aware=config.enable_type_aware_generation,
+                    profile="common",
+                )
+                selected = generated
+                source = "generated_fresh_fallback"
+                metadata = _generated_candidate_metadata(generated)
+                preflight = preflight_case(
+                    selected,
+                    enable_validation=config.enable_preflight_validation,
+                    enable_repair=config.enable_preflight_repair,
+                )
+                candidate = preflight.case
+                replay_skip_reason = _replay_bug_filter_reason(candidate, config)
+                if replay_skip_reason:
+                    replay_filtered_candidate_count += 1
+                    raise RuntimeError(f"fresh fallback generated replay candidate: {replay_skip_reason}")
+                break
             candidate_meta[id(candidate)] = {
                 "source": source,
                 "generated_seed": case_seed,
@@ -502,9 +558,15 @@ def run_fuzz(
                 "mutation": metadata.get("mutation", {}),
                 "operation_combo": classify_operation_combo(candidate.program.operations),
                 "preflight": preflight.to_dict(),
+                "replay_filter": {
+                    "enabled": not config.enable_replay_bug,
+                    "filtered_before_candidate": skipped_replay_candidates,
+                    "fallback_used": replay_fallback_used,
+                    "last_skip_reason": last_replay_skip_reason,
+                },
             }
             candidates.append(candidate)
-        next_seed += candidate_pool
+        next_seed = candidate_seed_cursor
         if guidance is not None:
             decision = guidance.choose_case(candidates)
             case = decision.case
@@ -532,6 +594,12 @@ def run_fuzz(
                     "errors_before": [],
                     "errors_after": [],
                 },
+                "replay_filter": {
+                    "enabled": not config.enable_replay_bug,
+                    "filtered_before_candidate": 0,
+                    "fallback_used": False,
+                    "last_skip_reason": "",
+                },
             },
         )
         preflight_row = selected_meta["preflight"]
@@ -550,6 +618,7 @@ def run_fuzz(
                     "mutation": selected_meta["mutation"],
                     "operation_combo": selected_meta["operation_combo"],
                     "preflight": preflight_row,
+                    "replay_filter": selected_meta["replay_filter"],
                     "generated_at": utc_now(),
                     "case": case.to_dict(),
                 }
@@ -665,6 +734,7 @@ def run_fuzz(
         row["mutation"] = selected_meta["mutation"]
         row["operation_combo"] = selected_meta["operation_combo"]
         row["preflight"] = preflight_row
+        row["replay_filter"] = selected_meta["replay_filter"]
         row["candidate_seed_start"] = candidate_seed_start
         row["candidate_pool_size"] = candidate_pool
         row["case_index"] = executed

@@ -1109,6 +1109,49 @@ def test_run_fuzz_records_guidance_metadata(tmp_path):
     assert meta["next_seed"] == 45
 
 
+def test_run_fuzz_fresh_policy_filters_replay_profile(tmp_path):
+    case_log = tmp_path / "fresh.cases.jsonl"
+    config = ExperimentConfig(
+        generator_profile="datafusion_setop_all_duplicate_count",
+        enable_replay_bug=False,
+    )
+
+    run_file = run_fuzz(cases=1, seed=137, backends=[], config=config, case_log_file=case_log)
+
+    row = read_jsonl(run_file)[0]
+    case_log_row = read_jsonl(case_log)[0]
+    meta = load_json(run_meta_path(run_file))
+    assert row["candidate_source"] == "generated_fresh_fallback"
+    assert row["replay_filter"]["enabled"] is True
+    assert row["replay_filter"]["filtered_before_candidate"] > 0
+    assert row["replay_filter"]["fallback_used"] is True
+    assert row["replay_filter"]["last_skip_reason"] == "issue_replay_probe"
+    assert row["case"].get("metadata", {}).get("generator_profile") != "datafusion_setop_all_duplicate_count"
+    assert case_log_row["replay_filter"] == row["replay_filter"]
+    assert meta["replay_bug_filter"]["enabled"] is True
+    assert meta["replay_bug_filter"]["filtered_candidates"] > 0
+
+
+def test_run_fuzz_replay_policy_allows_replay_profile(tmp_path):
+    case_log = tmp_path / "replay.cases.jsonl"
+    config = ExperimentConfig(
+        generator_profile="datafusion_setop_all_duplicate_count",
+        enable_replay_bug=True,
+    )
+
+    run_file = run_fuzz(cases=1, seed=137, backends=[], config=config, case_log_file=case_log)
+
+    row = read_jsonl(run_file)[0]
+    case_log_row = read_jsonl(case_log)[0]
+    meta = load_json(run_meta_path(run_file))
+    assert row["candidate_source"] == "generated"
+    assert row["replay_filter"]["enabled"] is False
+    assert row["replay_filter"]["filtered_before_candidate"] == 0
+    assert case_log_row["case"]["metadata"]["generator_profile"] == "datafusion_setop_all_duplicate_count"
+    assert meta["replay_bug_filter"]["enabled"] is False
+    assert meta["replay_bug_filter"]["filtered_candidates"] == 0
+
+
 def test_run_fuzz_uses_feedback_source_marker_for_candidate_source(tmp_path, monkeypatch):
     instances = []
 

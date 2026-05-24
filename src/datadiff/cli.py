@@ -10,7 +10,11 @@ from pathlib import Path
 
 from datadiff.ablation_audit import analyze_ablation_audit
 from datadiff.classification_oracle import classify_finding
-from datadiff.config import DEFAULT_KNOWN_SATURATED_BUG_FAMILIES, ExperimentConfig
+from datadiff.config import (
+    DEFAULT_KNOWN_SATURATED_BUG_FAMILIES,
+    DEFAULT_REPLAY_BUG_SOURCE_ISSUES,
+    ExperimentConfig,
+)
 from datadiff.dsl import Case
 from datadiff.experiment_analysis import analyze_experiment
 from datadiff.fixture_replay import build_fixture_replay_case, load_fixture_replay_spec
@@ -490,6 +494,7 @@ def _config_from_args(args: argparse.Namespace) -> ExperimentConfig:
         enable_differential_oracle=not args.disable_differential_oracle,
         enable_metamorphic_oracle=args.enable_metamorphic_oracle,
         enable_feedback=not args.disable_feedback,
+        enable_replay_bug=bool(getattr(args, "enable_replay_bug", False)),
         enable_reducer=args.enable_reducer,
         enable_artifact=not args.disable_artifact,
         enable_preflight_validation=not args.disable_preflight_validation,
@@ -513,6 +518,10 @@ def _config_from_args(args: argparse.Namespace) -> ExperimentConfig:
         saturated_family_reward=max(0.0, float(getattr(args, "saturated_family_reward", 0.02))),
         known_saturated_bug_families=parse_guidance_targets(
             getattr(args, "known_saturated_bug_families", "")
+        ),
+        replay_bug_source_issues=(
+            parse_guidance_targets(getattr(args, "replay_bug_source_issues", ""))
+            or list(DEFAULT_REPLAY_BUG_SOURCE_ISSUES)
         ),
         issue_replay_saturation_threshold=max(1, int(getattr(args, "issue_replay_saturation_threshold", 1))),
         issue_replay_saturation_penalty=max(0.0, float(getattr(args, "issue_replay_saturation_penalty", 1.0))),
@@ -543,6 +552,11 @@ def add_ablation_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--disable-differential-oracle", action="store_true")
     parser.add_argument("--enable-metamorphic-oracle", action="store_true")
     parser.add_argument("--disable-feedback", action="store_true")
+    parser.add_argument(
+        "--enable-replay-bug",
+        action="store_true",
+        help="allow known issue-replay cases; default fresh mode filters submitted or replay-only bug targets",
+    )
     parser.add_argument("--enable-reducer", action="store_true")
     parser.add_argument("--disable-artifact", action="store_true")
     parser.add_argument("--disable-preflight-validation", action="store_true")
@@ -634,6 +648,11 @@ def add_guidance_flags(
         "--known-saturated-bug-families",
         default="",
         help="comma-separated root@backend families already considered saturated before this run",
+    )
+    parser.add_argument(
+        "--replay-bug-source-issues",
+        default="",
+        help="comma-separated upstream issue URLs treated as known replay bugs in fresh mode",
     )
     parser.add_argument(
         "--issue-replay-saturation-threshold",
@@ -1605,10 +1624,13 @@ def _live_bughunt_config(
     metamorphic: bool = False,
     metamorphic_variant_limit: int = 4,
     known_saturated_bug_families: list[str] | None = None,
+    replay_bug_source_issues: list[str] | None = None,
+    enable_replay_bug: bool = False,
     issue_replay_global_saturation_threshold: int = 2,
     issue_replay_global_saturation_penalty: float = 2.0,
 ) -> ExperimentConfig:
     return ExperimentConfig(
+        enable_replay_bug=enable_replay_bug,
         generator_profile=generator_profile,
         enable_metamorphic_oracle=metamorphic,
         oracle_mode="both" if metamorphic else "differential",
@@ -1621,12 +1643,17 @@ def _live_bughunt_config(
         known_saturated_bug_families=list(
             known_saturated_bug_families or DEFAULT_KNOWN_SATURATED_BUG_FAMILIES
         ),
+        replay_bug_source_issues=list(replay_bug_source_issues or DEFAULT_REPLAY_BUG_SOURCE_ISSUES),
         issue_replay_global_saturation_threshold=issue_replay_global_saturation_threshold,
         issue_replay_global_saturation_penalty=issue_replay_global_saturation_penalty,
     )
 
 
 def _preset_config(name: str) -> ExperimentConfig:
+    if name.endswith("_replay"):
+        config = _preset_config(name[: -len("_replay")])
+        config.enable_replay_bug = True
+        return config
     if name == "baseline":
         return ExperimentConfig()
     if name == "no_type_aware":
@@ -3017,6 +3044,12 @@ def cmd_experiment(args: argparse.Namespace) -> int:
             "artifact_limit": args.artifact_limit,
             "metamorphic_variant_limit": args.metamorphic_variant_limit,
             "evidence_mode": evidence_mode,
+            "enable_replay_bug": bool(getattr(args, "enable_replay_bug", False))
+            or evidence_mode == "historical",
+            "replay_bug_source_issues": (
+                parse_guidance_targets(getattr(args, "replay_bug_source_issues", ""))
+                or list(DEFAULT_REPLAY_BUG_SOURCE_ISSUES)
+            ),
             "known_bug_id": str(getattr(args, "known_bug_id", "") or ""),
             "target_version": str(getattr(args, "target_version", "") or ""),
             "run_theme": str(getattr(args, "run_theme", "") or ""),
@@ -3035,6 +3068,9 @@ def cmd_experiment(args: argparse.Namespace) -> int:
         )
     ]
     for job in planned_runs:
+        job["enable_replay_bug"] = bool(job.get("enable_replay_bug", False)) or _preset_config(
+            str(job["preset"])
+        ).enable_replay_bug
         job["estimated_cost"] = round(_experiment_job_weight(job), 4)
     parallelism = _resolve_experiment_parallelism(args, planned_runs)
     for job in planned_runs:
@@ -3066,6 +3102,16 @@ def cmd_experiment(args: argparse.Namespace) -> int:
         "log_level": args.log_level,
         "compress_run_log": not args.no_compress_run_log,
         "metamorphic_variant_limit": args.metamorphic_variant_limit,
+        "replay_bug_policy": {
+            "enable_replay_bug": any(bool(job.get("enable_replay_bug", False)) for job in planned_runs),
+            "source_issues": sorted(
+                {
+                    source
+                    for job in planned_runs
+                    for source in job.get("replay_bug_source_issues", [])
+                }
+            ),
+        },
         "jobs": jobs,
         "parallelism": parallelism,
         "schedule": schedule,
@@ -3508,6 +3554,10 @@ def _run_experiment_job(job: dict) -> dict:
         )
     if job["metamorphic_variant_limit"] is not None:
         preset_config.metamorphic_variant_limit = max(0, int(job["metamorphic_variant_limit"]))
+    preset_config.enable_replay_bug = preset_config.enable_replay_bug or bool(job.get("enable_replay_bug", False))
+    replay_bug_sources = list(job.get("replay_bug_source_issues", []) or [])
+    if replay_bug_sources:
+        preset_config.replay_bug_source_issues = replay_bug_sources
     run_file = run_fuzz(
         cases=job["cases"],
         seed=int(job["seed"]),
@@ -3871,6 +3921,16 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="maximum metamorphic variants to execute per base case",
+    )
+    p_exp.add_argument(
+        "--enable-replay-bug",
+        action="store_true",
+        help="allow submitted or historical issue replay cases in experiment presets",
+    )
+    p_exp.add_argument(
+        "--replay-bug-source-issues",
+        default="",
+        help="comma-separated upstream issue URLs treated as known replay bugs in fresh experiment mode",
     )
     p_exp.add_argument("--no-compress-run-log", action="store_true")
     p_exp.add_argument(

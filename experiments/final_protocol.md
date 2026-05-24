@@ -4,6 +4,21 @@ Read `FINAL_GOAL.md` first. This file expands the protocol details for that goal
 
 This protocol is the paper-facing plan. It separates evidence for new latest-version bugs from historical replay and seeded sensitivity. Do not tune generator, oracle, normalizer, guidance, or triage code after starting the final runs.
 
+## Layered Method
+
+The experiment has one shared middle and bottom layer. Target-specific choices are kept in the top layer.
+
+- Top layer: target suites, presets, guidance targets, saturated families, and replay-source issue lists. This is where DataFusion, Polars, DuckDB, Arrow, and cross-family campaigns differ.
+- Middle layer: case origin and replay policy, feature extraction, guidance, feedback scheduling, quality oracles, reward accounting, and classification. The same `case_policy` decides whether a case is organic, issue-inspired, or issue-replay for every target family.
+- Bottom layer: DSL case representation, generators, preflight validation/repair, backend adapters, execution, normalization, differential oracle, metamorphic oracle, reducer, artifact writing, and run logging.
+
+Fresh latest-version discovery and replay therefore do not use different harnesses. They run through the same generator, runner, normalizer, oracle, classification, and reporting code. The only policy difference is `enable_replay_bug`:
+
+- `enable_replay_bug=false`: fresh/latest-version mode. Known submitted or replay-only issue cases are filtered before execution and replaced by fresh generated candidates.
+- `enable_replay_bug=true`: replay mode. The same cases are allowed through the same execution and oracle path, so historical/submitted bugs can be reproduced and measured separately.
+
+Presets with the `_replay` suffix only flip this policy switch on the same preset body. For example, `live_datafusion` and `live_datafusion_replay` share generator profile, guidance targets, scheduler, oracle, and backend execution; the replay preset allows known replay cases that the fresh preset filters. The same convention applies to project-specific replay probes such as DataFusion set operations, DuckDB tuple anti-null semantics, and Polars rolling-window semantics.
+
 ## Tracks
 
 ### 1. Latest-Version Live Discovery
@@ -31,6 +46,8 @@ Report:
 
 Family key: `root_cause + suspicious_backends`.
 
+Fresh live runs must keep `enable_replay_bug=false`. A candidate whose source issue or replay probe matches the known replay policy can still influence the written method description, but it is not executed or counted in fresh latest-version discovery. This prevents already submitted issues from inflating new-bug evidence.
+
 ### 2. Historical Replay
 
 Goal: show that the same final code can rediscover bugs that existed in previous vulnerable versions.
@@ -43,6 +60,8 @@ Historical replay must be run in an environment where the vulnerable backend ver
 - expected root cause
 - expected suspicious backend
 - seeds and budget
+
+Historical replay runs must use `enable_replay_bug=true`, either through `--enable-replay-bug`, a `_replay` preset, `--evidence-mode historical`, or fixture replay. The replay result is reported separately from latest-version discovery even when the same target suite and generator profile are used.
 
 Only `confirmed_fixed` historical specs count as historical bug evidence. Pending or candidate specs are case studies until upstream confirmation/fix.
 
