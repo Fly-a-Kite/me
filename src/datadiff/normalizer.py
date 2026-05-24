@@ -30,7 +30,7 @@ class NormalizedResult:
         }
 
 
-def _norm_value(v: Any) -> Any:
+def _norm_value(v: Any, *, preserve_float_precision: bool = False) -> Any:
     try:
         import pandas as pd
         if pd.isna(v):
@@ -49,6 +49,8 @@ def _norm_value(v: Any) -> Any:
             return {"kind": "inf", "sign": 1 if value > 0 else -1}
         if value.is_integer() and abs(value) < 2**53:
             return int(value)
+        if preserve_float_precision:
+            return value
         rounded = float(round(value, 10))
         if rounded.is_integer() and abs(rounded) < 2**53:
             return int(rounded)
@@ -57,7 +59,7 @@ def _norm_value(v: Any) -> Any:
         return unicodedata.normalize("NFC", v)
     if hasattr(v, "item"):
         try:
-            return _norm_value(v.item())
+            return _norm_value(v.item(), preserve_float_precision=preserve_float_precision)
         except Exception:
             pass
     return v
@@ -106,8 +108,14 @@ def normalize_result(result: BackendResult, program: Program, enable_normalizer:
         column_positions = sorted(enumerate(original_columns), key=lambda item: (item[1], item[0]))
         columns = [name for _, name in column_positions]
         rows: list[list[Any]] = []
+        preserve_float_precision = program.order_sensitive
         for raw_row in raw_rows:
-            rows.append([_norm_value(raw_row[idx]) for idx, _ in column_positions])
+            rows.append(
+                [
+                    _norm_value(raw_row[idx], preserve_float_precision=preserve_float_precision)
+                    for idx, _ in column_positions
+                ]
+            )
         if enable_normalizer and not program.order_sensitive:
             # SQL/DataFrame backends differ on stable ordering for ties and on
             # whether intermediate order is observable. The default oracle is

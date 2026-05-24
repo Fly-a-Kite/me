@@ -300,6 +300,45 @@ def test_oracle_classifies_negative_zero_range_filter_after_join():
     assert findings[0].root_cause == "negative_zero_comparison"
 
 
+def test_oracle_classifies_negative_zero_from_non_unit_negative_multiplier():
+    case = Case(
+        "case-negative-zero-non-unit-mul",
+        79415,
+        [
+            TableData("t0", [ColumnSpec("id", "int", nullable=False)], [{"id": 0}]),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("z", "float")],
+                [{"id": 0, "z": 0.0}],
+            ),
+        ],
+        Program(
+            "prog-negative-zero-non-unit-mul",
+            79415,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+                {
+                    "op": "mutate",
+                    "column": "m_0",
+                    "expr": {"kind": "arith_const", "op": "mul", "source": "z", "value": -2},
+                },
+                {"op": "filter", "column": "m_0", "cmp": "!=", "value": 0.0},
+            ],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["id", "m_0", "z"], []),
+            "datafusion": NormalizedResult("datafusion", "ok", ["id", "m_0", "z"], [[0, 0, 0]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "negative_zero_comparison"
+
+
 def test_oracle_classifies_joined_order_offset_without_projection():
     case = Case(
         "case-join-order-offset-sort",

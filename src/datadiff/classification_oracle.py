@@ -179,6 +179,21 @@ def classify_finding(
             documentation_refs=_documentation_refs(case, finding),
         )
 
+    if _is_float_precision_boundary_mismatch(case, normalized):
+        return Classification(
+            verdict="expected_semantic_divergence",
+            paper_status="valid_finding_not_bug",
+            confidence="high",
+            evidence=(
+                "Backends differ only in full-precision floating-point arithmetic or aggregate "
+                "ordering; the relaxed numeric row multisets agree."
+            ),
+            recommendation=[
+                "Do not count this finding as an implementation bug.",
+                "Use exact decimal inputs or backend-specific numeric semantics before making a bug claim.",
+            ],
+        )
+
     metamorphic_classification = _metamorphic_classification(finding, backends)
     if metamorphic_classification is not None:
         return metamorphic_classification
@@ -1324,7 +1339,10 @@ def _normalize_reference_rows(
     column_positions = sorted(enumerate(columns), key=lambda item: (item[1], item[0]))
     out_columns = [name for _, name in column_positions]
     out_rows = [
-        [_norm_value(row.get(columns[idx])) for idx, _ in column_positions]
+        [
+            _norm_value(row.get(columns[idx]), preserve_float_precision=preserve_order)
+            for idx, _ in column_positions
+        ]
         for row in rows
     ]
     if not preserve_order:
@@ -1505,6 +1523,161 @@ def _semantic_boundary_reasons(case: Case, finding: Finding | dict[str, Any], co
     if _case_uses_string_lower(case) and _case_contains_non_ascii_string(case):
         reasons.append("case lowercases non-ASCII text; Unicode case mapping support differs across engines")
     return unique_preserve_order(reasons)
+
+
+def _is_float_precision_boundary_mismatch(
+    case: Case,
+    normalized: dict[str, NormalizedResult | dict[str, Any]],
+) -> bool:
+    if not _case_uses_precision_sensitive_float_arithmetic(case):
+        return False
+    ok_results = [result for result in normalized.values() if _result_get(result, "status") == "ok"]
+    if len(ok_results) < 2:
+        return False
+    column_sets = [_result_get(result, "columns", []) for result in ok_results]
+    first_columns = column_sets[0]
+    if any(columns != first_columns for columns in column_sets):
+        return False
+    ordered_rows = [_stable_rows(_result_get(result, "rows", [])) for result in ok_results]
+    if len({tuple(rows) for rows in ordered_rows}) <= 1:
+        return False
+    relaxed_rows = [
+        [_relaxed_float_precision_row(row) for row in _result_get(result, "rows", [])]
+        for result in ok_results
+    ]
+    relaxed_ordered = [_stable_rows(rows) for rows in relaxed_rows]
+    if len({tuple(rows) for rows in relaxed_ordered}) <= 1:
+        return True
+    relaxed_unordered = [tuple(sorted(rows)) for rows in relaxed_ordered]
+    return len(set(relaxed_unordered)) == 1
+
+
+def _relaxed_float_precision_row(row: list[Any]) -> list[Any]:
+    return [_norm_value(value, preserve_float_precision=False) for value in row]
+
+
+def _case_uses_precision_sensitive_float_arithmetic(case: Case) -> bool:
+    if not case.tables:
+        return False
+    table_by_name = {table.name: table for table in case.tables}
+    column_types = {column.name: column.type for column in case.tables[0].columns}
+    float_lineage = {column.name for column in case.tables[0].columns if column.type == "float"}
+    precision_columns: set[str] = set(float_lineage)
+    saw_precision_arithmetic = False
+    for operation in case.program.operations:
+        operation_kind = operation.get("op")
+        if operation_kind == "join":
+            right_table = table_by_name.get(str(operation.get("table", "")))
+            if right_table is None:
+                continue
+            right_key = str(operation.get("right_on", ""))
+            for column in right_table.columns:
+                if column.name == right_key or column.name in column_types:
+                    continue
+                column_types[column.name] = column.type
+                if column.type == "float":
+                    float_lineage.add(column.name)
+                    precision_columns.add(column.name)
+        elif operation_kind == "select":
+            selected_columns = {str(column) for column in operation.get("columns", [])}
+            column_types = {name: value_type for name, value_type in column_types.items() if name in selected_columns}
+            float_lineage &= selected_columns
+            precision_columns &= selected_columns
+        elif operation_kind == "mutate":
+            output_column = str(operation.get("column", ""))
+            expression = operation.get("expr", {})
+            source_name = str(expression.get("source", ""))
+            result_type = _mutate_float_precision_result_type(expression, column_types)
+            if not output_column or result_type is None:
+                continue
+            column_types[output_column] = result_type
+            if result_type != "float":
+                continue
+            source_is_float = source_name in float_lineage or column_types.get(source_name) == "float"
+            expression_kind = expression.get("kind")
+            expression_operator = expression.get("op")
+            precision_sensitive = (
+                expression_kind == "cast"
+                or source_is_float
+                or expression_operator in {"div", "mul"}
+            )
+            if precision_sensitive:
+                saw_precision_arithmetic = True
+                float_lineage.add(output_column)
+                precision_columns.add(output_column)
+        elif operation_kind in {"groupby", "aggregate"}:
+            input_column_types = dict(column_types)
+            aggregate_outputs = _float_precision_aggregate_outputs(operation, input_column_types, precision_columns)
+            if aggregate_outputs:
+                saw_precision_arithmetic = True
+            if operation_kind == "groupby":
+                group_keys = [str(key) for key in operation.get("keys", [])]
+                column_types = {key: input_column_types.get(key, "derived") for key in group_keys}
+                precision_columns = {key for key in group_keys if key in precision_columns}
+                float_lineage = {key for key in group_keys if key in float_lineage}
+            else:
+                column_types = {}
+                precision_columns = set()
+                float_lineage = set()
+            for aggregate in operation.get("aggs", []):
+                output_column = str(aggregate.get("as", ""))
+                if not output_column:
+                    continue
+                source_type = input_column_types.get(str(aggregate.get("column", "")), "float")
+                result_type = _aggregate_result_type(source_type, str(aggregate.get("func", "")))
+                column_types[output_column] = result_type
+                if output_column in aggregate_outputs:
+                    precision_columns.add(output_column)
+                    float_lineage.add(output_column)
+        elif operation_kind == "sort":
+            try:
+                sort_columns = {sort_key.column for sort_key in normalize_sort_keys(operation)}
+            except ValueError:
+                sort_columns = set()
+            if saw_precision_arithmetic and sort_columns & precision_columns:
+                return True
+    return saw_precision_arithmetic
+
+
+def _mutate_float_precision_result_type(
+    expression: dict[str, Any],
+    column_types: dict[str, str],
+) -> str | None:
+    source_name = str(expression.get("source", ""))
+    source_type = column_types.get(source_name)
+    if source_type is None:
+        return None
+    expression_kind = expression.get("kind")
+    if expression_kind == "add_const":
+        return source_type if source_type in {"int", "float"} else None
+    if expression_kind == "arith_const":
+        expression_operator = expression.get("op")
+        if source_type not in {"int", "float"} or expression_operator not in {"sub", "mul", "div", "mod"}:
+            return None
+        return "float" if expression_operator == "div" or source_type == "float" else source_type
+    if expression_kind == "cast" and expression.get("to") == "float":
+        return "float" if source_type in {"int", "float"} else None
+    return None
+
+
+def _float_precision_aggregate_outputs(
+    operation: dict[str, Any],
+    column_types: dict[str, str],
+    precision_columns: set[str],
+) -> set[str]:
+    outputs: set[str] = set()
+    for aggregate in operation.get("aggs", []):
+        source_name = str(aggregate.get("column", ""))
+        aggregate_function = str(aggregate.get("func", ""))
+        output_column = str(aggregate.get("as", ""))
+        if not output_column:
+            continue
+        source_type = column_types.get(source_name)
+        if aggregate_function in {"sum", "mean"} and (
+            source_name in precision_columns or source_type == "float"
+        ):
+            outputs.add(output_column)
+    return outputs
 
 
 def _has_clear_minority_backend(finding: Finding | dict[str, Any], backends: list[str]) -> bool:

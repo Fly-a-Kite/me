@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -360,7 +361,7 @@ def _case_has_ordered_topk_projection(case: Case) -> bool:
 
 
 def _case_has_negative_zero_comparison(case: Case) -> bool:
-    zero_source_columns = _columns_with_numeric_zero(case)
+    zero_source_columns = _columns_with_float_zero(case)
     negative_zero_columns = set()
     for op in case.program.operations:
         kind = op.get("op")
@@ -369,7 +370,7 @@ def _case_has_negative_zero_comparison(case: Case) -> bool:
             if (
                 expr.get("kind") == "arith_const"
                 and expr.get("op") == "mul"
-                and _is_numeric_value(expr.get("value"), -1.0)
+                and _is_negative_numeric_value(expr.get("value"))
                 and expr.get("source") in zero_source_columns
             ):
                 negative_zero_columns.add(str(op.get("column")))
@@ -392,14 +393,24 @@ def _filter_comparator_touches_zero(base: str, value: Any) -> bool:
     return False
 
 
-def _columns_with_numeric_zero(case: Case) -> set[str]:
+def _columns_with_float_zero(case: Case) -> set[str]:
     columns = set()
     for table in case.tables:
+        float_columns = {column.name for column in table.columns if column.type == "float"}
         for row in table.rows:
             for column, value in row.items():
-                if _is_numeric_value(value, 0.0):
+                if column in float_columns and _is_numeric_value(value, 0.0):
                     columns.add(column)
     return columns
+
+
+def _is_negative_numeric_value(value: Any) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return float(value) < 0.0
+    except Exception:
+        return False
 
 
 def _is_numeric_value(value: Any, target: float) -> bool:

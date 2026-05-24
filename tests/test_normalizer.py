@@ -56,6 +56,17 @@ def test_normalizer_preserves_explicit_sort_order_for_order_sensitive_programs()
     assert result.rows == [[2], [1]]
 
 
+def test_normalizer_preserves_float_precision_for_order_sensitive_programs():
+    df = pd.DataFrame([[1.6], [1.5999999999999999]], columns=["x"])
+    program = Program("prog", 1, [{"op": "sort", "columns": ["x"], "ascending": False}])
+
+    result = normalize_result(BackendResult("pandas", "ok", data=df), program)
+
+    assert program.order_sensitive is True
+    assert result.rows == [[1.6], [1.5999999999999999]]
+    assert result.rows[0] != result.rows[1]
+
+
 def test_order_sensitive_survives_limit_and_offset_after_sort():
     program = Program(
         "prog",

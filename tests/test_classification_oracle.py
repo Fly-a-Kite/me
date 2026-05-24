@@ -284,6 +284,73 @@ def test_classification_excludes_limit_before_any_defined_order():
     assert classification.false_positive_reason == "limit_offset_order_underconstrained"
 
 
+def test_classification_marks_float_precision_order_boundary_not_candidate_bug():
+    case = Case(
+        "case-float-precision-order-boundary",
+        135030,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int"), ColumnSpec("flag", "bool"), ColumnSpec("x", "int")],
+                [
+                    {"id": 1, "flag": False, "x": 1},
+                    {"id": 2, "flag": False, "x": 2},
+                ],
+            ),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int"), ColumnSpec("tag", "str")],
+                [{"id": 1, "tag": None}, {"id": 2, "tag": "space value"}],
+            ),
+        ],
+        Program(
+            "prog-float-precision-order-boundary",
+            135030,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+                {"op": "mutate", "column": "m_0", "expr": {"kind": "arith_const", "op": "div", "source": "id", "value": 5}},
+                {
+                    "op": "groupby",
+                    "keys": ["tag"],
+                    "aggs": [
+                        {"column": "flag", "func": "min", "as": "min_flag"},
+                        {"column": "x", "func": "nunique", "as": "nunique_x"},
+                        {"column": "m_0", "func": "sum", "as": "sum_m_0"},
+                    ],
+                },
+                {"op": "sort", "columns": ["sum_m_0", "min_flag", "nunique_x", "tag"], "ascending": False},
+                {"op": "limit", "n": 24},
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "groupby_aggregation",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "duckdb": NormalizedResult(
+            "duckdb",
+            "ok",
+            ["min_flag", "nunique_x", "sum_m_0", "tag"],
+            [[False, 2, 1.6, "space value"], [False, 5, 1.5999999999999999, None]],
+        ),
+        "pandas": NormalizedResult(
+            "pandas",
+            "ok",
+            ["min_flag", "nunique_x", "sum_m_0", "tag"],
+            [[False, 5, 1.6, None], [False, 2, 1.5999999999999999, "space value"]],
+        ),
+    }
+
+    classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "bughunt"}, ["pandas", "duckdb"])
+
+    assert classification.verdict == "expected_semantic_divergence"
+    assert classification.paper_status == "valid_finding_not_bug"
+    assert classification.false_positive is False
+
+
 def test_classification_excludes_groupby_limit_without_order():
     case = Case(
         "case-groupby-limit-no-order",
