@@ -703,7 +703,9 @@ def test_cli_parses_live_datafusion_presets():
     assert fresh.enable_local_source_scheduler is True
     assert fresh.local_source_exploration_weight == 0.45
     assert "groupby" not in fresh.guidance_targets
-    assert {"join", "mutate", "filter", "sort_offset", "wide_offset_topk"}.issubset(
+    assert "sort_offset" not in fresh.guidance_targets
+    assert "wide_offset_topk" not in fresh.guidance_targets
+    assert {"join", "mutate", "filter", "truth_filter", "set_membership_filter"}.issubset(
         fresh.guidance_targets
     )
     assert "joined_order_offset_projection@datafusion" in fresh.known_saturated_bug_families
