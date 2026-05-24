@@ -136,6 +136,9 @@ def write_standalone_reproducer(bug_dir: Path, report: dict[str, Any] | None = N
         else:
             path = bug_dir / "standalone_datafusion_negative_zero_truth_filter.py"
             content = _standalone_datafusion_negative_zero_truth_filter_reproducer()
+    elif "negative_zero_comparison" in roots and "datafusion" in suspicious:
+        path = bug_dir / "standalone_datafusion_negative_zero_truth_filter.py"
+        content = _standalone_datafusion_negative_zero_truth_filter_reproducer()
     elif "joined_order_offset_projection" in roots and "datafusion" in suspicious:
         path = bug_dir / "standalone_datafusion_joined_order_offset_projection.py"
         content = _standalone_datafusion_joined_order_offset_projection_reproducer()
@@ -160,6 +163,7 @@ def supports_standalone_reproducer(report: dict[str, Any]) -> bool:
     return (
         bool(roots & {"grouped_topk_null_sort_key"})
         or bool(roots & {"groupby_aggregation", "outer_join_truth_filter"} and suspicious & {"datafusion"})
+        or bool(roots & {"negative_zero_comparison"} and suspicious & {"datafusion"})
         or bool(roots & {"joined_order_offset_projection"} and suspicious & {"datafusion"})
         or bool(roots & {"reverse_division_operand_order", "tuple_absence_null_filter"})
         or report.get("generator_profile") == "edge_float"

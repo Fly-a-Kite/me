@@ -69,6 +69,8 @@ LogLevel = Literal["full", "compact", "minimal"]
 DEFAULT_KNOWN_SATURATED_BUG_FAMILIES = [
     "groupby_aggregation@datafusion",
     "grouped_topk_null_sort_key@datafusion",
+    "joined_order_offset_projection@datafusion",
+    "negative_zero_comparison@datafusion",
     "outer_join_truth_filter@datafusion",
     "topk_filter_pushdown@datafusion",
     "reverse_division_operand_order@polars",

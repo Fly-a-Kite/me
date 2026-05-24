@@ -147,6 +147,35 @@ LIVE_BUGHUNT_TARGETS = [
     "expressions",
 ]
 
+LIVE_DATAFUSION_FRESH_TARGETS = [
+    "common_workflow",
+    "operation_combo",
+    "join",
+    "mutate",
+    "filter",
+    "truth_filter",
+    "nulls",
+    "strings",
+    "numeric",
+    "casts",
+    "expressions",
+    "sort",
+    "limit",
+    "offset",
+    "sort_limit",
+    "sort_offset",
+    "wide_offset_topk",
+    "set_membership_filter",
+    "null_predicate_filter",
+    "boolean_predicate_filter",
+    "tuple_absence_filter",
+    "row_value_absence_filter",
+    "running_sum_precision",
+    "running_sum",
+    "sortedness_null_placement",
+    "sortedness",
+]
+
 LIVE_ARROW_TARGETS = [
     "common_workflow",
     "operation_combo",
@@ -2820,6 +2849,21 @@ def _preset_config(name: str) -> ExperimentConfig:
             candidate_pool=8,
             guidance_targets=list(LIVE_BUGHUNT_TARGETS),
             local_source_exploration_weight=0.35,
+            metamorphic=True,
+            metamorphic_variant_limit=6,
+        )
+    if name == "live_datafusion_fresh":
+        return _live_bughunt_config(
+            generator_profile="bughunt_no_groupby",
+            guidance_targets=list(LIVE_DATAFUSION_FRESH_TARGETS),
+            local_source_exploration_weight=0.45,
+        )
+    if name == "live_datafusion_fresh_metamorphic":
+        return _live_bughunt_config(
+            generator_profile="bughunt_no_groupby",
+            candidate_pool=8,
+            guidance_targets=list(LIVE_DATAFUSION_FRESH_TARGETS),
+            local_source_exploration_weight=0.45,
             metamorphic=True,
             metamorphic_variant_limit=6,
         )

@@ -73,6 +73,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "grouped_topk_null_sort_key"
     if _case_has_float_group_key_instability(case, normalized):
         return "float_group_key_instability"
+    if _case_has_negative_zero_comparison(case):
+        return "negative_zero_comparison"
     if _case_has_outer_join_truth_filter(case):
         return "outer_join_truth_filter"
     if _case_has_post_topk_filter(case):
@@ -304,7 +306,6 @@ def _case_has_post_topk_filter(case: Case) -> bool:
 def _case_has_joined_order_offset_projection(case: Case) -> bool:
     saw_join = False
     saw_order_after_join = False
-    saw_offset_after_order = False
     for op in case.program.operations:
         kind = op.get("op")
         if kind == "join":
@@ -312,10 +313,49 @@ def _case_has_joined_order_offset_projection(case: Case) -> bool:
         elif kind == "sort" and saw_join:
             saw_order_after_join = True
         elif kind == "offset" and saw_order_after_join:
-            saw_offset_after_order = True
-        elif kind == "select" and saw_offset_after_order:
             return True
     return False
+
+
+def _case_has_negative_zero_comparison(case: Case) -> bool:
+    zero_source_columns = _columns_with_numeric_zero(case)
+    negative_zero_columns = set()
+    for op in case.program.operations:
+        kind = op.get("op")
+        if kind == "mutate":
+            expr = op.get("expr", {})
+            if (
+                expr.get("kind") == "arith_const"
+                and expr.get("op") == "mul"
+                and _is_numeric_value(expr.get("value"), -1.0)
+                and expr.get("source") in zero_source_columns
+            ):
+                negative_zero_columns.add(str(op.get("column")))
+        elif kind == "filter" and op.get("column") in negative_zero_columns:
+            parsed = parse_filter_comparator(op.get("cmp"))
+            if parsed is not None and parsed.base in {">", ">=", "<", "<=", "==", "!="}:
+                if _is_numeric_value(op.get("value"), 0.0):
+                    return True
+    return False
+
+
+def _columns_with_numeric_zero(case: Case) -> set[str]:
+    columns = set()
+    for table in case.tables:
+        for row in table.rows:
+            for column, value in row.items():
+                if _is_numeric_value(value, 0.0):
+                    columns.add(column)
+    return columns
+
+
+def _is_numeric_value(value: Any, target: float) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return float(value) == target
+    except Exception:
+        return False
 
 
 def _case_has_tuple_absence_filter(case: Case) -> bool:

@@ -208,6 +208,18 @@ def test_write_datafusion_standalone_reproducer_for_negative_zero_truth_filter(t
     assert "IS NOT TRUE" in text
 
 
+def test_write_datafusion_standalone_reproducer_for_negative_zero_root(tmp_path):
+    path = write_standalone_reproducer(
+        tmp_path,
+        {
+            "reproduced_roots": ["negative_zero_comparison"],
+            "suspicious_backends": ["datafusion"],
+        },
+    )
+
+    assert path.name == "standalone_datafusion_negative_zero_truth_filter.py"
+
+
 def test_write_datafusion_standalone_reproducer_for_truth_filter_offset(tmp_path):
     path = write_standalone_reproducer(
         tmp_path,

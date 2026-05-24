@@ -203,6 +203,75 @@ def test_oracle_classifies_post_topk_filter_pushdown():
     assert findings[0].root_cause == "topk_filter_pushdown"
 
 
+def test_oracle_classifies_negative_zero_comparison():
+    case = Case(
+        "case-negative-zero-comparison",
+        370015,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int"), ColumnSpec("y", "float")],
+                [{"id": 1, "y": 0.0}],
+            )
+        ],
+        Program(
+            "prog-negative-zero-comparison",
+            370015,
+            [
+                {
+                    "op": "mutate",
+                    "column": "m_0",
+                    "expr": {"kind": "arith_const", "source": "y", "op": "mul", "value": -1},
+                },
+                {"op": "filter", "column": "m_0", "cmp": "ge_is_not_true", "value": 0.0},
+            ],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["id", "m_0", "y"], []),
+            "datafusion": NormalizedResult("datafusion", "ok", ["id", "m_0", "y"], [[1, 0, 0]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "negative_zero_comparison"
+
+
+def test_oracle_classifies_joined_order_offset_without_projection():
+    case = Case(
+        "case-join-order-offset-sort",
+        370016,
+        [
+            TableData("t0", [ColumnSpec("id", "int")], [{"id": 1}]),
+            TableData("t1", [ColumnSpec("id", "int"), ColumnSpec("x", "int")], [{"id": 1, "x": 10}]),
+        ],
+        Program(
+            "prog-join-order-offset-sort",
+            370016,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+                {"op": "sort", "columns": ["x"], "ascending": False},
+                {"op": "offset", "n": 1},
+                {"op": "sort", "columns": ["id"], "ascending": True},
+            ],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["id", "x"], [[1, 10]]),
+            "datafusion": NormalizedResult("datafusion", "ok", ["id", "x"], [[1, 20]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "joined_order_offset_projection"
+
+
 def test_oracle_classifies_tuple_absence_null_filter():
     case = generate_case(370017, profile="tuple_absence_filter")
 

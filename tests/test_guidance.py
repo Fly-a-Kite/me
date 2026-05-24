@@ -741,6 +741,104 @@ def test_guidance_family_saturation_demotes_known_specific_family():
     assert decision.case is fresh_case
 
 
+def test_guidance_family_saturation_uses_untargeted_fallback():
+    saturated_case = _case(
+        170,
+        [
+            {
+                "op": "mutate",
+                "column": "ratio",
+                "expr": {"kind": "reverse_division_columns", "source": "x", "numerator": 1.0},
+            }
+        ],
+    )
+    fallback_case = _case(171, [{"op": "select", "columns": ["id"]}])
+    guidance = GuidanceState(
+        targets=["polars_reverse_division_columns"],
+        active_backends=["polars"],
+        known_saturated_bug_families=["reverse_division_operand_order@polars"],
+    )
+
+    decision = guidance.choose_case([saturated_case, fallback_case])
+
+    assert decision.case is fallback_case
+    assert decision.matched_targets == []
+
+
+def test_guidance_family_saturation_catches_joined_order_offset_without_projection():
+    saturated_case = _case(
+        172,
+        [
+            {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+            {"op": "sort", "columns": ["x"], "ascending": False},
+            {"op": "offset", "n": 1},
+            {"op": "sort", "columns": ["id"], "ascending": True},
+        ],
+    )
+    fallback_case = _case(173, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}])
+    guidance = GuidanceState(
+        targets=["join", "sort_offset"],
+        active_backends=["datafusion"],
+        known_saturated_bug_families=["joined_order_offset_projection@datafusion"],
+    )
+
+    saturated_decision = guidance.choose_case([saturated_case])
+    decision = guidance.choose_case([saturated_case, fallback_case])
+
+    assert saturated_decision.score_breakdown["family_saturation_active"] == 1.0
+    assert decision.case is fallback_case
+
+
+def test_guidance_family_saturation_catches_topk_filter_combo_risk():
+    saturated_case = _case(
+        174,
+        [
+            {"op": "sort", "columns": ["x"], "ascending": False},
+            {"op": "offset", "n": 1},
+            {"op": "filter", "column": "x", "cmp": ">=", "value": 0},
+        ],
+    )
+    fallback_case = _case(175, [{"op": "select", "columns": ["id"]}])
+    guidance = GuidanceState(
+        targets=["sort_offset"],
+        active_backends=["datafusion"],
+        known_saturated_bug_families=["topk_filter_pushdown@datafusion"],
+    )
+
+    saturated_decision = guidance.choose_case([saturated_case])
+    decision = guidance.choose_case([saturated_case, fallback_case])
+
+    assert "combo_risk:topk_filter_pushdown" in saturated_decision.features
+    assert saturated_decision.score_breakdown["family_saturation_active"] == 1.0
+    assert decision.case is fallback_case
+
+
+def test_guidance_family_saturation_catches_negative_zero_comparison():
+    saturated_case = _case(
+        176,
+        [
+            {
+                "op": "mutate",
+                "column": "m_0",
+                "expr": {"kind": "arith_const", "source": "x", "op": "mul", "value": -1},
+            },
+            {"op": "filter", "column": "m_0", "cmp": "ge_is_not_true", "value": 0.0},
+        ],
+    )
+    fallback_case = _case(177, [{"op": "select", "columns": ["id"]}])
+    guidance = GuidanceState(
+        targets=["mutate", "filter"],
+        active_backends=["datafusion"],
+        known_saturated_bug_families=["negative_zero_comparison@datafusion"],
+    )
+
+    saturated_decision = guidance.choose_case([saturated_case])
+    decision = guidance.choose_case([saturated_case, fallback_case])
+
+    assert saturated_decision.score_breakdown["family_saturation_active"] == 1.0
+    assert decision.case is fallback_case
+
+
 def test_guidance_family_saturation_demotes_runtime_repeated_family():
     saturated_case = _case(
         72,

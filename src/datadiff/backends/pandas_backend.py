@@ -58,11 +58,15 @@ class PandasBackend(Backend):
                     right_rows = right[list(op["right_columns"])].to_dict("records")
                     left_columns = list(op["columns"])
                     right_columns = list(op["right_columns"])
-                    mask = [
-                        evaluate_tuple_absence(row, left_columns, right_rows, right_columns)
-                        for row in df.to_dict("records")
-                    ]
-                    df = df[mask]
+                    keep_mask = pd.Series(
+                        [
+                            evaluate_tuple_absence(row, left_columns, right_rows, right_columns)
+                            for row in df.to_dict("records")
+                        ],
+                        index=df.index,
+                        dtype=bool,
+                    )
+                    df = df.loc[keep_mask]
                 elif kind == "running_sum":
                     columns = [column for column in df.columns if column != op["column"]] + [op["column"]]
                     rows = sort_rows_for_running(df.to_dict("records"), normalize_sort_keys({"keys": op["order_by"]}))

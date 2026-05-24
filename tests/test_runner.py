@@ -188,6 +188,44 @@ def test_run_loaded_case_pandas_empty_filter_preserves_columns_for_groupby():
     any(name != "sqlite" and importlib.util.find_spec(name) is None for name in REQUIRED_BACKENDS),
     reason="data backends are not installed",
 )
+def test_run_loaded_case_pandas_empty_tuple_absence_preserves_columns():
+    case = Case(
+        "case-empty-tuple-absence-schema",
+        225,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("flag", "bool"),
+                    ColumnSpec("x", "int"),
+                ],
+                [{"id": 1, "flag": True, "x": 10}],
+            ),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int", nullable=False)],
+                [{"id": 1}],
+            ),
+        ],
+        Program(
+            "prog-empty-tuple-absence-schema",
+            225,
+            [{"op": "tuple_absence_filter", "columns": ["id"], "table": "t1", "right_columns": ["id"]}],
+        ),
+    )
+
+    row = run_loaded_case(case, REQUIRED_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert {tuple(result["columns"]) for result in row["normalized"].values()} == {("flag", "id", "x")}
+    assert {tuple(tuple(item) for item in result["rows"]) for result in row["normalized"].values()} == {()}
+
+
+@pytest.mark.skipif(
+    any(name != "sqlite" and importlib.util.find_spec(name) is None for name in REQUIRED_BACKENDS),
+    reason="data backends are not installed",
+)
 def test_run_loaded_case_drops_right_join_keys_for_mismatched_key_names():
     case = Case(
         "case-mismatched-join-key-schema",

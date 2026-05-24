@@ -685,6 +685,8 @@ def test_cli_parses_live_datafusion_presets():
     assert live.issue_inspired_source_saturation_penalty == 1.25
     assert "groupby_aggregation@datafusion" in live.known_saturated_bug_families
     assert "grouped_topk_null_sort_key@datafusion" in live.known_saturated_bug_families
+    assert "joined_order_offset_projection@datafusion" in live.known_saturated_bug_families
+    assert "negative_zero_comparison@datafusion" in live.known_saturated_bug_families
     assert "outer_join_truth_filter@datafusion" in live.known_saturated_bug_families
     assert "topk_filter_pushdown@datafusion" in live.known_saturated_bug_families
     assert {"common_workflow", "operation_combo", "topk", "join", "groupby", "join_null_key_topk"}.issubset(live.guidance_targets)
@@ -693,6 +695,24 @@ def test_cli_parses_live_datafusion_presets():
     assert metamorphic.enable_metamorphic_oracle is True
     assert metamorphic.oracle_mode == "both"
     assert metamorphic.metamorphic_variant_limit == 6
+
+    fresh = _preset_config("live_datafusion_fresh")
+    assert fresh.generator_profile == "bughunt_no_groupby"
+    assert fresh.guidance_strategy == "guided"
+    assert fresh.enable_local_source_scheduler is True
+    assert fresh.local_source_exploration_weight == 0.45
+    assert "groupby" not in fresh.guidance_targets
+    assert {"join", "mutate", "filter", "sort_offset", "wide_offset_topk"}.issubset(
+        fresh.guidance_targets
+    )
+    assert "joined_order_offset_projection@datafusion" in fresh.known_saturated_bug_families
+    assert "negative_zero_comparison@datafusion" in fresh.known_saturated_bug_families
+
+    fresh_metamorphic = _preset_config("live_datafusion_fresh_metamorphic")
+    assert fresh_metamorphic.generator_profile == "bughunt_no_groupby"
+    assert fresh_metamorphic.enable_metamorphic_oracle is True
+    assert fresh_metamorphic.oracle_mode == "both"
+    assert fresh_metamorphic.metamorphic_variant_limit == 6
 
 
 def test_cli_parses_non_datafusion_live_presets():

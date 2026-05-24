@@ -774,16 +774,21 @@ class GuidanceState:
         contributing = [decision for decision in scored if self._is_contributing_candidate(decision)]
         if not contributing:
             contributing = [max(scored, key=lambda decision: (decision.score, -decision.case.seed))]
-        non_global_replay_candidates = [
-            decision for decision in contributing if not _decision_has_issue_replay_global_saturation(decision)
-        ]
-        if non_global_replay_candidates:
-            contributing = non_global_replay_candidates
-        non_saturated_issue_source_candidates = [
-            decision for decision in contributing if not _decision_has_issue_inspired_source_saturation(decision)
-        ]
-        if non_saturated_issue_source_candidates:
-            contributing = non_saturated_issue_source_candidates
+        contributing = _prefer_unsaturated_decisions(
+            contributing,
+            scored,
+            _decision_has_issue_replay_global_saturation,
+        )
+        contributing = _prefer_unsaturated_decisions(
+            contributing,
+            scored,
+            _decision_has_issue_inspired_source_saturation,
+        )
+        contributing = _prefer_unsaturated_decisions(
+            contributing,
+            scored,
+            _decision_has_family_saturation,
+        )
         pruned = len(scored) - len(contributing)
         for decision in contributing:
             decision.contributing_candidate_count = len(contributing)
@@ -1066,6 +1071,18 @@ def _decision_has_issue_replay_global_saturation(decision: GuidanceDecision) -> 
 
 def _decision_has_issue_inspired_source_saturation(decision: GuidanceDecision) -> bool:
     return decision.score_breakdown.get("issue_inspired_source_saturation_active", 0.0) > 0.0
+
+
+def _prefer_unsaturated_decisions(
+    current: list[GuidanceDecision],
+    scored: list[GuidanceDecision],
+    is_saturated: Any,
+) -> list[GuidanceDecision]:
+    preferred = [decision for decision in current if not is_saturated(decision)]
+    if preferred:
+        return preferred
+    fallback = [decision for decision in scored if not is_saturated(decision)]
+    return fallback or current
 
 
 def _matched_targets(features: set[str], targets: list[str]) -> list[str]:
@@ -2654,6 +2671,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("boolean_null_filter")
     if "pattern:post_topk_range_filter" in features:
         roots.add("topk_filter_pushdown")
+    if "combo_risk:topk_filter_pushdown" in features:
+        roots.add("topk_filter_pushdown")
     if "pattern:tuple_absence_filter" in features or "pattern:row_value_absence_filter" in features:
         roots.add("tuple_absence_null_filter")
     if "pattern:running_sum_precision" in features or "op:running_sum" in features:
@@ -2740,8 +2759,15 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("groupby_aggregation")
     if "op:join" in features:
         roots.add("join_semantics")
-        if {"op:sort", "op:offset", "op:select"}.issubset(features):
+        if {"op:sort", "op:offset"}.issubset(features):
             roots.add("joined_order_offset_projection")
+    if (
+        "mutate:arith:mul" in features
+        and "mutate:negative" in features
+        and "has:zero" in features
+        and "filter:truth-test" in features
+    ):
+        roots.add("negative_zero_comparison")
     if "op:groupby" in features:
         roots.add("float_group_key_instability" if "pattern:float_group_key" in features else "groupby_aggregation")
     if "op:aggregate" in features:

@@ -334,7 +334,7 @@ def test_datafusion_negative_zero_truth_filter_is_candidate_bug():
     assert result["normalized"]["pandas"]["rows"] == []
     assert result["normalized"]["duckdb"]["rows"] == []
     assert result["normalized"]["datafusion"]["rows"] == [[1, 0, 0]]
-    assert result["findings"][0]["root_cause"] == "outer_join_truth_filter"
+    assert result["findings"][0]["root_cause"] == "negative_zero_comparison"
     assert result["findings"][0]["suspicious_backends"] == ["datafusion"]
 
     report = build_triage_report(
