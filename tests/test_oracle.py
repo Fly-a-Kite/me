@@ -265,6 +265,41 @@ def test_oracle_classifies_negative_zero_comparison():
     assert findings[0].root_cause == "negative_zero_comparison"
 
 
+def test_oracle_classifies_negative_zero_range_filter_after_join():
+    case = Case(
+        "case-negative-zero-range-filter-after-join",
+        38506,
+        [
+            TableData("t0", [ColumnSpec("id", "int")], [{"id": 3}]),
+            TableData("t1", [ColumnSpec("id", "int"), ColumnSpec("z", "float")], [{"id": 3, "z": 0.0}]),
+        ],
+        Program(
+            "prog-negative-zero-range-filter-after-join",
+            38506,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+                {
+                    "op": "mutate",
+                    "column": "m_1",
+                    "expr": {"kind": "arith_const", "source": "z", "op": "mul", "value": -1},
+                },
+                {"op": "filter", "column": "m_1", "cmp": "range_closed", "value": [0.0, 1.0]},
+            ],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["id", "m_1", "z"], [[3, 0, 0]]),
+            "datafusion": NormalizedResult("datafusion", "ok", ["id", "m_1", "z"], []),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "negative_zero_comparison"
+
+
 def test_oracle_classifies_joined_order_offset_without_projection():
     case = Case(
         "case-join-order-offset-sort",

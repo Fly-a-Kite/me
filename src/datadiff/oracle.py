@@ -375,9 +375,20 @@ def _case_has_negative_zero_comparison(case: Case) -> bool:
                 negative_zero_columns.add(str(op.get("column")))
         elif kind == "filter" and op.get("column") in negative_zero_columns:
             parsed = parse_filter_comparator(op.get("cmp"))
-            if parsed is not None and parsed.base in {">", ">=", "<", "<=", "==", "!="}:
-                if _is_numeric_value(op.get("value"), 0.0):
-                    return True
+            if parsed is not None and _filter_comparator_touches_zero(parsed.base, op.get("value")):
+                return True
+    return False
+
+
+def _filter_comparator_touches_zero(base: str, value: Any) -> bool:
+    if base in {">", ">=", "<", "<=", "==", "!="}:
+        return _is_numeric_value(value, 0.0)
+    if base == "range_closed" and isinstance(value, (list, tuple)) and len(value) == 2:
+        lower, upper = value
+        if _is_numeric_value(lower, 0.0) or _is_numeric_value(upper, 0.0):
+            return True
+        if _is_orderable_number(lower) and _is_orderable_number(upper):
+            return float(lower) < 0.0 < float(upper)
     return False
 
 
@@ -398,6 +409,16 @@ def _is_numeric_value(value: Any, target: float) -> bool:
         return float(value) == target
     except Exception:
         return False
+
+
+def _is_orderable_number(value: Any) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        number = float(value)
+    except Exception:
+        return False
+    return not math.isnan(number)
 
 
 def _case_has_tuple_absence_filter(case: Case) -> bool:
