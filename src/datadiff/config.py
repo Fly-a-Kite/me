@@ -71,6 +71,7 @@ DEFAULT_KNOWN_SATURATED_BUG_FAMILIES = [
     "grouped_topk_null_sort_key@datafusion",
     "joined_order_offset_projection@datafusion",
     "negative_zero_comparison@datafusion",
+    "ordered_topk_projection@datafusion",
     "outer_join_truth_filter@datafusion",
     "topk_filter_pushdown@datafusion",
     "reverse_division_operand_order@polars",

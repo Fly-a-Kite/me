@@ -220,6 +220,21 @@ def test_write_datafusion_standalone_reproducer_for_negative_zero_root(tmp_path)
     assert path.name == "standalone_datafusion_negative_zero_truth_filter.py"
 
 
+def test_write_datafusion_standalone_reproducer_for_ordered_topk_projection(tmp_path):
+    path = write_standalone_reproducer(
+        tmp_path,
+        {
+            "reproduced_roots": ["ordered_topk_projection"],
+            "suspicious_backends": ["datafusion"],
+        },
+    )
+
+    assert path.name == "standalone_datafusion_ordered_topk_projection.py"
+    text = path.read_text(encoding="utf-8")
+    assert "ORDER BY x DESC NULLS LAST, g DESC NULLS LAST" in text
+    assert "OFFSET 1" in text
+
+
 def test_write_datafusion_standalone_reproducer_for_truth_filter_offset(tmp_path):
     path = write_standalone_reproducer(
         tmp_path,

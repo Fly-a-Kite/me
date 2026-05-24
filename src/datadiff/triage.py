@@ -142,6 +142,9 @@ def write_standalone_reproducer(bug_dir: Path, report: dict[str, Any] | None = N
     elif "joined_order_offset_projection" in roots and "datafusion" in suspicious:
         path = bug_dir / "standalone_datafusion_joined_order_offset_projection.py"
         content = _standalone_datafusion_joined_order_offset_projection_reproducer()
+    elif "ordered_topk_projection" in roots and "datafusion" in suspicious:
+        path = bug_dir / "standalone_datafusion_ordered_topk_projection.py"
+        content = _standalone_datafusion_ordered_topk_projection_reproducer()
     elif "reverse_division_operand_order" in roots:
         path = bug_dir / "standalone_polars_reverse_division_columns.py"
         content = _standalone_polars_reverse_division_columns_reproducer()
@@ -165,6 +168,7 @@ def supports_standalone_reproducer(report: dict[str, Any]) -> bool:
         or bool(roots & {"groupby_aggregation", "outer_join_truth_filter"} and suspicious & {"datafusion"})
         or bool(roots & {"negative_zero_comparison"} and suspicious & {"datafusion"})
         or bool(roots & {"joined_order_offset_projection"} and suspicious & {"datafusion"})
+        or bool(roots & {"ordered_topk_projection"} and suspicious & {"datafusion"})
         or bool(roots & {"reverse_division_operand_order", "tuple_absence_null_filter"})
         or report.get("generator_profile") == "edge_float"
         or bool(features.get("contains_nan"))
@@ -880,6 +884,78 @@ def main() -> None:
     print(f"observed={result!r}")
 
     assert result == ["filfM"], "DataFusion returned the row that OFFSET should skip"
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+def _standalone_datafusion_ordered_topk_projection_reproducer() -> str:
+    return '''#!/usr/bin/env python3
+"""Standalone reproduction for DataFusion ordered TopK projection.
+
+This script does not import DataDiffFuzz. An inner ORDER BY/OFFSET subquery
+keeps the row where g is NULL, but an outer ORDER BY over another projected
+column returns the skipped row instead.
+"""
+
+from __future__ import annotations
+
+import datafusion
+import duckdb
+import pandas as pd
+import pyarrow as pa
+from datafusion import SessionContext
+
+
+QUERY = (
+    "SELECT q.g FROM ("
+    "  SELECT g, x, id FROM t0 "
+    "  ORDER BY x DESC NULLS LAST, g DESC NULLS LAST "
+    "  OFFSET 1"
+    ") q "
+    "ORDER BY id DESC NULLS LAST"
+)
+
+
+def main() -> None:
+    rows = [
+        {"g": None, "id": 0, "x": -1},
+        {"g": "f", "id": 0, "x": -1},
+    ]
+    schema = pa.schema(
+        [
+            pa.field("g", pa.string(), nullable=True),
+            pa.field("id", pa.int64(), nullable=False),
+            pa.field("x", pa.int64(), nullable=False),
+        ]
+    )
+
+    ctx = SessionContext()
+    batch = pa.RecordBatch.from_pylist(rows, schema=schema)
+    ctx.register_record_batches("t0", [[batch]])
+    datafusion_result = ctx.sql(QUERY).to_pandas()
+
+    con = duckdb.connect(database=":memory:")
+    con.execute("CREATE TABLE t0(g VARCHAR, id BIGINT, x BIGINT)")
+    con.executemany("INSERT INTO t0 VALUES (?, ?, ?)", [(row["g"], row["id"], row["x"]) for row in rows])
+    duckdb_result = con.execute(QUERY).df()
+
+    print(f"datafusion={getattr(datafusion, '__version__', 'unknown')}")
+    print(f"pyarrow={pa.__version__}")
+    print(f"duckdb={duckdb.__version__}")
+    print("query:")
+    print(QUERY)
+    print("duckdb result:")
+    print(duckdb_result)
+    print("datafusion result:")
+    print(datafusion_result)
+
+    assert len(duckdb_result) == 1 and pd.isna(duckdb_result.iloc[0]["g"])
+    assert len(datafusion_result) == 1 and pd.isna(datafusion_result.iloc[0]["g"]), (
+        "DataFusion returned the row skipped by the inner ORDER BY/OFFSET"
+    )
 
 
 if __name__ == "__main__":

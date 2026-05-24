@@ -813,6 +813,31 @@ def test_guidance_family_saturation_catches_topk_filter_combo_risk():
     assert decision.case is fallback_case
 
 
+def test_guidance_family_saturation_catches_ordered_topk_projection():
+    saturated_case = _case(
+        178,
+        [
+            {"op": "sort", "columns": ["x", "g"], "ascending": False},
+            {"op": "offset", "n": 1},
+            {"op": "select", "columns": ["g", "id", "x"]},
+            {"op": "sort", "columns": ["id"], "ascending": False},
+        ],
+    )
+    fallback_case = _case(179, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}])
+    guidance = GuidanceState(
+        targets=["sort_offset"],
+        active_backends=["datafusion"],
+        known_saturated_bug_families=["ordered_topk_projection@datafusion"],
+    )
+
+    saturated_decision = guidance.choose_case([saturated_case])
+    decision = guidance.choose_case([saturated_case, fallback_case])
+
+    assert "combo_risk:projection_ordering" in saturated_decision.features
+    assert saturated_decision.score_breakdown["family_saturation_active"] == 1.0
+    assert decision.case is fallback_case
+
+
 def test_guidance_family_saturation_catches_negative_zero_comparison():
     saturated_case = _case(
         176,

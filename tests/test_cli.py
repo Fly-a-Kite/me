@@ -687,6 +687,7 @@ def test_cli_parses_live_datafusion_presets():
     assert "grouped_topk_null_sort_key@datafusion" in live.known_saturated_bug_families
     assert "joined_order_offset_projection@datafusion" in live.known_saturated_bug_families
     assert "negative_zero_comparison@datafusion" in live.known_saturated_bug_families
+    assert "ordered_topk_projection@datafusion" in live.known_saturated_bug_families
     assert "outer_join_truth_filter@datafusion" in live.known_saturated_bug_families
     assert "topk_filter_pushdown@datafusion" in live.known_saturated_bug_families
     assert {"common_workflow", "operation_combo", "topk", "join", "groupby", "join_null_key_topk"}.issubset(live.guidance_targets)
@@ -707,6 +708,7 @@ def test_cli_parses_live_datafusion_presets():
     )
     assert "joined_order_offset_projection@datafusion" in fresh.known_saturated_bug_families
     assert "negative_zero_comparison@datafusion" in fresh.known_saturated_bug_families
+    assert "ordered_topk_projection@datafusion" in fresh.known_saturated_bug_families
 
     fresh_metamorphic = _preset_config("live_datafusion_fresh_metamorphic")
     assert fresh_metamorphic.generator_profile == "bughunt_no_groupby"

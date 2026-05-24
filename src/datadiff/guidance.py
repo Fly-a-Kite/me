@@ -2673,6 +2673,12 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("topk_filter_pushdown")
     if "combo_risk:topk_filter_pushdown" in features:
         roots.add("topk_filter_pushdown")
+    if (
+        "combo_risk:projection_ordering" in features
+        and "op:sort" in features
+        and ("op:limit" in features or "op:offset" in features)
+    ):
+        roots.add("ordered_topk_projection")
     if "pattern:tuple_absence_filter" in features or "pattern:row_value_absence_filter" in features:
         roots.add("tuple_absence_null_filter")
     if "pattern:running_sum_precision" in features or "op:running_sum" in features:

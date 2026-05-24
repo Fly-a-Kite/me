@@ -272,6 +272,36 @@ def test_oracle_classifies_joined_order_offset_without_projection():
     assert findings[0].root_cause == "joined_order_offset_projection"
 
 
+def test_oracle_classifies_ordered_topk_projection():
+    case = Case(
+        "case-ordered-topk-projection",
+        370017,
+        [TableData("t0", [ColumnSpec("g", "str"), ColumnSpec("id", "int"), ColumnSpec("x", "int")], [])],
+        Program(
+            "prog-ordered-topk-projection",
+            370017,
+            [
+                {"op": "sort", "columns": ["x", "g"], "ascending": False},
+                {"op": "offset", "n": 1},
+                {"op": "select", "columns": ["g", "id", "x"]},
+                {"op": "sort", "columns": ["id"], "ascending": False},
+                {"op": "select", "columns": ["g"]},
+            ],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["g"], [[None]]),
+            "datafusion": NormalizedResult("datafusion", "ok", ["g"], [["f"]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "ordered_topk_projection"
+
+
 def test_oracle_classifies_tuple_absence_null_filter():
     case = generate_case(370017, profile="tuple_absence_filter")
 
