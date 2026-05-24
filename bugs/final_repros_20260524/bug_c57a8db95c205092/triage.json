@@ -1,0 +1,52 @@
+{
+  "artifact": "bugs/final_repros_20260524/bug_c57a8db95c205092",
+  "backends": [
+    "duckdb",
+    "sqlite"
+  ],
+  "case_id": "case-00009513-bughunt-row-value-absence-filter",
+  "documentation_refs": [],
+  "false_positive_reasons": [],
+  "features": {
+    "contains_inf": false,
+    "contains_nan": false,
+    "contains_non_ascii_string": false,
+    "contains_null": true,
+    "operation_sequence": [
+      "tuple_absence_filter"
+    ],
+    "uses_filter": false,
+    "uses_groupby": false,
+    "uses_limit": false,
+    "uses_modulo": false,
+    "uses_mutate": false,
+    "uses_offset": false,
+    "uses_sort": false,
+    "uses_string_lower": false
+  },
+  "generator_profile": "bughunt",
+  "operations": 1,
+  "original_kinds": [
+    "semantic_output_mismatch"
+  ],
+  "paper_status": "candidate_bug_needs_external_confirmation",
+  "recommendation": [
+    "Minimize the artifact and create a backend-specific reproduction script.",
+    "Check documentation and release notes, then submit an upstream issue.",
+    "Count as confirmed only after maintainer acknowledgement, fix, or clear spec violation."
+  ],
+  "reduced": true,
+  "reproduced_kinds": [
+    "semantic_output_mismatch"
+  ],
+  "reproduced_roots": [
+    "tuple_absence_null_filter"
+  ],
+  "rows": 1,
+  "seed": 9513,
+  "suspicious_backends": [
+    "duckdb"
+  ],
+  "triage_confidence": "high",
+  "verdict": "candidate_implementation_bug"
+}

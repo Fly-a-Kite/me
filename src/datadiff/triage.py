@@ -121,6 +121,12 @@ def write_standalone_reproducer(bug_dir: Path, report: dict[str, Any] | None = N
     if "grouped_topk_null_sort_key" in roots:
         path = bug_dir / "standalone_datafusion_groupby_null_sortkey_limit.py"
         content = _standalone_datafusion_groupby_null_sortkey_reproducer()
+    elif "reverse_division_operand_order" in roots:
+        path = bug_dir / "standalone_polars_reverse_division_columns.py"
+        content = _standalone_polars_reverse_division_columns_reproducer()
+    elif "tuple_absence_null_filter" in roots:
+        path = bug_dir / "standalone_duckdb_tuple_absence_null_filter.py"
+        content = _standalone_duckdb_tuple_absence_null_filter_reproducer()
     else:
         path = bug_dir / "standalone_edge_float_reproducer.py"
         content = _standalone_edge_float_reproducer()
@@ -134,6 +140,7 @@ def supports_standalone_reproducer(report: dict[str, Any]) -> bool:
     roots = set(report.get("reproduced_roots", []))
     return (
         bool(roots & {"grouped_topk_null_sort_key"})
+        or bool(roots & {"reverse_division_operand_order", "tuple_absence_null_filter"})
         or report.get("generator_profile") == "edge_float"
         or bool(features.get("contains_nan"))
         or bool(features.get("contains_inf"))
@@ -466,4 +473,108 @@ if __name__ == "__main__":
     run_pandas()
     run_duckdb()
     run_sqlite()
+'''
+
+
+def _standalone_polars_reverse_division_columns_reproducer() -> str:
+    return '''#!/usr/bin/env python3
+"""Standalone reproduction for Polars Series.__rtruediv__ operand order.
+
+This script does not import DataDiffFuzz. It compares an eager Series
+right-division expression with the equivalent lazy column expression.
+"""
+
+from __future__ import annotations
+
+import polars as pl
+
+
+def main() -> None:
+    df = pl.DataFrame({"divisor_value": [4], "numerator_value": [5]})
+
+    eager = df.with_columns(
+        df["divisor_value"].__rtruediv__(df["numerator_value"]).alias("ratio_value")
+    )
+    lazy = df.lazy().with_columns(
+        (pl.col("numerator_value") / pl.col("divisor_value")).alias("ratio_value")
+    ).collect()
+
+    eager_ratio = eager.get_column("ratio_value").item()
+    lazy_ratio = lazy.get_column("ratio_value").item()
+
+    print(f"polars={pl.__version__}")
+    print("eager Series.__rtruediv__ result:")
+    print(eager)
+    print("lazy numerator / divisor result:")
+    print(lazy)
+
+    assert eager_ratio == lazy_ratio, (
+        "Series.__rtruediv__ returned a different operand order: "
+        f"eager={eager_ratio!r}, expected={lazy_ratio!r}"
+    )
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+def _standalone_duckdb_tuple_absence_null_filter_reproducer() -> str:
+    return '''#!/usr/bin/env python3
+"""Standalone reproduction for DuckDB row-value NOT IN with NULL.
+
+This script does not import DataDiffFuzz. It compares a minimal row-value
+NOT IN query against SQLite and DuckDB's direct row equality result.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+
+import duckdb
+
+
+DUCKDB_QUERY = """
+WITH t0(left_a, left_b) AS (VALUES (2, 2)),
+     t1(right_a, right_b) AS (VALUES (NULL, 4))
+SELECT left_a, left_b
+FROM t0
+WHERE (left_a, left_b) NOT IN (SELECT right_a, right_b FROM t1)
+"""
+
+SQLITE_QUERY = """
+WITH t0(left_a, left_b) AS (VALUES (2, 2)),
+     t1(right_a, right_b) AS (VALUES (NULL, 4))
+SELECT left_a, left_b
+FROM t0
+WHERE (left_a, left_b) NOT IN (SELECT right_a, right_b FROM t1)
+"""
+
+
+def main() -> None:
+    duck = duckdb.connect(database=":memory:")
+    sqlite = sqlite3.connect(":memory:")
+
+    duck_rows = duck.execute(DUCKDB_QUERY).fetchall()
+    sqlite_rows = sqlite.execute(SQLITE_QUERY).fetchall()
+    duck_row_equal = duck.execute("SELECT (2, 2) = (NULL, 4)").fetchone()[0]
+    duck_row_not_in = duck.execute(
+        "SELECT (2, 2) NOT IN (SELECT * FROM (VALUES (NULL, 4)) AS t(a, b))"
+    ).fetchone()[0]
+
+    print(f"duckdb={duckdb.__version__}")
+    print(f"sqlite={sqlite3.sqlite_version}")
+    print(f"duckdb filtered rows: {duck_rows}")
+    print(f"sqlite filtered rows: {sqlite_rows}")
+    print(f"duckdb row equality (2,2) = (NULL,4): {duck_row_equal!r}")
+    print(f"duckdb row NOT IN result: {duck_row_not_in!r}")
+
+    assert duck_rows == sqlite_rows == [(2, 2)], (
+        "DuckDB filtered out the row even though the unequal second tuple "
+        "component makes the row comparison false."
+    )
+
+
+if __name__ == "__main__":
+    main()
 '''

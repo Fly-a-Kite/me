@@ -1,0 +1,38 @@
+{
+  "polars": {
+    "backend": "polars",
+    "columns": [
+      "divisor_value",
+      "numerator_value",
+      "ratio_value"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        4,
+        5,
+        0.8
+      ]
+    ],
+    "status": "ok"
+  },
+  "polars_lazy": {
+    "backend": "polars_lazy",
+    "columns": [
+      "divisor_value",
+      "numerator_value",
+      "ratio_value"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        4,
+        5,
+        1.25
+      ]
+    ],
+    "status": "ok"
+  }
+}

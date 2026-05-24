@@ -19,6 +19,7 @@ from datadiff.mutator import (
     _append_json_predicate_order_probe,
     _append_sparse_mask_probe,
     _append_float_wrap_probe,
+    _append_groupby_fractional_membership_filter,
     _append_index_bool_probe,
     _append_empty_literal_groupby_probe,
     _append_arrow_string_eq_sum_probe,
@@ -34,6 +35,7 @@ from datadiff.mutator import (
     _append_order_projection_probe,
     _append_range_filter_probe,
     _append_random_case_probe,
+    _append_row_value_absence_filter,
     _append_running_sum_probe,
     _append_sortedness_check_probe,
     _append_truth_filter_probe,
@@ -154,6 +156,8 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_boolean_predicate_filter" in MUTATION_OPERATOR_NAMES
     assert "append_range_filter" in MUTATION_OPERATOR_NAMES
     assert "append_tuple_absence_filter" in MUTATION_OPERATOR_NAMES
+    assert "append_row_value_absence_filter" in MUTATION_OPERATOR_NAMES
+    assert "append_row_value_absence_filter" in DISCOVERY_MUTATION_OPERATOR_NAMES
     assert "append_running_sum" in MUTATION_OPERATOR_NAMES
     assert "append_sortedness_check" in MUTATION_OPERATOR_NAMES
     assert "append_random_case_probe" in MUTATION_OPERATOR_NAMES
@@ -180,6 +184,8 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_hash_pivot_wider_probe" in MUTATION_OPERATOR_NAMES
     assert "append_rolling_mean_by_null_count_probe" in MUTATION_OPERATOR_NAMES
     assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
+    assert "append_groupby_fractional_membership_filter" in MUTATION_OPERATOR_NAMES
+    assert "append_groupby_fractional_membership_filter" in DISCOVERY_MUTATION_OPERATOR_NAMES
 
 
 def test_append_order_projection_mutation_drops_sort_key_but_stays_valid():
@@ -275,6 +281,29 @@ def test_append_tuple_absence_filter_mutation_stays_valid():
     assert len(operations[-1]["columns"]) == 2
     assert operations[-1]["table"] == "t1"
     case = Case("case-mut-tuple-filter", 1, [left, right], Program("prog-mut-tuple-filter", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_row_value_absence_filter_mutation_stays_valid_and_discoverable():
+    left = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+        [{"id": 0, "x": 2, "s": "b"}, {"id": 1, "x": None, "s": "a"}],
+    )
+    right = TableData(
+        "t1",
+        [ColumnSpec("id", "int"), ColumnSpec("j", "int"), ColumnSpec("tag", "str")],
+        [{"id": 0, "j": None, "tag": "b"}],
+    )
+    operations = [{"op": "select", "columns": ["id", "x", "s"]}]
+
+    detail = _append_row_value_absence_filter([left, right], operations, random.Random(1))
+
+    assert detail.startswith("append_row_value_absence_filter:")
+    assert operations[-1]["op"] == "tuple_absence_filter"
+    assert len(operations[-1]["columns"]) == 2
+    assert operations[-1]["table"] == "t1"
+    case = Case("case-mut-row-value-filter", 1, [left, right], Program("prog-mut-row-value-filter", 1, operations))
     assert validate_case_program(case) == []
 
 
@@ -761,4 +790,33 @@ def test_append_grouped_topk_mutation_stays_valid():
     assert detail.startswith("append_grouped_topk:")
     assert [op["op"] for op in operations[-4:]] == ["groupby", "select", "sort", "limit"]
     case = Case("case-mut-grouped-topk", 1, [table], Program("prog-mut-grouped-topk", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_groupby_fractional_membership_filter_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("bucket_code", "int"), ColumnSpec("amount_code", "int")],
+        [
+            {"bucket_code": 0, "amount_code": 2},
+            {"bucket_code": 0, "amount_code": 10},
+            {"bucket_code": 1, "amount_code": 2},
+        ],
+    )
+    operations = [
+        {
+            "op": "groupby",
+            "keys": ["bucket_code"],
+            "aggs": [{"column": "bucket_code", "func": "min", "as": "agg_min_bucket"}],
+        }
+    ]
+
+    detail = _append_groupby_fractional_membership_filter([table], operations, random.Random(1))
+
+    assert detail.startswith("append_groupby_fractional_membership_filter:")
+    assert operations[-1]["op"] == "filter"
+    assert operations[-1]["column"] == "agg_min_bucket"
+    assert operations[-1]["cmp"] == "in_set"
+    assert any(isinstance(value, float) and not value.is_integer() for value in operations[-1]["value"])
+    case = Case("case-mut-groupby-membership", 1, [table], Program("prog-mut-groupby-membership", 1, operations))
     assert validate_case_program(case) == []

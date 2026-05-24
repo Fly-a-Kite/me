@@ -171,6 +171,8 @@ class PandasBackend(Backend):
                             df[op["column"]] = df[expr["source"]] % expr["value"]
                         else:
                             raise ValueError(expr["op"])
+                    elif expr["kind"] == "reverse_division_columns":
+                        df[op["column"]] = df[expr["numerator"]] / df[expr["source"]]
                     elif expr["kind"] == "cast" and expr["to"] == "float":
                         df[op["column"]] = df[expr["source"]].astype("float64")
                     elif expr["kind"] == "string_length":

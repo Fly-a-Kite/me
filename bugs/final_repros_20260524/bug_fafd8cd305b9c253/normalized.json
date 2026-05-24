@@ -1,0 +1,48 @@
+{
+  "duckdb": {
+    "backend": "duckdb",
+    "columns": [
+      "agg_max_amount",
+      "agg_min_bucket",
+      "amount_code",
+      "bucket_code"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [],
+    "status": "ok"
+  },
+  "pandas": {
+    "backend": "pandas",
+    "columns": [
+      "agg_max_amount",
+      "agg_min_bucket",
+      "amount_code",
+      "bucket_code"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [],
+    "status": "ok"
+  },
+  "pyarrow": {
+    "backend": "pyarrow",
+    "columns": [
+      "agg_max_amount",
+      "agg_min_bucket",
+      "amount_code",
+      "bucket_code"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        2,
+        0,
+        2,
+        0
+      ]
+    ],
+    "status": "ok"
+  }
+}

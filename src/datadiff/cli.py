@@ -109,6 +109,7 @@ LIVE_BUGHUNT_TARGETS = [
     "round_even_probe",
     "series_rtruediv_operand_order",
     "series_rtruediv_probe",
+    "polars_reverse_division_columns",
     "pandas_uint64_isin_precision",
     "uint64_isin_probe",
     "duckdb_tuple_anti_null_semantics",
@@ -170,6 +171,7 @@ LIVE_ARROW_TARGETS = [
     "string_count_groupby",
     "unique_count_groupby",
     "set_membership_filter",
+    "pyarrow_groupby_filter_cast_membership",
     "null_predicate_filter",
     "boolean_predicate_filter",
     "post_topk_range_filter",
@@ -234,83 +236,25 @@ LIVE_ARROW_TARGETS = [
 LIVE_POLARS_LAZY_TARGETS = [
     "common_workflow",
     "operation_combo",
-    "join",
-    "join_null_truth_filter",
-    "join_null_key_topk",
     "filter",
     "truth_filter",
     "mutate",
     "groupby",
-    "strings",
     "casts",
     "nulls",
     "global_aggregation",
     "sort_limit",
     "topk",
-    "topk_resort",
-    "ordered_groupby_sort",
-    "join_ordered_agg_topk",
-    "global_null_aggregate",
-    "string_count_groupby",
-    "unique_count_groupby",
-    "set_membership_filter",
-    "null_predicate_filter",
-    "boolean_predicate_filter",
-    "post_topk_range_filter",
-    "tuple_absence_filter",
-    "running_sum_precision",
-    "running_sum",
-    "sortedness_null_placement",
-    "sortedness",
-    "simple_case_random_subject",
-    "random_case_probe",
-    "group_quantile_key_probe",
-    "group_quantile_probe",
-    "scalar_subquery_double_parentheses",
-    "scalar_subquery_probe",
-    "window_avg_rows_frame",
-    "window_avg_probe",
-    "struct_distinct_unnest",
-    "struct_distinct_probe",
-    "bit_compare_unequal_length",
-    "bit_compare_probe",
-    "round_even_float_scale",
-    "round_even_probe",
     "series_rtruediv_operand_order",
     "series_rtruediv_probe",
-    "pandas_uint64_isin_precision",
-    "uint64_isin_probe",
-    "duckdb_tuple_anti_null_semantics",
-    "tuple_anti_null_probe",
-    "duckdb_json_predicate_order_semantics",
-    "json_predicate_order_probe",
-    "pandas_sparse_array_mask_semantics",
-    "sparse_mask_probe",
+    "polars_reverse_division_columns",
+    "reverse_division",
     "polars_float_wrap_numerical_semantics",
     "float_wrap_probe",
-    "pandas_index_bool_result_type",
-    "index_bool_probe",
     "polars_empty_literal_groupby_semantics",
     "empty_literal_groupby_probe",
-    "pandas_arrow_string_eq_sum_semantics",
-    "arrow_string_eq_sum_probe",
-    "pandas_arrow_timestamp_loc_slice_semantics",
-    "arrow_timestamp_loc_slice_probe",
-    "pandas_arrow_timestamp_index_attr_semantics",
-    "arrow_timestamp_index_attr_probe",
-    "pandas_eval_inplace_aliasing_semantics",
-    "eval_inplace_alias_probe",
-    "eval_inplace_aliasing",
-    "pyarrow_dataset_isin_all_match_semantics",
-    "dataset_isin_all_match_probe",
-    "pyarrow_large_string_partition_schema_semantics",
-    "large_string_partition_probe",
-    "pyarrow_hash_pivot_wider_order_semantics",
-    "hash_pivot_wider_probe",
-    "hash_pivot_wider",
     "polars_rolling_mean_by_null_count_semantics",
     "rolling_mean_by_null_count_probe",
-    "empty_filter_groupby",
     "expressions",
 ]
 
@@ -340,6 +284,8 @@ LIVE_EMBEDDED_SQL_TARGETS = [
     "boolean_predicate_filter",
     "post_topk_range_filter",
     "tuple_absence_filter",
+    "row_value_absence_filter",
+    "row_value_absence",
     "running_sum_precision",
     "running_sum",
     "sortedness_null_placement",
@@ -422,6 +368,7 @@ LIVE_CROSS_FAMILY_TARGETS = [
     "string_count_groupby",
     "unique_count_groupby",
     "set_membership_filter",
+    "pyarrow_groupby_filter_cast_membership",
     "null_predicate_filter",
     "boolean_predicate_filter",
     "post_topk_range_filter",
@@ -446,6 +393,7 @@ LIVE_CROSS_FAMILY_TARGETS = [
     "round_even_probe",
     "series_rtruediv_operand_order",
     "series_rtruediv_probe",
+    "polars_reverse_division_columns",
     "pandas_uint64_isin_precision",
     "uint64_isin_probe",
     "duckdb_tuple_anti_null_semantics",
@@ -2011,6 +1959,38 @@ def _preset_config(name: str) -> ExperimentConfig:
             guidance_targets=["set_membership_filter", "set_membership", "filter", "strings", "nulls", "aggregation", "sort_limit"],
             metamorphic_variant_limit=8,
         )
+    if name == "pyarrow_groupby_filter_cast_membership":
+        return ExperimentConfig(
+            generator_profile="pyarrow_groupby_filter_cast_membership",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=[
+                "pyarrow_groupby_filter_cast_membership",
+                "set_membership",
+                "filter",
+                "groupby",
+                "casts",
+                "aggregation",
+            ],
+            metamorphic_variant_limit=4,
+        )
+    if name == "pyarrow_groupby_filter_cast_membership_metamorphic":
+        return ExperimentConfig(
+            generator_profile="pyarrow_groupby_filter_cast_membership",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=[
+                "pyarrow_groupby_filter_cast_membership",
+                "set_membership",
+                "filter",
+                "groupby",
+                "casts",
+                "aggregation",
+            ],
+            metamorphic_variant_limit=8,
+        )
     if name == "null_predicate_filter":
         return ExperimentConfig(
             generator_profile="null_predicate_filter",
@@ -2081,6 +2061,24 @@ def _preset_config(name: str) -> ExperimentConfig:
             guidance_strategy="guided",
             guidance_candidate_pool=4,
             guidance_targets=["tuple_absence_filter", "tuple_absence", "filter", "nulls", "join"],
+            metamorphic_variant_limit=8,
+        )
+    if name == "row_value_absence_filter":
+        return ExperimentConfig(
+            generator_profile="row_value_absence_filter",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["row_value_absence_filter", "row_value_absence", "tuple_absence", "filter", "nulls", "join"],
+            metamorphic_variant_limit=4,
+        )
+    if name == "row_value_absence_filter_metamorphic":
+        return ExperimentConfig(
+            generator_profile="row_value_absence_filter",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=4,
+            guidance_targets=["row_value_absence_filter", "row_value_absence", "tuple_absence", "filter", "nulls", "join"],
             metamorphic_variant_limit=8,
         )
     if name == "running_sum_precision":
@@ -2268,6 +2266,32 @@ def _preset_config(name: str) -> ExperimentConfig:
             guidance_targets=[
                 "series_rtruediv_operand_order",
                 "series_rtruediv_probe",
+                "reverse_division",
+                "numeric",
+            ],
+            metamorphic_variant_limit=2,
+        )
+    if name == "polars_reverse_division_columns":
+        return ExperimentConfig(
+            generator_profile="polars_reverse_division_columns",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=[
+                "polars_reverse_division_columns",
+                "reverse_division",
+                "numeric",
+            ],
+            metamorphic_variant_limit=0,
+        )
+    if name == "polars_reverse_division_columns_metamorphic":
+        return ExperimentConfig(
+            generator_profile="polars_reverse_division_columns",
+            enable_metamorphic_oracle=True,
+            oracle_mode="both",
+            guidance_strategy="guided",
+            guidance_candidate_pool=2,
+            guidance_targets=[
+                "polars_reverse_division_columns",
                 "reverse_division",
                 "numeric",
             ],
@@ -2788,6 +2812,17 @@ def _preset_config(name: str) -> ExperimentConfig:
     raise ValueError(f"unknown experiment preset: {name}")
 
 
+def _effective_job_local_source_scheduler(job: dict) -> tuple[bool, float]:
+    preset_config = _preset_config(str(job["preset"]))
+    job_enabled = bool(job.get("enable_local_source_scheduler", False))
+    enabled = preset_config.enable_local_source_scheduler or job_enabled
+    if job_enabled:
+        weight = job.get("local_source_exploration_weight", preset_config.local_source_exploration_weight)
+    else:
+        weight = preset_config.local_source_exploration_weight
+    return enabled, max(0.0, float(weight))
+
+
 def cmd_experiment(args: argparse.Namespace) -> int:
     ensure_dirs()
     presets = _parse_presets(args.presets)
@@ -2836,6 +2871,11 @@ def cmd_experiment(args: argparse.Namespace) -> int:
         job["worker_thread_limit"] = parallelism["worker_thread_limit"]
     jobs = int(parallelism["worker_count"])
     schedule = _resolve_experiment_schedule(args, jobs=jobs)
+    local_source_settings = [_effective_job_local_source_scheduler(job) for job in planned_runs]
+    local_source_enabled = schedule == "adaptive" or any(enabled for enabled, _ in local_source_settings)
+    local_source_weights = [weight for enabled, weight in local_source_settings if enabled]
+    if schedule == "adaptive" and not local_source_weights:
+        local_source_weights.append(max(0.0, float(getattr(args, "local_source_exploration_weight", 0.5))))
     manifest = {
         "created_at": utc_now(),
         "presets": presets,
@@ -2860,8 +2900,8 @@ def cmd_experiment(args: argparse.Namespace) -> int:
         "parallelism": parallelism,
         "schedule": schedule,
         "local_source_scheduler": {
-            "enabled": bool(getattr(args, "enable_local_source_scheduler", False) or schedule == "adaptive"),
-            "exploration_weight": max(0.0, float(getattr(args, "local_source_exploration_weight", 0.5))),
+            "enabled": local_source_enabled,
+            "exploration_weight": max(local_source_weights) if local_source_weights else 0.0,
         },
         "runs": [],
     }
@@ -3236,6 +3276,7 @@ def _experiment_job_weight(job: dict) -> float:
         "boolean_predicate_filter": 1.1,
         "post_topk_range_filter": 1.1,
         "tuple_absence_filter": 1.2,
+        "row_value_absence_filter": 1.2,
         "running_sum_precision": 1.4,
         "sortedness_null_placement": 1.0,
         "simple_case_random_subject": 1.0,
@@ -3246,6 +3287,7 @@ def _experiment_job_weight(job: dict) -> float:
         "bit_compare_unequal_length": 1.0,
         "round_even_float_scale": 1.0,
         "series_rtruediv_operand_order": 1.0,
+        "polars_reverse_division_columns": 1.0,
         "pandas_uint64_isin_precision": 1.0,
         "duckdb_tuple_anti_null_semantics": 1.0,
         "duckdb_json_predicate_order_semantics": 1.0,
@@ -3372,7 +3414,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_fuzz.add_argument("--duration", default=None, help="wall-clock budget such as 10s, 5m, 24h")
     p_fuzz.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_fuzz)
-    p_fuzz.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "set_membership_filter", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "running_sum_precision", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest", "bit_compare_unequal_length", "round_even_float_scale", "series_rtruediv_operand_order", "pandas_uint64_isin_precision", "duckdb_tuple_anti_null_semantics", "duckdb_json_predicate_order_semantics", "pandas_sparse_array_mask_semantics", "polars_float_wrap_numerical_semantics", "pandas_index_bool_result_type", "polars_empty_literal_groupby_semantics", "pandas_arrow_string_eq_sum_semantics", "pandas_arrow_timestamp_loc_slice_semantics", "pandas_arrow_timestamp_index_attr_semantics", "pandas_eval_inplace_aliasing_semantics", "pyarrow_dataset_isin_all_match_semantics", "pyarrow_large_string_partition_schema_semantics", "pyarrow_hash_pivot_wider_order_semantics", "polars_rolling_mean_by_null_count_semantics"], default="common")
+    p_fuzz.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "set_membership_filter", "pyarrow_groupby_filter_cast_membership", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "row_value_absence_filter", "running_sum_precision", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest", "bit_compare_unequal_length", "round_even_float_scale", "series_rtruediv_operand_order", "polars_reverse_division_columns", "pandas_uint64_isin_precision", "duckdb_tuple_anti_null_semantics", "duckdb_json_predicate_order_semantics", "pandas_sparse_array_mask_semantics", "polars_float_wrap_numerical_semantics", "pandas_index_bool_result_type", "polars_empty_literal_groupby_semantics", "pandas_arrow_string_eq_sum_semantics", "pandas_arrow_timestamp_loc_slice_semantics", "pandas_arrow_timestamp_index_attr_semantics", "pandas_eval_inplace_aliasing_semantics", "pyarrow_dataset_isin_all_match_semantics", "pyarrow_large_string_partition_schema_semantics", "pyarrow_hash_pivot_wider_order_semantics", "polars_rolling_mean_by_null_count_semantics"], default="common")
     add_guidance_flags(p_fuzz, default_strategy="random", default_candidate_pool=8)
     add_ablation_flags(p_fuzz)
     add_paper_journal_flags(p_fuzz)
@@ -3383,7 +3425,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_long.add_argument("--duration", default="24h", help="wall-clock budget such as 10m, 24h, 2d")
     p_long.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_long)
-    p_long.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "set_membership_filter", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "running_sum_precision", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest", "bit_compare_unequal_length", "round_even_float_scale", "series_rtruediv_operand_order", "pandas_uint64_isin_precision", "duckdb_tuple_anti_null_semantics", "duckdb_json_predicate_order_semantics", "pandas_sparse_array_mask_semantics", "polars_float_wrap_numerical_semantics", "pandas_index_bool_result_type", "polars_empty_literal_groupby_semantics", "pandas_arrow_string_eq_sum_semantics", "pandas_arrow_timestamp_loc_slice_semantics", "pandas_arrow_timestamp_index_attr_semantics", "pandas_eval_inplace_aliasing_semantics", "pyarrow_dataset_isin_all_match_semantics", "pyarrow_large_string_partition_schema_semantics", "pyarrow_hash_pivot_wider_order_semantics", "polars_rolling_mean_by_null_count_semantics"], default="common")
+    p_long.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "set_membership_filter", "pyarrow_groupby_filter_cast_membership", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "row_value_absence_filter", "running_sum_precision", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest", "bit_compare_unequal_length", "round_even_float_scale", "series_rtruediv_operand_order", "polars_reverse_division_columns", "pandas_uint64_isin_precision", "duckdb_tuple_anti_null_semantics", "duckdb_json_predicate_order_semantics", "pandas_sparse_array_mask_semantics", "polars_float_wrap_numerical_semantics", "pandas_index_bool_result_type", "polars_empty_literal_groupby_semantics", "pandas_arrow_string_eq_sum_semantics", "pandas_arrow_timestamp_loc_slice_semantics", "pandas_arrow_timestamp_index_attr_semantics", "pandas_eval_inplace_aliasing_semantics", "pyarrow_dataset_isin_all_match_semantics", "pyarrow_large_string_partition_schema_semantics", "pyarrow_hash_pivot_wider_order_semantics", "polars_rolling_mean_by_null_count_semantics"], default="common")
     add_guidance_flags(p_long, default_strategy="guided", default_candidate_pool=8)
     p_long.add_argument("--case-log", default=None, help="optional JSONL path for generated test cases")
     p_long.add_argument("--checkpoint-interval", default="60s", help="checkpoint write interval")

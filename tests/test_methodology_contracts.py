@@ -111,6 +111,7 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     boolean_predicate_filter = _preset_config("boolean_predicate_filter")
     post_topk_range_filter = _preset_config("post_topk_range_filter")
     tuple_absence_filter = _preset_config("tuple_absence_filter")
+    row_value_absence_filter = _preset_config("row_value_absence_filter")
     running_sum_precision = _preset_config("running_sum_precision")
     sortedness_null_placement = _preset_config("sortedness_null_placement")
     simple_case_random_subject = _preset_config("simple_case_random_subject")
@@ -191,6 +192,10 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     assert {"filter", "range_filter", "sort_limit", "topk"}.issubset(post_topk_range_filter.guidance_targets)
     assert tuple_absence_filter.generator_profile == "tuple_absence_filter"
     assert {"filter", "tuple_absence", "nulls", "join"}.issubset(tuple_absence_filter.guidance_targets)
+    assert row_value_absence_filter.generator_profile == "row_value_absence_filter"
+    assert {"filter", "row_value_absence", "tuple_absence", "nulls", "join"}.issubset(
+        row_value_absence_filter.guidance_targets
+    )
     assert running_sum_precision.generator_profile == "running_sum_precision"
     assert {"running_sum", "numeric", "sort_limit"}.issubset(running_sum_precision.guidance_targets)
     assert sortedness_null_placement.generator_profile == "sortedness_null_placement"

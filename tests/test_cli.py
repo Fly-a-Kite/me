@@ -109,6 +109,27 @@ def test_cli_parses_bughunt_no_groupby_profile():
     assert args.profile == "bughunt_no_groupby"
 
 
+def test_cli_parses_pyarrow_groupby_filter_cast_membership_profile():
+    parser = build_parser()
+    args = parser.parse_args(["fuzz", "--profile", "pyarrow_groupby_filter_cast_membership"])
+    assert args.cmd == "fuzz"
+    assert args.profile == "pyarrow_groupby_filter_cast_membership"
+
+
+def test_cli_parses_polars_reverse_division_columns_profile():
+    parser = build_parser()
+    args = parser.parse_args(["fuzz", "--profile", "polars_reverse_division_columns"])
+    assert args.cmd == "fuzz"
+    assert args.profile == "polars_reverse_division_columns"
+
+
+def test_cli_parses_row_value_absence_filter_profile():
+    parser = build_parser()
+    args = parser.parse_args(["fuzz", "--profile", "row_value_absence_filter"])
+    assert args.cmd == "fuzz"
+    assert args.profile == "row_value_absence_filter"
+
+
 def test_cli_parses_null_groupby_topk_profile():
     parser = build_parser()
     args = parser.parse_args(["fuzz", "--profile", "null_groupby_topk"])
@@ -457,6 +478,15 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("set_membership_filter").generator_profile == "set_membership_filter"
     assert _preset_config("set_membership_filter").guidance_targets[0] == "set_membership_filter"
     assert _preset_config("set_membership_filter_metamorphic").enable_metamorphic_oracle is True
+    assert (
+        _preset_config("pyarrow_groupby_filter_cast_membership").generator_profile
+        == "pyarrow_groupby_filter_cast_membership"
+    )
+    assert (
+        _preset_config("pyarrow_groupby_filter_cast_membership").guidance_targets[0]
+        == "pyarrow_groupby_filter_cast_membership"
+    )
+    assert _preset_config("pyarrow_groupby_filter_cast_membership_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("null_predicate_filter").generator_profile == "null_predicate_filter"
     assert _preset_config("null_predicate_filter").guidance_targets[0] == "null_predicate_filter"
     assert _preset_config("null_predicate_filter_metamorphic").enable_metamorphic_oracle is True
@@ -469,6 +499,9 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("tuple_absence_filter").generator_profile == "tuple_absence_filter"
     assert _preset_config("tuple_absence_filter").guidance_targets[0] == "tuple_absence_filter"
     assert _preset_config("tuple_absence_filter_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("row_value_absence_filter").generator_profile == "row_value_absence_filter"
+    assert _preset_config("row_value_absence_filter").guidance_targets[0] == "row_value_absence_filter"
+    assert _preset_config("row_value_absence_filter_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("running_sum_precision").generator_profile == "running_sum_precision"
     assert _preset_config("running_sum_precision").guidance_targets[0] == "running_sum_precision"
     assert _preset_config("running_sum_precision_metamorphic").enable_metamorphic_oracle is True
@@ -499,6 +532,9 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("series_rtruediv_operand_order").generator_profile == "series_rtruediv_operand_order"
     assert _preset_config("series_rtruediv_operand_order").guidance_targets[0] == "series_rtruediv_operand_order"
     assert _preset_config("series_rtruediv_operand_order_metamorphic").enable_metamorphic_oracle is True
+    assert _preset_config("polars_reverse_division_columns").generator_profile == "polars_reverse_division_columns"
+    assert _preset_config("polars_reverse_division_columns").guidance_targets[0] == "polars_reverse_division_columns"
+    assert _preset_config("polars_reverse_division_columns_metamorphic").enable_metamorphic_oracle is True
     assert _preset_config("pandas_uint64_isin_precision").generator_profile == "pandas_uint64_isin_precision"
     assert _preset_config("pandas_uint64_isin_precision").guidance_targets[0] == "pandas_uint64_isin_precision"
     assert _preset_config("pandas_uint64_isin_precision_metamorphic").enable_metamorphic_oracle is True
@@ -661,6 +697,7 @@ def test_cli_parses_non_datafusion_live_presets():
         "string_count_groupby",
         "unique_count_groupby",
         "set_membership_filter",
+        "pyarrow_groupby_filter_cast_membership",
         "null_predicate_filter",
         "boolean_predicate_filter",
         "post_topk_range_filter",
@@ -695,16 +732,32 @@ def test_cli_parses_non_datafusion_live_presets():
 
     polars_lazy = _preset_config("live_polars_lazy")
     assert polars_lazy.generator_profile == "bughunt"
-    assert {"join", "filter", "mutate", "sort_limit", "topk", "global_aggregation"}.issubset(polars_lazy.guidance_targets)
+    assert {
+        "filter",
+        "mutate",
+        "sort_limit",
+        "topk",
+        "global_aggregation",
+        "polars_reverse_division_columns",
+    }.issubset(polars_lazy.guidance_targets)
     assert polars_lazy.local_source_exploration_weight == 0.45
 
     embedded_sql = _preset_config("live_embedded_sql")
     assert embedded_sql.generator_profile == "bughunt"
-    assert {"join", "filter", "groupby", "aggregation", "casts"}.issubset(embedded_sql.guidance_targets)
+    assert {"join", "filter", "groupby", "aggregation", "casts", "row_value_absence_filter"}.issubset(
+        embedded_sql.guidance_targets
+    )
 
     cross_family = _preset_config("live_cross_family")
     assert cross_family.generator_profile == "bughunt"
-    assert {"common_workflow", "operation_combo", "join", "groupby", "topk"}.issubset(cross_family.guidance_targets)
+    assert {
+        "common_workflow",
+        "operation_combo",
+        "join",
+        "groupby",
+        "topk",
+        "pyarrow_groupby_filter_cast_membership",
+    }.issubset(cross_family.guidance_targets)
 
 
 def test_cli_parses_non_datafusion_live_metamorphic_presets():
@@ -1088,6 +1141,58 @@ def test_cli_experiment_static_manifest_records_local_source_scheduler(tmp_path,
     assert manifest["evidence_mode"] == "live"
     assert manifest["local_source_scheduler"]["enabled"] is True
     assert manifest["local_source_scheduler"]["exploration_weight"] == 0.25
+
+
+def test_cli_experiment_manifest_records_live_preset_source_scheduler(tmp_path, monkeypatch, capsys):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    bugs_dir = tmp_path / "bugs"
+    corpus_dir = tmp_path / "corpus"
+    monkeypatch.setattr(cli, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(cli, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(cli, "BUGS_DIR", bugs_dir)
+    monkeypatch.setattr(cli, "CORPUS_DIR", corpus_dir)
+
+    def fake_run_fuzz(*, cases, seed, backends, config, duration_s):
+        run_file = runs_dir / "run-live.jsonl"
+        append_jsonl(
+            {
+                "case": {"case_id": "case-0", "seed": seed},
+                "is_new_behavior": False,
+                "findings": [],
+            },
+            run_file,
+        )
+        run_meta_path(run_file).write_text(
+            json.dumps({"elapsed_s": 0.1, "throughput_cases_s": 10.0, "next_seed": seed + 1}),
+            encoding="utf-8",
+        )
+        return run_file
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "experiment",
+            "--target-suite",
+            "datafusion_cross",
+            "--presets",
+            "live_datafusion",
+            "--seeds",
+            "1",
+            "--cases",
+            "1",
+            "--skip-run-reports",
+        ]
+    )
+
+    assert args.func(args) == 0
+    manifests = sorted(runs_dir.glob("experiment-*.json"))
+    manifest = json.loads(manifests[0].read_text(encoding="utf-8"))
+    assert manifest["local_source_scheduler"]["enabled"] is True
+    assert manifest["local_source_scheduler"]["exploration_weight"] == 0.35
 
 
 def test_cli_experiment_manifest_records_historical_evidence_metadata(tmp_path, monkeypatch, capsys):

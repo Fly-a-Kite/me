@@ -1,0 +1,88 @@
+{
+  "artifact": "bugs/final_repros_20260524/bug_c57a8db95c205092",
+  "label": "duckdb_row_value_absence_filter",
+  "original_shapes": {
+    "columns": [
+      4,
+      2
+    ],
+    "ops": 3,
+    "rows": [
+      5,
+      2
+    ]
+  },
+  "reduced_shapes": {
+    "columns": [
+      2,
+      2
+    ],
+    "ops": 1,
+    "rows": [
+      1,
+      1
+    ]
+  },
+  "reproduced_findings": [
+    {
+      "confidence": "medium",
+      "discovery_origin": "organic",
+      "documentation_refs": [],
+      "evidence": "Backends returned different canonical tables; mismatch_class=row_count; shapes={'duckdb': (0, 2), 'sqlite': (1, 2)}",
+      "false_positive": false,
+      "false_positive_reason": "",
+      "finding_id": "finding-c57a8db95c205092",
+      "kind": "semantic_output_mismatch",
+      "mismatch_class": "row_count",
+      "oracle": "differential",
+      "paper_status": "candidate_bug_needs_external_confirmation",
+      "recommendation": [
+        "Minimize the case and include the DSL reference output in the artifact.",
+        "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+      ],
+      "root_cause": "tuple_absence_null_filter",
+      "severity": "critical",
+      "signature": "c57a8db95c205092",
+      "source_issue": "",
+      "suspicious_backends": [
+        "duckdb"
+      ],
+      "triage_confidence": "high",
+      "triage_evidence": "Independent DSL reference agrees with ['sqlite'] and disagrees with ['duckdb'].",
+      "triage_verdict": "candidate_implementation_bug"
+    }
+  ],
+  "source_case_id": "case-00009513-bughunt-row-value-absence-filter",
+  "source_finding": {
+    "confidence": "medium",
+    "discovery_origin": "organic",
+    "documentation_refs": [],
+    "evidence": "Backends returned different canonical tables; mismatch_class=row_count; shapes={'duckdb': (0, 4), 'sqlite': (1, 4)}",
+    "false_positive": false,
+    "false_positive_reason": "",
+    "finding_id": "finding-c45618120f5d5c46",
+    "kind": "semantic_output_mismatch",
+    "mismatch_class": "row_count",
+    "oracle": "differential",
+    "paper_status": "candidate_bug_needs_external_confirmation",
+    "recommendation": [
+      "Minimize the case and include the DSL reference output in the artifact.",
+      "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+    ],
+    "root_cause": "tuple_absence_null_filter",
+    "severity": "critical",
+    "signature": "c45618120f5d5c46",
+    "source_issue": "",
+    "suspicious_backends": [
+      "duckdb"
+    ],
+    "triage_confidence": "high",
+    "triage_evidence": "Independent DSL reference agrees with ['sqlite'] and disagrees with ['duckdb'].",
+    "triage_verdict": "candidate_implementation_bug"
+  },
+  "source_index": 0,
+  "source_run": "runs/run-20260523T191528-1779563728306017720.jsonl.gz",
+  "standalone_reproducer": "",
+  "triage_json": "bugs/final_repros_20260524/bug_c57a8db95c205092/triage.json",
+  "triage_md": "bugs/final_repros_20260524/bug_c57a8db95c205092/triage.md"
+}

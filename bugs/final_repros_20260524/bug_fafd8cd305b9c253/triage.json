@@ -1,0 +1,47 @@
+{
+  "artifact": "bugs/final_repros_20260524/bug_fafd8cd305b9c253",
+  "backends": [
+    "pandas",
+    "duckdb",
+    "pyarrow"
+  ],
+  "case_id": "case-00009762-bughunt-pyarrow-groupby-filter-cast-membership",
+  "documentation_refs": [],
+  "false_positive_reasons": [],
+  "features": {
+    "contains_inf": false,
+    "contains_nan": false,
+    "contains_non_ascii_string": false,
+    "contains_null": false,
+    "operation_sequence": [
+      "groupby",
+      "filter"
+    ],
+    "uses_filter": true,
+    "uses_groupby": true,
+    "uses_limit": false,
+    "uses_modulo": false,
+    "uses_mutate": false,
+    "uses_offset": false,
+    "uses_sort": false,
+    "uses_string_lower": false
+  },
+  "generator_profile": "bughunt",
+  "operations": 2,
+  "original_kinds": [
+    "semantic_output_mismatch"
+  ],
+  "paper_status": "not_usable_until_reproduced",
+  "recommendation": [
+    "Do not count this artifact as a bug until reproduction succeeds.",
+    "Check dependency versions and backend list."
+  ],
+  "reduced": false,
+  "reproduced_kinds": [],
+  "reproduced_roots": [],
+  "rows": 1,
+  "seed": 9762,
+  "suspicious_backends": [],
+  "triage_confidence": "low",
+  "verdict": "not_reproduced"
+}

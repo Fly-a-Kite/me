@@ -1,6 +1,7 @@
-from datadiff.classification_oracle import classify_finding, validate_case_program
+from datadiff.classification_oracle import annotate_findings, classify_finding, validate_case_program
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.normalizer import NormalizedResult
+from datadiff.oracle import Finding
 
 
 def _case(ops):
@@ -27,6 +28,54 @@ def test_classification_marks_invalid_generated_program_false_positive():
     assert classification.false_positive is True
     assert classification.false_positive_reason == "invalid_generated_program"
     assert validate_case_program(case)
+
+
+def test_annotate_findings_marks_issue_replay_origin():
+    case = Case(
+        "case-replay",
+        1,
+        [TableData("t0", [ColumnSpec("probe_id", "int", nullable=False)], [{"probe_id": 0}])],
+        Program("prog-replay", 1, [{"op": "group_quantile_probe", "as": "quantile_key_mismatch"}]),
+        metadata={"source_issue": "https://github.com/example/project/issues/1"},
+    )
+    finding = Finding(
+        finding_id="finding-1",
+        kind="semantic_output_mismatch",
+        severity="critical",
+        suspicious_backends=["polars"],
+        evidence="mismatch",
+        signature="sig-1",
+        root_cause="group_quantile_key_expression",
+    )
+
+    annotate_findings(case, [finding], {}, {}, {"generator_profile": "bughunt"}, ["pandas", "polars"])
+
+    assert finding.discovery_origin == "issue_replay"
+    assert finding.source_issue == "https://github.com/example/project/issues/1"
+
+
+def test_annotate_findings_marks_structural_issue_inspired_origin():
+    case = Case(
+        "case-inspired",
+        1,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-inspired", 1, [{"op": "filter", "column": "x", "cmp": ">", "value": 0}]),
+        metadata={"source_issue": "https://github.com/example/project/issues/2"},
+    )
+    finding = Finding(
+        finding_id="finding-2",
+        kind="semantic_output_mismatch",
+        severity="critical",
+        suspicious_backends=["duckdb"],
+        evidence="mismatch",
+        signature="sig-2",
+        root_cause="filter_predicate",
+    )
+
+    annotate_findings(case, [finding], {}, {}, {"generator_profile": "bughunt"}, ["pandas", "duckdb"])
+
+    assert finding.discovery_origin == "issue_inspired"
+    assert finding.source_issue == "https://github.com/example/project/issues/2"
 
 
 def test_validate_case_program_accepts_and_rejects_per_column_sort_keys():

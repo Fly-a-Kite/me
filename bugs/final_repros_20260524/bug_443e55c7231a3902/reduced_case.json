@@ -1,0 +1,126 @@
+{
+  "case_id": "case-00011843-bughunt",
+  "program": {
+    "operations": [
+      {
+        "how": "left",
+        "left_on": "id",
+        "op": "join",
+        "right_on": "id",
+        "table": "t1"
+      },
+      {
+        "aggs": [
+          {
+            "as": "sum_z",
+            "column": "z",
+            "func": "sum"
+          },
+          {
+            "as": "count_y",
+            "column": "y",
+            "func": "count"
+          }
+        ],
+        "keys": [
+          "tag"
+        ],
+        "op": "groupby"
+      },
+      {
+        "keys": [
+          {
+            "ascending": false,
+            "column": "sum_z",
+            "nulls": "first"
+          },
+          {
+            "ascending": false,
+            "column": "count_y",
+            "nulls": "first"
+          },
+          {
+            "ascending": false,
+            "column": "tag",
+            "nulls": "last"
+          }
+        ],
+        "op": "sort"
+      },
+      {
+        "n": 12,
+        "op": "limit"
+      },
+      {
+        "ascending": false,
+        "columns": [
+          "count_y",
+          "sum_z"
+        ],
+        "op": "sort"
+      },
+      {
+        "n": 1,
+        "op": "offset"
+      }
+    ],
+    "program_id": "prog-00011843",
+    "seed": 11843
+  },
+  "seed": 11843,
+  "tables": [
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "type": "int"
+        },
+        {
+          "name": "y",
+          "nullable": true,
+          "type": "float"
+        }
+      ],
+      "name": "t0",
+      "rows": [
+        {
+          "id": 0,
+          "y": 0.0
+        }
+      ]
+    },
+    {
+      "columns": [
+        {
+          "name": "id",
+          "nullable": false,
+          "type": "int"
+        },
+        {
+          "name": "z",
+          "nullable": true,
+          "type": "float"
+        },
+        {
+          "name": "tag",
+          "nullable": true,
+          "type": "str"
+        }
+      ],
+      "name": "t1",
+      "rows": [
+        {
+          "id": 0,
+          "tag": "zDo",
+          "z": null
+        },
+        {
+          "id": 0,
+          "tag": "gamma",
+          "z": -0.5
+        }
+      ]
+    }
+  ]
+}

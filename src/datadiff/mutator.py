@@ -324,6 +324,17 @@ def _append_tuple_absence_filter_probe(
     return f"append_tuple_absence_filter:{','.join(left_columns)}:{right.name}:{','.join(selected_right_columns)}"
 
 
+def _append_row_value_absence_filter(
+    tables: list[TableData],
+    operations: list[dict[str, Any]],
+    rnd: random.Random,
+) -> str:
+    detail = _append_tuple_absence_filter_probe(tables, operations, rnd)
+    if detail.startswith("append_tuple_absence_filter:"):
+        return "append_row_value_absence_filter:" + detail.split(":", 1)[1]
+    return detail.replace("append_tuple_absence_filter", "append_row_value_absence_filter", 1)
+
+
 def _append_running_sum_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
     if not tables:
         return "append_running_sum:none"
@@ -663,6 +674,51 @@ def _append_grouped_topk_probe(tables: list[TableData], operations: list[dict[st
     return f"append_grouped_topk:{key}:{value}"
 
 
+def _append_groupby_fractional_membership_filter(
+    tables: list[TableData],
+    operations: list[dict[str, Any]],
+    rnd: random.Random,
+) -> str:
+    if not tables:
+        return "append_groupby_fractional_membership_filter:none"
+    available = set(_available_columns(tables, operations))
+    candidates: list[tuple[str, str]] = []
+    for op in operations:
+        if op.get("op") != "groupby":
+            continue
+        for agg in op.get("aggs", []):
+            alias = str(agg.get("as", ""))
+            source = str(agg.get("column", ""))
+            if (
+                alias in available
+                and agg.get("func") in {"min", "max"}
+                and _column_type(tables, source) == "int"
+            ):
+                candidates.append((alias, source))
+    if not candidates:
+        return "append_groupby_fractional_membership_filter:no-int-aggregate"
+    alias, source = rnd.choice(candidates)
+    source_values = [
+        int(row[source])
+        for table in tables
+        for row in table.rows
+        if source in row and isinstance(row.get(source), int) and not isinstance(row.get(source), bool)
+    ]
+    non_negative_values = [value for value in unique_preserve_order(source_values) if value >= 0]
+    if not non_negative_values:
+        return "append_groupby_fractional_membership_filter:no-nonnegative-value"
+    target = rnd.choice(non_negative_values)
+    operations.append(
+        {
+            "op": "filter",
+            "column": alias,
+            "cmp": "in_set",
+            "value": [float(target) + 0.5, -999.0, 999.0],
+        }
+    )
+    return f"append_groupby_fractional_membership_filter:{alias}:{target}"
+
+
 def _random_operation(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> dict[str, Any] | None:
     table = tables[0]
     available = _available_columns(tables, operations)
@@ -735,7 +791,11 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
             ])
         else:
             src = rnd.choice(numeric)
-            expr = {"kind": "add_const", "source": src, "value": rnd.choice([-10, -1, 0, 1, 10])}
+            if len(numeric) > 1 and rnd.random() < 0.20:
+                numerator = rnd.choice([column for column in numeric if column != src])
+                expr = {"kind": "reverse_division_columns", "source": src, "numerator": numerator}
+            else:
+                expr = {"kind": "add_const", "source": src, "value": rnd.choice([-10, -1, 0, 1, 10])}
         return {
             "op": "mutate",
             "column": f"m_{len([o for o in operations if o.get('op') == 'mutate'])}",
@@ -970,6 +1030,7 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_boolean_predicate_filter", _append_boolean_predicate_filter_probe),
     MutationOperator("append_range_filter", _append_range_filter_probe),
     MutationOperator("append_tuple_absence_filter", _append_tuple_absence_filter_probe),
+    MutationOperator("append_row_value_absence_filter", _append_row_value_absence_filter),
     MutationOperator("append_running_sum", _append_running_sum_probe),
     MutationOperator("append_sortedness_check", _append_sortedness_check_probe),
     MutationOperator("append_random_case_probe", _append_random_case_probe),
@@ -996,6 +1057,7 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_hash_pivot_wider_probe", _append_hash_pivot_wider_probe),
     MutationOperator("append_rolling_mean_by_null_count_probe", _append_rolling_mean_by_null_count_probe),
     MutationOperator("append_grouped_topk", _append_grouped_topk_probe),
+    MutationOperator("append_groupby_fractional_membership_filter", _append_groupby_fractional_membership_filter),
     MutationOperator("drop_op", _drop_operation),
     MutationOperator("tweak_op", _tweak_random_operation),
 )

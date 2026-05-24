@@ -1,0 +1,70 @@
+{
+  "case_id": "case-00009513-bughunt-row-value-absence-filter",
+  "metadata": {
+    "generator_profile": "bughunt",
+    "mixed_generator_profile": "row_value_absence_filter"
+  },
+  "program": {
+    "operations": [
+      {
+        "columns": [
+          "left_a",
+          "left_b"
+        ],
+        "op": "tuple_absence_filter",
+        "right_columns": [
+          "right_a",
+          "right_b"
+        ],
+        "table": "t1"
+      }
+    ],
+    "program_id": "prog-00009513-row-value-absence-filter",
+    "seed": 9513
+  },
+  "seed": 9513,
+  "tables": [
+    {
+      "columns": [
+        {
+          "name": "left_a",
+          "nullable": true,
+          "type": "int"
+        },
+        {
+          "name": "left_b",
+          "nullable": true,
+          "type": "int"
+        }
+      ],
+      "name": "t0",
+      "rows": [
+        {
+          "left_a": 2,
+          "left_b": 2
+        }
+      ]
+    },
+    {
+      "columns": [
+        {
+          "name": "right_a",
+          "nullable": true,
+          "type": "int"
+        },
+        {
+          "name": "right_b",
+          "nullable": true,
+          "type": "int"
+        }
+      ],
+      "name": "t1",
+      "rows": [
+        {
+          "right_a": null,
+          "right_b": 4
+        }
+      ]
+    }
+  ]
+}

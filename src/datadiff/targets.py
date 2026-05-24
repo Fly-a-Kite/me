@@ -58,6 +58,7 @@ COMMON_DSL_CAPABILITIES: tuple[str, ...] = (
     "op:join",
     "expr:add_const",
     "expr:arith_const",
+    "expr:reverse_division_columns",
     "expr:cast",
     "expr:string_length",
     "expr:string_lower",

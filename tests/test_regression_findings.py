@@ -3,6 +3,7 @@ import importlib.util
 import pytest
 
 from datadiff.config import ExperimentConfig
+from datadiff.datagen import generate_case
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.runner import run_loaded_case
 from datadiff.triage import build_triage_report
@@ -10,6 +11,9 @@ from datadiff.triage import build_triage_report
 
 REQUIRED_BACKENDS = ["pandas", "polars", "duckdb", "sqlite"]
 DATAFUSION_BACKENDS = ["pandas", "duckdb", "datafusion"]
+PYARROW_BACKENDS = ["pandas", "duckdb", "pyarrow"]
+POLARS_LAZY_BACKENDS = ["polars", "polars_lazy"]
+EMBEDDED_SQL_BACKENDS = ["duckdb", "sqlite"]
 
 
 @pytest.mark.skipif(
@@ -202,6 +206,101 @@ def test_datafusion_grouped_topk_null_sort_key_is_candidate_bug():
         reproduced_findings=result["findings"],
         config=ExperimentConfig().to_dict(),
         backends=DATAFUSION_BACKENDS,
+    )
+    assert report["verdict"] == "candidate_implementation_bug"
+    assert report["paper_status"] == "candidate_bug_needs_external_confirmation"
+
+
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in PYARROW_BACKENDS),
+    reason="pyarrow comparison backends are not installed",
+)
+def test_pyarrow_groupby_filter_cast_membership_does_not_cast_fractional_literals_to_ints():
+    case = generate_case(123, profile="pyarrow_groupby_filter_cast_membership")
+
+    result = run_loaded_case(
+        case,
+        PYARROW_BACKENDS,
+        config=ExperimentConfig(),
+        save_artifact=False,
+    )
+
+    assert result["status"] == "ok"
+    assert result["normalized"]["pandas"]["rows"] == []
+    assert result["normalized"]["duckdb"]["rows"] == []
+    assert result["normalized"]["pyarrow"]["rows"] == []
+    assert result["findings"] == []
+
+    report = build_triage_report(
+        case,
+        original_findings=[{"kind": "semantic_output_mismatch"}],
+        reproduced_findings=result["findings"],
+        config=ExperimentConfig().to_dict(),
+        backends=PYARROW_BACKENDS,
+    )
+    assert report["verdict"] == "not_reproduced"
+    assert report["paper_status"] == "not_usable_until_reproduced"
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("polars") is None,
+    reason="polars comparison backends are not installed",
+)
+def test_polars_reverse_division_columns_is_candidate_bug():
+    case = generate_case(135, profile="polars_reverse_division_columns")
+
+    result = run_loaded_case(
+        case,
+        POLARS_LAZY_BACKENDS,
+        config=ExperimentConfig(),
+        save_artifact=False,
+    )
+
+    assert result["status"] == "bug"
+    assert result["normalized"]["polars"]["rows"] == [[0, 0.5], [1, 0.6666666667], [1, 0.75]]
+    assert result["normalized"]["polars_lazy"]["rows"] == [[0, 2], [1, 1.3333333333], [1, 1.5]]
+    assert result["findings"][0]["root_cause"] == "reverse_division_operand_order"
+    assert result["findings"][0]["suspicious_backends"] == ["polars"]
+
+    report = build_triage_report(
+        case,
+        original_findings=[{"kind": "semantic_output_mismatch"}],
+        reproduced_findings=result["findings"],
+        config=ExperimentConfig().to_dict(),
+        backends=POLARS_LAZY_BACKENDS,
+    )
+    assert report["verdict"] == "candidate_implementation_bug"
+    assert report["paper_status"] == "candidate_bug_needs_external_confirmation"
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("duckdb") is None,
+    reason="duckdb comparison backend is not installed",
+)
+def test_row_value_absence_filter_is_organic_candidate_bug():
+    case = generate_case(125, profile="row_value_absence_filter")
+
+    result = run_loaded_case(
+        case,
+        EMBEDDED_SQL_BACKENDS,
+        config=ExperimentConfig(generator_profile="row_value_absence_filter"),
+        save_artifact=False,
+    )
+
+    assert result["status"] == "bug"
+    assert result["normalized"]["duckdb"]["rows"] == []
+    assert result["normalized"]["sqlite"]["rows"] == [["survivor", 2, 2, 1]]
+    assert result["findings"][0]["root_cause"] == "tuple_absence_null_filter"
+    assert result["findings"][0]["suspicious_backends"] == ["duckdb"]
+    assert result["findings"][0]["discovery_origin"] == "organic"
+    assert result["findings"][0]["source_issue"] == ""
+
+    report = build_triage_report(
+        case,
+        original_findings=[{"kind": "semantic_output_mismatch"}],
+        reproduced_findings=result["findings"],
+        config=ExperimentConfig(generator_profile="row_value_absence_filter").to_dict(),
+        backends=EMBEDDED_SQL_BACKENDS,
     )
     assert report["verdict"] == "candidate_implementation_bug"
     assert report["paper_status"] == "candidate_bug_needs_external_confirmation"

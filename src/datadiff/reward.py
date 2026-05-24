@@ -4,6 +4,7 @@ from collections import Counter
 from typing import Any
 
 CANDIDATE_BUG_VERDICT = "candidate_implementation_bug"
+ISSUE_REPLAY_ORIGIN = "issue_replay"
 SEMANTIC_DIVERGENCE_VERDICTS = {
     "documented_semantic_divergence",
     "expected_semantic_divergence",
@@ -23,6 +24,14 @@ def is_candidate_bug_finding(finding: dict[str, Any]) -> bool:
     return finding.get("triage_verdict") == CANDIDATE_BUG_VERDICT and not finding.get("false_positive")
 
 
+def is_issue_replay_finding(finding: dict[str, Any]) -> bool:
+    return str(finding.get("discovery_origin", "")).strip() == ISSUE_REPLAY_ORIGIN
+
+
+def is_rewardable_candidate_bug_finding(finding: dict[str, Any]) -> bool:
+    return is_candidate_bug_finding(finding) and not is_issue_replay_finding(finding)
+
+
 def is_semantic_divergence_finding(finding: dict[str, Any]) -> bool:
     return str(finding.get("triage_verdict", "unclassified")) in SEMANTIC_DIVERGENCE_VERDICTS
 
@@ -39,14 +48,14 @@ def candidate_bug_family_keys(findings: list[dict[str, Any]]) -> Counter[str]:
     keys: Counter[str] = Counter()
     root_by_suspicious: dict[str, str] = {}
     for finding in findings:
-        if not is_candidate_bug_finding(finding):
+        if not is_rewardable_candidate_bug_finding(finding):
             continue
         root = str(finding.get("root_cause", "unknown"))
         if root.startswith("metamorphic_"):
             continue
         root_by_suspicious.setdefault(suspicious_key(finding), root)
     for finding in findings:
-        if not is_candidate_bug_finding(finding):
+        if not is_rewardable_candidate_bug_finding(finding):
             continue
         root = str(finding.get("root_cause", "unknown"))
         suspicious = suspicious_key(finding)
@@ -59,7 +68,7 @@ def candidate_bug_family_keys(findings: list[dict[str, Any]]) -> Counter[str]:
 def candidate_bug_signatures(findings: list[dict[str, Any]]) -> Counter[str]:
     signatures: Counter[str] = Counter()
     for finding in findings:
-        if not is_candidate_bug_finding(finding):
+        if not is_rewardable_candidate_bug_finding(finding):
             continue
         signature = str(finding.get("signature", "")).strip()
         if signature:
@@ -69,7 +78,10 @@ def candidate_bug_signatures(findings: list[dict[str, Any]]) -> Counter[str]:
 
 def row_reward_signals(row: dict[str, Any]) -> dict[str, Any]:
     findings = row.get("findings") or []
-    candidate_bug_count = sum(1 for finding in findings if is_candidate_bug_finding(finding))
+    candidate_bug_count = sum(1 for finding in findings if is_rewardable_candidate_bug_finding(finding))
+    issue_replay_candidate_bug_count = sum(
+        1 for finding in findings if is_candidate_bug_finding(finding) and is_issue_replay_finding(finding)
+    )
     semantic_divergence_count = sum(1 for finding in findings if is_semantic_divergence_finding(finding))
     false_positive_count = sum(1 for finding in findings if is_false_positive_finding(finding))
     needs_confirmation_count = sum(
@@ -80,6 +92,7 @@ def row_reward_signals(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "candidate_bug": candidate_bug_count > 0,
         "candidate_bug_count": candidate_bug_count,
+        "issue_replay_candidate_bug_count": issue_replay_candidate_bug_count,
         "semantic_divergence": semantic_divergence_count > 0,
         "semantic_divergence_count": semantic_divergence_count,
         "false_positive": false_positive_count > 0,

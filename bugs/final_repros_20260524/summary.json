@@ -1,0 +1,102 @@
+[
+  {
+    "artifact": "bugs/final_repros_20260524/bug_443e55c7231a3902",
+    "backends": [
+      "pandas",
+      "duckdb",
+      "datafusion"
+    ],
+    "label": "datafusion_grouped_topk_null_sort_key",
+    "origin": "organic",
+    "paper_status": "candidate_bug_needs_external_confirmation",
+    "reduced_cols": [
+      2,
+      3
+    ],
+    "reduced_ops": 6,
+    "reduced_rows": [
+      1,
+      2
+    ],
+    "root": "grouped_topk_null_sort_key",
+    "source_case_id": "case-00011843-bughunt",
+    "source_index": 195,
+    "standalone": "bugs/final_repros_20260524/bug_443e55c7231a3902/standalone_datafusion_groupby_null_sortkey_limit.py",
+    "status": "valid_candidate",
+    "suspicious_backend": "datafusion",
+    "validation_status": "valid",
+    "verdict": "candidate_implementation_bug"
+  },
+  {
+    "artifact": "bugs/final_repros_20260524/bug_f82da91dcce39d31",
+    "backends": [
+      "polars",
+      "polars_lazy"
+    ],
+    "label": "polars_reverse_division_operand_order",
+    "origin": "organic",
+    "paper_status": "candidate_bug_needs_external_confirmation",
+    "reduced_cols": [
+      2
+    ],
+    "reduced_ops": 1,
+    "reduced_rows": [
+      1
+    ],
+    "root": "reverse_division_operand_order",
+    "source_case_id": "case-00009532-bughunt-polars-reverse-division-columns",
+    "source_index": 2,
+    "standalone": "bugs/final_repros_20260524/bug_f82da91dcce39d31/standalone_polars_reverse_division_columns.py",
+    "status": "valid_candidate",
+    "suspicious_backend": "polars",
+    "validation_status": "valid",
+    "verdict": "candidate_implementation_bug"
+  },
+  {
+    "artifact": "bugs/final_repros_20260524/bug_c57a8db95c205092",
+    "backends": [
+      "duckdb",
+      "sqlite"
+    ],
+    "label": "duckdb_row_value_absence_filter",
+    "origin": "organic",
+    "paper_status": "candidate_bug_needs_external_confirmation",
+    "reduced_cols": [
+      2,
+      2
+    ],
+    "reduced_ops": 1,
+    "reduced_rows": [
+      1,
+      1
+    ],
+    "root": "tuple_absence_null_filter",
+    "source_case_id": "case-00009513-bughunt-row-value-absence-filter",
+    "source_index": 0,
+    "standalone": "bugs/final_repros_20260524/bug_c57a8db95c205092/standalone_duckdb_tuple_absence_null_filter.py",
+    "status": "valid_candidate",
+    "suspicious_backend": "duckdb",
+    "validation_status": "valid",
+    "verdict": "candidate_implementation_bug"
+  },
+  {
+    "artifact": "bugs/final_repros_20260524/bug_fafd8cd305b9c253",
+    "backends": [
+      "pandas",
+      "duckdb",
+      "pyarrow"
+    ],
+    "label": "pyarrow_groupby_filter_cast_membership",
+    "origin": "organic",
+    "paper_status": "not_usable_until_reproduced",
+    "rejection_reason": "PyArrow adapter used an unsafe in_set literal cast that converted fractional floats to integer values; fixed adapter now matches pandas and DuckDB.",
+    "root": "groupby_aggregation",
+    "source_case_id": "case-00009762-bughunt-pyarrow-groupby-filter-cast-membership",
+    "source_index": 21,
+    "standalone": "",
+    "status": "rejected_adapter_noise",
+    "suspicious_backend": "",
+    "validation_status": "not-reproduced",
+    "verdict": "not_reproduced"
+  }
+]

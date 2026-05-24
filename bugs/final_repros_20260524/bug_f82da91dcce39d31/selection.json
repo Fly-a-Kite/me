@@ -1,0 +1,84 @@
+{
+  "artifact": "bugs/final_repros_20260524/bug_f82da91dcce39d31",
+  "label": "polars_reverse_division_operand_order",
+  "original_shapes": {
+    "columns": [
+      3
+    ],
+    "ops": 2,
+    "rows": [
+      3
+    ]
+  },
+  "reduced_shapes": {
+    "columns": [
+      2
+    ],
+    "ops": 1,
+    "rows": [
+      1
+    ]
+  },
+  "reproduced_findings": [
+    {
+      "confidence": "medium",
+      "discovery_origin": "organic",
+      "documentation_refs": [],
+      "evidence": "Backends returned different canonical tables; mismatch_class=value; shapes={'polars': (1, 3), 'polars_lazy': (1, 3)}",
+      "false_positive": false,
+      "false_positive_reason": "",
+      "finding_id": "finding-f82da91dcce39d31",
+      "kind": "semantic_output_mismatch",
+      "mismatch_class": "value",
+      "oracle": "differential",
+      "paper_status": "candidate_bug_needs_external_confirmation",
+      "recommendation": [
+        "Minimize the case and include the DSL reference output in the artifact.",
+        "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+      ],
+      "root_cause": "reverse_division_operand_order",
+      "severity": "critical",
+      "signature": "f82da91dcce39d31",
+      "source_issue": "",
+      "suspicious_backends": [
+        "polars"
+      ],
+      "triage_confidence": "high",
+      "triage_evidence": "Independent DSL reference agrees with ['polars_lazy'] and disagrees with ['polars'].",
+      "triage_verdict": "candidate_implementation_bug"
+    }
+  ],
+  "source_case_id": "case-00009532-bughunt-polars-reverse-division-columns",
+  "source_finding": {
+    "confidence": "medium",
+    "discovery_origin": "organic",
+    "documentation_refs": [],
+    "evidence": "Backends returned different canonical tables; mismatch_class=value; shapes={'polars': (3, 2), 'polars_lazy': (3, 2)}",
+    "false_positive": false,
+    "false_positive_reason": "",
+    "finding_id": "finding-5ec7b00ddbe8cef6",
+    "kind": "semantic_output_mismatch",
+    "mismatch_class": "value",
+    "oracle": "differential",
+    "paper_status": "candidate_bug_needs_external_confirmation",
+    "recommendation": [
+      "Minimize the case and include the DSL reference output in the artifact.",
+      "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+    ],
+    "root_cause": "reverse_division_operand_order",
+    "severity": "critical",
+    "signature": "5ec7b00ddbe8cef6",
+    "source_issue": "",
+    "suspicious_backends": [
+      "polars"
+    ],
+    "triage_confidence": "high",
+    "triage_evidence": "Independent DSL reference agrees with ['polars_lazy'] and disagrees with ['polars'].",
+    "triage_verdict": "candidate_implementation_bug"
+  },
+  "source_index": 2,
+  "source_run": "runs/run-20260523T191528-1779563728284618301.jsonl.gz",
+  "standalone_reproducer": "",
+  "triage_json": "bugs/final_repros_20260524/bug_f82da91dcce39d31/triage.json",
+  "triage_md": "bugs/final_repros_20260524/bug_f82da91dcce39d31/triage.md"
+}

@@ -57,6 +57,10 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "unique_count": {"agg:nunique"},
     "set_membership_filter": {"pattern:set_membership_filter"},
     "set_membership": {"filter:set-membership"},
+    "pyarrow_groupby_filter_cast_membership": {
+        "pattern:pyarrow_groupby_filter_cast_membership",
+        "membership:int-column-fractional-literal",
+    },
     "null_predicate_filter": {"pattern:null_predicate_filter"},
     "null_predicate": {"filter:null-predicate"},
     "boolean_predicate_filter": {"pattern:boolean_predicate_filter"},
@@ -65,6 +69,8 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "range_filter": {"filter:range-closed"},
     "tuple_absence_filter": {"pattern:tuple_absence_filter"},
     "tuple_absence": {"filter:tuple-absence"},
+    "row_value_absence_filter": {"pattern:row_value_absence_filter"},
+    "row_value_absence": {"filter:tuple-absence", "nulls:ternary-membership"},
     "running_sum_precision": {"pattern:running_sum_precision"},
     "running_sum": {"op:running_sum"},
     "sortedness_null_placement": {"pattern:sortedness_null_placement"},
@@ -92,7 +98,12 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "rounding": {"numeric:round-even", "float:decimal-scale"},
     "series_rtruediv_operand_order": {"pattern:series_rtruediv_operand_order"},
     "series_rtruediv_probe": {"op:series_rtruediv_probe"},
-    "reverse_division": {"series:reverse-division", "arithmetic:operand-order"},
+    "polars_reverse_division_columns": {"pattern:polars_reverse_division_columns"},
+    "reverse_division": {
+        "series:reverse-division",
+        "expr:reverse_division_columns",
+        "arithmetic:operand-order",
+    },
     "pandas_uint64_isin_precision": {"pattern:pandas_uint64_isin_precision"},
     "uint64_isin_probe": {"op:uint64_isin_probe"},
     "unsigned_membership": {"pandas:uint64-isin", "membership:unsigned-precision"},
@@ -270,6 +281,10 @@ def extract_case_features(case: Case) -> set[str]:
             if parsed is not None and parsed.base == "in_set":
                 features.add("filter:set-membership")
                 has_set_membership_filter = True
+                if _has_fractional_float_literal(op.get("value")):
+                    features.add("membership:fractional-literal")
+                    if available_types.get(column) == "int":
+                        features.add("membership:int-column-fractional-literal")
             if parsed is not None and parsed.base in {"is_null", "is_not_null"}:
                 features.add("filter:null-predicate")
                 features.add(f"filter:null-predicate:{parsed.base}")
@@ -448,12 +463,29 @@ def extract_case_features(case: Case) -> set[str]:
         elif kind == "mutate":
             expr = op.get("expr", {})
             expr_kind = expr.get("kind", "unknown")
+            output_column = str(op.get("column", "derived"))
+            source_column = str(expr.get("source", ""))
             features.add(f"mutate:{expr_kind}")
             features.add(f"expr:{expr_kind}")
             if expr_kind == "arith_const":
                 features.add(f"arith:{expr.get('op', 'unknown')}")
+                if expr.get("op") == "div":
+                    available_types[output_column] = "float"
+                else:
+                    available_types[output_column] = available_types.get(source_column, "derived")
+            elif expr_kind == "reverse_division_columns":
+                features.add("arithmetic:operand-order")
+                features.add("arithmetic:reverse-division")
+                available_types[output_column] = "float"
+            elif expr_kind == "add_const":
+                available_types[output_column] = available_types.get(source_column, "derived")
             if expr_kind == "cast":
                 features.add(f"cast_to:{expr.get('to', 'unknown')}")
+                available_types[output_column] = str(expr.get("to", "derived"))
+            elif expr_kind == "string_length":
+                available_types[output_column] = "int"
+            elif expr_kind == "string_lower":
+                available_types[output_column] = "str"
         elif kind == "groupby":
             for key in op.get("keys", []):
                 features.add(f"group_key_type:{available_types.get(key, 'derived')}")
@@ -467,8 +499,9 @@ def extract_case_features(case: Case) -> set[str]:
                 if agg.get("func") == "nunique":
                     features.add(f"agg:nunique:{source_type}")
                     has_unique_count_groupby = True
-                available_types[str(agg.get("as", "derived"))] = (
-                    "int" if agg.get("func") in {"count", "nunique"} else "float"
+                available_types[str(agg.get("as", "derived"))] = _aggregate_feature_type(
+                    source_type,
+                    str(agg.get("func", "")),
                 )
         elif kind == "aggregate":
             for agg in op.get("aggs", []):
@@ -479,8 +512,9 @@ def extract_case_features(case: Case) -> set[str]:
                     features.add("agg:count:str")
                 if agg.get("func") == "nunique":
                     features.add(f"agg:nunique:{source_type}")
-                available_types[str(agg.get("as", "derived"))] = (
-                    "int" if agg.get("func") in {"count", "nunique"} else "float"
+                available_types[str(agg.get("as", "derived"))] = _aggregate_feature_type(
+                    source_type,
+                    str(agg.get("func", "")),
                 )
     if op_names:
         features.add("opseq:" + ">".join(op_names))
@@ -528,6 +562,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:unique_count_groupby")
     if has_set_membership_filter:
         features.add("pattern:set_membership_filter")
+    if _has_groupby_filter_cast_membership_pattern(case.program.operations):
+        features.add("pattern:pyarrow_groupby_filter_cast_membership")
     if has_null_predicate_filter:
         features.add("pattern:null_predicate_filter")
     if has_boolean_predicate_filter:
@@ -538,6 +574,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:post_topk_range_filter")
     if has_tuple_absence_filter:
         features.add("pattern:tuple_absence_filter")
+    if generator_profile == "row_value_absence_filter" or mixed_generator_profile == "row_value_absence_filter":
+        features.add("pattern:row_value_absence_filter")
     if has_running_sum_precision or _has_running_sum_precision_pattern(case.program.operations):
         features.add("pattern:running_sum_precision")
     if has_sortedness_check and _has_sortedness_null_placement_pattern(case.program.operations):
@@ -558,6 +596,8 @@ def extract_case_features(case: Case) -> set[str]:
         features.add("pattern:round_even_float_scale")
     if has_series_rtruediv_probe:
         features.add("pattern:series_rtruediv_operand_order")
+    if _has_reverse_division_columns_pattern(case.program.operations):
+        features.add("pattern:polars_reverse_division_columns")
     if has_uint64_isin_probe:
         features.add("pattern:pandas_uint64_isin_precision")
     if has_tuple_anti_null_probe:
@@ -2252,7 +2292,7 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("boolean_null_filter")
     if "pattern:post_topk_range_filter" in features:
         roots.add("topk_filter_pushdown")
-    if "pattern:tuple_absence_filter" in features:
+    if "pattern:tuple_absence_filter" in features or "pattern:row_value_absence_filter" in features:
         roots.add("tuple_absence_null_filter")
     if "pattern:running_sum_precision" in features or "op:running_sum" in features:
         roots.add("running_sum_precision")
@@ -2512,6 +2552,48 @@ def _has_join_null_truth_filter_pattern(ops: list[dict[str, Any]]) -> bool:
         return False
     parsed = parse_filter_comparator(filter_op.get("cmp", ""))
     return parsed is not None and parsed.truth_test in {"is_not_true", "is_not_false", "is_unknown"}
+
+
+def _aggregate_feature_type(source_type: str, func: str) -> str:
+    if func in {"count", "nunique"}:
+        return "int"
+    if func in {"min", "max"} and source_type in {"int", "float", "str", "bool"}:
+        return source_type
+    return "float"
+
+
+def _has_fractional_float_literal(value: Any) -> bool:
+    if isinstance(value, float):
+        return math.isfinite(value) and not value.is_integer()
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return any(_has_fractional_float_literal(item) for item in value)
+    return False
+
+
+def _has_groupby_filter_cast_membership_pattern(ops: list[dict[str, Any]]) -> bool:
+    groupby_agg_aliases: set[str] = set()
+    for op in ops:
+        kind = op.get("op")
+        if kind == "groupby":
+            groupby_agg_aliases = {str(agg.get("as", "")) for agg in op.get("aggs", []) if agg.get("as")}
+            continue
+        if kind != "filter" or not groupby_agg_aliases:
+            continue
+        parsed = parse_filter_comparator(op.get("cmp", ""))
+        if parsed is None or parsed.base != "in_set":
+            continue
+        if str(op.get("column", "")) in groupby_agg_aliases and _has_fractional_float_literal(op.get("value")):
+            return True
+    return False
+
+
+def _has_reverse_division_columns_pattern(ops: list[dict[str, Any]]) -> bool:
+    return any(
+        op.get("op") == "mutate"
+        and op.get("expr", {}).get("kind") == "reverse_division_columns"
+        and bool(op.get("expr", {}).get("numerator"))
+        for op in ops
+    )
 
 
 def _has_float_group_key_pattern(ops: list[dict[str, Any]]) -> bool:

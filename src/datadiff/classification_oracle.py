@@ -9,7 +9,7 @@ from datadiff.dsl import Case, SortKey, normalize_sort_keys
 from datadiff.filtering import evaluate_filter_predicate, filter_comparator_supports_type, is_filter_comparator, parse_filter_comparator
 from datadiff.identifiers import is_reserved_output_name
 from datadiff.normalizer import NormalizedResult, _norm_value
-from datadiff.oracle import Finding
+from datadiff.oracle import PROBE_ROOTS, Finding
 from datadiff.running import sort_rows_for_running, stable_running_sum_values
 from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
@@ -40,6 +40,8 @@ def annotate_findings(
     config: dict[str, Any],
     backends: list[str],
 ) -> None:
+    discovery_origin = _discovery_origin(case)
+    source_issue = _source_issue(case)
     for finding in findings:
         classification = classify_finding(case, finding, normalized, raw_results, config, backends)
         finding.triage_verdict = classification.verdict
@@ -50,6 +52,8 @@ def annotate_findings(
         finding.triage_evidence = classification.evidence
         finding.recommendation = classification.recommendation
         finding.documentation_refs = classification.documentation_refs
+        finding.discovery_origin = discovery_origin
+        finding.source_issue = source_issue
         if classification.implicated_backends:
             finding.suspicious_backends = classification.implicated_backends
 
@@ -189,6 +193,23 @@ def classify_finding(
             "Deduplicate by signature, minimize the case, and inspect backend-specific outputs.",
         ],
     )
+
+
+ISSUE_REPLAY_OPS = frozenset(PROBE_ROOTS) | {"running_sum", "tuple_absence_filter"}
+
+
+def _source_issue(case: Case) -> str:
+    metadata = case.metadata if isinstance(case.metadata, dict) else {}
+    return str(metadata.get("source_issue") or metadata.get("source_issue_alt") or "").strip()
+
+
+def _discovery_origin(case: Case) -> str:
+    if not _source_issue(case):
+        return "organic"
+    ops = {str(op.get("op", "")) for op in case.program.operations}
+    if ops & ISSUE_REPLAY_OPS:
+        return "issue_replay"
+    return "issue_inspired"
 
 
 def validate_case_program(case: Case) -> list[str]:
@@ -815,6 +836,11 @@ def _mutate_output_type(
         if expr.get("op") in {"div", "mod"} and expr.get("value") == 0:
             return None
         return "float" if expr.get("op") == "div" or col_types[src] == "float" else col_types[src]
+    if kind == "reverse_division_columns":
+        numerator = expr.get("numerator")
+        if src not in numeric or numerator not in numeric:
+            return None
+        return "float"
     if kind == "cast":
         return "float" if src in numeric and expr.get("to") == "float" else None
     if kind == "string_length":
@@ -1140,6 +1166,11 @@ def _reference_eval_expr(row: dict[str, Any], expr: dict[str, Any]) -> Any:
             return value / rhs
         if op == "mod":
             return value % rhs
+    if kind == "reverse_division_columns":
+        numerator = row.get(expr.get("numerator"))
+        if numerator is None or value == 0:
+            return None
+        return numerator / value
     if kind == "cast" and expr.get("to") == "float":
         return float(value)
     if kind == "string_length":

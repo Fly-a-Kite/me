@@ -1,0 +1,29 @@
+{
+  "duckdb": {
+    "backend": "duckdb",
+    "columns": [
+      "left_a",
+      "left_b"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [],
+    "status": "ok"
+  },
+  "sqlite": {
+    "backend": "sqlite",
+    "columns": [
+      "left_a",
+      "left_b"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        2,
+        2
+      ]
+    ],
+    "status": "ok"
+  }
+}

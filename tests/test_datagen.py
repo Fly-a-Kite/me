@@ -175,10 +175,12 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "string_count_groupby",
         "unique_count_groupby",
         "set_membership_filter",
+        "pyarrow_groupby_filter_cast_membership",
         "null_predicate_filter",
         "boolean_predicate_filter",
         "post_topk_range_filter",
         "tuple_absence_filter",
+        "row_value_absence_filter",
         "wide_offset_topk",
         "join_null_key_topk",
         "empty_filter_groupby",
@@ -195,6 +197,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "bit_compare_unequal_length",
         "round_even_float_scale",
         "series_rtruediv_operand_order",
+        "polars_reverse_division_columns",
         "pandas_uint64_isin_precision",
         "duckdb_tuple_anti_null_semantics",
         "duckdb_json_predicate_order_semantics",
@@ -534,6 +537,22 @@ def test_generate_case_set_membership_filter_profile_is_supported_and_valid():
     assert validate_case_program(case) == []
 
 
+def test_generate_case_pyarrow_groupby_filter_cast_membership_profile_is_supported_and_valid():
+    case = generate_case(123, profile="pyarrow_groupby_filter_cast_membership")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000123-pyarrow-groupby-filter-cast-membership"
+    assert [op["op"] for op in case.program.operations] == ["groupby", "filter", "sort", "select"]
+    filter_op = case.program.operations[1]
+    assert filter_op["column"] == "agg_min_bucket"
+    assert filter_op["cmp"] == "in_set"
+    assert any(isinstance(value, float) and not value.is_integer() for value in filter_op["value"])
+    assert "source_issue" not in case.metadata
+    assert "pattern:pyarrow_groupby_filter_cast_membership" in features
+    assert "membership:int-column-fractional-literal" in features
+    assert validate_case_program(case) == []
+
+
 def test_generate_case_null_predicate_filter_profile_is_supported_and_valid():
     even_case = generate_case(124, profile="null_predicate_filter")
     odd_case = generate_case(125, profile="null_predicate_filter")
@@ -600,6 +619,25 @@ def test_generate_case_tuple_absence_filter_profile_is_supported_and_valid():
     assert "pattern:tuple_absence_filter" in features
     assert "filter:tuple-absence" in features
     assert case.metadata["source_issue"] == "https://github.com/duckdb/duckdb/issues/22418"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_row_value_absence_filter_profile_is_supported_and_valid():
+    case = generate_case(125, profile="row_value_absence_filter")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000125-row-value-absence-filter"
+    assert [op["op"] for op in case.program.operations] == ["tuple_absence_filter", "select", "sort"]
+    assert case.program.operations[0] == {
+        "op": "tuple_absence_filter",
+        "columns": ["left_a", "left_b"],
+        "table": "t1",
+        "right_columns": ["right_a", "right_b"],
+    }
+    assert "source_issue" not in case.metadata
+    assert "pattern:row_value_absence_filter" in features
+    assert "pattern:tuple_absence_filter" in features
+    assert "filter:tuple-absence" in features
     assert validate_case_program(case) == []
 
 
@@ -753,6 +791,27 @@ def test_generate_case_series_rtruediv_operand_order_profile_is_supported_and_va
     assert "pattern:series_rtruediv_operand_order" in features
     assert "series:reverse-division" in features
     assert case.metadata["source_issue"] == "https://github.com/pola-rs/polars/issues/17760"
+    assert validate_case_program(case) == []
+
+
+def test_generate_case_polars_reverse_division_columns_profile_is_supported_and_valid():
+    case = generate_case(135, profile="polars_reverse_division_columns")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000135-polars-reverse-division-columns"
+    assert [op["op"] for op in case.program.operations] == ["mutate", "select"]
+    assert case.program.operations[0] == {
+        "op": "mutate",
+        "column": "ratio_value",
+        "expr": {
+            "kind": "reverse_division_columns",
+            "source": "divisor_value",
+            "numerator": "numerator_value",
+        },
+    }
+    assert "source_issue" not in case.metadata
+    assert "pattern:polars_reverse_division_columns" in features
+    assert "arithmetic:reverse-division" in features
     assert validate_case_program(case) == []
 
 

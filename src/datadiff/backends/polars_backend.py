@@ -155,6 +155,9 @@ class PolarsBackend(Backend):
                         else:
                             raise ValueError(expr["op"])
                         df = df.with_columns(out.alias(op["column"]))
+                    elif expr["kind"] == "reverse_division_columns":
+                        out = df[expr["source"]].__rtruediv__(df[expr["numerator"]])
+                        df = df.with_columns(out.alias(op["column"]))
                     elif expr["kind"] == "cast" and expr["to"] == "float":
                         df = df.with_columns(pl.col(expr["source"]).cast(pl.Float64).alias(op["column"]))
                     elif expr["kind"] == "string_length":
@@ -350,6 +353,10 @@ class PolarsLazyBackend(PolarsBackend):
                         else:
                             raise ValueError(expr["op"])
                         lf = lf.with_columns(out.alias(op["column"]))
+                    elif expr["kind"] == "reverse_division_columns":
+                        lf = lf.with_columns(
+                            (pl.col(expr["numerator"]) / pl.col(expr["source"])).alias(op["column"])
+                        )
                     elif expr["kind"] == "cast" and expr["to"] == "float":
                         lf = lf.with_columns(pl.col(expr["source"]).cast(pl.Float64).alias(op["column"]))
                     elif expr["kind"] == "string_length":

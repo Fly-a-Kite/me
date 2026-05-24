@@ -1,0 +1,71 @@
+{
+  "case_id": "case-00009762-bughunt-pyarrow-groupby-filter-cast-membership",
+  "metadata": {
+    "generator_profile": "bughunt",
+    "membership_values": [
+      0.5,
+      -1.0,
+      10.0
+    ],
+    "mixed_generator_profile": "pyarrow_groupby_filter_cast_membership"
+  },
+  "program": {
+    "operations": [
+      {
+        "aggs": [
+          {
+            "as": "agg_min_bucket",
+            "column": "bucket_code",
+            "func": "min"
+          },
+          {
+            "as": "agg_max_amount",
+            "column": "amount_code",
+            "func": "max"
+          }
+        ],
+        "keys": [
+          "bucket_code",
+          "amount_code"
+        ],
+        "op": "groupby"
+      },
+      {
+        "cmp": "in_set",
+        "column": "agg_min_bucket",
+        "op": "filter",
+        "value": [
+          0.5,
+          -1.0,
+          10.0
+        ]
+      }
+    ],
+    "program_id": "prog-00009762-pyarrow-groupby-filter-cast-membership",
+    "seed": 9762
+  },
+  "seed": 9762,
+  "tables": [
+    {
+      "columns": [
+        {
+          "name": "bucket_code",
+          "nullable": false,
+          "type": "int"
+        },
+        {
+          "name": "amount_code",
+          "nullable": true,
+          "type": "int"
+        }
+      ],
+      "name": "t0",
+      "rows": [
+        {
+          "amount_code": 2,
+          "bucket_code": 0
+        }
+      ]
+    }
+  ]
+}

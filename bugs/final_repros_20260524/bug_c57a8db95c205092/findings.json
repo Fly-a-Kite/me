@@ -1,0 +1,29 @@
+[
+  {
+    "confidence": "medium",
+    "discovery_origin": "organic",
+    "documentation_refs": [],
+    "evidence": "Backends returned different canonical tables; mismatch_class=row_count; shapes={'duckdb': (0, 2), 'sqlite': (1, 2)}",
+    "false_positive": false,
+    "false_positive_reason": "",
+    "finding_id": "finding-c57a8db95c205092",
+    "kind": "semantic_output_mismatch",
+    "mismatch_class": "row_count",
+    "oracle": "differential",
+    "paper_status": "candidate_bug_needs_external_confirmation",
+    "recommendation": [
+      "Minimize the case and include the DSL reference output in the artifact.",
+      "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+    ],
+    "root_cause": "tuple_absence_null_filter",
+    "severity": "critical",
+    "signature": "c57a8db95c205092",
+    "source_issue": "",
+    "suspicious_backends": [
+      "duckdb"
+    ],
+    "triage_confidence": "high",
+    "triage_evidence": "Independent DSL reference agrees with ['sqlite'] and disagrees with ['duckdb'].",
+    "triage_verdict": "candidate_implementation_bug"
+  }
+]

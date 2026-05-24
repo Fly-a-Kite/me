@@ -1,0 +1,46 @@
+{
+  "case_id": "case-00009532-bughunt-polars-reverse-division-columns",
+  "metadata": {
+    "generator_profile": "bughunt",
+    "mixed_generator_profile": "polars_reverse_division_columns"
+  },
+  "program": {
+    "operations": [
+      {
+        "column": "ratio_value",
+        "expr": {
+          "kind": "reverse_division_columns",
+          "numerator": "numerator_value",
+          "source": "divisor_value"
+        },
+        "op": "mutate"
+      }
+    ],
+    "program_id": "prog-00009532-polars-reverse-division-columns",
+    "seed": 9532
+  },
+  "seed": 9532,
+  "tables": [
+    {
+      "columns": [
+        {
+          "name": "divisor_value",
+          "nullable": false,
+          "type": "int"
+        },
+        {
+          "name": "numerator_value",
+          "nullable": false,
+          "type": "int"
+        }
+      ],
+      "name": "t0",
+      "rows": [
+        {
+          "divisor_value": 4,
+          "numerator_value": 5
+        }
+      ]
+    }
+  ]
+}

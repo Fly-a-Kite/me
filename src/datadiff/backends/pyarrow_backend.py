@@ -279,9 +279,7 @@ def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):
     if parsed is None:
         raise ValueError(comparator)
     if parsed.base == "in_set":
-        values = list(value)
-        value_set = pa.array(values, type=array.type)
-        return pc.fill_null(pc.is_in(array, value_set=value_set), False)
+        return _membership_mask(pa, pc, array, value)
     if parsed.base == "is_null":
         return pc.is_null(array)
     if parsed.base == "is_not_null":
@@ -325,6 +323,17 @@ def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):
     raise ValueError(parsed.truth_test)
 
 
+def _membership_mask(pa, pc, array: Any, values: Any):
+    mask = pa.array([False] * len(array), type=pa.bool_())
+    for value in values:
+        try:
+            value_mask = pc.equal(array, value)
+        except (pa.ArrowException, TypeError):
+            continue
+        mask = pc.or_(mask, pc.fill_null(value_mask, False))
+    return mask
+
+
 def _apply_boolean_truth_test(pc, mask: Any, truth_test: str | None):
     if truth_test == "is_true":
         return pc.fill_null(mask, False)
@@ -356,6 +365,8 @@ def _eval_expr(pc, table: Any, expr: dict[str, Any]):
         if op == "mod":
             raise ValueError("pyarrow backend does not support modulo in the common DSL subset")
         raise ValueError(op)
+    if expr["kind"] == "reverse_division_columns":
+        return pc.divide(pc.cast(table[expr["numerator"]], "float64"), pc.cast(source, "float64"))
     if expr["kind"] == "cast" and expr["to"] == "float":
         return pc.cast(source, "float64")
     if expr["kind"] == "string_length":

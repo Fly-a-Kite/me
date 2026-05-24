@@ -391,6 +391,8 @@ class DataFusionBackend(Backend):
                             else f"q.{_quote(expr['source'])}"
                         )
                         expr_sql = f"{source_sql} {op_sql} {_lit(expr['value'])}"
+                    elif expr["kind"] == "reverse_division_columns":
+                        expr_sql = f"CAST(q.{_quote(expr['numerator'])} AS DOUBLE) / q.{_quote(expr['source'])}"
                     elif expr["kind"] == "cast" and expr["to"] == "float":
                         expr_sql = f"CAST(q.{_quote(expr['source'])} AS DOUBLE)"
                     elif expr["kind"] == "string_length":

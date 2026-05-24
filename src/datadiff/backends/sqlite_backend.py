@@ -428,6 +428,8 @@ class SQLiteBackend(Backend):
                         else:
                             op_sql = {"sub": "-", "mul": "*", "mod": "%"}[expr["op"]]
                             expr_sql = f"q.{_quote(expr['source'])} {op_sql} {_lit(expr['value'])}"
+                    elif expr["kind"] == "reverse_division_columns":
+                        expr_sql = f"1.0 * q.{_quote(expr['numerator'])} / q.{_quote(expr['source'])}"
                     elif expr["kind"] == "cast" and expr["to"] == "float":
                         expr_sql = f"CAST(q.{_quote(expr['source'])} AS REAL)"
                     elif expr["kind"] == "string_length":

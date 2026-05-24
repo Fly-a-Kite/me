@@ -36,10 +36,12 @@ GeneratorProfile = Literal[
     "string_count_groupby",
     "unique_count_groupby",
     "set_membership_filter",
+    "pyarrow_groupby_filter_cast_membership",
     "null_predicate_filter",
     "boolean_predicate_filter",
     "post_topk_range_filter",
     "tuple_absence_filter",
+    "row_value_absence_filter",
     "running_sum_precision",
     "sortedness_null_placement",
     "simple_case_random_subject",
@@ -50,6 +52,7 @@ GeneratorProfile = Literal[
     "bit_compare_unequal_length",
     "round_even_float_scale",
     "series_rtruediv_operand_order",
+    "polars_reverse_division_columns",
     "pandas_uint64_isin_precision",
     "duckdb_tuple_anti_null_semantics",
     "duckdb_json_predicate_order_semantics",
@@ -305,7 +308,7 @@ def generate_program(
                 "groupby" not in emitted_ops
                 and numeric_cols
                 and len(ops) >= 3
-                and (remaining <= 3 or rnd.random() < 0.5)
+                and (remaining <= 3 or rnd.random() < 0.65)
             ):
                 op = "groupby"
             else:
@@ -1207,6 +1210,11 @@ def _mutate_output_type(
         if expr.get("op") in {"div", "mod"} and expr.get("value") == 0:
             return None
         return "float" if expr.get("op") == "div" or col_types[src] == "float" else col_types[src]
+    if kind == "reverse_division_columns":
+        numerator = expr.get("numerator")
+        if src not in numeric or numerator not in numeric:
+            return None
+        return "float"
     if kind == "cast":
         return "float" if src in numeric and expr.get("to") == "float" else None
     if kind == "string_length":
@@ -1305,6 +1313,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_unique_count_groupby_case(seed)
     if profile == "set_membership_filter" and type_aware:
         return generate_set_membership_filter_case(seed)
+    if profile == "pyarrow_groupby_filter_cast_membership" and type_aware:
+        return generate_pyarrow_groupby_filter_cast_membership_case(seed)
     if profile == "null_predicate_filter" and type_aware:
         return generate_null_predicate_filter_case(seed)
     if profile == "boolean_predicate_filter" and type_aware:
@@ -1313,6 +1323,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_post_topk_range_filter_case(seed)
     if profile == "tuple_absence_filter" and type_aware:
         return generate_tuple_absence_filter_case(seed)
+    if profile == "row_value_absence_filter" and type_aware:
+        return generate_row_value_absence_filter_case(seed)
     if profile == "running_sum_precision" and type_aware:
         return generate_running_sum_precision_case(seed)
     if profile == "sortedness_null_placement" and type_aware:
@@ -1333,6 +1345,8 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         return generate_round_even_float_scale_case(seed)
     if profile == "series_rtruediv_operand_order" and type_aware:
         return generate_series_rtruediv_operand_order_case(seed)
+    if profile == "polars_reverse_division_columns" and type_aware:
+        return generate_polars_reverse_division_columns_case(seed)
     if profile == "pandas_uint64_isin_precision" and type_aware:
         return generate_pandas_uint64_isin_precision_case(seed)
     if profile == "duckdb_tuple_anti_null_semantics" and type_aware:
@@ -1410,6 +1424,12 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
         return _as_bughunt_mixed_case(generate_set_membership_filter_case(seed), seed, "set_membership_filter")
     if selector == 51:
         return _as_bughunt_mixed_case(generate_null_predicate_filter_case(seed), seed, "null_predicate_filter")
+    if selector == 52:
+        return _as_bughunt_mixed_case(
+            generate_polars_reverse_division_columns_case(seed),
+            seed,
+            "polars_reverse_division_columns",
+        )
     if selector == 54:
         return _as_bughunt_mixed_case(generate_boolean_predicate_filter_case(seed), seed, "boolean_predicate_filter")
     if selector == 55:
@@ -1471,6 +1491,12 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
             generate_duckdb_json_predicate_order_semantics_case(seed),
             seed,
             "duckdb_json_predicate_order_semantics",
+        )
+    if seed % 181 == 101:
+        return _as_bughunt_mixed_case(
+            generate_row_value_absence_filter_case(seed),
+            seed,
+            "row_value_absence_filter",
         )
     if seed % 127 == 74:
         return _as_bughunt_mixed_case(
@@ -1543,6 +1569,12 @@ def _bughunt_issue_inspired_case(seed: int) -> Case | None:
             generate_polars_rolling_mean_by_null_count_semantics_case(seed),
             seed,
             "polars_rolling_mean_by_null_count_semantics",
+        )
+    if seed % 197 == 109:
+        return _as_bughunt_mixed_case(
+            generate_pyarrow_groupby_filter_cast_membership_case(seed),
+            seed,
+            "pyarrow_groupby_filter_cast_membership",
         )
     return None
 
@@ -2747,6 +2779,63 @@ def generate_set_membership_filter_case(seed: int) -> Case:
     )
 
 
+def generate_pyarrow_groupby_filter_cast_membership_case(seed: int) -> Case:
+    bucket_code = seed % 3
+    other_bucket = (bucket_code + 1) % 3
+    last_bucket = (bucket_code + 2) % 3
+    membership_values = [float(bucket_code) + 0.5, float(-(bucket_code + 1)), 10.0]
+    rows = [
+        {"bucket_code": bucket_code, "amount_code": 10, "metric_value": -0.5},
+        {"bucket_code": bucket_code, "amount_code": 2, "metric_value": -1.0},
+        {"bucket_code": other_bucket, "amount_code": 10, "metric_value": 0.5},
+        {"bucket_code": last_bucket, "amount_code": None, "metric_value": 1.0},
+    ]
+    if seed % 2:
+        rows.append({"bucket_code": other_bucket, "amount_code": 2, "metric_value": None})
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("bucket_code", "int", nullable=False),
+            ColumnSpec("amount_code", "int", nullable=True),
+            ColumnSpec("metric_value", "float", nullable=True),
+        ],
+        rows,
+    )
+    program = Program(
+        f"prog-{seed:08d}-pyarrow-groupby-filter-cast-membership",
+        seed,
+        [
+            {
+                "op": "groupby",
+                "keys": ["bucket_code", "amount_code"],
+                "aggs": [
+                    {"column": "bucket_code", "func": "min", "as": "agg_min_bucket"},
+                    {"column": "amount_code", "func": "max", "as": "agg_max_amount"},
+                ],
+            },
+            {"op": "filter", "column": "agg_min_bucket", "cmp": "in_set", "value": membership_values},
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": "agg_min_bucket", "ascending": True, "nulls": "last"},
+                    {"column": "amount_code", "ascending": True, "nulls": "last"},
+                ],
+            },
+            {"op": "select", "columns": ["bucket_code", "amount_code", "agg_min_bucket", "agg_max_amount"]},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-pyarrow-groupby-filter-cast-membership",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "pyarrow_groupby_filter_cast_membership",
+            "membership_values": membership_values,
+        },
+    )
+
+
 def generate_null_predicate_filter_case(seed: int) -> Case:
     use_is_null = seed % 2 == 0
     predicate = "is_null" if use_is_null else "is_not_null"
@@ -2978,6 +3067,59 @@ def generate_tuple_absence_filter_case(seed: int) -> Case:
             "generator_profile": "tuple_absence_filter",
             "source_issue": "https://github.com/duckdb/duckdb/issues/22418",
         },
+    )
+
+
+def generate_row_value_absence_filter_case(seed: int) -> Case:
+    left_rows = [
+        {"sample_id": 0, "left_a": 1, "left_b": 1, "label_value": "matched"},
+        {"sample_id": 1, "left_a": 2, "left_b": 2, "label_value": "survivor"},
+        {"sample_id": 2, "left_a": 3, "left_b": None, "label_value": "null-left"},
+        {"sample_id": 3, "left_a": None, "left_b": 4, "label_value": "null-pair"},
+    ]
+    if seed % 2:
+        left_rows.append({"sample_id": 4, "left_a": 5, "left_b": 4, "label_value": "unknown-tail"})
+    left = TableData(
+        "t0",
+        [
+            ColumnSpec("sample_id", "int", nullable=False),
+            ColumnSpec("left_a", "int", nullable=True),
+            ColumnSpec("left_b", "int", nullable=True),
+            ColumnSpec("label_value", "str", nullable=True),
+        ],
+        left_rows,
+    )
+    right = TableData(
+        "t1",
+        [
+            ColumnSpec("right_a", "int", nullable=True),
+            ColumnSpec("right_b", "int", nullable=True),
+        ],
+        [
+            {"right_a": 1, "right_b": 1},
+            {"right_a": None, "right_b": 4},
+        ],
+    )
+    program = Program(
+        f"prog-{seed:08d}-row-value-absence-filter",
+        seed,
+        [
+            {
+                "op": "tuple_absence_filter",
+                "columns": ["left_a", "left_b"],
+                "table": "t1",
+                "right_columns": ["right_a", "right_b"],
+            },
+            {"op": "select", "columns": ["sample_id", "left_a", "left_b", "label_value"]},
+            {"op": "sort", "keys": [{"column": "sample_id", "ascending": True, "nulls": "last"}]},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-row-value-absence-filter",
+        seed=seed,
+        tables=[left, right],
+        program=program,
+        metadata={"generator_profile": "row_value_absence_filter"},
     )
 
 
@@ -3296,6 +3438,47 @@ def generate_series_rtruediv_operand_order_case(seed: int) -> Case:
             "expected_series_rtruediv_mismatch": False,
             "expected_series_rtruediv_values": [2.0, 1.5, 4.0 / 3.0],
         },
+    )
+
+
+def generate_polars_reverse_division_columns_case(seed: int) -> Case:
+    offset = seed % 3
+    rows = [
+        {"divisor_value": 1 + offset, "numerator_value": 2 + offset, "group_code": 0},
+        {"divisor_value": 2 + offset, "numerator_value": 3 + offset, "group_code": 1},
+        {"divisor_value": 3 + offset, "numerator_value": 4 + offset, "group_code": 1},
+    ]
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("divisor_value", "int", nullable=False),
+            ColumnSpec("numerator_value", "int", nullable=False),
+            ColumnSpec("group_code", "int", nullable=False),
+        ],
+        rows,
+    )
+    program = Program(
+        f"prog-{seed:08d}-polars-reverse-division-columns",
+        seed,
+        [
+            {
+                "op": "mutate",
+                "column": "ratio_value",
+                "expr": {
+                    "kind": "reverse_division_columns",
+                    "source": "divisor_value",
+                    "numerator": "numerator_value",
+                },
+            },
+            {"op": "select", "columns": ["group_code", "ratio_value"]},
+        ],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-polars-reverse-division-columns",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={"generator_profile": "polars_reverse_division_columns"},
     )
 
 

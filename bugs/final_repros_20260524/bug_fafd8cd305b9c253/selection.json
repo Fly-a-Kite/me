@@ -1,0 +1,84 @@
+{
+  "artifact": "bugs/final_repros_20260524/bug_fafd8cd305b9c253",
+  "label": "pyarrow_groupby_filter_cast_membership",
+  "original_shapes": {
+    "columns": [
+      3
+    ],
+    "ops": 4,
+    "rows": [
+      4
+    ]
+  },
+  "reduced_shapes": {
+    "columns": [
+      2
+    ],
+    "ops": 2,
+    "rows": [
+      1
+    ]
+  },
+  "reproduced_findings": [
+    {
+      "confidence": "high",
+      "discovery_origin": "organic",
+      "documentation_refs": [],
+      "evidence": "Backends returned different canonical tables; mismatch_class=row_count; shapes={'pandas': (0, 4), 'duckdb': (0, 4), 'pyarrow': (1, 4)}",
+      "false_positive": false,
+      "false_positive_reason": "",
+      "finding_id": "finding-fafd8cd305b9c253",
+      "kind": "semantic_output_mismatch",
+      "mismatch_class": "row_count",
+      "oracle": "differential",
+      "paper_status": "candidate_bug_needs_external_confirmation",
+      "recommendation": [
+        "Minimize the case and include the DSL reference output in the artifact.",
+        "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+      ],
+      "root_cause": "groupby_aggregation",
+      "severity": "critical",
+      "signature": "fafd8cd305b9c253",
+      "source_issue": "",
+      "suspicious_backends": [
+        "pyarrow"
+      ],
+      "triage_confidence": "high",
+      "triage_evidence": "Independent DSL reference agrees with ['duckdb', 'pandas'] and disagrees with ['pyarrow'].",
+      "triage_verdict": "candidate_implementation_bug"
+    }
+  ],
+  "source_case_id": "case-00009762-bughunt-pyarrow-groupby-filter-cast-membership",
+  "source_finding": {
+    "confidence": "high",
+    "discovery_origin": "organic",
+    "documentation_refs": [],
+    "evidence": "Backends returned different canonical tables; mismatch_class=row_count; shapes={'pandas': (0, 4), 'duckdb': (0, 4), 'pyarrow': (2, 4)}",
+    "false_positive": false,
+    "false_positive_reason": "",
+    "finding_id": "finding-fe4a1fd12028da65",
+    "kind": "semantic_output_mismatch",
+    "mismatch_class": "row_count",
+    "oracle": "differential",
+    "paper_status": "candidate_bug_needs_external_confirmation",
+    "recommendation": [
+      "Minimize the case and include the DSL reference output in the artifact.",
+      "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+    ],
+    "root_cause": "groupby_aggregation",
+    "severity": "critical",
+    "signature": "fe4a1fd12028da65",
+    "source_issue": "",
+    "suspicious_backends": [
+      "pyarrow"
+    ],
+    "triage_confidence": "high",
+    "triage_evidence": "Independent DSL reference agrees with ['duckdb', 'pandas'] and disagrees with ['pyarrow'].",
+    "triage_verdict": "candidate_implementation_bug"
+  },
+  "source_index": 21,
+  "source_run": "runs/run-20260523T191528-1779563728240668270.jsonl.gz",
+  "standalone_reproducer": "",
+  "triage_json": "bugs/final_repros_20260524/bug_fafd8cd305b9c253/triage.json",
+  "triage_md": "bugs/final_repros_20260524/bug_fafd8cd305b9c253/triage.md"
+}

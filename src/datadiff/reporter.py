@@ -34,6 +34,7 @@ def write_report(run_file: Path | None = None, csv_limit: int | None = None) -> 
     oracle_counts = Counter()
     confidence_counts = Counter()
     triage_verdicts = Counter()
+    discovery_origins = Counter()
     candidate_bug_families = Counter()
     false_positive_reasons = Counter()
     backend_status = Counter()
@@ -66,6 +67,7 @@ def write_report(run_file: Path | None = None, csv_limit: int | None = None) -> 
             oracle_counts[finding.get("oracle", "unknown")] += 1
             confidence_counts[finding.get("confidence", "unknown")] += 1
             triage_verdicts[finding.get("triage_verdict", "unclassified")] += 1
+            discovery_origins[finding.get("discovery_origin", "legacy") or "legacy"] += 1
             if finding.get("false_positive_reason"):
                 false_positive_reasons[finding.get("false_positive_reason", "")] += 1
             if len(examples[finding["kind"]]) < 3:
@@ -141,6 +143,13 @@ def write_report(run_file: Path | None = None, csv_limit: int | None = None) -> 
     lines.append("## Triage Verdicts")
     if triage_verdicts:
         for key, count in triage_verdicts.most_common():
+            lines.append(f"- {key}: {count}")
+    else:
+        lines.append("- none")
+    lines.append("")
+    lines.append("## Discovery Origins")
+    if discovery_origins:
+        for key, count in discovery_origins.most_common():
             lines.append(f"- {key}: {count}")
     else:
         lines.append("- none")
@@ -290,6 +299,11 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
         root_causes = Counter(f.get("root_cause", "unknown") for f in findings)
         finding_kinds = Counter(f.get("kind", "unknown") for f in findings)
         triage_verdicts = Counter(f.get("triage_verdict", "unclassified") for f in findings)
+        discovery_origins = Counter(f.get("discovery_origin", "legacy") or "legacy" for f in findings)
+        issue_replay_candidate_count = sum(
+            1 for finding in findings if _is_candidate_bug_finding(finding) and _is_issue_replay_finding(finding)
+        )
+        rewardable_candidate_count = sum(1 for finding in findings if _is_rewardable_candidate_bug_finding(finding))
         candidate_bug_families = Counter()
         for row in run_rows:
             candidate_bug_families.update(_candidate_bug_family_keys(row.get("findings", [])))
@@ -349,9 +363,12 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
                 "top_root_causes": _counter_summary(root_causes),
                 "top_finding_kinds": _counter_summary(finding_kinds),
                 "top_triage_verdicts": _counter_summary(triage_verdicts),
+                "top_discovery_origins": _counter_summary(discovery_origins),
                 "candidate_bug_families": len(candidate_bug_families),
                 "top_candidate_bug_families": _counter_summary(candidate_bug_families),
                 "candidate_implementation_bug_count": triage_verdicts["candidate_implementation_bug"],
+                "rewardable_candidate_implementation_bug_count": rewardable_candidate_count,
+                "issue_replay_candidate_bug_count": issue_replay_candidate_count,
                 "documented_semantic_divergence_count": triage_verdicts["documented_semantic_divergence"],
                 "expected_semantic_divergence_count": triage_verdicts["expected_semantic_divergence"],
                 "semantic_divergence_needs_confirmation_count": triage_verdicts[
@@ -390,8 +407,8 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
         "",
         "## Runs",
         "",
-        "| target suite | preset | seed | batch | arm | reward | cases | findings | candidate bugs | candidate case % | first candidate | first candidate s | discovery AUC | semantic divs | false positives | new behavior % | cases/s | data sensitivity | path proxy | frontier | contribution | pruned % | roots | triage |",
-        "|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|",
+        "| target suite | preset | seed | batch | arm | reward | cases | findings | candidate bugs | rewardable candidates | issue replays | candidate case % | first candidate | first candidate s | discovery AUC | semantic divs | false positives | new behavior % | cases/s | data sensitivity | path proxy | frontier | contribution | pruned % | roots | triage | origins |",
+        "|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|",
     ]
     for row in rows:
         semantic_divergence_count = (
@@ -402,11 +419,11 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
         false_positive_count = row["generator_false_positive_count"] + row["normalizer_false_positive_count"]
         lines.append(
             "| {target_suite} | {preset} | {seed} | {batch_index} | {schedule_arm_id} | {scheduler_reward} | {cases} | {findings} | "
-            "{candidate_implementation_bug_count} | {candidate_bug_case_rate} | "
+            "{candidate_implementation_bug_count} | {rewardable_candidate_implementation_bug_count} | {issue_replay_candidate_bug_count} | {candidate_bug_case_rate} | "
             "{first_candidate_bug_case_index} | {first_candidate_bug_elapsed_s} | {candidate_bug_discovery_auc} | {semantic_divergence_count} | "
             "{false_positive_count} | {new_behavior_rate} | {throughput_cases_s} | {avg_data_sensitivity} | "
             "{avg_path_coverage_proxy} | {avg_frontier_conformance} | "
-            "{avg_contribution_potential} | {pruned_candidate_rate} | {top_root_causes} | {top_triage_verdicts} |".format(
+            "{avg_contribution_potential} | {pruned_candidate_rate} | {top_root_causes} | {top_triage_verdicts} | {top_discovery_origins} |".format(
                 **{
                     **row,
                     "semantic_divergence_count": semantic_divergence_count,
@@ -433,14 +450,14 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
             "",
             "## Aggregates",
             "",
-            "| target suite | preset | runs | cases | findings | candidate bugs | candidate case % | candidate cases/s | median first candidate | median first s | avg discovery AUC | avg reward | semantic divs | false positives | avg new behavior % | avg cases/s | avg data sensitivity | avg path proxy |",
-            "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+            "| target suite | preset | runs | cases | findings | candidate bugs | rewardable candidates | issue replays | candidate case % | candidate cases/s | median first candidate | median first s | avg discovery AUC | avg reward | semantic divs | false positives | avg new behavior % | avg cases/s | avg data sensitivity | avg path proxy |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         ]
     )
     for row in aggregate_rows:
         lines.append(
             "| {target_suite} | {preset} | {runs} | {cases} | {findings} | "
-            "{candidate_implementation_bug_count} | {candidate_bug_case_rate} | "
+            "{candidate_implementation_bug_count} | {rewardable_candidate_implementation_bug_count} | {issue_replay_candidate_bug_count} | {candidate_bug_case_rate} | "
             "{candidate_bug_cases_per_s} | {median_first_candidate_bug_case_index} | "
             "{median_first_candidate_bug_elapsed_s} | {avg_candidate_bug_discovery_auc} | {avg_scheduler_reward} | "
             "{semantic_divergence_count} | {false_positive_count} | {avg_new_behavior_rate} | "
@@ -578,9 +595,12 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
                 "top_root_causes",
                 "top_finding_kinds",
                 "top_triage_verdicts",
+                "top_discovery_origins",
                 "candidate_bug_families",
                 "top_candidate_bug_families",
                 "candidate_implementation_bug_count",
+                "rewardable_candidate_implementation_bug_count",
+                "issue_replay_candidate_bug_count",
                 "documented_semantic_divergence_count",
                 "expected_semantic_divergence_count",
                 "semantic_divergence_needs_confirmation_count",
@@ -606,6 +626,8 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
                 "cases",
                 "findings",
                 "candidate_implementation_bug_count",
+                "rewardable_candidate_implementation_bug_count",
+                "issue_replay_candidate_bug_count",
                 "candidate_bug_cases",
                 "candidate_bug_case_rate",
                 "candidate_bug_cases_per_s",
@@ -719,7 +741,7 @@ def _candidate_bug_family_keys(findings: list[dict]) -> Counter:
     keys: Counter = Counter()
     root_by_suspicious: dict[str, str] = {}
     for finding in findings:
-        if not _is_candidate_bug_finding(finding):
+        if not _is_rewardable_candidate_bug_finding(finding):
             continue
         root = str(finding.get("root_cause", "unknown"))
         if root.startswith("metamorphic_"):
@@ -727,7 +749,7 @@ def _candidate_bug_family_keys(findings: list[dict]) -> Counter:
         suspicious = _suspicious_key(finding)
         root_by_suspicious.setdefault(suspicious, root)
     for finding in findings:
-        if not _is_candidate_bug_finding(finding):
+        if not _is_rewardable_candidate_bug_finding(finding):
             continue
         root = str(finding.get("root_cause", "unknown"))
         suspicious = _suspicious_key(finding)
@@ -743,6 +765,14 @@ def _is_candidate_bug_finding(finding: dict) -> bool:
     if finding.get("false_positive"):
         return False
     return True
+
+
+def _is_issue_replay_finding(finding: dict) -> bool:
+    return str(finding.get("discovery_origin", "")).strip() == "issue_replay"
+
+
+def _is_rewardable_candidate_bug_finding(finding: dict) -> bool:
+    return _is_candidate_bug_finding(finding) and not _is_issue_replay_finding(finding)
 
 
 def _candidate_bug_family_key(finding: dict) -> str:
@@ -830,6 +860,12 @@ def _aggregate_experiment_rows(rows: list[dict]) -> list[dict]:
         cases = sum(int(row["cases"]) for row in items)
         findings = sum(int(row["findings"]) for row in items)
         candidate_count = sum(int(row["candidate_implementation_bug_count"]) for row in items)
+        rewardable_candidate_count = sum(
+            int(row.get("rewardable_candidate_implementation_bug_count", 0) or 0) for row in items
+        )
+        issue_replay_candidate_count = sum(
+            int(row.get("issue_replay_candidate_bug_count", 0) or 0) for row in items
+        )
         family_counter = Counter()
         for row in items:
             family_counter.update(_parse_counter_summary(str(row.get("top_candidate_bug_families", ""))))
@@ -857,6 +893,8 @@ def _aggregate_experiment_rows(rows: list[dict]) -> list[dict]:
                 "cases": cases,
                 "findings": findings,
                 "candidate_implementation_bug_count": candidate_count,
+                "rewardable_candidate_implementation_bug_count": rewardable_candidate_count,
+                "issue_replay_candidate_bug_count": issue_replay_candidate_count,
                 "candidate_bug_families": len(family_counter),
                 "top_candidate_bug_families": _counter_summary(family_counter),
                 "candidate_bug_cases": candidate_bug_cases,

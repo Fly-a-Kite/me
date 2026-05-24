@@ -94,6 +94,20 @@ def test_standalone_reproducer_supports_known_root_causes():
     assert supports_standalone_reproducer(
         {
             "generator_profile": "common",
+            "features": {"contains_nan": False, "contains_inf": False},
+            "reproduced_roots": ["reverse_division_operand_order"],
+        }
+    ) is True
+    assert supports_standalone_reproducer(
+        {
+            "generator_profile": "common",
+            "features": {"contains_nan": False, "contains_inf": False},
+            "reproduced_roots": ["tuple_absence_null_filter"],
+        }
+    ) is True
+    assert supports_standalone_reproducer(
+        {
+            "generator_profile": "common",
             "features": {"contains_nan": True, "contains_inf": False},
             "reproduced_roots": ["nan_inf_semantics"],
         }
@@ -119,6 +133,34 @@ def test_write_datafusion_standalone_reproducer_for_grouped_topk(tmp_path):
     text = path.read_text(encoding="utf-8")
     assert "ORDER BY min_x ASC NULLS LAST LIMIT 20" in text
     assert "DataFusion dropped the group" in text
+
+
+def test_write_polars_standalone_reproducer_for_reverse_division(tmp_path):
+    path = write_standalone_reproducer(
+        tmp_path,
+        {
+            "reproduced_roots": ["reverse_division_operand_order"],
+        },
+    )
+
+    assert path.name == "standalone_polars_reverse_division_columns.py"
+    text = path.read_text(encoding="utf-8")
+    assert "Series.__rtruediv__" in text
+    assert "numerator_value" in text
+
+
+def test_write_duckdb_standalone_reproducer_for_tuple_absence_null_filter(tmp_path):
+    path = write_standalone_reproducer(
+        tmp_path,
+        {
+            "reproduced_roots": ["tuple_absence_null_filter"],
+        },
+    )
+
+    assert path.name == "standalone_duckdb_tuple_absence_null_filter.py"
+    text = path.read_text(encoding="utf-8")
+    assert "NOT IN" in text
+    assert "duckdb row equality" in text
 
 
 def test_triage_marks_boundary_semantics_as_expected_divergence():

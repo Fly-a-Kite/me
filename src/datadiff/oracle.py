@@ -30,6 +30,8 @@ class Finding:
     recommendation: list[str] = field(default_factory=list)
     documentation_refs: list[dict[str, str]] = field(default_factory=list)
     mismatch_class: str = ""
+    discovery_origin: str = "organic"
+    source_issue: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -91,6 +93,8 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         }
         if kinds & {"string_length", "string_lower"}:
             return "string_expression"
+        if "reverse_division_columns" in kinds:
+            return "reverse_division_operand_order"
         if "cast" in kinds:
             return "type_cast"
         return "arithmetic_expression"

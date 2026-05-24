@@ -1,0 +1,50 @@
+{
+  "datafusion": {
+    "backend": "datafusion",
+    "columns": [
+      "count_y",
+      "sum_z",
+      "tag"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [],
+    "status": "ok"
+  },
+  "duckdb": {
+    "backend": "duckdb",
+    "columns": [
+      "count_y",
+      "sum_z",
+      "tag"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        1,
+        null,
+        "zDo"
+      ]
+    ],
+    "status": "ok"
+  },
+  "pandas": {
+    "backend": "pandas",
+    "columns": [
+      "count_y",
+      "sum_z",
+      "tag"
+    ],
+    "error": "",
+    "error_type": "",
+    "rows": [
+      [
+        1,
+        null,
+        "zDo"
+      ]
+    ],
+    "status": "ok"
+  }
+}

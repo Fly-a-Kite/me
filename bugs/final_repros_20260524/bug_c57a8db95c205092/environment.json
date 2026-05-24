@@ -1,0 +1,11 @@
+{
+  "datadiff_fuzz_lab": "0.1.0",
+  "duckdb": "1.5.3",
+  "pandas": "3.0.3",
+  "platform": "Linux-6.17.0-29-generic-x86_64-with-glibc2.39",
+  "polars": "1.40.1",
+  "pysqlite3_binary": "0.5.4.post2",
+  "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+  "sqlite": "3.51.1",
+  "sqlite_runtime": "pysqlite3"
+}

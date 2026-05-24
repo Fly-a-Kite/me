@@ -1,0 +1,16 @@
+{
+  "polars": {
+    "backend": "polars",
+    "duration_ms": 0.10911398567259312,
+    "error": "",
+    "error_type": "",
+    "status": "ok"
+  },
+  "polars_lazy": {
+    "backend": "polars_lazy",
+    "duration_ms": 0.15281399828381836,
+    "error": "",
+    "error_type": "",
+    "status": "ok"
+  }
+}

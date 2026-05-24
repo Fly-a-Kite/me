@@ -542,6 +542,8 @@ class DuckDBBackend(Backend):
                         op_sql = {"sub": "-", "mul": "*", "div": "/", "mod": "%"}[expr["op"]]
                         source_sql = f"CAST(q.{_quote(expr['source'])} AS DOUBLE)" if expr["op"] == "div" else f"q.{_quote(expr['source'])}"
                         expr_sql = f"{source_sql} {op_sql} {_lit(expr['value'])}"
+                    elif expr["kind"] == "reverse_division_columns":
+                        expr_sql = f"CAST(q.{_quote(expr['numerator'])} AS DOUBLE) / q.{_quote(expr['source'])}"
                     elif expr["kind"] == "cast" and expr["to"] == "float":
                         expr_sql = f"CAST(q.{_quote(expr['source'])} AS DOUBLE)"
                     elif expr["kind"] == "string_length":

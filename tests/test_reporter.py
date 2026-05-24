@@ -278,7 +278,7 @@ def test_write_experiment_summary_aggregates_triage_verdicts(tmp_path, monkeypat
     assert row["candidate_bug_discovery_auc"] == "1.0"
     assert "candidate_implementation_bug:1" in row["top_triage_verdicts"]
     assert "## Aggregates" in md
-    assert "| core | edge_float | 1 | 4 | 4 | 1 | 25.0% | 5.00 | 0 | 0.1 | 1.00 | 0.00 | 2 | 1 |" in md
+    assert "| core | edge_float | 1 | 4 | 4 | 1 | 1 | 0 | 25.0% | 5.00 | 0 | 0.1 | 1.00 | 0.00 | 2 | 1 |" in md
     assert aggregate_row["candidate_bug_case_rate"] == "0.25"
     assert aggregate_row["candidate_bug_cases_per_s"] == "5.0"
     assert aggregate_row["median_first_candidate_bug_case_index"] == "0.0"
@@ -347,6 +347,81 @@ def test_write_experiment_summary_reports_candidate_bug_families(tmp_path, monke
     assert row["candidate_bug_families"] == "2"
     assert "grouped_topk_null_sort_key@datafusion:2" in row["top_candidate_bug_families"]
     assert aggregate_row["candidate_bug_families"] == "2"
+
+
+def test_write_experiment_summary_separates_issue_replay_candidates(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(reporter, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(reporter, "REPORTS_DIR", reports_dir)
+    run_file = runs_dir / "run-origin.jsonl.gz"
+    append_jsonl(
+        {
+            "status": "bug",
+            "case_index": 0,
+            "case": {"case_id": "case-0", "seed": 0, "program": {"operations": []}},
+            "findings": [
+                {
+                    "kind": "semantic_output_mismatch",
+                    "root_cause": "groupby_aggregation",
+                    "triage_verdict": "candidate_implementation_bug",
+                    "suspicious_backends": ["datafusion"],
+                    "signature": "sig-organic",
+                    "discovery_origin": "organic",
+                },
+                {
+                    "kind": "semantic_output_mismatch",
+                    "root_cause": "group_quantile_key_expression",
+                    "triage_verdict": "candidate_implementation_bug",
+                    "suspicious_backends": ["polars"],
+                    "signature": "sig-replay",
+                    "discovery_origin": "issue_replay",
+                },
+            ],
+            "behavior_signature": "sig-0",
+            "backend_status": {},
+            "quality_oracles": [],
+        },
+        run_file,
+    )
+    dump_json(
+        {
+            "elapsed_s": 0.1,
+            "throughput_cases_s": 10.0,
+            "backends": [],
+            "targets": [],
+            "common_capabilities": [],
+        },
+        run_meta_path(run_file),
+    )
+    manifest = runs_dir / "experiment-origin.json"
+    dump_json(
+        {
+            "presets": ["live_cross_family"],
+            "seeds": [1],
+            "backends": [],
+            "target_suite": "latest_all_engines",
+            "targets": [],
+            "common_capabilities": [],
+            "runs": [{"preset": "live_cross_family", "seed": 1, "run_file": str(run_file), "report": ""}],
+        },
+        manifest,
+    )
+
+    md_path, csv_path = reporter.write_experiment_summary(manifest)
+    row = next(csv.DictReader(csv_path.open(encoding="utf-8")))
+    aggregate_csv_path = reports_dir / "experiment-summary-experiment-origin-aggregates.csv"
+    aggregate_row = next(csv.DictReader(aggregate_csv_path.open(encoding="utf-8")))
+    md = md_path.read_text(encoding="utf-8")
+
+    assert row["candidate_implementation_bug_count"] == "2"
+    assert row["rewardable_candidate_implementation_bug_count"] == "1"
+    assert row["issue_replay_candidate_bug_count"] == "1"
+    assert "organic:1" in row["top_discovery_origins"]
+    assert "issue_replay:1" in row["top_discovery_origins"]
+    assert row["top_candidate_bug_families"] == "groupby_aggregation@datafusion:1"
+    assert aggregate_row["rewardable_candidate_implementation_bug_count"] == "1"
+    assert "rewardable candidates" in md
 
 
 def test_write_experiment_summary_includes_adaptive_schedule_fields(tmp_path, monkeypatch):
