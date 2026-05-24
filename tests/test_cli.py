@@ -1039,6 +1039,8 @@ def test_cli_parses_final_readiness_command():
             "runs/experiment-a.json",
             "--manifest",
             "runs/experiment-b.json",
+            "--latest-confirmation-file",
+            "experiments/latest_confirmations.json",
             "--min-live-cases-per-suite",
             "100",
             "--min-live-duration-hours",
@@ -1058,6 +1060,7 @@ def test_cli_parses_final_readiness_command():
     )
     assert args.cmd == "final-readiness"
     assert args.manifest == ["runs/experiment-a.json", "runs/experiment-b.json"]
+    assert args.latest_confirmation_file == ["experiments/latest_confirmations.json"]
     assert args.min_live_cases_per_suite == 100
     assert args.min_live_duration_hours == 1.0
     assert args.min_live_candidate_families == 2

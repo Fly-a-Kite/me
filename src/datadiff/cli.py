@@ -1133,6 +1133,7 @@ def cmd_analyze_ablation_audit(args: argparse.Namespace) -> int:
 
 def cmd_final_readiness(args: argparse.Namespace) -> int:
     manifests = [Path(path) for path in getattr(args, "manifest", [])]
+    latest_confirmation_files = [Path(path) for path in getattr(args, "latest_confirmation_file", [])]
     required_live_suites = (
         tuple(_parse_presets(args.required_live_suites))
         if args.required_live_suites
@@ -1156,7 +1157,12 @@ def cmd_final_readiness(args: argparse.Namespace) -> int:
         min_historical_confirmed=max(0, int(args.min_historical_confirmed)),
         require_seeded=not bool(args.no_require_seeded),
     )
-    md_path, json_path = analyze_final_readiness(manifests or None, thresholds=thresholds, policy=policy)
+    md_path, json_path = analyze_final_readiness(
+        manifests or None,
+        latest_confirmation_files=latest_confirmation_files or None,
+        thresholds=thresholds,
+        policy=policy,
+    )
     print(f"final readiness markdown: {md_path}")
     print(f"final readiness json:     {json_path}")
     return 0
@@ -4388,6 +4394,15 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         help="experiment manifest to include; may be repeated; defaults to all runs/experiment-*.json",
+    )
+    p_final_ready.add_argument(
+        "--latest-confirmation-file",
+        action="append",
+        default=[],
+        help=(
+            "JSON file with upstream-confirmed latest bug families; may be repeated; "
+            "defaults to experiments/latest_confirmations.json when present"
+        ),
     )
     p_final_ready.add_argument("--min-live-cases-per-suite", type=int, default=1)
     p_final_ready.add_argument("--min-live-duration-hours", type=float, default=24.0)

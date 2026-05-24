@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "confirmations": [
+    {
+      "family": "grouped_topk_null_sort_key@datafusion",
+      "root_cause": "grouped_topk_null_sort_key",
+      "suspicious_backends": [
+        "datafusion"
+      ],
+      "issue_url": "https://github.com/apache/datafusion/issues/22190",
+      "issue_title": "DataFusion drops grouped MIN/MAX rows with NULL sort keys under ORDER BY + LIMIT",
+      "upstream_status": "upstream_labeled_bug",
+      "state": "open",
+      "labels": [
+        "bug"
+      ],
+      "assignee": "xiedeyantu",
+      "checked_at": "2026-05-25T03:56:00+08:00",
+      "notes": "GitHub issue is open, labeled bug, and assigned upstream. This is confirmation evidence only; the family remains excluded from fresh rewardable latest discovery if configured as known/saturated."
+    }
+  ]
+}

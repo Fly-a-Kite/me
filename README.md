@@ -310,7 +310,9 @@ candidate bug cases/s。它们是方法学敏感度实验，不能作为真实�
 - `reports/experiment-analysis-*.csv`: 上述分析的机器可读 CSV
 - `reports/final-readiness-*.md` / `.json`: A 会最终实验 readiness 审计，检查 live 广度、
   24h 深度、fresh/replay 隔离、latest confirmed bug、historical replay 和 seeded sensitivity 证据
-  （这些是上层实验 policy；审计逻辑只读取 manifest/run log，不改变底层执行语义）
+- `experiments/latest_confirmations.json`: 上层 latest bug 上游确认证据登记，只影响 final-readiness
+  的 confirmed gate，不会改变 fresh rewardable candidate 统计，也不会改变底层执行语义
+  （这些是上层实验 policy；审计逻辑只读取 manifest/run log 和 confirmation evidence，不改变底层执行语义）
 
 清理历史 feedback corpus 时先 dry-run：
 

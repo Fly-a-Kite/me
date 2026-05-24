@@ -158,9 +158,15 @@ The audit is intentionally strict by default: it checks all five live suites, 24
 depth per live suite, fresh replay-policy isolation, confirmed latest-version bug
 evidence, confirmed historical replay evidence, and seeded sensitivity evidence.
 Those requirements are top-layer policy inputs to the audit (`--required-live-suites`,
-`--required-live-families`, and threshold flags). The audit engine itself only reads
-manifests/run logs and evaluates the supplied policy; it does not change generation,
-execution, normalization, or oracle behavior.
+`--required-live-families`, confirmation files, and threshold flags). Confirmed
+latest-version evidence may come from run-log findings whose `paper_status` is
+maintainer-confirmed, or from `experiments/latest_confirmations.json` when an
+upstream issue/PR has independent confirmation such as a maintainer `bug` label,
+assignment, acknowledgement, or fix. This confirmation evidence is separate from
+fresh discovery reward: known/saturated or already submitted families still do not
+inflate rewardable latest candidate counts. The audit engine itself only reads
+manifests/run logs, confirmation evidence, and supplied policy; it does not change
+generation, execution, normalization, or oracle behavior.
 
 ## Paper Wording
 

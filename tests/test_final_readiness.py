@@ -296,6 +296,68 @@ def test_final_readiness_excludes_known_saturated_live_families_from_latest_evid
     assert audit["summary"]["confirmed_live_candidate_families"] == {}
 
 
+def test_final_readiness_counts_external_upstream_confirmation_without_rewarding_known_family(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="live-known-family",
+        evidence_mode="live",
+        target_suite="datafusion_cross",
+        preset="live_datafusion",
+        seed=1,
+        findings=[
+            {
+                "triage_verdict": "candidate_implementation_bug",
+                "root_cause": "grouped_topk_null_sort_key",
+                "suspicious_backends": ["datafusion"],
+                "discovery_origin": "organic",
+                "paper_status": "candidate_bug_needs_external_confirmation",
+            }
+        ],
+        config={
+            "enable_replay_bug": False,
+            "known_saturated_bug_families": ["grouped_topk_null_sort_key@datafusion"],
+        },
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+    confirmation_file = tmp_path / "latest_confirmations.json"
+    dump_json(
+        {
+            "schema_version": 1,
+            "confirmations": [
+                {
+                    "family": "grouped_topk_null_sort_key@datafusion",
+                    "issue_url": "https://github.com/apache/datafusion/issues/22190",
+                    "upstream_status": "upstream_labeled_bug",
+                    "labels": ["bug"],
+                }
+            ],
+        },
+        confirmation_file,
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        latest_confirmation_files=[confirmation_file],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=1,
+            min_historical_confirmed=0,
+            require_seeded=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=("datafusion_cross",), required_live_families=("query_engine",)),
+    )
+
+    assert audit["summary"]["rewardable_live_candidate_families"] == {}
+    assert audit["summary"]["external_confirmed_live_candidate_families"] == {
+        "grouped_topk_null_sort_key@datafusion": 1
+    }
+    assert audit["summary"]["confirmed_live_candidate_families"] == {
+        "grouped_topk_null_sort_key@datafusion": 1
+    }
+    assert {gate["name"]: gate["passed"] for gate in audit["gates"]}["latest_confirmed_bug_families"] is True
+
+
 def test_final_readiness_policy_keeps_top_level_requirements_out_of_engine(tmp_path):
     manifest = _write_manifest(
         tmp_path,

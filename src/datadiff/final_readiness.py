@@ -15,6 +15,15 @@ from datadiff.reward import (
 from datadiff.targets import TARGETS, TARGET_SUITES
 from datadiff.util import REPORTS_DIR, RUNS_DIR, dump_json, ensure_dirs, load_json, read_jsonl, run_meta_path, utc_now
 
+DEFAULT_LATEST_CONFIRMATIONS_FILE = Path("experiments/latest_confirmations.json")
+CONFIRMED_LATEST_UPSTREAM_STATUSES = frozenset(
+    {
+        "upstream_labeled_bug",
+        "maintainer_confirmed_bug",
+        "confirmed_bug",
+        "fixed_upstream",
+    }
+)
 
 # Layering: the audit engine below is middle-layer analysis over manifests and
 # run logs. A-level requirements are supplied as policy data and never alter the
@@ -55,6 +64,7 @@ class ReadinessThresholds:
 def analyze_final_readiness(
     manifest_files: list[Path] | None = None,
     *,
+    latest_confirmation_files: list[Path] | None = None,
     thresholds: ReadinessThresholds | None = None,
     policy: ReadinessPolicy | None = None,
 ) -> tuple[Path, Path]:
@@ -63,7 +73,13 @@ def analyze_final_readiness(
     thresholds = thresholds or ReadinessThresholds()
     policy = policy or DEFAULT_A_LEVEL_READINESS_POLICY
     manifest_files = _resolve_manifest_files(manifest_files)
-    audit = build_final_readiness(manifest_files, thresholds=thresholds, policy=policy)
+    latest_confirmation_files = _resolve_latest_confirmation_files(latest_confirmation_files)
+    audit = build_final_readiness(
+        manifest_files,
+        latest_confirmation_files=latest_confirmation_files,
+        thresholds=thresholds,
+        policy=policy,
+    )
     stamp = utc_now().replace(":", "").replace("-", "").replace("Z", "")
     md_path = REPORTS_DIR / f"final-readiness-{stamp}.md"
     json_path = REPORTS_DIR / f"final-readiness-{stamp}.json"
@@ -75,11 +91,13 @@ def analyze_final_readiness(
 def build_final_readiness(
     manifest_files: list[Path],
     *,
+    latest_confirmation_files: list[Path] | None = None,
     thresholds: ReadinessThresholds,
     policy: ReadinessPolicy | None = None,
 ) -> dict[str, Any]:
     policy = policy or DEFAULT_A_LEVEL_READINESS_POLICY
     manifests = [_load_manifest(path) for path in manifest_files]
+    latest_confirmations = _load_latest_confirmations(latest_confirmation_files or [])
     runs = [run for manifest in manifests for run in _manifest_runs(manifest, policy=policy)]
     explicit_live_runs = [run for run in runs if run["evidence_mode"] == "live"]
     live_runs = [run for run in explicit_live_runs if _fresh_replay_policy_ok(run)]
@@ -92,6 +110,8 @@ def build_final_readiness(
     live_families = sorted({family for run in live_runs for family in run["target_families"]})
     rewardable_live_families = Counter()
     confirmed_live_families = Counter()
+    external_confirmed_live_families = _confirmed_latest_family_counter(latest_confirmations)
+    confirmed_live_families.update(external_confirmed_live_families)
     issue_replay_live_families = Counter()
     known_saturated_live_families = Counter()
     for run in live_runs:
@@ -118,6 +138,7 @@ def build_final_readiness(
         "thresholds": asdict(thresholds),
         "policy": asdict(policy),
         "manifest_files": [str(path) for path in manifest_files],
+        "latest_confirmation_files": [str(path) for path in latest_confirmation_files or []],
         "gates": gates,
         "summary": {
             "live_runs": len(live_runs),
@@ -130,6 +151,9 @@ def build_final_readiness(
             "live_families": live_families,
             "rewardable_live_candidate_families": dict(sorted(rewardable_live_families.items())),
             "confirmed_live_candidate_families": dict(sorted(confirmed_live_families.items())),
+            "external_confirmed_live_candidate_families": dict(
+                sorted(external_confirmed_live_families.items())
+            ),
             "issue_replay_live_candidate_families": dict(sorted(issue_replay_live_families.items())),
             "known_saturated_live_candidate_families": dict(sorted(known_saturated_live_families.items())),
             "historical_confirmed_bug_ids": sorted(historical_confirmed),
@@ -138,6 +162,7 @@ def build_final_readiness(
         },
         "live_suites": live_by_suite,
         "runs": live_runs + historical_runs + seeded_runs,
+        "latest_confirmations": latest_confirmations,
         "ignored_runs": ignored_runs,
         "replay_policy_rejected_live_runs": replay_policy_rejected_live_runs,
     }
@@ -149,10 +174,34 @@ def _resolve_manifest_files(manifest_files: list[Path] | None) -> list[Path]:
     return sorted(RUNS_DIR.glob("experiment-*.json"))
 
 
+def _resolve_latest_confirmation_files(latest_confirmation_files: list[Path] | None) -> list[Path]:
+    if latest_confirmation_files:
+        return [Path(path) for path in latest_confirmation_files]
+    return [DEFAULT_LATEST_CONFIRMATIONS_FILE] if DEFAULT_LATEST_CONFIRMATIONS_FILE.is_file() else []
+
+
 def _load_manifest(path: Path) -> dict[str, Any]:
     data = load_json(path)
     data["_manifest_file"] = str(path)
     return data
+
+
+def _load_latest_confirmations(paths: list[Path]) -> list[dict[str, Any]]:
+    confirmations: list[dict[str, Any]] = []
+    for path in paths:
+        if not path.is_file():
+            continue
+        data = load_json(path)
+        raw_items = data.get("confirmations", data) if isinstance(data, dict) else data
+        if not isinstance(raw_items, list):
+            continue
+        for raw_item in raw_items:
+            if not isinstance(raw_item, dict):
+                continue
+            item = dict(raw_item)
+            item["_confirmation_file"] = str(path)
+            confirmations.append(item)
+    return confirmations
 
 
 def _manifest_runs(manifest: dict[str, Any], *, policy: ReadinessPolicy) -> list[dict[str, Any]]:
@@ -284,6 +333,33 @@ def _candidate_family_counter(
 
 def _candidate_family_key(finding: dict[str, Any]) -> str:
     return candidate_bug_family_key(finding)
+
+
+def _confirmed_latest_family_counter(confirmations: list[dict[str, Any]]) -> Counter[str]:
+    counter: Counter[str] = Counter()
+    for confirmation in confirmations:
+        family = _latest_confirmation_family(confirmation)
+        if family:
+            counter[family] += 1
+    return counter
+
+
+def _latest_confirmation_family(confirmation: dict[str, Any]) -> str:
+    status = str(confirmation.get("upstream_status", "")).strip()
+    if status not in CONFIRMED_LATEST_UPSTREAM_STATUSES:
+        return ""
+    issue_url = str(confirmation.get("issue_url", "")).strip()
+    if not issue_url:
+        return ""
+    family = str(confirmation.get("family", "")).strip()
+    if family:
+        return family
+    root = str(confirmation.get("root_cause", "")).strip()
+    suspicious = confirmation.get("suspicious_backends", [])
+    if not root or not isinstance(suspicious, list):
+        return ""
+    backends = ",".join(sorted(str(backend).strip() for backend in suspicious if str(backend).strip()))
+    return f"{root}@{backends}" if backends else ""
 
 
 def _live_suite_summary(live_runs: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -446,10 +522,11 @@ def _render_markdown(audit: dict[str, Any]) -> str:
             f"- Ignored evidence runs: `{summary['ignored_evidence_runs']}`",
             f"- Live suites: `{', '.join(summary['live_suites']) or 'none'}`",
             f"- Live families: `{', '.join(summary['live_families']) or 'none'}`",
-            f"- Rewardable latest candidate families: `{len(summary['rewardable_live_candidate_families'])}`",
-            f"- Known/saturated latest candidate families: `{len(summary['known_saturated_live_candidate_families'])}`",
-            f"- Confirmed latest candidate families: `{len(summary['confirmed_live_candidate_families'])}`",
-            f"- Historical confirmed replay ids: `{', '.join(summary['historical_confirmed_bug_ids']) or 'none'}`",
+        f"- Rewardable latest candidate families: `{len(summary['rewardable_live_candidate_families'])}`",
+        f"- External confirmed latest candidate families: `{len(summary.get('external_confirmed_live_candidate_families', {}))}`",
+        f"- Known/saturated latest candidate families: `{len(summary['known_saturated_live_candidate_families'])}`",
+        f"- Confirmed latest candidate families: `{len(summary['confirmed_live_candidate_families'])}`",
+        f"- Historical confirmed replay ids: `{', '.join(summary['historical_confirmed_bug_ids']) or 'none'}`",
             "",
             "## Live Suites",
             "",
