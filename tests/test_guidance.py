@@ -56,6 +56,8 @@ def test_extract_case_features_marks_issue_replay_sources():
     replay_features = extract_case_features(replay_case)
     inspired_features = extract_case_features(inspired_case)
 
+    assert "source_issue:https://github.com/example/project/issues/1" in replay_features
+    assert "source_issue:https://github.com/example/project/issues/2" in inspired_features
     assert "source:issue_replay" in replay_features
     assert "source:issue_inspired" not in replay_features
     assert "source:issue_inspired" in inspired_features
@@ -875,6 +877,43 @@ def test_guidance_global_issue_replay_saturation_demotes_distinct_replay_probe()
     assert replay_decision.score_breakdown["issue_replay_global_saturation_active"] == 1.0
     assert replay_decision.score_breakdown["issue_replay_global_saturation_penalty"] < 0.0
     assert replay_decision.score_breakdown["issue_replay_saturation_active"] == 1.0
+    assert decision.case is fresh_case
+
+
+def test_guidance_issue_inspired_source_saturation_demotes_repeated_source_issue():
+    inspired_case = _case(77, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}])
+    inspired_case.metadata["source_issue"] = "https://github.com/apache/datafusion/issues/22190"
+    fresh_case = _case(78, [{"op": "mutate", "column": "m_0", "expr": {"kind": "add_const", "source": "x", "value": 1}}])
+    guidance = GuidanceState(
+        targets=["filter"],
+        active_backends=["datafusion"],
+        issue_inspired_source_saturation_threshold=3,
+        issue_inspired_source_saturation_penalty=1.25,
+    )
+    for idx in range(3):
+        guidance.record_result(
+            inspired_case,
+            {
+                "findings": [
+                    {
+                        "root_cause": "grouped_topk_null_sort_key",
+                        "triage_verdict": "candidate_implementation_bug",
+                        "suspicious_backends": ["datafusion"],
+                        "signature": f"sig-issue-inspired-{idx}",
+                        "discovery_origin": "issue_inspired",
+                        "source_issue": "https://github.com/apache/datafusion/issues/22190",
+                    }
+                ],
+                "preflight": {"valid": True, "fallback_used": False},
+            },
+        )
+
+    inspired_decision = guidance.choose_case([inspired_case])
+    decision = guidance.choose_case([inspired_case, fresh_case])
+
+    assert guidance.issue_inspired_source_counts["https://github.com/apache/datafusion/issues/22190"] == 3
+    assert inspired_decision.score_breakdown["issue_inspired_source_saturation_active"] == 1.0
+    assert inspired_decision.score_breakdown["issue_inspired_source_saturation_penalty"] < 0.0
     assert decision.case is fresh_case
 
 

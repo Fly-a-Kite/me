@@ -1036,6 +1036,8 @@ def test_run_fuzz_records_guidance_metadata(tmp_path):
     assert "online_weight_mean" in row["guidance"]
     assert "issue_replay_global_saturation_penalty" in row["guidance"]
     assert "issue_replay_global_saturation_active" in row["guidance"]
+    assert "issue_inspired_source_saturation_penalty" in row["guidance"]
+    assert "issue_inspired_source_saturation_active" in row["guidance"]
     assert case_log_row["candidate_pool_size"] == 4
     assert meta["guidance"]["strategy"] == "guided"
     assert meta["next_seed"] == 45

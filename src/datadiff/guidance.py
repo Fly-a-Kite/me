@@ -182,6 +182,10 @@ def _case_source_issue(case: Case) -> str:
     return str(metadata.get("source_issue") or metadata.get("source_issue_alt") or "").strip()
 
 
+def _source_issue_key(value: Any) -> str:
+    return str(value or "").strip().rstrip("/")
+
+
 def _uses_issue_replay_ops(op_names: list[str]) -> bool:
     return any(op_name in ISSUE_REPLAY_OPS for op_name in op_names)
 
@@ -533,6 +537,7 @@ def extract_case_features(case: Case) -> set[str]:
         features.add(_bucket("op_count", len(op_names), [(1, "one"), (3, "few"), (5, "many")], "deep"))
     source_issue = _case_source_issue(case)
     if source_issue:
+        features.add(f"source_issue:{_source_issue_key(source_issue)}")
         features.add("source:issue_replay" if _uses_issue_replay_ops(op_names) else "source:issue_inspired")
     combo = classify_operation_combo(case.program.operations)
     features.add(f"combo:{combo['template']}")
@@ -744,6 +749,7 @@ class GuidanceState:
     root_cause_counts: Counter[str] = field(default_factory=Counter)
     candidate_bug_family_counts: Counter[str] = field(default_factory=Counter)
     issue_replay_family_counts: Counter[str] = field(default_factory=Counter)
+    issue_inspired_source_counts: Counter[str] = field(default_factory=Counter)
     candidate_bug_signature_counts: Counter[str] = field(default_factory=Counter)
     frontier_bucket_counts: Counter[str] = field(default_factory=Counter)
     online_weights: OnlineFeatureWeights = field(default_factory=OnlineFeatureWeights)
@@ -756,6 +762,8 @@ class GuidanceState:
     issue_replay_saturation_penalty: float = 1.0
     issue_replay_global_saturation_threshold: int = 4
     issue_replay_global_saturation_penalty: float = 1.5
+    issue_inspired_source_saturation_threshold: int = 3
+    issue_inspired_source_saturation_penalty: float = 1.25
     issue_replay_count: int = 0
     active_backends: list[str] = field(default_factory=list)
 
@@ -771,6 +779,11 @@ class GuidanceState:
         ]
         if non_global_replay_candidates:
             contributing = non_global_replay_candidates
+        non_saturated_issue_source_candidates = [
+            decision for decision in contributing if not _decision_has_issue_inspired_source_saturation(decision)
+        ]
+        if non_saturated_issue_source_candidates:
+            contributing = non_saturated_issue_source_candidates
         pruned = len(scored) - len(contributing)
         for decision in contributing:
             decision.contributing_candidate_count = len(contributing)
@@ -823,6 +836,7 @@ class GuidanceState:
             issue_replay_families = issue_replay_candidate_bug_family_keys(findings)
             self.issue_replay_family_counts.update(issue_replay_families)
             self.issue_replay_count += sum(issue_replay_families.values())
+            self.issue_inspired_source_counts.update(_issue_inspired_candidate_source_issue_keys(findings))
             self.candidate_bug_signature_counts.update(candidate_bug_signatures(findings))
 
     def _score_case(self, case: Case, candidate_count: int) -> GuidanceDecision:
@@ -869,6 +883,8 @@ class GuidanceState:
         issue_replay_saturation_active = False
         issue_replay_global_saturation_penalty = 0.0
         issue_replay_global_saturation_active = False
+        issue_inspired_source_saturation_penalty = 0.0
+        issue_inspired_source_saturation_active = False
         if self.enable_family_saturation:
             family_saturation_penalty = _predicted_family_saturation_penalty(
                 predicted_roots,
@@ -910,6 +926,20 @@ class GuidanceState:
                     self.issue_replay_count,
                     threshold=self.issue_replay_global_saturation_threshold,
                 )
+            if "source:issue_inspired" in features:
+                source_issue_hits = _max_source_issue_hits(
+                    features,
+                    source_counts=self.issue_inspired_source_counts,
+                )
+                issue_inspired_source_saturation_penalty = _family_saturation(
+                    source_issue_hits,
+                    threshold=self.issue_inspired_source_saturation_threshold,
+                    penalty_weight=self.issue_inspired_source_saturation_penalty,
+                )
+                issue_inspired_source_saturation_active = _is_globally_saturated(
+                    source_issue_hits,
+                    threshold=self.issue_inspired_source_saturation_threshold,
+                )
         if matched_targets:
             saturation_multiplier = 0.35 if specific_target_matches else 0.85
             feature_saturation_penalty *= saturation_multiplier
@@ -918,6 +948,7 @@ class GuidanceState:
             family_saturation_penalty *= saturation_multiplier
             issue_replay_saturation_penalty *= saturation_multiplier
             issue_replay_global_saturation_penalty *= saturation_multiplier
+            issue_inspired_source_saturation_penalty *= saturation_multiplier
         issue_replay_saturation_active_any = (
             issue_replay_saturation_active or issue_replay_global_saturation_active
         )
@@ -956,6 +987,7 @@ class GuidanceState:
             + family_saturation_penalty
             + issue_replay_saturation_penalty
             + issue_replay_global_saturation_penalty
+            + issue_inspired_source_saturation_penalty
         )
         return GuidanceDecision(
             case=case,
@@ -993,6 +1025,10 @@ class GuidanceState:
                 "issue_replay_global_saturation_active": (
                     1.0 if issue_replay_global_saturation_active else 0.0
                 ),
+                "issue_inspired_source_saturation_penalty": -issue_inspired_source_saturation_penalty,
+                "issue_inspired_source_saturation_active": (
+                    1.0 if issue_inspired_source_saturation_active else 0.0
+                ),
             },
         )
 
@@ -1026,6 +1062,10 @@ def _decision_has_family_saturation(decision: GuidanceDecision) -> bool:
 
 def _decision_has_issue_replay_global_saturation(decision: GuidanceDecision) -> bool:
     return decision.score_breakdown.get("issue_replay_global_saturation_active", 0.0) > 0.0
+
+
+def _decision_has_issue_inspired_source_saturation(decision: GuidanceDecision) -> bool:
+    return decision.score_breakdown.get("issue_inspired_source_saturation_active", 0.0) > 0.0
 
 
 def _matched_targets(features: set[str], targets: list[str]) -> list[str]:
@@ -1182,6 +1222,28 @@ def _predicted_family_hit_count(
         else 0
     )
     return max(dynamic_hits, known_hits)
+
+
+def _issue_inspired_candidate_source_issue_keys(findings: list[dict[str, Any]]) -> Counter[str]:
+    keys: Counter[str] = Counter()
+    for finding in findings:
+        if not is_candidate_bug_finding(finding):
+            continue
+        if str(finding.get("discovery_origin", "")).strip() != "issue_inspired":
+            continue
+        source_key = _source_issue_key(finding.get("source_issue"))
+        if source_key:
+            keys[source_key] += 1
+    return keys
+
+
+def _max_source_issue_hits(features: set[str], *, source_counts: Counter[str]) -> int:
+    hits = [
+        source_counts[feature.split(":", 1)[1]]
+        for feature in features
+        if feature.startswith("source_issue:")
+    ]
+    return max(hits, default=0)
 
 
 def _family_saturation(count: int, *, threshold: int, penalty_weight: float) -> float:

@@ -681,6 +681,8 @@ def test_cli_parses_live_datafusion_presets():
     assert live.issue_replay_saturation_penalty == 1.0
     assert live.issue_replay_global_saturation_threshold == 4
     assert live.issue_replay_global_saturation_penalty == 1.5
+    assert live.issue_inspired_source_saturation_threshold == 3
+    assert live.issue_inspired_source_saturation_penalty == 1.25
     assert "groupby_aggregation@datafusion" in live.known_saturated_bug_families
     assert "grouped_topk_null_sort_key@datafusion" in live.known_saturated_bug_families
     assert "outer_join_truth_filter@datafusion" in live.known_saturated_bug_families

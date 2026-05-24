@@ -494,6 +494,14 @@ def _config_from_args(args: argparse.Namespace) -> ExperimentConfig:
             0.0,
             float(getattr(args, "issue_replay_global_saturation_penalty", 1.5)),
         ),
+        issue_inspired_source_saturation_threshold=max(
+            1,
+            int(getattr(args, "issue_inspired_source_saturation_threshold", 3)),
+        ),
+        issue_inspired_source_saturation_penalty=max(
+            0.0,
+            float(getattr(args, "issue_inspired_source_saturation_penalty", 1.25)),
+        ),
         metamorphic_variant_limit=max(0, int(getattr(args, "metamorphic_variant_limit", 4))),
         log_level=getattr(args, "log_level", "compact"),
     )
@@ -620,6 +628,18 @@ def add_guidance_flags(
         type=float,
         default=1.5,
         help="score penalty scale for replay probes after the global replay budget is saturated",
+    )
+    parser.add_argument(
+        "--issue-inspired-source-saturation-threshold",
+        type=int,
+        default=3,
+        help="candidate bug count per source issue where guidance starts downweighting issue-inspired cases",
+    )
+    parser.add_argument(
+        "--issue-inspired-source-saturation-penalty",
+        type=float,
+        default=1.25,
+        help="score penalty scale for issue-inspired cases after their source issue is saturated",
     )
 
 
