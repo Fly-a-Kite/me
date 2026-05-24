@@ -293,6 +293,10 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
             run_rows = [_refresh_summary_row_findings(row) for row in run_rows]
         meta_path = run_meta_path(run_file)
         meta = load_json(meta_path) if meta_path.exists() else {}
+        meta_config = meta.get("config", {}) if isinstance(meta.get("config", {}), dict) else {}
+        replay_filter = (
+            meta.get("replay_bug_filter", {}) if isinstance(meta.get("replay_bug_filter", {}), dict) else {}
+        )
         preflight = meta.get("preflight", {}) if isinstance(meta.get("preflight", {}), dict) else {}
         findings = [finding for row in run_rows for finding in row.get("findings", [])]
         unique_finding_signatures = {f.get("signature", "") for f in findings}
@@ -338,6 +342,10 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
                 "batch_index": run.get("batch_index", ""),
                 "schedule_arm_id": run.get("schedule_arm_id", ""),
                 "scheduler_reward": run.get("scheduler_reward", ""),
+                "enable_replay_bug": bool(meta_config.get("enable_replay_bug", False)),
+                "replay_filter_enabled": replay_filter.get("enabled", ""),
+                "replay_filter_filtered_candidates": int(replay_filter.get("filtered_candidates", 0) or 0),
+                "replay_filter_fallback_candidates": int(replay_filter.get("fallback_candidates", 0) or 0),
                 "cases": total,
                 "bug_cases": bug_cases,
                 "bug_rate": bug_cases / total if total else 0.0,
@@ -384,6 +392,8 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
             }
         )
 
+    replay_policy = manifest.get("replay_bug_policy", {})
+    replay_source_issues = replay_policy.get("source_issues", []) if isinstance(replay_policy, dict) else []
     lines = [
         "# DataDiffFuzz Experiment Summary",
         "",
@@ -398,6 +408,10 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
         f"- Common target capabilities: {len(manifest.get('common_capabilities', []))}",
         f"- Schedule: {manifest.get('schedule', 'matrix_order')}",
         f"- Evidence mode: {manifest.get('evidence_mode', 'live')}",
+        (
+            f"- Replay bug policy: enable_replay_bug={str(bool(replay_policy.get('enable_replay_bug', False))).lower()}, "
+            f"source_issues={len(replay_source_issues) if isinstance(replay_source_issues, list) else 0}"
+        ),
         f"- Known bug id: {manifest.get('known_bug_id', '') or 'n/a'}",
         f"- Target version: {manifest.get('target_version', '') or 'n/a'}",
         f"- Local source scheduler: {manifest.get('local_source_scheduler', {'enabled': False, 'exploration_weight': ''})}",
@@ -560,6 +574,10 @@ def write_experiment_summary(manifest_file: Path | None = None, *, refresh: bool
                 "batch_index",
                 "schedule_arm_id",
                 "scheduler_reward",
+                "enable_replay_bug",
+                "replay_filter_enabled",
+                "replay_filter_filtered_candidates",
+                "replay_filter_fallback_candidates",
                 "cases",
                 "bug_cases",
                 "bug_rate",

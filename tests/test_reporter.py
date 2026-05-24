@@ -391,6 +391,12 @@ def test_write_experiment_summary_separates_issue_replay_candidates(tmp_path, mo
             "backends": [],
             "targets": [],
             "common_capabilities": [],
+            "config": {"enable_replay_bug": False},
+            "replay_bug_filter": {
+                "enabled": True,
+                "filtered_candidates": 7,
+                "fallback_candidates": 2,
+            },
         },
         run_meta_path(run_file),
     )
@@ -403,6 +409,13 @@ def test_write_experiment_summary_separates_issue_replay_candidates(tmp_path, mo
             "target_suite": "latest_all_engines",
             "targets": [],
             "common_capabilities": [],
+            "replay_bug_policy": {
+                "enable_replay_bug": False,
+                "source_issues": [
+                    "https://github.com/apache/datafusion/issues/22190",
+                    "https://github.com/duckdb/duckdb/issues/22075",
+                ],
+            },
             "runs": [{"preset": "live_cross_family", "seed": 1, "run_file": str(run_file), "report": ""}],
         },
         manifest,
@@ -417,11 +430,16 @@ def test_write_experiment_summary_separates_issue_replay_candidates(tmp_path, mo
     assert row["candidate_implementation_bug_count"] == "2"
     assert row["rewardable_candidate_implementation_bug_count"] == "1"
     assert row["issue_replay_candidate_bug_count"] == "1"
+    assert row["enable_replay_bug"] == "False"
+    assert row["replay_filter_enabled"] == "True"
+    assert row["replay_filter_filtered_candidates"] == "7"
+    assert row["replay_filter_fallback_candidates"] == "2"
     assert "organic:1" in row["top_discovery_origins"]
     assert "issue_replay:1" in row["top_discovery_origins"]
     assert row["top_candidate_bug_families"] == "groupby_aggregation@datafusion:1"
     assert aggregate_row["rewardable_candidate_implementation_bug_count"] == "1"
     assert "rewardable candidates" in md
+    assert "Replay bug policy: enable_replay_bug=false, source_issues=2" in md
 
 
 def test_write_experiment_summary_includes_adaptive_schedule_fields(tmp_path, monkeypatch):
