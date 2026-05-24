@@ -34,7 +34,10 @@ def build_run_journal_entry(run_file: Path, context: dict[str, Any] | None = Non
     target_specs = meta.get("targets", [])
     target_families = Counter(target.get("family", "unknown") for target in target_specs)
     target_layers = Counter(target.get("layer", "unknown") for target in target_specs)
-    config = meta.get("config", {})
+    config = meta.get("config", {}) if isinstance(meta.get("config", {}), dict) else {}
+    replay_filter = (
+        meta.get("replay_bug_filter", {}) if isinstance(meta.get("replay_bug_filter", {}), dict) else {}
+    )
     evidence_mode = str(context.get("evidence_mode") or meta.get("evidence_mode") or "live")
     theme = str(context.get("theme") or meta.get("run_theme") or _default_theme(context, meta, run_file))
 
@@ -74,12 +77,20 @@ def build_run_journal_entry(run_file: Path, context: dict[str, Any] | None = Non
             "metamorphic_oracle": config.get("enable_metamorphic_oracle"),
             "metamorphic_variant_limit": config.get("metamorphic_variant_limit"),
             "feedback": config.get("enable_feedback"),
+            "enable_replay_bug": config.get("enable_replay_bug"),
             "reducer": config.get("enable_reducer"),
             "artifact_limit": config.get("artifact_limit"),
             "guidance_strategy": config.get("guidance_strategy"),
             "guidance_candidate_pool": config.get("guidance_candidate_pool"),
             "guidance_targets": config.get("guidance_targets", []),
             "log_level": config.get("log_level", meta.get("log_level", "")),
+        },
+        "replay_bug_policy": {
+            "enable_replay_bug": bool(config.get("enable_replay_bug", False)),
+            "source_issue_count": len(config.get("replay_bug_source_issues", []) or []),
+            "filter_enabled": replay_filter.get("enabled", ""),
+            "filtered_candidates": int(replay_filter.get("filtered_candidates", 0) or 0),
+            "fallback_candidates": int(replay_filter.get("fallback_candidates", 0) or 0),
         },
         "result_summary": {
             "raw_findings": len(findings),
@@ -164,6 +175,7 @@ def write_run_journal_markdown(journal_file: Path | None = None) -> Path:
     for idx, entry in enumerate(entries, start=1):
         summary = entry.get("result_summary", {})
         config = entry.get("config_summary", {})
+        replay_policy = entry.get("replay_bug_policy", {})
         families = summary.get("candidate_bug_families", {})
         family_text = ", ".join(f"{name}:{count}" for name, count in sorted(families.items())) or "none"
         lines.extend(
@@ -174,6 +186,12 @@ def write_run_journal_markdown(journal_file: Path | None = None) -> Path:
                 f"- Evidence mode: `{entry.get('evidence_mode', '')}`; policy: {entry.get('counting_policy', '')}",
                 f"- Target suite: `{entry.get('target_suite', '')}`; backends: `{', '.join(entry.get('backends', []))}`",
                 f"- Preset/profile: `{entry.get('preset') or config.get('generator_profile', '')}`",
+                (
+                    f"- Replay policy: enable_replay_bug=`{replay_policy.get('enable_replay_bug', False)}`; "
+                    f"filter_enabled=`{replay_policy.get('filter_enabled', '')}`; "
+                    f"filtered_candidates=`{replay_policy.get('filtered_candidates', 0)}`; "
+                    f"fallback_candidates=`{replay_policy.get('fallback_candidates', 0)}`"
+                ),
                 f"- Seed: `{entry.get('seed', '')}`; requested cases: `{entry.get('requested_cases', '')}`; duration_s: `{entry.get('duration_s', '')}`",
                 f"- Executed cases: `{entry.get('executed_cases', 0)}`; elapsed_s: `{entry.get('elapsed_s', '')}`; throughput_cases_s: `{entry.get('throughput_cases_s', '')}`",
                 f"- Raw findings: `{summary.get('raw_findings', 0)}`; candidate bug cases: `{summary.get('candidate_bug_cases', 0)}`; candidate families: {family_text}",

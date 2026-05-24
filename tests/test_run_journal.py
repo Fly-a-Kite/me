@@ -36,9 +36,19 @@ def test_build_run_journal_entry_records_paper_facing_summary(tmp_path):
                 "common_capabilities": ["sort", "limit"],
                 "config": {
                     "generator_profile": "null_agg_topk",
+                    "enable_replay_bug": False,
+                    "replay_bug_source_issues": [
+                        "https://github.com/apache/datafusion/issues/22190",
+                        "https://github.com/duckdb/duckdb/issues/22075",
+                    ],
                     "guidance_strategy": "guided",
                     "guidance_candidate_pool": 8,
                     "guidance_targets": ["aggregation", "sort_limit"],
+                },
+                "replay_bug_filter": {
+                    "enabled": True,
+                    "filtered_candidates": 4,
+                    "fallback_candidates": 1,
                 },
             }
         ),
@@ -65,6 +75,14 @@ def test_build_run_journal_entry_records_paper_facing_summary(tmp_path):
         "grouped_topk_null_sort_key@datafusion": 1
     }
     assert entry["result_summary"]["first_candidate_bug_elapsed_s"] == 1.25
+    assert entry["config_summary"]["enable_replay_bug"] is False
+    assert entry["replay_bug_policy"] == {
+        "enable_replay_bug": False,
+        "source_issue_count": 2,
+        "filter_enabled": True,
+        "filtered_candidates": 4,
+        "fallback_candidates": 1,
+    }
 
 
 def test_record_run_journal_appends_jsonl_and_markdown(tmp_path):
@@ -83,4 +101,6 @@ def test_record_run_journal_appends_jsonl_and_markdown(tmp_path):
     rows = read_jsonl(journal_file)
     assert rows[0]["theme"] == "empty live run"
     assert rows[0]["result_summary"]["raw_findings"] == 0
-    assert "empty live run" in Path(md_path).read_text(encoding="utf-8")
+    md = Path(md_path).read_text(encoding="utf-8")
+    assert "empty live run" in md
+    assert "Replay policy" in md
