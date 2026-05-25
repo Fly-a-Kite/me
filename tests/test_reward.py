@@ -73,3 +73,21 @@ def test_reward_signals_do_not_count_known_saturated_family_as_fresh_candidate()
     assert signals["known_saturated_candidate_bug_count"] == 1
     assert candidate_bug_family_keys([finding], known_saturated_bug_families=known) == {}
     assert candidate_bug_signatures([finding], known_saturated_bug_families=known) == {}
+
+
+def test_known_saturated_family_matches_any_suspicious_backend():
+    finding = {
+        "triage_verdict": "candidate_implementation_bug",
+        "root_cause": "csv_long_numeric_roundtrip",
+        "suspicious_backends": ["duckdb", "pyarrow"],
+        "signature": "known-csv-roundtrip",
+        "discovery_origin": "organic",
+    }
+    known = ["csv_long_numeric_roundtrip@duckdb"]
+
+    signals = row_reward_signals({"findings": [finding]}, known_saturated_bug_families=known)
+
+    assert is_known_saturated_candidate_bug_finding(finding, known) is True
+    assert signals["candidate_bug"] is False
+    assert signals["candidate_bug_count"] == 0
+    assert signals["known_saturated_candidate_bug_count"] == 1

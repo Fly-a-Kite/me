@@ -79,6 +79,8 @@ GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]
 
 DEFAULT_KNOWN_SATURATED_BUG_FAMILIES = [
+    "csv_long_numeric_roundtrip@duckdb",
+    "csv_long_numeric_roundtrip@pyarrow",
     "groupby_aggregation@datafusion",
     "grouped_topk_null_sort_key@datafusion",
     "joined_order_offset_projection@datafusion",
@@ -102,6 +104,8 @@ DEFAULT_REPLAY_BUG_SOURCE_ISSUES = [
     "https://github.com/duckdb/duckdb/issues/22656",
     "https://github.com/duckdb/duckdb/issues/22837",
     "https://github.com/duckdb/duckdb/issues/22849",
+    "https://github.com/duckdb/duckdb/issues/22750",
+    "https://github.com/apache/arrow/issues/32171",
     "https://github.com/apache/arrow/issues/42231",
 ]
 

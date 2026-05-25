@@ -901,6 +901,7 @@ def test_cli_parses_non_datafusion_live_presets():
         embedded_sql.guidance_targets
     )
     assert "tuple_absence_null_filter@duckdb" in embedded_sql.known_saturated_bug_families
+    assert "csv_long_numeric_roundtrip@duckdb" in embedded_sql.known_saturated_bug_families
     assert embedded_sql.issue_replay_global_saturation_threshold == 2
     assert embedded_sql.issue_replay_global_saturation_penalty == 2.0
 
@@ -914,6 +915,8 @@ def test_cli_parses_non_datafusion_live_presets():
         "topk",
         "pyarrow_groupby_filter_cast_membership",
     }.issubset(cross_family.guidance_targets)
+    assert "csv_long_numeric_roundtrip@duckdb" in cross_family.known_saturated_bug_families
+    assert "csv_long_numeric_roundtrip@pyarrow" in cross_family.known_saturated_bug_families
     assert cross_family.issue_replay_global_saturation_threshold == 2
     assert cross_family.issue_replay_global_saturation_penalty == 2.0
 
