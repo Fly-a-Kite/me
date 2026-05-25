@@ -384,6 +384,8 @@ def _case_has_negative_zero_comparison(case: Case) -> bool:
 def _filter_comparator_touches_zero(base: str, value: Any) -> bool:
     if base in {">", ">=", "<", "<=", "==", "!="}:
         return _is_numeric_value(value, 0.0)
+    if base == "in_set" and isinstance(value, (list, tuple, frozenset, set)):
+        return any(_is_numeric_value(item, 0.0) for item in value)
     if base == "range_closed" and isinstance(value, (list, tuple)) and len(value) == 2:
         lower, upper = value
         if _is_numeric_value(lower, 0.0) or _is_numeric_value(upper, 0.0):
