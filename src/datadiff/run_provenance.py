@@ -44,6 +44,8 @@ def collect_run_provenance() -> dict[str, Any]:
             "git_status": _env_text("DATADIFF_RUN_PROVENANCE_GIT_STATUS"),
             "git_diff": _env_text("DATADIFF_RUN_PROVENANCE_GIT_DIFF"),
             "launcher_env": _env_text("DATADIFF_RUN_PROVENANCE_LAUNCH_ENV"),
+            "strategy_snapshot": _env_text("DATADIFF_RUN_PROVENANCE_STRATEGY_SNAPSHOT"),
+            "strategy_learning": _env_text("DATADIFF_RUN_PROVENANCE_STRATEGY_LEARNING"),
         },
     }
 

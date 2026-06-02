@@ -16,6 +16,9 @@ if str(PROJECT_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES  # noqa: E402
+from datadiff.classification_oracle import documented_semantic_rule_records  # noqa: E402
+from datadiff.classification_oracle import semantic_boundary_rule_records  # noqa: E402
+from datadiff.dynamic_strategy import write_strategy_snapshot  # noqa: E402
 from datadiff.experiment_catalog import (  # noqa: E402
     FINAL_COMPARISON_MATRIX,
     FINAL_LIVE_DISCOVERY_MATRIX,
@@ -26,6 +29,7 @@ from datadiff.experiment_catalog import (  # noqa: E402
     build_historical_experiment_meta,
 )
 from datadiff.historical import list_historical_bugs  # noqa: E402
+from datadiff.triage import standalone_reproducer_rule_records  # noqa: E402
 from datadiff.util import REPORTS_DIR, utc_now  # noqa: E402
 
 DATADIFF = Path(sys.prefix) / "bin" / "datadiff"
@@ -128,29 +132,35 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--include-pending-historical", action="store_true")
     parser.add_argument("--skip-run-reports", action="store_true", default=True)
+    parser.add_argument(
+        "--strategy-snapshot",
+        default="",
+        help="existing frozen strategy snapshot to reuse; default generates one for the plan",
+    )
     parser.add_argument("--execute", action="store_true", help="execute commands instead of only printing them")
     return parser.parse_args()
 
 
 def build_plan(args: argparse.Namespace) -> list[FinalCommand]:
     commands: list[FinalCommand] = []
+    strategy_snapshot = _resolve_strategy_snapshot(args)
     tracks = (
         set(FINAL_PROTOCOL_TRACKS)
         if args.track == "all"
         else {args.track}
     )
     if "validation" in tracks:
-        commands.append(short_validation_command(args))
+        commands.append(short_validation_command(args, strategy_snapshot=strategy_snapshot))
     if "live" in tracks:
-        commands.extend(live_discovery_commands(args))
+        commands.extend(live_discovery_commands(args, strategy_snapshot=strategy_snapshot))
     if "historical" in tracks:
-        commands.extend(historical_replay_commands(args))
+        commands.extend(historical_replay_commands(args, strategy_snapshot=strategy_snapshot))
     if "seeded" in tracks:
-        commands.append(seeded_sensitivity_command(args))
+        commands.append(seeded_sensitivity_command(args, strategy_snapshot=strategy_snapshot))
     if "ablation" in tracks:
-        commands.append(module_ablation_command(args))
+        commands.append(module_ablation_command(args, strategy_snapshot=strategy_snapshot))
     if "comparison" in tracks:
-        commands.append(method_comparison_command(args))
+        commands.append(method_comparison_command(args, strategy_snapshot=strategy_snapshot))
     return commands
 
 
@@ -158,7 +168,25 @@ def _append_experiment_meta(cmd: list[str], meta: dict[str, object]) -> None:
     cmd.extend(["--experiment-meta", json.dumps(meta, ensure_ascii=False, sort_keys=True)])
 
 
-def short_validation_command(args: argparse.Namespace) -> FinalCommand:
+def _resolve_strategy_snapshot(args: argparse.Namespace) -> str:
+    configured = str(getattr(args, "strategy_snapshot", "") or "").strip()
+    if configured:
+        return configured
+    snapshot = write_strategy_snapshot(
+        classification_documented_rules=list(documented_semantic_rule_records()),
+        classification_boundary_rules=list(semantic_boundary_rule_records()),
+        reproducer_rules=list(standalone_reproducer_rule_records()),
+        metadata={"generated_by": "scripts/run_final_experiments.py", "track": str(args.track)},
+    )
+    return str(snapshot)
+
+
+def _append_strategy_snapshot_args(cmd: list[str], *, strategy_snapshot: str) -> None:
+    if strategy_snapshot:
+        cmd.extend(["--strategy-snapshot", strategy_snapshot, "--freeze-strategy-snapshot"])
+
+
+def short_validation_command(args: argparse.Namespace, *, strategy_snapshot: str) -> FinalCommand:
     cmd = [
         str(DATADIFF),
         "experiment",
@@ -189,6 +217,7 @@ def short_validation_command(args: argparse.Namespace) -> FinalCommand:
         jobs_arg(args.jobs),
         "--skip-run-reports",
     ]
+    _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
     _append_experiment_meta(
         cmd,
         FINAL_VALIDATION_MATRIX.command_experiment_meta(
@@ -222,7 +251,7 @@ def short_validation_command(args: argparse.Namespace) -> FinalCommand:
     )
 
 
-def live_discovery_commands(args: argparse.Namespace) -> list[FinalCommand]:
+def live_discovery_commands(args: argparse.Namespace, *, strategy_snapshot: str) -> list[FinalCommand]:
     commands = []
     replay_sources = replay_source_issues()
     for campaign in FINAL_LIVE_DISCOVERY_MATRIX.campaigns:
@@ -255,6 +284,7 @@ def live_discovery_commands(args: argparse.Namespace) -> list[FinalCommand]:
         ]
         if args.skip_run_reports:
             cmd.append("--skip-run-reports")
+        _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
         experiment_meta = FINAL_LIVE_DISCOVERY_MATRIX.command_experiment_meta_for_campaign(campaign)
         _append_experiment_meta(cmd, experiment_meta)
         commands.append(
@@ -283,12 +313,12 @@ def live_discovery_commands(args: argparse.Namespace) -> list[FinalCommand]:
     return commands
 
 
-def historical_replay_commands(args: argparse.Namespace) -> list[FinalCommand]:
+def historical_replay_commands(args: argparse.Namespace, *, strategy_snapshot: str) -> list[FinalCommand]:
     specs = list_historical_bugs(include_pending=bool(args.include_pending_historical))
     commands: list[FinalCommand] = []
     for spec in specs:
         if spec.replay_kind == "fixture":
-            commands.append(_historical_fixture_replay_command(spec, args))
+            commands.append(_historical_fixture_replay_command(spec, args, strategy_snapshot=strategy_snapshot))
             continue
         seeds = args.historical_seeds or ",".join(str(seed) for seed in spec.default_seeds)
         artifact_limit = (
@@ -331,6 +361,7 @@ def historical_replay_commands(args: argparse.Namespace) -> list[FinalCommand]:
         ]
         if args.skip_run_reports:
             cmd.append("--skip-run-reports")
+        _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
         experiment_meta = build_historical_experiment_meta(spec)
         _append_experiment_meta(cmd, experiment_meta)
         commands.append(
@@ -356,7 +387,12 @@ def historical_replay_commands(args: argparse.Namespace) -> list[FinalCommand]:
     return commands
 
 
-def _historical_fixture_replay_command(spec: object, args: argparse.Namespace) -> FinalCommand:
+def _historical_fixture_replay_command(
+    spec: object,
+    args: argparse.Namespace,
+    *,
+    strategy_snapshot: str,
+) -> FinalCommand:
     replay_sources = replay_source_issues(str(getattr(spec, "issue_url", "")))
     cmd = [
         str(DATADIFF),
@@ -382,6 +418,7 @@ def _historical_fixture_replay_command(spec: object, args: argparse.Namespace) -
         "--log-level",
         str(args.log_level),
     ]
+    _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
     experiment_meta = build_historical_experiment_meta(spec)
     cmd.extend(["--experiment-meta", json.dumps(experiment_meta, ensure_ascii=False, sort_keys=True)])
     return FinalCommand(
@@ -403,7 +440,7 @@ def _historical_fixture_replay_command(spec: object, args: argparse.Namespace) -
     )
 
 
-def seeded_sensitivity_command(args: argparse.Namespace) -> FinalCommand:
+def seeded_sensitivity_command(args: argparse.Namespace, *, strategy_snapshot: str) -> FinalCommand:
     cmd = [
         str(DATADIFF),
         "experiment",
@@ -429,6 +466,7 @@ def seeded_sensitivity_command(args: argparse.Namespace) -> FinalCommand:
         jobs_arg(args.jobs),
         "--skip-run-reports",
     ]
+    _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
     experiment_meta = FINAL_SEEDED_SENSITIVITY_MATRIX.command_experiment_meta(
         target_suites=FINAL_SEEDED_SENSITIVITY_MATRIX.target_suites,
     )
@@ -449,7 +487,7 @@ def seeded_sensitivity_command(args: argparse.Namespace) -> FinalCommand:
     )
 
 
-def module_ablation_command(args: argparse.Namespace) -> FinalCommand:
+def module_ablation_command(args: argparse.Namespace, *, strategy_snapshot: str) -> FinalCommand:
     cmd = [
         str(DATADIFF),
         "experiment",
@@ -477,6 +515,7 @@ def module_ablation_command(args: argparse.Namespace) -> FinalCommand:
         jobs_arg(args.jobs),
         "--skip-run-reports",
     ]
+    _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
     experiment_meta = FINAL_MODULE_ABLATION_MATRIX.command_experiment_meta(
         target_suites=FINAL_MODULE_ABLATION_MATRIX.target_suites,
     )
@@ -506,7 +545,7 @@ def module_ablation_command(args: argparse.Namespace) -> FinalCommand:
     )
 
 
-def method_comparison_command(args: argparse.Namespace) -> FinalCommand:
+def method_comparison_command(args: argparse.Namespace, *, strategy_snapshot: str) -> FinalCommand:
     cmd = [
         str(DATADIFF),
         "experiment",
@@ -537,6 +576,7 @@ def method_comparison_command(args: argparse.Namespace) -> FinalCommand:
         jobs_arg(args.jobs),
         "--skip-run-reports",
     ]
+    _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
     experiment_meta = FINAL_COMPARISON_MATRIX.command_experiment_meta(
         target_suites=FINAL_COMPARISON_MATRIX.target_suites,
     )

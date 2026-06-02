@@ -4354,6 +4354,7 @@ def test_run_fuzz_records_run_provenance(monkeypatch):
         "vcs": {"git_commit": "abc123", "git_commit_short": "abc123", "git_branch": "main", "workspace_dirty": False},
         "launch": {"source": "closed_loop_tmux", "session": "s", "duration": "12h", "batch_duration": "10m", "log_prefix": "x", "launch_script": "start.sh"},
         "harness": {"authority": True, "freeze_intent": True, "latest_code_claim": True, "evidence_role": "latest_live_authority_12h"},
+        "freeze_artifacts": {"strategy_snapshot": "reports/strategy-snapshots/frozen.json"},
     }
     monkeypatch.setattr(runner_module, "collect_run_provenance", lambda: expected)
 

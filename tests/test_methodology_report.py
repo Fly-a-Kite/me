@@ -194,6 +194,7 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
     dump_json(
         {
             "schema_version": "candidate-pipeline-v1",
+            "strategy_snapshot_path": "new_issue/generated/candidate-pipelines/pipeline-one/strategy-snapshot.json",
             "summary": {
                 "candidate_count": 2,
                 "rechecked_count": 2,
@@ -204,28 +205,45 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
                 "needs_dedup_check_count": 1,
                 "already_submitted_or_confirmed_count": 0,
             },
+            "candidates": [
+                {
+                    "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-one/strategy-learning/candidate-pipeline-learning.json"
+                }
+            ],
         },
         candidate_pipeline_dir / "manifest.json",
     )
+    (candidate_pipeline_dir / "strategy-snapshot.json").write_text("{}", encoding="utf-8")
+    learning_dir = candidate_pipeline_dir / "strategy-learning"
+    learning_dir.mkdir(parents=True, exist_ok=True)
+    (learning_dir / "candidate-pipeline-learning.json").write_text("{}", encoding="utf-8")
     baseline_freeze_manifest = freeze_dir / "baseline-freeze.json"
     baseline_pip_freeze = freeze_dir / "baseline-pip-freeze.txt"
     baseline_git_status = freeze_dir / "baseline-git-status.txt"
     baseline_git_diff = freeze_dir / "baseline-git-diff.patch"
     baseline_launcher_env = freeze_dir / "baseline-launcher-env.txt"
+    baseline_strategy_snapshot = freeze_dir / "baseline-strategy-snapshot.json"
+    baseline_strategy_learning = freeze_dir / "baseline-strategy-learning.json"
     no_normalizer_freeze_manifest = freeze_dir / "no-normalizer-freeze.json"
     no_normalizer_pip_freeze = freeze_dir / "no-normalizer-pip-freeze.txt"
     no_normalizer_git_status = freeze_dir / "no-normalizer-git-status.txt"
     no_normalizer_launcher_env = freeze_dir / "no-normalizer-launcher-env.txt"
+    no_normalizer_strategy_snapshot = freeze_dir / "no-normalizer-strategy-snapshot.json"
+    no_normalizer_strategy_learning = freeze_dir / "no-normalizer-strategy-learning.json"
     for path in (
         baseline_freeze_manifest,
         baseline_pip_freeze,
         baseline_git_status,
         baseline_git_diff,
         baseline_launcher_env,
+        baseline_strategy_snapshot,
+        baseline_strategy_learning,
         no_normalizer_freeze_manifest,
         no_normalizer_pip_freeze,
         no_normalizer_git_status,
         no_normalizer_launcher_env,
+        no_normalizer_strategy_snapshot,
+        no_normalizer_strategy_learning,
     ):
         path.write_text("frozen\n", encoding="utf-8")
     monkeypatch.setattr(reporter, "REPORTS_DIR", reports_dir)
@@ -271,6 +289,8 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
                 "git_status": str(baseline_git_status),
                 "git_diff": str(baseline_git_diff),
                 "launcher_env": str(baseline_launcher_env),
+                "strategy_snapshot": str(baseline_strategy_snapshot),
+                "strategy_learning": str(baseline_strategy_learning),
             },
         },
     )
@@ -316,6 +336,8 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
                 "pip_freeze": str(no_normalizer_pip_freeze),
                 "git_status": str(no_normalizer_git_status),
                 "launcher_env": str(no_normalizer_launcher_env),
+                "strategy_snapshot": str(no_normalizer_strategy_snapshot),
+                "strategy_learning": str(no_normalizer_strategy_learning),
             },
         },
     )
@@ -472,6 +494,14 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
         str(baseline_launcher_env),
         str(no_normalizer_launcher_env),
     ]
+    assert report["evidence_chain"]["run_provenance_strategy_snapshot_artifacts"] == [
+        str(baseline_strategy_snapshot),
+        str(no_normalizer_strategy_snapshot),
+    ]
+    assert report["evidence_chain"]["run_provenance_strategy_learning_artifacts"] == [
+        str(baseline_strategy_learning),
+        str(no_normalizer_strategy_learning),
+    ]
     assert dict(iter_counts) == {
         str(baseline_run): 1,
         str(no_normalizer_run): 1,
@@ -499,6 +529,8 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
             "git_status": 2,
             "git_diff": 1,
             "launcher_env": 2,
+            "strategy_snapshot": 2,
+            "strategy_learning": 2,
         },
         "freeze_artifact_present_counts": {
             "manifest": 2,
@@ -506,10 +538,14 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
             "git_status": 2,
             "git_diff": 1,
             "launcher_env": 2,
+            "strategy_snapshot": 2,
+            "strategy_learning": 2,
         },
         "freeze_git_diff_paths": [str(baseline_git_diff)],
         "freeze_git_status_paths": [str(baseline_git_status), str(no_normalizer_git_status)],
         "freeze_launcher_env_paths": [str(baseline_launcher_env), str(no_normalizer_launcher_env)],
+        "freeze_strategy_snapshot_paths": [str(baseline_strategy_snapshot), str(no_normalizer_strategy_snapshot)],
+        "freeze_strategy_learning_paths": [str(baseline_strategy_learning), str(no_normalizer_strategy_learning)],
         "freeze_manifest_paths": [str(baseline_freeze_manifest), str(no_normalizer_freeze_manifest)],
         "freeze_pip_freeze_paths": [str(baseline_pip_freeze), str(no_normalizer_pip_freeze)],
         "freeze_intent_run_count": 1,
@@ -623,6 +659,8 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
     assert report["candidate_pipeline"]["manifest_count"] == 1
     assert report["candidate_pipeline"]["candidate_count"] == 2
     assert report["candidate_pipeline"]["reproduced_count"] == 1
+    assert report["candidate_pipeline"]["strategy_snapshot_count"] == 1
+    assert report["candidate_pipeline"]["strategy_learning_count"] == 1
     assert report["offline_oracle"]["classified_findings"] == 4
     assert report["offline_oracle"]["buckets"] == {
         "new_bug": 1,
@@ -677,6 +715,9 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
     assert "Run-provenance git-status artifacts indexed: 2" in md
     assert "Run-provenance git-diff artifacts indexed: 1" in md
     assert "Run-provenance launcher-env artifacts indexed: 2" in md
+    assert "Run-provenance strategy-snapshot artifacts indexed: 2" in md
+    assert "Run-provenance strategy-learning artifacts indexed: 2" in md
+    assert "Run-provenance freeze manifests indexed: 2" in md
     assert "Issue bundle reproducers executed: 2/2" in md
     assert "Issue bundle reproducer attempts: 4" in md
     assert "Issue bundle flaky reproducers: 0" in md

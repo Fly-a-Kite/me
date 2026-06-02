@@ -33,6 +33,8 @@ RUN_PROVENANCE_PIP_FREEZE=""
 RUN_PROVENANCE_GIT_STATUS=""
 RUN_PROVENANCE_GIT_DIFF=""
 RUN_PROVENANCE_LAUNCH_ENV=""
+RUN_PROVENANCE_STRATEGY_SNAPSHOT=""
+RUN_PROVENANCE_STRATEGY_LEARNING=""
 REQUIRE_CLEAN_WORKTREE=""
 POST_RUN_EVIDENCE_HOOK=""
 POST_RUN_STATUS=""
@@ -80,6 +82,8 @@ refresh_config() {
   RUN_PROVENANCE_GIT_STATUS="${DATADIFF_RUN_PROVENANCE_GIT_STATUS:-}"
   RUN_PROVENANCE_GIT_DIFF="${DATADIFF_RUN_PROVENANCE_GIT_DIFF:-}"
   RUN_PROVENANCE_LAUNCH_ENV="${DATADIFF_RUN_PROVENANCE_LAUNCH_ENV:-}"
+  RUN_PROVENANCE_STRATEGY_SNAPSHOT="${DATADIFF_RUN_PROVENANCE_STRATEGY_SNAPSHOT:-}"
+  RUN_PROVENANCE_STRATEGY_LEARNING="${DATADIFF_RUN_PROVENANCE_STRATEGY_LEARNING:-}"
   REQUIRE_CLEAN_WORKTREE="${DATADIFF_REQUIRE_CLEAN_WORKTREE:-1}"
   POST_RUN_EVIDENCE_HOOK="${DATADIFF_POST_RUN_EVIDENCE_HOOK:-}"
 }
@@ -124,6 +128,8 @@ write_config_file() {
     printf 'DATADIFF_RUN_PROVENANCE_GIT_STATUS=%q\n' "${RUN_PROVENANCE_GIT_STATUS}"
     printf 'DATADIFF_RUN_PROVENANCE_GIT_DIFF=%q\n' "${RUN_PROVENANCE_GIT_DIFF}"
     printf 'DATADIFF_RUN_PROVENANCE_LAUNCH_ENV=%q\n' "${RUN_PROVENANCE_LAUNCH_ENV}"
+    printf 'DATADIFF_RUN_PROVENANCE_STRATEGY_SNAPSHOT=%q\n' "${RUN_PROVENANCE_STRATEGY_SNAPSHOT}"
+    printf 'DATADIFF_RUN_PROVENANCE_STRATEGY_LEARNING=%q\n' "${RUN_PROVENANCE_STRATEGY_LEARNING}"
     printf 'DATADIFF_REQUIRE_CLEAN_WORKTREE=%q\n' "${REQUIRE_CLEAN_WORKTREE}"
     printf 'DATADIFF_POST_RUN_EVIDENCE_HOOK=%q\n' "${POST_RUN_EVIDENCE_HOOK}"
   } > "${config_file}"
@@ -156,6 +162,8 @@ write_status_file() {
     printf 'latest_code_claim=%s\n' "${RUN_PROVENANCE_LATEST_CODE_CLAIM}"
     printf 'launch_source=%s\n' "${RUN_PROVENANCE_LAUNCH_SOURCE}"
     printf 'freeze_manifest=%s\n' "${RUN_PROVENANCE_FREEZE_MANIFEST}"
+    printf 'strategy_snapshot=%s\n' "${RUN_PROVENANCE_STRATEGY_SNAPSHOT}"
+    printf 'strategy_learning=%s\n' "${RUN_PROVENANCE_STRATEGY_LEARNING}"
     if [[ -n "${POST_RUN_STATUS}" ]]; then
       printf 'post_run_status=%s\n' "${POST_RUN_STATUS}"
     fi
@@ -250,15 +258,22 @@ _pip_freeze_cmd() {
 _prepare_freeze_snapshot() {
   local run_id="$1"
   local snapshot_dir="${ROOT_DIR}/reports/freeze-snapshots"
+  local strategy_snapshot_dir="${ROOT_DIR}/reports/strategy-snapshots"
+  local strategy_learning_dir="${ROOT_DIR}/reports/strategy-learning"
+  local code_root
   local prefix="${LOG_PREFIX}-${run_id}"
   local python_cmd
   local workspace_dirty_before_snapshot
   mkdir -p "${snapshot_dir}"
+  mkdir -p "${strategy_snapshot_dir}"
+  mkdir -p "${strategy_learning_dir}"
   RUN_PROVENANCE_FREEZE_MANIFEST="${snapshot_dir}/${prefix}.json"
   RUN_PROVENANCE_PIP_FREEZE="${snapshot_dir}/${prefix}.pip-freeze.txt"
   RUN_PROVENANCE_GIT_STATUS="${snapshot_dir}/${prefix}.git-status.txt"
   RUN_PROVENANCE_GIT_DIFF="${snapshot_dir}/${prefix}.git-diff.patch"
   RUN_PROVENANCE_LAUNCH_ENV="${snapshot_dir}/${prefix}.launcher-env.txt"
+  RUN_PROVENANCE_STRATEGY_SNAPSHOT="${strategy_snapshot_dir}/${prefix}.strategy-snapshot.json"
+  RUN_PROVENANCE_STRATEGY_LEARNING="${strategy_learning_dir}/${prefix}.strategy-learning.json"
   workspace_dirty_before_snapshot="$(_workspace_dirty_text)"
 
   if _git_repo_available; then
@@ -270,7 +285,37 @@ _prepare_freeze_snapshot() {
   fi
 
   python_cmd="$(_pip_freeze_cmd)"
+  code_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   "${python_cmd}" -m pip freeze > "${RUN_PROVENANCE_PIP_FREEZE}" || true
+  FREEZE_CODE_ROOT="${code_root}" \
+  FREEZE_STRATEGY_SNAPSHOT_PATH="${RUN_PROVENANCE_STRATEGY_SNAPSHOT}" \
+  "${python_cmd}" - <<'PY'
+from pathlib import Path
+import os
+import sys
+
+code_root = Path(os.environ["FREEZE_CODE_ROOT"])
+sys.path.insert(0, str(code_root / "src"))
+
+from datadiff.classification_oracle import documented_semantic_rule_records
+from datadiff.classification_oracle import semantic_boundary_rule_records
+from datadiff.dynamic_strategy import write_strategy_snapshot
+from datadiff.triage import standalone_reproducer_rule_records
+
+target = Path(os.environ["FREEZE_STRATEGY_SNAPSHOT_PATH"])
+write_strategy_snapshot(
+    classification_documented_rules=list(documented_semantic_rule_records()),
+    classification_boundary_rules=list(semantic_boundary_rule_records()),
+    reproducer_rules=list(standalone_reproducer_rule_records()),
+    metadata={"generated_by": "start_closed_loop_12h_tmux.sh"},
+    output_dir=target.parent,
+    snapshot_id=target.stem,
+)
+PY
+  if [[ ! -f "${RUN_PROVENANCE_STRATEGY_SNAPSHOT}" ]]; then
+    printf '{\"schema_version\": \"dynamic-strategy-snapshot-v1\", \"generated_at\": \"\", \"snapshot_id\": \"launcher-fallback\", \"classification_documented_rules\": [], \"classification_boundary_rules\": [], \"reproducer_rules\": [], \"learning_summary\": {}, \"metadata\": {\"generated_by\": \"start_closed_loop_12h_tmux.sh\"}}\n' > "${RUN_PROVENANCE_STRATEGY_SNAPSHOT}"
+  fi
+  printf '{\"schema_version\": \"dynamic-strategy-learning-v1\", \"events\": [], \"generated_by\": \"start_closed_loop_12h_tmux.sh\"}\n' > "${RUN_PROVENANCE_STRATEGY_LEARNING}"
 
   {
     printf 'root=%s\n' "${ROOT_DIR}"
@@ -289,6 +334,8 @@ _prepare_freeze_snapshot() {
     printf 'git_commit=%s\n' "$(_git_commit)"
     printf 'git_branch=%s\n' "$(_git_branch)"
     printf 'workspace_dirty=%s\n' "${workspace_dirty_before_snapshot}"
+    printf 'strategy_snapshot=%s\n' "${RUN_PROVENANCE_STRATEGY_SNAPSHOT}"
+    printf 'strategy_learning=%s\n' "${RUN_PROVENANCE_STRATEGY_LEARNING}"
   } > "${RUN_PROVENANCE_LAUNCH_ENV}"
   FREEZE_MANIFEST_PATH="${RUN_PROVENANCE_FREEZE_MANIFEST}" \
   FREEZE_ROOT_DIR="${ROOT_DIR}" \
@@ -312,6 +359,8 @@ _prepare_freeze_snapshot() {
   FREEZE_GIT_STATUS="${RUN_PROVENANCE_GIT_STATUS}" \
   FREEZE_GIT_DIFF="${RUN_PROVENANCE_GIT_DIFF}" \
   FREEZE_LAUNCH_ENV="${RUN_PROVENANCE_LAUNCH_ENV}" \
+  FREEZE_STRATEGY_SNAPSHOT="${RUN_PROVENANCE_STRATEGY_SNAPSHOT}" \
+  FREEZE_STRATEGY_LEARNING="${RUN_PROVENANCE_STRATEGY_LEARNING}" \
   "${python_cmd}" - <<'PY'
 import json
 import os
@@ -343,6 +392,8 @@ payload = {
         "git_status": env("FREEZE_GIT_STATUS"),
         "git_diff": env("FREEZE_GIT_DIFF"),
         "launcher_env": env("FREEZE_LAUNCH_ENV"),
+        "strategy_snapshot": env("FREEZE_STRATEGY_SNAPSHOT"),
+        "strategy_learning": env("FREEZE_STRATEGY_LEARNING"),
     },
 }
 Path(env("FREEZE_MANIFEST_PATH")).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -370,6 +421,9 @@ _print_command() {
     --local-source-exploration-weight "${LOCAL_SOURCE_EXPLORATION_WEIGHT}" \
     --artifact-limit "${ARTIFACT_LIMIT}" \
     --log-level "${LOG_LEVEL}" \
+    --strategy-snapshot "${RUN_PROVENANCE_STRATEGY_SNAPSHOT}" \
+    --strategy-learning "${RUN_PROVENANCE_STRATEGY_LEARNING}" \
+    --freeze-strategy-snapshot \
     --run-theme "${RUN_THEME}" \
     --paper-notes "${PAPER_NOTES}" \
     --skip-run-reports
@@ -401,6 +455,9 @@ _start_command() {
       --local-source-exploration-weight "${LOCAL_SOURCE_EXPLORATION_WEIGHT}" \
       --artifact-limit "${ARTIFACT_LIMIT}" \
       --log-level "${LOG_LEVEL}" \
+      --strategy-snapshot "${RUN_PROVENANCE_STRATEGY_SNAPSHOT}" \
+      --strategy-learning "${RUN_PROVENANCE_STRATEGY_LEARNING}" \
+      --freeze-strategy-snapshot \
       --run-theme "${RUN_THEME}" \
       --paper-notes "${PAPER_NOTES}" \
       --skip-run-reports &
@@ -420,6 +477,9 @@ _start_command() {
       --local-source-exploration-weight "${LOCAL_SOURCE_EXPLORATION_WEIGHT}" \
       --artifact-limit "${ARTIFACT_LIMIT}" \
       --log-level "${LOG_LEVEL}" \
+      --strategy-snapshot "${RUN_PROVENANCE_STRATEGY_SNAPSHOT}" \
+      --strategy-learning "${RUN_PROVENANCE_STRATEGY_LEARNING}" \
+      --freeze-strategy-snapshot \
       --run-theme "${RUN_THEME}" \
       --paper-notes "${PAPER_NOTES}" \
       --skip-run-reports &
@@ -705,6 +765,8 @@ run_child() {
   export DATADIFF_RUN_PROVENANCE_GIT_STATUS="${RUN_PROVENANCE_GIT_STATUS}"
   export DATADIFF_RUN_PROVENANCE_GIT_DIFF="${RUN_PROVENANCE_GIT_DIFF}"
   export DATADIFF_RUN_PROVENANCE_LAUNCH_ENV="${RUN_PROVENANCE_LAUNCH_ENV}"
+  export DATADIFF_RUN_PROVENANCE_STRATEGY_SNAPSHOT="${RUN_PROVENANCE_STRATEGY_SNAPSHOT}"
+  export DATADIFF_RUN_PROVENANCE_STRATEGY_LEARNING="${RUN_PROVENANCE_STRATEGY_LEARNING}"
   local log_file="${ROOT_DIR}/logs/${LOG_PREFIX}-${run_id}.log"
   local status_file="${ROOT_DIR}/logs/${LOG_PREFIX}-${run_id}.status"
   local session_label="${SESSION_NAME}"

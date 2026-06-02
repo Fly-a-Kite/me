@@ -1194,6 +1194,7 @@ def test_final_readiness_rejects_live_runs_without_latest_frozen_authority_prove
         "live:datafusion_cross:live_datafusion:missing_launcher_env_artifact",
         "live:datafusion_cross:live_datafusion:missing_manifest_artifact",
         "live:datafusion_cross:live_datafusion:missing_pip_freeze_artifact",
+        "live:datafusion_cross:live_datafusion:missing_strategy_snapshot_artifact",
         "live:datafusion_cross:live_datafusion:non_authority",
     ]
 
@@ -1263,6 +1264,7 @@ def _write_manifest(
                 "git_status": str(root / "reports" / f"{name}.git-status.txt"),
                 "git_diff": str(root / "reports" / f"{name}.git-diff.patch"),
                 "launcher_env": str(root / "reports" / f"{name}.launcher-env.txt"),
+                "strategy_snapshot": str(root / "reports" / f"{name}.strategy-snapshot.json"),
             },
         },
     }

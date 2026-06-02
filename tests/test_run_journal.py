@@ -75,6 +75,7 @@ def test_build_run_journal_entry_records_paper_facing_summary(tmp_path):
                         "latest_code_claim": True,
                         "evidence_role": "latest_live_authority_24h",
                     },
+                    "freeze_artifacts": {"strategy_snapshot": "reports/strategy-snapshots/frozen.json"},
                 },
             }
         ),
@@ -132,6 +133,7 @@ def test_build_run_journal_entry_records_paper_facing_summary(tmp_path):
         "evidence_role": "latest_live_authority_24h",
         "launch_source": "closed_loop_tmux",
         "launch_duration": "24h",
+        "strategy_snapshot": "reports/strategy-snapshots/frozen.json",
     }
 
 

@@ -92,6 +92,8 @@ from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
 from datadiff.util import unique_preserve_order
 from datadiff.windowing import row_number_filter_rows
+from datadiff.dynamic_strategy import StrategyRuleRecord
+from datadiff.dynamic_strategy import load_strategy_snapshot
 
 
 BoundaryPredicate = Callable[[Case, Finding | dict[str, Any], dict[str, Any]], bool]
@@ -1105,6 +1107,59 @@ SEMANTIC_BOUNDARY_RULES: tuple[SemanticBoundaryRule, ...] = (
 )
 
 
+def documented_semantic_rule_records() -> tuple[StrategyRuleRecord, ...]:
+    return tuple(
+        StrategyRuleRecord(
+            rule_id=rule.rule_id,
+            kind="documented_semantic_rule",
+            reason=rule.reason,
+            priority=100 + index,
+        )
+        for index, rule in enumerate(DOCUMENTED_SEMANTIC_RULES)
+    )
+
+
+def semantic_boundary_rule_records() -> tuple[StrategyRuleRecord, ...]:
+    return tuple(
+        StrategyRuleRecord(
+            rule_id=rule.rule_id,
+            kind="semantic_boundary_rule",
+            reason=rule.reason,
+            priority=100 + index,
+        )
+        for index, rule in enumerate(SEMANTIC_BOUNDARY_RULES)
+    )
+
+
+def _ordered_rules_from_snapshot(
+    *,
+    config: dict[str, Any],
+    snapshot_key: str,
+    default_rules: tuple[SemanticBoundaryRule, ...],
+) -> tuple[SemanticBoundaryRule, ...]:
+    snapshot = load_strategy_snapshot(str(config.get("strategy_snapshot_path", "") or ""))
+    if snapshot is None:
+        return default_rules
+    requested_ids = [
+        rule.rule_id
+        for rule in (
+            getattr(snapshot, snapshot_key, ())
+            if hasattr(snapshot, snapshot_key)
+            else ()
+        )
+        if isinstance(rule, StrategyRuleRecord) and rule.rule_id
+    ]
+    if not requested_ids:
+        return default_rules
+    by_id = {rule.rule_id: rule for rule in default_rules}
+    ordered = [by_id[rule_id] for rule_id in requested_ids if rule_id in by_id]
+    if not ordered:
+        return default_rules
+    ordered_ids = {rule.rule_id for rule in ordered}
+    ordered.extend(rule for rule in default_rules if rule.rule_id not in ordered_ids)
+    return tuple(ordered)
+
+
 def _matching_semantic_rules(
     rules: tuple[SemanticBoundaryRule, ...],
     case: Case,
@@ -1131,7 +1186,16 @@ def _documented_semantic_matches(
     finding: Finding | dict[str, Any],
     config: dict[str, Any],
 ) -> list[SemanticBoundaryMatch]:
-    return _matching_semantic_rules(DOCUMENTED_SEMANTIC_RULES, case, finding, config)
+    return _matching_semantic_rules(
+        _ordered_rules_from_snapshot(
+            config=config,
+            snapshot_key="classification_documented_rules",
+            default_rules=DOCUMENTED_SEMANTIC_RULES,
+        ),
+        case,
+        finding,
+        config,
+    )
 
 
 def _semantic_boundary_matches(
@@ -1139,7 +1203,16 @@ def _semantic_boundary_matches(
     finding: Finding | dict[str, Any],
     config: dict[str, Any],
 ) -> list[SemanticBoundaryMatch]:
-    return _matching_semantic_rules(SEMANTIC_BOUNDARY_RULES, case, finding, config)
+    return _matching_semantic_rules(
+        _ordered_rules_from_snapshot(
+            config=config,
+            snapshot_key="classification_boundary_rules",
+            default_rules=SEMANTIC_BOUNDARY_RULES,
+        ),
+        case,
+        finding,
+        config,
+    )
 
 
 def _semantic_boundary_reasons(case: Case, finding: Finding | dict[str, Any], config: dict[str, Any]) -> list[str]:

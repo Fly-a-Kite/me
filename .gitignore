@@ -10,5 +10,9 @@ bugs/
 reports/
 corpus/
 study/
+logs/
 
 .env
+
+rust_kernel/target/
+rust_kernel/python/datadiff/_rust_kernel/*.so

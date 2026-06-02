@@ -346,6 +346,12 @@ def test_closed_loop_launcher_writes_freeze_snapshot_for_clean_authority_run(tmp
         assert '"workspace_dirty": false' in payload
         assert ".pip-freeze.txt" in payload
         assert ".launcher-env.txt" in payload
+        assert ".strategy-snapshot.json" in payload
+        assert ".strategy-learning.json" in payload
+        assert status["strategy_snapshot"].endswith(".strategy-snapshot.json")
+        assert status["strategy_learning"].endswith(".strategy-learning.json")
+        assert Path(status["strategy_snapshot"]).is_file()
+        assert Path(status["strategy_learning"]).is_file()
     finally:
         subprocess.run(["tmux", "kill-session", "-t", session_name], check=False, capture_output=True)
 

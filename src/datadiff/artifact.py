@@ -25,6 +25,14 @@ def save_issue_artifact(
     dump_json(normalized, bug_dir / "normalized.json")
     dump_json([f.to_dict() for f in findings], bug_dir / "findings.json")
     dump_json(config or {}, bug_dir / "config.json")
+    if isinstance(config, dict):
+        strategy_manifest = {
+            "strategy_snapshot_path": str(config.get("strategy_snapshot_path", "") or ""),
+            "strategy_learning_path": str(config.get("strategy_learning_path", "") or ""),
+            "freeze_strategy_snapshot": bool(config.get("freeze_strategy_snapshot", False)),
+        }
+        if any(strategy_manifest.values()):
+            dump_json(strategy_manifest, bug_dir / "strategy.json")
     context = target_context(list(raw_results))
     dump_json(context.target_dicts(), bug_dir / "targets.json")
     dump_json(context.to_dict(), bug_dir / "target_context.json")

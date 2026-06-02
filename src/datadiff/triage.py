@@ -12,6 +12,8 @@ from datadiff.case_features import (
     case_uses_modulo,
     case_uses_unicode_case_mapping,
 )
+from datadiff.dynamic_strategy import StrategyRuleRecord
+from datadiff.dynamic_strategy import load_strategy_snapshot
 from datadiff.dsl import Case
 from datadiff.util import dump_json
 
@@ -110,6 +112,7 @@ def build_triage_report(
         "verdict": verdict,
         "paper_status": paper_status,
         "triage_confidence": confidence,
+        "config": dict(config),
         "generator_profile": generator_profile,
         "backends": backends,
         "features": features,
@@ -177,44 +180,114 @@ def write_triage_artifact(bug_dir: Path, report: dict[str, Any]) -> tuple[Path, 
     return json_path, md_path
 
 
-def write_standalone_reproducer(bug_dir: Path, report: dict[str, Any] | None = None) -> Path:
+def standalone_reproducer_rule_records() -> tuple[StrategyRuleRecord, ...]:
+    return tuple(
+        StrategyRuleRecord(rule_id=rule_id, kind="standalone_reproducer", reason=reason, priority=priority)
+        for priority, (rule_id, reason) in enumerate(
+            [
+                ("repro:datafusion_grouped_topk_null_sort_key", "DataFusion grouped top-k null sort-key reproducer"),
+                ("repro:datafusion_groupby_aggregation", "DataFusion groupby aggregation reproducer"),
+                ("repro:datafusion_outer_join_truth_filter", "DataFusion outer-join truth-filter reproducer"),
+                ("repro:datafusion_negative_zero_comparison", "DataFusion negative-zero reproducer"),
+                ("repro:datafusion_joined_order_offset_projection", "DataFusion joined order/offset reproducer"),
+                ("repro:datafusion_ordered_topk_projection", "DataFusion ordered top-k projection reproducer"),
+                ("repro:polars_reverse_division_operand_order", "Polars reverse-division reproducer"),
+                ("repro:duckdb_tuple_absence_null_filter", "DuckDB tuple-absence reproducer"),
+                ("repro:edge_float_fallback", "Generic edge-float fallback reproducer"),
+            ],
+            start=100,
+        )
+    )
+
+
+def _ordered_reproducer_rule_ids(report: dict[str, Any] | None) -> list[str]:
+    config = dict((report or {}).get("config", {}) or {})
+    snapshot = load_strategy_snapshot(str(config.get("strategy_snapshot_path", "") or ""))
+    default_ids = [rule.rule_id for rule in standalone_reproducer_rule_records()]
+    if snapshot is None:
+        return default_ids
+    snapshot_ids = [
+        rule.rule_id
+        for rule in snapshot.reproducer_rules
+        if isinstance(rule, StrategyRuleRecord) and rule.rule_id
+    ]
+    if not snapshot_ids:
+        return default_ids
+    ordered = [rule_id for rule_id in snapshot_ids if rule_id in default_ids]
+    ordered.extend(rule_id for rule_id in default_ids if rule_id not in ordered)
+    return ordered
+
+
+def _resolve_standalone_reproducer(report: dict[str, Any] | None) -> tuple[str, str]:
     roots = set((report or {}).get("reproduced_roots", []))
     suspicious = set((report or {}).get("suspicious_backends", []))
-    if "grouped_topk_null_sort_key" in roots and "datafusion" in suspicious:
-        path = bug_dir / "standalone_datafusion_groupby_null_sortkey_limit.py"
-        content = _standalone_datafusion_groupby_null_sortkey_reproducer()
-    elif "groupby_aggregation" in roots and "datafusion" in suspicious:
-        if _is_datafusion_sort_offset_groupby_aggregation(report or {}):
-            path = bug_dir / "standalone_datafusion_sort_offset_groupby_aggregation.py"
-            content = _standalone_datafusion_sort_offset_groupby_aggregation_reproducer()
-        else:
-            path = bug_dir / "standalone_datafusion_groupby_limit_offset.py"
-            content = _standalone_datafusion_groupby_limit_offset_reproducer()
-    elif "outer_join_truth_filter" in roots and "datafusion" in suspicious:
-        if _is_datafusion_truth_filter_offset(report or {}):
-            path = bug_dir / "standalone_datafusion_truth_filter_offset.py"
-            content = _standalone_datafusion_truth_filter_offset_reproducer()
-        else:
-            path = bug_dir / "standalone_datafusion_negative_zero_truth_filter.py"
-            content = _standalone_datafusion_negative_zero_truth_filter_reproducer()
-    elif "negative_zero_comparison" in roots and "datafusion" in suspicious:
-        path = bug_dir / "standalone_datafusion_negative_zero_truth_filter.py"
-        content = _standalone_datafusion_negative_zero_truth_filter_reproducer()
-    elif "joined_order_offset_projection" in roots and "datafusion" in suspicious:
-        path = bug_dir / "standalone_datafusion_joined_order_offset_projection.py"
-        content = _standalone_datafusion_joined_order_offset_projection_reproducer()
-    elif "ordered_topk_projection" in roots and "datafusion" in suspicious:
-        path = bug_dir / "standalone_datafusion_ordered_topk_projection.py"
-        content = _standalone_datafusion_ordered_topk_projection_reproducer()
-    elif "reverse_division_operand_order" in roots:
-        path = bug_dir / "standalone_polars_reverse_division_columns.py"
-        content = _standalone_polars_reverse_division_columns_reproducer()
-    elif "tuple_absence_null_filter" in roots:
-        path = bug_dir / "standalone_duckdb_tuple_absence_null_filter.py"
-        content = _standalone_duckdb_tuple_absence_null_filter_reproducer()
-    else:
-        path = bug_dir / "standalone_edge_float_reproducer.py"
-        content = _standalone_edge_float_reproducer()
+    for rule_id in _ordered_reproducer_rule_ids(report):
+        if rule_id == "repro:datafusion_grouped_topk_null_sort_key":
+            if "grouped_topk_null_sort_key" in roots and "datafusion" in suspicious:
+                return (
+                    "standalone_datafusion_groupby_null_sortkey_limit.py",
+                    _standalone_datafusion_groupby_null_sortkey_reproducer(),
+                )
+        elif rule_id == "repro:datafusion_groupby_aggregation":
+            if "groupby_aggregation" in roots and "datafusion" in suspicious:
+                if _is_datafusion_sort_offset_groupby_aggregation(report or {}):
+                    return (
+                        "standalone_datafusion_sort_offset_groupby_aggregation.py",
+                        _standalone_datafusion_sort_offset_groupby_aggregation_reproducer(),
+                    )
+                return (
+                    "standalone_datafusion_groupby_limit_offset.py",
+                    _standalone_datafusion_groupby_limit_offset_reproducer(),
+                )
+        elif rule_id == "repro:datafusion_outer_join_truth_filter":
+            if "outer_join_truth_filter" in roots and "datafusion" in suspicious:
+                if _is_datafusion_truth_filter_offset(report or {}):
+                    return (
+                        "standalone_datafusion_truth_filter_offset.py",
+                        _standalone_datafusion_truth_filter_offset_reproducer(),
+                    )
+                return (
+                    "standalone_datafusion_negative_zero_truth_filter.py",
+                    _standalone_datafusion_negative_zero_truth_filter_reproducer(),
+                )
+        elif rule_id == "repro:datafusion_negative_zero_comparison":
+            if "negative_zero_comparison" in roots and "datafusion" in suspicious:
+                return (
+                    "standalone_datafusion_negative_zero_truth_filter.py",
+                    _standalone_datafusion_negative_zero_truth_filter_reproducer(),
+                )
+        elif rule_id == "repro:datafusion_joined_order_offset_projection":
+            if "joined_order_offset_projection" in roots and "datafusion" in suspicious:
+                return (
+                    "standalone_datafusion_joined_order_offset_projection.py",
+                    _standalone_datafusion_joined_order_offset_projection_reproducer(),
+                )
+        elif rule_id == "repro:datafusion_ordered_topk_projection":
+            if "ordered_topk_projection" in roots and "datafusion" in suspicious:
+                return (
+                    "standalone_datafusion_ordered_topk_projection.py",
+                    _standalone_datafusion_ordered_topk_projection_reproducer(),
+                )
+        elif rule_id == "repro:polars_reverse_division_operand_order":
+            if "reverse_division_operand_order" in roots:
+                return (
+                    "standalone_polars_reverse_division_columns.py",
+                    _standalone_polars_reverse_division_columns_reproducer(),
+                )
+        elif rule_id == "repro:duckdb_tuple_absence_null_filter":
+            if "tuple_absence_null_filter" in roots:
+                return (
+                    "standalone_duckdb_tuple_absence_null_filter.py",
+                    _standalone_duckdb_tuple_absence_null_filter_reproducer(),
+                )
+        elif rule_id == "repro:edge_float_fallback":
+            return ("standalone_edge_float_reproducer.py", _standalone_edge_float_reproducer())
+    return ("standalone_edge_float_reproducer.py", _standalone_edge_float_reproducer())
+
+
+def write_standalone_reproducer(bug_dir: Path, report: dict[str, Any] | None = None) -> Path:
+    filename, content = _resolve_standalone_reproducer(report)
+    path = bug_dir / filename
     path.write_text(content, encoding="utf-8")
     path.chmod(0o755)
     return path

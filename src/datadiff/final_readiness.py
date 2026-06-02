@@ -878,7 +878,7 @@ def _live_provenance_issues(runs: list[dict[str, Any]], *, workspace_git_commit:
             issues.append(f"{run_label}:freeze_not_declared")
         if not bool(harness.get("latest_code_claim", False)):
             issues.append(f"{run_label}:latest_code_not_declared")
-        for artifact_name in ("manifest", "pip_freeze", "git_status", "launcher_env"):
+        for artifact_name in ("manifest", "pip_freeze", "git_status", "launcher_env", "strategy_snapshot"):
             artifact_path = str(freeze_artifacts.get(artifact_name, "") or "").strip()
             if not artifact_path:
                 issues.append(f"{run_label}:missing_{artifact_name}_artifact")

@@ -402,6 +402,9 @@ def _run_provenance_summary(provenance: dict[str, Any]) -> dict[str, Any]:
     freeze_manifest = str((provenance.get("freeze_artifacts", {}) or {}).get("manifest", "") or "")
     if freeze_manifest:
         summary["freeze_manifest"] = freeze_manifest
+    strategy_snapshot = str((provenance.get("freeze_artifacts", {}) or {}).get("strategy_snapshot", "") or "")
+    if strategy_snapshot:
+        summary["strategy_snapshot"] = strategy_snapshot
     return summary
 
 

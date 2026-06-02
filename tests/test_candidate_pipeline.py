@@ -152,11 +152,16 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
     assert candidate["recheck"]["reproduced"] is True
     assert candidate["triage"]["verdict"] == "candidate_implementation_bug"
     assert candidate["issue_readiness"]["readiness_status"] == "needs_dedup_check"
+    assert candidate["strategy_learning_path"].endswith("candidate-pipeline-learning.json")
     assert (tmp_path / manifest["manifest_path"]).is_file()
     assert (tmp_path / manifest["markdown_path"]).is_file()
     assert (tmp_path / manifest["frozen_candidates_path"]).is_file()
+    assert (tmp_path / manifest["strategy_snapshot_path"]).is_file()
     assert (tmp_path / candidate["issue_draft"]["path"]).is_file()
     assert (bugs_dir / "bug_sig-fresh" / "reduced_case.json").is_file()
+    stored_config = json.loads((bugs_dir / "bug_sig-fresh" / "config.json").read_text(encoding="utf-8"))
+    assert stored_config["freeze_strategy_snapshot"] is True
+    assert stored_config["strategy_snapshot_path"]
 
     rendered = (tmp_path / manifest["markdown_path"]).read_text(encoding="utf-8")
     assert "## Candidates" in rendered

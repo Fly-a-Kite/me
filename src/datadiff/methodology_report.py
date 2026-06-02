@@ -48,8 +48,9 @@ RUN_PROVENANCE_REQUIRED_FREEZE_ARTIFACTS = (
     "pip_freeze",
     "git_status",
     "launcher_env",
+    "strategy_snapshot",
 )
-RUN_PROVENANCE_OPTIONAL_FREEZE_ARTIFACTS = ("git_diff",)
+RUN_PROVENANCE_OPTIONAL_FREEZE_ARTIFACTS = ("git_diff", "strategy_learning")
 RUN_PROVENANCE_ARTIFACT_FIELDS = (
     *RUN_PROVENANCE_REQUIRED_FREEZE_ARTIFACTS,
     *RUN_PROVENANCE_OPTIONAL_FREEZE_ARTIFACTS,
@@ -108,6 +109,12 @@ def write_methodology_report(
         "run_provenance_launcher_env_artifacts": report.get("reproducibility", {})
         .get("run_provenance", {})
         .get("freeze_launcher_env_paths", []),
+        "run_provenance_strategy_snapshot_artifacts": report.get("reproducibility", {})
+        .get("run_provenance", {})
+        .get("freeze_strategy_snapshot_paths", []),
+        "run_provenance_strategy_learning_artifacts": report.get("reproducibility", {})
+        .get("run_provenance", {})
+        .get("freeze_strategy_learning_paths", []),
         "artifact_dirs": report.get("reproducibility", {}).get("artifact_dirs", []),
         "issue_bundle_manifest": report.get("reproducibility", {}).get("issue_bundle", {}).get("path", ""),
         "issue_bundle_reproducers": report.get("reproducibility", {})
@@ -852,6 +859,8 @@ def _render_markdown(
             f"- Run-provenance git-status artifacts indexed: {len(run_provenance.get('freeze_git_status_paths', []))}",
             f"- Run-provenance git-diff artifacts indexed: {len(run_provenance.get('freeze_git_diff_paths', []))}",
             f"- Run-provenance launcher-env artifacts indexed: {len(run_provenance.get('freeze_launcher_env_paths', []))}",
+            f"- Run-provenance strategy-snapshot artifacts indexed: {len(run_provenance.get('freeze_strategy_snapshot_paths', []))}",
+            f"- Run-provenance strategy-learning artifacts indexed: {len(run_provenance.get('freeze_strategy_learning_paths', []))}",
             f"- Artifact dirs indexed: {len(evidence_chain.get('artifact_dirs', []))}",
             f"- Issue bundle manifest: `{evidence_chain.get('issue_bundle_manifest', '')}`",
             f"- Issue bundle reproducers indexed: {len(evidence_chain.get('issue_bundle_reproducers', []))}",
@@ -1174,6 +1183,8 @@ def _run_provenance_reproducibility(run_rows: list[dict[str, str]]) -> dict[str,
         "freeze_git_status_paths": sorted(freeze_artifact_paths["git_status"]),
         "freeze_git_diff_paths": sorted(freeze_artifact_paths["git_diff"]),
         "freeze_launcher_env_paths": sorted(freeze_artifact_paths["launcher_env"]),
+        "freeze_strategy_snapshot_paths": sorted(freeze_artifact_paths["strategy_snapshot"]),
+        "freeze_strategy_learning_paths": sorted(freeze_artifact_paths["strategy_learning"]),
         "missing_labels": sorted(set(missing_labels)),
         "incomplete_live_authority_labels": sorted(set(incomplete_live_authority_labels)),
     }
@@ -1438,9 +1449,13 @@ def _candidate_pipeline_metrics(generated_dir: Path) -> dict[str, Any]:
             "issue_draft_count": 0,
             "needs_dedup_check_count": 0,
             "already_submitted_or_confirmed_count": 0,
+            "strategy_snapshot_count": 0,
+            "strategy_learning_count": 0,
         }
     paths = sorted(pipeline_root.glob("*/manifest.json"))
     aggregate: Counter[str] = Counter()
+    strategy_snapshot_paths: list[str] = []
+    strategy_learning_paths: list[str] = []
     for path in paths:
         data = load_json(path)
         if not isinstance(data, dict):
@@ -1460,6 +1475,15 @@ def _candidate_pipeline_metrics(generated_dir: Path) -> dict[str, Any]:
                 ),
             }
         )
+        snapshot_path = str(data.get("strategy_snapshot_path", "") or "")
+        if snapshot_path:
+            strategy_snapshot_paths.append(snapshot_path)
+        for candidate in data.get("candidates", []) or []:
+            if not isinstance(candidate, dict):
+                continue
+            learning_path = str(candidate.get("strategy_learning_path", "") or "")
+            if learning_path:
+                strategy_learning_paths.append(learning_path)
     return {
         "manifest_count": len(paths),
         "manifest_paths": [str(path) for path in paths],
@@ -1467,6 +1491,10 @@ def _candidate_pipeline_metrics(generated_dir: Path) -> dict[str, Any]:
         "recheck_pass_rate": (
             aggregate["reproduced_count"] / aggregate["candidate_count"] if aggregate["candidate_count"] else 0.0
         ),
+        "strategy_snapshot_count": len(sorted(set(strategy_snapshot_paths))),
+        "strategy_learning_count": len(sorted(set(strategy_learning_paths))),
+        "strategy_snapshot_paths": sorted(set(strategy_snapshot_paths)),
+        "strategy_learning_paths": sorted(set(strategy_learning_paths)),
     }
 
 

@@ -294,6 +294,9 @@ class ExperimentConfig:
     candidate_recheck_count: int = 0
     metamorphic_variant_limit: int = 4
     log_level: LogLevel = "compact"
+    strategy_snapshot_path: str = ""
+    strategy_learning_path: str = ""
+    freeze_strategy_snapshot: bool = False
 
     def __post_init__(self) -> None:
         self.guidance_targets = _normalize_string_list(self.guidance_targets)
@@ -302,6 +305,9 @@ class ExperimentConfig:
         self.discovery_biases = merge_discovery_biases(self.discovery_biases)
         self.known_saturated_bug_families = _normalize_string_list(self.known_saturated_bug_families)
         self.replay_bug_source_issues = _normalize_string_list(self.replay_bug_source_issues)
+        self.strategy_snapshot_path = str(self.strategy_snapshot_path or "").strip()
+        self.strategy_learning_path = str(self.strategy_learning_path or "").strip()
+        self.freeze_strategy_snapshot = bool(self.freeze_strategy_snapshot)
 
     def to_dict(self) -> dict:
         payload = asdict(self)

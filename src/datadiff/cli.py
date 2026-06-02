@@ -227,6 +227,9 @@ def _config_from_args(args: argparse.Namespace) -> ExperimentConfig:
         candidate_recheck_count=max(0, int(getattr(args, "candidate_recheck_count", 0))),
         metamorphic_variant_limit=max(0, int(getattr(args, "metamorphic_variant_limit", 4))),
         log_level=getattr(args, "log_level", "compact"),
+        strategy_snapshot_path=str(getattr(args, "strategy_snapshot", "") or ""),
+        strategy_learning_path=str(getattr(args, "strategy_learning", "") or ""),
+        freeze_strategy_snapshot=bool(getattr(args, "freeze_strategy_snapshot", False)),
     )
 
 
@@ -287,6 +290,21 @@ def add_ablation_flags(parser: argparse.ArgumentParser) -> None:
         choices=["full", "compact", "minimal"],
         default="compact",
         help="run JSONL detail level; compact keeps full details only for finding rows",
+    )
+    parser.add_argument(
+        "--strategy-snapshot",
+        default="",
+        help="path to a frozen dynamic strategy snapshot used by classification/reproduction logic",
+    )
+    parser.add_argument(
+        "--strategy-learning",
+        default="",
+        help="path to a strategy-learning ledger used for evidence-driven updates outside frozen runs",
+    )
+    parser.add_argument(
+        "--freeze-strategy-snapshot",
+        action="store_true",
+        help="treat the configured strategy snapshot as frozen and disable runtime learning drift for final runs",
     )
 
 
@@ -4630,6 +4648,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_fixture.add_argument("--disable-artifact", action="store_true")
     p_fixture.add_argument("--no-compress-run-log", action="store_true")
+    add_ablation_flags(p_fixture)
     p_fixture.set_defaults(func=cmd_replay_fixture)
 
     p_exp = sub.add_parser("experiment", help="run repeatable ablation experiment matrix")

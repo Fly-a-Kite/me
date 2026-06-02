@@ -36,6 +36,7 @@ def _args(**overrides):
         "log_level": "compact",
         "include_pending_historical": False,
         "skip_run_reports": True,
+        "strategy_snapshot": "",
         "execute": False,
     }
     data.update(overrides)
@@ -233,6 +234,19 @@ def test_final_plan_commands_include_structured_experiment_meta():
     assert historical_meta["historical"]["bug_id"] == "duckdb-22075"
     assert historical_meta["historical"]["status"] == "confirmed_fixed"
     assert historical_meta["variant"]["variant_id"] == "duckdb-22075"
+
+
+def test_final_plan_freezes_dynamic_strategy_snapshot():
+    module = _module()
+
+    commands = module.build_plan(_args(track="validation"))
+
+    assert len(commands) == 1
+    command = commands[0]
+    snapshot_path = _flag_value(command.command, "--strategy-snapshot")
+    assert snapshot_path
+    assert "--freeze-strategy-snapshot" in command.command
+    assert Path(snapshot_path).is_file()
 
 
 def test_final_plan_explicitly_separates_fresh_and_replay_policy():

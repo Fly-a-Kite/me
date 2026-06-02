@@ -6,6 +6,8 @@ from typing import Any
 
 from datadiff.artifact import save_issue_artifact
 from datadiff.config import ExperimentConfig
+from datadiff.dynamic_strategy import append_learning_event
+from datadiff.dynamic_strategy import write_strategy_snapshot
 from datadiff.dsl import Case
 from datadiff.issue_readiness import build_issue_readiness
 from datadiff.oracle import Finding
@@ -14,10 +16,13 @@ from datadiff.reward import candidate_issue_family_keys
 from datadiff.runner import run_loaded_case
 from datadiff.triage import (
     build_triage_report,
+    standalone_reproducer_rule_records,
     supports_standalone_reproducer,
     write_standalone_reproducer,
     write_triage_artifact,
 )
+from datadiff.classification_oracle import documented_semantic_rule_records
+from datadiff.classification_oracle import semantic_boundary_rule_records
 from datadiff.util import PROJECT_ROOT, dump_json, load_json, slugify, utc_now
 
 CANDIDATE_PIPELINE_SCHEMA_VERSION = "candidate-pipeline-v1"
@@ -56,6 +61,18 @@ def build_candidate_pipeline(
     pipeline_dir = resolved_output_root / _pipeline_dir_name(resolved_manifest, resolved_evidence_files)
     pipeline_dir.mkdir(parents=True, exist_ok=True)
     frozen_path = pipeline_dir / "frozen-candidates.json"
+    strategy_snapshot_path = write_strategy_snapshot(
+        classification_documented_rules=list(documented_semantic_rule_records()),
+        classification_boundary_rules=list(semantic_boundary_rule_records()),
+        reproducer_rules=list(standalone_reproducer_rule_records()),
+        metadata={
+            "generated_by": "datadiff candidate-pipeline",
+            "pipeline_dir": _project_display_path(pipeline_dir),
+            "source_manifest_file": _project_display_path(resolved_manifest) if resolved_manifest is not None else "",
+        },
+        output_dir=pipeline_dir,
+        snapshot_id="strategy-snapshot",
+    )
     issue_drafts_dir = pipeline_dir / "issue-drafts"
     issue_drafts_dir.mkdir(parents=True, exist_ok=True)
 
@@ -91,7 +108,12 @@ def build_candidate_pipeline(
                 "findings": row.get("findings", []),
                 "normalized": row.get("normalized", {}),
                 "raw_results": row.get("raw_results", {}),
-                "config": row.get("config", {}),
+                "config": {
+                    **(row.get("config", {}) if isinstance(row.get("config", {}), dict) else {}),
+                    "strategy_snapshot_path": str(strategy_snapshot_path),
+                    "freeze_strategy_snapshot": True,
+                    "strategy_learning_path": str(pipeline_dir / "strategy-learning" / "candidate-pipeline-learning.json"),
+                },
                 "candidate_recheck": row.get("candidate_recheck", {}),
                 "bug_dir": row.get("bug_dir", ""),
                 "families": row_families,
@@ -118,6 +140,7 @@ def build_candidate_pipeline(
         "generated_by": "datadiff candidate-pipeline",
         "manifest_file": _project_display_path(resolved_manifest) if resolved_manifest is not None else "",
         "evidence_files": [_project_display_path(path) for path in resolved_evidence_files],
+        "strategy_snapshot_path": _project_display_path(strategy_snapshot_path),
         "candidate_count": len(frozen_rows),
         "candidates": frozen_rows,
     }
@@ -158,6 +181,7 @@ def build_candidate_pipeline(
             "generated_issue_dir": _project_display_path(resolved_generated_issue_dir),
         },
         "frozen_candidates_path": _project_display_path(frozen_path),
+        "strategy_snapshot_path": _project_display_path(strategy_snapshot_path),
         "summary": _candidate_pipeline_summary(candidates, queue),
         "existing_issue_readiness_summary": existing_queue.get("summary", {}),
         "pipeline_issue_readiness_summary": queue.get("summary", {}),
@@ -329,6 +353,23 @@ def _process_candidate(
             "path": _project_display_path(issue_path),
             "status_text": _issue_status_text(dedup),
         }
+    learning_event = append_learning_event(
+        {
+            "candidate_id": candidate_id,
+            "primary_family": primary_family,
+            "families": families,
+            "reproduced": bool(recheck.get("reproduced")),
+            "reproduced_families": list(recheck.get("reproduced_families", []) or []),
+            "triage_verdict": str(triage.get("verdict", "")),
+            "suspicious_backends": list(triage.get("suspicious_backends", []) or []),
+            "reproduced_roots": list(triage.get("reproduced_roots", []) or []),
+            "dedup_status": str(dedup.get("status", "")),
+            "source_run_file": str(row.get("source_run_file", "")),
+            "source_evidence_file": str(row.get("source_evidence_file", "")),
+        },
+        output_dir=pipeline_dir / "strategy-learning",
+        learning_id="candidate-pipeline-learning",
+    )
 
     return {
         "candidate_id": candidate_id,
@@ -345,6 +386,7 @@ def _process_candidate(
         "triage": triage,
         "dedup": dedup,
         "issue_draft": issue_draft,
+        "strategy_learning_path": _project_display_path(learning_event),
         "issue_readiness": {},
     }
 
