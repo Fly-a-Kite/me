@@ -5,6 +5,7 @@ from typing import Any
 from datadiff.backends.base import BackendResult
 from datadiff.backends.pandas_backend import PandasBackend
 from datadiff.dsl import Program, TableData
+from datadiff.operation_semantics import op_column, op_kind
 
 
 class FaultyPandasBackend(PandasBackend):
@@ -35,13 +36,13 @@ class FaultyPandasBackend(PandasBackend):
 def _program_triggers_fault(program: Program, fault: str) -> bool:
     ops = program.operations
     if fault == "filter":
-        return any(op.get("op") == "filter" for op in ops)
+        return any(op_kind(op) == "filter" for op in ops)
     if fault == "groupby":
-        return any(op.get("op") == "groupby" for op in ops)
+        return any(op_kind(op) == "groupby" for op in ops)
     if fault == "join":
-        return any(op.get("op") == "join" for op in ops)
+        return any(op_kind(op) == "join" for op in ops)
     if fault == "mutate":
-        return any(op.get("op") == "mutate" for op in ops)
+        return any(op_kind(op) == "mutate" for op in ops)
     return False
 
 
@@ -80,8 +81,8 @@ def _first_numeric_column(df: Any) -> str | None:
 
 def _last_mutated_output_column(program: Program) -> str | None:
     for op in reversed(program.operations):
-        if op.get("op") == "mutate":
-            return str(op.get("column"))
+        if op_kind(op) == "mutate":
+            return op_column(op)
     return None
 
 

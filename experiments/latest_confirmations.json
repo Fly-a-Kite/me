@@ -17,6 +17,132 @@
       "assignee": "xiedeyantu",
       "checked_at": "2026-05-25T03:56:00+08:00",
       "notes": "GitHub issue is open, labeled bug, and assigned upstream. This is confirmation evidence only; the family remains excluded from fresh rewardable latest discovery if configured as known/saturated."
+    },
+    {
+      "family": "groupby_aggregation@datafusion",
+      "root_cause": "groupby_aggregation",
+      "suspicious_backends": [
+        "datafusion"
+      ],
+      "issue_url": "https://github.com/apache/datafusion/issues/22489",
+      "issue_title": "DataFusion drops grouped row after inner ORDER BY/LIMIT and outer ORDER BY/OFFSET",
+      "upstream_status": "upstream_labeled_bug",
+      "state": "open",
+      "labels": [
+        "bug"
+      ],
+      "assignee": "kumarUjjawal",
+      "checked_at": "2026-05-26T23:21:21+08:00",
+      "notes": "GitHub issue is open, labeled bug, and assigned upstream. The issue was submitted by Fly-a-Kite from DataDiffFuzz evidence."
+    },
+    {
+      "family": "negative_zero_comparison@datafusion",
+      "root_cause": "negative_zero_comparison",
+      "suspicious_backends": [
+        "datafusion"
+      ],
+      "issue_url": "https://github.com/apache/datafusion/issues/22490",
+      "issue_title": "DataFusion evaluates -0.0 >= 0.0 as false",
+      "upstream_status": "upstream_labeled_bug",
+      "state": "open",
+      "labels": [
+        "bug"
+      ],
+      "assignee": "raman20",
+      "checked_at": "2026-05-26T23:21:21+08:00",
+      "notes": "GitHub issue is open, labeled bug, and assigned upstream. The issue was submitted by Fly-a-Kite from DataDiffFuzz evidence."
+    },
+    {
+      "family": "distinct_null_topk@datafusion",
+      "root_cause": "distinct_null_topk",
+      "suspicious_backends": [
+        "datafusion"
+      ],
+      "issue_url": "https://github.com/apache/datafusion/issues/22554",
+      "issue_title": "DISTINCT ORDER BY NULLS FIRST LIMIT returns the wrong top row",
+      "upstream_status": "upstream_labeled_bug",
+      "state": "open",
+      "labels": [
+        "bug"
+      ],
+      "assignee": "",
+      "checked_at": "2026-05-27T12:41:28+08:00",
+      "notes": "GitHub issue is open and labeled bug. It was submitted by Fly-a-Kite from DataDiffFuzz evidence. At this check, the issue body had the Output and Expected behavior snippets reversed; the local draft and reproducer remain correct and a follow-up correction comment is needed."
+    },
+    {
+      "family": "datafusion_limit_idempotence@datafusion",
+      "root_cause": "datafusion_limit_idempotence",
+      "suspicious_backends": [
+        "datafusion"
+      ],
+      "issue_url": "https://github.com/apache/datafusion/issues/22541",
+      "issue_title": "Repeating the same ordered LIMIT over a subquery changes the result",
+      "upstream_status": "upstream_labeled_bug",
+      "state": "open",
+      "labels": [
+        "bug"
+      ],
+      "assignee": "raman20",
+      "checked_at": "2026-05-28T20:10:59+08:00",
+      "notes": "GitHub issue is open, labeled bug, and assigned upstream. It was submitted by Fly-a-Kite from DataDiffFuzz deterministic audit and metamorphic limit-idempotence evidence."
+    },
+    {
+      "family": "groupby_aggregation@polars,polars_lazy",
+      "root_cause": "groupby_aggregation",
+      "suspicious_backends": [
+        "polars",
+        "polars_lazy"
+      ],
+      "issue_url": "https://github.com/pola-rs/polars/issues/27672",
+      "issue_title": "Incorrect descending sort after group_by max with maintain_order=True",
+      "upstream_status": "upstream_labeled_bug",
+      "state": "closed",
+      "labels": [
+        "bug",
+        "python",
+        "accepted",
+        "P-high"
+      ],
+      "assignee": "orlp",
+      "checked_at": "2026-05-26T23:21:21+08:00",
+      "notes": "GitHub issue was submitted by Fly-a-Kite, labeled bug/accepted/P-high, assigned upstream, and is closed."
+    },
+    {
+      "family": "polars_reflected_arithmetic_operand_order@polars",
+      "root_cause": "polars_reflected_arithmetic_operand_order",
+      "suspicious_backends": [
+        "polars"
+      ],
+      "issue_url": "https://github.com/pola-rs/polars/issues/27752",
+      "issue_title": "`Series.__rsub__`, `__rtruediv__`, `__rfloordiv__`, and `__rmod__` use `self op other` instead of `other op self`; `__rpow__(Series)` errors",
+      "upstream_status": "upstream_labeled_bug",
+      "state": "open",
+      "labels": [
+        "bug",
+        "python",
+        "P-medium"
+      ],
+      "assignee": "",
+      "checked_at": "2026-05-30T23:39:02+08:00",
+      "notes": "GitHub issue was submitted by Fly-a-Kite from DataDiffFuzz reflected-operator evidence and is labeled bug/P-medium upstream."
+    },
+    {
+      "family": "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+      "root_cause": "pyarrow_sliced_bool_groupby_any_all",
+      "suspicious_backends": [
+        "pyarrow"
+      ],
+      "issue_url": "https://github.com/apache/arrow/issues/50043",
+      "issue_title": "[Python] Table.group_by(...).aggregate([(\"flag\", \"any\")])` returns incorrect `True` on a sliced Boolean array with nulls",
+      "upstream_status": "upstream_labeled_bug",
+      "state": "open",
+      "labels": [
+        "Type: bug",
+        "Component: Python"
+      ],
+      "assignee": "",
+      "checked_at": "2026-05-30T23:39:02+08:00",
+      "notes": "GitHub issue was submitted by Fly-a-Kite from DataDiffFuzz sliced-Boolean group_by evidence and is labeled Type: bug upstream."
     }
   ]
 }

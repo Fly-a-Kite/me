@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import copy
+from collections import UserDict
 from dataclasses import asdict, dataclass, field
-from typing import Any, Literal
+from keyword import kwlist as PYTHON_KEYWORDS
+from typing import Any, Literal, Mapping
 
 ColumnType = Literal["int", "float", "bool", "str"]
 SortNulls = Literal["first", "last"]
@@ -60,10 +63,17 @@ class TableData:
 class Program:
     program_id: str
     seed: int
-    operations: list[dict[str, Any]] = field(default_factory=list)
+    operations: list["Operation"] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        self.operations = [coerce_operation(operation) for operation in self.operations]
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        return {
+            "program_id": self.program_id,
+            "seed": self.seed,
+            "operations": [operation.to_dict() for operation in self.operations],
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Program":
@@ -71,18 +81,26 @@ class Program:
 
     @property
     def order_sensitive(self) -> bool:
+        from datadiff.operation_semantics import op_kind
+
         row_order_preserving = {
             "filter",
             "tuple_absence_filter",
+            "drop_nulls",
+            "semi_join",
+            "anti_join",
+            "coalesce",
             "running_sum",
             "row_number_filter",
             "select",
+            "fill_null",
+            "case_when",
             "mutate",
             "limit",
             "offset",
         }
         for op in reversed(self.operations):
-            kind = op.get("op")
+            kind = op_kind(op)
             if kind in {"sort", "running_sum", "row_number_filter", "sortedness_check"}:
                 return True
             if kind in row_order_preserving:
@@ -91,7 +109,9 @@ class Program:
         return False
 
     def op_sequence(self) -> list[str]:
-        return [str(op.get("op", "unknown")) for op in self.operations]
+        from datadiff.operation_semantics import operation_names
+
+        return operation_names(self.operations, default="unknown")
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,13 +124,705 @@ class SortKey:
         return {"column": self.column, "ascending": self.ascending, "nulls": self.nulls}
 
 
-def normalize_sort_keys(op: dict[str, Any]) -> list[SortKey]:
+class IRNode(UserDict):
+    _child_roles: dict[str, type["IRNode"]] = {}
+    _list_child_roles: dict[str, type["IRNode"]] = {}
+    _reserved_property_names = frozenset(
+        {
+            *[name for name in dir(dict) if not name.startswith("_")],
+            *[name for name in dir(UserDict) if not name.startswith("_")],
+            *PYTHON_KEYWORDS,
+        }
+    )
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        conflicts = sorted(
+            name
+            for name, value in cls.__dict__.items()
+            if isinstance(value, property) and name in cls._reserved_property_names
+        )
+        if conflicts:
+            names = ", ".join(conflicts)
+            raise TypeError(
+                f"{cls.__name__} defines reserved IR property names: {names}. "
+                "Use semantic aliases that do not shadow mapping methods or Python keywords."
+            )
+
+    def __init__(self, initialdata: Mapping[str, Any] | None = None, /, **kwargs: Any) -> None:
+        payload: dict[str, Any] = {}
+        if initialdata is not None:
+            payload.update(dict(initialdata))
+        if kwargs:
+            payload.update(kwargs)
+        super().__init__()
+        for key, value in payload.items():
+            self.data[str(key)] = self._coerce_key_value(str(key), value)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.data[str(key)] = self._coerce_key_value(str(key), value)
+
+    def _coerce_key_value(self, key: str, value: Any) -> Any:
+        if isinstance(value, IRNode):
+            return value
+        role = self._child_roles.get(key)
+        if role is not None:
+            return _coerce_typed_child(role, value)
+        list_role = self._list_child_roles.get(key)
+        if list_role is not None and isinstance(value, list):
+            return [_coerce_typed_child(list_role, item) for item in value]
+        if key in {"keys", "order_by"} and _looks_like_sort_key_list(value):
+            return [_coerce_typed_child(SortKeySpec, item) for item in value]
+        if isinstance(value, Mapping):
+            return IRNode(value)
+        if isinstance(value, list):
+            return [self._coerce_list_item(item) for item in value]
+        return value
+
+    def _coerce_list_item(self, value: Any) -> Any:
+        if isinstance(value, IRNode):
+            return value
+        if isinstance(value, Mapping):
+            return IRNode(value)
+        if isinstance(value, list):
+            return [self._coerce_list_item(item) for item in value]
+        return value
+
+    def to_dict(self) -> dict[str, Any]:
+        return {key: _unwrap_ir_value(value) for key, value in self.data.items()}
+
+    def copy(self) -> "IRNode":
+        return type(self)(self.to_dict())
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> "IRNode":
+        node = type(self)(copy.deepcopy(self.to_dict(), memo))
+        memo[id(self)] = node
+        return node
+
+
+class Expression(IRNode):
+    @property
+    def kind(self) -> str:
+        return str(self.get("kind", ""))
+
+    @property
+    def source(self) -> str:
+        return str(self.get("source", ""))
+
+
+class StringLowerExpr(Expression):
+    pass
+
+
+class StringUpperExpr(Expression):
+    pass
+
+
+class StringStripExpr(Expression):
+    pass
+
+
+class StringReplaceExpr(Expression):
+    @property
+    def old(self) -> Any:
+        return self.get("old")
+
+    @property
+    def new(self) -> Any:
+        return self.get("new")
+
+
+class StringSliceExpr(Expression):
+    @property
+    def start(self) -> Any:
+        return self.get("start")
+
+    @property
+    def length(self) -> Any:
+        return self.get("length")
+
+
+class StringSplitPartExpr(Expression):
+    @property
+    def separator(self) -> Any:
+        return self.get("sep")
+
+    @property
+    def index(self) -> Any:
+        return self.get("index")
+
+
+class StringBasenameExpr(Expression):
+    pass
+
+
+class StringConcatExpr(Expression):
+    @property
+    def other(self) -> str:
+        return str(self.get("other", ""))
+
+    @property
+    def separator(self) -> str:
+        return str(self.get("sep", ""))
+
+
+class StringContainsExpr(Expression):
+    @property
+    def needle(self) -> Any:
+        return self.get("needle")
+
+
+class StringStartsWithExpr(Expression):
+    @property
+    def needle(self) -> Any:
+        return self.get("needle")
+
+
+class StringEndsWithExpr(Expression):
+    @property
+    def needle(self) -> Any:
+        return self.get("needle")
+
+
+class StringLengthExpr(Expression):
+    pass
+
+
+class StringNullIfEmptyExpr(Expression):
+    pass
+
+
+class AddConstExpr(Expression):
+    @property
+    def value(self) -> Any:
+        return self.get("value")
+
+
+class ArithConstExpr(Expression):
+    @property
+    def operator(self) -> str:
+        return str(self.get("op", ""))
+
+    @property
+    def value(self) -> Any:
+        return self.get("value")
+
+
+class CastExpr(Expression):
+    @property
+    def target_type(self) -> str:
+        return str(self.get("to", ""))
+
+    @property
+    def input_domain(self) -> str:
+        return str(self.get("input_domain", ""))
+
+
+class AbsExpr(Expression):
+    pass
+
+
+class ClipExpr(Expression):
+    @property
+    def lower(self) -> Any:
+        return self.get("lower")
+
+    @property
+    def upper(self) -> Any:
+        return self.get("upper")
+
+
+class BoolNotExpr(Expression):
+    pass
+
+
+class DatePartExpr(Expression):
+    @property
+    def part(self) -> str:
+        return str(self.get("part", ""))
+
+
+class ReverseDivisionColumnsExpr(Expression):
+    @property
+    def numerator(self) -> str:
+        return str(self.get("numerator", ""))
+
+
+class Condition(IRNode):
+    @property
+    def comparator(self) -> str:
+        return str(self.get("cmp", ""))
+
+    @property
+    def column(self) -> str:
+        return str(self.get("column", ""))
+
+    @property
+    def value(self) -> Any:
+        return self.get("value")
+
+
+class BooleanPredicateCondition(Condition):
+    pass
+
+
+class AggregateSpec(IRNode):
+    @property
+    def func(self) -> str:
+        return str(self.get("func", ""))
+
+    @property
+    def column(self) -> str:
+        return str(self.get("column", ""))
+
+    @property
+    def alias(self) -> str:
+        return str(self.get("as", ""))
+
+    @property
+    def output_name(self) -> str:
+        return self.alias
+
+
+class SortKeySpec(IRNode):
+    @property
+    def column(self) -> str:
+        return str(self.get("column", ""))
+
+    @property
+    def ascending(self) -> bool:
+        value = self.get("ascending", True)
+        return value if isinstance(value, bool) else bool(value)
+
+    @property
+    def nulls(self) -> SortNulls:
+        value = str(self.get("nulls", "last"))
+        return "first" if value == "first" else "last"
+
+
+def _normalized_column_list(value: Any) -> list[str]:
+    if isinstance(value, (list, tuple)):
+        return [str(item) for item in value if str(item)]
+    column = str(value or "")
+    return [column] if column else []
+
+
+class Operation(IRNode):
+    _child_roles = {
+        "expr": Expression,
+        "condition": Condition,
+    }
+    _list_child_roles = {
+        "aggs": AggregateSpec,
+    }
+
+    @property
+    def kind(self) -> str:
+        return str(self.get("op", ""))
+
+    @property
+    def output_alias(self) -> str:
+        return str(self.get("as", ""))
+
+    @property
+    def table(self) -> str:
+        return str(self.get("table", ""))
+
+
+class FilterOp(Operation):
+    @property
+    def column(self) -> str:
+        return str(self.get("column", ""))
+
+    @property
+    def comparator(self) -> str:
+        return str(self.get("cmp", ""))
+
+
+class TupleAbsenceFilterOp(Operation):
+    @property
+    def columns(self) -> list[str]:
+        return _normalized_column_list(self.get("columns", []))
+
+    @property
+    def right_columns(self) -> list[str]:
+        return _normalized_column_list(self.get("right_columns", []))
+
+
+class UnionAllOp(Operation):
+    pass
+
+
+class DropNullsOp(Operation):
+    @property
+    def columns(self) -> list[str]:
+        return _normalized_column_list(self.get("columns", []))
+
+
+class FillNullOp(Operation):
+    @property
+    def column(self) -> str:
+        return str(self.get("column", ""))
+
+    @property
+    def value(self) -> Any:
+        return self.get("value")
+
+
+class CoalesceOp(Operation):
+    @property
+    def sources(self) -> list[str]:
+        return _normalized_column_list(self.get("columns", []))
+
+    @property
+    def fallback(self) -> Any:
+        return self.get("fallback")
+
+
+class CaseWhenOp(Operation):
+    _child_roles = {
+        **Operation._child_roles,
+        "condition": Condition,
+    }
+
+    @property
+    def then_value(self) -> Any:
+        return self.get("then")
+
+    @property
+    def else_value(self) -> Any:
+        return self.get("else")
+
+
+class MutateOp(Operation):
+    _child_roles = {
+        **Operation._child_roles,
+        "expr": Expression,
+    }
+
+    @property
+    def column(self) -> str:
+        return str(self.get("column", ""))
+
+    @property
+    def expression(self) -> Expression | None:
+        expr = self.get("expr")
+        return expr if isinstance(expr, Expression) else None
+
+
+class RowNumberFilterOp(Operation):
+    @property
+    def partition_columns(self) -> list[str]:
+        return _normalized_column_list(self.get("partition_by", []))
+
+    @property
+    def order_keys(self) -> list[SortKey]:
+        return normalize_sort_keys({"keys": self.get("order_by", [])})
+
+    @property
+    def comparator(self) -> str:
+        return str(self.get("cmp", ""))
+
+    @property
+    def value(self) -> Any:
+        return self.get("value")
+
+
+class RunningSumOp(Operation):
+    @property
+    def source(self) -> str:
+        return str(self.get("source", ""))
+
+    @property
+    def column(self) -> str:
+        return str(self.get("column", ""))
+
+    @property
+    def partition_columns(self) -> list[str]:
+        return _normalized_column_list(self.get("partition_by", []))
+
+    @property
+    def order_keys(self) -> list[SortKey]:
+        return normalize_sort_keys({"keys": self.get("order_by", [])})
+
+
+class SortednessCheckOp(Operation):
+    @property
+    def column(self) -> str:
+        return str(self.get("column", ""))
+
+    @property
+    def ascending(self) -> Any:
+        return self.get("ascending", True)
+
+    @property
+    def nulls(self) -> str:
+        return str(self.get("nulls", "last"))
+
+
+class ProbeOp(Operation):
+    @property
+    def rows(self) -> Any:
+        return self.get("rows")
+
+    @property
+    def branches(self) -> Any:
+        return self.get("branches")
+
+    @property
+    def probe_values(self) -> list[Any]:
+        value = self.get("values", [])
+        return list(value) if isinstance(value, (list, tuple)) else ([] if value is None else [value])
+
+    @property
+    def quantiles(self) -> list[Any]:
+        value = self.get("quantiles", [])
+        return list(value) if isinstance(value, (list, tuple)) else ([] if value is None else [value])
+
+    @property
+    def literal(self) -> Any:
+        return self.get("literal")
+
+
+class JoinLikeOp(Operation):
+    @property
+    def left_keys(self) -> list[str]:
+        return _normalized_column_list(self.get("left_on"))
+
+    @property
+    def right_keys(self) -> list[str]:
+        return _normalized_column_list(self.get("right_on"))
+
+
+class JoinOp(JoinLikeOp):
+    @property
+    def how(self) -> str:
+        return str(self.get("how", ""))
+
+
+class SemiJoinOp(JoinLikeOp):
+    pass
+
+
+class AntiJoinOp(JoinLikeOp):
+    pass
+
+
+class DistinctOp(Operation):
+    @property
+    def columns(self) -> list[str]:
+        return _normalized_column_list(self.get("columns", []))
+
+
+class SelectOp(Operation):
+    @property
+    def columns(self) -> list[str]:
+        return _normalized_column_list(self.get("columns", []))
+
+
+class GroupByOp(Operation):
+    _list_child_roles = {
+        **Operation._list_child_roles,
+        "aggs": AggregateSpec,
+    }
+
+    @property
+    def group_keys(self) -> list[str]:
+        return [str(key) for key in self.get("keys", [])]
+
+    @property
+    def aggregates(self) -> list[AggregateSpec]:
+        return [agg for agg in self.get("aggs", []) if isinstance(agg, AggregateSpec)]
+
+    @property
+    def aggregate_aliases(self) -> list[str]:
+        return [agg.alias for agg in self.aggregates if agg.alias]
+
+
+class AggregateOp(Operation):
+    _list_child_roles = {
+        **Operation._list_child_roles,
+        "aggs": AggregateSpec,
+    }
+
+    @property
+    def aggregates(self) -> list[AggregateSpec]:
+        return [agg for agg in self.get("aggs", []) if isinstance(agg, AggregateSpec)]
+
+    @property
+    def aggregate_aliases(self) -> list[str]:
+        return [agg.alias for agg in self.aggregates if agg.alias]
+
+    @property
+    def columns(self) -> list[str]:
+        return [agg.column for agg in self.aggregates if agg.column]
+
+
+class SortOp(Operation):
+    @property
+    def sort_keys(self) -> list[SortKey]:
+        return normalize_sort_keys(self)
+
+
+class LimitOp(Operation):
+    @property
+    def n(self) -> Any:
+        return self.get("n")
+
+
+class OffsetOp(Operation):
+    @property
+    def n(self) -> Any:
+        return self.get("n")
+
+
+EXPRESSION_NODE_TYPES: dict[str, type[Expression]] = {
+    "string_lower": StringLowerExpr,
+    "string_upper": StringUpperExpr,
+    "string_strip": StringStripExpr,
+    "string_replace": StringReplaceExpr,
+    "string_slice": StringSliceExpr,
+    "string_split_part": StringSplitPartExpr,
+    "string_basename": StringBasenameExpr,
+    "string_concat": StringConcatExpr,
+    "string_contains": StringContainsExpr,
+    "string_starts_with": StringStartsWithExpr,
+    "string_ends_with": StringEndsWithExpr,
+    "string_length": StringLengthExpr,
+    "string_null_if_empty": StringNullIfEmptyExpr,
+    "add_const": AddConstExpr,
+    "arith_const": ArithConstExpr,
+    "cast": CastExpr,
+    "abs": AbsExpr,
+    "clip": ClipExpr,
+    "bool_not": BoolNotExpr,
+    "date_part": DatePartExpr,
+    "reverse_division_columns": ReverseDivisionColumnsExpr,
+}
+
+
+OPERATION_NODE_TYPES: dict[str, type[Operation]] = {
+    "filter": FilterOp,
+    "tuple_absence_filter": TupleAbsenceFilterOp,
+    "union_all": UnionAllOp,
+    "drop_nulls": DropNullsOp,
+    "fill_null": FillNullOp,
+    "coalesce": CoalesceOp,
+    "case_when": CaseWhenOp,
+    "mutate": MutateOp,
+    "row_number_filter": RowNumberFilterOp,
+    "running_sum": RunningSumOp,
+    "sortedness_check": SortednessCheckOp,
+    "random_case_probe": ProbeOp,
+    "group_quantile_probe": ProbeOp,
+    "scalar_subquery_probe": ProbeOp,
+    "window_avg_probe": ProbeOp,
+    "struct_distinct_probe": ProbeOp,
+    "bit_compare_probe": ProbeOp,
+    "round_even_probe": ProbeOp,
+    "float_literal_precision_probe": ProbeOp,
+    "timestamp_precision_filter_probe": ProbeOp,
+    "series_rtruediv_probe": ProbeOp,
+    "uint64_isin_probe": ProbeOp,
+    "tuple_anti_null_probe": ProbeOp,
+    "setop_all_duplicate_probe": ProbeOp,
+    "json_predicate_order_probe": ProbeOp,
+    "sparse_mask_probe": ProbeOp,
+    "float_wrap_probe": ProbeOp,
+    "index_bool_probe": ProbeOp,
+    "empty_literal_groupby_probe": ProbeOp,
+    "arrow_string_eq_sum_probe": ProbeOp,
+    "arrow_timestamp_loc_slice_probe": ProbeOp,
+    "arrow_timestamp_index_attr_probe": ProbeOp,
+    "eval_inplace_alias_probe": ProbeOp,
+    "bool_reduction_skipna_probe": ProbeOp,
+    "dataset_isin_all_match_probe": ProbeOp,
+    "run_end_null_compute_probe": ProbeOp,
+    "large_string_partition_probe": ProbeOp,
+    "hash_pivot_wider_probe": ProbeOp,
+    "list_flatten_parent_indices_probe": ProbeOp,
+    "rolling_mean_by_null_count_probe": ProbeOp,
+    "csv_long_numeric_roundtrip_probe": ProbeOp,
+    "join": JoinOp,
+    "semi_join": SemiJoinOp,
+    "anti_join": AntiJoinOp,
+    "distinct": DistinctOp,
+    "select": SelectOp,
+    "groupby": GroupByOp,
+    "aggregate": AggregateOp,
+    "sort": SortOp,
+    "limit": LimitOp,
+    "offset": OffsetOp,
+}
+
+
+def _looks_like_sort_key_list(value: Any) -> bool:
+    return isinstance(value, list) and bool(value) and all(
+        isinstance(item, Mapping) and "column" in item
+        for item in value
+    )
+
+
+def _unwrap_ir_value(value: Any) -> Any:
+    if isinstance(value, IRNode):
+        return value.to_dict()
+    if isinstance(value, list):
+        return [_unwrap_ir_value(item) for item in value]
+    return value
+
+
+def _coerce_typed_child(role: type[IRNode], value: Any) -> Any:
+    if not isinstance(value, Mapping):
+        return value
+    if issubclass(role, Expression):
+        return coerce_expression(value)
+    if issubclass(role, Condition):
+        return coerce_condition(value)
+    if issubclass(role, AggregateSpec):
+        return AggregateSpec(value)
+    if issubclass(role, SortKeySpec):
+        return SortKeySpec(value)
+    return role(value)
+
+
+def coerce_expression(expression: Mapping[str, Any] | Expression) -> Expression:
+    if isinstance(expression, Expression):
+        return expression
+    if not isinstance(expression, Mapping):
+        raise TypeError(f"expression must be a mapping, got {type(expression).__name__}")
+    kind = str(expression.get("kind", ""))
+    expr_type = EXPRESSION_NODE_TYPES.get(kind, Expression)
+    return expr_type(expression)
+
+
+def coerce_condition(condition: Mapping[str, Any] | Condition) -> Condition:
+    if isinstance(condition, Condition):
+        return condition
+    if not isinstance(condition, Mapping):
+        raise TypeError(f"condition must be a mapping, got {type(condition).__name__}")
+    cmp = str(condition.get("cmp", ""))
+    if cmp.startswith("bool_"):
+        return BooleanPredicateCondition(condition)
+    return Condition(condition)
+
+
+def coerce_operation(operation: Mapping[str, Any] | Operation) -> Operation:
+    if isinstance(operation, Operation):
+        return operation
+    if not isinstance(operation, Mapping):
+        raise TypeError(f"operation must be a mapping, got {type(operation).__name__}")
+    kind = str(operation.get("op", ""))
+    op_type = OPERATION_NODE_TYPES.get(kind, Operation)
+    return op_type(operation)
+
+
+def normalize_sort_keys(op: Mapping[str, Any]) -> list[SortKey]:
     """Return the canonical per-column sort keys for old and new sort ops."""
 
     if "keys" in op:
         keys = []
         for item in op.get("keys", []):
-            if not isinstance(item, dict):
+            if not isinstance(item, Mapping):
                 raise ValueError(f"sort key must be a mapping: {item!r}")
             column = item.get("column")
             ascending = item.get("ascending", True)
@@ -136,7 +848,7 @@ def normalize_sort_keys(op: dict[str, Any]) -> list[SortKey]:
     return keys
 
 
-def sort_columns(op: dict[str, Any]) -> list[str]:
+def sort_columns(op: Mapping[str, Any]) -> list[str]:
     return [key.column for key in normalize_sort_keys(op)]
 
 

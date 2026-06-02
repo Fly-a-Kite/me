@@ -145,5 +145,17 @@
   "pattern_analyses": {
     "null_agg_topk_markdown": "reports/pattern-variants-null_agg_topk-experiment-20260514T195546.md",
     "null_agg_topk_csv": "reports/pattern-variants-null_agg_topk-experiment-20260514T195546.csv"
+  },
+  "harness_evidence": {
+    "freeze_manifest": {
+      "json": "reports/final-freeze-manifest-20260522T0034+0800.json",
+      "markdown": "reports/final-freeze-manifest-20260522T0034+0800.md"
+    },
+    "freeze_runtime": {
+      "pip_freeze_live": "reports/pip-freeze-final-live-freeze-20260522.txt",
+      "pip_freeze_latest": "reports/pip-freeze-final-live-latest.txt",
+      "pytest_live": "reports/pytest-final-live-freeze-20260522.txt",
+      "uname_live": "reports/uname-freeze-20260522.txt"
+    }
   }
 }

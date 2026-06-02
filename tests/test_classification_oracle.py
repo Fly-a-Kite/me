@@ -9,7 +9,13 @@ def _case(ops):
     return Case(
         "case-x",
         1,
-        [TableData("t0", [ColumnSpec("x", "int"), ColumnSpec("s", "str")], [{"x": 1, "s": "Alpha"}])],
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("x", "int"), ColumnSpec("s", "str"), ColumnSpec("flag", "bool")],
+                [{"x": 1, "s": "Alpha", "flag": True}],
+            )
+        ],
         Program("prog-x", 1, ops),
     )
 
@@ -29,6 +35,427 @@ def test_classification_marks_invalid_generated_program_false_positive():
     assert classification.false_positive is True
     assert classification.false_positive_reason == "invalid_generated_program"
     assert validate_case_program(case)
+
+
+def test_validate_case_program_accepts_and_rejects_string_contains_filter():
+    valid = _case([{"op": "filter", "column": "s", "cmp": "str_contains", "value": "Al"}])
+    valid_prefix = _case([{"op": "filter", "column": "s", "cmp": "str_starts_with", "value": "A"}])
+    valid_suffix = _case([{"op": "filter", "column": "s", "cmp": "str_ends_with", "value": "a"}])
+    wrong_type = _case([{"op": "filter", "column": "x", "cmp": "str_contains", "value": "1"}])
+    empty_literal = _case([{"op": "filter", "column": "s", "cmp": "str_contains", "value": ""}])
+    null_literal = _case([{"op": "filter", "column": "s", "cmp": "str_contains", "value": None}])
+
+    assert validate_case_program(valid) == []
+    assert validate_case_program(valid_prefix) == []
+    assert validate_case_program(valid_suffix) == []
+    assert "not supported for int filter" in validate_case_program(wrong_type)[0]
+    assert "non-empty string for str_contains" in validate_case_program(empty_literal)[0]
+    assert "non-empty string for str_contains" in validate_case_program(null_literal)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_numeric_clip_mutate():
+    valid = _case([{"op": "mutate", "column": "x_clip", "expr": {"kind": "clip", "source": "x", "lower": -2, "upper": 2}}])
+    missing = _case([{"op": "mutate", "column": "bad", "expr": {"kind": "clip", "source": "missing", "lower": -2, "upper": 2}}])
+    reversed_bounds = _case([{"op": "mutate", "column": "bad", "expr": {"kind": "clip", "source": "x", "lower": 2, "upper": -2}}])
+    string_source = _case([{"op": "mutate", "column": "bad", "expr": {"kind": "clip", "source": "s", "lower": -2, "upper": 2}}])
+
+    assert validate_case_program(valid) == []
+    assert "invalid mutate expression" in validate_case_program(missing)[0]
+    assert "invalid mutate expression" in validate_case_program(reversed_bounds)[0]
+    assert "invalid mutate expression" in validate_case_program(string_source)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_numeric_abs_mutate():
+    valid = _case([{"op": "mutate", "column": "x_abs", "expr": {"kind": "abs", "source": "x"}}])
+    missing = _case([{"op": "mutate", "column": "bad", "expr": {"kind": "abs", "source": "missing"}}])
+    string_source = _case([{"op": "mutate", "column": "bad", "expr": {"kind": "abs", "source": "s"}}])
+
+    assert validate_case_program(valid) == []
+    assert "invalid mutate expression" in validate_case_program(missing)[0]
+    assert "invalid mutate expression" in validate_case_program(string_source)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_string_strip_mutate():
+    valid = _case([{"op": "mutate", "column": "s_clean", "expr": {"kind": "string_strip", "source": "s"}}])
+    missing = _case([{"op": "mutate", "column": "bad", "expr": {"kind": "string_strip", "source": "missing"}}])
+    numeric_source = _case([{"op": "mutate", "column": "bad", "expr": {"kind": "string_strip", "source": "x"}}])
+
+    assert validate_case_program(valid) == []
+    assert "invalid mutate expression" in validate_case_program(missing)[0]
+    assert "invalid mutate expression" in validate_case_program(numeric_source)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_string_replace_mutate():
+    valid = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "s_token",
+                "expr": {"kind": "string_replace", "source": "s", "old": " ", "new": "_"},
+            }
+        ]
+    )
+    missing = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_replace", "source": "missing", "old": " ", "new": "_"},
+            }
+        ]
+    )
+    numeric_source = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_replace", "source": "x", "old": " ", "new": "_"},
+            }
+        ]
+    )
+    empty_pattern = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_replace", "source": "s", "old": "", "new": "_"},
+            }
+        ]
+    )
+
+    assert validate_case_program(valid) == []
+    assert "invalid mutate expression" in validate_case_program(missing)[0]
+    assert "invalid mutate expression" in validate_case_program(numeric_source)[0]
+    assert "invalid mutate expression" in validate_case_program(empty_pattern)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_string_slice_mutate():
+    valid = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "s_prefix",
+                "expr": {"kind": "string_slice", "source": "s", "start": 0, "length": 3},
+            }
+        ]
+    )
+    missing = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_slice", "source": "missing", "start": 0, "length": 3},
+            }
+        ]
+    )
+    numeric_source = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_slice", "source": "x", "start": 0, "length": 3},
+            }
+        ]
+    )
+    negative_start = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_slice", "source": "s", "start": -1, "length": 3},
+            }
+        ]
+    )
+
+    assert validate_case_program(valid) == []
+    assert "invalid mutate expression" in validate_case_program(missing)[0]
+    assert "invalid mutate expression" in validate_case_program(numeric_source)[0]
+    assert "invalid mutate expression" in validate_case_program(negative_start)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_string_null_if_empty_mutate():
+    valid = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "s_norm",
+                "expr": {"kind": "string_null_if_empty", "source": "s"},
+            }
+        ]
+    )
+    missing = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_null_if_empty", "source": "missing"},
+            }
+        ]
+    )
+    numeric_source = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_null_if_empty", "source": "x"},
+            }
+        ]
+    )
+
+    assert validate_case_program(valid) == []
+    assert "invalid mutate expression" in validate_case_program(missing)[0]
+    assert "invalid mutate expression" in validate_case_program(numeric_source)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_string_split_part_mutate():
+    valid = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "s_token",
+                "expr": {"kind": "string_split_part", "source": "s", "sep": " ", "index": 0},
+            }
+        ]
+    )
+    numeric_source = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_split_part", "source": "x", "sep": " ", "index": 0},
+            }
+        ]
+    )
+    empty_separator = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_split_part", "source": "s", "sep": "", "index": 0},
+            }
+        ]
+    )
+    later_token = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_split_part", "source": "s", "sep": " ", "index": 1},
+            }
+        ]
+    )
+
+    assert validate_case_program(valid) == []
+    assert "invalid mutate expression" in validate_case_program(numeric_source)[0]
+    assert "invalid mutate expression" in validate_case_program(empty_separator)[0]
+    assert "invalid mutate expression" in validate_case_program(later_token)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_date_part_mutate():
+    valid = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "year",
+                "expr": {"kind": "date_part", "source": "s", "part": "year"},
+            }
+        ]
+    )
+    numeric_source = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "date_part", "source": "x", "part": "year"},
+            }
+        ]
+    )
+    bad_part = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "date_part", "source": "s", "part": "hour"},
+            }
+        ]
+    )
+
+    assert validate_case_program(valid) == []
+    assert "invalid mutate expression" in validate_case_program(numeric_source)[0]
+    assert "invalid mutate expression" in validate_case_program(bad_part)[0]
+
+
+def test_validate_case_program_accepts_cast_boundary_mutate():
+    numeric_text_case = Case(
+        "case-cast-boundary",
+        1,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("x", "int"), ColumnSpec("num_s", "str"), ColumnSpec("label", "str")],
+                [{"x": 1, "num_s": "10", "label": "alpha"}],
+            )
+        ],
+        Program(
+            "prog-cast-boundary",
+            1,
+            [
+                {"op": "mutate", "column": "num_i", "expr": {"kind": "cast", "source": "num_s", "to": "int", "input_domain": "integer_string"}},
+                {"op": "mutate", "column": "num_f", "expr": {"kind": "cast", "source": "num_i", "to": "float"}},
+                {"op": "mutate", "column": "num_label", "expr": {"kind": "cast", "source": "num_i", "to": "str"}},
+            ],
+        ),
+    )
+    missing_domain = _case([{"op": "mutate", "column": "bad", "expr": {"kind": "cast", "source": "s", "to": "int"}}])
+    bad_target = _case([{"op": "mutate", "column": "bad", "expr": {"kind": "cast", "source": "x", "to": "bool"}}])
+    bool_to_str = _case([{"op": "mutate", "column": "bad", "expr": {"kind": "cast", "source": "flag", "to": "str"}}])
+
+    assert validate_case_program(numeric_text_case) == []
+    assert "invalid mutate expression" in validate_case_program(missing_domain)[0]
+    assert "invalid mutate expression" in validate_case_program(bad_target)[0]
+    assert "invalid mutate expression" in validate_case_program(bool_to_str)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_string_concat_mutate():
+    valid = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "label",
+                "expr": {"kind": "string_concat", "source": "s", "other": "s", "sep": "-"},
+            }
+        ]
+    )
+    missing = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_concat", "source": "s", "other": "missing", "sep": "-"},
+            }
+        ]
+    )
+    numeric_other = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_concat", "source": "s", "other": "x", "sep": "-"},
+            }
+        ]
+    )
+    non_string_separator = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_concat", "source": "s", "other": "s", "sep": 1},
+            }
+        ]
+    )
+
+    assert validate_case_program(valid) == []
+    assert "invalid mutate expression" in validate_case_program(missing)[0]
+    assert "invalid mutate expression" in validate_case_program(numeric_other)[0]
+    assert "invalid mutate expression" in validate_case_program(non_string_separator)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_string_contains_mutate():
+    valid = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "has_a",
+                "expr": {"kind": "string_contains", "source": "s", "needle": "a"},
+            }
+        ]
+    )
+    missing = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_contains", "source": "missing", "needle": "a"},
+            }
+        ]
+    )
+    numeric_source = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_contains", "source": "x", "needle": "a"},
+            }
+        ]
+    )
+    non_string_needle = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_contains", "source": "s", "needle": 1},
+            }
+        ]
+    )
+
+    assert validate_case_program(valid) == []
+    assert "invalid mutate expression" in validate_case_program(missing)[0]
+    assert "invalid mutate expression" in validate_case_program(numeric_source)[0]
+    assert "invalid mutate expression" in validate_case_program(non_string_needle)[0]
+
+
+def test_validate_case_program_accepts_string_starts_and_ends_with_mutate():
+    starts = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "starts_a",
+                "expr": {"kind": "string_starts_with", "source": "s", "needle": "A"},
+            }
+        ]
+    )
+    ends = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "ends_a",
+                "expr": {"kind": "string_ends_with", "source": "s", "needle": "a"},
+            }
+        ]
+    )
+    numeric_source = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_starts_with", "source": "x", "needle": "A"},
+            }
+        ]
+    )
+    non_string_needle = _case(
+        [
+            {
+                "op": "mutate",
+                "column": "bad",
+                "expr": {"kind": "string_ends_with", "source": "s", "needle": 1},
+            }
+        ]
+    )
+
+    assert validate_case_program(starts) == []
+    assert validate_case_program(ends) == []
+    assert "invalid mutate expression" in validate_case_program(numeric_source)[0]
+    assert "invalid mutate expression" in validate_case_program(non_string_needle)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_bool_not_mutate():
+    valid = _case([{"op": "mutate", "column": "not_flag", "expr": {"kind": "bool_not", "source": "flag"}}])
+    missing = _case([{"op": "mutate", "column": "bad", "expr": {"kind": "bool_not", "source": "missing"}}])
+    numeric_source = _case([{"op": "mutate", "column": "bad", "expr": {"kind": "bool_not", "source": "x"}}])
+
+    assert validate_case_program(valid) == []
+    assert "invalid mutate expression" in validate_case_program(missing)[0]
+    assert "invalid mutate expression" in validate_case_program(numeric_source)[0]
 
 
 def test_annotate_findings_marks_issue_replay_origin():
@@ -95,6 +522,210 @@ def test_validate_case_program_accepts_and_rejects_per_column_sort_keys():
 
     assert validate_case_program(valid) == []
     assert "invalid sort keys" in validate_case_program(invalid)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_distinct_columns():
+    valid = _case([{"op": "distinct", "columns": ["x", "s"]}])
+    missing = _case([{"op": "distinct", "columns": ["x", "missing"]}])
+    duplicate = _case([{"op": "distinct", "columns": ["x", "x"]}])
+    empty = _case([{"op": "distinct", "columns": []}])
+
+    assert validate_case_program(valid) == []
+    assert "distinct columns unavailable" in validate_case_program(missing)[0]
+    assert "distinct contains duplicate columns" in validate_case_program(duplicate)[0]
+    assert "distinct has no columns" in validate_case_program(empty)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_fill_null():
+    valid = _case([{"op": "fill_null", "column": "x", "value": 0}])
+    missing = _case([{"op": "fill_null", "column": "missing", "value": 0}])
+    null_value = _case([{"op": "fill_null", "column": "x", "value": None}])
+    incompatible = _case([{"op": "fill_null", "column": "x", "value": "zero"}])
+
+    assert validate_case_program(valid) == []
+    assert "fill_null column unavailable" in validate_case_program(missing)[0]
+    assert "fill_null value must not be NULL" in validate_case_program(null_value)[0]
+    assert "fill_null literal" in validate_case_program(incompatible)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_coalesce():
+    valid = Case(
+        "case-coalesce-valid",
+        1,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("g", "str"), ColumnSpec("s", "str"), ColumnSpec("x", "int")],
+                [{"g": None, "s": "fallback", "x": 1}],
+            )
+        ],
+        Program("prog-coalesce-valid", 1, [{"op": "coalesce", "columns": ["g", "s"], "as": "label", "fallback": "missing"}]),
+    )
+    missing = _case([{"op": "coalesce", "columns": ["s", "missing"], "as": "label"}])
+    duplicate = _case([{"op": "coalesce", "columns": ["s", "s"], "as": "label"}])
+    narrow = _case([{"op": "coalesce", "columns": ["s"], "as": "label"}])
+    reserved = _case([{"op": "coalesce", "columns": ["x", "s"], "as": "select"}])
+    type_mismatch = _case([{"op": "coalesce", "columns": ["x", "s"], "as": "label"}])
+    bad_fallback = Case(
+        "case-coalesce-bad-fallback",
+        1,
+        [TableData("t0", [ColumnSpec("x", "int"), ColumnSpec("y", "int")], [{"x": None, "y": 1}])],
+        Program("prog-coalesce-bad-fallback", 1, [{"op": "coalesce", "columns": ["x", "y"], "as": "label", "fallback": "zero"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert "coalesce columns unavailable" in validate_case_program(missing)[0]
+    assert "coalesce contains duplicate columns" in validate_case_program(duplicate)[0]
+    assert "coalesce needs at least two columns" in validate_case_program(narrow)[0]
+    assert "coalesce output alias" in validate_case_program(reserved)[0]
+    assert "coalesce column type mismatch" in validate_case_program(type_mismatch)[0]
+    assert "coalesce fallback literal" in validate_case_program(bad_fallback)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_case_when():
+    valid = _case(
+        [
+            {
+                "op": "case_when",
+                "as": "label",
+                "condition": {"column": "x", "cmp": ">=", "value": 0},
+                "then": "yes",
+                "else": "no",
+            }
+        ]
+    )
+    missing = _case(
+        [
+            {
+                "op": "case_when",
+                "as": "label",
+                "condition": {"column": "missing", "cmp": ">=", "value": 0},
+                "then": "yes",
+                "else": "no",
+            }
+        ]
+    )
+    reserved = _case(
+        [
+            {
+                "op": "case_when",
+                "as": "select",
+                "condition": {"column": "x", "cmp": ">=", "value": 0},
+                "then": "yes",
+                "else": "no",
+            }
+        ]
+    )
+    bad_branch_types = _case(
+        [
+            {
+                "op": "case_when",
+                "as": "label",
+                "condition": {"column": "x", "cmp": ">=", "value": 0},
+                "then": "yes",
+                "else": 0,
+            }
+        ]
+    )
+
+    assert validate_case_program(valid) == []
+    assert "case_when condition column unavailable" in validate_case_program(missing)[0]
+    assert "case_when output alias" in validate_case_program(reserved)[0]
+    assert "case_when branch literals are incompatible" in validate_case_program(bad_branch_types)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_union_all():
+    valid = Case(
+        "case-union-valid",
+        1,
+        [
+            TableData("t0", [ColumnSpec("x", "int"), ColumnSpec("s", "str")], [{"x": 1, "s": "a"}]),
+            TableData("t_append", [ColumnSpec("x", "int"), ColumnSpec("s", "str")], [{"x": 2, "s": "b"}]),
+        ],
+        Program("prog-union-valid", 1, [{"op": "union_all", "table": "t_append"}]),
+    )
+    missing_table = _case([{"op": "union_all", "table": "missing"}])
+    missing_column = Case(
+        "case-union-missing-column",
+        1,
+        [
+            TableData("t0", [ColumnSpec("x", "int"), ColumnSpec("s", "str")], [{"x": 1, "s": "a"}]),
+            TableData("t_append", [ColumnSpec("x", "int")], [{"x": 2}]),
+        ],
+        Program("prog-union-missing-column", 1, [{"op": "union_all", "table": "t_append"}]),
+    )
+    type_mismatch = Case(
+        "case-union-type-mismatch",
+        1,
+        [
+            TableData("t0", [ColumnSpec("x", "int"), ColumnSpec("s", "str")], [{"x": 1, "s": "a"}]),
+            TableData("t_append", [ColumnSpec("x", "float"), ColumnSpec("s", "str")], [{"x": 2.0, "s": "b"}]),
+        ],
+        Program("prog-union-type-mismatch", 1, [{"op": "union_all", "table": "t_append"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert "unknown union_all table" in validate_case_program(missing_table)[0]
+    assert "union_all columns unavailable" in validate_case_program(missing_column)[0]
+    assert "union_all column type mismatch" in validate_case_program(type_mismatch)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_drop_nulls_columns():
+    valid = _case([{"op": "drop_nulls", "columns": ["x", "s"]}])
+    missing = _case([{"op": "drop_nulls", "columns": ["x", "missing"]}])
+    duplicate = _case([{"op": "drop_nulls", "columns": ["x", "x"]}])
+    empty = _case([{"op": "drop_nulls", "columns": []}])
+
+    assert validate_case_program(valid) == []
+    assert "drop_nulls columns unavailable" in validate_case_program(missing)[0]
+    assert "drop_nulls contains duplicate columns" in validate_case_program(duplicate)[0]
+    assert "drop_nulls has no columns" in validate_case_program(empty)[0]
+
+
+def test_validate_case_program_accepts_and_rejects_semi_and_anti_join_keys():
+    valid = Case(
+        "case-semi-valid",
+        1,
+        [
+            TableData("t0", [ColumnSpec("id", "int"), ColumnSpec("s", "str")], [{"id": 1, "s": "a"}]),
+            TableData("t_lookup", [ColumnSpec("id", "int"), ColumnSpec("tag", "str")], [{"id": 1, "tag": "keep"}]),
+        ],
+        Program("prog-semi-valid", 1, [{"op": "semi_join", "table": "t_lookup", "left_on": "id", "right_on": "id"}]),
+    )
+    missing_table = _case([{"op": "anti_join", "table": "missing", "left_on": "x", "right_on": "x"}])
+    missing_left = Case(
+        "case-semi-missing-left",
+        1,
+        [
+            TableData("t0", [ColumnSpec("id", "int")], [{"id": 1}]),
+            TableData("t_lookup", [ColumnSpec("id", "int")], [{"id": 1}]),
+        ],
+        Program("prog-semi-missing-left", 1, [{"op": "semi_join", "table": "t_lookup", "left_on": "missing", "right_on": "id"}]),
+    )
+    missing_right = Case(
+        "case-anti-missing-right",
+        1,
+        [
+            TableData("t0", [ColumnSpec("id", "int")], [{"id": 1}]),
+            TableData("t_lookup", [ColumnSpec("other", "int")], [{"other": 1}]),
+        ],
+        Program("prog-anti-missing-right", 1, [{"op": "anti_join", "table": "t_lookup", "left_on": "id", "right_on": "id"}]),
+    )
+    type_mismatch = Case(
+        "case-semi-type-mismatch",
+        1,
+        [
+            TableData("t0", [ColumnSpec("id", "int")], [{"id": 1}]),
+            TableData("t_lookup", [ColumnSpec("id", "str")], [{"id": "1"}]),
+        ],
+        Program("prog-semi-type-mismatch", 1, [{"op": "semi_join", "table": "t_lookup", "left_on": "id", "right_on": "id"}]),
+    )
+
+    assert validate_case_program(valid) == []
+    assert "unknown anti_join table" in validate_case_program(missing_table)[0]
+    assert "semi_join left key" in validate_case_program(missing_left)[0]
+    assert "anti_join right key" in validate_case_program(missing_right)[0]
+    assert "semi_join key type mismatch" in validate_case_program(type_mismatch)[0]
 
 
 def test_validate_case_program_accepts_and_rejects_offset():
@@ -214,6 +845,55 @@ def test_classification_uses_ordered_reference_for_order_sensitive_mismatch():
     assert classification.implicated_backends == ["duckdb"]
 
 
+def test_classification_reference_marks_row_count_minority_backend():
+    case = Case(
+        "case-reference-row-count",
+        4101,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-reference-row-count", 4101, []),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "unknown",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["x"], [[1]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["x"], [[1], [1]]),
+    }
+
+    classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "common"}, ["pandas", "duckdb"])
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["duckdb"]
+    assert classification.confidence == "high"
+
+
+def test_classification_reference_marks_schema_minority_backend():
+    case = Case(
+        "case-reference-schema",
+        4102,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-reference-schema", 4102, []),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "schema_projection",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["x"], [[1]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["y"], [[1]]),
+    }
+
+    classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "common"}, ["pandas", "duckdb"])
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["duckdb"]
+
+
 def test_classification_excludes_order_sensitive_sort_tie_order_noise():
     case = Case(
         "case-sort-tie-order",
@@ -247,6 +927,122 @@ def test_classification_excludes_order_sensitive_sort_tie_order_noise():
     assert classification.verdict == "normalizer_false_positive"
     assert classification.false_positive is True
     assert classification.false_positive_reason == "sort_tie_order_underconstrained"
+
+
+def test_classification_excludes_sort_limit_tie_cutoff_noise():
+    case = Case(
+        "case-sort-limit-tie-cutoff",
+        45,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int"), ColumnSpec("g", "str"), ColumnSpec("s", "str")],
+                [
+                    {"id": 0, "g": "", "s": "first"},
+                    {"id": 0, "g": "", "s": "second"},
+                    {"id": 2, "g": "", "s": "left"},
+                    {"id": 2, "g": "", "s": "right"},
+                ],
+            )
+        ],
+        Program(
+            "prog-sort-limit-tie-cutoff",
+            45,
+            [
+                {
+                    "op": "mutate",
+                    "column": "g_token",
+                    "expr": {"kind": "string_replace", "source": "g", "old": " ", "new": "_"},
+                },
+                {
+                    "op": "sort",
+                    "keys": [
+                        {"column": "g_token", "ascending": True, "nulls": "last"},
+                        {"column": "id", "ascending": True, "nulls": "last"},
+                    ],
+                },
+                {"op": "select", "columns": ["id", "g_token", "s"]},
+                {"op": "limit", "n": 3},
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "string_expression",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "pandas": NormalizedResult(
+            "pandas",
+            "ok",
+            ["g_token", "id", "s"],
+            [["", 0, "first"], ["", 0, "second"], ["", 2, "left"]],
+        ),
+        "duckdb": NormalizedResult(
+            "duckdb",
+            "ok",
+            ["g_token", "id", "s"],
+            [["", 0, "first"], ["", 0, "second"], ["", 2, "right"]],
+        ),
+        "datafusion": NormalizedResult(
+            "datafusion",
+            "ok",
+            ["g_token", "id", "s"],
+            [["", 0, "first"], ["", 0, "second"], ["", 2, "left"]],
+        ),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "common_api_workflow"},
+        ["pandas", "duckdb", "datafusion"],
+    )
+
+    assert classification.verdict == "normalizer_false_positive"
+    assert classification.false_positive is True
+    assert classification.false_positive_reason == "sort_tie_order_underconstrained"
+
+
+def test_classification_keeps_unique_sort_limit_mismatch_as_candidate_bug():
+    case = Case(
+        "case-unique-sort-limit",
+        46,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int"), ColumnSpec("s", "str")],
+                [{"id": 1, "s": "a"}, {"id": 2, "s": "b"}],
+            )
+        ],
+        Program(
+            "prog-unique-sort-limit",
+            46,
+            [
+                {"op": "sort", "columns": ["id"], "ascending": True},
+                {"op": "select", "columns": ["id", "s"]},
+                {"op": "limit", "n": 1},
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "ordering_or_limit",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["id", "s"], [[1, "a"]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["id", "s"], [[2, "b"]]),
+    }
+
+    classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "common"}, ["pandas", "duckdb"])
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.false_positive is False
 
 
 def test_classification_excludes_limit_before_any_defined_order():
@@ -505,6 +1301,25 @@ def test_classification_marks_unicode_lower_as_semantic_boundary():
     assert classification.verdict == "expected_semantic_divergence"
 
 
+def test_classification_marks_unicode_upper_as_semantic_boundary():
+    case = Case(
+        "case-upper",
+        4,
+        [TableData("t0", [ColumnSpec("s", "str")], [{"s": "δ"}])],
+        Program("prog-upper", 4, [{"op": "mutate", "column": "m_0", "expr": {"kind": "string_upper", "source": "s"}}]),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "string_expression",
+        "confidence": "high",
+        "suspicious_backends": ["sqlite"],
+    }
+
+    classification = classify_finding(case, finding, {}, {}, {"generator_profile": "common"}, ["pandas", "sqlite"])
+
+    assert classification.verdict == "expected_semantic_divergence"
+
+
 def test_classification_uses_dsl_reference_to_identify_mismatching_backend():
     case = Case(
         "case-reference",
@@ -533,6 +1348,7 @@ def test_classification_uses_dsl_reference_to_identify_mismatching_backend():
     )
 
     assert classification.verdict == "candidate_implementation_bug"
+    assert classification.confidence == "high"
     assert "duckdb" in classification.evidence
     assert "pandas" in classification.evidence
 
@@ -2210,6 +3026,32 @@ def test_validate_case_accepts_hash_pivot_wider_probe():
     assert any("reserved" in error for error in validate_case_program(bad_alias))
 
 
+def test_validate_case_accepts_list_flatten_parent_indices_probe():
+    valid = Case(
+        "case-list-flatten-parent-indices-probe",
+        98,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-list-flatten-parent-indices-probe",
+            98,
+            [{"op": "list_flatten_parent_indices_probe", "as": "list_flatten_parent_indices_mismatch"}],
+        ),
+    )
+    bad_alias = Case(
+        "case-list-flatten-parent-indices-probe-alias",
+        99,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-list-flatten-parent-indices-probe-alias",
+            99,
+            [{"op": "list_flatten_parent_indices_probe", "as": "where"}],
+        ),
+    )
+
+    assert validate_case_program(valid) == []
+    assert any("reserved" in error for error in validate_case_program(bad_alias))
+
+
 def test_classification_reference_understands_large_string_partition_probe():
     case = Case(
         "case-large-string-partition-reference",
@@ -2273,6 +3115,41 @@ def test_classification_reference_understands_hash_pivot_wider_probe():
         normalized,
         {},
         {"generator_profile": "pyarrow_hash_pivot_wider_order_semantics"},
+        ["reference", "pyarrow"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["pyarrow"]
+
+
+def test_classification_reference_understands_list_flatten_parent_indices_probe():
+    case = Case(
+        "case-list-flatten-parent-indices-reference",
+        100,
+        [TableData("t0", [ColumnSpec("probe_id", "int")], [{"probe_id": 0}])],
+        Program(
+            "prog-list-flatten-parent-indices-reference",
+            100,
+            [{"op": "list_flatten_parent_indices_probe", "as": "list_flatten_parent_indices_mismatch"}],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "pyarrow_list_flatten_parent_indices_semantics",
+        "confidence": "high",
+        "suspicious_backends": ["pyarrow"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["list_flatten_parent_indices_mismatch"], [[False]]),
+        "pyarrow": NormalizedResult("pyarrow", "ok", ["list_flatten_parent_indices_mismatch"], [[True]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "pyarrow_list_flatten_parent_indices_semantics"},
         ["reference", "pyarrow"],
     )
 
@@ -2586,6 +3463,103 @@ def test_classification_reference_understands_bool_any_all_all_null_input():
 
     assert classification.verdict == "candidate_implementation_bug"
     assert classification.implicated_backends == ["sqlite"]
+
+
+def test_classification_reference_anchor_summary_flags_backend_minority():
+    case = Case(
+        "case-reference-anchor-summary",
+        113,
+        [TableData("t0", [ColumnSpec("flag", "bool")], [{"flag": None}, {"flag": None}])],
+        Program(
+            "prog-reference-anchor-summary",
+            113,
+            [
+                {
+                    "op": "aggregate",
+                    "aggs": [
+                        {"column": "flag", "func": "any", "as": "any_flag"},
+                        {"column": "flag", "func": "all", "as": "all_flag"},
+                    ],
+                }
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "groupby_aggregation",
+        "confidence": "medium",
+        "suspicious_backends": ["sqlite"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["all_flag", "any_flag"], [[None, None]]),
+        "sqlite": NormalizedResult("sqlite", "ok", ["all_flag", "any_flag"], [[False, False]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "bool_null_groupby_agg"},
+        ["pandas", "sqlite"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["sqlite"]
+    assert "disagrees with ['sqlite']" in classification.evidence
+
+
+def test_classification_excludes_stale_pyarrow_empty_global_bool_aggregate_adapter_error():
+    case = Case(
+        "case-pyarrow-empty-global-bool-aggregate-stale",
+        14,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("flag", "bool")],
+                [{"id": 0, "flag": None}, {"id": 1, "flag": True}],
+            )
+        ],
+        Program(
+            "prog-pyarrow-empty-global-bool-aggregate-stale",
+            14,
+            [
+                {"op": "filter", "column": "id", "cmp": "<", "value": 0},
+                {
+                    "op": "aggregate",
+                    "aggs": [
+                        {"column": "flag", "func": "any", "as": "any_flag"},
+                        {"column": "flag", "func": "all", "as": "all_flag"},
+                    ],
+                },
+                {"op": "filter", "column": "any_flag", "cmp": "bool_is_not_true", "value": None},
+            ],
+        ),
+    )
+    finding = {
+        "kind": "accept_reject_mismatch",
+        "root_cause": "groupby_aggregation",
+        "confidence": "high",
+        "suspicious_backends": ["pyarrow"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["all_flag", "any_flag"], [[None, None]]),
+        "pyarrow": NormalizedResult("pyarrow", "error", [], [], "ArrowInvalid", "Invalid null value"),
+    }
+    raw_results = {"pyarrow": {"status": "error", "error_type": "ArrowInvalid", "error": "Invalid null value"}}
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        raw_results,
+        {"generator_profile": "common_api_workflow"},
+        ["pandas", "pyarrow"],
+    )
+
+    assert classification.verdict == "normalizer_false_positive"
+    assert classification.false_positive is True
+    assert classification.false_positive_reason == "pyarrow_empty_global_bool_aggregate_adapter_error"
 
 
 def test_validate_case_rejects_reserved_output_aliases():

@@ -1,0 +1,75 @@
+{
+  "bug_audit": {
+    "skipped": true
+  },
+  "cases_per_lane_seed": 80,
+  "duration": null,
+  "generated_at": "2026-05-26T17:24:20Z",
+  "generated_by": "datadiff bug-sprint",
+  "lane_ids": [
+    "common_api_workflow"
+  ],
+  "lanes": [
+    {
+      "id": "common_api_workflow",
+      "preset": "live_common_api_workflow_metamorphic",
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, mutate, join, groupby, sort, and slice"
+    }
+  ],
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "pyarrow",
+        "polars",
+        "polars_lazy",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 80,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 16,
+        "refresh": false,
+        "run_file": "runs/run-20260526T172358-1779816238860870641.jsonl.gz",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260526T172358-1779816238860870641.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/bug-sprint-common-api-distinct-smoke-s7301-manifest-common_api_workflow-seed7301-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "common_api_workflow",
+      "preset": "live_common_api_workflow_metamorphic",
+      "report": "reports/report-run-20260526T172358-1779816238860870641.md",
+      "run_file": "runs/run-20260526T172358-1779816238860870641.jsonl.gz",
+      "seed": 7301,
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, mutate, join, groupby, sort, and slice"
+    }
+  ],
+  "schema_version": "bug-sprint-v1",
+  "seeds": [
+    7301
+  ],
+  "summary": {
+    "fresh_candidate_bug_families": {},
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {},
+    "run_count": 1,
+    "triage_verdicts": {}
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "targeted_short_sprints",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence"
+  ]
+}

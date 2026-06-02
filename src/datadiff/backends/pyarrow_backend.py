@@ -5,6 +5,17 @@ from contextlib import contextmanager
 from typing import Any
 
 from datadiff.backends.base import Backend, BackendResult
+from datadiff.backends.dataframe_semantics import (
+    aggregate_triplets,
+    case_when_plan,
+    coalesce_plan,
+    distinct_columns,
+    filter_plan,
+    groupby_plan,
+    mutate_plan,
+    select_columns,
+)
+from datadiff.backends.probe_semantics import EXTENDED_FALSE_PROBE_KINDS, resolve_bool_probe
 from datadiff.csv_roundtrip import (
     csv_long_numeric_roundtrip_mismatch,
     csv_long_numeric_values,
@@ -12,6 +23,20 @@ from datadiff.csv_roundtrip import (
 )
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
 from datadiff.filtering import parse_filter_comparator
+from datadiff.join_keys import join_key_arg, join_key_pairs
+from datadiff.operation_semantics import (
+    join_how,
+    op_ascending,
+    op_column,
+    op_columns,
+    op_kind,
+    op_n,
+    op_nulls,
+    op_output_alias,
+    op_right_columns,
+    op_table,
+    op_value,
+)
 from datadiff.pathing import path_basename
 from datadiff.running import (
     running_sum_partition_columns,
@@ -22,6 +47,21 @@ from datadiff.running import (
 from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
 from datadiff.windowing import row_number_filter_rows
+
+
+def _single_bool_table(pa: Any, alias: str, value: bool):
+    return pa.Table.from_pydict({alias: [value]})
+
+
+def _pyarrow_probe_handlers(pa: Any, op: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "dataset_isin_all_match_probe": lambda: _pyarrow_dataset_isin_all_match_mismatch(pa),
+        "run_end_null_compute_probe": lambda: _pyarrow_run_end_null_compute_mismatch(pa),
+        "large_string_partition_probe": lambda: _pyarrow_large_string_partition_mismatch(pa),
+        "hash_pivot_wider_probe": lambda: _pyarrow_hash_pivot_wider_mismatch(pa),
+        "list_flatten_parent_indices_probe": lambda: _pyarrow_list_flatten_parent_indices_mismatch(pa),
+        "csv_long_numeric_roundtrip_probe": lambda: _pyarrow_csv_long_numeric_roundtrip_mismatch(pa, op),
+    }
 
 
 class PyArrowBackend(Backend):
@@ -49,33 +89,63 @@ class PyArrowBackend(Backend):
                 current = arrow_tables[tables[0].name]
 
                 for op in program.operations:
-                    kind = op["op"]
+                    kind = op_kind(op)
                     if kind == "join":
-                        right_data = table_by_name[op["table"]]
-                        right = arrow_tables[op["table"]]
+                        right_name = op_table(op)
+                        right_data = table_by_name[right_name]
+                        right = arrow_tables[right_name]
+                        left_keys, right_keys = join_key_pairs(op)
+                        right_key_set = set(right_keys)
                         right_cols = [
                             column.name
                             for column in right_data.columns
-                            if column.name != op["right_on"] and column.name not in current_cols
+                            if column.name not in right_key_set and column.name not in current_cols
                         ]
-                        join_type = "left outer" if op["how"] == "left" else "inner"
+                        join_type = "left outer" if join_how(op) == "left" else "inner"
                         current = current.join(
-                            right.select([op["right_on"], *right_cols]),
-                            keys=op["left_on"],
-                            right_keys=op["right_on"],
+                            right.select([*right_keys, *right_cols]),
+                            keys=join_key_arg(left_keys),
+                            right_keys=join_key_arg(right_keys),
                             join_type=join_type,
                             coalesce_keys=True,
                             use_threads=False,
                         )
                         current_cols = [*current_cols, *right_cols]
                         current = _select_existing(current, current_cols)
+                    elif kind == "union_all":
+                        right = arrow_tables[op_table(op)].select(current_cols)
+                        current = pa.concat_tables([current.select(current_cols), right], promote_options="default")
+                    elif kind in {"semi_join", "anti_join"}:
+                        join_type = "left semi" if kind == "semi_join" else "left anti"
+                        left_keys, right_keys = join_key_pairs(op)
+                        right_key_table = arrow_tables[op_table(op)].select(right_keys)
+                        valid_mask = pc.is_valid(right_key_table[right_keys[0]])
+                        for right_key in right_keys[1:]:
+                            valid_mask = pc.and_(valid_mask, pc.is_valid(right_key_table[right_key]))
+                        right_key_table = right_key_table.filter(valid_mask)
+                        current = current.join(
+                            right_key_table,
+                            keys=join_key_arg(left_keys),
+                            right_keys=join_key_arg(right_keys),
+                            join_type=join_type,
+                            coalesce_keys=True,
+                            use_threads=False,
+                        )
+                        current = _select_existing(current, current_cols)
+                    elif kind == "drop_nulls":
+                        columns = op_columns(op)
+                        mask = pc.is_valid(current[columns[0]])
+                        for column in columns[1:]:
+                            mask = pc.and_(mask, pc.is_valid(current[column]))
+                        current = current.filter(mask)
                     elif kind == "filter":
-                        mask = _comparison_mask(pa, pc, current[op["column"]], op["cmp"], op["value"])
+                        column, comparator, value = filter_plan(op)
+                        mask = _comparison_mask(pa, pc, current[column], comparator, value)
                         current = current.filter(mask)
                     elif kind == "tuple_absence_filter":
-                        right_rows = arrow_tables[op["table"]].select(list(op["right_columns"])).to_pylist()
-                        left_columns = list(op["columns"])
-                        right_columns = list(op["right_columns"])
+                        right_columns = op_right_columns(op)
+                        right_rows = arrow_tables[op_table(op)].select(right_columns).to_pylist()
+                        left_columns = op_columns(op)
                         rows = [
                             row
                             for row in current.to_pylist()
@@ -86,143 +156,93 @@ class PyArrowBackend(Backend):
                         rows = row_number_filter_rows(current.to_pylist(), op)
                         current = pa.Table.from_pylist(rows, schema=current.schema)
                     elif kind == "running_sum":
+                        out_column = op_column(op)
                         rows = sort_rows_for_running(current.to_pylist(), running_sum_sort_keys(op))
-                        values = stable_running_sum_values(rows, op["source"], running_sum_partition_columns(op))
-                        rows = [{**row, op["column"]: value} for row, value in zip(rows, values)]
-                        current_cols = [col for col in current_cols if col != op["column"]] + [op["column"]]
+                        values = stable_running_sum_values(rows, op.source, running_sum_partition_columns(op))
+                        rows = [{**row, out_column: value} for row, value in zip(rows, values)]
+                        current_cols = [col for col in current_cols if col != out_column] + [out_column]
                         fields = [
-                            field for field in current.schema if field.name != op["column"]
-                        ] + [pa.field(op["column"], pa.float64(), nullable=True)]
+                            field for field in current.schema if field.name != out_column
+                        ] + [pa.field(out_column, pa.float64(), nullable=True)]
                         current = pa.Table.from_pylist(rows, schema=pa.schema(fields))
                     elif kind == "sortedness_check":
+                        alias = op_output_alias(op)
                         ok = is_sorted_values(
-                            current[op["column"]].to_pylist(),
-                            ascending=bool(op.get("ascending", True)),
-                            nulls=str(op.get("nulls", "last")),
+                            current[op_column(op)].to_pylist(),
+                            ascending=op_ascending(op),
+                            nulls=op_nulls(op),
                         )
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [ok]})
-                    elif kind == "random_case_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "group_quantile_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "scalar_subquery_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "window_avg_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "struct_distinct_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "bit_compare_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "round_even_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "float_literal_precision_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "timestamp_precision_filter_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "series_rtruediv_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "uint64_isin_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "tuple_anti_null_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "setop_all_duplicate_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "json_predicate_order_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "sparse_mask_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "float_wrap_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "index_bool_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "empty_literal_groupby_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "arrow_string_eq_sum_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "arrow_timestamp_loc_slice_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "arrow_timestamp_index_attr_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "eval_inplace_alias_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "bool_reduction_skipna_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "dataset_isin_all_match_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [_pyarrow_dataset_isin_all_match_mismatch(pa)]})
-                    elif kind == "run_end_null_compute_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [_pyarrow_run_end_null_compute_mismatch(pa)]})
-                    elif kind == "large_string_partition_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [_pyarrow_large_string_partition_mismatch(pa)]})
-                    elif kind == "hash_pivot_wider_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [_pyarrow_hash_pivot_wider_mismatch(pa)]})
-                    elif kind == "rolling_mean_by_null_count_probe":
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [False]})
-                    elif kind == "csv_long_numeric_roundtrip_probe":
-                        expected_values = csv_long_numeric_values(op)
-                        with long_numeric_csv_path(expected_values) as csv_path:
-                            observed_table = pacsv.read_csv(csv_path)
-                            observed_values = observed_table.column("value").to_pylist()
-                        mismatch = csv_long_numeric_roundtrip_mismatch(observed_values, expected_values)
-                        current_cols = [op["as"]]
-                        current = pa.Table.from_pydict({op["as"]: [mismatch]})
-                    elif kind == "select":
-                        current_cols = list(op["columns"])
-                        current = current.select(current_cols)
-                    elif kind == "sort":
-                        current = _sort_table(pa, current, normalize_sort_keys(op))
-                    elif kind == "limit":
-                        current = current.slice(0, int(op["n"]))
-                    elif kind == "offset":
-                        current = current.slice(int(op["n"]))
-                    elif kind == "mutate":
-                        expr = op["expr"]
-                        values = _eval_expr(pc, current, expr)
-                        current, current_cols = _replace_column(current, current_cols, op["column"], values)
-                    elif kind == "groupby":
-                        keys = list(op["keys"])
-                        aggregates = [(agg["column"], _arrow_aggregate_func(agg["func"])) for agg in op["aggs"]]
-                        current = current.group_by(keys, use_threads=False).aggregate(aggregates)
-                        source_names = [*keys, *[f"{agg['column']}_{_arrow_aggregate_func(agg['func'])}" for agg in op["aggs"]]]
-                        target_names = [*keys, *[agg["as"] for agg in op["aggs"]]]
-                        current = _select_existing(current, source_names).rename_columns(target_names)
-                        current_cols = target_names
-                    elif kind == "aggregate":
-                        values = {}
-                        for agg in op["aggs"]:
-                            values[agg["as"]] = [_global_aggregate(pc, current[agg["column"]], agg["func"])]
-                        current = pa.Table.from_pydict(values)
-                        current_cols = [agg["as"] for agg in op["aggs"]]
+                        current_cols = [alias]
+                        current = _single_bool_table(pa, alias, ok)
                     else:
-                        raise ValueError(kind)
+                        probe_value = resolve_bool_probe(
+                            kind,
+                            handlers=_pyarrow_probe_handlers(pa, op),
+                            fallback_false_kinds=EXTENDED_FALSE_PROBE_KINDS,
+                        )
+                        if probe_value is not None:
+                            alias = op_output_alias(op)
+                            current_cols = [alias]
+                            current = _single_bool_table(pa, alias, probe_value)
+                        elif kind == "select":
+                            current_cols = select_columns(op)
+                            current = current.select(current_cols)
+                        elif kind == "distinct":
+                            current_cols = distinct_columns(op)
+                            current = current.select(current_cols).group_by(current_cols, use_threads=False).aggregate([])
+                        elif kind == "fill_null":
+                            column = op_column(op)
+                            values = pc.fill_null(current[column], pa.scalar(op_value(op)))
+                            current, current_cols = _replace_column(current, current_cols, column, values)
+                        elif kind == "coalesce":
+                            alias, sources, has_fallback, fallback = coalesce_plan(op)
+                            values = [current[column] for column in sources]
+                            if has_fallback:
+                                values.append(pa.scalar(fallback))
+                            current, current_cols = _replace_column(current, current_cols, alias, pc.coalesce(*values))
+                        elif kind == "case_when":
+                            alias, column, comparator, value, then_value, else_value = case_when_plan(op)
+                            mask = _comparison_mask(pa, pc, current[column], comparator, value)
+                            mask = pc.fill_null(mask, False)
+                            values = pc.if_else(mask, pa.scalar(then_value), pa.scalar(else_value))
+                            current, current_cols = _replace_column(current, current_cols, alias, values)
+                        elif kind == "sort":
+                            current = _sort_table(pa, current, normalize_sort_keys(op))
+                        elif kind == "limit":
+                            current = current.slice(0, op_n(op))
+                        elif kind == "offset":
+                            current = current.slice(op_n(op))
+                        elif kind == "mutate":
+                            plan = mutate_plan(op)
+                            values = _eval_expr_plan(pa, pc, current, plan)
+                            current, current_cols = _replace_column(current, current_cols, plan.column, values)
+                        elif kind == "groupby":
+                            keys, triplets = groupby_plan(op)
+                            aggregates = [(column, _arrow_aggregate_func(func)) for column, func, _alias in triplets]
+                            current = current.group_by(keys, use_threads=False).aggregate(aggregates)
+                            source_names = [*keys, *[f"{column}_{_arrow_aggregate_func(func)}" for column, func, _alias in triplets]]
+                            target_names = [*keys, *[alias for _column, _func, alias in triplets]]
+                            current = _select_existing(current, source_names).rename_columns(target_names)
+                            current_cols = target_names
+                        elif kind == "aggregate":
+                            values = {}
+                            fields = []
+                            aliases: list[str] = []
+                            for column, func, alias in aggregate_triplets(op):
+                                source = current[column]
+                                values[alias] = [_global_aggregate(pc, source, func)]
+                                aliases.append(alias)
+                                fields.append(
+                                    pa.field(
+                                        alias,
+                                        _global_aggregate_output_type(pa, source.type, func),
+                                        nullable=True,
+                                    )
+                                )
+                            current = pa.Table.from_pydict(values, schema=pa.schema(fields))
+                            current_cols = aliases
+                        else:
+                            raise ValueError(kind)
 
                 data = current.to_pandas(use_threads=False)
 
@@ -327,12 +347,38 @@ def _pyarrow_hash_pivot_wider_mismatch(pa) -> bool:
     return observed != expected
 
 
+def _pyarrow_list_flatten_parent_indices_mismatch(pa) -> bool:
+    import pyarrow.compute as pc
+
+    values = pa.array([[1, 2], None, [], [None, 3]], type=pa.list_(pa.int64()))
+    expected_flattened = [1, 2, None, 3]
+    expected_parent_indices = [0, 0, 3, 3]
+    try:
+        flattened = pc.list_flatten(values).to_pylist()
+        parent_indices = pc.list_parent_indices(values).to_pylist()
+    except Exception:  # noqa: BLE001
+        return True
+    return flattened != expected_flattened or parent_indices != expected_parent_indices
+
+
+def _pyarrow_csv_long_numeric_roundtrip_mismatch(pa, op: dict[str, Any]) -> bool:
+    import pyarrow.csv as pacsv
+
+    expected_values = csv_long_numeric_values(op)
+    with long_numeric_csv_path(expected_values) as csv_path:
+        observed_table = pacsv.read_csv(csv_path)
+        observed_values = observed_table.column("value").to_pylist()
+    return csv_long_numeric_roundtrip_mismatch(observed_values, expected_values)
+
+
 def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):
     parsed = parse_filter_comparator(comparator)
     if parsed is None:
         raise ValueError(comparator)
     if parsed.base == "in_set":
         return _membership_mask(pa, pc, array, value)
+    if parsed.base == "not_in_set":
+        return pc.and_(pc.invert(_membership_mask(pa, pc, array, value)), pc.invert(pc.is_null(array)))
     if parsed.base == "is_null":
         return pc.is_null(array)
     if parsed.base == "is_not_null":
@@ -342,6 +388,12 @@ def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):
     if parsed.base == "range_closed":
         lower, upper = value
         return pc.and_(pc.greater_equal(array, lower), pc.less_equal(array, upper))
+    if parsed.base == "str_contains":
+        return pc.fill_null(pc.match_substring(array, pattern=value), False)
+    if parsed.base == "str_starts_with":
+        return pc.fill_null(pc.starts_with(array, pattern=value), False)
+    if parsed.base == "str_ends_with":
+        return pc.fill_null(pc.ends_with(array, pattern=value), False)
     scalar = value
     if scalar is None:
         mask = pa.array([None] * len(array), type=pa.bool_())
@@ -403,37 +455,75 @@ def _apply_boolean_truth_test(pc, mask: Any, truth_test: str | None):
     raise ValueError(truth_test)
 
 
-def _eval_expr(pc, table: Any, expr: dict[str, Any]):
-    source = table[expr["source"]]
-    if expr["kind"] == "add_const":
-        return pc.add(source, expr["value"])
-    if expr["kind"] == "arith_const":
-        op = expr["op"]
-        if op == "sub":
-            return pc.subtract(source, expr["value"])
-        if op == "mul":
-            return pc.multiply(source, expr["value"])
-        if op == "div":
-            return pc.divide(pc.cast(source, "float64"), expr["value"])
-        if op == "mod":
+def _eval_expr_plan(pa, pc, table: Any, plan: Any):
+    source = table[plan.source]
+    if plan.kind == "add_const":
+        return pc.add(source, plan.value)
+    if plan.kind == "arith_const":
+        operator = plan.operator
+        if operator == "sub":
+            return pc.subtract(source, plan.value)
+        if operator == "mul":
+            return pc.multiply(source, plan.value)
+        if operator == "div":
+            return pc.divide(pc.cast(source, "float64"), plan.value)
+        if operator == "mod":
             raise ValueError("pyarrow backend does not support modulo in the common DSL subset")
-        raise ValueError(op)
-    if expr["kind"] == "reverse_division_columns":
-        return pc.divide(pc.cast(table[expr["numerator"]], "float64"), pc.cast(source, "float64"))
-    if expr["kind"] == "cast" and expr["to"] == "float":
-        return pc.cast(source, "float64")
-    if expr["kind"] == "string_length":
+        raise ValueError(operator)
+    if plan.kind == "reverse_division_columns":
+        return pc.divide(pc.cast(table[plan.numerator], "float64"), pc.cast(source, "float64"))
+    if plan.kind == "abs":
+        return pc.abs(source)
+    if plan.kind == "clip":
+        lower = plan.lower
+        upper = plan.upper
+        lower_clipped = pc.if_else(pc.less(source, lower), lower, source)
+        return pc.if_else(pc.greater(lower_clipped, upper), upper, lower_clipped)
+    if plan.kind == "bool_not":
+        return pc.invert(source)
+    if plan.kind == "cast":
+        if plan.target_type == "float":
+            return pc.cast(source, "float64")
+        if plan.target_type == "int":
+            return pc.cast(source, "int64")
+        if plan.target_type == "str":
+            return pc.cast(source, "string")
+        raise ValueError(plan.target_type)
+    if plan.kind == "string_length":
         return pc.utf8_length(source)
-    if expr["kind"] == "string_lower":
+    if plan.kind == "string_lower":
         return pc.utf8_lower(source)
-    if expr["kind"] == "string_basename":
-        import pyarrow as pa
-
+    if plan.kind == "string_upper":
+        return pc.utf8_upper(source)
+    if plan.kind == "string_strip":
+        return pc.utf8_trim_whitespace(source)
+    if plan.kind == "string_null_if_empty":
+        return pc.if_else(pc.equal(source, ""), pa.scalar(None, type=source.type), source)
+    if plan.kind == "string_replace":
+        return pc.replace_substring(source, pattern=plan.old, replacement=plan.new)
+    if plan.kind == "string_slice":
+        start = plan.start
+        return pc.utf8_slice_codeunits(source, start=start, stop=start + plan.length)
+    if plan.kind == "string_split_part":
+        return pc.list_element(pc.split_pattern(source, pattern=plan.separator, max_splits=1), plan.index)
+    if plan.kind == "string_concat":
+        return pc.binary_join_element_wise(source, table[plan.other], plan.separator or "")
+    if plan.kind == "string_contains":
+        return pc.match_substring(source, pattern=plan.needle)
+    if plan.kind == "string_starts_with":
+        return pc.starts_with(source, pattern=plan.needle)
+    if plan.kind == "string_ends_with":
+        return pc.ends_with(source, pattern=plan.needle)
+    if plan.kind == "date_part":
+        spans = {"year": (0, 4), "month": (5, 7), "day": (8, 10)}
+        start, stop = spans[plan.part]
+        return pc.cast(pc.utf8_slice_codeunits(source, start=start, stop=stop), "int64")
+    if plan.kind == "string_basename":
         return pa.array([
             path_basename(value)
             for value in source.to_pylist()
         ], type=pa.string())
-    raise ValueError(expr["kind"])
+    raise ValueError(plan.kind)
 
 
 def _global_aggregate(pc, array: Any, func: str) -> Any:
@@ -453,6 +543,18 @@ def _global_aggregate(pc, array: Any, func: str) -> Any:
         return pc.min(array).as_py()
     if func == "max":
         return pc.max(array).as_py()
+    raise ValueError(func)
+
+
+def _global_aggregate_output_type(pa, source_type: Any, func: str) -> Any:
+    if func in {"count", "nunique"}:
+        return pa.int64()
+    if func == "mean":
+        return pa.float64()
+    if func in {"any", "all"}:
+        return pa.bool_()
+    if func in {"sum", "min", "max"}:
+        return source_type
     raise ValueError(func)
 
 

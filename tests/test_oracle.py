@@ -35,6 +35,182 @@ def test_oracle_semantic_output_mismatch():
     assert findings[0].mismatch_class == "value"
 
 
+def test_oracle_uses_clear_majority_to_mark_single_suspicious_backend():
+    case = generate_case(2002)
+    findings = evaluate_case(
+        case,
+        {
+            "a": NormalizedResult("a", "ok", ["x"], [[1]]),
+            "b": NormalizedResult("b", "ok", ["x"], [[1]]),
+            "c": NormalizedResult("c", "ok", ["x"], [[2]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].kind == "semantic_output_mismatch"
+    assert findings[0].suspicious_backends == ["c"]
+    assert findings[0].confidence == "high"
+
+
+def test_oracle_marks_all_backends_suspicious_on_tied_groups():
+    case = generate_case(2003)
+    findings = evaluate_case(
+        case,
+        {
+            "a": NormalizedResult("a", "ok", ["x"], [[1]]),
+            "b": NormalizedResult("b", "ok", ["x"], [[2]]),
+            "c": NormalizedResult("c", "ok", ["x"], [[1]]),
+            "d": NormalizedResult("d", "ok", ["x"], [[2]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].kind == "semantic_output_mismatch"
+    assert findings[0].suspicious_backends == ["a", "b", "c", "d"]
+    assert findings[0].confidence == "medium"
+
+
+def test_oracle_classifies_string_pattern_expression_mismatch():
+    case = Case(
+        "case-string-pattern-expr",
+        101,
+        [TableData("t0", [ColumnSpec("s", "str")], [{"s": "Alpha"}])],
+        Program(
+            "prog-string-pattern-expr",
+            101,
+            [{"op": "mutate", "column": "starts_a", "expr": {"kind": "string_starts_with", "source": "s", "needle": "A"}}],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "a": NormalizedResult("a", "ok", ["starts_a"], [[True]]),
+            "b": NormalizedResult("b", "ok", ["starts_a"], [[False]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "string_expression"
+
+
+def test_oracle_prioritizes_unicode_case_mapping_boundary_over_coalesce():
+    case = Case(
+        "case-unicode-case-coalesce",
+        106,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("s", "str"),
+                    ColumnSpec("x", "int"),
+                    ColumnSpec("y", "float"),
+                    ColumnSpec("z", "float"),
+                ],
+                [{"s": "δelta", "x": 1, "y": None, "z": 0.5}],
+            )
+        ],
+        Program(
+            "prog-unicode-case-coalesce",
+            106,
+            [
+                {"op": "mutate", "column": "s_upper", "expr": {"kind": "string_upper", "source": "s"}},
+                {"op": "coalesce", "columns": ["y", "z"], "as": "co_y", "fallback": 0.0},
+                {"op": "groupby", "keys": ["s_upper"], "aggs": [{"column": "x", "func": "nunique", "as": "nunique_x"}]},
+            ],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "duckdb": NormalizedResult("duckdb", "ok", ["s_upper", "nunique_x"], [["ΔELTA", 1]]),
+            "sqlite": NormalizedResult("sqlite", "ok", ["s_upper", "nunique_x"], [["δELTA", 1]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "unicode_case_mapping"
+
+
+def test_oracle_classifies_string_null_if_empty_expression_mismatch():
+    case = Case(
+        "case-string-null-if-empty-expr",
+        103,
+        [TableData("t0", [ColumnSpec("s", "str")], [{"s": ""}])],
+        Program(
+            "prog-string-null-if-empty-expr",
+            103,
+            [{"op": "mutate", "column": "s_norm", "expr": {"kind": "string_null_if_empty", "source": "s"}}],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "a": NormalizedResult("a", "ok", ["s_norm"], [[None]]),
+            "b": NormalizedResult("b", "ok", ["s_norm"], [[""]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "string_expression"
+
+
+def test_oracle_classifies_string_split_part_expression_mismatch():
+    case = Case(
+        "case-string-split-part-expr",
+        102,
+        [TableData("t0", [ColumnSpec("s", "str")], [{"s": "alpha beta"}])],
+        Program(
+            "prog-string-split-part-expr",
+            102,
+            [{"op": "mutate", "column": "token", "expr": {"kind": "string_split_part", "source": "s", "sep": " ", "index": 0}}],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "a": NormalizedResult("a", "ok", ["token"], [["alpha"]]),
+            "b": NormalizedResult("b", "ok", ["token"], [["alpha beta"]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "string_expression"
+
+
+def test_oracle_classifies_string_basename_expression_mismatch():
+    case = Case(
+        "case-string-basename-expr",
+        104,
+        [TableData("t0", [ColumnSpec("path_value", "str")], [{"path_value": "/tmp/alpha.csv"}])],
+        Program(
+            "prog-string-basename-expr",
+            104,
+            [
+                {
+                    "op": "mutate",
+                    "column": "path_base",
+                    "expr": {"kind": "string_basename", "source": "path_value"},
+                }
+            ],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "a": NormalizedResult("a", "ok", ["path_base"], [["alpha.csv"]]),
+            "b": NormalizedResult("b", "ok", ["path_base"], [["/tmp/alpha.csv"]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "string_expression"
+
+
 def test_oracle_labels_row_order_only_mismatch():
     case = Program("prog-order", 1, [{"op": "sort", "columns": ["x"], "ascending": True}])
     findings = evaluate_case(
@@ -972,6 +1148,21 @@ def test_oracle_classifies_pyarrow_hash_pivot_wider_order_semantics():
     assert findings[0].root_cause == "pyarrow_hash_pivot_wider_order_semantics"
 
 
+def test_oracle_classifies_pyarrow_list_flatten_parent_indices_semantics():
+    case = generate_case(370042, profile="pyarrow_list_flatten_parent_indices_semantics")
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["list_flatten_parent_indices_mismatch"], [[False]]),
+            "pyarrow": NormalizedResult("pyarrow", "ok", ["list_flatten_parent_indices_mismatch"], [[True]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "pyarrow_list_flatten_parent_indices_semantics"
+
+
 def test_oracle_classifies_polars_rolling_mean_by_null_count_semantics():
     case = generate_case(370038, profile="polars_rolling_mean_by_null_count_semantics")
 
@@ -1020,6 +1211,39 @@ def test_oracle_classifies_grouped_topk_null_sort_key():
 
     assert findings
     assert findings[0].root_cause == "grouped_topk_null_sort_key"
+
+
+def test_oracle_classifies_distinct_null_topk():
+    case = Case(
+        "case-distinct-null-topk",
+        14,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("s", "str", nullable=True)],
+                [{"s": None}, {"s": ""}],
+            )
+        ],
+        Program(
+            "prog-distinct-null-topk",
+            14,
+            [
+                {"op": "distinct", "columns": ["s"]},
+                {"op": "sort", "keys": [{"column": "s", "ascending": True, "nulls": "first"}]},
+                {"op": "limit", "n": 1},
+            ],
+        ),
+    )
+    findings = evaluate_case(
+        case,
+        {
+            "duckdb": NormalizedResult("duckdb", "ok", ["s"], [[None]]),
+            "datafusion": NormalizedResult("datafusion", "ok", ["s"], [[""]]),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "distinct_null_topk"
 
 
 def test_oracle_classifies_grouped_topk_null_sort_key_after_join():

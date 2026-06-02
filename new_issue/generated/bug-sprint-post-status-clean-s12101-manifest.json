@@ -1,0 +1,192 @@
+{
+  "bug_audit": {
+    "skipped": true
+  },
+  "cases_per_lane_seed": 80,
+  "duration": null,
+  "generated_at": "2026-05-27T19:17:48Z",
+  "generated_by": "datadiff bug-sprint",
+  "lane_ids": [
+    "arrow_layout",
+    "polars_lazy",
+    "embedded_sql",
+    "common_api_workflow"
+  ],
+  "lanes": [
+    {
+      "id": "arrow_layout",
+      "preset": "live_arrow_deep_organic_metamorphic",
+      "target_suite": "arrow_cross",
+      "theme": "Organic Arrow table/list layout, nullable aggregation, string/cast, and compute equivalence"
+    },
+    {
+      "id": "polars_lazy",
+      "preset": "live_polars_deep_organic_metamorphic",
+      "target_suite": "polars_cross",
+      "theme": "Organic Polars eager/lazy state, sortedness, nullable dtype, and expression equivalence"
+    },
+    {
+      "id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    },
+    {
+      "id": "common_api_workflow",
+      "preset": "live_common_api_workflow_metamorphic",
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, string clean/replace/slice/concat/pattern flags, ISO date-part extraction, int/float/string casts, nullable boolean not/reductions, drop-null, mutate, union-all, semi/anti join, fill-null/coalesce, case-when, distinct, join, groupby, sort, and slice"
+    }
+  ],
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "pyarrow"
+      ],
+      "cases": 80,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 17,
+        "refresh": false,
+        "run_file": "runs/run-20260527T191638-1779909398546211622.jsonl",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260527T191638-1779909398546211622.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/bug-sprint-post-status-clean-s12101-manifest-arrow_layout-seed12101-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "arrow_layout",
+      "preset": "live_arrow_deep_organic_metamorphic",
+      "report": "reports/report-run-20260527T191638-1779909398546211622.md",
+      "run_file": "runs/run-20260527T191638-1779909398546211622.jsonl",
+      "seed": 12101,
+      "target_suite": "arrow_cross",
+      "theme": "Organic Arrow table/list layout, nullable aggregation, string/cast, and compute equivalence"
+    },
+    {
+      "backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "cases": 80,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 17,
+        "refresh": false,
+        "run_file": "runs/run-20260527T191658-1779909418322750845.jsonl",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260527T191658-1779909418322750845.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/bug-sprint-post-status-clean-s12101-manifest-polars_lazy-seed12101-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "polars_lazy",
+      "preset": "live_polars_deep_organic_metamorphic",
+      "report": "reports/report-run-20260527T191658-1779909418322750845.md",
+      "run_file": "runs/run-20260527T191658-1779909418322750845.jsonl",
+      "seed": 12101,
+      "target_suite": "polars_cross",
+      "theme": "Organic Polars eager/lazy state, sortedness, nullable dtype, and expression equivalence"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 80,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 17,
+        "refresh": false,
+        "run_file": "runs/run-20260527T191707-1779909427055131960.jsonl",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260527T191707-1779909427055131960.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/bug-sprint-post-status-clean-s12101-manifest-embedded_sql-seed12101-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "report": "reports/report-run-20260527T191707-1779909427055131960.md",
+      "run_file": "runs/run-20260527T191707-1779909427055131960.jsonl",
+      "seed": 12101,
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    },
+    {
+      "backends": [
+        "pandas",
+        "pyarrow",
+        "polars",
+        "polars_lazy",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 80,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 17,
+        "refresh": false,
+        "run_file": "runs/run-20260527T191730-1779909450002641496.jsonl",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260527T191730-1779909450002641496.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/bug-sprint-post-status-clean-s12101-manifest-common_api_workflow-seed12101-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "common_api_workflow",
+      "preset": "live_common_api_workflow_metamorphic",
+      "report": "reports/report-run-20260527T191730-1779909450002641496.md",
+      "run_file": "runs/run-20260527T191730-1779909450002641496.jsonl",
+      "seed": 12101,
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, string clean/replace/slice/concat/pattern flags, ISO date-part extraction, int/float/string casts, nullable boolean not/reductions, drop-null, mutate, union-all, semi/anti join, fill-null/coalesce, case-when, distinct, join, groupby, sort, and slice"
+    }
+  ],
+  "schema_version": "bug-sprint-v1",
+  "seeds": [
+    12101
+  ],
+  "summary": {
+    "fresh_candidate_bug_families": {},
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {},
+    "run_count": 4,
+    "triage_verdicts": {}
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "targeted_short_sprints",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence"
+  ]
+}

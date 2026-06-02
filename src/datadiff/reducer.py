@@ -4,6 +4,7 @@ from collections.abc import Iterable
 
 from datadiff.config import ExperimentConfig
 from datadiff.dsl import Case
+from datadiff.operation_semantics import op_kind, op_table
 from datadiff.runner import run_loaded_case
 
 
@@ -102,22 +103,22 @@ def reduce_case(
 
 def _can_remove_operation(ops: list[dict], idx: int) -> bool:
     op = ops[idx]
-    if op.get("op") != "sort":
+    if op_kind(op) != "sort":
         return True
     # Dropping a sort while keeping a later limit/offset turns deterministic top-k
     # semantics into an arbitrary prefix. That can preserve a finding for the
     # wrong reason and produce a misleading reduced artifact. A later sort
     # supersedes the current one before any limit observes it.
     for later in ops[idx + 1 :]:
-        if later.get("op") in {"limit", "offset"}:
+        if op_kind(later) in {"limit", "offset"}:
             return False
-        if later.get("op") == "sort":
+        if op_kind(later) == "sort":
             return True
     return True
 
 
 def _program_references_table(ops: list[dict], table_name: str) -> bool:
-    return any(op.get("op") in {"join", "tuple_absence_filter"} and op.get("table") == table_name for op in ops)
+    return any(op_kind(op) in {"join", "tuple_absence_filter"} and op_table(op) == table_name for op in ops)
 
 
 def _preserves_target(

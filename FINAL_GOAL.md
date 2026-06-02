@@ -71,6 +71,22 @@ Purpose: measure detection sensitivity on controlled injected faults.
 
 Seeded faults are method-validation evidence only. They must not be counted as real backend bugs.
 
+The short final validation track uses `--evidence-mode validation`. It is a
+pre-freeze harness gate and must not be counted as live latest-version bug
+evidence.
+
+### Ablation And Comparison Support
+
+Purpose: quantify which framework modules and target-scope choices contribute
+to bug discovery, false-positive control, throughput, storage cost, and
+reproducibility.
+
+The final module-ablation and related-scope/baseline tracks use
+`--evidence-mode ablation` and `--evidence-mode comparison`. They support RQ
+tables only. Candidates from those tracks must be rerun or promoted through the
+latest-version live confirmation workflow before they can affect real bug
+counts.
+
 ## Freeze Rule
 
 Before starting final 24h runs:
@@ -102,8 +118,11 @@ runs and historical vulnerable-version replays use different isolated Python
 environments. Execute frozen plans track-by-track from the matching venv:
 
 ```bash
+<latest-live-venv>/bin/python scripts/run_final_experiments.py --track validation --validation-cases 200 --jobs 1 --execute
 <latest-live-venv>/bin/python scripts/run_final_experiments.py --track live --duration 24h --jobs 1 --execute
 <latest-live-venv>/bin/python scripts/run_final_experiments.py --track seeded --duration 24h --jobs 1 --execute
+<latest-live-venv>/bin/python scripts/run_final_experiments.py --track ablation --ablation-cases 2000 --jobs 1 --execute
+<latest-live-venv>/bin/python scripts/run_final_experiments.py --track comparison --comparison-cases 2000 --jobs 1 --execute
 <historical-vulnerable-venv>/bin/python scripts/run_final_experiments.py --track historical --duration 24h --jobs 1 --execute
 ```
 
@@ -115,7 +134,9 @@ experiments/final_protocol.md
 
 ## Working Rule For Future Sessions
 
-At the start of each new continuation on this project, read this file first, then align the next action with the final experiment goal.
+At the start of each new continuation on this project, read this file first,
+then read `NEXT_SESSION_TODO.md` and align the next action with the final
+experiment goal.
 
 Default priority order:
 

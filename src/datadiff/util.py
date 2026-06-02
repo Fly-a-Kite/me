@@ -4,6 +4,7 @@ import json
 import gzip
 import math
 import re
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, TypeVar
@@ -32,12 +33,27 @@ def json_default(obj: Any) -> Any:
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
-def dump_json(data: Any, path: Path) -> None:
+def dump_json(data: Any, path: Path, *, compact: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True, default=json_default), encoding="utf-8")
+    payload = json.dumps(
+        data,
+        ensure_ascii=False,
+        indent=None if compact else 2,
+        separators=(",", ":") if compact else None,
+        sort_keys=True,
+        default=json_default,
+    )
+    if path.suffix == ".gz":
+        with gzip.open(path, "wt", encoding="utf-8") as fh:
+            fh.write(payload)
+        return
+    path.write_text(payload, encoding="utf-8")
 
 
 def load_json(path: Path) -> Any:
+    if path.suffix == ".gz":
+        with gzip.open(path, "rt", encoding="utf-8") as fh:
+            return json.loads(fh.read())
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -47,12 +63,22 @@ def append_jsonl(row: dict[str, Any], path: Path) -> None:
 
 
 class JsonlWriter:
-    def __init__(self, path: Path, *, mode: str = "at", compresslevel: int = 1, sort_keys: bool = False):
+    def __init__(
+        self,
+        path: Path,
+        *,
+        mode: str = "at",
+        compresslevel: int = 1,
+        sort_keys: bool = False,
+        buffer_lines: int = 1,
+    ):
         self.path = path
         self.mode = mode
         self.compresslevel = compresslevel
         self.sort_keys = sort_keys
+        self.buffer_lines = max(1, int(buffer_lines))
         self._file = None
+        self._pending_lines: list[str] = []
 
     def __enter__(self) -> "JsonlWriter":
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -69,13 +95,30 @@ class JsonlWriter:
 
     def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
         if self._file is not None:
+            self.flush()
             self._file.close()
             self._file = None
 
     def write(self, row: dict[str, Any]) -> None:
         if self._file is None:
             raise RuntimeError("JsonlWriter is not open")
-        self._file.write(json.dumps(row, ensure_ascii=False, sort_keys=self.sort_keys, default=json_default) + "\n")
+        self._pending_lines.append(
+            json.dumps(row, ensure_ascii=False, sort_keys=self.sort_keys, default=json_default) + "\n"
+        )
+        if len(self._pending_lines) >= self.buffer_lines:
+            self._flush_pending()
+
+    def flush(self) -> None:
+        if self._file is None:
+            return
+        self._flush_pending()
+        self._file.flush()
+
+    def _flush_pending(self) -> None:
+        if self._file is None or not self._pending_lines:
+            return
+        self._file.write("".join(self._pending_lines))
+        self._pending_lines.clear()
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -89,6 +132,26 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def read_jsonl_partial(path: Path) -> tuple[list[dict[str, Any]], bool]:
+    rows: list[dict[str, Any]] = []
+    partial = False
+    opener = gzip.open if path.suffix == ".gz" else open
+    try:
+        with opener(path, "rt", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except json.JSONDecodeError:
+                    partial = True
+                    break
+    except (EOFError, zlib.error):
+        partial = True
+    return rows, partial
+
+
 def jsonl_log_stem(path: Path) -> str:
     name = path.name
     if name.endswith(".jsonl.gz"):
@@ -100,6 +163,10 @@ def jsonl_log_stem(path: Path) -> str:
 
 def run_meta_path(run_file: Path) -> Path:
     return run_file.with_name(f"{jsonl_log_stem(run_file)}.meta.json")
+
+
+def closed_loop_state_path(run_file: Path) -> Path:
+    return run_file.with_name(f"{jsonl_log_stem(run_file)}.state.json.gz")
 
 
 def slugify(text: str, max_len: int = 80) -> str:

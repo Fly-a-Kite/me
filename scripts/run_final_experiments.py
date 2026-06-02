@@ -16,6 +16,15 @@ if str(PROJECT_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES  # noqa: E402
+from datadiff.experiment_catalog import (  # noqa: E402
+    FINAL_COMPARISON_MATRIX,
+    FINAL_LIVE_DISCOVERY_MATRIX,
+    FINAL_MODULE_ABLATION_MATRIX,
+    FINAL_PROTOCOL_TRACKS,
+    FINAL_SEEDED_SENSITIVITY_MATRIX,
+    FINAL_VALIDATION_MATRIX,
+    build_historical_experiment_meta,
+)
 from datadiff.historical import list_historical_bugs  # noqa: E402
 from datadiff.util import REPORTS_DIR, utc_now  # noqa: E402
 
@@ -34,6 +43,7 @@ class FinalCommand:
     expected_output: str
     notes: str = ""
     replay_bug_policy: dict[str, object] = field(default_factory=dict)
+    experiment_meta: dict[str, object] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -41,70 +51,11 @@ class FinalCommand:
         return data
 
 
-LIVE_DISCOVERY_SUITES: tuple[tuple[str, str, str], ...] = (
-    (
-        "datafusion_cross",
-        "live_datafusion",
-        "Latest-version DataFusion differential discovery against pandas and DuckDB references.",
-    ),
-    (
-        "datafusion_cross",
-        "live_datafusion_fresh",
-        "Latest-version DataFusion fresh discovery over non-groupby surfaces using the same shared harness.",
-    ),
-    (
-        "dataframe_lazy",
-        "live_polars_lazy",
-        "Latest-version Polars eager/lazy consistency discovery.",
-    ),
-    (
-        "arrow_cross",
-        "live_arrow",
-        "Latest-version Arrow/PyArrow cross-family discovery.",
-    ),
-    (
-        "embedded_sql",
-        "live_embedded_sql",
-        "Latest-version embedded SQL cross-engine discovery.",
-    ),
-    (
-        "latest_all_engines",
-        "live_cross_family",
-        "Broad latest-version cross-family discovery over every implemented real backend.",
-    ),
-    (
-        "latest_no_datafusion",
-        "live_cross_family",
-        "Broad latest-version cross-family discovery excluding DataFusion to avoid known DataFusion saturation.",
-    ),
-    (
-        "polars_cross",
-        "live_polars_issue_focus",
-        "Latest-version Polars-focused discovery using fresh-safe issue-inspired semantic sketches.",
-    ),
-    (
-        "embedded_sql_cross",
-        "live_duckdb_issue_focus",
-        "Latest-version DuckDB/SQLite/Pandas discovery using fresh-safe issue-inspired SQL sketches.",
-    ),
-    (
-        "arrow_cross",
-        "live_arrow_issue_focus",
-        "Latest-version Arrow/PyArrow discovery using fresh-safe issue-inspired Arrow sketches.",
-    ),
-    (
-        "latest_no_datafusion",
-        "live_issue_focus",
-        "Broad non-DataFusion latest-version discovery over fresh-safe issue-inspired sketches.",
-    ),
-)
-
-
 def main() -> int:
-    return main_with_args_for_test(parse_args())
+    return run_with_args(parse_args())
 
 
-def main_with_args_for_test(args: argparse.Namespace) -> int:
+def run_with_args(args: argparse.Namespace) -> int:
     if args.execute and args.track == "all":
         print(
             "refusing --track all --execute because live/latest and historical/vulnerable "
@@ -131,6 +82,11 @@ def main_with_args_for_test(args: argparse.Namespace) -> int:
     return 0
 
 
+def main_with_args_for_test(args: argparse.Namespace) -> int:
+    # Compatibility alias for older tests and external wrappers.
+    return run_with_args(args)
+
+
 def jobs_arg(value: object) -> str:
     text = str(value).strip().lower()
     if text == "auto":
@@ -147,15 +103,21 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--track",
-        choices=["all", "live", "historical", "seeded"],
+        choices=["all", *FINAL_PROTOCOL_TRACKS],
         default="all",
         help="experiment track to plan",
     )
     parser.add_argument("--duration", default="24h", help="per-run wall-clock budget for live discovery")
+    parser.add_argument("--validation-cases", type=int, default=200, help="cases per short validation run")
+    parser.add_argument("--validation-seeds", default="1,101", help="short validation seeds")
     parser.add_argument("--live-seeds", default="1,1001,2001", help="comma-separated live discovery seeds")
     parser.add_argument("--historical-seeds", default=None, help="override historical replay seeds")
     parser.add_argument("--seeded-cases", type=int, default=5000, help="cases per seeded sensitivity run")
     parser.add_argument("--seeded-seeds", default="1,1001,2001,3001,4001", help="seeded sensitivity seeds")
+    parser.add_argument("--ablation-cases", type=int, default=2000, help="cases per module-ablation run")
+    parser.add_argument("--ablation-seeds", default="1,1001,2001", help="module-ablation seeds")
+    parser.add_argument("--comparison-cases", type=int, default=2000, help="cases per baseline/comparison run")
+    parser.add_argument("--comparison-seeds", default="1,1001,2001", help="baseline/comparison seeds")
     parser.add_argument("--jobs", default="auto", help="parallel experiment jobs, or 'auto'")
     parser.add_argument("--artifact-limit", type=int, default=50, help="bug artifacts per run")
     parser.add_argument(
@@ -172,20 +134,99 @@ def parse_args() -> argparse.Namespace:
 
 def build_plan(args: argparse.Namespace) -> list[FinalCommand]:
     commands: list[FinalCommand] = []
-    tracks = {"live", "historical", "seeded"} if args.track == "all" else {args.track}
+    tracks = (
+        set(FINAL_PROTOCOL_TRACKS)
+        if args.track == "all"
+        else {args.track}
+    )
+    if "validation" in tracks:
+        commands.append(short_validation_command(args))
     if "live" in tracks:
         commands.extend(live_discovery_commands(args))
     if "historical" in tracks:
         commands.extend(historical_replay_commands(args))
     if "seeded" in tracks:
         commands.append(seeded_sensitivity_command(args))
+    if "ablation" in tracks:
+        commands.append(module_ablation_command(args))
+    if "comparison" in tracks:
+        commands.append(method_comparison_command(args))
     return commands
+
+
+def _append_experiment_meta(cmd: list[str], meta: dict[str, object]) -> None:
+    cmd.extend(["--experiment-meta", json.dumps(meta, ensure_ascii=False, sort_keys=True)])
+
+
+def short_validation_command(args: argparse.Namespace) -> FinalCommand:
+    cmd = [
+        str(DATADIFF),
+        "experiment",
+        "--cases",
+        str(max(1, int(args.validation_cases))),
+        "--seeds",
+        str(args.validation_seeds),
+        "--presets",
+        ",".join(variant.preset for variant in FINAL_VALIDATION_MATRIX.variants),
+        "--target-suites",
+        ",".join(FINAL_VALIDATION_MATRIX.target_suites),
+        "--evidence-mode",
+        "validation",
+        "--run-theme",
+        "final-validation-smoke",
+        "--paper-notes",
+        (
+            "Short pre-freeze validation over live target families; inspect run-health, "
+            "classify-run, experiment-summary, and methodology-report before starting 24h runs."
+        ),
+        "--replay-bug-source-issues",
+        ",".join(replay_source_issues()),
+        "--artifact-limit",
+        str(max(0, int(args.artifact_limit))),
+        "--log-level",
+        "compact",
+        "--jobs",
+        jobs_arg(args.jobs),
+        "--skip-run-reports",
+    ]
+    _append_experiment_meta(
+        cmd,
+        FINAL_VALIDATION_MATRIX.command_experiment_meta(
+            target_suites=FINAL_VALIDATION_MATRIX.target_suites,
+        ),
+    )
+    return FinalCommand(
+        track="validation",
+        name="short_validation_smoke",
+        command=cmd,
+        purpose=(
+            "Run a short validation-mode smoke matrix before the frozen 24h campaigns to catch "
+            "adapter, oracle, preflight, classification, and evidence-pipeline noise."
+        ),
+        count_as_real_bugs=False,
+        expected_output=(
+            "short experiment manifest plus run-health/classify-run/experiment-summary/"
+            "methodology-report checks; do not count candidates as final 24h bug evidence"
+        ),
+        notes=(
+            "If this track exposes harness noise, fix it before freezing and regenerate all "
+            "final plans. Validation keeps enable_replay_bug=false and only gates readiness."
+        ),
+        replay_bug_policy={
+            "enable_replay_bug": False,
+            "source_issues": replay_source_issues(),
+        },
+        experiment_meta=FINAL_VALIDATION_MATRIX.command_experiment_meta(
+            target_suites=FINAL_VALIDATION_MATRIX.target_suites,
+        ),
+    )
 
 
 def live_discovery_commands(args: argparse.Namespace) -> list[FinalCommand]:
     commands = []
     replay_sources = replay_source_issues()
-    for suite, preset, purpose in LIVE_DISCOVERY_SUITES:
+    for campaign in FINAL_LIVE_DISCOVERY_MATRIX.campaigns:
+        suite, preset, purpose = campaign.suite, campaign.preset, campaign.purpose
         cmd = [
             str(DATADIFF),
             "experiment",
@@ -211,10 +252,11 @@ def live_discovery_commands(args: argparse.Namespace) -> list[FinalCommand]:
             str(args.log_level),
             "--jobs",
             jobs_arg(args.jobs),
-            "--skip-paper-journal",
         ]
         if args.skip_run_reports:
             cmd.append("--skip-run-reports")
+        experiment_meta = FINAL_LIVE_DISCOVERY_MATRIX.command_experiment_meta_for_campaign(campaign)
+        _append_experiment_meta(cmd, experiment_meta)
         commands.append(
             FinalCommand(
                 track="live",
@@ -222,7 +264,10 @@ def live_discovery_commands(args: argparse.Namespace) -> list[FinalCommand]:
                 command=cmd,
                 purpose=purpose,
                 count_as_real_bugs=True,
-                expected_output="runs/experiment-*.json plus reports from experiment-summary/analyze-experiment",
+                expected_output=(
+                    "runs/experiment-*.json plus experiment-summary/analyze-experiment/"
+                    "methodology-report outputs"
+                ),
                 notes=(
                     "Fresh/latest mode keeps enable_replay_bug=false and filters known replay probes. "
                     "Run without changing generator/oracle code after inspecting findings. "
@@ -232,6 +277,7 @@ def live_discovery_commands(args: argparse.Namespace) -> list[FinalCommand]:
                     "enable_replay_bug": False,
                     "source_issues": replay_sources,
                 },
+                experiment_meta=experiment_meta,
             )
         )
     return commands
@@ -282,10 +328,11 @@ def historical_replay_commands(args: argparse.Namespace) -> list[FinalCommand]:
             log_level,
             "--jobs",
             jobs_arg(args.jobs),
-            "--skip-paper-journal",
         ]
         if args.skip_run_reports:
             cmd.append("--skip-run-reports")
+        experiment_meta = build_historical_experiment_meta(spec)
+        _append_experiment_meta(cmd, experiment_meta)
         commands.append(
             FinalCommand(
                 track="historical",
@@ -303,6 +350,7 @@ def historical_replay_commands(args: argparse.Namespace) -> list[FinalCommand]:
                     "enable_replay_bug": True,
                     "source_issues": replay_sources,
                 },
+                experiment_meta=experiment_meta,
             )
         )
     return commands
@@ -334,6 +382,8 @@ def _historical_fixture_replay_command(spec: object, args: argparse.Namespace) -
         "--log-level",
         str(args.log_level),
     ]
+    experiment_meta = build_historical_experiment_meta(spec)
+    cmd.extend(["--experiment-meta", json.dumps(experiment_meta, ensure_ascii=False, sort_keys=True)])
     return FinalCommand(
         track="historical",
         name=str(getattr(spec, "bug_id")),
@@ -349,6 +399,7 @@ def _historical_fixture_replay_command(spec: object, args: argparse.Namespace) -
             "enable_replay_bug": True,
             "source_issues": replay_sources,
         },
+        experiment_meta=experiment_meta,
     )
 
 
@@ -361,9 +412,9 @@ def seeded_sensitivity_command(args: argparse.Namespace) -> FinalCommand:
         "--seeds",
         str(args.seeded_seeds),
         "--presets",
-        "baseline,guided_filter,guided_groupby,guided_join,guided_mutate",
+        ",".join(variant.preset for variant in FINAL_SEEDED_SENSITIVITY_MATRIX.variants),
         "--target-suites",
-        "seeded_filter,seeded_groupby,seeded_join,seeded_mutate",
+        ",".join(FINAL_SEEDED_SENSITIVITY_MATRIX.target_suites),
         "--evidence-mode",
         "seeded",
         "--run-theme",
@@ -376,9 +427,12 @@ def seeded_sensitivity_command(args: argparse.Namespace) -> FinalCommand:
         "minimal",
         "--jobs",
         jobs_arg(args.jobs),
-        "--skip-paper-journal",
         "--skip-run-reports",
     ]
+    experiment_meta = FINAL_SEEDED_SENSITIVITY_MATRIX.command_experiment_meta(
+        target_suites=FINAL_SEEDED_SENSITIVITY_MATRIX.target_suites,
+    )
+    _append_experiment_meta(cmd, experiment_meta)
     return FinalCommand(
         track="seeded",
         name="seeded_sensitivity",
@@ -391,6 +445,122 @@ def seeded_sensitivity_command(args: argparse.Namespace) -> FinalCommand:
             "enable_replay_bug": False,
             "source_issues": replay_source_issues(),
         },
+        experiment_meta=experiment_meta,
+    )
+
+
+def module_ablation_command(args: argparse.Namespace) -> FinalCommand:
+    cmd = [
+        str(DATADIFF),
+        "experiment",
+        "--cases",
+        str(max(1, int(args.ablation_cases))),
+        "--seeds",
+        str(args.ablation_seeds),
+        "--presets",
+        ",".join(variant.preset for variant in FINAL_MODULE_ABLATION_MATRIX.variants),
+        "--target-suites",
+        ",".join(FINAL_MODULE_ABLATION_MATRIX.target_suites),
+        "--evidence-mode",
+        "ablation",
+        "--run-theme",
+        "final-ablation-modules",
+        "--paper-notes",
+        "Module ablation for generator typing, normalizer, feedback, reducer, and oracle composition.",
+        "--replay-bug-source-issues",
+        ",".join(replay_source_issues()),
+        "--artifact-limit",
+        str(max(0, int(args.artifact_limit))),
+        "--log-level",
+        str(args.log_level),
+        "--jobs",
+        jobs_arg(args.jobs),
+        "--skip-run-reports",
+    ]
+    experiment_meta = FINAL_MODULE_ABLATION_MATRIX.command_experiment_meta(
+        target_suites=FINAL_MODULE_ABLATION_MATRIX.target_suites,
+    )
+    _append_experiment_meta(cmd, experiment_meta)
+    return FinalCommand(
+        track="ablation",
+        name="module_ablation",
+        command=cmd,
+        purpose=(
+            "Quantify sensitivity of type-aware generation, semantic normalization, feedback, "
+            "reducer, and oracle composition across core target families."
+        ),
+        count_as_real_bugs=False,
+        expected_output=(
+            "experiment manifest plus experiment-summary/analyze-experiment/"
+            "analyze-ablation-audit/methodology-report outputs"
+        ),
+        notes=(
+            "Use for RQ ablation and baseline comparison tables. Candidate bugs from this track "
+            "require the same live confirmation pipeline before they can be counted as real bugs."
+        ),
+        replay_bug_policy={
+            "enable_replay_bug": False,
+            "source_issues": replay_source_issues(),
+        },
+        experiment_meta=experiment_meta,
+    )
+
+
+def method_comparison_command(args: argparse.Namespace) -> FinalCommand:
+    cmd = [
+        str(DATADIFF),
+        "experiment",
+        "--cases",
+        str(max(1, int(args.comparison_cases))),
+        "--seeds",
+        str(args.comparison_seeds),
+        "--presets",
+        ",".join(variant.preset for variant in FINAL_COMPARISON_MATRIX.variants),
+        "--target-suites",
+        ",".join(FINAL_COMPARISON_MATRIX.target_suites),
+        "--evidence-mode",
+        "comparison",
+        "--run-theme",
+        "final-baseline-and-scope-comparison",
+        "--paper-notes",
+        (
+            "Baseline and related-scope comparison: SQL/DBMS-style target suites versus "
+            "cross-ecosystem DataFrame/Arrow/SQL target suites under the same harness."
+        ),
+        "--replay-bug-source-issues",
+        ",".join(replay_source_issues()),
+        "--artifact-limit",
+        str(max(0, int(args.artifact_limit))),
+        "--log-level",
+        str(args.log_level),
+        "--jobs",
+        jobs_arg(args.jobs),
+        "--skip-run-reports",
+    ]
+    experiment_meta = FINAL_COMPARISON_MATRIX.command_experiment_meta(
+        target_suites=FINAL_COMPARISON_MATRIX.target_suites,
+    )
+    _append_experiment_meta(cmd, experiment_meta)
+    return FinalCommand(
+        track="comparison",
+        name="baseline_and_related_scope",
+        command=cmd,
+        purpose=(
+            "Compare random/guided/metamorphic/workflow presets and SQL/query-engine-only "
+            "scope against the cross-ecosystem DataDiffFuzz scope."
+        ),
+        count_as_real_bugs=False,
+        expected_output="experiment manifest plus baseline, methodology, and space/time efficiency analysis outputs",
+        notes=(
+            "This is not a reimplementation of SQLancer/SQUIRREL; it is a controlled scope "
+            "baseline inside the same runner, used to isolate what DataFrame/Arrow/cross-family "
+            "coverage adds beyond SQL/query-engine-oriented testing."
+        ),
+        replay_bug_policy={
+            "enable_replay_bug": False,
+            "source_issues": replay_source_issues(),
+        },
+        experiment_meta=experiment_meta,
     )
 
 
@@ -408,6 +578,12 @@ def write_plan(commands: Iterable[FinalCommand], args: argparse.Namespace) -> Pa
             "live_counts": "Live latest-version runs count candidate/confirmed real backend bugs after family deduplication.",
             "historical_counts": "Historical runs count only confirmed_fixed specs; pending/candidate specs are case studies.",
             "seeded_counts": "Seeded runs measure sensitivity only and do not count as real bugs.",
+            "validation_counts": "Short validation runs gate the harness before 24h runs and do not count as real bugs.",
+            "ablation_counts": "Ablation/comparison runs support RQ tables and do not directly count as real bugs.",
+            "paper_run_journal": (
+                "Every final-plan command keeps paper-run-journal recording enabled so each counted or "
+                "paper-facing support run is appended to reports/paper-run-journal.jsonl and .md."
+            ),
             "family_key": "root_cause + suspicious_backends",
             "replay_bug_gate": (
                 "Final live commands explicitly keep enable_replay_bug=false; historical commands "

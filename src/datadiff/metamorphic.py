@@ -1,13 +1,47 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import dataclass
 from typing import Any
 
-from datadiff.dsl import Case, Program, TableData, sort_columns
-from datadiff.normalizer import NormalizedResult
+from datadiff.canonicalization import dedupe_by_canonical_key, short_canonical_hash
+from datadiff.dsl import Case, ColumnSpec, Program, TableData, sort_columns
+from datadiff.operation_type_semantics import case_when_output_type
+from datadiff.expression_semantics import aggregate_output_type, cast_output_type, expr_output_type, literal_output_type
+from datadiff.filtering import evaluate_filter_predicate
+from datadiff.join_keys import join_key_pairs, join_key_value
+from datadiff.normalizer import NormalizedResult, _norm_value
+from datadiff.operation_semantics import (
+    aggregate_alias,
+    aggregate_column,
+    aggregate_func,
+    aggregate_specs,
+    condition_column,
+    expr_index,
+    join_how,
+    op_column,
+    op_comparator,
+    op_columns,
+    op_kind,
+    op_table,
+    op_value,
+    expr_kind,
+    expr_length,
+    expr_new,
+    expr_old,
+    expr_separator,
+    expr_source,
+    expr_start,
+    groupby_keys,
+    op_column,
+    op_columns,
+    op_n,
+    op_output_alias,
+    op_table,
+    operation_names,
+)
 from datadiff.oracle import Finding
+from datadiff.program_state import state_before_operation
 
 
 @dataclass(slots=True)
@@ -17,24 +51,52 @@ class MetamorphicVariant:
     case: Case
 
 
+def _as_plain_mapping(value: Any) -> dict[str, Any]:
+    if hasattr(value, "to_dict"):
+        return dict(value.to_dict())
+    return dict(value)
+
+
 def build_metamorphic_variants(case: Case, limit: int = 4) -> list[MetamorphicVariant]:
     variants: list[MetamorphicVariant] = []
+    variants.extend(_filter_input_materialization_variants(case))
+    variants.extend(_cleanup_input_materialization_variants(case))
+    variants.extend(_input_partition_union_all_variants(case))
     variants.extend(_filter_rejecting_row_injection_variants(case))
     variants.extend(_join_unmatched_dimension_injection_variants(case))
     variants.extend(_join_inner_left_equivalence_variants(case))
     variants.extend(_join_filter_pushdown_variants(case))
+    variants.extend(_semi_anti_join_rewrite_variants(case))
+    variants.extend(_groupby_sorted_input_variants(case))
     variants.extend(_groupby_neutral_mutation_variants(case))
     variants.extend(_mutate_add_zero_insertion_variants(case))
     variants.extend(_filter_mutate_commutation_variants(case))
     variants.extend(_string_lower_normalized_column_variants(case))
     variants.extend(_string_lower_idempotence_variants(case))
+    variants.extend(_string_upper_idempotence_variants(case))
+    variants.extend(_string_strip_idempotence_variants(case))
+    variants.extend(_string_null_if_empty_idempotence_variants(case))
+    variants.extend(_string_replace_idempotence_variants(case))
+    variants.extend(_string_slice_prefix_idempotence_variants(case))
+    variants.extend(_string_split_part_idempotence_variants(case))
     variants.extend(_filter_tautology_insertion_variants(case))
+    variants.extend(_offset_limit_fusion_variants(case))
+    variants.extend(_limit_offset_fusion_variants(case))
+    variants.extend(_offset_zero_insertion_variants(case))
     variants.extend(_groupby_aggregation_permutation_variants(case))
     variants.extend(_sort_select_commutation_variants(case))
     variants.extend(_sort_idempotence_variants(case))
     variants.extend(_row_permutation_variants(case))
     variants.extend(_join_table_permutation_variants(case))
     variants.extend(_filter_idempotence_variants(case))
+    variants.extend(_union_all_empty_append_variants(case))
+    variants.extend(_drop_nulls_idempotence_variants(case))
+    variants.extend(_semi_anti_join_unmatched_right_injection_variants(case))
+    variants.extend(_semi_anti_join_right_duplicate_variants(case))
+    variants.extend(_distinct_idempotence_variants(case))
+    variants.extend(_fill_null_idempotence_variants(case))
+    variants.extend(_coalesce_idempotence_variants(case))
+    variants.extend(_case_when_idempotence_variants(case))
     variants.extend(_limit_idempotence_variants(case))
     variants.extend(_groupby_key_permutation_variants(case))
     variants.extend(_filter_commutativity_variants(case))
@@ -54,6 +116,8 @@ def evaluate_metamorphic_variants(
             if variant_result is None:
                 continue
             if _payload(base_result) == _payload(variant_result):
+                continue
+            if _relaxed_float_payload(base_result) == _relaxed_float_payload(variant_result):
                 continue
             relation = variant_name.split(":", 1)[0]
             sig = _signature(case, backend, variant_name, base_result, variant_result)
@@ -94,22 +158,192 @@ def _row_permutation_variants(case: Case) -> list[MetamorphicVariant]:
     return [MetamorphicVariant("row_permutation:reverse", "row_permutation", variant)]
 
 
+def _filter_input_materialization_variants(case: Case) -> list[MetamorphicVariant]:
+    """Replace a leading filter with an equivalent pre-filtered input table."""
+
+    if not case.tables or not case.program.operations:
+        return []
+    ops = case.program.op_sequence()
+    if case.program.order_sensitive or "limit" in ops or "offset" in ops:
+        return []
+    filter_op = case.program.operations[0]
+    if op_kind(filter_op) != "filter":
+        return []
+    base = case.tables[0]
+    column = op_column(filter_op)
+    if column not in {spec.name for spec in base.columns}:
+        return []
+    comparator = op_comparator(filter_op)
+    if comparator is None:
+        return []
+    try:
+        filtered_rows = [
+            dict(row)
+            for row in base.rows
+            if evaluate_filter_predicate(row.get(column), comparator, op_value(filter_op))
+        ]
+    except (TypeError, ValueError):
+        return []
+    if filtered_rows == [dict(row) for row in base.rows]:
+        return []
+
+    materialized = TableData(base.name, list(base.columns), filtered_rows)
+    program = Program(
+        program_id=f"{case.program.program_id}-mr-filter-input-materialization",
+        seed=case.program.seed,
+        operations=list(case.program.operations[1:]),
+    )
+    return [
+        MetamorphicVariant(
+            f"filter_input_materialization:{column}-{len(base.rows)}to{len(filtered_rows)}",
+            "filter_input_materialization",
+            Case(
+                f"{case.case_id}-mr-filter-input-materialization",
+                case.seed,
+                [materialized, *case.tables[1:]],
+                program,
+                metadata=dict(case.metadata),
+            ),
+        )
+    ]
+
+
+def _cleanup_input_materialization_variants(case: Case) -> list[MetamorphicVariant]:
+    """Replace a leading cleanup/table-shaping op with an equivalent input table."""
+
+    if not case.tables or not case.program.operations:
+        return []
+    op = case.program.operations[0]
+    kind = op_kind(op)
+    if kind == "drop_nulls":
+        return _drop_nulls_input_materialization_variants(case, op)
+    if kind == "fill_null":
+        return _fill_null_input_materialization_variants(case, op)
+    if kind == "distinct":
+        return _distinct_input_materialization_variants(case, op)
+    return []
+
+
+def _drop_nulls_input_materialization_variants(case: Case, op: dict[str, Any]) -> list[MetamorphicVariant]:
+    base = case.tables[0]
+    base_columns = {spec.name for spec in base.columns}
+    columns = op_columns(op)
+    if not columns or any(column not in base_columns for column in columns):
+        return []
+    rows = [
+        dict(row)
+        for row in base.rows
+        if all(evaluate_filter_predicate(row.get(column), "is_not_null", None) for column in columns)
+    ]
+    if rows == [dict(row) for row in base.rows]:
+        return []
+    materialized = TableData(base.name, list(base.columns), rows)
+    program = Program(
+        program_id=f"{case.program.program_id}-mr-drop-nulls-input-materialization",
+        seed=case.program.seed,
+        operations=list(case.program.operations[1:]),
+    )
+    return [
+        MetamorphicVariant(
+            f"drop_nulls_input_materialization:{'-'.join(columns)}-{len(base.rows)}to{len(rows)}",
+            "drop_nulls_input_materialization",
+            Case(
+                f"{case.case_id}-mr-drop-nulls-input-materialization",
+                case.seed,
+                [materialized, *case.tables[1:]],
+                program,
+                metadata=dict(case.metadata),
+            ),
+        )
+    ]
+
+
+def _fill_null_input_materialization_variants(case: Case, op: dict[str, Any]) -> list[MetamorphicVariant]:
+    base = case.tables[0]
+    column = op_column(op)
+    fill_value = op_value(op)
+    if column not in {spec.name for spec in base.columns} or fill_value is None:
+        return []
+    rows: list[dict[str, Any]] = []
+    changed = False
+    for row in base.rows:
+        copied = dict(row)
+        if evaluate_filter_predicate(copied.get(column), "is_null", None):
+            copied[column] = fill_value
+            changed = True
+        rows.append(copied)
+    if not changed:
+        return []
+    materialized = TableData(base.name, list(base.columns), rows)
+    program = Program(
+        program_id=f"{case.program.program_id}-mr-fill-null-input-materialization",
+        seed=case.program.seed,
+        operations=list(case.program.operations[1:]),
+    )
+    return [
+        MetamorphicVariant(
+            f"fill_null_input_materialization:{column}",
+            "fill_null_input_materialization",
+            Case(
+                f"{case.case_id}-mr-fill-null-input-materialization",
+                case.seed,
+                [materialized, *case.tables[1:]],
+                program,
+                metadata=dict(case.metadata),
+            ),
+        )
+    ]
+
+
+def _distinct_input_materialization_variants(case: Case, op: dict[str, Any]) -> list[MetamorphicVariant]:
+    base = case.tables[0]
+    spec_by_name = {spec.name: spec for spec in base.columns}
+    columns = op_columns(op)
+    if not columns or any(column not in spec_by_name for column in columns):
+        return []
+    rows = dedupe_by_canonical_key(
+        ({column: row.get(column) for column in columns} for row in base.rows),
+        payload=lambda row: [ _norm_value(row.get(column)) for column in columns ],
+    )
+    if rows == [{column: row.get(column) for column in columns} for row in base.rows] and len(columns) == len(base.columns):
+        return []
+    materialized = TableData(base.name, [spec_by_name[column] for column in columns], rows)
+    program = Program(
+        program_id=f"{case.program.program_id}-mr-distinct-input-materialization",
+        seed=case.program.seed,
+        operations=list(case.program.operations[1:]),
+    )
+    return [
+        MetamorphicVariant(
+            f"distinct_input_materialization:{'-'.join(columns)}-{len(base.rows)}to{len(rows)}",
+            "distinct_input_materialization",
+            Case(
+                f"{case.case_id}-mr-distinct-input-materialization",
+                case.seed,
+                [materialized, *case.tables[1:]],
+                program,
+                metadata=dict(case.metadata),
+            ),
+        )
+    ]
+
+
 def _filter_rejecting_row_injection_variants(case: Case) -> list[MetamorphicVariant]:
     """Inject a domain row that should be removed by an existing cleaning filter."""
 
     primary = case.tables[0]
     columns = {col.name: col for col in primary.columns}
     for idx, op in enumerate(case.program.operations):
-        kind = op.get("op")
+        kind = op_kind(op)
         if kind in {"limit", "offset", "groupby"}:
             return []
         if kind != "filter":
             continue
-        column = str(op.get("column", ""))
+        column = op_column(op)
         spec = columns.get(column)
         if spec is None:
             continue
-        rejecting = _rejecting_value(spec.type, op.get("cmp"), op.get("value"))
+        rejecting = _rejecting_value(spec.type, op_comparator(op), op_value(op))
         if rejecting is _NO_VALUE:
             continue
         injected = _default_row(primary)
@@ -140,15 +374,16 @@ def _join_unmatched_dimension_injection_variants(case: Case) -> list[Metamorphic
     primary = case.tables[0]
     table_by_name = {table.name: table for table in case.tables}
     for idx, op in enumerate(case.program.operations):
-        if op.get("op") != "join":
+        if op_kind(op) != "join":
             continue
-        right = table_by_name.get(str(op.get("table", "")))
+        right = table_by_name.get(op_table(op))
         if right is None:
             continue
-        left_on = str(op.get("left_on", ""))
-        right_on = str(op.get("right_on", ""))
-        if not left_on or not right_on:
+        left_keys, right_keys = join_key_pairs(op)
+        if len(left_keys) != 1 or len(right_keys) != 1:
             continue
+        left_on = left_keys[0]
+        right_on = right_keys[0]
         left_values = {row.get(left_on) for row in primary.rows}
         right_spec = _column_spec(right, right_on)
         if right_spec is None:
@@ -187,14 +422,17 @@ def _join_inner_left_equivalence_variants(case: Case) -> list[MetamorphicVariant
     table_by_name = {table.name: table for table in case.tables}
     mutated: set[str] = set()
     for idx, op in enumerate(case.program.operations):
-        if op.get("op") == "mutate":
-            mutated.add(str(op.get("column", "")))
+        if op_kind(op) == "mutate":
+            mutated.add(op_column(op))
             continue
-        if op.get("op") != "join":
+        if op_kind(op) != "join":
             continue
-        left_on = str(op.get("left_on", ""))
-        right_on = str(op.get("right_on", ""))
-        right = table_by_name.get(str(op.get("table", "")))
+        left_keys, right_keys = join_key_pairs(op)
+        if len(left_keys) != 1 or len(right_keys) != 1:
+            return []
+        left_on = left_keys[0]
+        right_on = right_keys[0]
+        right = table_by_name.get(op_table(op))
         if right is None or not left_on or not right_on or left_on in mutated:
             return []
         left_values = {row.get(left_on) for row in primary.rows}
@@ -203,8 +441,8 @@ def _join_inner_left_equivalence_variants(case: Case) -> list[MetamorphicVariant
         right_values = {row.get(right_on) for row in right.rows}
         if not left_values.issubset(right_values):
             return []
-        replacement = dict(op)
-        replacement["how"] = "inner" if op.get("how") == "left" else "left"
+        replacement = _as_plain_mapping(op)
+        replacement["how"] = "inner" if join_how(op) == "left" else "left"
         program = Program(
             program_id=f"{case.program.program_id}-mr-join-left-inner-equivalence-{idx}",
             seed=case.program.seed,
@@ -227,22 +465,23 @@ def _join_filter_pushdown_variants(case: Case) -> list[MetamorphicVariant]:
     mutated: set[str] = set()
     ops = case.program.operations
     for idx, op in enumerate(ops):
-        if op.get("op") == "mutate":
-            mutated.add(str(op.get("column", "")))
+        if op_kind(op) == "mutate":
+            mutated.add(op_column(op))
             continue
-        if op.get("op") != "join":
+        if op_kind(op) != "join":
             continue
         between_mutated: set[str] = set()
         for filter_idx in range(idx + 1, len(ops)):
             candidate = ops[filter_idx]
-            if candidate.get("op") in {"groupby", "limit", "offset", "join", "tuple_absence_filter"}:
+            candidate_kind = op_kind(candidate)
+            if candidate_kind in {"groupby", "limit", "offset", "join", "tuple_absence_filter"}:
                 break
-            if candidate.get("op") == "mutate":
-                between_mutated.add(str(candidate.get("column", "")))
+            if candidate_kind == "mutate":
+                between_mutated.add(op_column(candidate))
                 continue
-            if candidate.get("op") != "filter":
+            if candidate_kind != "filter":
                 continue
-            filter_column = str(candidate.get("column", ""))
+            filter_column = op_column(candidate)
             if (
                 filter_column not in primary_columns
                 or filter_column in mutated
@@ -274,19 +513,19 @@ def _groupby_neutral_mutation_variants(case: Case) -> list[MetamorphicVariant]:
     """Aggregate over a +0 mirror of a numeric column while keeping aliases unchanged."""
 
     for idx, op in enumerate(case.program.operations):
-        if op.get("op") != "groupby":
+        if op_kind(op) != "groupby":
             continue
         col_types = _column_types_before(case, idx)
         used_columns = set(col_types)
-        aggs = list(op.get("aggs", []))
+        aggs = list(aggregate_specs(op))
         for agg_index, agg in enumerate(aggs):
-            source = str(agg.get("column", ""))
+            source = aggregate_column(agg)
             if col_types.get(source) not in {"int", "float"}:
                 continue
             mirror = _fresh_column_name(used_columns, f"mr_{source}_plus0")
-            mutated_agg = dict(agg)
+            mutated_agg = _as_plain_mapping(agg)
             mutated_agg["column"] = mirror
-            replacement = dict(op)
+            replacement = _as_plain_mapping(op)
             replacement["aggs"] = aggs[:agg_index] + [mutated_agg] + aggs[agg_index + 1 :]
             neutral_mutate = {
                 "op": "mutate",
@@ -308,6 +547,71 @@ def _groupby_neutral_mutation_variants(case: Case) -> list[MetamorphicVariant]:
                 )
             ]
     return []
+
+
+def _groupby_sorted_input_variants(case: Case) -> list[MetamorphicVariant]:
+    """Pre-sort exact groupby inputs to exercise sorted aggregation paths."""
+
+    for idx, op in enumerate(case.program.operations):
+        if op_kind(op) != "groupby":
+            continue
+        aggs = list(aggregate_specs(op))
+        if not aggs or any(aggregate_func(agg) not in _EXACT_GROUPBY_SORT_FUNCS for agg in aggs):
+            continue
+        if not _groupby_sorted_input_tail_safe(case.program.operations[idx + 1 :]):
+            continue
+        current_columns = _column_names_before(case, idx)
+        if len(current_columns) < 2:
+            continue
+        keys = [key for key in groupby_keys(op) if key in current_columns]
+        sort_columns_for_variant = keys + [column for column in current_columns if column not in set(keys)]
+        sort_columns_for_variant = sort_columns_for_variant[: min(3, len(sort_columns_for_variant))]
+        if not sort_columns_for_variant:
+            continue
+        sort_op = {
+            "op": "sort",
+            "keys": [
+                {
+                    "column": column,
+                    "ascending": index % 2 == 0,
+                    "nulls": "first" if index % 2 else "last",
+                }
+                for index, column in enumerate(sort_columns_for_variant)
+            ],
+        }
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-groupby-sorted-input-{idx}",
+            seed=case.program.seed,
+            operations=case.program.operations[:idx] + [sort_op, _as_plain_mapping(op)] + case.program.operations[idx + 1 :],
+        )
+        return [
+            MetamorphicVariant(
+                f"groupby_sorted_input:{'-'.join(sort_columns_for_variant)}-{idx}",
+                "groupby_sorted_input",
+                Case(
+                    f"{case.case_id}-mr-groupby-sorted-input-{idx}",
+                    case.seed,
+                    case.tables,
+                    program,
+                    metadata=dict(case.metadata),
+                ),
+            )
+        ]
+    return []
+
+
+_EXACT_GROUPBY_SORT_FUNCS = {"count", "nunique", "min", "max", "any", "all"}
+_GROUPBY_OUTPUT_ORDER_OBSERVERS = {"limit", "offset", "row_number_filter", "running_sum", "sortedness_check"}
+
+
+def _groupby_sorted_input_tail_safe(tail: list[dict[str, Any]]) -> bool:
+    for op in tail:
+        kind = op_kind(op)
+        if kind == "sort":
+            return True
+        if kind in _GROUPBY_OUTPUT_ORDER_OBSERVERS:
+            return False
+    return True
 
 
 def _mutate_add_zero_insertion_variants(case: Case) -> list[MetamorphicVariant]:
@@ -341,7 +645,7 @@ def _filter_mutate_commutation_variants(case: Case) -> list[MetamorphicVariant]:
     for idx in range(len(ops) - 1):
         first = ops[idx]
         second = ops[idx + 1]
-        if first.get("op") == "filter" and second.get("op") == "mutate":
+        if op_kind(first) == "filter" and op_kind(second) == "mutate":
             if not _filter_and_mutate_are_independent(first, second):
                 continue
             swapped = list(ops)
@@ -358,7 +662,7 @@ def _filter_mutate_commutation_variants(case: Case) -> list[MetamorphicVariant]:
                     Case(f"{case.case_id}-mr-filter-mutate-commute-{idx}", case.seed, case.tables, program),
                 )
             ]
-        if first.get("op") == "mutate" and second.get("op") == "filter":
+        if op_kind(first) == "mutate" and op_kind(second) == "filter":
             if not _filter_and_mutate_are_independent(second, first):
                 continue
             swapped = list(ops)
@@ -379,9 +683,9 @@ def _filter_mutate_commutation_variants(case: Case) -> list[MetamorphicVariant]:
 
 
 def _filter_and_mutate_are_independent(filter_op: dict[str, Any], mutate_op: dict[str, Any]) -> bool:
-    filter_column = str(filter_op.get("column", ""))
-    mutate_column = str(mutate_op.get("column", ""))
-    mutate_source = str(mutate_op.get("expr", {}).get("source", ""))
+    filter_column = op_column(filter_op)
+    mutate_column = op_column(mutate_op)
+    mutate_source = expr_source(mutate_op)
     return bool(filter_column) and filter_column != mutate_column and filter_column != mutate_source
 
 
@@ -415,10 +719,9 @@ def _string_lower_normalized_column_variants(case: Case) -> list[MetamorphicVari
 
 def _string_lower_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
     for idx, op in enumerate(case.program.operations):
-        expr = op.get("expr", {})
-        if op.get("op") != "mutate" or expr.get("kind") != "string_lower":
+        if op_kind(op) != "mutate" or expr_kind(op) != "string_lower":
             continue
-        column = str(op.get("column", ""))
+        column = op_column(op)
         if not column:
             continue
         repeated = {
@@ -441,16 +744,193 @@ def _string_lower_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
     return []
 
 
+def _string_upper_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
+    for idx, op in enumerate(case.program.operations):
+        if op_kind(op) != "mutate" or expr_kind(op) != "string_upper":
+            continue
+        column = op_column(op)
+        if not column:
+            continue
+        repeated = {
+            "op": "mutate",
+            "column": column,
+            "expr": {"kind": "string_upper", "source": column},
+        }
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-string-upper-idempotence-{idx}",
+            seed=case.program.seed,
+            operations=case.program.operations[: idx + 1] + [repeated] + case.program.operations[idx + 1 :],
+        )
+        return [
+            MetamorphicVariant(
+                f"string_upper_idempotence:repeat-{idx}",
+                "string_upper_idempotence",
+                Case(f"{case.case_id}-mr-string-upper-idempotence-{idx}", case.seed, case.tables, program),
+            )
+        ]
+    return []
+
+
+def _string_strip_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
+    for idx, op in enumerate(case.program.operations):
+        if op_kind(op) != "mutate" or expr_kind(op) != "string_strip":
+            continue
+        column = op_column(op)
+        if not column:
+            continue
+        repeated = {
+            "op": "mutate",
+            "column": column,
+            "expr": {"kind": "string_strip", "source": column},
+        }
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-string-strip-idempotence-{idx}",
+            seed=case.program.seed,
+            operations=case.program.operations[: idx + 1] + [repeated] + case.program.operations[idx + 1 :],
+        )
+        return [
+            MetamorphicVariant(
+                f"string_strip_idempotence:repeat-{idx}",
+                "string_strip_idempotence",
+                Case(f"{case.case_id}-mr-string-strip-idempotence-{idx}", case.seed, case.tables, program),
+            )
+        ]
+    return []
+
+
+def _string_null_if_empty_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
+    for idx, op in enumerate(case.program.operations):
+        if op_kind(op) != "mutate" or expr_kind(op) != "string_null_if_empty":
+            continue
+        column = op_column(op)
+        if not column:
+            continue
+        repeated = {
+            "op": "mutate",
+            "column": column,
+            "expr": {"kind": "string_null_if_empty", "source": column},
+        }
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-string-null-if-empty-idempotence-{idx}",
+            seed=case.program.seed,
+            operations=case.program.operations[: idx + 1] + [repeated] + case.program.operations[idx + 1 :],
+        )
+        return [
+            MetamorphicVariant(
+                f"string_null_if_empty_idempotence:repeat-{idx}",
+                "string_null_if_empty_idempotence",
+                Case(f"{case.case_id}-mr-string-null-if-empty-idempotence-{idx}", case.seed, case.tables, program),
+            )
+        ]
+    return []
+
+
+def _string_replace_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
+    for idx, op in enumerate(case.program.operations):
+        if op_kind(op) != "mutate" or expr_kind(op) != "string_replace":
+            continue
+        old = expr_old(op)
+        new = expr_new(op)
+        if not isinstance(old, str) or old == "" or not isinstance(new, str) or old in new:
+            continue
+        column = op_column(op)
+        if not column:
+            continue
+        repeated = {
+            "op": "mutate",
+            "column": column,
+            "expr": {"kind": "string_replace", "source": column, "old": old, "new": new},
+        }
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-string-replace-idempotence-{idx}",
+            seed=case.program.seed,
+            operations=case.program.operations[: idx + 1] + [repeated] + case.program.operations[idx + 1 :],
+        )
+        return [
+            MetamorphicVariant(
+                f"string_replace_idempotence:repeat-{idx}",
+                "string_replace_idempotence",
+                Case(f"{case.case_id}-mr-string-replace-idempotence-{idx}", case.seed, case.tables, program),
+            )
+        ]
+    return []
+
+
+def _string_slice_prefix_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
+    for idx, op in enumerate(case.program.operations):
+        if op_kind(op) != "mutate" or expr_kind(op) != "string_slice":
+            continue
+        start = expr_start(op)
+        length = expr_length(op)
+        if start != 0 or type(length) is not int or length < 0:
+            continue
+        column = op_column(op)
+        if not column:
+            continue
+        repeated = {
+            "op": "mutate",
+            "column": column,
+            "expr": {"kind": "string_slice", "source": column, "start": 0, "length": length},
+        }
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-string-slice-prefix-idempotence-{idx}",
+            seed=case.program.seed,
+            operations=case.program.operations[: idx + 1] + [repeated] + case.program.operations[idx + 1 :],
+        )
+        return [
+            MetamorphicVariant(
+                f"string_slice_prefix_idempotence:repeat-{idx}",
+                "string_slice_prefix_idempotence",
+                Case(f"{case.case_id}-mr-string-slice-prefix-idempotence-{idx}", case.seed, case.tables, program),
+            )
+        ]
+    return []
+
+
+def _string_split_part_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
+    for idx, op in enumerate(case.program.operations):
+        if op_kind(op) != "mutate" or expr_kind(op) != "string_split_part":
+            continue
+        sep = expr_separator(op)
+        index = expr_index(op)
+        if not isinstance(sep, str) or sep == "" or index != 0:
+            continue
+        column = op_column(op)
+        if not column:
+            continue
+        repeated = {
+            "op": "mutate",
+            "column": column,
+            "expr": {"kind": "string_split_part", "source": column, "sep": sep, "index": 0},
+        }
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-string-split-part-idempotence-{idx}",
+            seed=case.program.seed,
+            operations=case.program.operations[: idx + 1] + [repeated] + case.program.operations[idx + 1 :],
+        )
+        return [
+            MetamorphicVariant(
+                f"string_split_part_idempotence:repeat-{idx}",
+                "string_split_part_idempotence",
+                Case(f"{case.case_id}-mr-string-split-part-idempotence-{idx}", case.seed, case.tables, program),
+            )
+        ]
+    return []
+
+
 def _filter_tautology_insertion_variants(case: Case) -> list[MetamorphicVariant]:
     primary = case.tables[0]
     id_spec = _column_spec(primary, "id")
     if id_spec is None or id_spec.type != "int":
         return []
-    id_values = [
-        row.get("id")
-        for row in primary.rows
-        if isinstance(row.get("id"), int) and not isinstance(row.get("id"), bool)
-    ]
+    if _sorts_by_mean_aggregation(case.program.operations):
+        return []
+    id_values = []
+    for row in primary.rows:
+        value = row.get("id")
+        if not isinstance(value, int) or isinstance(value, bool):
+            return []
+        id_values.append(value)
     if not id_values:
         return []
     tautology = {"op": "filter", "column": "id", "cmp": ">=", "value": min(id_values)}
@@ -468,15 +948,113 @@ def _filter_tautology_insertion_variants(case: Case) -> list[MetamorphicVariant]
     ]
 
 
+def _sorts_by_mean_aggregation(ops: list[dict[str, Any]]) -> bool:
+    mean_aliases: set[str] = set()
+    for op in ops:
+        kind = op_kind(op)
+        if kind == "groupby":
+            for agg in aggregate_specs(op):
+                if aggregate_func(agg) == "mean" and aggregate_alias(agg):
+                    mean_aliases.add(aggregate_alias(agg))
+        elif kind == "sort" and mean_aliases:
+            try:
+                sorted_columns = sort_columns(op)
+            except ValueError:
+                continue
+            if any(column in mean_aliases for column in sorted_columns):
+                return True
+    return False
+
+
+def _offset_zero_insertion_variants(case: Case) -> list[MetamorphicVariant]:
+    ops = case.program.operations
+    if not any(kind in {"sort", "limit", "offset"} for kind in operation_names(ops)):
+        return []
+    if ops and op_kind(ops[-1]) == "offset" and op_n(ops[-1]) == 0:
+        return []
+    program = Program(
+        program_id=f"{case.program.program_id}-mr-offset-zero",
+        seed=case.program.seed,
+        operations=list(ops) + [{"op": "offset", "n": 0}],
+    )
+    return [
+        MetamorphicVariant(
+            "offset_zero_insertion:tail",
+            "offset_zero_insertion",
+            Case(f"{case.case_id}-mr-offset-zero", case.seed, case.tables, program),
+        )
+    ]
+
+
+def _offset_limit_fusion_variants(case: Case) -> list[MetamorphicVariant]:
+    ops = case.program.operations
+    for idx in range(len(ops) - 1):
+        first = ops[idx]
+        second = ops[idx + 1]
+        if op_kind(first) != "offset" or op_kind(second) != "limit":
+            continue
+        try:
+            offset = op_n(first)
+            limit = op_n(second)
+        except (TypeError, ValueError):
+            continue
+        if offset < 0 or limit < 0:
+            continue
+        rewritten = ops[:idx] + [{"op": "limit", "n": offset + limit}, {"op": "offset", "n": offset}] + ops[idx + 2 :]
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-offset-limit-fusion-{idx}",
+            seed=case.program.seed,
+            operations=rewritten,
+        )
+        return [
+            MetamorphicVariant(
+                f"offset_limit_fusion:swap-{idx}-{idx + 1}",
+                "offset_limit_fusion",
+                Case(f"{case.case_id}-mr-offset-limit-fusion-{idx}", case.seed, case.tables, program),
+            )
+        ]
+    return []
+
+
+def _limit_offset_fusion_variants(case: Case) -> list[MetamorphicVariant]:
+    ops = case.program.operations
+    for idx in range(len(ops) - 1):
+        first = ops[idx]
+        second = ops[idx + 1]
+        if op_kind(first) != "limit" or op_kind(second) != "offset":
+            continue
+        try:
+            limit = op_n(first)
+            offset = op_n(second)
+        except (TypeError, ValueError):
+            continue
+        if offset < 0 or limit < 0:
+            continue
+        rewritten = ops[:idx] + [{"op": "offset", "n": offset}, {"op": "limit", "n": max(0, limit - offset)}] + ops[idx + 2 :]
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-limit-offset-fusion-{idx}",
+            seed=case.program.seed,
+            operations=rewritten,
+        )
+        return [
+            MetamorphicVariant(
+                f"limit_offset_fusion:swap-{idx}-{idx + 1}",
+                "limit_offset_fusion",
+                Case(f"{case.case_id}-mr-limit-offset-fusion-{idx}", case.seed, case.tables, program),
+            )
+        ]
+    return []
+
+
 def _groupby_aggregation_permutation_variants(case: Case) -> list[MetamorphicVariant]:
     ops = case.program.operations
     for idx, op in enumerate(ops):
-        if op.get("op") != "groupby":
+        if op_kind(op) != "groupby":
             continue
-        aggs = list(op.get("aggs", []))
+        aggs = list(aggregate_specs(op))
         if len(aggs) < 2:
             continue
-        permuted = dict(op)
+        permuted = _as_plain_mapping(op)
         permuted["aggs"] = list(reversed(aggs))
         program = Program(
             program_id=f"{case.program.program_id}-mr-groupby-agg-permutation-{idx}",
@@ -521,9 +1099,9 @@ def _join_table_permutation_variants(case: Case) -> list[MetamorphicVariant]:
 def _sort_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
     ops = case.program.operations
     for idx, op in enumerate(ops):
-        if op.get("op") != "sort":
+        if op_kind(op) != "sort":
             continue
-        duplicated = ops[: idx + 1] + [dict(op)] + ops[idx + 1 :]
+        duplicated = ops[: idx + 1] + [_as_plain_mapping(op)] + ops[idx + 1 :]
         program = Program(
             program_id=f"{case.program.program_id}-mr-sort-idempotence-{idx}",
             seed=case.program.seed,
@@ -539,13 +1117,51 @@ def _sort_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
     return []
 
 
+def _input_partition_union_all_variants(case: Case) -> list[MetamorphicVariant]:
+    """Rebuild the primary input through a UNION ALL partition boundary."""
+
+    ops = case.program.op_sequence()
+    if not case.tables or case.program.order_sensitive or "limit" in ops or "offset" in ops:
+        return []
+    base = case.tables[0]
+    if len(base.rows) < 2:
+        return []
+    existing_names = {table.name for table in case.tables}
+    if "t_partition_tail" in existing_names:
+        return []
+    split = len(base.rows) // 2
+    if split <= 0 or split >= len(base.rows):
+        return []
+
+    head = TableData(base.name, list(base.columns), list(base.rows[:split]))
+    tail = TableData("t_partition_tail", list(base.columns), list(base.rows[split:]))
+    program = Program(
+        program_id=f"{case.program.program_id}-mr-input-partition-union-all",
+        seed=case.program.seed,
+        operations=[{"op": "union_all", "table": tail.name}, *case.program.operations],
+    )
+    return [
+        MetamorphicVariant(
+            f"input_partition_union_all:split-{split}-{len(base.rows) - split}",
+            "input_partition_union_all",
+            Case(
+                f"{case.case_id}-mr-input-partition-union-all",
+                case.seed,
+                [head, *case.tables[1:], tail],
+                program,
+                metadata=dict(case.metadata),
+            ),
+        )
+    ]
+
+
 def _sort_select_commutation_variants(case: Case) -> list[MetamorphicVariant]:
     ops = case.program.operations
     for idx in range(len(ops) - 1):
         first = ops[idx]
         second = ops[idx + 1]
-        if first.get("op") == "select" and second.get("op") == "sort":
-            selected = set(first.get("columns", []))
+        if op_kind(first) == "select" and op_kind(second) == "sort":
+            selected = set(op_columns(first))
             columns = sort_columns(second)
             if columns and set(columns).issubset(selected):
                 swapped = list(ops)
@@ -562,8 +1178,8 @@ def _sort_select_commutation_variants(case: Case) -> list[MetamorphicVariant]:
                         Case(f"{case.case_id}-mr-sort-select-commute-{idx}", case.seed, case.tables, program),
                     )
                 ]
-        if first.get("op") == "sort" and second.get("op") == "select":
-            selected = set(second.get("columns", []))
+        if op_kind(first) == "sort" and op_kind(second) == "select":
+            selected = set(op_columns(second))
             columns = sort_columns(first)
             if columns and set(columns).issubset(selected):
                 swapped = list(ops)
@@ -586,9 +1202,9 @@ def _sort_select_commutation_variants(case: Case) -> list[MetamorphicVariant]:
 def _filter_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
     ops = case.program.operations
     for idx, op in enumerate(ops):
-        if op.get("op") != "filter":
+        if op_kind(op) != "filter":
             continue
-        duplicated = ops[: idx + 1] + [dict(op)] + ops[idx + 1 :]
+        duplicated = ops[: idx + 1] + [_as_plain_mapping(op)] + ops[idx + 1 :]
         program = Program(
             program_id=f"{case.program.program_id}-mr-filter-idempotence-{idx}",
             seed=case.program.seed,
@@ -604,12 +1220,354 @@ def _filter_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
     return []
 
 
+def _distinct_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
+    ops = case.program.operations
+    for idx, op in enumerate(ops):
+        if op_kind(op) != "distinct":
+            continue
+        duplicated = ops[: idx + 1] + [_as_plain_mapping(op)] + ops[idx + 1 :]
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-distinct-idempotence-{idx}",
+            seed=case.program.seed,
+            operations=duplicated,
+        )
+        return [
+            MetamorphicVariant(
+                f"distinct_idempotence:duplicate-{idx}",
+                "distinct_idempotence",
+                Case(f"{case.case_id}-mr-distinct-idempotence-{idx}", case.seed, case.tables, program),
+            )
+        ]
+    return []
+
+
+def _drop_nulls_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
+    ops = case.program.operations
+    for idx, op in enumerate(ops):
+        if op_kind(op) != "drop_nulls":
+            continue
+        duplicated = ops[: idx + 1] + [_as_plain_mapping(op)] + ops[idx + 1 :]
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-drop-nulls-idempotence-{idx}",
+            seed=case.program.seed,
+            operations=duplicated,
+        )
+        return [
+            MetamorphicVariant(
+                f"drop_nulls_idempotence:duplicate-{idx}",
+                "drop_nulls_idempotence",
+                Case(f"{case.case_id}-mr-drop-nulls-idempotence-{idx}", case.seed, case.tables, program),
+            )
+        ]
+    return []
+
+
+def _union_all_empty_append_variants(case: Case) -> list[MetamorphicVariant]:
+    if not case.tables or any(table.name == "t_empty_union" for table in case.tables):
+        return []
+    base = case.tables[0]
+    empty = TableData("t_empty_union", list(base.columns), [])
+    program = Program(
+        program_id=f"{case.program.program_id}-mr-union-all-empty-append",
+        seed=case.program.seed,
+        operations=[{"op": "union_all", "table": empty.name}, *case.program.operations],
+    )
+    return [
+        MetamorphicVariant(
+            "union_all_empty_append:prepend-empty",
+            "union_all_empty_append",
+            Case(
+                f"{case.case_id}-mr-union-all-empty-append",
+                case.seed,
+                [*case.tables, empty],
+                program,
+                metadata=dict(case.metadata),
+            ),
+        )
+    ]
+
+
+def _semi_anti_join_rewrite_variants(case: Case) -> list[MetamorphicVariant]:
+    """Rewrite existence joins into equivalent materialized-key join plans."""
+
+    if not case.tables:
+        return []
+    tables = {table.name: table for table in case.tables}
+    table_names = set(tables)
+    all_column_names = {column.name for table in case.tables for column in table.columns}
+    for idx, op in enumerate(case.program.operations):
+        kind = op_kind(op)
+        if kind not in {"semi_join", "anti_join"}:
+            continue
+        right = tables.get(op_table(op))
+        if right is None:
+            continue
+        left_keys, right_keys = join_key_pairs(op)
+        if not left_keys or len(left_keys) != len(right_keys) or len(set(right_keys)) != len(right_keys):
+            continue
+        current_columns = _column_names_before(case, idx)
+        if not current_columns or any(left_key not in current_columns for left_key in left_keys):
+            continue
+        marker = None
+        if kind == "anti_join":
+            marker = _fresh_column_name(all_column_names | set(current_columns), "__datadiff_mr_match")
+        key_table_name = _fresh_table_name(table_names, f"t_mr_{kind}_keys_{idx}")
+        key_table = _semi_anti_rewrite_key_table(key_table_name, right, right_keys, marker)
+        if key_table is None:
+            continue
+        rewritten_join = {
+            "op": "join",
+            "table": key_table.name,
+            "left_on": list(left_keys),
+            "right_on": list(right_keys),
+            "how": "inner" if kind == "semi_join" else "left",
+        }
+        rewritten_ops: list[dict[str, Any]] = [_as_plain_mapping(operation) for operation in case.program.operations[:idx]]
+        rewritten_ops.append(rewritten_join)
+        if kind == "anti_join":
+            if marker is None:
+                continue
+            rewritten_ops.extend(
+                [
+                    {"op": "filter", "column": marker, "cmp": "is_null", "value": None},
+                    {"op": "select", "columns": list(current_columns)},
+                ]
+            )
+        rewritten_ops.extend(_as_plain_mapping(operation) for operation in case.program.operations[idx + 1 :])
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-semi-anti-rewrite-{idx}",
+            seed=case.program.seed,
+            operations=rewritten_ops,
+        )
+        return [
+            MetamorphicVariant(
+                f"semi_anti_join_rewrite:{kind}-op-{idx}",
+                "semi_anti_join_rewrite",
+                Case(
+                    f"{case.case_id}-mr-semi-anti-rewrite-{idx}",
+                    case.seed,
+                    [*case.tables, key_table],
+                    program,
+                    metadata=dict(case.metadata),
+                ),
+            )
+        ]
+    return []
+
+
+def _semi_anti_rewrite_key_table(
+    name: str,
+    right: TableData,
+    right_keys: list[str],
+    marker: str | None,
+) -> TableData | None:
+    columns: list[ColumnSpec] = []
+    for key in right_keys:
+        spec = _column_spec(right, key)
+        if spec is None:
+            return None
+        columns.append(ColumnSpec(key, spec.type, nullable=False))
+    if marker is not None:
+        columns.append(ColumnSpec(marker, "int", nullable=False))
+
+    rows: list[dict[str, Any]] = []
+    seen: set[tuple[Any, ...]] = set()
+    for row in right.rows:
+        key = join_key_value(row, right_keys)
+        if key is None or key in seen:
+            continue
+        seen.add(key)
+        out = {right_key: row.get(right_key) for right_key in right_keys}
+        if marker is not None:
+            out[marker] = 1
+        rows.append(out)
+    return TableData(name, columns, rows)
+
+
+def _semi_anti_join_right_duplicate_variants(case: Case) -> list[MetamorphicVariant]:
+    tables = {table.name: table for table in case.tables}
+    for idx, op in enumerate(case.program.operations):
+        if op_kind(op) not in {"semi_join", "anti_join"}:
+            continue
+        right = tables.get(op_table(op))
+        if right is None:
+            continue
+        _, right_keys = join_key_pairs(op)
+        if not right_keys:
+            continue
+        duplicate = next((row for row in right.rows if join_key_value(row, right_keys) is not None), None)
+        if duplicate is None:
+            continue
+        cloned_tables = []
+        for table in case.tables:
+            rows = [dict(row) for row in table.rows]
+            if table.name == right.name:
+                rows.append(dict(duplicate))
+            cloned_tables.append(TableData(table.name, list(table.columns), rows))
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-semi-anti-right-duplicate-{idx}",
+            seed=case.program.seed,
+            operations=[_as_plain_mapping(operation) for operation in case.program.operations],
+        )
+        return [
+            MetamorphicVariant(
+                f"semi_anti_join_right_duplicate_injection:op-{idx}",
+                "semi_anti_join_right_duplicate_injection",
+                Case(
+                    f"{case.case_id}-mr-semi-anti-right-duplicate-{idx}",
+                    case.seed,
+                    cloned_tables,
+                    program,
+                    metadata=dict(case.metadata),
+                ),
+            )
+        ]
+    return []
+
+
+def _semi_anti_join_unmatched_right_injection_variants(case: Case) -> list[MetamorphicVariant]:
+    tables = {table.name: table for table in case.tables}
+    primary = case.tables[0]
+    for idx, op in enumerate(case.program.operations):
+        if op_kind(op) not in {"semi_join", "anti_join"}:
+            continue
+        right = tables.get(op_table(op))
+        if right is None:
+            continue
+        left_keys, right_keys = join_key_pairs(op)
+        if not left_keys or len(left_keys) != len(right_keys):
+            continue
+        injected = _default_row(right)
+        if not _fill_unmatched_join_key(injected, right, right_keys, primary, left_keys):
+            continue
+        cloned_tables = []
+        for table in case.tables:
+            rows = [dict(row) for row in table.rows]
+            if table.name == right.name:
+                rows.append(injected)
+            cloned_tables.append(TableData(table.name, list(table.columns), rows))
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-semi-anti-right-unmatched-{idx}",
+            seed=case.program.seed,
+            operations=[_as_plain_mapping(operation) for operation in case.program.operations],
+        )
+        return [
+            MetamorphicVariant(
+                f"semi_anti_join_unmatched_right_injection:op-{idx}",
+                "semi_anti_join_unmatched_right_injection",
+                Case(
+                    f"{case.case_id}-mr-semi-anti-right-unmatched-{idx}",
+                    case.seed,
+                    cloned_tables,
+                    program,
+                    metadata=dict(case.metadata),
+                ),
+            )
+        ]
+    return []
+
+
+def _fill_unmatched_join_key(
+    injected: dict[str, Any],
+    right: TableData,
+    right_keys: list[str],
+    primary: TableData,
+    left_keys: list[str],
+) -> bool:
+    left_values_by_key = {
+        left_key: {row.get(left_key) for row in primary.rows}
+        for left_key in left_keys
+    }
+    for left_key, right_key in zip(left_keys, right_keys):
+        right_spec = _column_spec(right, right_key)
+        if right_spec is None:
+            return False
+        existing_values = left_values_by_key.get(left_key, set())
+        fresh_value = _fresh_unmatched_value(right_spec.type, existing_values)
+        if fresh_value is _NO_VALUE:
+            continue
+        injected[right_key] = fresh_value
+        for other_right_key in right_keys:
+            if other_right_key != right_key and injected.get(other_right_key) is None:
+                other_spec = _column_spec(right, other_right_key)
+                if other_spec is None:
+                    return False
+                injected[other_right_key] = _default_value(other_spec.type)
+        return True
+    return False
+
+
+def _fill_null_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
+    ops = case.program.operations
+    for idx, op in enumerate(ops):
+        if op_kind(op) != "fill_null":
+            continue
+        duplicated = ops[: idx + 1] + [_as_plain_mapping(op)] + ops[idx + 1 :]
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-fill-null-idempotence-{idx}",
+            seed=case.program.seed,
+            operations=duplicated,
+        )
+        return [
+            MetamorphicVariant(
+                f"fill_null_idempotence:duplicate-{idx}",
+                "fill_null_idempotence",
+                Case(f"{case.case_id}-mr-fill-null-idempotence-{idx}", case.seed, case.tables, program),
+            )
+        ]
+    return []
+
+
+def _coalesce_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
+    ops = case.program.operations
+    for idx, op in enumerate(ops):
+        if op_kind(op) != "coalesce":
+            continue
+        duplicated = ops[: idx + 1] + [_as_plain_mapping(op)] + ops[idx + 1 :]
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-coalesce-idempotence-{idx}",
+            seed=case.program.seed,
+            operations=duplicated,
+        )
+        return [
+            MetamorphicVariant(
+                f"coalesce_idempotence:duplicate-{idx}",
+                "coalesce_idempotence",
+                Case(f"{case.case_id}-mr-coalesce-idempotence-{idx}", case.seed, case.tables, program),
+            )
+        ]
+    return []
+
+
+def _case_when_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
+    ops = case.program.operations
+    for idx, op in enumerate(ops):
+        if op_kind(op) != "case_when":
+            continue
+        if condition_column(op) == op_output_alias(op):
+            continue
+        duplicated = ops[: idx + 1] + [_as_plain_mapping(op)] + ops[idx + 1 :]
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-case-when-idempotence-{idx}",
+            seed=case.program.seed,
+            operations=duplicated,
+        )
+        return [
+            MetamorphicVariant(
+                f"case_when_idempotence:duplicate-{idx}",
+                "case_when_idempotence",
+                Case(f"{case.case_id}-mr-case-when-idempotence-{idx}", case.seed, case.tables, program),
+            )
+        ]
+    return []
+
+
 def _limit_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
     ops = case.program.operations
     for idx, op in enumerate(ops):
-        if op.get("op") != "limit":
+        if op_kind(op) != "limit":
             continue
-        duplicated = ops[: idx + 1] + [dict(op)] + ops[idx + 1 :]
+        duplicated = ops[: idx + 1] + [_as_plain_mapping(op)] + ops[idx + 1 :]
         program = Program(
             program_id=f"{case.program.program_id}-mr-limit-idempotence-{idx}",
             seed=case.program.seed,
@@ -628,12 +1586,12 @@ def _limit_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
 def _groupby_key_permutation_variants(case: Case) -> list[MetamorphicVariant]:
     ops = case.program.operations
     for idx, op in enumerate(ops):
-        if op.get("op") != "groupby":
+        if op_kind(op) != "groupby":
             continue
-        keys = list(op.get("keys", []))
+        keys = list(groupby_keys(op))
         if len(keys) < 2:
             continue
-        permuted = dict(op)
+        permuted = _as_plain_mapping(op)
         permuted["keys"] = list(reversed(keys))
         program = Program(
             program_id=f"{case.program.program_id}-mr-groupby-key-permutation-{idx}",
@@ -654,7 +1612,7 @@ def _filter_commutativity_variants(case: Case) -> list[MetamorphicVariant]:
     ops = case.program.operations
     variants: list[MetamorphicVariant] = []
     for idx in range(len(ops) - 1):
-        if ops[idx].get("op") != "filter" or ops[idx + 1].get("op") != "filter":
+        if op_kind(ops[idx]) != "filter" or op_kind(ops[idx + 1]) != "filter":
             continue
         swapped = list(ops)
         swapped[idx], swapped[idx + 1] = swapped[idx + 1], swapped[idx]
@@ -677,9 +1635,9 @@ def _filter_commutativity_variants(case: Case) -> list[MetamorphicVariant]:
 def _select_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
     ops = case.program.operations
     for idx, op in enumerate(ops):
-        if op.get("op") != "select":
+        if op_kind(op) != "select":
             continue
-        duplicated = ops[: idx + 1] + [dict(op)] + ops[idx + 1 :]
+        duplicated = ops[: idx + 1] + [_as_plain_mapping(op)] + ops[idx + 1 :]
         program = Program(
             program_id=f"{case.program.program_id}-mr-select-idempotence-{idx}",
             seed=case.program.seed,
@@ -705,62 +1663,32 @@ def _column_spec(table: TableData, column: str):
     return None
 
 
+def _column_names_before(case: Case, op_index: int) -> list[str]:
+    return state_before_operation(case, op_index).columns
+
+
 def _column_types_before(case: Case, op_index: int) -> dict[str, str]:
-    table_by_name = {table.name: table for table in case.tables}
-    col_types = {col.name: col.type for col in case.tables[0].columns}
-    for op in case.program.operations[:op_index]:
-        kind = op.get("op")
-        if kind == "join":
-            right = table_by_name.get(str(op.get("table", "")))
-            if right is None:
-                continue
-            right_on = str(op.get("right_on", ""))
-            for col in right.columns:
-                if col.name == right_on or col.name in col_types:
-                    continue
-                col_types[col.name] = col.type
-        elif kind == "select":
-            selected = set(op.get("columns", []))
-            col_types = {name: typ for name, typ in col_types.items() if name in selected}
-        elif kind == "mutate":
-            out_type = _expr_output_type(op.get("expr", {}), col_types)
-            if out_type is not None:
-                col_types[str(op.get("column", ""))] = out_type
-        elif kind == "groupby":
-            next_types: dict[str, str] = {}
-            for key in op.get("keys", []):
-                if key in col_types:
-                    next_types[str(key)] = col_types[str(key)]
-            for agg in op.get("aggs", []):
-                source = str(agg.get("column", ""))
-                alias = str(agg.get("as", ""))
-                if not alias:
-                    continue
-                next_types[alias] = "int" if agg.get("func") == "count" else col_types.get(source, "float")
-            col_types = next_types
-    return col_types
+    return state_before_operation(case, op_index).column_types
+
+
+def _case_when_output_type(then_value: Any, else_value: Any) -> str | None:
+    return case_when_output_type(then_value, else_value)
+
+
+def _literal_output_type(value: Any) -> str | None:
+    return literal_output_type(value)
+
+
+def _aggregate_output_type(source_type: str | None, func: str) -> str:
+    return aggregate_output_type(source_type, func)
 
 
 def _expr_output_type(expr: dict[str, Any], col_types: dict[str, str]) -> str | None:
-    source = str(expr.get("source", ""))
-    source_type = col_types.get(source)
-    if source_type is None:
-        return None
-    kind = expr.get("kind")
-    if kind == "add_const":
-        return source_type if source_type in {"int", "float"} else None
-    if kind == "arith_const":
-        op = expr.get("op")
-        if source_type not in {"int", "float"} or op not in {"sub", "mul", "div", "mod"}:
-            return None
-        return "float" if op == "div" or source_type == "float" else source_type
-    if kind == "cast" and expr.get("to") == "float":
-        return "float" if source_type in {"int", "float"} else None
-    if kind == "string_length":
-        return "int" if source_type == "str" else None
-    if kind == "string_lower":
-        return "str" if source_type == "str" else None
-    return None
+    return expr_output_type(expr, col_types)
+
+
+def _cast_output_type(source_type: str, expr: dict[str, Any]) -> str | None:
+    return cast_output_type(source_type, expr)
 
 
 def _fresh_column_name(existing: set[str], stem: str) -> str:
@@ -772,18 +1700,30 @@ def _fresh_column_name(existing: set[str], stem: str) -> str:
     return candidate
 
 
+def _fresh_table_name(existing: set[str], stem: str) -> str:
+    candidate = stem
+    suffix = 0
+    while candidate in existing:
+        suffix += 1
+        candidate = f"{stem}_{suffix}"
+    return candidate
+
+
 def _default_row(table: TableData) -> dict[str, Any]:
     row: dict[str, Any] = {}
     for column in table.columns:
-        if column.type == "int":
-            row[column.name] = 0
-        elif column.type == "float":
-            row[column.name] = 0.0
-        elif column.type == "bool":
-            row[column.name] = False
-        else:
-            row[column.name] = ""
+        row[column.name] = _default_value(column.type)
     return row
+
+
+def _default_value(column_type: str) -> Any:
+    if column_type == "int":
+        return 0
+    if column_type == "float":
+        return 0.0
+    if column_type == "bool":
+        return False
+    return ""
 
 
 def _rejecting_value(column_type: str, comparator: Any, value: Any) -> Any:
@@ -853,6 +1793,18 @@ def _payload(norm: NormalizedResult) -> dict[str, Any]:
     }
 
 
+def _relaxed_float_payload(norm: NormalizedResult) -> dict[str, Any]:
+    return {
+        "status": norm.status,
+        "columns": norm.columns,
+        "rows": [
+            [_norm_value(value, preserve_float_precision=False) for value in row]
+            for row in norm.rows
+        ],
+        "error_type": norm.error_type,
+    }
+
+
 def _signature(
     case: Case,
     backend: str,
@@ -867,5 +1819,4 @@ def _signature(
         "base": _payload(base_result),
         "variant_result": _payload(variant_result),
     }
-    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()
-    return hashlib.sha256(raw).hexdigest()[:16]
+    return short_canonical_hash(payload, 16)

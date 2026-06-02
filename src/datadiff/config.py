@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
+from typing import Any
 from typing import Literal
 
 OracleMode = Literal["differential", "metamorphic", "both"]
@@ -11,7 +14,9 @@ GeneratorProfile = Literal[
     "bughunt",
     "bughunt_fresh",
     "bughunt_no_groupby",
+    "common_api_workflow",
     "issue_focus",
+    "deep_probe_rotation",
     "null_groupby_topk",
     "null_agg_topk",
     "filter_null_agg_topk",
@@ -72,41 +77,176 @@ GeneratorProfile = Literal[
     "pyarrow_run_end_null_compute_semantics",
     "pyarrow_large_string_partition_schema_semantics",
     "pyarrow_hash_pivot_wider_order_semantics",
+    "pyarrow_list_flatten_parent_indices_semantics",
     "polars_rolling_mean_by_null_count_semantics",
     "csv_long_numeric_roundtrip",
 ]
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]
 
+
+@dataclass(slots=True)
+class DiscoveryBias:
+    targets: list[str] = field(default_factory=list)
+    feature_prefixes: list[str] = field(default_factory=list)
+    score_bonus: float = 0.0
+    novelty_bonus: float = 0.0
+    contribution_bonus: float = 0.0
+    candidate_pool_bonus: float = 0.0
+    keep_in_pool: bool = False
+
+    def __post_init__(self) -> None:
+        self.targets = _normalize_string_list(self.targets)
+        self.feature_prefixes = _normalize_string_list(self.feature_prefixes)
+        self.score_bonus = float(self.score_bonus or 0.0)
+        self.novelty_bonus = float(self.novelty_bonus or 0.0)
+        self.contribution_bonus = float(self.contribution_bonus or 0.0)
+        self.candidate_pool_bonus = float(self.candidate_pool_bonus or 0.0)
+        self.keep_in_pool = bool(self.keep_in_pool)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    def key(self) -> tuple[Any, ...]:
+        return (
+            tuple(self.targets),
+            tuple(self.feature_prefixes),
+            self.score_bonus,
+            self.novelty_bonus,
+            self.contribution_bonus,
+            self.candidate_pool_bonus,
+            self.keep_in_pool,
+        )
+
+    def is_noop(self) -> bool:
+        return (
+            not self.targets
+            and not self.feature_prefixes
+            and self.score_bonus == 0.0
+            and self.novelty_bonus == 0.0
+            and self.contribution_bonus == 0.0
+            and self.candidate_pool_bonus == 0.0
+            and not self.keep_in_pool
+        )
+
+
+def _normalize_string_list(values: Iterable[Any] | None) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for value in values or []:
+        text = str(value).strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        normalized.append(text)
+    return normalized
+
+
+def coerce_discovery_bias(value: DiscoveryBias | Mapping[str, Any]) -> DiscoveryBias:
+    if isinstance(value, DiscoveryBias):
+        return DiscoveryBias(**value.to_dict())
+    if isinstance(value, Mapping):
+        return DiscoveryBias(**dict(value))
+    raise TypeError(f"unsupported discovery bias payload: {type(value)!r}")
+
+
+def merge_discovery_biases(
+    *groups: Iterable[DiscoveryBias | Mapping[str, Any] | None] | None,
+) -> list[DiscoveryBias]:
+    merged: list[DiscoveryBias] = []
+    seen: set[tuple[Any, ...]] = set()
+    for group in groups:
+        if group is None:
+            continue
+        for item in group:
+            if item is None:
+                continue
+            bias = coerce_discovery_bias(item)
+            if bias.is_noop():
+                continue
+            key = bias.key()
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(bias)
+    return merged
+
 DEFAULT_KNOWN_SATURATED_BUG_FAMILIES = [
     "csv_long_numeric_roundtrip@duckdb",
     "csv_long_numeric_roundtrip@pyarrow",
+    "distinct_null_topk@datafusion",
     "groupby_aggregation@datafusion",
     "grouped_topk_null_sort_key@datafusion",
+    "datafusion_limit_idempotence@datafusion",
+    "metamorphic_limit_idempotence@datafusion",
     "joined_order_offset_projection@datafusion",
     "negative_zero_comparison@datafusion",
     "ordered_topk_projection@datafusion",
     "outer_join_truth_filter@datafusion",
+    "pandas_arrow_timestamp_index_attr_semantics@pandas",
+    "path_projection_keyed_pick@duckdb",
+    "polars_reflected_arithmetic_operand_order@polars",
+    "polars_vector_division_rounding@polars",
+    "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+    "pyarrow_sliced_bool_groupby_any_all@pyarrow",
     "topk_filter_pushdown@datafusion",
     "reverse_division_operand_order@polars",
     "tuple_absence_null_filter@duckdb",
 ]
 
 DEFAULT_REPLAY_BUG_SOURCE_ISSUES = [
-    "https://github.com/apache/datafusion/issues/22190",
-    "https://github.com/apache/datafusion/issues/22489",
-    "https://github.com/apache/datafusion/issues/22441",
-    "https://github.com/apache/datafusion/issues/12956",
+    "https://github.com/apache/arrow/issues/32171",
+    "https://github.com/apache/arrow/issues/36149",
+    "https://github.com/apache/arrow/issues/42231",
+    "https://github.com/apache/arrow/issues/46183",
+    "https://github.com/apache/arrow/issues/47177",
+    "https://github.com/apache/arrow/issues/48679",
+    "https://github.com/apache/arrow/issues/49889",
     "https://github.com/apache/datafusion/issues/12955",
+    "https://github.com/apache/datafusion/issues/12956",
+    "https://github.com/apache/datafusion/issues/22190",
+    "https://github.com/apache/datafusion/issues/22441",
+    "https://github.com/apache/datafusion/issues/22489",
+    "https://github.com/apache/datafusion/issues/22554",
     "https://github.com/duckdb/duckdb/issues/3015",
+    "https://github.com/duckdb/duckdb/issues/4978",
     "https://github.com/duckdb/duckdb/issues/11261",
+    "https://github.com/duckdb/duckdb/issues/17278",
+    "https://github.com/duckdb/duckdb/issues/19491",
+    "https://github.com/duckdb/duckdb/issues/19851",
+    "https://github.com/duckdb/duckdb/issues/20366",
     "https://github.com/duckdb/duckdb/issues/22075",
+    "https://github.com/duckdb/duckdb/issues/22418",
+    "https://github.com/duckdb/duckdb/issues/22527",
+    "https://github.com/duckdb/duckdb/issues/22576",
     "https://github.com/duckdb/duckdb/issues/22656",
+    "https://github.com/duckdb/duckdb/issues/22676",
+    "https://github.com/duckdb/duckdb/issues/22750",
     "https://github.com/duckdb/duckdb/issues/22837",
     "https://github.com/duckdb/duckdb/issues/22849",
-    "https://github.com/duckdb/duckdb/issues/22750",
-    "https://github.com/apache/arrow/issues/32171",
-    "https://github.com/apache/arrow/issues/42231",
+    "https://github.com/pandas-dev/pandas/issues/43767",
+    "https://github.com/pandas-dev/pandas/issues/45284",
+    "https://github.com/pandas-dev/pandas/issues/59609",
+    "https://github.com/pandas-dev/pandas/issues/62766",
+    "https://github.com/pandas-dev/pandas/issues/63458",
+    "https://github.com/pandas-dev/pandas/issues/63526",
+    "https://github.com/pandas-dev/pandas/issues/63527",
+    "https://github.com/pandas-dev/pandas/issues/65664",
+    "https://github.com/pandas-dev/pandas/issues/65710",
+    "https://github.com/pola-rs/polars/issues/8516",
+    "https://github.com/pola-rs/polars/issues/17760",
+    "https://github.com/pola-rs/polars/issues/18546",
+    "https://github.com/pola-rs/polars/issues/22149",
+    "https://github.com/pola-rs/polars/issues/23870",
+    "https://github.com/pola-rs/polars/issues/25888",
+    "https://github.com/pola-rs/polars/issues/26065",
+    "https://github.com/pola-rs/polars/issues/26671",
+    "https://github.com/pola-rs/polars/issues/26800",
+    "https://github.com/pola-rs/polars/issues/26803",
+    "https://github.com/pola-rs/polars/issues/26993",
+    "https://github.com/pola-rs/polars/issues/27661",
+    "https://github.com/pola-rs/polars/issues/27662",
+    "https://github.com/pola-rs/polars/issues/27726",
 ]
 
 
@@ -134,6 +274,9 @@ class ExperimentConfig:
     guidance_strategy: GuidanceStrategy = "random"
     guidance_candidate_pool: int = 1
     guidance_targets: list[str] = field(default_factory=list)
+    semantic_focus_families: list[str] = field(default_factory=list)
+    semantic_focus_signals: list[str] = field(default_factory=list)
+    discovery_biases: list[DiscoveryBias] = field(default_factory=list)
     enable_family_saturation: bool = True
     family_saturation_threshold: int = 8
     family_saturation_penalty: float = 1.25
@@ -152,5 +295,15 @@ class ExperimentConfig:
     metamorphic_variant_limit: int = 4
     log_level: LogLevel = "compact"
 
+    def __post_init__(self) -> None:
+        self.guidance_targets = _normalize_string_list(self.guidance_targets)
+        self.semantic_focus_families = _normalize_string_list(self.semantic_focus_families)
+        self.semantic_focus_signals = _normalize_string_list(self.semantic_focus_signals)
+        self.discovery_biases = merge_discovery_biases(self.discovery_biases)
+        self.known_saturated_bug_families = _normalize_string_list(self.known_saturated_bug_families)
+        self.replay_bug_source_issues = _normalize_string_list(self.replay_bug_source_issues)
+
     def to_dict(self) -> dict:
-        return asdict(self)
+        payload = asdict(self)
+        payload["discovery_biases"] = [bias.to_dict() for bias in self.discovery_biases]
+        return payload

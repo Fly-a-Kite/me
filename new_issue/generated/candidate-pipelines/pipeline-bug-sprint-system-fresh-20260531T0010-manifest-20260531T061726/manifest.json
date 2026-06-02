@@ -1,0 +1,502 @@
+{
+  "candidates": [
+    {
+      "artifact_created": true,
+      "bug_dir": "bugs/bug_67eaec8004a0f8ef",
+      "candidate_id": "metamorphic_semi_anti_join_rewrite-duckdb-case-00056174-bughunt-fresh-mut-56887",
+      "case_id": "case-00056174-bughunt-fresh-mut-56887",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [
+          "new_issue/duckdb_cte_boolean_inner_join_empty_result.md"
+        ],
+        "pipeline_duplicate_of": "",
+        "status": "duplicate_local_family"
+      },
+      "families": [
+        "metamorphic_semi_anti_join_rewrite@duckdb"
+      ],
+      "initial_candidate_recheck": {},
+      "issue_draft": {
+        "path": "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_semi_anti_join_rewrite-duckdb-case-00056174-bughunt-fresh-mut-56887.md",
+        "status_text": "Needs final upstream dedup before submission"
+      },
+      "issue_readiness": {
+        "blocking_reasons": [
+          "needs final upstream duplicate check before submission"
+        ],
+        "confirmed_latest_match": {},
+        "counts_as_confirmed": false,
+        "discovery_basis": "Automated candidate pipeline from `runs/run-20260530T165542-1780160142319932143.jsonl.gz`",
+        "discovery_time": "2026-05-31T06:19:14Z",
+        "evidence_found": {
+          "discovery_record": true,
+          "environment": true,
+          "expected": true,
+          "observed_or_actual": true,
+          "project_evidence": true,
+          "reproducer": true
+        },
+        "family_guess": "metamorphic_semi_anti_join_rewrite@duckdb",
+        "missing_evidence": [],
+        "missing_referenced_paths": [],
+        "old_known_urls_mentioned": [],
+        "path": "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_semi_anti_join_rewrite-duckdb-case-00056174-bughunt-fresh-mut-56887.md",
+        "priority": "medium",
+        "priority_score": 81,
+        "readiness_status": "needs_dedup_check",
+        "safe_for_paper_confirmed_count": false,
+        "source": "manual",
+        "status_text": "Needs final upstream dedup before submission",
+        "title": "Auto Issue Draft: metamorphic_semi_anti_join_rewrite@duckdb",
+        "upstream_urls": [],
+        "warnings": []
+      },
+      "primary_family": "metamorphic_semi_anti_join_rewrite@duckdb",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [
+              "metamorphic_semi_anti_join_rewrite@duckdb"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "metamorphic_semi_anti_join_rewrite@duckdb"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 2,
+            "candidate_families": [
+              "metamorphic_semi_anti_join_rewrite@duckdb"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "metamorphic_semi_anti_join_rewrite@duckdb"
+            ],
+            "status": "bug"
+          }
+        ],
+        "attempts": 2,
+        "reproduced": true,
+        "reproduced_families": [
+          "metamorphic_semi_anti_join_rewrite@duckdb"
+        ]
+      },
+      "reduction": {
+        "original_operations": 13,
+        "original_rows": 24,
+        "performed": true,
+        "reduced_case_path": "bugs/bug_67eaec8004a0f8ef/reduced_case.json",
+        "reduced_operations": 6,
+        "reduced_reproducer_path": "bugs/bug_67eaec8004a0f8ef/reproduce_reduced.py",
+        "reduced_rows": 9,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/bug-sprint-system-fresh-20260531T0010-manifest-embedded_sql-seed53001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260530T165542-1780160142319932143.jsonl.gz",
+      "triage": {
+        "paper_status": "candidate_bug_needs_external_confirmation",
+        "reproduced_roots": [
+          "metamorphic_semi_anti_join_rewrite"
+        ],
+        "suspicious_backends": [
+          "duckdb"
+        ],
+        "triage_confidence": "high",
+        "triage_json": "bugs/bug_67eaec8004a0f8ef/triage.json",
+        "triage_markdown": "bugs/bug_67eaec8004a0f8ef/triage.md",
+        "verdict": "candidate_implementation_bug"
+      }
+    },
+    {
+      "artifact_created": true,
+      "bug_dir": "bugs/bug_6106a2d4ad837c90",
+      "candidate_id": "metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-61559",
+      "case_id": "case-00054113-bughunt-fresh-mut-61559",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "",
+        "status": "needs_final_upstream_dedup"
+      },
+      "families": [
+        "metamorphic_groupby_neutral_mutation@duckdb"
+      ],
+      "initial_candidate_recheck": {},
+      "issue_draft": {
+        "path": "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-6155.md",
+        "status_text": "Needs final upstream dedup before submission"
+      },
+      "issue_readiness": {
+        "blocking_reasons": [
+          "needs final upstream duplicate check before submission"
+        ],
+        "confirmed_latest_match": {},
+        "counts_as_confirmed": false,
+        "discovery_basis": "Automated candidate pipeline from `runs/run-20260530T165542-1780160142319932143.jsonl.gz`",
+        "discovery_time": "2026-05-31T06:19:41Z",
+        "evidence_found": {
+          "discovery_record": true,
+          "environment": true,
+          "expected": true,
+          "observed_or_actual": true,
+          "project_evidence": true,
+          "reproducer": true
+        },
+        "family_guess": "metamorphic_groupby_neutral_mutation@duckdb",
+        "missing_evidence": [],
+        "missing_referenced_paths": [],
+        "old_known_urls_mentioned": [],
+        "path": "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-6155.md",
+        "priority": "medium",
+        "priority_score": 81,
+        "readiness_status": "needs_dedup_check",
+        "safe_for_paper_confirmed_count": false,
+        "source": "manual",
+        "status_text": "Needs final upstream dedup before submission",
+        "title": "Auto Issue Draft: metamorphic_groupby_neutral_mutation@duckdb",
+        "upstream_urls": [],
+        "warnings": []
+      },
+      "primary_family": "metamorphic_groupby_neutral_mutation@duckdb",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [
+              "metamorphic_groupby_neutral_mutation@duckdb"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "metamorphic_groupby_neutral_mutation@duckdb"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 2,
+            "candidate_families": [
+              "metamorphic_groupby_neutral_mutation@duckdb"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "metamorphic_groupby_neutral_mutation@duckdb"
+            ],
+            "status": "bug"
+          }
+        ],
+        "attempts": 2,
+        "reproduced": true,
+        "reproduced_families": [
+          "metamorphic_groupby_neutral_mutation@duckdb"
+        ]
+      },
+      "reduction": {
+        "original_operations": 14,
+        "original_rows": 29,
+        "performed": true,
+        "reduced_case_path": "bugs/bug_6106a2d4ad837c90/reduced_case.json",
+        "reduced_operations": 4,
+        "reduced_reproducer_path": "bugs/bug_6106a2d4ad837c90/reproduce_reduced.py",
+        "reduced_rows": 1,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/bug-sprint-system-fresh-20260531T0010-manifest-embedded_sql-seed53001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260530T165542-1780160142319932143.jsonl.gz",
+      "triage": {
+        "paper_status": "candidate_bug_needs_external_confirmation",
+        "reproduced_roots": [
+          "metamorphic_groupby_neutral_mutation"
+        ],
+        "suspicious_backends": [
+          "duckdb"
+        ],
+        "triage_confidence": "high",
+        "triage_json": "bugs/bug_6106a2d4ad837c90/triage.json",
+        "triage_markdown": "bugs/bug_6106a2d4ad837c90/triage.md",
+        "verdict": "candidate_implementation_bug"
+      }
+    },
+    {
+      "artifact_created": true,
+      "bug_dir": "bugs/bug_af8a33b4e73b5276",
+      "candidate_id": "metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-62827",
+      "case_id": "case-00054113-bughunt-fresh-mut-62827",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-61559",
+        "status": "duplicate_pipeline_family"
+      },
+      "families": [
+        "metamorphic_groupby_neutral_mutation@duckdb"
+      ],
+      "initial_candidate_recheck": {},
+      "issue_draft": {
+        "path": "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-6282.md",
+        "status_text": "Needs final upstream dedup before submission"
+      },
+      "issue_readiness": {
+        "blocking_reasons": [
+          "needs final upstream duplicate check before submission"
+        ],
+        "confirmed_latest_match": {},
+        "counts_as_confirmed": false,
+        "discovery_basis": "Automated candidate pipeline from `runs/run-20260530T165542-1780160142319932143.jsonl.gz`",
+        "discovery_time": "2026-05-31T06:20:09Z",
+        "evidence_found": {
+          "discovery_record": true,
+          "environment": true,
+          "expected": true,
+          "observed_or_actual": true,
+          "project_evidence": true,
+          "reproducer": true
+        },
+        "family_guess": "metamorphic_groupby_neutral_mutation@duckdb",
+        "missing_evidence": [],
+        "missing_referenced_paths": [],
+        "old_known_urls_mentioned": [],
+        "path": "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-6282.md",
+        "priority": "medium",
+        "priority_score": 81,
+        "readiness_status": "needs_dedup_check",
+        "safe_for_paper_confirmed_count": false,
+        "source": "manual",
+        "status_text": "Needs final upstream dedup before submission",
+        "title": "Auto Issue Draft: metamorphic_groupby_neutral_mutation@duckdb",
+        "upstream_urls": [],
+        "warnings": []
+      },
+      "primary_family": "metamorphic_groupby_neutral_mutation@duckdb",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [
+              "metamorphic_groupby_neutral_mutation@duckdb"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "metamorphic_groupby_neutral_mutation@duckdb"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 2,
+            "candidate_families": [
+              "metamorphic_groupby_neutral_mutation@duckdb"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "metamorphic_groupby_neutral_mutation@duckdb"
+            ],
+            "status": "bug"
+          }
+        ],
+        "attempts": 2,
+        "reproduced": true,
+        "reproduced_families": [
+          "metamorphic_groupby_neutral_mutation@duckdb"
+        ]
+      },
+      "reduction": {
+        "original_operations": 14,
+        "original_rows": 29,
+        "performed": true,
+        "reduced_case_path": "bugs/bug_af8a33b4e73b5276/reduced_case.json",
+        "reduced_operations": 4,
+        "reduced_reproducer_path": "bugs/bug_af8a33b4e73b5276/reproduce_reduced.py",
+        "reduced_rows": 1,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/bug-sprint-system-fresh-20260531T0010-manifest-embedded_sql-seed53001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260530T165542-1780160142319932143.jsonl.gz",
+      "triage": {
+        "paper_status": "candidate_bug_needs_external_confirmation",
+        "reproduced_roots": [
+          "metamorphic_groupby_neutral_mutation"
+        ],
+        "suspicious_backends": [
+          "duckdb"
+        ],
+        "triage_confidence": "high",
+        "triage_json": "bugs/bug_af8a33b4e73b5276/triage.json",
+        "triage_markdown": "bugs/bug_af8a33b4e73b5276/triage.md",
+        "verdict": "candidate_implementation_bug"
+      }
+    }
+  ],
+  "existing_issue_readiness_summary": {
+    "already_submitted_or_confirmed_count": 15,
+    "already_submitted_or_confirmed_family_count": 10,
+    "confirmed_count_eligible_count": 13,
+    "confirmed_count_eligible_families": [
+      "datafusion_limit_idempotence@datafusion",
+      "distinct_null_topk@datafusion",
+      "groupby_aggregation@datafusion",
+      "groupby_aggregation@polars,polars_lazy",
+      "grouped_topk_null_sort_key@datafusion",
+      "negative_zero_comparison@datafusion",
+      "polars_reflected_arithmetic_operand_order@polars",
+      "pyarrow_sliced_bool_groupby_any_all@pyarrow"
+    ],
+    "confirmed_count_eligible_family_count": 8,
+    "duplicate_family_draft_count": 0,
+    "duplicate_family_draft_groups": {},
+    "issue_document_count": 19,
+    "needs_dedup_check": [],
+    "needs_dedup_check_count": 0,
+    "needs_dedup_check_families": [],
+    "needs_dedup_check_family_count": 0,
+    "needs_reproducer_or_evidence": [
+      "new_issue/datafusion_22554_followup_comment.md",
+      "new_issue/datafusion_null_group_key_candidate.md",
+      "new_issue/generated/polars_vector_division_rounding.md"
+    ],
+    "needs_reproducer_or_evidence_count": 3,
+    "needs_reproducer_or_evidence_family_count": 3,
+    "not_latest_reproducible_count": 1,
+    "not_latest_reproducible_family_count": 1,
+    "ready_to_submit": [],
+    "ready_to_submit_count": 0,
+    "ready_to_submit_families": [],
+    "ready_to_submit_family_count": 0,
+    "submission_group_count": 0,
+    "submission_group_families": [],
+    "submission_groups_needs_dedup_count": 0,
+    "submission_groups_ready_to_submit_count": 0,
+    "top_priority": [
+      "new_issue/generated/polars_vector_division_rounding.md",
+      "new_issue/datafusion_null_group_key_candidate.md",
+      "new_issue/datafusion_22554_followup_comment.md",
+      "new_issue/datafusion_distinct_null_topk.md",
+      "new_issue/datafusion_limit_idempotence.md"
+    ]
+  },
+  "frozen_candidates_path": "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/frozen-candidates.json",
+  "generated_at": "2026-05-31T06:20:09Z",
+  "generated_by": "datadiff candidate-pipeline",
+  "inputs": {
+    "evidence_files": [
+      "new_issue/generated/bug-sprint-system-fresh-20260531T0010-manifest-common_api_workflow-seed53001-fresh-candidates.json",
+      "new_issue/generated/bug-sprint-system-fresh-20260531T0010-manifest-common_api_workflow-seed53002-fresh-candidates.json",
+      "new_issue/generated/bug-sprint-system-fresh-20260531T0010-manifest-embedded_sql-seed53001-fresh-candidates.json"
+    ],
+    "generated_issue_dir": "new_issue/generated",
+    "manifest_file": "new_issue/generated/bug-sprint-system-fresh-20260531T0010-manifest.json",
+    "new_issue_dir": "new_issue",
+    "old_issue_dir": "old_issue",
+    "output_dir": "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726",
+    "recheck_attempts": 2,
+    "reduce_artifacts": true,
+    "standalone_reproducer": true
+  },
+  "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/manifest.json",
+  "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/manifest.md",
+  "pipeline_issue_readiness_summary": {
+    "already_submitted_or_confirmed_count": 0,
+    "already_submitted_or_confirmed_family_count": 0,
+    "confirmed_count_eligible_count": 0,
+    "confirmed_count_eligible_families": [],
+    "confirmed_count_eligible_family_count": 0,
+    "duplicate_family_draft_count": 1,
+    "duplicate_family_draft_groups": {
+      "metamorphic_groupby_neutral_mutation@duckdb": [
+        "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-6155.md",
+        "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-6282.md"
+      ]
+    },
+    "issue_document_count": 3,
+    "needs_dedup_check": [
+      "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-6155.md",
+      "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-6282.md",
+      "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_semi_anti_join_rewrite-duckdb-case-00056174-bughunt-fresh-mut-56887.md"
+    ],
+    "needs_dedup_check_count": 3,
+    "needs_dedup_check_families": [
+      "metamorphic_groupby_neutral_mutation@duckdb",
+      "metamorphic_semi_anti_join_rewrite@duckdb"
+    ],
+    "needs_dedup_check_family_count": 2,
+    "needs_reproducer_or_evidence": [],
+    "needs_reproducer_or_evidence_count": 0,
+    "needs_reproducer_or_evidence_family_count": 0,
+    "not_latest_reproducible_count": 0,
+    "not_latest_reproducible_family_count": 0,
+    "ready_to_submit": [],
+    "ready_to_submit_count": 0,
+    "ready_to_submit_families": [],
+    "ready_to_submit_family_count": 0,
+    "submission_group_count": 2,
+    "submission_group_families": [
+      "metamorphic_groupby_neutral_mutation@duckdb",
+      "metamorphic_semi_anti_join_rewrite@duckdb"
+    ],
+    "submission_groups_needs_dedup_count": 2,
+    "submission_groups_ready_to_submit_count": 0,
+    "top_priority": [
+      "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-6155.md",
+      "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-6282.md",
+      "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_semi_anti_join_rewrite-duckdb-case-00056174-bughunt-fresh-mut-56887.md"
+    ]
+  },
+  "schema_version": "candidate-pipeline-v1",
+  "submission_groups": [
+    {
+      "family": "metamorphic_groupby_neutral_mutation@duckdb",
+      "issue_count": 2,
+      "issue_paths": [
+        "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-6155.md",
+        "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-6282.md"
+      ],
+      "needs_dedup_check": true,
+      "primary_issue_path": "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-6155.md",
+      "primary_title": "Auto Issue Draft: metamorphic_groupby_neutral_mutation@duckdb",
+      "priority": "medium",
+      "priority_score": 81,
+      "status_counts": {
+        "needs_dedup_check": 2
+      },
+      "submission_status": "needs_dedup_check",
+      "supporting_issue_paths": [
+        "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-6282.md"
+      ]
+    },
+    {
+      "family": "metamorphic_semi_anti_join_rewrite@duckdb",
+      "issue_count": 1,
+      "issue_paths": [
+        "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_semi_anti_join_rewrite-duckdb-case-00056174-bughunt-fresh-mut-56887.md"
+      ],
+      "needs_dedup_check": true,
+      "primary_issue_path": "new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_semi_anti_join_rewrite-duckdb-case-00056174-bughunt-fresh-mut-56887.md",
+      "primary_title": "Auto Issue Draft: metamorphic_semi_anti_join_rewrite@duckdb",
+      "priority": "medium",
+      "priority_score": 81,
+      "status_counts": {
+        "needs_dedup_check": 1
+      },
+      "submission_status": "needs_dedup_check",
+      "supporting_issue_paths": []
+    }
+  ],
+  "summary": {
+    "already_submitted_or_confirmed_count": 0,
+    "artifact_created_count": 3,
+    "candidate_bug_verdict_count": 3,
+    "candidate_count": 3,
+    "issue_draft_count": 3,
+    "local_duplicate_candidate_count": 2,
+    "needs_dedup_check_count": 3,
+    "needs_reproducer_or_evidence_count": 0,
+    "not_latest_reproducible_count": 0,
+    "ready_to_submit_count": 0,
+    "recheck_pass_rate": 1.0,
+    "rechecked_count": 3,
+    "reduced_count": 3,
+    "reproduced_count": 3,
+    "submission_group_count": 2,
+    "unique_family_count": 2
+  }
+}

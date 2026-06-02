@@ -9,5 +9,6 @@ runs/
 bugs/
 reports/
 corpus/
+study/
 
 .env

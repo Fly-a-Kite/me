@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import time
-import os
 
 from datadiff.backends.base import Backend, BackendResult
+from datadiff.backends.sql_lowering import (
+    SqlDialect,
+    render_aggregate_sql,
+    render_case_when_expr,
+    render_coalesce_expr,
+    render_fill_null_expr,
+    render_groupby_sql,
+    render_mutate_expr,
+)
+from datadiff.backends.sql_runtime import build_relation_step_runtime
 from datadiff.csv_roundtrip import (
     csv_long_numeric_roundtrip_mismatch,
     csv_long_numeric_values,
@@ -12,6 +22,26 @@ from datadiff.csv_roundtrip import (
 )
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
 from datadiff.filtering import sql_filter_condition
+from datadiff.join_keys import join_key_pairs
+from datadiff.operation_semantics import (
+    aggregate_alias,
+    aggregate_specs,
+    groupby_keys,
+    op_ascending,
+    op_branches,
+    op_column,
+    op_columns,
+    op_comparator,
+    op_kind,
+    op_literal,
+    op_n,
+    op_nulls,
+    op_output_alias,
+    op_table,
+    op_rows,
+    op_value,
+    join_how,
+)
 from datadiff.running import running_sum_partition_columns, running_sum_sort_keys
 from datadiff.sortedness import is_sorted_values
 from datadiff.windowing import row_number_order_keys, row_number_partition_columns
@@ -51,13 +81,6 @@ def _sql_type(kind: str) -> str:
     return "VARCHAR"
 
 
-def _replace_projection(cols: list[str], column: str, expr_sql: str) -> tuple[str, list[str]]:
-    kept_cols = [col for col in cols if col != column]
-    select_parts = [f"q.{_quote(col)}" for col in kept_cols]
-    select_parts.append(f"{expr_sql} AS {_quote(column)}")
-    return ", ".join(select_parts), kept_cols + [column]
-
-
 def _order_clause(sort_keys: list[SortKey]) -> str:
     return ", ".join(
         f"{_quote(key.column)} {'ASC' if key.ascending else 'DESC'} NULLS {key.nulls.upper()}"
@@ -76,6 +99,40 @@ def _agg_expr(column: str, func: str) -> str:
         return f"AVG({_quote(column)})"
     sql_func = "COUNT" if func == "count" else func.upper()
     return f"{sql_func}({_quote(column)})"
+
+
+DUCKDB_DIALECT = SqlDialect(
+    float_cast_type="DOUBLE",
+    int_cast_type="BIGINT",
+    str_cast_type="VARCHAR",
+    string_slice_fn="SUBSTRING",
+    string_startswith_fn=lambda source, needle: (
+        f"CASE WHEN {source} IS NULL THEN NULL ELSE SUBSTRING({source}, 1, LENGTH({needle})) = {needle} END"
+    ),
+    string_endswith_fn=lambda source, needle: (
+        f"CASE WHEN {source} IS NULL THEN NULL ELSE SUBSTRING({source}, LENGTH({source}) - LENGTH({needle}) + 1, LENGTH({needle})) = {needle} END"
+    ),
+    date_part_spans={"year": (1, 4), "month": (6, 2), "day": (9, 2)},
+    basename_sql=lambda source: f"parse_filename({source})",
+    split_part_sql=lambda source, sep, index: f"SPLIT_PART({source}, {sep}, {index + 1})",
+    division_sql=lambda source, value: f"CAST({source} AS DOUBLE) / {value}",
+    reverse_division_sql=lambda numerator, source: f"CAST({numerator} AS DOUBLE) / {source}",
+)
+
+
+def _join_condition(op: dict) -> str:
+    left_keys, right_keys = join_key_pairs(op)
+    return " AND ".join(f"q.{_quote(left)} = r.{_quote(right)}" for left, right in zip(left_keys, right_keys))
+
+
+def _semi_anti_join_condition(op: dict, kind: str) -> str:
+    left_keys, right_keys = join_key_pairs(op)
+    predicates = [
+        *(f"r.{_quote(right)} IS NOT NULL" for right in right_keys),
+        *(f"q.{_quote(left)} = r.{_quote(right)}" for left, right in zip(left_keys, right_keys)),
+    ]
+    exists_sql = f"EXISTS (SELECT 1 FROM {_quote(op['table'])} r WHERE {' AND '.join(predicates)})"
+    return exists_sql if kind == "semi_join" else f"NOT {exists_sql}"
 
 
 def _tuple_absence_native_condition(op: dict) -> str:
@@ -110,13 +167,13 @@ def _row_number_window_sql(op: dict) -> str:
 
 
 def _row_number_condition_sql(op: dict) -> str:
-    comparator = {"==": "=", "<": "<", "<=": "<="}[str(op.get("cmp", "=="))]
-    return f"ROW_NUMBER() OVER ({_row_number_window_sql(op)}) {comparator} {int(op.get('value', 1))}"
+    comparator = {"==": "=", "<": "<", "<=": "<="}[op_comparator(op, "==")]
+    return f"ROW_NUMBER() OVER ({_row_number_window_sql(op)}) {comparator} {int(op_value(op) or 1)}"
 
 
 def _random_case_probe_sql(op: dict) -> str:
-    rows = int(op.get("rows", 100_000))
-    branches = int(op.get("branches", 3))
+    rows = op_rows(op, 100_000)
+    branches = op_branches(op, 3)
     when_sql = " ".join(f"WHEN {idx} THEN 'branch_{idx}'" for idx in range(branches))
     return (
         f"SELECT (COUNT(*) > 0) AS {_quote(op['as'])} FROM ("
@@ -164,7 +221,7 @@ def _round_even_probe_sql(op: dict) -> str:
 
 
 def _float_literal_text(op: dict) -> str:
-    literal = str(op.get("literal", "")).strip()
+    literal = op_literal(op).strip()
     allowed = set("0123456789+-.eE")
     if not literal or not any(ch.isdigit() for ch in literal) or any(ch not in allowed for ch in literal):
         raise ValueError(f"invalid float literal probe value: {literal!r}")
@@ -342,410 +399,325 @@ class DuckDBBackend(Backend):
                 con.execute("CHECKPOINT")
             ctes: list[tuple[str, str]] = []
             relation = _quote(tables[0].name)
-            pending_order: list[SortKey] | None = None
-            visible_cols = list(current_cols)
-            hidden_order_cols: list[str] = []
 
             def add_step(sql: str) -> str:
                 name = f"step_{len(ctes)}"
                 ctes.append((name, sql))
                 return _quote(name)
 
+            runtime = build_relation_step_runtime(
+                relation,
+                current_cols,
+                quote=_quote,
+                order_clause=_order_clause,
+                add_step=add_step,
+            )
+
             def visible_projection() -> str:
-                return ", ".join(f"q.{_quote(col)}" for col in visible_cols)
+                return runtime.visible_projection()
 
             def drop_hidden_order_cols() -> None:
-                nonlocal relation, current_cols, hidden_order_cols
-                if not hidden_order_cols:
-                    return
-                relation = add_step(f"SELECT {visible_projection()} FROM {relation} q")
-                current_cols = list(visible_cols)
-                hidden_order_cols = []
+                nonlocal relation
+                if runtime.drop_hidden_order_cols():
+                    relation = runtime.source
 
             def materialize_visible_relation():
-                if pending_order is not None:
-                    body = (
-                        f"SELECT {visible_projection()} FROM {relation} q "
-                        f"ORDER BY {_order_clause(pending_order)}"
-                    )
-                else:
-                    drop_hidden_order_cols()
-                    body = f"SELECT {visible_projection()} FROM {relation} q"
+                body = runtime.materialize_sql()
                 if ctes:
                     cte_sql = ", ".join(f"{_quote(name)} AS ({sql})" for name, sql in ctes)
                     body = f"WITH {cte_sql} {body}"
                 return con.execute(body).df()
 
             def select_with_pending_order(cols: list[str]) -> str:
-                nonlocal pending_order, hidden_order_cols
-                if pending_order is None:
-                    return ", ".join(f"q.{_quote(c)}" for c in cols)
-                projection = [f"q.{_quote(c)}" for c in cols]
-                selected = set(cols)
-                updated_order: list[SortKey] = []
-                for idx, key in enumerate(pending_order):
-                    if key.column in selected:
-                        updated_order.append(key)
-                        continue
-                    hidden = (
-                        key.column
-                        if key.column in hidden_order_cols
-                        else f"__datadiff_order_{len(hidden_order_cols)}_{idx}"
-                    )
-                    if hidden not in hidden_order_cols:
-                        projection.append(f"q.{_quote(key.column)} AS {_quote(hidden)}")
-                        hidden_order_cols.append(hidden)
-                    else:
-                        projection.append(f"q.{_quote(hidden)}")
-                    updated_order.append(SortKey(hidden, key.ascending, key.nulls))
-                pending_order = updated_order
-                return ", ".join(projection)
+                return runtime.select_with_pending_order(cols)
+
+            def freeze_pending_order() -> None:
+                nonlocal relation
+                if runtime.freeze_pending_order():
+                    relation = runtime.source
 
             for op in program.operations:
-                kind = op["op"]
+                kind = op_kind(op)
                 if kind == "join":
                     drop_hidden_order_cols()
-                    right = table_by_name[op["table"]]
+                    right = table_by_name[op_table(op)]
+                    _, right_keys = join_key_pairs(op)
+                    right_key_set = set(right_keys)
                     right_cols = [
                         f"r.{_quote(c.name)} AS {_quote(c.name)}"
                         for c in right.columns
-                        if c.name != op["right_on"]
+                        if c.name not in right_key_set
                     ]
                     select_right = ", " + ", ".join(right_cols) if right_cols else ""
-                    join_kind = "LEFT JOIN" if op["how"] == "left" else "INNER JOIN"
-                    relation = add_step(
+                    join_kind = "LEFT JOIN" if join_how(op) == "left" else "INNER JOIN"
+                    relation = runtime.assign_source(add_step(
                         f"SELECT q.*{select_right} FROM {relation} q {join_kind} {_quote(right.name)} r "
-                        f"ON q.{_quote(op['left_on'])} = r.{_quote(op['right_on'])}"
-                    )
-                    current_cols.extend(
+                        f"ON {_join_condition(op)}"
+                    ))
+                    runtime.state.current_cols.extend(
                         c.name
                         for c in right.columns
-                        if c.name != op["right_on"] and c.name not in current_cols
+                        if c.name not in right_key_set and c.name not in runtime.state.current_cols
                     )
-                    visible_cols = list(current_cols)
-                    pending_order = None
+                    runtime.state.visible_cols = list(runtime.state.current_cols)
+                    runtime.state.pending_order = None
+                elif kind == "union_all":
+                    drop_hidden_order_cols()
+                    right_projection = ", ".join(_quote(col) for col in runtime.state.visible_cols)
+                    relation = runtime.assign_source(add_step(
+                        f"SELECT {visible_projection()} FROM {relation} q "
+                        f"UNION ALL SELECT {right_projection} FROM {_quote(op_table(op))}"
+                    ))
+                    runtime.state.current_cols = list(runtime.state.visible_cols)
+                    runtime.state.pending_order = None
+                elif kind in {"semi_join", "anti_join"}:
+                    condition = _semi_anti_join_condition(op, kind)
+                    relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q WHERE {condition}"))
+                elif kind == "drop_nulls":
+                    condition = " AND ".join(f"q.{_quote(column)} IS NOT NULL" for column in op["columns"])
+                    relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q WHERE {condition}"))
                 elif kind == "filter":
-                    condition = sql_filter_condition(f"q.{_quote(op['column'])}", _lit(op["value"]), op["cmp"])
-                    relation = add_step(f"SELECT * FROM {relation} q WHERE {condition}")
+                    condition = sql_filter_condition(f"q.{_quote(op_column(op))}", _lit(op_value(op)), op_comparator(op))
+                    relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q WHERE {condition}"))
                 elif kind == "tuple_absence_filter":
-                    relation = add_step(f"SELECT * FROM {relation} q WHERE {_tuple_absence_native_condition(op)}")
+                    relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q WHERE {_tuple_absence_native_condition(op)}"))
                 elif kind == "row_number_filter":
-                    relation = add_step(f"SELECT * FROM {relation} q QUALIFY {_row_number_condition_sql(op)}")
-                    pending_order = [
+                    relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q QUALIFY {_row_number_condition_sql(op)}"))
+                    runtime.state.pending_order = [
                         *(SortKey(column, True, "last") for column in row_number_partition_columns(op)),
                         *row_number_order_keys(op),
                     ]
                 elif kind == "running_sum":
                     drop_hidden_order_cols()
                     order_keys = running_sum_sort_keys(op)
-                    projection, current_cols = _running_sum_projection(current_cols, op)
-                    relation = add_step(f"SELECT {projection} FROM {relation} q")
-                    visible_cols = [col for col in visible_cols if col != op["column"]] + [op["column"]]
-                    pending_order = order_keys
+                    projection, runtime.state.current_cols = _running_sum_projection(runtime.state.current_cols, op)
+                    relation = runtime.assign_source(add_step(f"SELECT {projection} FROM {relation} q"))
+                    runtime.state.visible_cols = [col for col in runtime.state.visible_cols if col != op["column"]] + [op["column"]]
+                    runtime.state.pending_order = order_keys
                 elif kind == "sortedness_check":
                     materialized = materialize_visible_relation()
                     ok = is_sorted_values(
                         materialized[op["column"]].tolist(),
-                        ascending=bool(op.get("ascending", True)),
-                        nulls=str(op.get("nulls", "last")),
+                        ascending=op_ascending(op),
+                        nulls=op_nulls(op),
                     )
                     materialized_name = f"__datadiff_sortedness_{len(ctes)}"
                     con.register(materialized_name, pd.DataFrame({op["as"]: [ok]}))
                     ctes = []
-                    relation = _quote(materialized_name)
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(_quote(materialized_name))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "random_case_probe":
                     ctes = []
-                    relation = add_step(_random_case_probe_sql(op))
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(_random_case_probe_sql(op)))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "group_quantile_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "scalar_subquery_probe":
                     ctes = []
-                    relation = add_step(_scalar_subquery_probe_sql(op))
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(_scalar_subquery_probe_sql(op)))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "window_avg_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "struct_distinct_probe":
                     ctes = []
-                    relation = add_step(_struct_distinct_probe_sql(op))
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(_struct_distinct_probe_sql(op)))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "bit_compare_probe":
                     ctes = []
-                    relation = add_step(_bit_compare_probe_sql(op))
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(_bit_compare_probe_sql(op)))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "round_even_probe":
                     ctes = []
-                    relation = add_step(_round_even_probe_sql(op))
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(_round_even_probe_sql(op)))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "float_literal_precision_probe":
                     ctes = []
-                    relation = add_step(_float_literal_precision_probe_sql(op))
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(_float_literal_precision_probe_sql(op)))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "timestamp_precision_filter_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "series_rtruediv_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "uint64_isin_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "tuple_anti_null_probe":
                     ctes = []
-                    relation = add_step(_tuple_anti_null_probe_sql(op))
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(_tuple_anti_null_probe_sql(op)))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "setop_all_duplicate_probe":
                     ctes = []
-                    relation = add_step(_setop_all_duplicate_probe_sql(op))
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(_setop_all_duplicate_probe_sql(op)))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "json_predicate_order_probe":
                     ctes = []
                     mismatch = _duckdb_json_predicate_order_mismatch(con)
                     materialized_name = f"__datadiff_json_predicate_order_{len(ctes)}"
                     con.register(materialized_name, pd.DataFrame({op["as"]: [mismatch]}))
-                    relation = _quote(materialized_name)
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(_quote(materialized_name))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "sparse_mask_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "float_wrap_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "index_bool_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "empty_literal_groupby_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "arrow_string_eq_sum_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "arrow_timestamp_loc_slice_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "arrow_timestamp_index_attr_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "eval_inplace_alias_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "bool_reduction_skipna_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "dataset_isin_all_match_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "run_end_null_compute_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "large_string_partition_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "hash_pivot_wider_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
+                elif kind == "list_flatten_parent_indices_probe":
+                    ctes = []
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "rolling_mean_by_null_count_probe":
                     ctes = []
-                    relation = add_step(f"SELECT FALSE AS {_quote(op['as'])}")
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "csv_long_numeric_roundtrip_probe":
                     ctes = []
                     mismatch = _duckdb_csv_long_numeric_roundtrip_mismatch(con, op)
                     materialized_name = f"__datadiff_csv_long_numeric_{len(ctes)}"
                     con.register(materialized_name, pd.DataFrame({op["as"]: [mismatch]}))
-                    relation = _quote(materialized_name)
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    hidden_order_cols = []
-                    pending_order = None
+                    relation = runtime.assign_source(_quote(materialized_name))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "select":
-                    cols = list(op["columns"])
+                    cols = op_columns(op)
                     projection = select_with_pending_order(cols)
-                    relation = add_step(f"SELECT {projection} FROM {relation} q")
-                    visible_cols = cols
-                    current_cols = cols + [col for col in hidden_order_cols if col not in cols]
+                    relation = runtime.assign_source(add_step(f"SELECT {projection} FROM {relation} q"))
+                elif kind == "distinct":
+                    drop_hidden_order_cols()
+                    cols = op_columns(op)
+                    projection = ", ".join(f"q.{_quote(c)}" for c in cols)
+                    relation = runtime.assign_source(add_step(f"SELECT DISTINCT {projection} FROM {relation} q"))
+                    runtime.state.reset_projection(cols)
+                elif kind == "fill_null":
+                    column, expr_sql = render_fill_null_expr(op, _quote, _lit)
+                    if runtime.state.pending_order_mentions(column):
+                        freeze_pending_order()
+                    projection = runtime.state.replace_projection_expr(column, expr_sql, _quote)
+                    relation = runtime.assign_source(add_step(f"SELECT {projection} FROM {relation} q"))
+                    runtime.state.replace_visible_column(column)
+                    if runtime.state.pending_order_mentions(column):
+                        runtime.state.clear_pending_order()
+                        drop_hidden_order_cols()
+                elif kind == "coalesce":
+                    alias, expr_sql = render_coalesce_expr(op, _quote, _lit)
+                    if runtime.state.pending_order_mentions(alias):
+                        freeze_pending_order()
+                    projection = runtime.state.replace_projection_expr(alias, expr_sql, _quote)
+                    relation = runtime.assign_source(add_step(f"SELECT {projection} FROM {relation} q"))
+                    runtime.state.replace_visible_column(alias)
+                    if runtime.state.pending_order_mentions(alias):
+                        runtime.state.clear_pending_order()
+                        drop_hidden_order_cols()
+                elif kind == "case_when":
+                    alias, expr_sql = render_case_when_expr(op, _quote, _lit)
+                    if runtime.state.pending_order_mentions(alias):
+                        freeze_pending_order()
+                    projection = runtime.state.replace_projection_expr(alias, expr_sql, _quote)
+                    relation = runtime.assign_source(add_step(f"SELECT {projection} FROM {relation} q"))
+                    runtime.state.replace_visible_column(alias)
+                    if runtime.state.pending_order_mentions(alias):
+                        runtime.state.clear_pending_order()
+                        drop_hidden_order_cols()
                 elif kind == "sort":
                     drop_hidden_order_cols()
-                    pending_order = normalize_sort_keys(op)
+                    runtime.state.pending_order = normalize_sort_keys(op)
                 elif kind == "limit":
-                    if pending_order is not None:
-                        relation = add_step(
+                    if runtime.state.pending_order is not None:
+                        relation = runtime.assign_source(add_step(
                             f"SELECT * FROM {relation} q "
-                            f"ORDER BY {_order_clause(pending_order)} LIMIT {int(op['n'])}"
-                        )
+                            f"ORDER BY {_order_clause(runtime.state.pending_order)} LIMIT {op_n(op)}"
+                        ))
                     else:
-                        relation = add_step(f"SELECT * FROM {relation} q LIMIT {int(op['n'])}")
+                        relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q LIMIT {op_n(op)}"))
                 elif kind == "offset":
-                    if pending_order is not None:
-                        relation = add_step(
+                    if runtime.state.pending_order is not None:
+                        relation = runtime.assign_source(add_step(
                             f"SELECT * FROM {relation} q "
-                            f"ORDER BY {_order_clause(pending_order)} OFFSET {int(op['n'])}"
-                        )
+                            f"ORDER BY {_order_clause(runtime.state.pending_order)} OFFSET {op_n(op)}"
+                        ))
                     else:
-                        relation = add_step(f"SELECT * FROM {relation} q OFFSET {int(op['n'])}")
+                        relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q OFFSET {op_n(op)}"))
                 elif kind == "mutate":
-                    expr = op["expr"]
-                    if expr["kind"] == "add_const":
-                        expr_sql = f"q.{_quote(expr['source'])} + {_lit(expr['value'])}"
-                    elif expr["kind"] == "arith_const":
-                        op_sql = {"sub": "-", "mul": "*", "div": "/", "mod": "%"}[expr["op"]]
-                        source_sql = f"CAST(q.{_quote(expr['source'])} AS DOUBLE)" if expr["op"] == "div" else f"q.{_quote(expr['source'])}"
-                        expr_sql = f"{source_sql} {op_sql} {_lit(expr['value'])}"
-                    elif expr["kind"] == "reverse_division_columns":
-                        expr_sql = f"CAST(q.{_quote(expr['numerator'])} AS DOUBLE) / q.{_quote(expr['source'])}"
-                    elif expr["kind"] == "cast" and expr["to"] == "float":
-                        expr_sql = f"CAST(q.{_quote(expr['source'])} AS DOUBLE)"
-                    elif expr["kind"] == "string_length":
-                        expr_sql = f"LENGTH(q.{_quote(expr['source'])})"
-                    elif expr["kind"] == "string_lower":
-                        expr_sql = f"LOWER(q.{_quote(expr['source'])})"
-                    elif expr["kind"] == "string_basename":
-                        expr_sql = f"parse_filename(q.{_quote(expr['source'])})"
-                    else:
-                        raise ValueError(expr["kind"])
-                    projection, current_cols = _replace_projection(current_cols, op["column"], expr_sql)
-                    relation = add_step(f"SELECT {projection} FROM {relation} q")
-                    visible_cols = [col for col in visible_cols if col != op["column"]] + [op["column"]]
-                    if pending_order is not None and op["column"] in {key.column for key in pending_order}:
-                        pending_order = None
+                    out_column, expr_sql = render_mutate_expr(op, DUCKDB_DIALECT, _quote, _lit)
+                    if runtime.state.pending_order_mentions(out_column):
+                        freeze_pending_order()
+                    projection = runtime.state.replace_projection_expr(out_column, expr_sql, _quote)
+                    relation = runtime.assign_source(add_step(f"SELECT {projection} FROM {relation} q"))
+                    runtime.state.replace_visible_column(out_column)
+                    if runtime.state.pending_order_mentions(out_column):
+                        runtime.state.clear_pending_order()
                         drop_hidden_order_cols()
                 elif kind == "groupby":
                     drop_hidden_order_cols()
-                    keys = list(op["keys"])
-                    key_sql = ", ".join(_quote(k) for k in keys)
-                    agg_sql = []
-                    for agg in op["aggs"]:
-                        agg_sql.append(f"{_agg_expr(agg['column'], agg['func'])} AS {_quote(agg['as'])}")
-                    relation = add_step(
-                        f"SELECT {key_sql}, {', '.join(agg_sql)} FROM {relation} q "
-                        f"GROUP BY {key_sql}"
-                    )
-                    current_cols = keys + [agg["as"] for agg in op["aggs"]]
-                    visible_cols = list(current_cols)
-                    pending_order = None
+                    keys = groupby_keys(op)
+                    select_sql, aliases = render_groupby_sql(op, _agg_expr, _quote, keys)
+                    relation = runtime.assign_source(add_step(
+                        f"SELECT {select_sql} FROM {relation} q "
+                        f"GROUP BY {', '.join(_quote(key) for key in keys)}"
+                    ))
+                    runtime.state.reset_projection(keys + aliases)
                 elif kind == "aggregate":
                     drop_hidden_order_cols()
-                    agg_sql = []
-                    for agg in op["aggs"]:
-                        agg_sql.append(f"{_agg_expr(agg['column'], agg['func'])} AS {_quote(agg['as'])}")
-                    relation = add_step(f"SELECT {', '.join(agg_sql)} FROM {relation} q")
-                    current_cols = [agg["as"] for agg in op["aggs"]]
-                    visible_cols = list(current_cols)
-                    pending_order = None
+                    agg_sql, aliases = render_aggregate_sql(op, _agg_expr, _quote)
+                    relation = runtime.assign_source(add_step(f"SELECT {', '.join(agg_sql)} FROM {relation} q"))
+                    runtime.state.reset_projection(aliases)
                 else:
                     raise ValueError(kind)
-            if pending_order is not None:
-                relation = add_step(f"SELECT {visible_projection()} FROM {relation} q ORDER BY {_order_clause(pending_order)}")
-            else:
-                drop_hidden_order_cols()
+            relation = runtime.assign_source(runtime.finalize_source())
             if ctes:
                 cte_sql = ", ".join(f"{_quote(name)} AS ({sql})" for name, sql in ctes)
                 query = f"WITH {cte_sql} SELECT * FROM {relation}"

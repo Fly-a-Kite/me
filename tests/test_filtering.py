@@ -33,7 +33,14 @@ def test_set_membership_filter_uses_two_valued_null_safe_semantics():
     assert evaluate_filter_predicate("alpha", "in_set", ["alpha", "中文"]) is True
     assert evaluate_filter_predicate("beta", "in_set", ["alpha", "中文"]) is False
     assert evaluate_filter_predicate(None, "in_set", ["alpha", "中文"]) is False
+    assert evaluate_filter_predicate("alpha", "not_in_set", ["alpha", "中文"]) is False
+    assert evaluate_filter_predicate("beta", "not_in_set", ["alpha", "中文"]) is True
+    assert evaluate_filter_predicate(None, "not_in_set", ["alpha", "中文"]) is False
     assert sql_filter_condition('q."s"', "('alpha', '中文')", "in_set") == 'q."s" IN (\'alpha\', \'中文\')'
+    assert (
+        sql_filter_condition('q."s"', "('alpha', '中文')", "not_in_set")
+        == 'q."s" IS NOT NULL AND q."s" NOT IN (\'alpha\', \'中文\')'
+    )
 
 
 def test_range_filter_uses_closed_numeric_bounds():
@@ -42,6 +49,19 @@ def test_range_filter_uses_closed_numeric_bounds():
     assert evaluate_filter_predicate(2, "range_closed", [-1, 1]) is False
     assert evaluate_filter_predicate(None, "range_closed", [-1, 1]) is False
     assert sql_filter_condition('q."x"', "(-1, 1)", "range_closed") == 'q."x" BETWEEN -1 AND 1'
+
+
+def test_string_contains_filter_uses_null_safe_literal_substring_semantics():
+    assert evaluate_filter_predicate("Alpha", "str_contains", "a") is True
+    assert evaluate_filter_predicate("space value", "str_contains", "space") is True
+    assert evaluate_filter_predicate("", "str_contains", "a") is False
+    assert evaluate_filter_predicate(None, "str_contains", "a") is False
+    assert evaluate_filter_predicate("Alpha", "str_starts_with", "Al") is True
+    assert evaluate_filter_predicate("Alpha", "str_starts_with", "ha") is False
+    assert evaluate_filter_predicate("Alpha", "str_ends_with", "ha") is True
+    assert evaluate_filter_predicate(None, "str_ends_with", "ha") is False
+    assert sql_filter_condition('q."s"', "'space'", "str_contains") == 'instr(q."s", \'space\') > 0'
+    assert sql_filter_condition('q."s"', "'Al'", "str_starts_with") == 'substr(q."s", 1, length(\'Al\')) = \'Al\''
 
 
 def test_tuple_absence_filter_uses_sql_row_value_not_in_truth_table():
@@ -78,3 +98,11 @@ def test_boolean_predicate_filters_match_sql_truth_tests():
     assert sql_filter_condition('q."flag"', "NULL", "bool_is_true") == 'q."flag" IS TRUE'
     assert sql_filter_condition('q."flag"', "NULL", "bool_is_not_true") == 'q."flag" IS NOT TRUE'
     assert sql_filter_condition('q."flag"', "NULL", "bool_is_unknown") == 'q."flag" IS NULL'
+
+
+def test_boolean_predicate_filters_accept_numpy_bool_scalars():
+    import numpy as np
+
+    assert evaluate_filter_predicate(np.bool_(True), "bool_is_true", None) is True
+    assert evaluate_filter_predicate(np.bool_(False), "bool_is_true", None) is False
+    assert evaluate_filter_predicate(np.bool_(False), "bool_is_not_false", None) is False

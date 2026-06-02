@@ -1,0 +1,184 @@
+{
+  "backends": [
+    "polars_lazy",
+    "polars_streaming"
+  ],
+  "bug_audit": {
+    "candidate_bug_families": [
+      "polars_reflected_arithmetic_operand_order@polars",
+      "polars_vector_division_rounding@polars",
+      "pyarrow_sliced_bool_groupby_any_all@pyarrow"
+    ],
+    "issue_files": [
+      "new_issue/generated/polars_reflected_arithmetic_operand_order.md",
+      "new_issue/generated/polars_vector_division_rounding.md",
+      "new_issue/generated/pyarrow_sliced_bool_groupby_any_all.md"
+    ],
+    "output_json": "reports/bug-audit-20260526T142107.json",
+    "output_markdown": "reports/bug-audit-20260526T142107.md",
+    "skipped": false
+  },
+  "cases": 1800,
+  "classification": {
+    "candidate_bug_families": {},
+    "examples": {
+      "expected_semantic_divergence": [
+        {
+          "case_id": "case-01006263-bughunt",
+          "evidence": "Backends differ only in full-precision floating-point arithmetic or aggregate ordering; the relaxed numeric row multisets agree.",
+          "kind": "semantic_output_mismatch",
+          "root": "groupby_aggregation",
+          "seed": 1006263,
+          "signature": "ecb90275d8e5310d",
+          "suspicious": [
+            "polars_lazy",
+            "polars_streaming"
+          ]
+        },
+        {
+          "case_id": "case-01007401-bughunt",
+          "evidence": "Backends differ only in full-precision floating-point arithmetic or aggregate ordering; the relaxed numeric row multisets agree.",
+          "kind": "semantic_output_mismatch",
+          "root": "grouped_topk_null_sort_key",
+          "seed": 1007401,
+          "signature": "c28c15e1cf7e53ac",
+          "suspicious": [
+            "polars_lazy",
+            "polars_streaming"
+          ]
+        },
+        {
+          "case_id": "case-01007460-bughunt",
+          "evidence": "Backends differ only in full-precision floating-point arithmetic or aggregate ordering; the relaxed numeric row multisets agree.",
+          "kind": "semantic_output_mismatch",
+          "root": "grouped_topk_null_sort_key",
+          "seed": 1007460,
+          "signature": "1f7eace2efeaa9bb",
+          "suspicious": [
+            "polars_lazy",
+            "polars_streaming"
+          ]
+        }
+      ]
+    },
+    "false_positive_reasons": {},
+    "fresh_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {},
+    "known_saturated_reference_count": 14,
+    "refresh": false,
+    "run_file": "runs/run-20260526T142107-1779805267137569521.jsonl.gz",
+    "triage_verdicts": {
+      "expected_semantic_divergence": 10
+    }
+  },
+  "config": {
+    "artifact_limit": null,
+    "candidate_recheck_count": 2,
+    "compress_run_log": true,
+    "enable_artifact": true,
+    "enable_differential_oracle": true,
+    "enable_family_saturation": true,
+    "enable_feedback": true,
+    "enable_local_source_scheduler": true,
+    "enable_metamorphic_oracle": false,
+    "enable_normalizer": true,
+    "enable_preflight_repair": true,
+    "enable_preflight_validation": true,
+    "enable_reducer": false,
+    "enable_replay_bug": false,
+    "enable_type_aware_generation": true,
+    "family_saturation_penalty": 6.0,
+    "family_saturation_threshold": 4,
+    "feedback_max_cases_per_profile": 6,
+    "feedback_persist_limit": 4096,
+    "generator_profile": "bughunt",
+    "guidance_candidate_pool": 12,
+    "guidance_strategy": "guided",
+    "guidance_targets": [
+      "common_workflow",
+      "operation_combo",
+      "filter",
+      "truth_filter",
+      "mutate",
+      "groupby",
+      "aggregation",
+      "numeric_mean_aggregate",
+      "global_aggregation",
+      "sort_limit",
+      "topk",
+      "nulls",
+      "numeric",
+      "partitioned_running_sum",
+      "running_sum_partitioned",
+      "running_sum",
+      "path_basename_keyed_pick",
+      "path_projection",
+      "keyed_row_pick",
+      "strings",
+      "casts",
+      "expressions"
+    ],
+    "issue_inspired_source_saturation_penalty": 1.25,
+    "issue_inspired_source_saturation_threshold": 3,
+    "issue_replay_global_saturation_penalty": 2.0,
+    "issue_replay_global_saturation_threshold": 2,
+    "issue_replay_saturation_penalty": 1.0,
+    "issue_replay_saturation_threshold": 1,
+    "known_saturated_bug_families": [
+      "csv_long_numeric_roundtrip@duckdb",
+      "csv_long_numeric_roundtrip@pyarrow",
+      "groupby_aggregation@datafusion",
+      "grouped_topk_null_sort_key@datafusion",
+      "joined_order_offset_projection@datafusion",
+      "negative_zero_comparison@datafusion",
+      "ordered_topk_projection@datafusion",
+      "outer_join_truth_filter@datafusion",
+      "polars_reflected_arithmetic_operand_order@polars",
+      "polars_vector_division_rounding@polars",
+      "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+      "topk_filter_pushdown@datafusion",
+      "reverse_division_operand_order@polars",
+      "tuple_absence_null_filter@duckdb"
+    ],
+    "local_source_exploration_weight": 0.45,
+    "log_level": "compact",
+    "metamorphic_variant_limit": 4,
+    "oracle_mode": "differential",
+    "persist_feedback_corpus": false,
+    "replay_bug_source_issues": [
+      "https://github.com/apache/datafusion/issues/22190",
+      "https://github.com/apache/datafusion/issues/22489",
+      "https://github.com/apache/datafusion/issues/22441",
+      "https://github.com/apache/datafusion/issues/12956",
+      "https://github.com/apache/datafusion/issues/12955",
+      "https://github.com/duckdb/duckdb/issues/3015",
+      "https://github.com/duckdb/duckdb/issues/11261",
+      "https://github.com/duckdb/duckdb/issues/22075",
+      "https://github.com/duckdb/duckdb/issues/22656",
+      "https://github.com/duckdb/duckdb/issues/22837",
+      "https://github.com/duckdb/duckdb/issues/22849",
+      "https://github.com/duckdb/duckdb/issues/22750",
+      "https://github.com/apache/arrow/issues/32171",
+      "https://github.com/apache/arrow/issues/42231"
+    ],
+    "saturated_family_reward": 0.0
+  },
+  "duration": null,
+  "fuzz_run": {
+    "csv": "reports/findings-run-20260526T142107-1779805267137569521.csv",
+    "report": "reports/report-run-20260526T142107-1779805267137569521.md",
+    "run_file": "runs/run-20260526T142107-1779805267137569521.jsonl.gz"
+  },
+  "generated_at": "2026-05-26T14:22:19Z",
+  "generated_by": "datadiff bug-hunt",
+  "preset": "live_polars_streaming",
+  "schema_version": "bug-hunt-v1",
+  "seed": 996001,
+  "target_suite": "polars_streaming_cross",
+  "workflow": [
+    "deterministic_bug_audit",
+    "fresh_guided_fuzz",
+    "run_report",
+    "candidate_classification"
+  ]
+}

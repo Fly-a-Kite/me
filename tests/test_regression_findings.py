@@ -276,7 +276,7 @@ def test_datafusion_groupby_limit_offset_is_candidate_bug():
     assert result["normalized"]["pandas"]["rows"] == [[1, 0, 0]]
     assert result["normalized"]["duckdb"]["rows"] == [[1, 0, 0]]
     assert result["normalized"]["datafusion"]["rows"] == []
-    assert result["findings"][0]["root_cause"] == "groupby_aggregation"
+    assert result["findings"][0]["root_cause"] == "joined_order_offset_projection"
     assert result["findings"][0]["suspicious_backends"] == ["datafusion"]
 
     report = build_triage_report(

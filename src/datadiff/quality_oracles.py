@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from datadiff.dsl import Case
-from datadiff.guidance import extract_case_features
+from datadiff.guidance import derive_case_features
 
 
 @dataclass(slots=True)
@@ -60,8 +60,9 @@ def mutation_oracle(
             metrics={"candidate_source": candidate_source},
         )
 
+    signal_new_behavior = bool(row.get("signal_new_behavior", row.get("is_new_behavior")))
     valid = bool(preflight.get("valid", True))
-    productive = bool(row.get("findings") or row.get("is_new_behavior"))
+    productive = bool(row.get("findings") or signal_new_behavior)
     fallback_used = bool(preflight.get("fallback_used", False))
     passed = valid and productive and not fallback_used
     if passed:
@@ -73,7 +74,7 @@ def mutation_oracle(
     else:
         verdict = "redundant_mutation"
         evidence = "Feedback mutation executed but did not add new behavior or findings."
-    score = (1.0 if row.get("findings") else 0.0) + (0.5 if row.get("is_new_behavior") else 0.0)
+    score = (1.0 if row.get("findings") else 0.0) + (0.5 if signal_new_behavior else 0.0)
     if not valid or fallback_used:
         score -= 0.5
     return QualityOracleResult(
@@ -88,7 +89,7 @@ def mutation_oracle(
             "preflight_valid": valid,
             "preflight_repaired": bool(preflight.get("repaired", False)),
             "preflight_fallback_used": fallback_used,
-            "new_behavior": bool(row.get("is_new_behavior")),
+            "new_behavior": signal_new_behavior,
             "findings": len(row.get("findings", [])),
         },
     )
@@ -96,7 +97,7 @@ def mutation_oracle(
 
 def feedback_oracle(row: dict[str, Any]) -> QualityOracleResult:
     has_finding = bool(row.get("findings"))
-    new_behavior = bool(row.get("is_new_behavior"))
+    new_behavior = bool(row.get("signal_new_behavior", row.get("is_new_behavior")))
     stored = bool(row.get("stored_in_feedback_corpus"))
     passed = has_finding or new_behavior
     if has_finding:
@@ -141,10 +142,11 @@ def guidance_oracle(
             metrics={"strategy": guidance_strategy},
         )
 
+    signal_new_behavior = bool(row.get("signal_new_behavior", row.get("is_new_behavior")))
     matched_targets = list(guidance_decision.get("matched_targets", []))
-    features = extract_case_features(case)
+    features = derive_case_features(case)
     target_hit = bool(matched_targets) if guidance_targets else True
-    productive = bool(row.get("findings") or row.get("is_new_behavior"))
+    productive = bool(row.get("findings") or signal_new_behavior)
     passed = target_hit and productive
     if passed:
         verdict = "guided_productive"
@@ -171,12 +173,22 @@ def guidance_oracle(
             ),
             "pruned_candidate_count": int(guidance_decision.get("pruned_candidate_count", 0)),
             "frontier_bucket_count": len(guidance_decision.get("frontier_buckets", [])),
+            "discovery_bucket_count": len(guidance_decision.get("discovery_buckets", [])),
             "frontier_conformance": float(guidance_decision.get("score_breakdown", {}).get("frontier_conformance", 0.0)),
+            "discovery_diversity_bonus": float(
+                guidance_decision.get("score_breakdown", {}).get("discovery_diversity_bonus", 0.0)
+            ),
+            "candidate_pool_diversity_bonus": float(
+                guidance_decision.get("score_breakdown", {}).get("candidate_pool_diversity_bonus", 0.0)
+            ),
+            "discovery_stale_penalty": float(
+                guidance_decision.get("score_breakdown", {}).get("discovery_stale_penalty", 0.0)
+            ),
             "contribution_potential": float(
                 guidance_decision.get("score_breakdown", {}).get("contribution_potential", 0.0)
             ),
             "feature_count": len(features),
-            "new_behavior": bool(row.get("is_new_behavior")),
+            "new_behavior": signal_new_behavior,
             "findings": len(row.get("findings", [])),
         },
     )

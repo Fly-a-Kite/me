@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from datadiff.backends.base import BackendResult
+from datadiff.canonicalization import canonical_key, result_comparison_key
 from datadiff.dsl import Program
 from datadiff.normalizer import _norm_value, normalize_result
 
@@ -44,6 +45,24 @@ def test_normalizer_uses_stable_json_row_order_for_mixed_null_and_float_rows():
     result = normalize_result(BackendResult("pandas", "ok", data=df), Program("prog", 1, []))
 
     assert result.rows == [[None, 3, -0.5], [None, 3, None]]
+    assert result.stable_row_keys == [canonical_key(row) for row in result.rows]
+    assert result.ordered_row_signature == canonical_key(result.stable_row_keys)
+    assert result.unordered_row_signature == result.ordered_row_signature
+
+
+def test_normalizer_comparison_key_reuses_object_level_row_signature():
+    df = pd.DataFrame([[2], [1], [1]], columns=["x"])
+
+    result = normalize_result(BackendResult("pandas", "ok", data=df), Program("prog", 1, []))
+
+    assert result.rows == [[1], [1], [2]]
+    assert result.has_duplicate_rows is True
+    assert result.comparison_key == result_comparison_key(
+        status="ok",
+        columns=["x"],
+        ordered_row_signature=result.ordered_row_signature,
+        error_type="",
+    )
 
 
 def test_normalizer_preserves_explicit_sort_order_for_order_sensitive_programs():

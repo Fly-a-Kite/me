@@ -1,9 +1,17 @@
 from __future__ import annotations
 
-import math
 from pathlib import Path
 from typing import Any
 
+from datadiff.adjudication import build_adjudication, finding_adjudication
+from datadiff.case_features import (
+    case_contains_inf,
+    case_contains_nan,
+    case_contains_non_ascii_string,
+    case_contains_null,
+    case_uses_modulo,
+    case_uses_unicode_case_mapping,
+)
 from datadiff.dsl import Case
 from datadiff.util import dump_json
 
@@ -31,26 +39,70 @@ def build_triage_report(
         verdict = "not_reproduced"
         paper_status = "not_usable_until_reproduced"
         confidence = "low"
+        adjudication = build_adjudication(
+            verdict,
+            validity_gate="not_reproduced",
+            attribution_gate="reproduction_missing",
+            needs_manual_review=False,
+        )
     elif preclassified is not None:
         verdict = preclassified["verdict"]
         paper_status = preclassified["paper_status"]
         confidence = preclassified["confidence"]
+        adjudication = _merge_report_adjudication(reproduced_findings, verdict)
     elif documented_divergence:
         verdict = "documented_semantic_divergence"
         paper_status = "valid_finding_not_bug"
         confidence = "high"
+        adjudication = build_adjudication(
+            verdict,
+            validity_gate="valid_case",
+            semantic_gate="documented_boundary",
+            attribution_gate="documented_semantics",
+            documentation_support="documented",
+            countable_as_valid_finding=True,
+            needs_manual_review=False,
+            documented_rule_ids=["documented:polars_nan_inf_semantics"],
+            boundary_rule_ids=["documented:polars_nan_inf_semantics"],
+        )
     elif semantic_boundary:
         verdict = "expected_semantic_divergence"
         paper_status = "valid_finding_not_bug"
         confidence = "medium"
+        adjudication = build_adjudication(
+            verdict,
+            validity_gate="valid_case",
+            semantic_gate="expected_boundary",
+            attribution_gate="semantic_boundary",
+            countable_as_valid_finding=True,
+            needs_manual_review=False,
+        )
     elif _has_clear_minority_backend(reproduced_findings, backends):
         verdict = "candidate_implementation_bug"
         paper_status = "candidate_bug_needs_external_confirmation"
         confidence = "high"
+        adjudication = build_adjudication(
+            verdict,
+            validity_gate="valid_case",
+            semantic_gate="common_subset_or_backend_specific",
+            attribution_gate="backend_candidate_bug",
+            countable_as_bug_evidence=True,
+            countable_as_valid_finding=True,
+            needs_manual_review=False,
+            needs_external_confirmation=True,
+        )
     else:
         verdict = "needs_manual_confirmation"
         paper_status = "valid_finding_needs_triage"
         confidence = "medium"
+        adjudication = build_adjudication(
+            verdict,
+            validity_gate="valid_case",
+            semantic_gate="unknown",
+            attribution_gate="manual_triage_required",
+            countable_as_valid_finding=True,
+            needs_manual_review=True,
+        )
 
     return {
         "case_id": case.case_id,
@@ -68,6 +120,7 @@ def build_triage_report(
         "false_positive_reasons": sorted({f.get("false_positive_reason", "") for f in reproduced_findings if f.get("false_positive_reason")}),
         "documentation_refs": _documentation_refs(verdict),
         "recommendation": _recommendation(verdict),
+        "adjudication": adjudication,
     }
 
 
@@ -90,6 +143,14 @@ def _preclassified_verdict(findings: list[dict[str, Any]]) -> dict[str, str] | N
                 "confidence": finding.get("triage_confidence", "medium"),
             }
     return None
+
+
+def _merge_report_adjudication(findings: list[dict[str, Any]], verdict: str) -> dict[str, Any]:
+    for finding in findings:
+        if str(finding.get("triage_verdict", "")) != verdict:
+            continue
+        return finding_adjudication(finding)
+    return build_adjudication(verdict)
 
 
 def _paper_status_for_verdict(verdict: str) -> str:
@@ -119,7 +180,7 @@ def write_triage_artifact(bug_dir: Path, report: dict[str, Any]) -> tuple[Path, 
 def write_standalone_reproducer(bug_dir: Path, report: dict[str, Any] | None = None) -> Path:
     roots = set((report or {}).get("reproduced_roots", []))
     suspicious = set((report or {}).get("suspicious_backends", []))
-    if "grouped_topk_null_sort_key" in roots:
+    if "grouped_topk_null_sort_key" in roots and "datafusion" in suspicious:
         path = bug_dir / "standalone_datafusion_groupby_null_sortkey_limit.py"
         content = _standalone_datafusion_groupby_null_sortkey_reproducer()
     elif "groupby_aggregation" in roots and "datafusion" in suspicious:
@@ -164,7 +225,7 @@ def supports_standalone_reproducer(report: dict[str, Any]) -> bool:
     roots = set(report.get("reproduced_roots", []))
     suspicious = set(report.get("suspicious_backends", []))
     return (
-        bool(roots & {"grouped_topk_null_sort_key"})
+        bool(roots & {"grouped_topk_null_sort_key"} and suspicious & {"datafusion"})
         or bool(roots & {"groupby_aggregation", "outer_join_truth_filter"} and suspicious & {"datafusion"})
         or bool(roots & {"negative_zero_comparison"} and suspicious & {"datafusion"})
         or bool(roots & {"joined_order_offset_projection"} and suspicious & {"datafusion"})
@@ -200,14 +261,14 @@ def _is_datafusion_truth_filter_offset(report: dict[str, Any]) -> bool:
 def _case_features(case: Case) -> dict[str, Any]:
     ops = case.program.op_sequence()
     return {
-        "contains_null": _case_contains_null(case),
-        "contains_nan": _case_contains_nan(case),
-        "contains_inf": _case_contains_inf(case),
-        "contains_non_ascii_string": _case_contains_non_ascii_string(case),
+        "contains_null": case_contains_null(case),
+        "contains_nan": case_contains_nan(case),
+        "contains_inf": case_contains_inf(case),
+        "contains_non_ascii_string": case_contains_non_ascii_string(case),
         "uses_filter": "filter" in ops,
         "uses_mutate": "mutate" in ops,
-        "uses_modulo": _case_uses_modulo(case),
-        "uses_string_lower": _case_uses_string_lower(case),
+        "uses_modulo": case_uses_modulo(case),
+        "uses_unicode_case_mapping": case_uses_unicode_case_mapping(case),
         "uses_groupby": "groupby" in ops,
         "uses_sort": "sort" in ops,
         "uses_limit": "limit" in ops,
@@ -221,7 +282,7 @@ def _is_semantic_boundary(features: dict[str, Any], roots: list[str], generator_
         return True
     if features["uses_modulo"]:
         return True
-    if features["uses_string_lower"] and features["contains_non_ascii_string"]:
+    if features["uses_unicode_case_mapping"] and features["contains_non_ascii_string"]:
         return True
     return any(root in {"nan_inf_semantics", "null_semantics", "ordering_or_limit"} for root in roots)
 
@@ -343,53 +404,6 @@ def _triage_markdown(report: dict[str, Any]) -> str:
     for item in report["recommendation"]:
         lines.append(f"- {item}")
     return "\n".join(lines) + "\n"
-
-
-def _case_contains_null(case: Case) -> bool:
-    return any(value is None for table in case.tables for row in table.rows for value in row.values())
-
-
-def _case_contains_nan(case: Case) -> bool:
-    return any(
-        isinstance(value, float) and math.isnan(value)
-        for table in case.tables
-        for row in table.rows
-        for value in row.values()
-    )
-
-
-def _case_contains_inf(case: Case) -> bool:
-    return any(
-        isinstance(value, float) and math.isinf(value)
-        for table in case.tables
-        for row in table.rows
-        for value in row.values()
-    )
-
-
-def _case_contains_non_ascii_string(case: Case) -> bool:
-    return any(
-        isinstance(value, str) and any(ord(ch) > 127 for ch in value)
-        for table in case.tables
-        for row in table.rows
-        for value in row.values()
-    )
-
-
-def _case_uses_modulo(case: Case) -> bool:
-    return any(
-        op.get("op") == "mutate"
-        and op.get("expr", {}).get("kind") == "arith_const"
-        and op.get("expr", {}).get("op") == "mod"
-        for op in case.program.operations
-    )
-
-
-def _case_uses_string_lower(case: Case) -> bool:
-    return any(
-        op.get("op") == "mutate" and op.get("expr", {}).get("kind") == "string_lower"
-        for op in case.program.operations
-    )
 
 
 def _standalone_datafusion_groupby_null_sortkey_reproducer() -> str:

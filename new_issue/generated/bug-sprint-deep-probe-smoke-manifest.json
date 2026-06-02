@@ -1,0 +1,128 @@
+{
+  "bug_audit": {
+    "skipped": true
+  },
+  "cases_per_lane_seed": 4,
+  "duration": null,
+  "generated_at": "2026-05-28T08:31:02Z",
+  "generated_by": "datadiff bug-sprint",
+  "lane_ids": [
+    "deep_probe_rotation"
+  ],
+  "lanes": [
+    {
+      "id": "deep_probe_rotation",
+      "preset": "live_deep_probe_rotation_metamorphic",
+      "target_suite": "latest_all_engines",
+      "theme": "Low-rate deterministic deep probe rotation across Python API, Arrow layout, nullable dtype, lazy/streaming, embedded SQL, and query-engine semantic edges"
+    }
+  ],
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "pyarrow",
+        "polars",
+        "polars_lazy",
+        "duckdb",
+        "sqlite",
+        "datafusion"
+      ],
+      "cases": 4,
+      "classification": {
+        "candidate_bug_families": {
+          "pandas_arrow_timestamp_index_attr_semantics@pandas": 1,
+          "path_projection_keyed_pick@duckdb": 2
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00046022-deep-probe-rotation-pandas-arrow-timestamp-index-attr-semantics",
+              "evidence": "Independent DSL reference agrees with ['datafusion', 'duckdb', 'polars', 'polars_lazy', 'pyarrow', 'sqlite'] and disagrees with ['pandas'].",
+              "kind": "semantic_output_mismatch",
+              "root": "pandas_arrow_timestamp_index_attr_semantics",
+              "seed": 46022,
+              "signature": "767ba463c76e2e45",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00046033-deep-probe-rotation-path-basename-keyed-pick",
+              "evidence": "Independent DSL reference agrees with ['datafusion', 'pandas', 'polars', 'polars_lazy', 'pyarrow', 'sqlite'] and disagrees with ['duckdb'].",
+              "kind": "semantic_output_mismatch",
+              "root": "path_projection_keyed_pick",
+              "seed": 46033,
+              "signature": "1e8382c094f15996",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00046033-deep-probe-rotation-path-basename-keyed-pick-mut-46039",
+              "evidence": "Independent DSL reference agrees with ['datafusion', 'pandas', 'polars', 'polars_lazy', 'pyarrow', 'sqlite'] and disagrees with ['duckdb'].",
+              "kind": "semantic_output_mismatch",
+              "root": "path_projection_keyed_pick",
+              "seed": 46039,
+              "signature": "0e3464673c2d1bad",
+              "suspicious": [
+                "duckdb"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "pandas_arrow_timestamp_index_attr_semantics@pandas": 1,
+          "path_projection_keyed_pick@duckdb": 2
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 18,
+        "refresh": true,
+        "run_file": "runs/run-20260528T083101-1779957061517259596.jsonl",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 3
+        },
+        "unsaturated_candidate_bug_families": {
+          "pandas_arrow_timestamp_index_attr_semantics@pandas": 1,
+          "path_projection_keyed_pick@duckdb": 2
+        }
+      },
+      "csv": "",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/bug-sprint-deep-probe-smoke-manifest-deep_probe_rotation-seed46022-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 3,
+      "lane_id": "deep_probe_rotation",
+      "preset": "live_deep_probe_rotation_metamorphic",
+      "report": "",
+      "run_file": "runs/run-20260528T083101-1779957061517259596.jsonl",
+      "seed": 46022,
+      "target_suite": "latest_all_engines",
+      "theme": "Low-rate deterministic deep probe rotation across Python API, Arrow layout, nullable dtype, lazy/streaming, embedded SQL, and query-engine semantic edges"
+    }
+  ],
+  "schema_version": "bug-sprint-v1",
+  "seeds": [
+    46022
+  ],
+  "summary": {
+    "fresh_candidate_bug_families": {
+      "pandas_arrow_timestamp_index_attr_semantics@pandas": 1,
+      "path_projection_keyed_pick@duckdb": 2
+    },
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {},
+    "run_count": 1,
+    "triage_verdicts": {
+      "candidate_implementation_bug": 3
+    }
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "targeted_short_sprints",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence"
+  ]
+}

@@ -1,5 +1,6 @@
 import random
 
+import datadiff.mutator as mutator_module
 from datadiff.classification_oracle import validate_case_program
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.mutator import (
@@ -7,6 +8,8 @@ from datadiff.mutator import (
     MUTATION_OPERATOR_NAMES,
     PROBE_MUTATION_OPERATOR_NAMES,
     ROOT_TARGETED_MUTATION_OPERATOR_NAMES,
+    SPECIALIZED_DISCOVERY_MUTATION_OPERATOR_NAMES,
+    mutation_operator_profiles,
     _append_group_quantile_probe,
     _append_scalar_subquery_probe,
     _append_window_avg_probe,
@@ -21,6 +24,19 @@ from datadiff.mutator import (
     _append_sparse_mask_probe,
     _append_float_wrap_probe,
     _append_groupby_fractional_membership_filter,
+    _append_normalized_string_membership,
+    _append_sql_distinct_null_topk,
+    _append_left_join_coalesce_membership,
+    _append_left_join_case_membership,
+    _append_empty_filter_global_aggregate,
+    _append_sql_union_coalesce_distinct_topk,
+    _append_boolean_membership_case_aggregate,
+    _append_left_join_boolean_case_aggregate,
+    _append_left_join_boolean_coalesce_case_aggregate,
+    _append_boolean_antijoin_case_aggregate,
+    _append_left_join_boolean_coalesce_filter_aggregate,
+    _append_numeric_text_boolean_antijoin_case_aggregate,
+    _append_multi_key_membership_case_aggregate,
     _append_index_bool_probe,
     _append_empty_literal_groupby_probe,
     _append_arrow_string_eq_sum_probe,
@@ -30,6 +46,7 @@ from datadiff.mutator import (
     _append_dataset_isin_all_match_probe,
     _append_large_string_partition_probe,
     _append_hash_pivot_wider_probe,
+    _append_list_flatten_parent_indices_probe,
     _append_rolling_mean_by_null_count_probe,
     _append_boolean_predicate_filter_probe,
     _append_grouped_topk_probe,
@@ -41,6 +58,7 @@ from datadiff.mutator import (
     _append_sortedness_check_probe,
     _append_truth_filter_probe,
     _append_tuple_absence_filter_probe,
+    _fallback_column_type,
     _available_columns,
     _random_operation,
     mutate_case,
@@ -55,12 +73,55 @@ def test_random_operation_can_mutate_string_only_available_columns():
         [{"s": "Alpha"}, {"s": "中文"}],
     )
 
-    for seed in range(200):
+    kinds = set()
+    for seed in range(500):
         op = _random_operation([table], [], random.Random(seed))
         if op is None or op["op"] != "mutate":
             continue
-        assert op["expr"]["kind"] in {"string_length", "string_lower"}
+        kinds.add(op["expr"]["kind"])
+        assert op["expr"]["kind"] in {
+            "string_length",
+            "string_lower",
+            "string_upper",
+            "string_strip",
+            "string_null_if_empty",
+            "string_replace",
+            "string_slice",
+            "string_split_part",
+            "string_basename",
+            "string_contains",
+            "string_starts_with",
+            "string_ends_with",
+        }
         assert op["expr"]["source"] == "s"
+    assert "string_null_if_empty" in kinds
+    assert "string_strip" in kinds
+    assert "string_slice" in kinds
+    assert "string_split_part" in kinds
+    assert "string_basename" in kinds
+
+
+def test_random_operation_can_append_date_part_for_date_like_string_column():
+    table = TableData(
+        "t0",
+        [ColumnSpec("dt", "str")],
+        [{"dt": "2024-01-03"}, {"dt": "2025-12-31"}],
+    )
+
+    seen = []
+    for seed in range(500):
+        op = _random_operation([table], [], random.Random(seed))
+        if op is not None and op["op"] == "mutate":
+            seen.append(op["expr"])
+
+    assert any(expr["kind"] == "date_part" and expr["source"] == "dt" for expr in seen)
+
+
+def test_mutation_operator_profiles_expose_semantic_family_affinity_alias():
+    profile = mutation_operator_profiles(allow_probe_operators=False)["append_left_join_case_membership"]
+
+    assert "conditional_semantics" in profile.semantic_family_affinity
+    assert profile.semantic_affinity == profile.semantic_family_affinity
 
 
 def test_available_columns_are_deduplicated_after_overwrite_and_select():
@@ -108,6 +169,145 @@ def test_mutate_case_with_metadata_records_lineage_and_operator():
     assert isinstance(mutate_case(base, 100), Case)
 
 
+def test_mutate_case_with_metadata_retries_unproductive_operator(monkeypatch):
+    base = Case(
+        "case-base",
+        10,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-base", 10, [{"op": "limit", "n": 1}]),
+    )
+
+    def fail(tables, operations, rnd):
+        del tables, operations, rnd
+        return "fail:no-key-or-bool-column"
+
+    def good(tables, operations, rnd):
+        del operations, rnd
+        tables[0].rows[0]["x"] = 2
+        return "good:x"
+
+    monkeypatch.setattr(
+        mutator_module,
+        "MUTATION_OPERATORS",
+        (
+            mutator_module.MutationOperator("fail", fail),
+            mutator_module.MutationOperator("good", good),
+        ),
+    )
+
+    result = mutate_case_with_metadata(base, 99)
+
+    assert result.metadata["mutation"]["operator"] == "good"
+    assert result.metadata["mutation"]["detail"] == "good:x"
+    assert result.metadata["mutation"]["changed"] is True
+    assert result.case.tables[0].rows[0]["x"] == 2
+
+
+def test_mutate_case_prioritizes_operator_scores(monkeypatch):
+    base = Case(
+        "case-base",
+        10,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-base", 10, [{"op": "limit", "n": 1}]),
+    )
+
+    def low_value(tables, operations, rnd):
+        del operations, rnd
+        tables[0].rows[0]["x"] = -1
+        return "low:x"
+
+    def high_value(tables, operations, rnd):
+        del operations, rnd
+        tables[0].rows[0]["x"] = 99
+        return "high:x"
+
+    monkeypatch.setattr(
+        mutator_module,
+        "MUTATION_OPERATORS",
+        (
+            mutator_module.MutationOperator("low", low_value),
+            mutator_module.MutationOperator("high", high_value),
+        ),
+    )
+
+    result = mutate_case_with_metadata(base, 99, operator_scores={"low": -1.0, "high": 3.0})
+
+    assert result.metadata["mutation"]["operator"] == "high"
+    assert result.case.tables[0].rows[0]["x"] == 99
+
+
+def test_mutate_case_uses_untried_operator_score(monkeypatch):
+    base = Case(
+        "case-base",
+        10,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-base", 10, [{"op": "limit", "n": 1}]),
+    )
+
+    def known(tables, operations, rnd):
+        del operations, rnd
+        tables[0].rows[0]["x"] = -1
+        return "known:x"
+
+    def untried(tables, operations, rnd):
+        del operations, rnd
+        tables[0].rows[0]["x"] = 42
+        return "untried:x"
+
+    monkeypatch.setattr(
+        mutator_module,
+        "MUTATION_OPERATORS",
+        (
+            mutator_module.MutationOperator("known", known),
+            mutator_module.MutationOperator("untried", untried),
+        ),
+    )
+
+    result = mutate_case_with_metadata(base, 99, operator_scores={"known": -1.0, "__untried__": 2.0})
+
+    assert result.metadata["mutation"]["operator"] == "untried"
+    assert result.case.tables[0].rows[0]["x"] == 42
+
+
+def test_mutate_case_with_metadata_does_not_mutate_original_inputs(monkeypatch):
+    base = Case(
+        "case-base",
+        10,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-base", 10, [{"op": "filter", "column": "x", "cmp": "range_closed", "value": [0, 2]}]),
+        metadata={"source_issue_alt": {"tags": ["alpha", "beta"]}},
+    )
+
+    def mutate_nested_inputs(tables, operations, rnd):
+        del rnd
+        tables[0].rows[0]["x"] = 99
+        operations[0]["value"][0] = -10
+        return "nested:x"
+
+    monkeypatch.setattr(
+        mutator_module,
+        "MUTATION_OPERATORS",
+        (mutator_module.MutationOperator("nested", mutate_nested_inputs),),
+    )
+
+    result = mutate_case_with_metadata(base, 99)
+
+    assert base.tables[0].rows[0]["x"] == 1
+    assert list(base.program.operations[0]["value"]) == [0, 2]
+    assert result.case.tables[0].rows[0]["x"] == 99
+    assert list(result.case.program.operations[0]["value"]) == [-10, 2]
+
+    result.metadata["source_issue_alt"]["tags"].append("gamma")
+    assert base.metadata["source_issue_alt"]["tags"] == ["alpha", "beta"]
+
+
+def test_fallback_column_type_treats_probe_outputs_as_boolean():
+    assert _fallback_column_type("unexpected_else_seen") == "bool"
+    assert _fallback_column_type("sorted_ok_x") == "bool"
+    assert _fallback_column_type("setop_all_duplicate_mismatch") == "bool"
+    assert _fallback_column_type("rolling_mean_by_null_count_mismatch_1") == "bool"
+
+
 def test_mutate_case_preserves_issue_profile_metadata_for_guidance():
     base = Case(
         "case-template",
@@ -144,6 +344,7 @@ def test_mutate_case_can_exclude_probe_append_operators():
         seen.add(operator_name)
         assert operator_name not in PROBE_MUTATION_OPERATOR_NAMES
         assert operator_name not in ROOT_TARGETED_MUTATION_OPERATOR_NAMES
+        assert operator_name not in SPECIALIZED_DISCOVERY_MUTATION_OPERATOR_NAMES
         assert operator_name in DISCOVERY_MUTATION_OPERATOR_NAMES
 
     assert seen
@@ -168,6 +369,10 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_struct_distinct_probe" in MUTATION_OPERATOR_NAMES
     assert "append_bit_compare_probe" in MUTATION_OPERATOR_NAMES
     assert "append_round_even_probe" in MUTATION_OPERATOR_NAMES
+
+
+def test_specialized_discovery_mutation_operator_alias_matches_compatibility_name():
+    assert SPECIALIZED_DISCOVERY_MUTATION_OPERATOR_NAMES == ROOT_TARGETED_MUTATION_OPERATOR_NAMES
     assert "append_series_rtruediv_probe" in MUTATION_OPERATOR_NAMES
     assert "append_uint64_isin_probe" in MUTATION_OPERATOR_NAMES
     assert "append_tuple_anti_null_probe" in MUTATION_OPERATOR_NAMES
@@ -184,10 +389,37 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_dataset_isin_all_match_probe" in MUTATION_OPERATOR_NAMES
     assert "append_large_string_partition_probe" in MUTATION_OPERATOR_NAMES
     assert "append_hash_pivot_wider_probe" in MUTATION_OPERATOR_NAMES
+    assert "append_list_flatten_parent_indices_probe" in MUTATION_OPERATOR_NAMES
     assert "append_rolling_mean_by_null_count_probe" in MUTATION_OPERATOR_NAMES
     assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
     assert "append_groupby_fractional_membership_filter" in MUTATION_OPERATOR_NAMES
     assert "append_groupby_fractional_membership_filter" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_normalized_string_membership" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_sql_distinct_null_topk" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_left_join_coalesce_membership" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_left_join_case_membership" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_empty_filter_global_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_sql_union_coalesce_distinct_topk" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_boolean_membership_case_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_left_join_boolean_case_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_left_join_boolean_coalesce_case_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_boolean_antijoin_case_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_left_join_boolean_coalesce_filter_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_numeric_text_boolean_antijoin_case_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_multi_key_membership_case_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
+
+
+def test_mutation_operator_profiles_expose_semantic_affinity_for_high_risk_discovery_ops():
+    profiles = mutation_operator_profiles(allow_probe_operators=False)
+
+    left_join_case = profiles["append_left_join_case_membership"]
+    normalized_membership = profiles["append_normalized_string_membership"]
+
+    assert "conditional_semantics" in left_join_case.semantic_affinity
+    assert "join_membership" in left_join_case.semantic_affinity
+    assert "left_join_case_when_membership" in left_join_case.semantic_signal_affinity
+    assert "string_semantics" in normalized_membership.semantic_affinity
+    assert "normalized_string_membership_key" in normalized_membership.semantic_signal_affinity
 
 
 def test_append_order_projection_mutation_drops_sort_key_but_stays_valid():
@@ -780,6 +1012,30 @@ def test_append_hash_pivot_wider_probe_mutation_stays_valid():
     assert validate_case_program(case) == []
 
 
+def test_append_list_flatten_parent_indices_probe_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("probe_id", "int")],
+        [{"id": 0, "probe_id": 0}],
+    )
+    operations = [{"op": "select", "columns": ["probe_id"]}]
+
+    detail = _append_list_flatten_parent_indices_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_list_flatten_parent_indices_probe:")
+    assert operations[-1] == {
+        "op": "list_flatten_parent_indices_probe",
+        "as": "list_flatten_parent_indices_mismatch",
+    }
+    case = Case(
+        "case-mut-list-flatten-parent-indices",
+        1,
+        [table],
+        Program("prog-mut-list-flatten-parent-indices", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
 def test_append_rolling_mean_by_null_count_probe_mutation_stays_valid():
     table = TableData(
         "t0",
@@ -846,4 +1102,413 @@ def test_append_groupby_fractional_membership_filter_mutation_stays_valid():
     assert operations[-1]["cmp"] == "in_set"
     assert any(isinstance(value, float) and not value.is_integer() for value in operations[-1]["value"])
     case = Case("case-mut-groupby-membership", 1, [table], Program("prog-mut-groupby-membership", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_normalized_string_membership_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("s", "str"), ColumnSpec("x", "int")],
+        [
+            {"id": 0, "s": " Alpha ", "x": 1},
+            {"id": 1, "s": "Beta", "x": 2},
+            {"id": 2, "s": None, "x": 3},
+            {"id": 3, "s": "space value", "x": 4},
+        ],
+    )
+    tables = [table]
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_normalized_string_membership(tables, operations, random.Random(1))
+
+    assert detail.startswith("append_normalized_string_membership:")
+    assert any(op["op"] in {"semi_join", "anti_join"} for op in operations)
+    assert any(t.name.startswith("t_string_membership_mut") for t in tables[1:])
+    case = Case(
+        "case-mut-normalized-string-membership",
+        1,
+        tables,
+        Program("prog-mut-normalized-string-membership", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
+def test_append_sql_distinct_null_topk_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("g", "str"), ColumnSpec("s", "str"), ColumnSpec("flag", "bool")],
+        [
+            {"id": 0, "g": "a", "s": "", "flag": True},
+            {"id": 1, "g": None, "s": None, "flag": None},
+            {"id": 2, "g": "space value", "s": " Alpha ", "flag": False},
+        ],
+    )
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_sql_distinct_null_topk([table], operations, random.Random(1))
+
+    assert detail.startswith("append_sql_distinct_null_topk:")
+    assert [op["op"] for op in operations[-4:]] == ["distinct", "sort", "offset", "limit"]
+    assert any(op["op"] == "coalesce" for op in operations)
+    case = Case("case-mut-sql-distinct", 1, [table], Program("prog-mut-sql-distinct", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_left_join_coalesce_membership_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("row_nr", "int"), ColumnSpec("id", "int"), ColumnSpec("g", "str"), ColumnSpec("x", "int")],
+        [
+            {"row_nr": 0, "id": 0, "g": "a", "x": 1},
+            {"row_nr": 1, "id": 1, "g": None, "x": 2},
+            {"row_nr": 2, "id": 2, "g": "space value", "x": 3},
+        ],
+    )
+    tables = [table]
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_left_join_coalesce_membership(tables, operations, random.Random(1))
+
+    assert detail.startswith("append_left_join_coalesce_membership:")
+    assert any(op["op"] == "join" and op.get("how") == "left" for op in operations)
+    assert any(op["op"] == "coalesce" for op in operations)
+    assert any(op["op"] in {"semi_join", "anti_join"} for op in operations)
+    assert len(tables) == 3
+    case = Case(
+        "case-mut-left-join-coalesce-membership",
+        1,
+        tables,
+        Program("prog-mut-left-join-coalesce-membership", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
+def test_append_left_join_case_membership_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("row_nr", "int"), ColumnSpec("id", "int"), ColumnSpec("g", "str"), ColumnSpec("x", "int")],
+        [
+            {"row_nr": 0, "id": 0, "g": "a", "x": 1},
+            {"row_nr": 1, "id": 1, "g": None, "x": 2},
+            {"row_nr": 2, "id": 2, "g": "space value", "x": 3},
+        ],
+    )
+    tables = [table]
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_left_join_case_membership(tables, operations, random.Random(1))
+
+    assert detail.startswith("append_left_join_case_membership:")
+    assert any(op["op"] == "join" and op.get("how") == "left" for op in operations)
+    assert any(op["op"] == "case_when" for op in operations)
+    assert any(op["op"] == "groupby" for op in operations)
+    assert len(tables) == 2
+    case = Case(
+        "case-mut-left-join-case-membership",
+        1,
+        tables,
+        Program("prog-mut-left-join-case-membership", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
+def test_append_empty_filter_global_aggregate_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int"),
+            ColumnSpec("x", "int"),
+            ColumnSpec("y", "float"),
+            ColumnSpec("flag", "bool"),
+        ],
+        [
+            {"id": 0, "x": 1, "y": 0.5, "flag": True},
+            {"id": 1, "x": None, "y": None, "flag": None},
+            {"id": 2, "x": -1, "y": -0.5, "flag": False},
+        ],
+    )
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_empty_filter_global_aggregate([table], operations, random.Random(1))
+
+    assert detail.startswith("append_empty_filter_global_aggregate:")
+    assert [op["op"] for op in operations[-2:]] == ["filter", "aggregate"]
+    assert any(agg["func"] in {"any", "all"} for agg in operations[-1]["aggs"])
+    case = Case("case-mut-empty-global-aggregate", 1, [table], Program("prog-mut-empty-global-aggregate", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_sql_union_coalesce_distinct_topk_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("g", "str"), ColumnSpec("s", "str"), ColumnSpec("flag", "bool")],
+        [
+            {"id": 0, "g": "a", "s": "", "flag": True},
+            {"id": 1, "g": None, "s": None, "flag": None},
+            {"id": 2, "g": "space value", "s": " Alpha ", "flag": False},
+        ],
+    )
+    tables = [table]
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_sql_union_coalesce_distinct_topk(tables, operations, random.Random(1))
+
+    assert detail.startswith("append_sql_union_coalesce_distinct_topk:")
+    assert operations[-5]["op"] in {"coalesce", "mutate"}
+    assert [op["op"] for op in operations[-4:]] == ["distinct", "sort", "offset", "limit"]
+    assert any(op["op"] == "union_all" for op in operations)
+    assert len(tables) == 2
+    case = Case("case-mut-sql-union-distinct", 1, tables, Program("prog-mut-sql-union-distinct", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_append_boolean_membership_case_aggregate_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int"),
+            ColumnSpec("x", "int"),
+            ColumnSpec("flag", "bool"),
+        ],
+        [
+            {"id": 0, "x": 1, "flag": True},
+            {"id": 1, "x": 2, "flag": None},
+            {"id": 2, "x": 3, "flag": False},
+        ],
+    )
+    tables = [table]
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_boolean_membership_case_aggregate(tables, operations, random.Random(1))
+
+    assert detail.startswith("append_boolean_membership_case_aggregate:")
+    assert [op["op"] for op in operations[-5:]] == ["filter", "semi_join", "case_when", "groupby", "sort"]
+    assert operations[-3]["condition"]["cmp"] == "bool_is_true"
+    assert any(agg["func"] in {"any", "all"} for agg in operations[-2]["aggs"])
+    assert len(tables) == 2
+    case = Case(
+        "case-mut-bool-membership-case-agg",
+        1,
+        tables,
+        Program("prog-mut-bool-membership-case-agg", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
+def test_append_left_join_boolean_case_aggregate_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int"),
+            ColumnSpec("x", "int"),
+            ColumnSpec("flag", "bool"),
+        ],
+        [
+            {"id": 0, "x": 1, "flag": True},
+            {"id": 1, "x": None, "flag": None},
+            {"id": 2, "x": 3, "flag": False},
+        ],
+    )
+    tables = [table]
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_left_join_boolean_case_aggregate(tables, operations, random.Random(1))
+
+    assert detail.startswith("append_left_join_boolean_case_aggregate:")
+    assert [op["op"] for op in operations[-4:]] == ["join", "case_when", "groupby", "sort"]
+    assert operations[-4]["how"] == "left"
+    assert operations[-3]["then"] is True
+    assert operations[-3]["else"] is False
+    assert any(agg["func"] in {"any", "all"} for agg in operations[-2]["aggs"])
+    assert len(tables) == 2
+    case = Case(
+        "case-mut-left-join-bool-case-agg",
+        1,
+        tables,
+        Program("prog-mut-left-join-bool-case-agg", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
+def test_append_left_join_boolean_coalesce_case_aggregate_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int"),
+            ColumnSpec("x", "int"),
+            ColumnSpec("flag", "bool"),
+        ],
+        [
+            {"id": 0, "x": 1, "flag": True},
+            {"id": 1, "x": None, "flag": None},
+            {"id": 2, "x": 3, "flag": False},
+        ],
+    )
+    tables = [table]
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_left_join_boolean_coalesce_case_aggregate(tables, operations, random.Random(1))
+
+    assert detail.startswith("append_left_join_boolean_coalesce_case_aggregate:")
+    assert [op["op"] for op in operations[-5:]] == ["join", "coalesce", "case_when", "groupby", "sort"]
+    assert operations[-5]["how"] == "left"
+    assert operations[-4]["fallback"] is False
+    assert operations[-3]["condition"]["cmp"] == "bool_is_true"
+    assert any(agg["func"] in {"any", "all"} for agg in operations[-2]["aggs"])
+    assert len(tables) == 2
+    case = Case(
+        "case-mut-left-join-bool-coalesce-case-agg",
+        1,
+        tables,
+        Program("prog-mut-left-join-bool-coalesce-case-agg", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
+def test_append_boolean_antijoin_case_aggregate_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int"),
+            ColumnSpec("x", "int"),
+            ColumnSpec("flag", "bool"),
+        ],
+        [
+            {"id": 0, "x": 1, "flag": True},
+            {"id": 1, "x": 2, "flag": None},
+            {"id": 2, "x": 3, "flag": False},
+        ],
+    )
+    tables = [table]
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_boolean_antijoin_case_aggregate(tables, operations, random.Random(1))
+
+    assert detail.startswith("append_boolean_antijoin_case_aggregate:")
+    assert [op["op"] for op in operations[-5:]] == ["filter", "anti_join", "case_when", "groupby", "sort"]
+    assert operations[-3]["condition"]["cmp"] == "bool_is_true"
+    assert any(agg["func"] in {"any", "all"} for agg in operations[-2]["aggs"])
+    assert len(tables) == 2
+    case = Case(
+        "case-mut-bool-antijoin-case-agg",
+        1,
+        tables,
+        Program("prog-mut-bool-antijoin-case-agg", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
+def test_append_left_join_boolean_coalesce_filter_aggregate_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int"),
+            ColumnSpec("x", "int"),
+            ColumnSpec("flag", "bool"),
+        ],
+        [
+            {"id": 0, "x": 1, "flag": True},
+            {"id": 1, "x": None, "flag": None},
+            {"id": 2, "x": 3, "flag": False},
+        ],
+    )
+    tables = [table]
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_left_join_boolean_coalesce_filter_aggregate(tables, operations, random.Random(1))
+
+    assert detail.startswith("append_left_join_boolean_coalesce_filter_aggregate:")
+    assert [op["op"] for op in operations[-6:]] == ["join", "coalesce", "filter", "case_when", "groupby", "sort"]
+    assert operations[-6]["how"] == "left"
+    assert operations[-5]["fallback"] is False
+    assert operations[-4]["cmp"] == "=="
+    assert isinstance(operations[-4]["value"], bool)
+    assert any(agg["func"] in {"any", "all"} for agg in operations[-2]["aggs"])
+    assert len(tables) == 2
+    case = Case(
+        "case-mut-left-join-bool-coalesce-filter-agg",
+        1,
+        tables,
+        Program("prog-mut-left-join-bool-coalesce-filter-agg", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
+def test_append_numeric_text_boolean_antijoin_case_aggregate_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int"),
+            ColumnSpec("num_s", "str"),
+            ColumnSpec("flag", "bool"),
+        ],
+        [
+            {"id": 0, "num_s": "0", "flag": True},
+            {"id": 1, "num_s": "1", "flag": None},
+            {"id": 2, "num_s": "2", "flag": False},
+            {"id": 3, "num_s": "5", "flag": True},
+        ],
+    )
+    tables = [table]
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_numeric_text_boolean_antijoin_case_aggregate(tables, operations, random.Random(1))
+
+    assert detail.startswith("append_numeric_text_boolean_antijoin_case_aggregate:")
+    assert [op["op"] for op in operations[-7:]] == [
+        "mutate",
+        "filter",
+        "filter",
+        "anti_join",
+        "case_when",
+        "groupby",
+        "sort",
+    ]
+    assert operations[-7]["expr"]["input_domain"] == "integer_string"
+    assert operations[-5]["cmp"] == "bool_is_not_false"
+    assert any(agg["func"] in {"any", "all"} for agg in operations[-2]["aggs"])
+    assert len(tables) == 2
+    case = Case(
+        "case-mut-numeric-text-bool-antijoin-case-agg",
+        1,
+        tables,
+        Program("prog-mut-numeric-text-bool-antijoin-case-agg", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
+def test_append_multi_key_membership_case_aggregate_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int"),
+            ColumnSpec("g", "str"),
+            ColumnSpec("x", "int"),
+            ColumnSpec("flag", "bool"),
+        ],
+        [
+            {"id": 0, "g": "a", "x": 1, "flag": True},
+            {"id": 1, "g": "b", "x": 2, "flag": None},
+            {"id": 2, "g": "c", "x": 3, "flag": False},
+            {"id": 3, "g": None, "x": 5, "flag": True},
+        ],
+    )
+    tables = [table]
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_multi_key_membership_case_aggregate(tables, operations, random.Random(1))
+
+    assert detail.startswith("append_multi_key_membership_case_aggregate:")
+    assert [op["op"] for op in operations[-5:]] == ["filter", "semi_join", "case_when", "groupby", "sort"]
+    assert isinstance(operations[-4]["left_on"], list)
+    assert operations[-4]["left_on"] == operations[-4]["right_on"]
+    assert operations[-3]["condition"]["cmp"] == "bool_is_true"
+    assert any(agg["func"] in {"any", "all"} for agg in operations[-2]["aggs"])
+    assert len(tables) == 2
+    case = Case(
+        "case-mut-multi-key-membership-case-agg",
+        1,
+        tables,
+        Program("prog-mut-multi-key-membership-case-agg", 1, operations),
+    )
     assert validate_case_program(case) == []

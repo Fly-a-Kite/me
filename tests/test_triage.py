@@ -89,8 +89,17 @@ def test_standalone_reproducer_supports_known_root_causes():
             "generator_profile": "common",
             "features": {"contains_nan": False, "contains_inf": False},
             "reproduced_roots": ["grouped_topk_null_sort_key"],
+            "suspicious_backends": ["datafusion"],
         }
     ) is True
+    assert supports_standalone_reproducer(
+        {
+            "generator_profile": "common",
+            "features": {"contains_nan": False, "contains_inf": False},
+            "reproduced_roots": ["grouped_topk_null_sort_key"],
+            "suspicious_backends": ["pyarrow"],
+        }
+    ) is False
     assert supports_standalone_reproducer(
         {
             "generator_profile": "bughunt",
@@ -150,6 +159,7 @@ def test_write_datafusion_standalone_reproducer_for_grouped_topk(tmp_path):
         tmp_path,
         {
             "reproduced_roots": ["grouped_topk_null_sort_key"],
+            "suspicious_backends": ["datafusion"],
         },
     )
 

@@ -37,6 +37,121 @@ python3 -m venv .venv
 .venv/bin/datadiff show-bugs
 ```
 
+自动化最新版本 bug 审计：
+
+```bash
+.venv/bin/datadiff bug-audit
+.venv/bin/datadiff bug-audit --write-issues
+.venv/bin/datadiff bug-hunt --cases 500 --seed 1
+.venv/bin/datadiff bug-sprint --list-lanes
+.venv/bin/datadiff bug-sprint --cases 100 --seeds 1
+.venv/bin/datadiff bug-sprint --cases 100 --seeds 1 --watch-health
+.venv/bin/datadiff bug-sprint-status --manifest new_issue/generated/bug-sprint-manifest.json
+.venv/bin/datadiff candidate-pipeline --manifest new_issue/generated/bug-sprint-manifest.json
+.venv/bin/datadiff run-health
+.venv/bin/datadiff run-health --fail-on-fresh-candidate --fail-on-bug
+.venv/bin/datadiff bug-hunt --cases 2000 --seed 1 --preset live_deep_organic_metamorphic
+.venv/bin/datadiff bug-status
+.venv/bin/datadiff bug-status --json --write-report
+.venv/bin/datadiff issue-readiness
+.venv/bin/datadiff issue-readiness --json --write-report
+.venv/bin/datadiff issue-bundle
+.venv/bin/datadiff issue-bundle --run-reproducers
+.venv/bin/datadiff issue-bundle --run-reproducers --repeat 3 --primary-per-family
+.venv/bin/datadiff methodology-report --manifest runs/experiment-YYYYMMDDTHHMMSS.json
+.venv/bin/datadiff methodology-report --summary-only --json
+.venv/bin/datadiff final-readiness --latest-confirmation-file experiments/latest_confirmations.json --min-live-duration-hours 0 --no-require-validation --no-require-seeded --no-require-ablation --no-require-comparison --summary-only --json
+.venv/bin/datadiff review-readiness --json --write-report
+```
+
+`bug-audit` 是确定性探针流程，不依赖人工判读结果。每个 probe 都在项目代码中写明
+可验证的不变量，例如“Polars reflected Series 运算必须符合 Python reflected operator
+语义”、“PyArrow sliced table 的 group_by 结果必须等价于 zero-offset rebuilt table”，
+或“DataFusion 对同一有序子查询重复应用相同 LIMIT 后结果必须保持不变”。
+运行后会自动写出 `reports/bug-audit-*.json` 和 `reports/bug-audit-*.md`，其中包含环境、
+expected/observed、自动 verdict 和 candidate bug family。加 `--write-issues` 时，会把
+候选问题按同一份 manifest 自动写入 `new_issue/generated/`，记录发现时间、命令依据和复现命令。
+`new_issue/` 根目录保留人工整理后的最终上报草稿，`new_issue/generated/` 保留项目命令生成的
+原始证据草稿。
+
+`bug-hunt` 是当前推荐的一体化入口：先运行 `bug-audit`，再用 latest target suite 做 guided
+fresh fuzz。默认 preset 是 `live_deep_organic`，使用 `bughunt_fresh` profile，优先探索新的
+Python API / Arrow / SQL engine 深层语义风险，而不是主动注入已有 issue 来源。随后命令会
+自动生成报告、分类 candidate family，并把本次运行的审计输出、run log、
+fresh/known-saturated 候选家族写入 `new_issue/generated/bug-hunt-manifest.json`。这样新探索逻辑
+和项目 runner、oracle、分类、证据目录保持在同一套代码路径里。若 fuzz 阶段发现 fresh
+candidate，该命令还会将完整 case、后端标准化结果和自动 verdict 导出为配套的
+`*-fresh-candidates.json`，供上传和复现审计。受已有上游 issue 启发生成的候选会单独归为
+`issue_inspired_unsaturated_candidate_bug_families`，默认不算作原创 fresh bug。
+`live_deep_organic_metamorphic` 会叠加 metamorphic oracle，适合 nightly/24h 深层探索。
+
+`bug-sprint` 是更偏发现效率的入口：一次命令按多个窄目标 lane 运行短预算探索。默认 lane
+是 organic/fresh 版本，例如 `arrow_layout`、`polars_lazy`、`polars_streaming`、
+`datafusion_optimizer`、`datafusion_common_api`、`embedded_sql`、`cross_family` 和 `common_api_workflow`。
+其中 `common_api_workflow` 专门覆盖低复杂度但高频的真实操作组合，例如 filter、字符串 contains/starts-with/ends-with/strip/replace/slice/concat、nullable boolean not、数值 abs/clip、drop-null/dropna、mutate、
+union-all/concat、semi/anti join、fill-null/coalesce、多列 coalesce、case-when、distinct、nullable distinct top-k、join、groupby、sort、limit/offset 和 select；`datafusion_common_api` 用同一组日常低复杂度模板专门压 DataFusion cross suite；其他 organic lane 使用 `bughunt_fresh` 生成器，
+不主动注入已有上游 issue。另有 `arrow_probe_stress`、`polars_probe_stress`、
+`duckdb_probe_stress` 这类可手动选择的压力 lane；它们产生的 issue-inspired 结果仍会被
+classification 单独分离，不会自动计入 fresh。每个 lane 使用对应的 target suite 和 live preset，
+只跑较小 case budget，然后把各 lane 的 run log、report、classification、fresh candidate
+evidence 聚合成一个 `new_issue/generated/bug-sprint-manifest.json`。这比直接跑一个 all-engine
+长任务更容易定位是哪类深层语义空间产出了候选，也方便后续增加新的 lane。`--list-lanes --json`
+会输出机器可读 lane catalog，便于实验脚本选择目标。
+
+`bug-sprint` 现在会根据最近 lane 的产出率、novelty 和 false-positive 惩罚动态重排下一轮 lane，
+并把 score、budget multiplier、yield/novelty/fp 摘要写入 manifest，便于后续自动调预算。
+`bug-sprint --watch-health` 会把每个已完成 run 的健康摘要写入 manifest，并在出现 bug 行或
+organic fresh candidate 后停止剩余 lane。`run-health` 是长时间探索的轻量看门入口。默认按修改时间读取最新 run 文件，支持仍在写入的
+`.jsonl.gz`，并汇总 status、candidate/fresh/known-saturated family、false-positive reason
+和示例。长跑时可用 `--fail-on-fresh-candidate --fail-on-bug` 作为 watchdog 退出码：一旦出现
+候选就停止 sprint，优先进入 artifact 验证和去重，避免继续在同一热点上消耗 CPU。
+`bug-sprint-status` 读取 sprint manifest，并补充当前/最近 run 的 `run-health` 摘要与最近 lane yield
+摘要，适合监控端到端系统级 fresh 探索是否仍在同一 lane、已经完成多少 lane/seed、下一轮该增减哪些
+lane 预算，以及是否已出现需要马上 triage 的候选。
+
+当 fresh candidate 出现时，`bug-hunt` / `bug-sprint` 会自动串起
+freeze -> recheck -> reduce -> dedup -> issue-readiness 流水线，并把结果写到
+`new_issue/generated/candidate-pipelines/`。需要对已有 `*-fresh-candidates.json` 或 manifest
+回放这条后处理链时，可直接运行 `datadiff candidate-pipeline --manifest ...`。
+
+`bug-status` 是轻量状态汇总入口，只读取 `experiments/latest_confirmations.json`、`new_issue/`、
+`old_issue/` 和 `new_issue/generated/`，不扫描大型 run log。它会自动列出当前 latest confirmed
+bug family、确定性 audit candidate、按当前 saturated 列表去重后仍未饱和的 fresh candidate、
+历史记录过的 fresh signal、待提交 issue 草稿和 old-known 上游 issue 数量。加 `--json` 可作为
+脚本输入，加 `--write-report` 会写出 `reports/bug-status-*.json` 和 `.md`，用于汇报或论文
+artifact 的当前状态快照。
+
+`issue-readiness` 是上游提交前的自动自审入口。它同样只读取本地轻量证据，不联网、不扫描大型
+run log；会把 `new_issue/` 草稿分成 `ready_to_submit`、`needs_dedup_check`、
+`needs_reproducer_or_evidence`、`already_submitted_or_confirmed` 和
+`not_latest_reproducible`。这个命令的目的，是自动指出哪个 issue 可以优先提交、哪个还缺
+复现/证据或最终去重检查，同时明确只有 `experiments/latest_confirmations.json` 中已有上游
+确认登记的问题才可进入论文 confirmed 计数。
+
+`issue-bundle` 是 issue 提交前的证据打包入口。它读取 `issue-readiness` 的队列结果，默认选择
+`ready_to_submit` 和 `needs_dedup_check` 草稿，从 Markdown 中自动提取 `python` reproducer，
+写入 `new_issue/generated/issue-bundles/reproducers/`，并生成
+`new_issue/generated/issue-bundles/manifest.json` 和 `.md`。加 `--run-reproducers` 时，会用当前
+Python 环境执行这些复现脚本并捕获 stdout/stderr/退出码；非零退出只作为当前行为证据记录，
+不会被直接当作 confirmed bug。加 `--repeat N` 可对每个 reproducer 重复执行并记录 attempt
+级 stdout/stderr/退出码，若输出或退出码不稳定会标记为 flaky reproducer。加
+`--primary-per-family` 会只提取每个 submission family 的主 issue 草稿，同时在 manifest 中保留
+supporting/duplicate 草稿路径，避免重复 family 的辅助草稿增加待运行 reproducer 数。这样上游 issue 附件、
+论文 artifact 和本地复现证据来自同一条
+项目命令路径。`bug-status` 和 `review-readiness` 会汇总 missing reproducer、compile failure、
+flaky、非零退出和 timeout 数量；claim paper readiness 前这些 bundle 执行失败必须为 0。
+
+`review-readiness` 是面向论文/评审的轻量审计入口。它不扫描大型 run log，而是检查当前仓库是否
+具备可评审的关键证据：三层/多层架构文档、target registry 覆盖、自动 bug-audit/bug-hunt/
+bug-sprint 证据、issue-bundle 复现证据、fresh/replay/known 分离、最终实验 protocol
+（validation/live/historical/seeded/ablation/comparison）、复现命令、artifact hygiene、方法学契约测试，
+以及 latest confirmed bug family 数量是否达到目标。默认目标是 20 个 confirmed family；
+如果当前未达到，报告会明确列为未完成，而不是把候选数量误当作 confirmed。它还会读取
+`issue-readiness` 的 family-level submission groups，把 ready-to-submit、needs-dedup 和
+needs-reproducer/stabilization 草稿分成不同建议，避免把多个 issue 文档误当作多个 bug family。
+
+详细流程见 `docs/automated_bug_detection.md` 和 `docs/project_architecture.md`。
+
 查看和选择测试目标：
 
 ```bash
@@ -234,6 +349,7 @@ backend implementation bug。可用
 ```bash
 .venv/bin/datadiff classify-run --run-file runs/run_x.jsonl.gz --limit 5
 .venv/bin/datadiff classify-run --run-file runs/run_x.jsonl.gz --refresh --limit 5
+.venv/bin/datadiff classify-run --run-file runs/run_x.jsonl.gz --json
 ```
 
 分类 oracle 会把 finding 标成 `candidate_implementation_bug`、`documented_semantic_divergence`、
@@ -241,6 +357,9 @@ backend implementation bug。可用
 `generator_false_positive`。后两类会带 `false_positive_reason`，用于从大量 finding 中先排除
 normalizer/生成器造成的误报。当前 normalizer 会把 NumPy float 标量压成 Python 标量，并使用
 JSON-stable row key 做 canonical 排序，以减少 `order_only_normalization_mismatch`。
+`--json` 输出 paper-facing `offline_buckets`，离线区分 `new_bug`、`known_bug`、
+`false_positive`、`semantic_divergence` 和 residual triage 状态。`methodology-report`
+会把同一套 offline bucket 汇总进最终 JSON/Markdown，供最终表格和证据链消费。
 判别顺序是分层的：先排除 generator/normalizer false positive，再识别 NaN/Infinity、NULL join、
 Unicode lower、模运算等合理语义边界；之后用独立 DSL reference oracle 解释公共语义子集，
 若参考输出与多数/某些后端一致而某个后端偏离，则标为 `candidate_implementation_bug`。
@@ -264,17 +383,37 @@ metamorphic oracle 的单后端关系违例也会被提升为候选实现 bug。
 批量消融实验：
 
 ```bash
+.venv/bin/python scripts/run_final_experiments.py --track validation --validation-cases 200 --jobs 1
 .venv/bin/datadiff experiment \
   --cases 1000 \
   --seeds 1,1001,2001 \
   --presets baseline,no_type_aware,no_normalizer,no_feedback,metamorphic,workflow_metamorphic,reducer \
   --target-suites dataframe,embedded_sql,cross_family \
+  --evidence-mode ablation \
   --artifact-limit 20 \
   --log-level minimal \
   --skip-run-reports
 .venv/bin/datadiff experiment-summary
 .venv/bin/datadiff analyze-experiment --refresh
+.venv/bin/datadiff methodology-report --refresh
 ```
+
+消融和 related-scope/baseline 对比应使用 `ablation` / `comparison` evidence mode，
+避免被 final-readiness 或 run journal 误计入最新版本 live bug evidence。
+
+`methodology-report` 会把复现能力量化到 JSON/Markdown：除了 seeded sensitivity 和 run log
+可用性，还会统计 run log 引用的 bug artifact 目录、`reproduce.py`、`reproduce_reduced.py`、
+standalone reproducer 和 `triage.json` 覆盖率，避免只用“有 artifact”这种弱证据支撑复现性。
+默认报告仍可做完整 run-log scan；当 latest manifest 指向 24h 大型压缩日志时，可用
+`--summary-only` 复用已有 experiment-summary CSV 并跳过 offline bucket/artifact/first-seen 的
+run-log 派生区块，用于快速检查 coverage、效率汇总和 issue-bundle 复现状态。
+提交上游前的 `issue-bundle --run-reproducers` 也作为轻量复现门禁：manifest 中的
+missing/compile/nonzero/timeout 计数会进入 `bug-status` 和 `review-readiness`，防止不可执行的
+issue 草稿被误当作完整证据；有重复 family 辅助草稿时可加 `--primary-per-family` 只运行主草稿，
+同时保留 supporting draft 路径；同一份 issue-bundle manifest 和 reproducer 路径也会进入
+`methodology-report` 的 reproducibility/evidence-chain 区块。
+同一份报告还会记录全局 first candidate，以及每个 rewardable candidate family 的首次出现
+case/time/run 上下文，用于论文中的 time-to-each-new-family 指标。
 
 可控 seeded-bug 评估用于衡量检出率和效率，不计入真实后端 bug 数：
 
@@ -308,8 +447,13 @@ candidate bug cases/s。它们是方法学敏感度实验，不能作为真实�
 - `reports/experiment-analysis-*.md`: baseline 对比分析，包含提升倍数、candidate bug cases/s、
   median first candidate 等论文表格指标
 - `reports/experiment-analysis-*.csv`: 上述分析的机器可读 CSV
-- `reports/final-readiness-*.md` / `.json`: A 会最终实验 readiness 审计，检查 live 广度、
-  24h 深度、fresh/replay 隔离、latest confirmed bug、historical replay 和 seeded sensitivity 证据
+- `reports/bug-status-*.md` / `.json`: 当前 confirmed/candidate/known issue 状态快照
+- `reports/issue-readiness-*.md` / `.json`: 上游提交前的本地 issue 草稿自审队列
+- `new_issue/generated/issue-bundles/`: 从待提交 issue 草稿自动提取的复现脚本和证据 manifest
+- `reports/final-readiness-*.md` / `.json`: A 会最终实验 readiness 审计，检查 validation smoke、
+  live 广度、24h 深度、fresh/replay 隔离、latest confirmed bug、historical replay、seeded sensitivity、
+  module ablation 和 baseline/comparison 证据；未显式传 `--manifest` 时只扫描最新一组 experiment manifest，
+  并默认使用 metadata-only status mode，论文最终声明应传入冻结计划对应的 manifest 列表以触发完整 run-log scan
 - `experiments/latest_confirmations.json`: 上层 latest bug 上游确认证据登记，只影响 final-readiness
   的 confirmed gate，不会改变 fresh rewardable candidate 统计，也不会改变底层执行语义
   （这些是上层实验 policy；审计逻辑只读取 manifest/run log 和 confirmation evidence，不改变底层执行语义）

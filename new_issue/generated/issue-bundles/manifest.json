@@ -1,0 +1,116 @@
+{
+  "bundle_selection": {
+    "available_issue_count": 0,
+    "available_issue_paths": [],
+    "available_submission_group_count": 0,
+    "groups": [],
+    "primary_issue_paths": [],
+    "primary_per_family": true,
+    "selected_issue_count": 0,
+    "selected_issue_paths": [],
+    "selected_statuses": [
+      "ready_to_submit",
+      "needs_dedup_check"
+    ],
+    "selected_submission_group_count": 0,
+    "skipped_supporting_duplicate_count": 0,
+    "skipped_supporting_issue_paths": [],
+    "supporting_issue_paths": []
+  },
+  "generated_at": "2026-05-30T15:41:08Z",
+  "generated_by": "datadiff issue-bundle",
+  "inputs": {
+    "generated_issue_dir": "new_issue/generated",
+    "latest_confirmation_files": [
+      "experiments/latest_confirmations.json"
+    ],
+    "new_issue_dir": "new_issue",
+    "old_issue_dir": "old_issue",
+    "primary_per_family": true,
+    "repeat_count": 3,
+    "run_reproducers": true,
+    "statuses": [
+      "ready_to_submit",
+      "needs_dedup_check"
+    ],
+    "timeout_s": 20.0
+  },
+  "issue_readiness_summary": {
+    "already_submitted_or_confirmed_count": 11,
+    "already_submitted_or_confirmed_family_count": 10,
+    "confirmed_count_eligible_count": 9,
+    "confirmed_count_eligible_families": [
+      "datafusion_limit_idempotence@datafusion",
+      "distinct_null_topk@datafusion",
+      "groupby_aggregation@datafusion",
+      "groupby_aggregation@polars,polars_lazy",
+      "grouped_topk_null_sort_key@datafusion",
+      "negative_zero_comparison@datafusion",
+      "polars_reflected_arithmetic_operand_order@polars",
+      "pyarrow_sliced_bool_groupby_any_all@pyarrow"
+    ],
+    "confirmed_count_eligible_family_count": 8,
+    "duplicate_family_draft_count": 0,
+    "duplicate_family_draft_groups": {},
+    "issue_document_count": 14,
+    "needs_dedup_check": [],
+    "needs_dedup_check_count": 0,
+    "needs_dedup_check_families": [],
+    "needs_dedup_check_family_count": 0,
+    "needs_reproducer_or_evidence": [
+      "new_issue/datafusion_22554_followup_comment.md",
+      "new_issue/datafusion_null_group_key_candidate.md"
+    ],
+    "needs_reproducer_or_evidence_count": 2,
+    "needs_reproducer_or_evidence_family_count": 2,
+    "not_latest_reproducible_count": 1,
+    "not_latest_reproducible_family_count": 1,
+    "ready_to_submit": [],
+    "ready_to_submit_count": 0,
+    "ready_to_submit_families": [],
+    "ready_to_submit_family_count": 0,
+    "submission_group_count": 0,
+    "submission_group_families": [],
+    "submission_groups_needs_dedup_count": 0,
+    "submission_groups_ready_to_submit_count": 0,
+    "top_priority": [
+      "new_issue/datafusion_null_group_key_candidate.md",
+      "new_issue/datafusion_22554_followup_comment.md",
+      "new_issue/datafusion_distinct_null_topk.md",
+      "new_issue/datafusion_limit_idempotence.md",
+      "new_issue/duckdb_cte_boolean_inner_join_empty_result.md"
+    ]
+  },
+  "issues": [],
+  "manifest_path": "new_issue/generated/issue-bundles/manifest.json",
+  "markdown_path": "new_issue/generated/issue-bundles/manifest.md",
+  "schema_version": "issue-bundle-v1",
+  "submission_groups": [],
+  "summary": {
+    "available_issue_count": 0,
+    "available_submission_group_count": 0,
+    "bundled_primary_per_family": true,
+    "compile_failure_count": 0,
+    "duplicate_family_draft_count": 0,
+    "duplicate_family_draft_groups": {},
+    "executed_reproducer_attempt_count": 0,
+    "executed_reproducer_count": 0,
+    "extracted_reproducer_count": 0,
+    "families": [],
+    "family_count": 0,
+    "family_groups": {},
+    "flaky_reproducer_count": 0,
+    "issue_count": 0,
+    "missing_reproducer_count": 0,
+    "nonzero_exit_attempt_count": 0,
+    "nonzero_exit_count": 0,
+    "primary_issue_paths": [],
+    "selected_issue_count": 0,
+    "selected_submission_group_count": 0,
+    "skipped_supporting_duplicate_count": 0,
+    "skipped_supporting_issue_paths": [],
+    "supporting_issue_paths": [],
+    "timeout_attempt_count": 0,
+    "timeout_count": 0
+  }
+}

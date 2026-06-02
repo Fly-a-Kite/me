@@ -116,7 +116,7 @@ def main() -> int:
     selected = select_candidates(candidates, limit=args.limit, per_root=args.per_root)
     if args.execute:
         execute_triage(selected, reduce=args.reduce, timeout_s=args.timeout_s)
-    write_outputs(selected, all_candidates=candidates)
+    write_triage_outputs(selected, all_candidates=candidates)
     print(REPORTS_DIR / "candidate-bug-artifacts.csv")
     print(REPORTS_DIR / "candidate-bug-triage.md")
     return 0
@@ -339,9 +339,14 @@ def load_final_triage(candidate: Candidate) -> None:
     candidate.reduced_operations = _optional_int(report.get("operations"))
 
 
-def write_outputs(selected: list[Candidate], *, all_candidates: list[Candidate]) -> None:
+def write_triage_outputs(selected: list[Candidate], *, all_candidates: list[Candidate]) -> None:
     write_csv(REPORTS_DIR / "candidate-bug-artifacts.csv", selected)
     write_markdown(REPORTS_DIR / "candidate-bug-triage.md", selected, all_candidates=all_candidates)
+
+
+def write_outputs(selected: list[Candidate], *, all_candidates: list[Candidate]) -> None:
+    # Compatibility alias for older callers.
+    write_triage_outputs(selected, all_candidates=all_candidates)
 
 
 def write_csv(path: Path, candidates: list[Candidate]) -> None:

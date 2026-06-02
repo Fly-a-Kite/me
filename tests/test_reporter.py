@@ -1,4 +1,7 @@
 import csv
+import json
+
+import pytest
 
 from datadiff import reporter
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
@@ -50,6 +53,26 @@ def test_write_report_uses_run_stem_for_unique_artifact_names(tmp_path, monkeypa
     assert md_a.exists()
     assert md_b.exists()
     assert md_a != md_b
+
+
+def test_latest_run_file_uses_mtime_not_lexical_order(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    monkeypatch.setattr(reporter, "RUNS_DIR", runs_dir)
+    older_lexically_later = runs_dir / "run-z.jsonl"
+    newer_lexically_earlier = runs_dir / "run-a.jsonl.gz"
+    _write_run(older_lexically_later, "case-old")
+    _write_run(newer_lexically_earlier, "case-new")
+    older_time = 1_700_000_000
+    newer_time = older_time + 60
+    older_lexically_later.touch()
+    newer_lexically_earlier.touch()
+    import os
+
+    os.utime(older_lexically_later, (older_time, older_time))
+    os.utime(newer_lexically_earlier, (newer_time, newer_time))
+
+    assert reporter.latest_run_file() == newer_lexically_earlier
+    assert reporter.latest_run_log_path() == newer_lexically_earlier
 
 
 def test_write_report_can_limit_findings_csv_rows(tmp_path, monkeypatch):
@@ -105,6 +128,17 @@ def test_write_report_can_limit_findings_csv_rows(tmp_path, monkeypatch):
     assert len(csv_path.read_text(encoding="utf-8").splitlines()) == 2
 
 
+def test_reporter_canonical_helpers_match_compatibility_aliases(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(reporter, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(reporter, "REPORTS_DIR", reports_dir)
+    run_file = runs_dir / "run-canonical.jsonl"
+    _write_run(run_file, "case-canonical")
+
+    assert reporter.write_run_report(run_file) == reporter.write_report(run_file)
+
+
 def test_write_experiment_summary_uses_manifest_stem(tmp_path, monkeypatch):
     runs_dir = tmp_path / "runs"
     reports_dir = tmp_path / "reports"
@@ -127,11 +161,300 @@ def test_write_experiment_summary_uses_manifest_stem(tmp_path, monkeypatch):
     )
 
     md_path, csv_path = reporter.write_experiment_summary(manifest)
+    row = next(csv.DictReader(csv_path.open(encoding="utf-8")))
+    aggregate_csv = reports_dir / "experiment-summary-experiment-x-aggregates.csv"
+    aggregate_row = next(csv.DictReader(aggregate_csv.open(encoding="utf-8")))
+    md_text = md_path.read_text(encoding="utf-8")
 
     assert md_path.name == "experiment-summary-experiment-x.md"
     assert csv_path.name == "experiment-summary-experiment-x.csv"
     assert md_path.exists()
     assert csv_path.exists()
+    assert "## Storage Efficiency" in md_text
+    assert "## Stage Profiling" in md_text
+    assert int(row["run_log_bytes"]) > 0
+    assert float(row["run_log_bytes_per_case"]) > 0.0
+    assert "stage_backend_execution_avg_ms" in row
+    assert int(aggregate_row["evidence_bytes"]) >= int(row["run_log_bytes"])
+    assert float(aggregate_row["evidence_bytes_per_case"]) > 0.0
+    assert "stage_total_case_wall_avg_ms" in aggregate_row
+
+
+def test_write_experiment_summary_preserves_structured_experiment_metadata(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(reporter, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(reporter, "REPORTS_DIR", reports_dir)
+    run_file = runs_dir / "run-structured.jsonl.gz"
+    _write_run(run_file, "case-structured")
+    manifest = runs_dir / "experiment-structured.json"
+    dump_json(
+        {
+            "presets": ["baseline"],
+            "seeds": [1],
+            "backends": [],
+            "target_suite": "core",
+            "target_suites": ["core"],
+            "targets": [],
+            "common_capabilities": [],
+            "experiment_meta": {
+                "matrix_id": "module_ablation",
+                "comparison_group": "module_ablation",
+            },
+            "runs": [
+                {
+                    "target_suite": "core",
+                    "preset": "baseline",
+                    "matrix_id": "module_ablation",
+                    "matrix_title": "Module Ablation",
+                    "comparison_group": "module_ablation",
+                    "variant_id": "baseline",
+                    "variant_title": "baseline",
+                    "base_preset": "baseline",
+                    "comparison_role": "baseline",
+                    "component_focus": "",
+                    "overlays": [],
+                    "factors": {"type_aware_generation": True},
+                    "scope_kind": "core",
+                    "oracle_profile": "differential",
+                    "rq_tags": ["RQ2", "RQ4"],
+                    "analysis_tags": ["ablation"],
+                    "counts_as_real_bugs": False,
+                    "seed": 1,
+                    "run_file": str(run_file),
+                    "report": "",
+                }
+            ],
+        },
+        manifest,
+    )
+
+    md_path, csv_path = reporter.write_experiment_summary(manifest)
+    row = next(csv.DictReader(csv_path.open(encoding="utf-8")))
+    aggregate_csv = reports_dir / "experiment-summary-experiment-structured-aggregates.csv"
+    aggregate_row = next(csv.DictReader(aggregate_csv.open(encoding="utf-8")))
+    md_text = md_path.read_text(encoding="utf-8")
+
+    assert row["matrix_id"] == "module_ablation"
+    assert row["comparison_group"] == "module_ablation"
+    assert row["variant_id"] == "baseline"
+    assert row["base_preset"] == "baseline"
+    assert row["comparison_role"] == "baseline"
+    assert row["canonical_comparison_role"] == "baseline"
+    assert row["variant_label"] == "baseline"
+    assert row["variant_group_id"] == "core|module_ablation|module_ablation"
+    assert row["component_focus"] == ""
+    assert row["semantic_focus_families"] == ""
+    assert row["semantic_focus_signals"] == ""
+    assert row["scope_kind"] == "core"
+    assert row["oracle_profile"] == "differential"
+    assert row["rq_tags"] == "RQ2,RQ4"
+    assert row["analysis_tags"] == "ablation"
+    assert '"type_aware_generation": true' in row["factors"]
+    assert aggregate_row["matrix_id"] == "module_ablation"
+    assert aggregate_row["comparison_group"] == "module_ablation"
+    assert aggregate_row["variant_id"] == "baseline"
+    assert aggregate_row["base_preset"] == "baseline"
+    assert aggregate_row["comparison_role"] == "baseline"
+    assert aggregate_row["canonical_comparison_role"] == "baseline"
+    assert aggregate_row["variant_label"] == "baseline"
+    assert aggregate_row["variant_group_id"] == "core|module_ablation|module_ablation"
+    assert aggregate_row["component_focus"] == ""
+    assert aggregate_row["semantic_focus_families"] == ""
+    assert aggregate_row["semantic_focus_signals"] == ""
+    assert aggregate_row["oracle_profile"] == "differential"
+    assert aggregate_row["analysis_tags"] == "ablation"
+    assert '"type_aware_generation": true' in aggregate_row["factors"]
+    assert "- Matrix id: module_ablation" in md_text
+    assert "- Comparison group: module_ablation" in md_text
+    assert "- Aggregate JSON: `" in md_text
+
+
+def test_write_experiment_summary_backfills_run_semantics_from_experiment_meta(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(reporter, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(reporter, "REPORTS_DIR", reports_dir)
+    run_file = runs_dir / "run-backfill.jsonl.gz"
+    _write_run(run_file, "case-backfill")
+    manifest = runs_dir / "experiment-backfill.json"
+    dump_json(
+        {
+            "presets": ["focus_variant"],
+            "seeds": [1],
+            "backends": [],
+            "target_suite": "core",
+            "target_suites": ["core"],
+            "targets": [],
+            "common_capabilities": [],
+            "experiment_meta": {
+                "matrix_id": "module_ablation",
+                "matrix_title": "Module Ablation",
+                "comparison_group": "module_ablation",
+                "rq_tags": ["RQ2"],
+                "analysis_tags": ["ablation"],
+                "scope_by_target_suite": {"core": "core"},
+                "variant_by_preset": {
+                    "focus_variant": {
+                        "variant_id": "focus_variant",
+                        "variant_title": "focus_variant",
+                        "base_preset": "stable_base",
+                        "comparison_role": "contrast",
+                        "component_focus": "semantic_normalizer",
+                        "semantic_focus_families": ["join_membership"],
+                        "semantic_focus_signals": ["row_value_absence_filter"],
+                        "factors": {"semantic_normalizer": False},
+                        "oracle_profile": "differential",
+                        "analysis_tags": ["noise_control"],
+                    }
+                },
+            },
+            "runs": [
+                {
+                    "target_suite": "core",
+                    "preset": "focus_variant",
+                    "seed": 1,
+                    "run_file": str(run_file),
+                    "report": "",
+                }
+            ],
+        },
+        manifest,
+    )
+
+    _, csv_path = reporter.write_experiment_summary(manifest)
+    row = next(csv.DictReader(csv_path.open(encoding="utf-8")))
+    assert row["matrix_id"] == "module_ablation"
+    assert row["comparison_group"] == "module_ablation"
+    assert row["variant_id"] == "focus_variant"
+    assert row["variant_label"] == "focus_variant"
+    assert row["variant_group_id"] == "core|module_ablation|module_ablation"
+    assert row["base_preset"] == "stable_base"
+    assert row["comparison_role"] == "contrast"
+    assert row["canonical_comparison_role"] == "contrast"
+    assert row["component_focus"] == "semantic_normalizer"
+    assert row["semantic_focus_families"] == "join_membership"
+    assert row["semantic_focus_signals"] == "row_value_absence_filter"
+    assert row["scope_kind"] == "core"
+    assert row["oracle_profile"] == "differential"
+    assert row["analysis_tags"] == "noise_control,ablation"
+
+
+def test_write_experiment_summary_writes_structured_aggregate_json(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(reporter, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(reporter, "REPORTS_DIR", reports_dir)
+    run_file = runs_dir / "run-aggregate-json.jsonl.gz"
+    _write_run(run_file, "case-aggregate-json")
+    manifest = runs_dir / "experiment-aggregate-json.json"
+    dump_json(
+        {
+            "presets": ["baseline"],
+            "seeds": [1],
+            "backends": [],
+            "target_suite": "core",
+            "target_suites": ["core"],
+            "targets": [],
+            "common_capabilities": [],
+            "evidence_mode": "ablation",
+            "experiment_meta": {
+                "matrix_id": "module_ablation",
+                "matrix_title": "Module Ablation",
+                "comparison_group": "module_ablation",
+                "rq_tags": ["RQ2", "RQ4"],
+                "analysis_tags": ["ablation"],
+            },
+            "runs": [
+                {
+                    "target_suite": "core",
+                    "preset": "baseline",
+                    "matrix_id": "module_ablation",
+                    "matrix_title": "Module Ablation",
+                    "comparison_group": "module_ablation",
+                    "variant_id": "baseline",
+                    "variant_title": "baseline",
+                    "base_preset": "baseline",
+                    "comparison_role": "baseline",
+                    "component_focus": "",
+                    "overlays": ["disable_normalizer"],
+                    "semantic_focus_families": ["join_membership"],
+                    "semantic_focus_signals": ["row_value_absence_filter"],
+                    "factors": {"semantic_normalizer": False, "type_aware_generation": True},
+                    "scope_kind": "core",
+                    "oracle_profile": "differential",
+                    "rq_tags": ["RQ2", "RQ4"],
+                    "analysis_tags": ["ablation"],
+                    "counts_as_real_bugs": False,
+                    "seed": 1,
+                    "run_file": str(run_file),
+                    "report": "",
+                }
+            ],
+        },
+        manifest,
+    )
+    dump_json(
+        {
+            "elapsed_s": 0.5,
+            "throughput_cases_s": 2.0,
+            "backends": [],
+            "targets": [],
+            "common_capabilities": [],
+            "config": {
+                "effective_guidance_targets": ["semantic_family:join_membership"],
+                "discovery_biases": [],
+            },
+            "stage_profile": {
+                "totals_ms": {
+                    "generate_mutate_ms": 1.0,
+                    "backend_execution_ms": 2.0,
+                    "normalize_ms": 3.0,
+                    "oracle_classification_ms": 4.0,
+                    "scheduler_feedback_ms": 5.0,
+                    "logging_artifact_ms": 6.0,
+                    "total_case_wall_ms": 21.0,
+                },
+                "avg_ms_per_case": {
+                    "generate_mutate_ms": 1.0,
+                    "backend_execution_ms": 2.0,
+                    "normalize_ms": 3.0,
+                    "oracle_classification_ms": 4.0,
+                    "scheduler_feedback_ms": 5.0,
+                    "logging_artifact_ms": 6.0,
+                    "total_case_wall_ms": 21.0,
+                },
+                "share_of_total": {
+                    "generate_mutate_ms": 1.0 / 21.0,
+                    "backend_execution_ms": 2.0 / 21.0,
+                    "normalize_ms": 3.0 / 21.0,
+                    "oracle_classification_ms": 4.0 / 21.0,
+                    "scheduler_feedback_ms": 5.0 / 21.0,
+                    "logging_artifact_ms": 6.0 / 21.0,
+                    "total_case_wall_ms": 1.0,
+                },
+            },
+        },
+        run_meta_path(run_file),
+    )
+
+    reporter.write_experiment_summary(manifest)
+    aggregate_json = reports_dir / "experiment-summary-experiment-aggregate-json-aggregates.json"
+    payload = json.loads(aggregate_json.read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == "experiment-summary-aggregates-v1"
+    assert payload["experiment_meta"]["matrix_id"] == "module_ablation"
+    assert payload["variant_count"] == 1
+    assert payload["run_count"] == 1
+    assert payload["by_matrix"][0]["group_value"] == "module_ablation"
+    assert payload["by_matrix"][0]["candidate_bug_cases"] == 0
+    assert payload["by_scope_kind"][0]["group_value"] == "core"
+    assert payload["by_oracle_profile"][0]["group_value"] == "differential"
+    assert {"RQ2", "RQ4"}.issubset({item["group_value"] for item in payload["by_rq"]})
+    factor_groups = {(item["factor_name"], item["factor_value"]) for item in payload["by_factor"]}
+    assert ("semantic_normalizer", False) in factor_groups
+    assert ("type_aware_generation", True) in factor_groups
+    assert payload["by_factor"][0]["stage_profile"]["totals_ms"]["total_case_wall_ms"] == 21.0
 
 
 def test_write_experiment_summary_aggregates_guidance_metrics(tmp_path, monkeypatch):
@@ -150,17 +473,31 @@ def test_write_experiment_summary_aggregates_guidance_metrics(tmp_path, monkeypa
                 "backend_status": {},
                 "quality_oracles": [],
                 "is_new_behavior": idx == 0,
+                "signal_new_behavior": False,
                 "guidance": {
                     "score": 2.0 + idx,
+                    "features": [
+                        "semantic_family:join_membership",
+                        "semantic_signal:topk_filter_pushdown",
+                    ],
+                    "matched_targets": ["groupby", "topk"] if idx == 0 else ["groupby"],
+                    "matched_semantic_targets": ["groupby", "topk"] if idx == 0 else ["groupby"],
+                    "discovery_bias_hits": ["groupby|semantic_signal:"] if idx == 0 else [],
+                    "matched_semantic_target_count": 2 if idx == 0 else 1,
+                    "discovery_bias_hit_count": 1 if idx == 0 else 0,
                     "data_sensitivity": 0.5 + idx,
                     "path_coverage_proxy": 0.25 + idx,
                     "frontier_conformance": 0.75 + idx,
+                    "discovery_diversity_bonus": 0.1 + idx,
+                    "candidate_pool_diversity_bonus": 0.05 + idx,
+                    "discovery_stale_penalty": -0.2 - idx,
                     "contribution_potential": 1.0 + idx,
                     "candidate_count": 4,
                     "contributing_candidate_count": 2,
                     "pruned_candidate_count": 1,
                     "feature_count": 3 + idx,
                     "frontier_bucket_count": 1 + idx,
+                    "discovery_bucket_count": 2 + idx,
                 },
             },
             run_file,
@@ -172,6 +509,25 @@ def test_write_experiment_summary_aggregates_guidance_metrics(tmp_path, monkeypa
             "backends": [],
             "targets": [],
             "common_capabilities": [],
+            "config": {
+                "guidance_targets": ["groupby", "topk"],
+                "effective_guidance_targets": [
+                    "groupby",
+                    "topk",
+                    "semantic_family:join_membership",
+                    "semantic_signal:topk_filter_pushdown",
+                ],
+                "semantic_focus_families": ["join_membership"],
+                "semantic_focus_signals": ["topk_filter_pushdown"],
+                "discovery_biases": [
+                    {
+                        "targets": ["groupby"],
+                        "feature_prefixes": ["semantic_signal:"],
+                        "keep_in_pool": True,
+                        "score_bonus": 1.0,
+                    }
+                ],
+            },
         },
         run_meta_path(run_file),
     )
@@ -192,14 +548,53 @@ def test_write_experiment_summary_aggregates_guidance_metrics(tmp_path, monkeypa
     md_path, csv_path = reporter.write_experiment_summary(manifest)
     row = next(csv.DictReader(csv_path.open(encoding="utf-8")))
 
-    assert "data sensitivity" in md_path.read_text(encoding="utf-8")
+    md_text = md_path.read_text(encoding="utf-8")
+    assert "data sensitivity" in md_text
+    assert "discovery bonus" in md_text
+    assert "raw new behavior % | signal new behavior %" in md_text
     assert row["new_behavior_rate"] == "0.5"
+    assert row["signal_new_behavior_rate"] == "0.0"
     assert row["avg_guidance_score"] == "2.5"
     assert row["avg_data_sensitivity"] == "1.0"
     assert row["avg_path_coverage_proxy"] == "0.75"
     assert row["avg_frontier_conformance"] == "1.25"
+    assert float(row["avg_discovery_diversity_bonus"]) == pytest.approx(0.6)
+    assert float(row["avg_candidate_pool_diversity_bonus"]) == pytest.approx(0.55)
+    assert float(row["avg_discovery_stale_penalty"]) == pytest.approx(-0.7)
     assert row["avg_contribution_potential"] == "1.5"
     assert row["pruned_candidate_rate"] == "0.25"
+    assert row["configured_guidance_targets"] == "groupby,topk"
+    assert row["configured_effective_guidance_targets"] == "groupby,topk,semantic_family:join_membership,semantic_signal:topk_filter_pushdown"
+    assert row["configured_semantic_focus_families"] == "join_membership"
+    assert row["configured_semantic_focus_signals"] == "topk_filter_pushdown"
+    assert row["configured_discovery_biases"] == "groupby|semantic_signal:|keep+score=1"
+    assert row["matched_semantic_target_cases"] == "2"
+    assert row["discovery_bias_hit_cases"] == "1"
+    assert float(row["matched_semantic_target_case_rate"]) == pytest.approx(1.0)
+    assert float(row["discovery_bias_hit_case_rate"]) == pytest.approx(0.5)
+    assert float(row["avg_matched_semantic_target_count"]) == pytest.approx(1.5)
+    assert float(row["avg_discovery_bias_hit_count"]) == pytest.approx(0.5)
+    assert row["top_matched_semantic_targets"] == "groupby:2; topk:1"
+    assert row["top_discovery_bias_hits"] == "groupby|semantic_signal::1"
+    assert row["top_observed_semantic_families"] == "join_membership:2"
+    assert row["top_observed_semantic_signals"] == "topk_filter_pushdown:2"
+    aggregate_csv = reports_dir / f"experiment-summary-{manifest.stem}-aggregates.csv"
+    aggregate_row = next(csv.DictReader(aggregate_csv.open(encoding="utf-8")))
+    assert float(aggregate_row["avg_discovery_diversity_bonus"]) == pytest.approx(0.6)
+    assert float(aggregate_row["avg_candidate_pool_diversity_bonus"]) == pytest.approx(0.55)
+    assert float(aggregate_row["avg_discovery_stale_penalty"]) == pytest.approx(-0.7)
+    assert float(aggregate_row["avg_discovery_bucket_count"]) == pytest.approx(2.5)
+    assert aggregate_row["configured_guidance_targets"] == "groupby,topk"
+    assert aggregate_row["configured_effective_guidance_targets"] == "groupby,topk,semantic_family:join_membership,semantic_signal:topk_filter_pushdown"
+    assert aggregate_row["configured_semantic_focus_families"] == "join_membership"
+    assert aggregate_row["configured_semantic_focus_signals"] == "topk_filter_pushdown"
+    assert aggregate_row["configured_discovery_biases"] == "groupby|semantic_signal:|keep+score=1"
+    assert aggregate_row["matched_semantic_target_cases"] == "2"
+    assert aggregate_row["discovery_bias_hit_cases"] == "1"
+    assert aggregate_row["top_matched_semantic_targets"] == "groupby:2; topk:1"
+    assert aggregate_row["top_observed_semantic_families"] == "join_membership:2"
+    assert "## Semantic Scheduling" in md_text
+    assert "configured discovery biases" in md_text
 
 
 def test_write_experiment_summary_aggregates_triage_verdicts(tmp_path, monkeypatch):
@@ -279,14 +674,17 @@ def test_write_experiment_summary_aggregates_triage_verdicts(tmp_path, monkeypat
     assert "candidate_implementation_bug:1" in row["top_triage_verdicts"]
     assert "## Aggregates" in md
     assert (
-        "| core | edge_float | 1 | 4 | 4 | 1 | 1 | 0 | 0 | 25.0% | "
-        "5.00 | 0 | 0.1 | 1.00 | 0.00 | 2 | 1 |"
+        "| core | edge_float | edge_float | 1 | 4 | 4 | 1 | 1 | 0 | 0 | 25.0% | "
+        "5.00 | 0 | 0.1 | 1.00 | 0.00 | 0.00 | 0.00 | 2 | 1 |"
     ) in md
     assert aggregate_row["candidate_bug_case_rate"] == "0.25"
     assert aggregate_row["candidate_bug_cases_per_s"] == "5.0"
     assert aggregate_row["median_first_candidate_bug_case_index"] == "0.0"
     assert aggregate_row["median_first_candidate_bug_elapsed_s"] == "0.05"
     assert aggregate_row["avg_candidate_bug_discovery_auc"] == "1.0"
+    assert aggregate_row["avg_scheduler_reward"] == "0.0"
+    assert aggregate_row["avg_scheduler_reward_signal"] == "0.0"
+    assert aggregate_row["avg_scheduler_mean_reward"] == "0.0"
 
 
 def test_write_experiment_summary_reports_candidate_bug_families(tmp_path, monkeypatch):
@@ -400,6 +798,11 @@ def test_write_experiment_summary_separates_issue_replay_candidates(tmp_path, mo
                 "filtered_candidates": 7,
                 "fallback_candidates": 2,
             },
+            "family_saturation_filter": {
+                "enabled": True,
+                "filtered_candidates": 11,
+                "fallback_candidates": 3,
+            },
         },
         run_meta_path(run_file),
     )
@@ -437,12 +840,21 @@ def test_write_experiment_summary_separates_issue_replay_candidates(tmp_path, mo
     assert row["replay_filter_enabled"] == "True"
     assert row["replay_filter_filtered_candidates"] == "7"
     assert row["replay_filter_fallback_candidates"] == "2"
+    assert row["family_saturation_filter_enabled"] == "True"
+    assert row["family_saturation_filter_filtered_candidates"] == "11"
+    assert row["family_saturation_filter_fallback_candidates"] == "3"
     assert "organic:1" in row["top_discovery_origins"]
     assert "issue_replay:1" in row["top_discovery_origins"]
     assert row["top_candidate_bug_families"] == "groupby_aggregation@datafusion:1"
     assert aggregate_row["rewardable_candidate_implementation_bug_count"] == "1"
+    assert aggregate_row["family_saturation_filter_filtered_candidates"] == "11"
+    assert aggregate_row["family_saturation_filter_fallback_candidates"] == "3"
+    assert aggregate_row["family_saturation_filter_filtered_per_case"] == "11.0"
+    assert aggregate_row["family_saturation_filter_fallback_per_case"] == "3.0"
     assert "rewardable candidates" in md
     assert "Replay bug policy: enable_replay_bug=false, source_issues=2" in md
+    assert "Family Saturation Filter" in md
+    assert "| latest_all_engines | live_cross_family | live_cross_family | 1 | 1 | 11 | 3 | 11.00 | 3.00 |" in md
 
 
 def test_write_experiment_summary_excludes_known_saturated_families_from_rewardable_count(tmp_path, monkeypatch):
@@ -538,7 +950,27 @@ def test_write_experiment_summary_includes_adaptive_schedule_fields(tmp_path, mo
             ],
             "behavior_signature": "sig-0",
             "backend_status": {},
-            "quality_oracles": [],
+            "quality_oracles": [
+                {"name": "mutation", "verdict": "productive_mutation", "passed": True, "score": 1.5},
+                {"name": "feedback", "verdict": "finding_yield", "passed": True, "score": 1.0},
+                {"name": "guidance", "verdict": "guided_productive", "passed": True, "score": 3.0},
+            ],
+            "candidate_source": "feedback_mutation",
+            "stored_in_feedback_corpus": True,
+            "feedback_summary": {
+                "candidate_source": "feedback_mutation",
+                "stored_in_feedback_corpus": True,
+                "quality_oracle_count": 3,
+                "quality_pass_count": 3,
+                "quality_fail_count": 0,
+                "quality_score_total": 5.5,
+                "source_reward_adjustment": 0.4,
+                "guidance_reward_adjustment": 0.25,
+                "seed_schedule_delta": 3.6,
+                "mutation_oracle_verdict": "productive_mutation",
+                "feedback_oracle_verdict": "finding_yield",
+                "guidance_oracle_verdict": "guided_productive",
+            },
             "is_new_behavior": True,
         },
         run_file,
@@ -565,7 +997,18 @@ def test_write_experiment_summary_includes_adaptive_schedule_fields(tmp_path, mo
             "schedule": "adaptive",
             "local_source_scheduler": {"enabled": True, "exploration_weight": 0.25},
             "adaptive_config": {"jobs": 2, "batch_cases": 1},
-            "adaptive_state": [{"arm_id": "datafusion_cross:baseline:seed1"}],
+            "adaptive_state": [
+                {
+                    "arm_id": "datafusion_cross:baseline:seed1",
+                    "target_suite": "datafusion_cross",
+                    "preset": "baseline",
+                    "pulls": 3,
+                    "mean_reward": 4.5,
+                    "reward_signal": 3.75,
+                    "last_reward": 4.25,
+                    "stale_batches": 1,
+                }
+            ],
             "runs": [
                 {
                     "target_suite": "datafusion_cross",
@@ -591,14 +1034,97 @@ def test_write_experiment_summary_includes_adaptive_schedule_fields(tmp_path, mo
     assert "- Schedule: adaptive" in md
     assert "- Local source scheduler: {'enabled': True, 'exploration_weight': 0.25}" in md
     assert "## Adaptive Schedule" in md
+    assert "## Closed-Loop Feedback" in md
     assert "- Global first candidate case: 1" in md
     assert "- Batches by suite: datafusion_cross:1" in md
     assert "- Cases by suite: datafusion_cross:1" in md
     assert "- Candidate cases by suite: datafusion_cross:1" in md
+    assert "| datafusion_cross:baseline:seed1 | datafusion_cross | 3 | 4.50 | 3.75 | 4.25 | 1 |" in md
     assert row["batch_index"] == "3"
     assert row["schedule_arm_id"] == "datafusion_cross:baseline:seed1"
     assert row["scheduler_reward"] == "4.25"
+    assert row["scheduler_reward_signal"] == "3.75"
+    assert row["scheduler_mean_reward"] == "4.5"
+    assert row["scheduler_last_reward"] == "4.25"
+    assert row["scheduler_pulls"] == "3"
+    assert row["scheduler_stale_batches"] == "1"
+    assert row["feedback_mutation_cases"] == "1"
+    assert row["quality_pass_count"] == "3"
+    assert row["source_reward_adjustment_per_case"] == "0.4"
+    assert row["feedback_operator_affinity_hit_rate"] == "0.0"
+    assert aggregate_row["feedback_mutation_case_rate"] == "1.0"
+    assert aggregate_row["quality_pass_rate"] == "1.0"
+    assert aggregate_row["seed_schedule_delta_per_case"] == "3.6"
     assert aggregate_row["avg_scheduler_reward"] == "4.25"
+    assert aggregate_row["avg_scheduler_reward_signal"] == "3.75"
+    assert aggregate_row["avg_scheduler_mean_reward"] == "4.5"
+
+
+def test_write_experiment_summary_reports_feedback_operator_selection_telemetry(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(reporter, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(reporter, "REPORTS_DIR", reports_dir)
+    run_file = runs_dir / "run-feedback-selection.jsonl.gz"
+    append_jsonl(
+        {
+            "status": "ok",
+            "case_index": 0,
+            "case": {"case_id": "case-0", "seed": 0, "program": {"operations": []}},
+            "findings": [],
+            "behavior_signature": "sig-0",
+            "backend_status": {},
+            "quality_oracles": [],
+            "candidate_source": "feedback_mutation",
+            "feedback_selection": {
+                "target_keys": [
+                    "semantic_family:conditional_semantics",
+                    "semantic_signal:left_join_case_when_membership",
+                ],
+                "selected_operator": "append_left_join_case_membership",
+                "selected_operator_score": 1.75,
+            },
+        },
+        run_file,
+    )
+    dump_json(
+        {
+            "elapsed_s": 0.1,
+            "throughput_cases_s": 10.0,
+            "backends": [],
+            "targets": [],
+            "common_capabilities": [],
+        },
+        run_meta_path(run_file),
+    )
+    manifest = runs_dir / "experiment-feedback-selection.json"
+    dump_json(
+        {
+            "presets": ["baseline"],
+            "seeds": [1],
+            "backends": [],
+            "target_suite": "core",
+            "targets": [],
+            "common_capabilities": [],
+            "runs": [{"preset": "baseline", "seed": 1, "run_file": str(run_file), "report": ""}],
+        },
+        manifest,
+    )
+
+    md_path, csv_path = reporter.write_experiment_summary(manifest)
+    row = next(csv.DictReader(csv_path.open(encoding="utf-8")))
+    aggregate_csv_path = reports_dir / "experiment-summary-experiment-feedback-selection-aggregates.csv"
+    aggregate_row = next(csv.DictReader(aggregate_csv_path.open(encoding="utf-8")))
+    md = md_path.read_text(encoding="utf-8")
+
+    assert row["feedback_target_key_count"] == "2"
+    assert row["feedback_semantic_family_target_count"] == "1"
+    assert row["feedback_semantic_signal_target_count"] == "1"
+    assert row["feedback_operator_affinity_hit_cases"] == "1"
+    assert row["top_feedback_selected_operators"] == "append_left_join_case_membership:1"
+    assert "## Feedback Operator Selection" in md
+    assert aggregate_row["feedback_operator_affinity_hit_rate"] == "1.0"
+    assert aggregate_row["feedback_selected_operator_score_avg"] == "1.75"
 
 
 def test_write_experiment_summary_reports_preflight_integrity(tmp_path, monkeypatch):
@@ -673,7 +1199,7 @@ def test_write_experiment_summary_reports_preflight_integrity(tmp_path, monkeypa
     md = md_path.read_text(encoding="utf-8")
 
     assert "## Preflight Integrity" in md
-    assert "| core | baseline | 1 | 2 | 0.0% | 50.0% | 50.0% |" in md
+    assert "| core | baseline | baseline | 1 | 2 | 0.0% | 50.0% | 50.0% |" in md
     assert row["preflight_repaired_cases"] == "1"
     assert row["preflight_fallback_cases"] == "1"
     assert row["preflight_invalid_cases"] == "0"

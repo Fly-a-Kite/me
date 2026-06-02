@@ -1,0 +1,9 @@
+{
+  "candidate_row_count": 0,
+  "candidate_rows": [],
+  "fresh_candidate_bug_families": {},
+  "generated_at": "2026-05-27T18:25:03Z",
+  "generated_by": "datadiff bug-hunt",
+  "schema_version": "bug-hunt-fresh-candidates-v1",
+  "source_run_file": "runs/run-20260527T182424-1779906264073851716.jsonl"
+}

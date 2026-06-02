@@ -1,0 +1,1082 @@
+{
+  "bug_audit": {
+    "candidate_bug_families": [
+      "datafusion_limit_idempotence@datafusion",
+      "polars_reflected_arithmetic_operand_order@polars",
+      "polars_vector_division_rounding@polars",
+      "pyarrow_sliced_bool_groupby_any_all@pyarrow"
+    ],
+    "environment": {
+      "datadiff_fuzz_lab": "0.1.0",
+      "datafusion": "53.0.0",
+      "duckdb": "1.5.3",
+      "pandas": "3.0.3",
+      "platform": "Linux-6.17.0-29-generic-x86_64-with-glibc2.39",
+      "polars": "1.41.0",
+      "pyarrow": "24.0.0",
+      "pysqlite3_binary": "0.5.4.post2",
+      "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+      "sqlite": "3.51.1",
+      "sqlite_runtime": "pysqlite3"
+    },
+    "generated_at": "2026-05-26T16:49:47Z",
+    "issue_files": [
+      "new_issue/generated/datafusion_limit_idempotence.md",
+      "new_issue/generated/polars_reflected_arithmetic_operand_order.md",
+      "new_issue/generated/polars_vector_division_rounding.md",
+      "new_issue/generated/pyarrow_sliced_bool_groupby_any_all.md"
+    ],
+    "output_json": "reports/bug-audit-20260526T164947.json",
+    "output_markdown": "reports/bug-audit-20260526T164947.md",
+    "results": [
+      {
+        "candidate_bug": true,
+        "details": {
+          "base_sql": "SELECT * FROM (\n  SELECT * FROM (\n    SELECT * FROM t0 ORDER BY s ASC NULLS FIRST, id ASC NULLS LAST LIMIT 5\n  ) q ORDER BY x DESC NULLS FIRST, id ASC NULLS LAST OFFSET 2\n) q ORDER BY x DESC NULLS FIRST, id ASC NULLS LAST",
+          "discovered_by": "datadiff bug-hunt --cases 1200 --seed 998001 --target-suite latest_all_engines --preset live_cross_family_metamorphic",
+          "duplicate_limit_sql": "SELECT * FROM (\n  SELECT * FROM (\n    SELECT * FROM (\n      SELECT * FROM t0 ORDER BY s ASC NULLS FIRST, id ASC NULLS LAST LIMIT 5\n    ) q ORDER BY s ASC NULLS FIRST, id ASC NULLS LAST LIMIT 5\n  ) q ORDER BY x DESC NULLS FIRST, id ASC NULLS LAST OFFSET 2\n) q ORDER BY x DESC NULLS FIRST, id ASC NULLS LAST",
+          "fresh_family": "metamorphic_limit_idempotence@datafusion"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "DataFusion should treat an immediately repeated identical ordered LIMIT as idempotent; base rows=3, duplicate-limit rows=1.",
+        "expected": {
+          "base_rows": [
+            {
+              "g": "c",
+              "id": 8,
+              "s": "A",
+              "x": 0,
+              "z": 0
+            },
+            {
+              "g": "a",
+              "id": 12,
+              "s": "",
+              "x": -2,
+              "z": -3
+            },
+            {
+              "g": "c",
+              "id": 2,
+              "s": "",
+              "x": -10,
+              "z": -3
+            }
+          ],
+          "relation": "duplicate_limit_sql should return the same rows as base_sql"
+        },
+        "family": "datafusion_limit_idempotence",
+        "invariant": "Repeating the same ordered LIMIT over the same subquery must not change query results.",
+        "observed": {
+          "base_row_count": 3,
+          "duplicate_limit_row_count": 1,
+          "duplicate_limit_rows": [
+            {
+              "g": "a",
+              "id": 12,
+              "s": "",
+              "x": -2,
+              "z": -3
+            }
+          ]
+        },
+        "probe_id": "datafusion_limit_idempotence",
+        "status": "candidate_implementation_bug",
+        "target_backend": "datafusion",
+        "title": "DataFusion duplicate ordered LIMIT idempotence",
+        "version": "53.0.0"
+      },
+      {
+        "candidate_bug": true,
+        "details": {
+          "methods_checked": [
+            "__rfloordiv__",
+            "__rmod__",
+            "__rpow__",
+            "__rsub__",
+            "__rtruediv__"
+          ],
+          "mismatched_methods": [
+            "__rsub__",
+            "__rtruediv__",
+            "__rfloordiv__",
+            "__rmod__",
+            "__rpow__"
+          ],
+          "scope": "Series-vs-Series reflected arithmetic; Polars Expr reflected arithmetic is checked separately by normal expression semantics."
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "Reflected Series methods with mismatched result or exception: ['__rsub__', '__rtruediv__', '__rfloordiv__', '__rmod__', '__rpow__']",
+        "expected": {
+          "__rfloordiv__": [
+            2,
+            2,
+            2
+          ],
+          "__rmod__": [
+            1,
+            1,
+            1
+          ],
+          "__rpow__": [
+            25,
+            343,
+            6561
+          ],
+          "__rsub__": [
+            3,
+            4,
+            5
+          ],
+          "__rtruediv__": [
+            2.5,
+            2.3333333333333335,
+            2.25
+          ]
+        },
+        "family": "polars_reflected_arithmetic_operand_order",
+        "invariant": "Series reflected arithmetic lhs.__rop__(rhs) must evaluate rhs op lhs.",
+        "observed": {
+          "__rfloordiv__": [
+            0,
+            0,
+            0
+          ],
+          "__rmod__": [
+            2,
+            3,
+            4
+          ],
+          "__rpow__": {
+            "error": "unable to find column \"lhs\"; valid columns: [\"rhs\"]",
+            "error_type": "ColumnNotFoundError"
+          },
+          "__rsub__": [
+            -3,
+            -4,
+            -5
+          ],
+          "__rtruediv__": [
+            0.4,
+            0.42857142857142855,
+            0.4444444444444444
+          ]
+        },
+        "probe_id": "polars_reflected_arithmetic",
+        "status": "candidate_implementation_bug",
+        "target_backend": "polars",
+        "title": "Polars Series reflected arithmetic operand order",
+        "version": "1.41.0"
+      },
+      {
+        "candidate_bug": false,
+        "details": {
+          "checked_comparisons": 2880,
+          "first_mismatch": null,
+          "mismatch_count": 0,
+          "sample_mismatches": [],
+          "sweep": "polars_slice_chunk_lazy_equivalence"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "Sliced, multi-chunk, rebuilt, and lazy Polars tables should agree for the same group/filter/sort operations; deterministic comparisons=2880, mismatches=0.",
+        "expected": {
+          "mismatch_count": 0
+        },
+        "family": "polars_slice_chunk_lazy_equivalence",
+        "invariant": "Equivalent Polars layouts and execution modes must return identical operation results.",
+        "observed": {
+          "first_mismatch": null,
+          "mismatch_count": 0
+        },
+        "probe_id": "polars_slice_chunk_lazy_equivalence",
+        "status": "no_bug_detected",
+        "target_backend": "polars",
+        "title": "Polars sliced/chunked/lazy operation equivalence",
+        "version": "1.41.0"
+      },
+      {
+        "candidate_bug": true,
+        "details": {
+          "checked_cases": 440,
+          "first_mismatch": {
+            "denominator": 3,
+            "expected": -6.666666666666667,
+            "expected_bits": "0xc01aaaaaaaaaaaab",
+            "numerator": -20,
+            "vector": [
+              -6.666666666666666,
+              -6.666666666666666
+            ],
+            "vector_bits": [
+              "0xc01aaaaaaaaaaaaa",
+              "0xc01aaaaaaaaaaaaa"
+            ]
+          },
+          "mismatch_count": 94,
+          "sample_mismatches": [
+            {
+              "denominator": 3,
+              "expected": -6.666666666666667,
+              "expected_bits": "0xc01aaaaaaaaaaaab",
+              "numerator": -20,
+              "vector": [
+                -6.666666666666666,
+                -6.666666666666666
+              ],
+              "vector_bits": [
+                "0xc01aaaaaaaaaaaaa",
+                "0xc01aaaaaaaaaaaaa"
+              ]
+            },
+            {
+              "denominator": 6,
+              "expected": -3.3333333333333335,
+              "expected_bits": "0xc00aaaaaaaaaaaab",
+              "numerator": -20,
+              "vector": [
+                -3.333333333333333,
+                -3.333333333333333
+              ],
+              "vector_bits": [
+                "0xc00aaaaaaaaaaaaa",
+                "0xc00aaaaaaaaaaaaa"
+              ]
+            },
+            {
+              "denominator": 7,
+              "expected": -2.857142857142857,
+              "expected_bits": "0xc006db6db6db6db7",
+              "numerator": -20,
+              "vector": [
+                -2.8571428571428568,
+                -2.8571428571428568
+              ],
+              "vector_bits": [
+                "0xc006db6db6db6db6",
+                "0xc006db6db6db6db6"
+              ]
+            },
+            {
+              "denominator": 11,
+              "expected": -1.8181818181818181,
+              "expected_bits": "0xbffd1745d1745d17",
+              "numerator": -20,
+              "vector": [
+                -1.8181818181818183,
+                -1.8181818181818183
+              ],
+              "vector_bits": [
+                "0xbffd1745d1745d18",
+                "0xbffd1745d1745d18"
+              ]
+            },
+            {
+              "denominator": 12,
+              "expected": -1.6666666666666667,
+              "expected_bits": "0xbffaaaaaaaaaaaab",
+              "numerator": -20,
+              "vector": [
+                -1.6666666666666665,
+                -1.6666666666666665
+              ],
+              "vector_bits": [
+                "0xbffaaaaaaaaaaaaa",
+                "0xbffaaaaaaaaaaaaa"
+              ]
+            },
+            {
+              "denominator": 5,
+              "expected": -3.8,
+              "expected_bits": "0xc00e666666666666",
+              "numerator": -19,
+              "vector": [
+                -3.8000000000000003,
+                -3.8000000000000003
+              ],
+              "vector_bits": [
+                "0xc00e666666666667",
+                "0xc00e666666666667"
+              ]
+            },
+            {
+              "denominator": 7,
+              "expected": -2.7142857142857144,
+              "expected_bits": "0xc005b6db6db6db6e",
+              "numerator": -19,
+              "vector": [
+                -2.714285714285714,
+                -2.714285714285714
+              ],
+              "vector_bits": [
+                "0xc005b6db6db6db6d",
+                "0xc005b6db6db6db6d"
+              ]
+            },
+            {
+              "denominator": 10,
+              "expected": -1.9,
+              "expected_bits": "0xbffe666666666666",
+              "numerator": -19,
+              "vector": [
+                -1.9000000000000001,
+                -1.9000000000000001
+              ],
+              "vector_bits": [
+                "0xbffe666666666667",
+                "0xbffe666666666667"
+              ]
+            },
+            {
+              "denominator": 7,
+              "expected": -2.5714285714285716,
+              "expected_bits": "0xc004924924924925",
+              "numerator": -18,
+              "vector": [
+                -2.571428571428571,
+                -2.571428571428571
+              ],
+              "vector_bits": [
+                "0xc004924924924924",
+                "0xc004924924924924"
+              ]
+            },
+            {
+              "denominator": 3,
+              "expected": -5.666666666666667,
+              "expected_bits": "0xc016aaaaaaaaaaab",
+              "numerator": -17,
+              "vector": [
+                -5.666666666666666,
+                -5.666666666666666
+              ],
+              "vector_bits": [
+                "0xc016aaaaaaaaaaaa",
+                "0xc016aaaaaaaaaaaa"
+              ]
+            }
+          ],
+          "sweep": "polars_int_column_scalar_division_single_vs_vector"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "Vectorized expression division should match the single-row/Python rounded double for 7 / 5; deterministic sweep mismatches=94.",
+        "expected": {
+          "bits": "0x3ff6666666666666",
+          "single_path": [
+            1.4
+          ],
+          "vector_path": [
+            1.4,
+            1.4
+          ]
+        },
+        "family": "polars_vector_division_rounding",
+        "invariant": "Vectorized column/scalar division must produce the same IEEE-754 double as the single-row path.",
+        "observed": {
+          "single_bits": [
+            "0x3ff6666666666666"
+          ],
+          "single_path": [
+            1.4
+          ],
+          "vector_bits": [
+            "0x3ff6666666666667",
+            "0x3ff6666666666667"
+          ],
+          "vector_path": [
+            1.4000000000000001,
+            1.4000000000000001
+          ]
+        },
+        "probe_id": "polars_vector_division_rounding",
+        "status": "candidate_implementation_bug",
+        "target_backend": "polars",
+        "title": "Polars vectorized expression division rounding",
+        "version": "1.41.0"
+      },
+      {
+        "candidate_bug": true,
+        "details": {
+          "checked_cases": 2880,
+          "first_mismatch": {
+            "aggregation": "any",
+            "flags": [
+              false,
+              null
+            ],
+            "groups": [
+              10,
+              10
+            ],
+            "offset": 1,
+            "rebuilt": [
+              {
+                "flag_any": false,
+                "g": 10
+              }
+            ],
+            "sliced": [
+              {
+                "flag_any": true,
+                "g": 10
+              }
+            ]
+          },
+          "mismatch_aggregations": [
+            "all",
+            "any"
+          ],
+          "mismatch_count": 1056,
+          "sample_mismatches": [
+            {
+              "aggregation": "any",
+              "flags": [
+                false,
+                null
+              ],
+              "groups": [
+                10,
+                10
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_any": false,
+                  "g": 10
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_any": true,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "all",
+              "flags": [
+                false,
+                null
+              ],
+              "groups": [
+                10,
+                10
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_all": false,
+                  "g": 10
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_all": true,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "any",
+              "flags": [
+                false,
+                null
+              ],
+              "groups": [
+                10,
+                11
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_any": false,
+                  "g": 10
+                },
+                {
+                  "flag_any": null,
+                  "g": 11
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_any": null,
+                  "g": 11
+                },
+                {
+                  "flag_any": true,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "all",
+              "flags": [
+                false,
+                null
+              ],
+              "groups": [
+                10,
+                11
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_all": false,
+                  "g": 10
+                },
+                {
+                  "flag_all": null,
+                  "g": 11
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_all": null,
+                  "g": 11
+                },
+                {
+                  "flag_all": true,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "any",
+              "flags": [
+                false,
+                null
+              ],
+              "groups": [
+                10,
+                null
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_any": false,
+                  "g": 10
+                },
+                {
+                  "flag_any": null,
+                  "g": null
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_any": null,
+                  "g": null
+                },
+                {
+                  "flag_any": true,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "all",
+              "flags": [
+                false,
+                null
+              ],
+              "groups": [
+                10,
+                null
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_all": false,
+                  "g": 10
+                },
+                {
+                  "flag_all": null,
+                  "g": null
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_all": null,
+                  "g": null
+                },
+                {
+                  "flag_all": true,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "any",
+              "flags": [
+                null,
+                true
+              ],
+              "groups": [
+                10,
+                10
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_any": true,
+                  "g": 10
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_any": false,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "all",
+              "flags": [
+                null,
+                true
+              ],
+              "groups": [
+                10,
+                10
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_all": true,
+                  "g": 10
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_all": false,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "any",
+              "flags": [
+                null,
+                true
+              ],
+              "groups": [
+                10,
+                11
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_any": null,
+                  "g": 10
+                },
+                {
+                  "flag_any": true,
+                  "g": 11
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_any": false,
+                  "g": 11
+                },
+                {
+                  "flag_any": null,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "all",
+              "flags": [
+                null,
+                true
+              ],
+              "groups": [
+                10,
+                11
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_all": null,
+                  "g": 10
+                },
+                {
+                  "flag_all": true,
+                  "g": 11
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_all": false,
+                  "g": 11
+                },
+                {
+                  "flag_all": null,
+                  "g": 10
+                }
+              ]
+            }
+          ],
+          "sweep": "pyarrow_sliced_bool_table_groupby_zero_offset_equivalence"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "Sliced table group_by boolean aggregates should match an equivalent zero-offset rebuilt table; mismatched aggregations: ['any', 'all']; sliced flag offset=1; deterministic sweep mismatches=1056.",
+        "expected": {
+          "all": [
+            {
+              "flag_all": false,
+              "g": 10
+            }
+          ],
+          "any": [
+            {
+              "flag_any": false,
+              "g": 10
+            }
+          ]
+        },
+        "family": "pyarrow_sliced_bool_groupby_any_all",
+        "invariant": "A sliced Arrow table must group/aggregate like an equivalent zero-offset rebuilt table.",
+        "observed": {
+          "all": [
+            {
+              "flag_all": true,
+              "g": 10
+            }
+          ],
+          "any": [
+            {
+              "flag_any": true,
+              "g": 10
+            }
+          ]
+        },
+        "probe_id": "pyarrow_sliced_bool_groupby",
+        "status": "candidate_implementation_bug",
+        "target_backend": "pyarrow",
+        "title": "PyArrow sliced Boolean group_by any/all",
+        "version": "24.0.0"
+      },
+      {
+        "candidate_bug": false,
+        "details": {
+          "checked_cases": 4356,
+          "first_mismatch": null,
+          "mismatch_count": 0,
+          "sample_mismatches": [],
+          "sweep": "pyarrow_sliced_table_filter_sort_take_zero_offset_equivalence"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "Sliced Arrow tables and zero-offset rebuilt tables should agree for Boolean filter/sort/take operations; checked cases=4356, mismatches=0.",
+        "expected": {
+          "mismatch_count": 0
+        },
+        "family": "pyarrow_sliced_transform_equivalence",
+        "invariant": "A sliced Arrow table must filter, sort, and take like an equivalent zero-offset rebuilt table.",
+        "observed": {
+          "first_mismatch": null,
+          "mismatch_count": 0
+        },
+        "probe_id": "pyarrow_sliced_transform_equivalence",
+        "status": "no_bug_detected",
+        "target_backend": "pyarrow",
+        "title": "PyArrow sliced Boolean transform equivalence",
+        "version": "24.0.0"
+      }
+    ],
+    "skipped": false
+  },
+  "cases_per_lane_seed": 150,
+  "duration": null,
+  "generated_at": "2026-05-26T16:53:20Z",
+  "generated_by": "datadiff bug-sprint",
+  "lane_ids": [
+    "arrow_layout",
+    "polars_lazy",
+    "polars_streaming",
+    "datafusion_optimizer",
+    "embedded_sql",
+    "cross_family"
+  ],
+  "lanes": [
+    {
+      "id": "arrow_layout",
+      "preset": "live_arrow_deep_organic_metamorphic",
+      "target_suite": "arrow_cross",
+      "theme": "Organic Arrow table layout, nullable aggregation, string/cast, and compute equivalence"
+    },
+    {
+      "id": "polars_lazy",
+      "preset": "live_polars_deep_organic_metamorphic",
+      "target_suite": "polars_cross",
+      "theme": "Organic Polars eager/lazy state, sortedness, nullable dtype, and expression equivalence"
+    },
+    {
+      "id": "polars_streaming",
+      "preset": "live_polars_streaming_deep_organic_metamorphic",
+      "target_suite": "polars_streaming_cross",
+      "theme": "Organic Polars lazy versus streaming execution state equivalence"
+    },
+    {
+      "id": "datafusion_optimizer",
+      "preset": "live_datafusion_deep_organic_metamorphic",
+      "target_suite": "datafusion_cross",
+      "theme": "Organic DataFusion optimizer, join/filter/projection, and SQL metamorphic equivalence"
+    },
+    {
+      "id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    },
+    {
+      "id": "cross_family",
+      "preset": "live_deep_organic_metamorphic",
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic cross-family Python API, Arrow, DataFrame, and embedded SQL semantics without DataFusion saturation"
+    }
+  ],
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "pyarrow"
+      ],
+      "cases": 150,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 16,
+        "refresh": false,
+        "run_file": "runs/run-20260526T164947-1779814187416992875.jsonl.gz",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260526T164947-1779814187416992875.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/bug-sprint-organic-s3301-manifest-arrow_layout-seed3301-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "arrow_layout",
+      "preset": "live_arrow_deep_organic_metamorphic",
+      "report": "reports/report-run-20260526T164947-1779814187416992875.md",
+      "run_file": "runs/run-20260526T164947-1779814187416992875.jsonl.gz",
+      "seed": 3301,
+      "target_suite": "arrow_cross",
+      "theme": "Organic Arrow table layout, nullable aggregation, string/cast, and compute equivalence"
+    },
+    {
+      "backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "cases": 150,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 16,
+        "refresh": false,
+        "run_file": "runs/run-20260526T165025-1779814225538590156.jsonl.gz",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260526T165025-1779814225538590156.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/bug-sprint-organic-s3301-manifest-polars_lazy-seed3301-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "polars_lazy",
+      "preset": "live_polars_deep_organic_metamorphic",
+      "report": "reports/report-run-20260526T165025-1779814225538590156.md",
+      "run_file": "runs/run-20260526T165025-1779814225538590156.jsonl.gz",
+      "seed": 3301,
+      "target_suite": "polars_cross",
+      "theme": "Organic Polars eager/lazy state, sortedness, nullable dtype, and expression equivalence"
+    },
+    {
+      "backends": [
+        "polars_lazy",
+        "polars_streaming"
+      ],
+      "cases": 150,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 16,
+        "refresh": false,
+        "run_file": "runs/run-20260526T165042-1779814242594689780.jsonl.gz",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260526T165042-1779814242594689780.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/bug-sprint-organic-s3301-manifest-polars_streaming-seed3301-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "polars_streaming",
+      "preset": "live_polars_streaming_deep_organic_metamorphic",
+      "report": "reports/report-run-20260526T165042-1779814242594689780.md",
+      "run_file": "runs/run-20260526T165042-1779814242594689780.jsonl.gz",
+      "seed": 3301,
+      "target_suite": "polars_streaming_cross",
+      "theme": "Organic Polars lazy versus streaming execution state equivalence"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "datafusion"
+      ],
+      "cases": 150,
+      "classification": {
+        "candidate_bug_families": {
+          "grouped_topk_null_sort_key@datafusion": 1
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00003390-bughunt-fresh",
+              "evidence": "Independent DSL reference agrees with ['duckdb', 'pandas'] and disagrees with ['datafusion'].",
+              "kind": "semantic_output_mismatch",
+              "root": "grouped_topk_null_sort_key",
+              "seed": 3390,
+              "signature": "b2b7b2aaa544ef40",
+              "suspicious": [
+                "datafusion"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {
+          "grouped_topk_null_sort_key@datafusion": 1
+        },
+        "known_saturated_reference_count": 16,
+        "refresh": false,
+        "run_file": "runs/run-20260526T165050-1779814250229166365.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 1
+        },
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260526T165050-1779814250229166365.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/bug-sprint-organic-s3301-manifest-datafusion_optimizer-seed3301-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "datafusion_optimizer",
+      "preset": "live_datafusion_deep_organic_metamorphic",
+      "report": "reports/report-run-20260526T165050-1779814250229166365.md",
+      "run_file": "runs/run-20260526T165050-1779814250229166365.jsonl.gz",
+      "seed": 3301,
+      "target_suite": "datafusion_cross",
+      "theme": "Organic DataFusion optimizer, join/filter/projection, and SQL metamorphic equivalence"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 150,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 16,
+        "refresh": false,
+        "run_file": "runs/run-20260526T165135-1779814295171673768.jsonl.gz",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260526T165135-1779814295171673768.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/bug-sprint-organic-s3301-manifest-embedded_sql-seed3301-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "report": "reports/report-run-20260526T165135-1779814295171673768.md",
+      "run_file": "runs/run-20260526T165135-1779814295171673768.jsonl.gz",
+      "seed": 3301,
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    },
+    {
+      "backends": [
+        "pandas",
+        "pyarrow",
+        "polars",
+        "polars_lazy",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 150,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 16,
+        "refresh": false,
+        "run_file": "runs/run-20260526T165222-1779814342462120258.jsonl.gz",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260526T165222-1779814342462120258.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/bug-sprint-organic-s3301-manifest-cross_family-seed3301-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "cross_family",
+      "preset": "live_deep_organic_metamorphic",
+      "report": "reports/report-run-20260526T165222-1779814342462120258.md",
+      "run_file": "runs/run-20260526T165222-1779814342462120258.jsonl.gz",
+      "seed": 3301,
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic cross-family Python API, Arrow, DataFrame, and embedded SQL semantics without DataFusion saturation"
+    }
+  ],
+  "schema_version": "bug-sprint-v1",
+  "seeds": [
+    3301
+  ],
+  "summary": {
+    "fresh_candidate_bug_families": {},
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {
+      "grouped_topk_null_sort_key@datafusion": 1
+    },
+    "run_count": 6,
+    "triage_verdicts": {
+      "candidate_implementation_bug": 1
+    }
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "targeted_short_sprints",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence"
+  ]
+}

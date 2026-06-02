@@ -27,6 +27,18 @@ def test_collect_manifest_paths_deduplicates_and_sorts():
         "pattern_analyses": {"null_agg_topk": "reports/pattern.md", "null_agg_topk_csv": "reports/pattern.csv"},
         "environment": {"pip": "reports/pip.txt"},
         "primary_artifact": {"triage": "bugs/x/triage.json"},
+        "harness_evidence": {
+            "freeze_manifest": {
+                "json": "reports/freeze.json",
+                "markdown": "reports/freeze.md",
+            },
+            "freeze_runtime": {
+                "pip_freeze": "reports/freeze-pip.txt",
+            },
+            "notes": "final harness freeze",
+            "upstream_issue": "https://example.com/issue/1",
+        },
+        "regression_tests": ["tests/test_x.py::test_y"],
         "experiments": [
             {
                 "manifest": "runs/e.json",
@@ -49,6 +61,9 @@ def test_collect_manifest_paths_deduplicates_and_sorts():
         "reports/a2.md",
         "reports/audit.csv",
         "reports/audit.md",
+        "reports/freeze-pip.txt",
+        "reports/freeze.json",
+        "reports/freeze.md",
         "reports/pattern.csv",
         "reports/pattern.md",
         "reports/pip.txt",
@@ -160,6 +175,7 @@ def test_main_writes_bundle_checksum_and_expanded_member_count(tmp_path, monkeyp
     (tmp_path / "reports" / "summary.md").write_text("# summary\n", encoding="utf-8")
     (tmp_path / "reports" / "roadmap.md").write_text("# roadmap\n", encoding="utf-8")
     (tmp_path / "reports" / "pip.txt").write_text("pkg==1\n", encoding="utf-8")
+    (tmp_path / "reports" / "freeze.json").write_text("{}\n", encoding="utf-8")
     (bug_dir / "case.json").write_text("{}\n", encoding="utf-8")
     (bug_dir / "triage.json").write_text("{}\n", encoding="utf-8")
     (tmp_path / "runs" / "exp.json").write_text("{}\n", encoding="utf-8")
@@ -174,6 +190,11 @@ def test_main_writes_bundle_checksum_and_expanded_member_count(tmp_path, monkeyp
         "primary_artifact": {
             "directory": "bugs/bug_x",
             "triage_json": "bugs/bug_x/triage.json",
+        },
+        "harness_evidence": {
+            "freeze_manifest": {
+                "json": "reports/freeze.json",
+            }
         },
         "experiments": [
             {
@@ -225,6 +246,7 @@ def test_main_fails_without_writing_outputs_for_empty_inputs(tmp_path, monkeypat
     (tmp_path / "reports" / "summary.md").write_text("# summary\n", encoding="utf-8")
     (tmp_path / "reports" / "roadmap.md").write_text("", encoding="utf-8")
     (tmp_path / "reports" / "pip.txt").write_text("pkg==1\n", encoding="utf-8")
+    (tmp_path / "reports" / "freeze.json").write_text("{}\n", encoding="utf-8")
     (bug_dir / "triage.json").write_text("{}\n", encoding="utf-8")
     (tmp_path / "runs" / "exp.json").write_text("{}\n", encoding="utf-8")
     (tmp_path / "reports" / "exp-summary.md").write_text("# exp\n", encoding="utf-8")
@@ -237,6 +259,11 @@ def test_main_fails_without_writing_outputs_for_empty_inputs(tmp_path, monkeypat
         "environment": {"pip_freeze": "reports/pip.txt"},
         "primary_artifact": {
             "triage_json": "bugs/bug_x/triage.json",
+        },
+        "harness_evidence": {
+            "freeze_manifest": {
+                "json": "reports/freeze.json",
+            }
         },
         "experiments": [
             {

@@ -1,0 +1,683 @@
+{
+  "candidate_row_count": 1,
+  "candidate_rows": [
+    {
+      "case": {
+        "case_id": "case-00009490-bughunt-fresh-mut-10776",
+        "metadata": {
+          "candidate_source": "feedback_mutation",
+          "mutation": {
+            "changed": true,
+            "detail": "append_order_projection:g:tail=limit",
+            "operator": "append_order_projection"
+          },
+          "seed_lineage": {
+            "depth": 1,
+            "mutation_seed": 10776,
+            "parent_case_id": "case-00009490-bughunt-fresh",
+            "parent_seed": 9490,
+            "root_seed": 9490
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "how": "inner",
+              "left_on": "id",
+              "op": "join",
+              "right_on": "id",
+              "table": "t1"
+            },
+            {
+              "column": "m_0",
+              "expr": {
+                "kind": "add_const",
+                "source": "j",
+                "value": 2
+              },
+              "op": "mutate"
+            },
+            {
+              "columns": [
+                "s"
+              ],
+              "op": "distinct"
+            },
+            {
+              "keys": [
+                {
+                  "ascending": true,
+                  "column": "s",
+                  "nulls": "first"
+                }
+              ],
+              "op": "sort"
+            },
+            {
+              "n": 1,
+              "op": "limit"
+            }
+          ],
+          "program_id": "prog-00009490-mut-10776",
+          "seed": 10776
+        },
+        "seed": 10776,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "g",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "x",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "y",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "flag",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "s",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "flag": null,
+                "g": "δelta",
+                "id": 0,
+                "s": "δelta",
+                "x": 1,
+                "y": null
+              },
+              {
+                "flag": true,
+                "g": "中文",
+                "id": 1,
+                "s": "beta",
+                "x": null,
+                "y": null
+              },
+              {
+                "flag": null,
+                "g": "JjvSMdov",
+                "id": 2,
+                "s": "gamma",
+                "x": -57,
+                "y": -0.5
+              },
+              {
+                "flag": true,
+                "g": null,
+                "id": 1,
+                "s": "UMPO",
+                "x": null,
+                "y": 13.998
+              },
+              {
+                "flag": false,
+                "g": "a",
+                "id": 1,
+                "s": "aWK",
+                "x": null,
+                "y": -1.0
+              },
+              {
+                "flag": true,
+                "g": "alpha",
+                "id": 2,
+                "s": "rpbfv",
+                "x": null,
+                "y": -0.5
+              },
+              {
+                "flag": true,
+                "g": "gamma",
+                "id": 0,
+                "s": "",
+                "x": 0,
+                "y": 42.995
+              },
+              {
+                "flag": true,
+                "g": "a",
+                "id": 1,
+                "s": "TPc",
+                "x": 0,
+                "y": -32.531
+              },
+              {
+                "flag": false,
+                "g": "δelta",
+                "id": 0,
+                "s": "",
+                "x": -2,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "A",
+                "id": 9,
+                "s": "beta",
+                "x": 1,
+                "y": 0.0
+              },
+              {
+                "flag": true,
+                "g": null,
+                "id": 10,
+                "s": "A",
+                "x": null,
+                "y": 0.0
+              },
+              {
+                "flag": false,
+                "g": null,
+                "id": 11,
+                "s": "a",
+                "x": 10,
+                "y": 0.0
+              },
+              {
+                "flag": true,
+                "g": "iHejHBb",
+                "id": 0,
+                "s": "xOmqnh",
+                "x": -10,
+                "y": 1.0
+              },
+              {
+                "flag": false,
+                "g": null,
+                "id": 13,
+                "s": "alpha",
+                "x": 2,
+                "y": -1.0
+              },
+              {
+                "flag": null,
+                "g": "t",
+                "id": 4,
+                "s": "gamma",
+                "x": 1,
+                "y": -0.5
+              },
+              {
+                "flag": true,
+                "g": "T",
+                "id": 1,
+                "s": "中文",
+                "x": -35,
+                "y": 16.428
+              },
+              {
+                "flag": true,
+                "g": "VtVHJ",
+                "id": 1,
+                "s": "中文",
+                "x": 1,
+                "y": 0.5
+              },
+              {
+                "flag": true,
+                "g": "sunVS",
+                "id": 1,
+                "s": "A",
+                "x": null,
+                "y": -29.738
+              },
+              {
+                "flag": true,
+                "g": "alpha",
+                "id": 3,
+                "s": "space value",
+                "x": 1,
+                "y": null
+              },
+              {
+                "flag": null,
+                "g": null,
+                "id": 4,
+                "s": "a",
+                "x": -1,
+                "y": -1.0
+              },
+              {
+                "flag": false,
+                "g": "",
+                "id": 1,
+                "s": "beta",
+                "x": 62,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": null,
+                "id": 1,
+                "s": null,
+                "x": -10,
+                "y": -1.0
+              }
+            ]
+          },
+          {
+            "columns": [
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "j",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "z",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "tag",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t1",
+            "rows": [
+              {
+                "id": 1,
+                "j": 2,
+                "tag": "a",
+                "z": -0.5
+              },
+              {
+                "id": 1,
+                "j": 1,
+                "tag": "Q",
+                "z": 0.5
+              },
+              {
+                "id": 1,
+                "j": -2,
+                "tag": "space value",
+                "z": null
+              },
+              {
+                "id": 3,
+                "j": 1,
+                "tag": "xTgJLiqO",
+                "z": -0.5
+              },
+              {
+                "id": 4,
+                "j": -2,
+                "tag": null,
+                "z": 0.0
+              },
+              {
+                "id": 0,
+                "j": -2,
+                "tag": "A",
+                "z": null
+              },
+              {
+                "id": 2,
+                "j": 10,
+                "tag": "beta",
+                "z": -0.5
+              },
+              {
+                "id": 1,
+                "j": 1,
+                "tag": "eK",
+                "z": null
+              },
+              {
+                "id": 2,
+                "j": null,
+                "tag": "δelta",
+                "z": null
+              },
+              {
+                "id": 4,
+                "j": -1,
+                "tag": "alpha",
+                "z": 0.0
+              },
+              {
+                "id": 0,
+                "j": 1,
+                "tag": null,
+                "z": -23.265
+              },
+              {
+                "id": 0,
+                "j": -63,
+                "tag": "δelta",
+                "z": 0.0
+              },
+              {
+                "id": 2,
+                "j": 2,
+                "tag": "Sqq",
+                "z": null
+              },
+              {
+                "id": 0,
+                "j": 43,
+                "tag": "OsOWaTc",
+                "z": 0.5
+              },
+              {
+                "id": 0,
+                "j": 0,
+                "tag": "space value",
+                "z": 8.564
+              },
+              {
+                "id": 2,
+                "j": null,
+                "tag": "δelta",
+                "z": null
+              },
+              {
+                "id": 1,
+                "j": 10,
+                "tag": "gamma",
+                "z": 0.0
+              },
+              {
+                "id": 9,
+                "j": 9,
+                "tag": "tag_9",
+                "z": 9.0
+              },
+              {
+                "id": 10,
+                "j": 10,
+                "tag": "tag_10",
+                "z": 10.0
+              },
+              {
+                "id": 11,
+                "j": 11,
+                "tag": "tag_11",
+                "z": 11.0
+              },
+              {
+                "id": 13,
+                "j": 13,
+                "tag": "tag_13",
+                "z": 13.0
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": null,
+        "candidate_recheck_count": 2,
+        "compress_run_log": true,
+        "enable_artifact": true,
+        "enable_differential_oracle": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_normalizer": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_type_aware_generation": true,
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "generator_profile": "bughunt_fresh",
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "common_workflow",
+          "operation_combo",
+          "join",
+          "filter",
+          "truth_filter",
+          "mutate",
+          "strings",
+          "numeric",
+          "casts",
+          "nulls",
+          "sort_limit",
+          "expressions",
+          "set_membership_filter",
+          "null_predicate_filter",
+          "boolean_predicate_filter",
+          "post_topk_range_filter",
+          "tuple_absence_filter",
+          "row_value_absence_filter",
+          "running_sum_precision",
+          "running_sum",
+          "partitioned_running_sum",
+          "running_sum_partitioned",
+          "path_basename_keyed_pick",
+          "path_projection",
+          "keyed_row_pick",
+          "sortedness_null_placement",
+          "sortedness",
+          "scalar_subquery_double_parentheses",
+          "scalar_subquery_probe",
+          "window_avg_rows_frame",
+          "window_avg_probe",
+          "struct_distinct_unnest",
+          "struct_distinct_probe",
+          "bit_compare_unequal_length",
+          "bit_compare_probe"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.45,
+        "log_level": "compact",
+        "metamorphic_variant_limit": 6,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0
+      },
+      "findings": [
+        {
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Backends returned different canonical tables; mismatch_class=value; shapes={'pandas': (1, 1), 'duckdb': (1, 1), 'datafusion': (1, 1)}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-e9e3a5c96a9390d1",
+          "kind": "semantic_output_mismatch",
+          "mismatch_class": "value",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the artifact and make a backend-specific reproducer.",
+            "Check backend documentation/release notes, then file upstream if behavior contradicts the expected semantics."
+          ],
+          "root_cause": "join_semantics",
+          "severity": "critical",
+          "signature": "e9e3a5c96a9390d1",
+          "source_issue": "",
+          "suspicious_backends": [
+            "datafusion"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Clear suspicious minority backend(s): ['datafusion']",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "datafusion": {
+          "backend": "datafusion",
+          "columns": [
+            "s"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              ""
+            ]
+          ],
+          "status": "ok"
+        },
+        "duckdb": {
+          "backend": "duckdb",
+          "columns": [
+            "s"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "s"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null
+            ]
+          ],
+          "status": "ok"
+        }
+      },
+      "raw_results": {
+        "datafusion": {
+          "backend": "datafusion",
+          "duration_ms": 6.396307027898729,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "duckdb": {
+          "backend": "duckdb",
+          "duration_ms": 24.1034550126642,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 5.372474028263241,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        }
+      }
+    }
+  ],
+  "fresh_candidate_bug_families": {
+    "join_semantics@datafusion": 1
+  },
+  "generated_at": "2026-05-26T23:02:58Z",
+  "generated_by": "datadiff bug-hunt",
+  "schema_version": "bug-hunt-fresh-candidates-v1",
+  "source_run_file": "runs/run-20260526T230056-1779836456327590561.jsonl.gz"
+}

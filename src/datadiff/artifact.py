@@ -6,11 +6,11 @@ from typing import Any
 from datadiff.dsl import Case
 from datadiff.env import collect_environment
 from datadiff.oracle import Finding
-from datadiff.targets import describe_targets
+from datadiff.targets import target_context
 from datadiff.util import BUGS_DIR, dump_json
 
 
-def save_bug_artifact(
+def save_issue_artifact(
     case: Case,
     raw_results: dict[str, dict[str, Any]],
     normalized: dict[str, dict[str, Any]],
@@ -25,7 +25,9 @@ def save_bug_artifact(
     dump_json(normalized, bug_dir / "normalized.json")
     dump_json([f.to_dict() for f in findings], bug_dir / "findings.json")
     dump_json(config or {}, bug_dir / "config.json")
-    dump_json(describe_targets(list(raw_results)), bug_dir / "targets.json")
+    context = target_context(list(raw_results))
+    dump_json(context.target_dicts(), bug_dir / "targets.json")
+    dump_json(context.to_dict(), bug_dir / "target_context.json")
     dump_json(collect_environment(), bug_dir / "environment.json")
     repro = f'''#!/usr/bin/env python3
 from datadiff.config import ExperimentConfig
@@ -43,11 +45,11 @@ for f in result["findings"]:
     print(f)
 '''
     (bug_dir / "reproduce.py").write_text(repro, encoding="utf-8")
-    (bug_dir / "report.md").write_text(_bug_report(case, findings), encoding="utf-8")
+    (bug_dir / "report.md").write_text(_render_issue_artifact_report(case, findings), encoding="utf-8")
     return bug_dir
 
 
-def _bug_report(case: Case, findings: list[Finding]) -> str:
+def _render_issue_artifact_report(case: Case, findings: list[Finding]) -> str:
     lines = [f"# Bug Artifact: {case.case_id}", "", f"Seed: `{case.seed}`", "", "## Program", "", "```json"]
     import json
     lines.append(json.dumps(case.program.to_dict(), ensure_ascii=False, indent=2))
@@ -68,3 +70,7 @@ def _bug_report(case: Case, findings: list[Finding]) -> str:
     lines.append(json.dumps(collect_environment(), ensure_ascii=False, indent=2))
     lines.append("```")
     return "\n".join(lines) + "\n"
+
+
+save_bug_artifact = save_issue_artifact
+_bug_report = _render_issue_artifact_report

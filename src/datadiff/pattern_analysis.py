@@ -6,7 +6,9 @@ from pathlib import Path
 from typing import Any
 
 from datadiff.dsl import normalize_sort_keys
-from datadiff.reporter import latest_experiment_manifest
+from datadiff.operation_semantics import aggregate_alias, aggregate_func, aggregate_specs, op_kind
+from datadiff.reporter import latest_experiment_manifest_path
+from datadiff.reward import backend_group_key, candidate_issue_family_keys
 from datadiff.util import REPORTS_DIR, ensure_dirs, load_json, read_jsonl
 
 
@@ -17,7 +19,7 @@ def analyze_pattern_variants(
 ) -> tuple[Path, Path]:
     ensure_dirs()
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    manifest_file = manifest_file or latest_experiment_manifest()
+    manifest_file = manifest_file or latest_experiment_manifest_path()
     if pattern != "null_agg_topk":
         raise ValueError(f"unsupported pattern: {pattern}")
     manifest = load_json(manifest_file)
@@ -54,7 +56,7 @@ def _collect_null_agg_topk_rows(manifest: dict[str, Any]) -> list[dict[str, Any]
             ]
             if candidate_findings:
                 bucket["candidate_cases"] += 1
-                family_counts[key].update(_candidate_bug_family_keys(candidate_findings))
+                family_counts[key].update(_candidate_issue_family_keys(candidate_findings))
             bucket["candidate_findings"] += len(candidate_findings)
             bucket["false_positive_findings"] += sum(1 for finding in findings if finding.get("false_positive"))
             bucket["semantic_divergence_findings"] += sum(
@@ -88,18 +90,18 @@ def _collect_null_agg_topk_rows(manifest: dict[str, Any]) -> list[dict[str, Any]
 def _null_agg_topk_variant(case: dict[str, Any]) -> dict[str, str] | None:
     ops = case.get("program", {}).get("operations", [])
     for groupby_idx, op in enumerate(ops):
-        if op.get("op") != "groupby":
+        if op_kind(op) != "groupby":
             continue
-        aggs = op.get("aggs", [])
+        aggs = aggregate_specs(op)
         if len(aggs) != 1:
             continue
         agg = aggs[0]
-        alias = str(agg.get("as", ""))
+        alias = aggregate_alias(agg)
         if not alias:
             continue
         for sort_idx in range(groupby_idx + 1, len(ops)):
             sort = ops[sort_idx]
-            if sort.get("op") != "sort":
+            if op_kind(sort) != "sort":
                 continue
             try:
                 sort_keys = normalize_sort_keys(sort)
@@ -108,10 +110,10 @@ def _null_agg_topk_variant(case: dict[str, Any]) -> dict[str, str] | None:
             matching_key = next((key for key in sort_keys if key.column == alias), None)
             if matching_key is None:
                 continue
-            if not any(later.get("op") == "limit" for later in ops[sort_idx + 1 :]):
+            if not any(op_kind(later) == "limit" for later in ops[sort_idx + 1 :]):
                 continue
             return {
-                "agg_func": str(agg.get("func", "unknown")),
+                "agg_func": aggregate_func(agg, "unknown"),
                 "sort_direction": "asc" if matching_key.ascending else "desc",
             }
     return None
@@ -168,22 +170,8 @@ def _format_counter(counter: Counter[str]) -> str:
     return "; ".join(f"{family}:{count}" for family, count in counter.most_common())
 
 
-def _candidate_bug_family_keys(findings: list[dict[str, Any]]) -> Counter[str]:
-    keys: Counter[str] = Counter()
-    root_by_suspicious: dict[str, str] = {}
-    for finding in findings:
-        root = str(finding.get("root_cause", "unknown"))
-        suspicious = _suspicious_key(finding)
-        if not root.startswith("metamorphic_"):
-            root_by_suspicious.setdefault(suspicious, root)
-    for finding in findings:
-        root = str(finding.get("root_cause", "unknown"))
-        suspicious = _suspicious_key(finding)
-        if root.startswith("metamorphic_") and suspicious in root_by_suspicious:
-            root = root_by_suspicious[suspicious]
-        keys[f"{root}@{suspicious}"] += 1
-    return keys
+def _candidate_issue_family_keys(findings: list[dict[str, Any]]) -> Counter[str]:
+    return candidate_issue_family_keys(findings)
 
 
-def _suspicious_key(finding: dict[str, Any]) -> str:
-    return ",".join(sorted(finding.get("suspicious_backends", []) or [])) or "unknown"
+_candidate_bug_family_keys = _candidate_issue_family_keys

@@ -1,10 +1,11 @@
 from datadiff.case_policy import case_discovery_origin, replay_bug_filter_reason
 from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES
-from datadiff.datagen import generate_case, repair_operations
+from datadiff.datagen import COMMON_API_WORKFLOW_TEMPLATES, generate_case, repair_operations
 from datadiff.classification_oracle import validate_case_program
-from datadiff.dsl import sort_columns
+from datadiff.dsl import ColumnSpec, Program, TableData, sort_columns
 from datadiff.guidance import extract_case_features
 from datadiff.identifiers import is_reserved_output_name, make_safe_output_name
+from datadiff.join_keys import join_key_columns
 
 
 def _assert_program_columns_are_valid(case):
@@ -13,15 +14,47 @@ def _assert_program_columns_are_valid(case):
     for op in case.program.operations:
         if op["op"] == "join":
             right = table_by_name[op["table"]]
-            assert op["left_on"] in known_cols
-            assert op["right_on"] in {c.name for c in right.columns}
-            known_cols.update(c.name for c in right.columns if c.name != op["right_on"])
+            left_keys = join_key_columns(op["left_on"])
+            right_keys = join_key_columns(op["right_on"])
+            assert len(left_keys) == len(right_keys)
+            assert set(left_keys).issubset(known_cols)
+            assert set(right_keys).issubset({c.name for c in right.columns})
+            known_cols.update(c.name for c in right.columns if c.name not in set(right_keys))
+        elif op["op"] == "union_all":
+            right = table_by_name[op["table"]]
+            assert known_cols.issubset({c.name for c in right.columns})
+        elif op["op"] in {"semi_join", "anti_join"}:
+            right = table_by_name[op["table"]]
+            left_keys = join_key_columns(op["left_on"])
+            right_keys = join_key_columns(op["right_on"])
+            assert len(left_keys) == len(right_keys)
+            assert set(left_keys).issubset(known_cols)
+            assert set(right_keys).issubset({c.name for c in right.columns})
+        elif op["op"] == "drop_nulls":
+            assert set(op["columns"]).issubset(known_cols)
+            assert len(op["columns"]) == len(set(op["columns"]))
         elif op["op"] == "filter":
             assert op["column"] in known_cols
         elif op["op"] == "select":
             assert set(op["columns"]).issubset(known_cols)
             assert len(op["columns"]) == len(set(op["columns"]))
             known_cols = set(op["columns"])
+        elif op["op"] == "distinct":
+            assert set(op["columns"]).issubset(known_cols)
+            assert len(op["columns"]) == len(set(op["columns"]))
+            known_cols = set(op["columns"])
+        elif op["op"] == "fill_null":
+            assert op["column"] in known_cols
+        elif op["op"] == "coalesce":
+            assert set(op["columns"]).issubset(known_cols)
+            assert len(op["columns"]) == len(set(op["columns"]))
+            assert len(op["columns"]) >= 2
+            assert not is_reserved_output_name(op["as"])
+            known_cols.add(op["as"])
+        elif op["op"] == "case_when":
+            assert op["condition"]["column"] in known_cols
+            assert not is_reserved_output_name(op["as"])
+            known_cols.add(op["as"])
         elif op["op"] == "sort":
             columns = sort_columns(op)
             assert set(columns).issubset(known_cols)
@@ -110,6 +143,9 @@ def _assert_program_columns_are_valid(case):
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
         elif op["op"] == "hash_pivot_wider_probe":
+            assert not is_reserved_output_name(op["as"])
+            known_cols = {op["as"]}
+        elif op["op"] == "list_flatten_parent_indices_probe":
             assert not is_reserved_output_name(op["as"])
             known_cols = {op["as"]}
         elif op["op"] == "groupby":
@@ -247,6 +283,7 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "pyarrow_dataset_isin_all_match_semantics",
         "pyarrow_large_string_partition_schema_semantics",
         "pyarrow_hash_pivot_wider_order_semantics",
+        "pyarrow_list_flatten_parent_indices_semantics",
         "polars_rolling_mean_by_null_count_semantics",
         "csv_long_numeric_roundtrip",
     }.issubset(mixed_profiles)
@@ -283,6 +320,34 @@ def test_generate_case_issue_focus_profile_is_policy_gated_and_valid():
         )
     assert "" in filter_reasons
     assert {"known_replay_source_issue", "issue_replay_probe"}.issubset(filter_reasons)
+
+
+def test_generate_case_deep_probe_rotation_profile_covers_deep_targets_with_policy_gate():
+    cases = [generate_case(seed, profile="deep_probe_rotation") for seed in range(40)]
+    mixed_profiles = {case.metadata.get("mixed_generator_profile") for case in cases}
+
+    assert {
+        "duckdb_json_predicate_order_semantics",
+        "pandas_arrow_timestamp_index_attr_semantics",
+        "pyarrow_run_end_null_compute_semantics",
+        "polars_rolling_mean_by_null_count_semantics",
+        "csv_long_numeric_roundtrip",
+    }.issubset(mixed_profiles)
+    origins = {case_discovery_origin(case) for case in cases}
+    filter_reasons = {
+        replay_bug_filter_reason(
+            case,
+            enable_replay_bug=False,
+            replay_bug_source_issues=DEFAULT_REPLAY_BUG_SOURCE_ISSUES,
+        )
+        for case in cases
+    }
+    for case in cases:
+        assert case.metadata["generator_profile"] == "deep_probe_rotation"
+        assert case.case_id.startswith(f"case-{case.seed:08d}-deep-probe-rotation-")
+        assert validate_case_program(case) == []
+    assert {"organic", "issue_replay"}.issubset(origins)
+    assert {"", "issue_replay_probe"}.issubset(filter_reasons)
 
 
 def test_bughunt_no_groupby_profile_excludes_groupby_without_type_aware_generation():
@@ -1204,6 +1269,20 @@ def test_generate_case_pyarrow_hash_pivot_wider_order_profile_is_supported_and_v
     assert validate_case_program(case) == []
 
 
+def test_generate_case_pyarrow_list_flatten_parent_indices_profile_is_supported_and_valid():
+    case = generate_case(150, profile="pyarrow_list_flatten_parent_indices_semantics")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000150-pyarrow-list-flatten-parent-indices-semantics"
+    assert case.program.operations == [
+        {"op": "list_flatten_parent_indices_probe", "as": "list_flatten_parent_indices_mismatch"}
+    ]
+    assert "pattern:pyarrow_list_flatten_parent_indices_semantics" in features
+    assert "pyarrow:list-flatten-parent-indices" in features
+    assert "source_issue" not in case.metadata
+    assert validate_case_program(case) == []
+
+
 def test_generate_case_polars_rolling_mean_by_null_count_semantics_profile_is_supported_and_valid():
     case = generate_case(146, profile="polars_rolling_mean_by_null_count_semantics")
     features = extract_case_features(case)
@@ -1230,6 +1309,643 @@ def test_generate_case_csv_long_numeric_roundtrip_profile_is_supported_and_fresh
     assert "csv:long-numeric-roundtrip" in features
     assert "source_issue" not in case.metadata
     assert validate_case_program(case) == []
+
+
+def test_generate_case_common_api_workflow_profile_covers_daily_low_complexity_ops():
+    cases = [generate_case(seed, profile="common_api_workflow") for seed in range(len(COMMON_API_WORKFLOW_TEMPLATES))]
+    templates = {case.metadata.get("workflow_template") for case in cases}
+    op_sets = [{op["op"] for op in case.program.operations} for case in cases]
+
+    assert templates == {
+        "filter_mutate_project_topk",
+        "membership_groupby_aggregate",
+        "input_partition_union_groupby",
+        "filter_input_materialization_groupby",
+        "negative_membership_topk",
+        "negative_membership_groupby",
+        "string_derive_groupby",
+        "string_upper_groupby",
+        "string_upper_topk",
+        "string_contains_groupby",
+        "string_contains_topk",
+        "string_strip_groupby",
+        "string_strip_topk",
+        "string_replace_groupby",
+        "string_replace_topk",
+        "string_slice_groupby",
+        "string_slice_topk",
+        "string_concat_groupby",
+        "string_concat_topk",
+        "string_contains_flag_groupby",
+        "string_contains_flag_topk",
+        "string_starts_with_flag_groupby",
+        "string_starts_with_flag_topk",
+        "string_ends_with_flag_groupby",
+        "string_ends_with_flag_topk",
+        "bool_not_groupby",
+        "bool_not_topk",
+        "join_filter_groupby",
+        "nullable_bool_groupby",
+        "bool_reduction_groupby_topk",
+        "bool_reduction_global_summary",
+        "ordered_slice_projection",
+        "range_cast_groupby",
+        "type_cast_boundary_groupby",
+        "type_cast_boundary_topk",
+        "abs_groupby",
+        "abs_topk",
+        "clip_groupby",
+        "clip_topk",
+        "double_filter_topk",
+        "distinct_sort_topk",
+        "distinct_null_topk",
+        "filter_distinct_groupby",
+        "fill_null_groupby",
+        "fill_null_distinct_topk",
+        "fill_null_filter_groupby_topk",
+        "coalesce_fill_null_groupby_topk",
+        "coalesce_groupby",
+        "coalesce_topk",
+        "case_when_classify_topk",
+        "case_when_groupby",
+        "union_all_filter_groupby",
+        "union_all_case_when_topk",
+        "drop_nulls_groupby",
+        "union_all_drop_nulls_topk",
+        "semi_join_filter_topk",
+        "anti_join_groupby",
+        "top_n_per_group",
+        "dedup_latest_per_id",
+        "running_total_by_group",
+        "left_join_fill_groupby",
+        "clean_key_join_groupby",
+        "filtered_global_aggregate",
+        "groupby_having_topk",
+        "pagination_filter_select",
+        "nunique_groupby",
+        "join_nunique_groupby",
+        "global_nunique_summary",
+        "multi_key_groupby_summary",
+        "multi_key_groupby_topk",
+        "empty_filter_groupby_common",
+        "empty_filter_global_aggregate",
+        "multi_key_join_groupby",
+        "multi_key_join_topk",
+        "date_part_groupby",
+        "date_part_topk",
+        "string_split_part_groupby",
+        "string_split_part_topk",
+        "string_null_if_empty_groupby",
+        "string_null_if_empty_topk",
+        "string_length_groupby",
+        "string_length_topk",
+        "string_lower_groupby",
+        "string_lower_topk",
+        "string_basename_groupby",
+        "string_basename_topk",
+        "normalized_string_join_groupby",
+        "normalized_string_join_topk",
+        "normalized_string_semi_join_topk",
+        "normalized_string_anti_join_groupby",
+        "normalized_string_case_when_groupby",
+        "normalized_string_case_when_topk",
+        "string_pattern_case_when_groupby",
+        "string_pattern_case_when_topk",
+        "sql_distinct_null_coalesce_topk",
+        "sql_left_join_coalesce_membership",
+        "sql_case_membership_distinct_topk",
+        "sql_union_coalesce_distinct_topk",
+        "sql_left_join_case_membership_groupby",
+        "sql_left_join_null_predicate_aggregate",
+        "sql_coalesce_case_distinct_groupby",
+        "sql_numeric_text_cast_membership_groupby",
+        "sql_bool_membership_case_aggregate",
+        "sql_left_join_bool_case_groupby",
+        "sql_left_join_bool_coalesce_case_groupby",
+        "sql_bool_antijoin_case_aggregate",
+        "sql_left_join_bool_coalesce_filter_groupby",
+        "sql_numeric_text_cast_bool_antijoin_groupby",
+        "sql_multi_key_semijoin_case_groupby",
+        "sql_multi_key_antijoin_case_groupby",
+    }
+    assert any({"join", "filter", "groupby"}.issubset(ops) for ops in op_sets)
+    assert any({"sort", "offset", "limit", "select"}.issubset(ops) for ops in op_sets)
+    assert any({"filter", "mutate", "groupby"}.issubset(ops) for ops in op_sets)
+    assert any(
+        case.metadata.get("workflow_template") == "input_partition_union_groupby"
+        and case.program.op_sequence() == ["mutate", "fill_null", "groupby"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "filter_input_materialization_groupby"
+        and case.program.op_sequence() == ["filter", "fill_null", "groupby"]
+        for case in cases
+    )
+    assert any(
+        op["op"] == "filter" and op.get("cmp") in {"str_contains", "str_starts_with", "str_ends_with"}
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "filter" and op.get("cmp") == "not_in_set"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "string_strip"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "string_upper"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "string_lower"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "string_basename"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "normalized_string_join_groupby"
+        and case.program.op_sequence() == ["mutate", "mutate", "join", "fill_null", "groupby", "sort"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "normalized_string_join_topk"
+        and case.program.op_sequence() == ["mutate", "mutate", "join", "fill_null", "sort", "select", "limit"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "normalized_string_semi_join_topk"
+        and case.program.op_sequence() == ["mutate", "mutate", "filter", "semi_join", "sort", "select", "limit"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "normalized_string_anti_join_groupby"
+        and case.program.op_sequence() == ["mutate", "mutate", "filter", "anti_join", "groupby", "sort"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "normalized_string_case_when_groupby"
+        and case.program.op_sequence() == ["mutate", "mutate", "case_when", "groupby", "sort"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "normalized_string_case_when_topk"
+        and case.program.op_sequence() == ["mutate", "mutate", "case_when", "sort", "select", "limit"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "string_pattern_case_when_groupby"
+        and case.program.op_sequence() == ["mutate", "case_when", "groupby", "sort"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "string_pattern_case_when_topk"
+        and case.program.op_sequence() == ["mutate", "case_when", "sort", "select", "limit"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_distinct_null_coalesce_topk"
+        and case.program.op_sequence() == ["mutate", "coalesce", "distinct", "sort", "offset", "limit"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_left_join_coalesce_membership"
+        and {"join", "coalesce", "fill_null"}.issubset(set(case.program.op_sequence()))
+        and any(op["op"] in {"semi_join", "anti_join"} for op in case.program.operations)
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_case_membership_distinct_topk"
+        and case.program.op_sequence() == ["mutate", "case_when", "distinct", "sort", "limit"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_union_coalesce_distinct_topk"
+        and case.program.op_sequence() == ["union_all", "mutate", "coalesce", "distinct", "sort", "offset", "limit"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_left_join_case_membership_groupby"
+        and case.program.op_sequence() == ["join", "case_when", "fill_null", "groupby", "sort"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_left_join_null_predicate_aggregate"
+        and case.program.op_sequence() == ["join", "filter", "aggregate"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_coalesce_case_distinct_groupby"
+        and case.program.op_sequence() == ["mutate", "coalesce", "case_when", "distinct", "groupby", "sort"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_numeric_text_cast_membership_groupby"
+        and case.program.op_sequence() == ["mutate", "filter", "semi_join", "groupby", "sort"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_bool_membership_case_aggregate"
+        and case.program.op_sequence() == ["filter", "semi_join", "case_when", "groupby", "sort"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_left_join_bool_case_groupby"
+        and case.program.op_sequence() == ["join", "case_when", "groupby", "sort"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_left_join_bool_coalesce_case_groupby"
+        and case.program.op_sequence() == ["join", "coalesce", "case_when", "groupby", "sort"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_bool_antijoin_case_aggregate"
+        and case.program.op_sequence() == ["filter", "anti_join", "case_when", "groupby", "sort"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_left_join_bool_coalesce_filter_groupby"
+        and case.program.op_sequence() == ["join", "coalesce", "filter", "case_when", "groupby", "sort"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_numeric_text_cast_bool_antijoin_groupby"
+        and case.program.op_sequence() == ["mutate", "filter", "filter", "anti_join", "case_when", "groupby", "sort"]
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_multi_key_semijoin_case_groupby"
+        and case.program.op_sequence() == ["mutate", "filter", "semi_join", "case_when", "groupby", "sort"]
+        and any(op["op"] == "semi_join" and isinstance(op.get("left_on"), list) for op in case.program.operations)
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_multi_key_antijoin_case_groupby"
+        and case.program.op_sequence() == ["mutate", "filter", "anti_join", "case_when", "groupby", "sort"]
+        and any(op["op"] == "anti_join" and isinstance(op.get("left_on"), list) for op in case.program.operations)
+        for case in cases
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "string_replace"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "string_slice"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "string_split_part"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "string_null_if_empty"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "string_length"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "string_concat"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "string_contains"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "string_starts_with"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "string_ends_with"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "bool_not"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        agg.get("func") == "any"
+        for case in cases
+        for op in case.program.operations
+        for agg in op.get("aggs", [])
+    )
+    assert any(
+        agg.get("func") == "all"
+        for case in cases
+        for op in case.program.operations
+        for agg in op.get("aggs", [])
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "clip"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "abs"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "date_part"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "cast" and op.get("expr", {}).get("to") == "int"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "mutate" and op.get("expr", {}).get("kind") == "cast" and op.get("expr", {}).get("to") == "str"
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any("distinct" in ops for ops in op_sets)
+    assert any("fill_null" in ops for ops in op_sets)
+    assert any("coalesce" in ops for ops in op_sets)
+    assert any({"fill_null", "filter", "groupby", "sort", "limit"}.issubset(ops) for ops in op_sets)
+    assert any({"coalesce", "fill_null", "groupby", "sort", "limit"}.issubset(ops) for ops in op_sets)
+    assert any("case_when" in ops for ops in op_sets)
+    assert any("union_all" in ops for ops in op_sets)
+    assert any("drop_nulls" in ops for ops in op_sets)
+    assert any("semi_join" in ops for ops in op_sets)
+    assert any("anti_join" in ops for ops in op_sets)
+    assert any("row_number_filter" in ops for ops in op_sets)
+    assert any("running_sum" in ops for ops in op_sets)
+    assert any("aggregate" in ops for ops in op_sets)
+    assert any(
+        op["op"] == "join" and isinstance(op.get("left_on"), list) and isinstance(op.get("right_on"), list)
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        op["op"] == "groupby" and len(op.get("keys", [])) > 1
+        for case in cases
+        for op in case.program.operations
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "empty_filter_global_aggregate"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "date_part_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "date_part_topk"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "string_split_part_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "string_split_part_topk"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "string_null_if_empty_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "string_null_if_empty_topk"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "string_length_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "string_length_topk"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "string_lower_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "string_lower_topk"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "string_basename_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "string_basename_topk"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "normalized_string_join_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "normalized_string_join_topk"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "normalized_string_semi_join_topk"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "normalized_string_anti_join_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "normalized_string_case_when_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "normalized_string_case_when_topk"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "string_pattern_case_when_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "string_pattern_case_when_topk"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_distinct_null_coalesce_topk"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_left_join_coalesce_membership"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_case_membership_distinct_topk"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_union_coalesce_distinct_topk"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_left_join_case_membership_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_left_join_null_predicate_aggregate"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_coalesce_case_distinct_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_numeric_text_cast_membership_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_bool_membership_case_aggregate"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_left_join_bool_case_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_left_join_bool_coalesce_case_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_bool_antijoin_case_aggregate"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_left_join_bool_coalesce_filter_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_numeric_text_cast_bool_antijoin_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_multi_key_semijoin_case_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "sql_multi_key_antijoin_case_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "type_cast_boundary_groupby"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "type_cast_boundary_topk"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "bool_reduction_groupby_topk"
+        for case in cases
+    )
+    assert any(
+        case.metadata.get("workflow_template") == "bool_reduction_global_summary"
+        for case in cases
+    )
+    assert any(
+        agg.get("func") == "nunique"
+        for case in cases
+        for op in case.program.operations
+        for agg in op.get("aggs", [])
+    )
+    for case in cases:
+        features = extract_case_features(case)
+        assert case.case_id.endswith("-common-api-workflow")
+        assert "pattern:common_api_workflow" in features
+        assert "generator_profile:common_api_workflow" in features
+        assert "source_issue" not in case.metadata
+        assert case.metadata.get("discovery_origin") == "organic"
+        assert validate_case_program(case) == []
+        _assert_program_columns_are_valid(case)
+
+
+def test_repair_operations_keeps_valid_semi_and_anti_join_only():
+    case = generate_case(7)
+    table = case.tables[0]
+    lookup = TableData(
+        "t_lookup",
+        [ColumnSpec("id", "int"), ColumnSpec("bad", "str")],
+        [{"id": 1, "bad": "one"}],
+    )
+
+    repaired = repair_operations(
+        table,
+        [
+            {"op": "semi_join", "table": "t_lookup", "left_on": "id", "right_on": "id"},
+            {"op": "anti_join", "table": "missing", "left_on": "id", "right_on": "id"},
+            {"op": "anti_join", "table": "t_lookup", "left_on": "id", "right_on": "bad"},
+        ],
+        extra_tables=[lookup],
+    )
+
+    assert repaired == [{"op": "semi_join", "table": "t_lookup", "left_on": "id", "right_on": "id"}]
+
+
+def test_repair_operations_keeps_valid_multi_key_semi_and_anti_join():
+    case = generate_case(7)
+    table = case.tables[0]
+    lookup = TableData(
+        "t_lookup",
+        [ColumnSpec("id", "int"), ColumnSpec("g", "str"), ColumnSpec("bad", "str")],
+        [{"id": 1, "g": "a", "bad": "one"}],
+    )
+
+    repaired = repair_operations(
+        table,
+        [
+            {"op": "semi_join", "table": "t_lookup", "left_on": ["id", "g"], "right_on": ["id", "g"]},
+            {"op": "anti_join", "table": "t_lookup", "left_on": ["id", "g"], "right_on": ["id"]},
+            {"op": "anti_join", "table": "t_lookup", "left_on": ["id", "x"], "right_on": ["id", "bad"]},
+        ],
+        extra_tables=[lookup],
+    )
+
+    assert repaired == [
+        {"op": "semi_join", "table": "t_lookup", "left_on": ["id", "g"], "right_on": ["id", "g"]}
+    ]
+
+
+def test_repair_operations_keeps_valid_coalesce_only():
+    case = generate_case(7)
+    table = case.tables[0]
+
+    repaired = repair_operations(
+        table,
+        [
+            {"op": "coalesce", "columns": ["x", "id"], "as": "x_or_id", "fallback": 0},
+            {"op": "coalesce", "columns": ["g", "x"], "as": "bad_mixed"},
+            {"op": "coalesce", "columns": ["g"], "as": "too_narrow"},
+            {"op": "coalesce", "columns": ["x", "id"], "as": "select"},
+        ],
+    )
+
+    assert repaired == [{"op": "coalesce", "columns": ["x", "id"], "as": "x_or_id", "fallback": 0}]
 
 
 def test_repair_operations_keeps_safe_string_aggregations_only():
@@ -1344,6 +2060,38 @@ def test_repair_drops_groupby_aggregation_alias_colliding_with_key():
             "op": "groupby",
             "keys": ["g"],
             "aggs": [{"column": "x", "func": "min", "as": "min_x"}],
+        }
+    ]
+
+
+def test_repair_operations_accepts_typed_groupby_ops_without_mapping_method_conflict():
+    case = generate_case(7)
+    table = case.tables[0]
+    typed_program = Program(
+        "typed-groupby-repair",
+        7,
+        [
+            {
+                "op": "groupby",
+                "keys": ["g"],
+                "aggs": [
+                    {"column": "x", "func": "max", "as": "max_x"},
+                    {"column": "x", "func": "min", "as": "min_x"},
+                ],
+            }
+        ],
+    )
+
+    repaired = repair_operations(table, typed_program.operations)
+
+    assert repaired == [
+        {
+            "op": "groupby",
+            "keys": ["g"],
+            "aggs": [
+                {"column": "x", "func": "max", "as": "max_x"},
+                {"column": "x", "func": "min", "as": "min_x"},
+            ],
         }
     ]
 

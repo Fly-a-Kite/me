@@ -1,12 +1,22 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 import json
 import math
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from datadiff.backends.base import BackendResult
+from datadiff.canonicalization import (
+    CanonicalizedRows,
+    RowSetProfile,
+    canonical_key,
+    canonical_keys,
+    canonicalize_rows,
+    profile_rows,
+    result_comparison_key,
+)
 from datadiff.dsl import Program
 
 
@@ -18,6 +28,22 @@ class NormalizedResult:
     rows: list[list[Any]]
     error_type: str = ""
     error: str = ""
+    _comparison_key_cache: str = field(default="", init=False, repr=False)
+    _row_profile_cache: RowSetProfile | None = field(default=None, init=False, repr=False)
+    _stable_row_keys_cache: list[str] | None = field(default=None, init=False, repr=False)
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any], *, backend: str | None = None) -> NormalizedResult:
+        columns = [str(column) for column in list(payload.get("columns", []) or [])]
+        rows = [list(row) for row in list(payload.get("rows", []) or [])]
+        return cls(
+            backend=str(payload.get("backend", backend or "")),
+            status=str(payload.get("status", "")),
+            columns=columns,
+            rows=rows,
+            error_type=str(payload.get("error_type", "")),
+            error=str(payload.get("error", "")),
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -28,6 +54,68 @@ class NormalizedResult:
             "error_type": self.error_type,
             "error": self.error,
         }
+
+    def comparison_payload(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "columns": self.columns,
+            "rows": self.rows,
+            "error_type": self.error_type,
+        }
+
+    @property
+    def comparison_key(self) -> str:
+        if not self._comparison_key_cache:
+            self._comparison_key_cache = result_comparison_key(
+                status=self.status,
+                columns=self.columns,
+                ordered_row_signature=self.ordered_row_signature,
+                error_type=self.error_type,
+            )
+        return self._comparison_key_cache
+
+    @property
+    def row_profile(self) -> RowSetProfile:
+        if self._row_profile_cache is None:
+            self._row_profile_cache = profile_rows(self.rows)
+        return self._row_profile_cache
+
+    @property
+    def stable_row_keys(self) -> list[str]:
+        if self._stable_row_keys_cache is None:
+            self._stable_row_keys_cache = canonical_keys(self.rows)
+        return self._stable_row_keys_cache
+
+    def adopt_canonicalized_rows(self, canonicalized: CanonicalizedRows) -> None:
+        self.rows = canonicalized.rows
+        self._stable_row_keys_cache = list(canonicalized.stable_row_keys)
+        self._row_profile_cache = canonicalized.profile
+        self._comparison_key_cache = ""
+
+    @property
+    def ordered_row_signature(self) -> str:
+        return self.row_profile.ordered_signature
+
+    @property
+    def unordered_row_signature(self) -> str:
+        return self.row_profile.unordered_signature
+
+    @property
+    def has_duplicate_rows(self) -> bool:
+        return self.row_profile.has_duplicates
+
+
+def normalized_results_from_mapping(
+    mapping: Mapping[str, Mapping[str, Any] | NormalizedResult],
+) -> dict[str, NormalizedResult]:
+    out: dict[str, NormalizedResult] = {}
+    for backend, payload in mapping.items():
+        key = str(backend)
+        if isinstance(payload, NormalizedResult):
+            out[key] = payload
+            continue
+        out[key] = NormalizedResult.from_dict(payload, backend=key)
+    return out
 
 
 def _norm_value(v: Any, *, preserve_float_precision: bool = False) -> Any:
@@ -116,16 +204,13 @@ def normalize_result(result: BackendResult, program: Program, enable_normalizer:
                     for idx, _ in column_positions
                 ]
             )
+        normalized = NormalizedResult(result.backend, "ok", columns=columns, rows=rows)
         if enable_normalizer and not program.order_sensitive:
             # SQL/DataFrame backends differ on stable ordering for ties and on
             # whether intermediate order is observable. The default oracle is
             # bag-semantics; order-sensitive metamorphic checks should be tested
             # separately with explicit tie-breakers.
-            rows = sorted(rows, key=_row_sort_key)
-        return NormalizedResult(result.backend, "ok", columns=columns, rows=rows)
+            normalized.adopt_canonicalized_rows(canonicalize_rows(rows))
+        return normalized
     except Exception as exc:  # noqa: BLE001
         return NormalizedResult(result.backend, "normalization_error", [], [], type(exc).__name__, str(exc)[:500])
-
-
-def _row_sort_key(row: list[Any]) -> str:
-    return json.dumps(row, ensure_ascii=False, sort_keys=True)

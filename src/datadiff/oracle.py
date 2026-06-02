@@ -1,14 +1,70 @@
 from __future__ import annotations
 
-import hashlib
-import json
 import math
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from datadiff.canonicalization import (
+    compare_row_set_batch,
+    short_canonical_hash,
+)
+from datadiff.case_features import (
+    PROBE_ROOTS,
+    case_contains_non_ascii_string as _case_contains_non_ascii_string,
+    case_contains_null as _case_contains_null,
+    case_contains_special_float as _case_contains_special_float,
+    case_has_outer_join_truth_filter as _case_has_outer_join_truth_filter,
+    case_has_path_projection_keyed_pick as _case_has_path_projection_keyed_pick,
+    case_has_post_topk_filter as _case_has_post_topk_filter,
+    case_has_running_sum as _case_has_running_sum,
+    case_uses_modulo as _case_uses_modulo,
+    case_uses_unicode_case_mapping as _case_uses_unicode_case_mapping,
+    last_probe_root as _last_probe_root,
+)
 from datadiff.dsl import Case, normalize_sort_keys
+from datadiff.expression_semantics import cast_output_type, eval_expr_on_row, expr_output_type
 from datadiff.filtering import evaluate_filter_predicate, parse_filter_comparator
+from datadiff.join_keys import join_key_pairs, join_key_value
 from datadiff.normalizer import NormalizedResult
+from datadiff.operation_semantics import (
+    aggregate_alias,
+    aggregate_column,
+    aggregate_func,
+    aggregate_specs,
+    condition_cmp,
+    expr_payload,
+    expr_numerator,
+    expr_kinds,
+    expr_input_domain,
+    expr_kind,
+    expr_other,
+    expr_operator,
+    expr_source,
+    expr_target_type,
+    expr_value,
+    groupby_keys,
+    join_how,
+    op_column,
+    op_comparator,
+    op_columns,
+    op_kind,
+    op_output_alias,
+    op_right_columns,
+    op_table,
+    op_value,
+    operation_names,
+)
+from datadiff.program_analysis import case_uses_arithmetic_float_lineage
+from datadiff.program_state import state_before_first_operation
+from datadiff.sample_semantics import (
+    distinct_output_samples,
+    eval_expr_samples,
+    filter_samples,
+    groupby_output_samples,
+    join_samples,
+    rows_from_samples,
+    samples_from_rows,
+)
 
 
 @dataclass(slots=True)
@@ -30,6 +86,7 @@ class Finding:
     triage_evidence: str = ""
     recommendation: list[str] = field(default_factory=list)
     documentation_refs: list[dict[str, str]] = field(default_factory=list)
+    adjudication: dict[str, Any] = field(default_factory=dict)
     mismatch_class: str = ""
     discovery_origin: str = "organic"
     source_issue: str = ""
@@ -39,12 +96,7 @@ class Finding:
 
 
 def _payload(norm: NormalizedResult) -> dict[str, Any]:
-    return {
-        "status": norm.status,
-        "columns": norm.columns,
-        "rows": norm.rows,
-        "error_type": norm.error_type,
-    }
+    return norm.comparison_payload()
 
 
 def _signature(case: Case, normalized: dict[str, NormalizedResult], kind: str) -> str:
@@ -53,8 +105,7 @@ def _signature(case: Case, normalized: dict[str, NormalizedResult], kind: str) -
         "ops": case.program.op_sequence(),
         "results": {k: _payload(v) for k, v in sorted(normalized.items())},
     }
-    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()
-    return hashlib.sha256(raw).hexdigest()[:16]
+    return short_canonical_hash(payload, 16)
 
 
 def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kind: str) -> str:
@@ -76,12 +127,16 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "reverse_division_operand_order"
     if _case_has_grouped_topk_null_sort_key(case):
         return "grouped_topk_null_sort_key"
+    if _case_has_distinct_null_topk(case):
+        return "distinct_null_topk"
     if _case_has_float_group_key_instability(case, normalized):
         return "float_group_key_instability"
     if _case_has_negative_zero_comparison(case):
         return "negative_zero_comparison"
     if _case_has_tuple_absence_filter(case):
         return "tuple_absence_null_filter"
+    if _case_uses_unicode_case_mapping(case) and _case_contains_non_ascii_string(case):
+        return "unicode_case_mapping"
     if _case_has_outer_join_truth_filter(case):
         return "outer_join_truth_filter"
     if _case_has_post_topk_filter(case):
@@ -90,20 +145,50 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
         return "joined_order_offset_projection"
     if _case_has_ordered_topk_projection(case):
         return "ordered_topk_projection"
+    if any(op == "case_when" for op in ops):
+        return "conditional_expression"
+    if any(op == "union_all" for op in ops):
+        return "union_all_row_append"
+    if any(op == "drop_nulls" for op in ops):
+        return "drop_nulls_null_filter"
+    if any(op == "semi_join" for op in ops):
+        return "semi_join_membership"
+    if any(op == "anti_join" for op in ops):
+        return "anti_join_exclusion"
+    if any(op == "coalesce" for op in ops):
+        return "coalesce_null_semantics"
     if any(op in {"groupby", "aggregate"} for op in ops):
         return "groupby_aggregation"
     if any(op == "join" for op in ops):
         return "join_semantics"
+    if any(op == "fill_null" for op in ops):
+        return "fill_null_null_semantics"
+    if any(op == "distinct" for op in ops):
+        return "distinct_duplicate_elimination"
     if any(op == "filter" for op in ops):
         return "filter_predicate"
     if any(op == "mutate" for op in ops):
-        kinds = {
-            operation.get("expr", {}).get("kind", "")
-            for operation in case.program.operations
-            if operation.get("op") == "mutate"
-        }
-        if kinds & {"string_length", "string_lower"}:
+        kinds = expr_kinds(case.program.operations)
+        if kinds & {
+            "string_length",
+            "string_lower",
+            "string_upper",
+            "string_strip",
+            "string_null_if_empty",
+            "string_replace",
+            "string_slice",
+            "string_split_part",
+            "string_basename",
+            "string_concat",
+            "string_contains",
+            "string_starts_with",
+            "string_ends_with",
+        }:
             return "string_expression"
+        if "date_part" in kinds:
+            return "datetime_expression"
+        if "bool_not" in kinds:
+            return "nullable_boolean_expression"
         if "cast" in kinds:
             return "type_cast"
         return "arithmetic_expression"
@@ -117,224 +202,118 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
     return "unknown"
 
 
-def _case_contains_null(case: Case) -> bool:
-    for table in case.tables:
-        for row in table.rows:
-            if any(v is None for v in row.values()):
-                return True
-    return False
-
-
-PROBE_ROOTS = {
-    "sortedness_check": "sortedness_null_placement",
-    "random_case_probe": "simple_case_random_subject",
-    "group_quantile_probe": "group_quantile_key_expression",
-    "scalar_subquery_probe": "scalar_subquery_double_parentheses",
-    "window_avg_probe": "window_avg_rows_frame",
-    "struct_distinct_probe": "struct_distinct_unnest",
-    "bit_compare_probe": "bit_compare_unequal_length",
-    "round_even_probe": "round_even_float_scale",
-    "float_literal_precision_probe": "duckdb_float_literal_precision",
-    "timestamp_precision_filter_probe": "polars_timestamp_precision_filter",
-    "series_rtruediv_probe": "series_rtruediv_operand_order",
-    "uint64_isin_probe": "pandas_uint64_isin_precision",
-    "tuple_anti_null_probe": "duckdb_tuple_anti_null_semantics",
-    "setop_all_duplicate_probe": "datafusion_setop_all_duplicate_count",
-    "json_predicate_order_probe": "duckdb_json_predicate_order_semantics",
-    "sparse_mask_probe": "pandas_sparse_array_mask_semantics",
-    "float_wrap_probe": "polars_float_wrap_numerical_semantics",
-    "index_bool_probe": "pandas_index_bool_result_type",
-    "empty_literal_groupby_probe": "polars_empty_literal_groupby_semantics",
-    "arrow_string_eq_sum_probe": "pandas_arrow_string_eq_sum_semantics",
-    "arrow_timestamp_loc_slice_probe": "pandas_arrow_timestamp_loc_slice_semantics",
-    "arrow_timestamp_index_attr_probe": "pandas_arrow_timestamp_index_attr_semantics",
-    "eval_inplace_alias_probe": "pandas_eval_inplace_aliasing_semantics",
-    "bool_reduction_skipna_probe": "pandas_bool_reduction_skipna_semantics",
-    "dataset_isin_all_match_probe": "pyarrow_dataset_isin_all_match_semantics",
-    "run_end_null_compute_probe": "pyarrow_run_end_null_compute_semantics",
-    "large_string_partition_probe": "pyarrow_large_string_partition_schema_semantics",
-    "hash_pivot_wider_probe": "pyarrow_hash_pivot_wider_order_semantics",
-    "rolling_mean_by_null_count_probe": "polars_rolling_mean_by_null_count_semantics",
-    "csv_long_numeric_roundtrip_probe": "csv_long_numeric_roundtrip",
-}
-
-
-def _last_probe_root(case: Case) -> str | None:
-    for op in reversed(case.program.operations):
-        root = PROBE_ROOTS.get(str(op.get("op", "")))
-        if root is not None:
-            return root
-    return None
-
-
-def _case_contains_special_float(case: Case) -> bool:
-    import math
-
-    for table in case.tables:
-        for row in table.rows:
-            for value in row.values():
-                if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
-                    return True
-    return False
-
-
-def _case_has_running_sum(case: Case) -> bool:
-    return any(op.get("op") == "running_sum" for op in case.program.operations)
-
-
-def _case_has_path_projection_keyed_pick(case: Case) -> bool:
-    has_basename = any(
-        op.get("op") == "mutate" and op.get("expr", {}).get("kind") == "string_basename"
-        for op in case.program.operations
-    )
-    has_keyed_pick = any(op.get("op") == "row_number_filter" for op in case.program.operations)
-    return has_basename and has_keyed_pick
-
-
 def _case_has_sortedness_check(case: Case) -> bool:
-    return any(op.get("op") == "sortedness_check" for op in case.program.operations)
+    return "sortedness_check" in operation_names(case.program.operations)
 
 
 def _case_has_random_case_probe(case: Case) -> bool:
-    return any(op.get("op") == "random_case_probe" for op in case.program.operations)
+    return "random_case_probe" in operation_names(case.program.operations)
 
 
 def _case_has_group_quantile_probe(case: Case) -> bool:
-    return any(op.get("op") == "group_quantile_probe" for op in case.program.operations)
+    return "group_quantile_probe" in operation_names(case.program.operations)
 
 
 def _case_has_scalar_subquery_probe(case: Case) -> bool:
-    return any(op.get("op") == "scalar_subquery_probe" for op in case.program.operations)
+    return "scalar_subquery_probe" in operation_names(case.program.operations)
 
 
 def _case_has_window_avg_probe(case: Case) -> bool:
-    return any(op.get("op") == "window_avg_probe" for op in case.program.operations)
+    return "window_avg_probe" in operation_names(case.program.operations)
 
 
 def _case_has_struct_distinct_probe(case: Case) -> bool:
-    return any(op.get("op") == "struct_distinct_probe" for op in case.program.operations)
+    return "struct_distinct_probe" in operation_names(case.program.operations)
 
 
 def _case_has_bit_compare_probe(case: Case) -> bool:
-    return any(op.get("op") == "bit_compare_probe" for op in case.program.operations)
+    return "bit_compare_probe" in operation_names(case.program.operations)
 
 
 def _case_has_round_even_probe(case: Case) -> bool:
-    return any(op.get("op") == "round_even_probe" for op in case.program.operations)
+    return "round_even_probe" in operation_names(case.program.operations)
 
 
 def _case_has_series_rtruediv_probe(case: Case) -> bool:
-    return any(op.get("op") == "series_rtruediv_probe" for op in case.program.operations)
+    return "series_rtruediv_probe" in operation_names(case.program.operations)
 
 
 def _case_has_uint64_isin_probe(case: Case) -> bool:
-    return any(op.get("op") == "uint64_isin_probe" for op in case.program.operations)
+    return "uint64_isin_probe" in operation_names(case.program.operations)
 
 
 def _case_has_tuple_anti_null_probe(case: Case) -> bool:
-    return any(op.get("op") == "tuple_anti_null_probe" for op in case.program.operations)
+    return "tuple_anti_null_probe" in operation_names(case.program.operations)
 
 
 def _case_has_json_predicate_order_probe(case: Case) -> bool:
-    return any(op.get("op") == "json_predicate_order_probe" for op in case.program.operations)
+    return "json_predicate_order_probe" in operation_names(case.program.operations)
 
 
 def _case_has_sparse_mask_probe(case: Case) -> bool:
-    return any(op.get("op") == "sparse_mask_probe" for op in case.program.operations)
+    return "sparse_mask_probe" in operation_names(case.program.operations)
 
 
 def _case_has_float_wrap_probe(case: Case) -> bool:
-    return any(op.get("op") == "float_wrap_probe" for op in case.program.operations)
+    return "float_wrap_probe" in operation_names(case.program.operations)
 
 
 def _case_has_index_bool_probe(case: Case) -> bool:
-    return any(op.get("op") == "index_bool_probe" for op in case.program.operations)
+    return "index_bool_probe" in operation_names(case.program.operations)
 
 
 def _case_has_empty_literal_groupby_probe(case: Case) -> bool:
-    return any(op.get("op") == "empty_literal_groupby_probe" for op in case.program.operations)
+    return "empty_literal_groupby_probe" in operation_names(case.program.operations)
 
 
 def _case_has_arrow_string_eq_sum_probe(case: Case) -> bool:
-    return any(op.get("op") == "arrow_string_eq_sum_probe" for op in case.program.operations)
+    return "arrow_string_eq_sum_probe" in operation_names(case.program.operations)
 
 
 def _case_has_arrow_timestamp_loc_slice_probe(case: Case) -> bool:
-    return any(op.get("op") == "arrow_timestamp_loc_slice_probe" for op in case.program.operations)
+    return "arrow_timestamp_loc_slice_probe" in operation_names(case.program.operations)
 
 
 def _case_has_arrow_timestamp_index_attr_probe(case: Case) -> bool:
-    return any(op.get("op") == "arrow_timestamp_index_attr_probe" for op in case.program.operations)
+    return "arrow_timestamp_index_attr_probe" in operation_names(case.program.operations)
 
 
 def _case_has_eval_inplace_alias_probe(case: Case) -> bool:
-    return any(op.get("op") == "eval_inplace_alias_probe" for op in case.program.operations)
+    return "eval_inplace_alias_probe" in operation_names(case.program.operations)
 
 
 def _case_has_dataset_isin_all_match_probe(case: Case) -> bool:
-    return any(op.get("op") == "dataset_isin_all_match_probe" for op in case.program.operations)
+    return "dataset_isin_all_match_probe" in operation_names(case.program.operations)
 
 
 def _case_has_large_string_partition_probe(case: Case) -> bool:
-    return any(op.get("op") == "large_string_partition_probe" for op in case.program.operations)
+    return "large_string_partition_probe" in operation_names(case.program.operations)
 
 
 def _case_has_hash_pivot_wider_probe(case: Case) -> bool:
-    return any(op.get("op") == "hash_pivot_wider_probe" for op in case.program.operations)
+    return "hash_pivot_wider_probe" in operation_names(case.program.operations)
+
+
+def _case_has_list_flatten_parent_indices_probe(case: Case) -> bool:
+    return "list_flatten_parent_indices_probe" in operation_names(case.program.operations)
 
 
 def _case_has_rolling_mean_by_null_count_probe(case: Case) -> bool:
-    return any(op.get("op") == "rolling_mean_by_null_count_probe" for op in case.program.operations)
-
-
-def _case_uses_modulo(case: Case) -> bool:
-    return any(
-        op.get("op") == "mutate"
-        and op.get("expr", {}).get("kind") == "arith_const"
-        and op.get("expr", {}).get("op") == "mod"
-        for op in case.program.operations
-    )
+    return "rolling_mean_by_null_count_probe" in operation_names(case.program.operations)
 
 
 def _case_has_reverse_division_columns(case: Case) -> bool:
     return any(
-        op.get("op") == "mutate" and op.get("expr", {}).get("kind") == "reverse_division_columns"
-        for op in case.program.operations
+        op_kind == "mutate" and expr_kind(op) == "reverse_division_columns"
+        for op_kind, op in zip(operation_names(case.program.operations), case.program.operations)
     )
-
-
-def _case_has_outer_join_truth_filter(case: Case) -> bool:
-    after_left_join = False
-    for op in case.program.operations:
-        if op.get("op") == "join":
-            after_left_join = op.get("how") == "left"
-        elif op.get("op") == "filter" and after_left_join:
-            parsed = parse_filter_comparator(op.get("cmp", ""))
-            if parsed is not None and parsed.truth_test is not None:
-                return True
-        elif op.get("op") in {"groupby", "aggregate"}:
-            after_left_join = False
-    return False
-
-
-def _case_has_post_topk_filter(case: Case) -> bool:
-    ops = case.program.operations
-    for sort_idx, op in enumerate(ops):
-        if op.get("op") != "sort":
-            continue
-        for topk_idx in range(sort_idx + 1, len(ops)):
-            if ops[topk_idx].get("op") not in {"limit", "offset"}:
-                continue
-            if any(later.get("op") == "filter" for later in ops[topk_idx + 1 :]):
-                return True
-    return False
 
 
 def _case_has_joined_order_offset_projection(case: Case) -> bool:
     saw_join = False
     saw_order_after_join = False
     for op in case.program.operations:
-        kind = op.get("op")
+        kind = op_kind(op)
         if kind == "join":
             saw_join = True
         elif kind == "sort" and saw_join:
@@ -348,7 +327,7 @@ def _case_has_ordered_topk_projection(case: Case) -> bool:
     saw_order = False
     saw_topk_after_order = False
     for op in case.program.operations:
-        kind = op.get("op")
+        kind = op_kind(op)
         if kind == "sort":
             if saw_topk_after_order:
                 return True
@@ -364,19 +343,18 @@ def _case_has_negative_zero_comparison(case: Case) -> bool:
     zero_source_columns = _columns_with_float_zero(case)
     negative_zero_columns = set()
     for op in case.program.operations:
-        kind = op.get("op")
+        kind = op_kind(op)
         if kind == "mutate":
-            expr = op.get("expr", {})
             if (
-                expr.get("kind") == "arith_const"
-                and expr.get("op") == "mul"
-                and _is_negative_numeric_value(expr.get("value"))
-                and expr.get("source") in zero_source_columns
+                expr_kind(op) == "arith_const"
+                and expr_operator(op) == "mul"
+                and _is_negative_numeric_value(expr_value(op))
+                and expr_source(op) in zero_source_columns
             ):
-                negative_zero_columns.add(str(op.get("column")))
-        elif kind == "filter" and op.get("column") in negative_zero_columns:
-            parsed = parse_filter_comparator(op.get("cmp"))
-            if parsed is not None and _filter_comparator_touches_zero(parsed.base, op.get("value")):
+                negative_zero_columns.add(op_column(op))
+        elif kind == "filter" and op_column(op) in negative_zero_columns:
+            parsed = parse_filter_comparator(condition_cmp(op) or op_comparator(op))
+            if parsed is not None and _filter_comparator_touches_zero(parsed.base, op_value(op)):
                 return True
     return False
 
@@ -384,7 +362,7 @@ def _case_has_negative_zero_comparison(case: Case) -> bool:
 def _filter_comparator_touches_zero(base: str, value: Any) -> bool:
     if base in {">", ">=", "<", "<=", "==", "!="}:
         return _is_numeric_value(value, 0.0)
-    if base == "in_set" and isinstance(value, (list, tuple, frozenset, set)):
+    if base in {"in_set", "not_in_set"} and isinstance(value, (list, tuple, frozenset, set)):
         return any(_is_numeric_value(item, 0.0) for item in value)
     if base == "range_closed" and isinstance(value, (list, tuple)) and len(value) == 2:
         lower, upper = value
@@ -435,7 +413,7 @@ def _is_orderable_number(value: Any) -> bool:
 
 
 def _case_has_tuple_absence_filter(case: Case) -> bool:
-    return any(op.get("op") == "tuple_absence_filter" for op in case.program.operations)
+    return "tuple_absence_filter" in operation_names(case.program.operations)
 
 
 def _case_has_grouped_topk_null_sort_key(case: Case) -> bool:
@@ -452,21 +430,21 @@ def _case_has_grouped_topk_null_sort_key(case: Case) -> bool:
     grouped = False
     ops = case.program.operations
     for idx, op in enumerate(ops):
-        kind = op.get("op")
+        kind = op_kind(op)
         if kind == "join":
-            samples = _join_samples(samples, table_samples.get(str(op.get("table", "")), {}), op)
+            samples = join_samples(samples, table_samples.get(op_table(op), {}), op)
         elif kind == "filter":
-            samples = _filter_samples(samples, op)
+            samples = filter_samples(samples, op)
         elif kind == "select":
-            selected = [str(column) for column in op.get("columns", []) if str(column) in samples]
+            selected = [column for column in op_columns(op) if column in samples]
             samples = {column: samples[column] for column in selected}
         elif kind == "mutate":
-            column = str(op.get("column", ""))
-            values = _eval_expr_samples(samples, op.get("expr", {}))
+            column = op_column(op)
+            values = eval_expr_samples(samples, expr_payload(op))
             if column and values is not None:
                 samples[column] = values
         elif kind == "groupby":
-            samples = _groupby_output_samples(samples, op)
+            samples = groupby_output_samples(samples, op)
             grouped = True
         elif kind == "sort" and grouped:
             try:
@@ -474,65 +452,51 @@ def _case_has_grouped_topk_null_sort_key(case: Case) -> bool:
             except ValueError:
                 sort_columns = []
             if any(any(value is None for value in samples[column]) for column in sort_columns):
-                if any(later.get("op") in {"limit", "offset"} for later in ops[idx + 1 :]):
+                if any(operation_names(ops[idx + 1 :])[j] in {"limit", "offset"} for j in range(len(ops[idx + 1 :]))):
                     return True
     return False
 
 
-def _join_samples(
-    left_samples: dict[str, list[Any]],
-    right_samples: dict[str, list[Any]],
-    op: dict[str, Any],
-) -> dict[str, list[Any]]:
-    left_on = str(op.get("left_on", ""))
-    right_on = str(op.get("right_on", ""))
-    if not right_samples or left_on not in left_samples or right_on not in right_samples:
-        return left_samples
-
-    right_extra_columns = [
-        column
-        for column in right_samples
-        if column != right_on and column not in left_samples
-    ]
-    output_columns = list(left_samples) + right_extra_columns
-    right_index: dict[Any, list[dict[str, Any]]] = {}
-    for row in _rows_from_samples(right_samples):
-        key = row.get(right_on)
-        if key is not None:
-            right_index.setdefault(key, []).append(row)
-
-    joined_rows: list[dict[str, Any]] = []
-    how = str(op.get("how", "inner"))
-    for left in _rows_from_samples(left_samples):
-        key = left.get(left_on)
-        matches = [] if key is None else right_index.get(key, [])
-        if matches:
-            for right in matches:
-                row = dict(left)
-                for column in right_extra_columns:
-                    row[column] = right.get(column)
-                joined_rows.append(row)
-        elif how == "left":
-            row = dict(left)
-            for column in right_extra_columns:
-                row[column] = None
-            joined_rows.append(row)
-    return _samples_from_rows(joined_rows, output_columns)
-
-
-def _rows_from_samples(samples: dict[str, list[Any]]) -> list[dict[str, Any]]:
-    row_count = min((len(values) for values in samples.values()), default=0)
-    return [
-        {column: values[idx] for column, values in samples.items()}
-        for idx in range(row_count)
-    ]
-
-
-def _samples_from_rows(rows: list[dict[str, Any]], columns: list[str]) -> dict[str, list[Any]]:
-    return {
-        column: [row.get(column) for row in rows]
-        for column in columns
+def _case_has_distinct_null_topk(case: Case) -> bool:
+    if not case.tables:
+        return False
+    table_samples = {
+        table.name: {
+            column.name: [row.get(column.name) for row in table.rows]
+            for column in table.columns
+        }
+        for table in case.tables
     }
+    samples = dict(table_samples.get(case.tables[0].name, {}))
+    saw_distinct = False
+    ops = case.program.operations
+    for idx, op in enumerate(ops):
+        kind = op_kind(op)
+        if kind == "join":
+            samples = join_samples(samples, table_samples.get(op_table(op), {}), op)
+        elif kind == "filter":
+            samples = filter_samples(samples, op)
+        elif kind == "select":
+            selected = [column for column in op_columns(op) if column in samples]
+            samples = {column: samples[column] for column in selected}
+        elif kind == "mutate":
+            column = op_column(op)
+            values = eval_expr_samples(samples, expr_payload(op))
+            if column and values is not None:
+                samples[column] = values
+        elif kind == "distinct":
+            samples = distinct_output_samples(samples, op)
+            saw_distinct = True
+        elif kind == "sort" and saw_distinct:
+            try:
+                sort_keys = [key for key in normalize_sort_keys(op) if key.column in samples]
+            except ValueError:
+                sort_keys = []
+            nulls_first_keys = [key.column for key in sort_keys if key.nulls == "first"]
+            if any(any(value is None for value in samples[column]) for column in nulls_first_keys):
+                if any(operation_names(ops[idx + 1 :])[j] in {"limit", "offset"} for j in range(len(ops[idx + 1 :]))):
+                    return True
+    return False
 
 
 def _case_has_float_group_key_instability(
@@ -559,121 +523,29 @@ def _case_has_float_group_key_instability(
 
 def _final_groupby_keys(case: Case) -> list[str]:
     for op in reversed(case.program.operations):
-        if op.get("op") == "groupby":
-            return [str(key) for key in op.get("keys", [])]
+        if op_kind(op) == "groupby":
+            return groupby_keys(op)
     return []
 
 
 def _column_types_before_groupby(case: Case) -> dict[str, str]:
-    if not case.tables:
-        return {}
-    table_by_name = {table.name: table for table in case.tables}
-    col_types = {column.name: column.type for column in case.tables[0].columns}
-    for op in case.program.operations:
-        kind = op.get("op")
-        if kind == "join":
-            right = table_by_name.get(str(op.get("table", "")))
-            if right is None:
-                continue
-            right_on = str(op.get("right_on", ""))
-            for column in right.columns:
-                if column.name == right_on or column.name in col_types:
-                    continue
-                col_types[column.name] = column.type
-        elif kind == "select":
-            selected = {str(column) for column in op.get("columns", [])}
-            col_types = {name: typ for name, typ in col_types.items() if name in selected}
-        elif kind == "mutate":
-            out_type = _expr_output_type(op.get("expr", {}), col_types)
-            if out_type is not None:
-                col_types[str(op.get("column", ""))] = out_type
-        elif kind == "groupby":
-            return col_types
-    return col_types
+    return state_before_first_operation(case, "groupby").column_types
 
 
 def _case_uses_arithmetic_float_lineage(case: Case, groupby_keys: list[str]) -> bool:
-    lineage: dict[str, set[str]] = {}
-    if case.tables:
-        for column in case.tables[0].columns:
-            lineage[column.name] = {column.name}
-        for table in case.tables[1:]:
-            for column in table.columns:
-                lineage.setdefault(column.name, {column.name})
-    arithmetic_float_columns: set[str] = set()
-    for op in case.program.operations:
-        kind = op.get("op")
-        if kind == "select":
-            selected = {str(column) for column in op.get("columns", [])}
-            lineage = {name: deps for name, deps in lineage.items() if name in selected}
-        elif kind == "mutate":
-            column = str(op.get("column", ""))
-            expr = op.get("expr", {})
-            source = str(expr.get("source", ""))
-            deps = set(lineage.get(source, {source}))
-            if column:
-                lineage[column] = deps | {column}
-            if (
-                expr.get("kind") == "arith_const"
-                and expr.get("op") == "div"
-                and column
-            ) or (expr.get("kind") == "cast" and expr.get("to") == "float" and column):
-                arithmetic_float_columns.add(column)
-        elif kind == "groupby":
-            break
-    for key in groupby_keys:
-        deps = lineage.get(key, {key})
-        if deps & arithmetic_float_columns:
-            return True
-        if key in arithmetic_float_columns:
-            return True
-    return False
+    return case_uses_arithmetic_float_lineage(case, groupby_keys)
 
 
 def _expr_output_type(expr: dict[str, Any], col_types: dict[str, str]) -> str | None:
-    source = str(expr.get("source", ""))
-    source_type = col_types.get(source)
-    if source_type is None:
-        return None
-    kind = expr.get("kind")
-    if kind == "add_const":
-        return source_type if source_type in {"int", "float"} else None
-    if kind == "arith_const":
-        op = expr.get("op")
-        if source_type not in {"int", "float"} or op not in {"sub", "mul", "div", "mod"}:
-            return None
-        return "float" if op == "div" or source_type == "float" else source_type
-    if kind == "cast" and expr.get("to") == "float":
-        return "float" if source_type in {"int", "float"} else None
-    if kind == "string_length":
-        return "int" if source_type == "str" else None
-    if kind == "string_lower":
-        return "str" if source_type == "str" else None
-    if kind == "string_basename":
-        return "str" if source_type == "str" else None
-    return None
+    return expr_output_type(expr, col_types)
+
+
+def _cast_output_type(source_type: str, expr: dict[str, Any]) -> str | None:
+    return cast_output_type(source_type, expr)
 
 
 def _has_duplicate_normalized_rows(result: NormalizedResult) -> bool:
-    seen: set[str] = set()
-    for row in result.rows:
-        key = json.dumps(row, ensure_ascii=False, sort_keys=True)
-        if key in seen:
-            return True
-        seen.add(key)
-    return False
-
-
-def _filter_samples(samples: dict[str, list[Any]], op: dict[str, Any]) -> dict[str, list[Any]]:
-    column = str(op.get("column", ""))
-    values = samples.get(column)
-    if values is None:
-        return samples
-    mask = [_compare_value(value, str(op.get("cmp", "")), op.get("value")) for value in values]
-    return {
-        name: [value for value, keep in zip(column_values, mask) if keep]
-        for name, column_values in samples.items()
-    }
+    return result.has_duplicate_rows
 
 
 def _compare_value(left: Any, comparator: str, right: Any) -> bool:
@@ -681,93 +553,6 @@ def _compare_value(left: Any, comparator: str, right: Any) -> bool:
         return evaluate_filter_predicate(left, comparator, right)
     except Exception:
         return False
-
-
-def _eval_expr_samples(samples: dict[str, list[Any]], expr: dict[str, Any]) -> list[Any] | None:
-    source = str(expr.get("source", ""))
-    values = samples.get(source)
-    if values is None:
-        return None
-    out = []
-    for value in values:
-        if value is None:
-            out.append(None)
-            continue
-        try:
-            kind = expr.get("kind")
-            if kind == "add_const":
-                out.append(value + expr.get("value", 0))
-            elif kind == "arith_const":
-                op = expr.get("op")
-                operand = expr.get("value", 0)
-                if op == "sub":
-                    out.append(value - operand)
-                elif op == "mul":
-                    out.append(value * operand)
-                elif op == "div":
-                    out.append(value / operand)
-                elif op == "mod":
-                    out.append(value % operand)
-                else:
-                    out.append(None)
-            elif kind == "cast" and expr.get("to") == "float":
-                out.append(float(value))
-            elif kind == "string_length":
-                out.append(len(value) if isinstance(value, str) else None)
-            elif kind == "string_lower":
-                out.append(value.lower() if isinstance(value, str) else None)
-            elif kind == "string_basename":
-                text = str(value)
-                slash = max(text.rfind("/"), text.rfind("\\"))
-                out.append(text[slash + 1 :] if slash >= 0 else text)
-            else:
-                out.append(None)
-        except Exception:
-            out.append(None)
-    return out
-
-
-def _groupby_output_samples(samples: dict[str, list[Any]], op: dict[str, Any]) -> dict[str, list[Any]]:
-    keys = [str(key) for key in op.get("keys", []) if str(key) in samples]
-    row_count = min((len(samples[key]) for key in keys), default=0)
-    groups: dict[tuple[Any, ...], list[int]] = {}
-    for idx in range(row_count):
-        key_tuple = tuple(samples[key][idx] for key in keys)
-        groups.setdefault(key_tuple, []).append(idx)
-    out: dict[str, list[Any]] = {key: [] for key in keys}
-    for key_tuple in groups:
-        for idx, key in enumerate(keys):
-            out[key].append(key_tuple[idx])
-    for agg in op.get("aggs", []):
-        alias = str(agg.get("as", ""))
-        source_values = samples.get(str(agg.get("column", "")), [])
-        if not alias:
-            continue
-        values = []
-        for indices in groups.values():
-            group_values = [source_values[idx] for idx in indices if idx < len(source_values)]
-            non_null = [value for value in group_values if value is not None]
-            func = agg.get("func")
-            if func == "count":
-                values.append(len(non_null))
-            elif func == "nunique":
-                values.append(len(set(non_null)))
-            elif not non_null:
-                values.append(None)
-            elif func == "any":
-                values.append(any(bool(value) for value in non_null))
-            elif func == "all":
-                values.append(all(bool(value) for value in non_null))
-            elif func == "sum":
-                values.append(sum(non_null))
-            elif func == "min":
-                values.append(min(non_null))
-            elif func == "max":
-                values.append(max(non_null))
-            else:
-                values.append(None)
-        out[alias] = values
-    return out
 
 
 def evaluate_case(case: Case, normalized: dict[str, NormalizedResult]) -> list[Finding]:
@@ -811,23 +596,18 @@ def evaluate_case(case: Case, normalized: dict[str, NormalizedResult]) -> list[F
         return findings
 
     if len(ok) >= 2:
-        payloads = {b: _payload(r) for b, r in ok.items()}
-        unique = {}
-        for b, p in payloads.items():
-            key = json.dumps(p, ensure_ascii=False, sort_keys=True)
-            unique.setdefault(key, []).append(b)
-        if len(unique) > 1:
-            group_sizes = [len(group) for group in unique.values()]
-            max_size = max(group_sizes)
-            if group_sizes.count(max_size) > 1:
-                suspicious = sorted(ok)
-            else:
-                largest_group = next(group for group in unique.values() if len(group) == max_size)
-                suspicious = sorted(b for group in unique.values() if group is not largest_group for b in group)
+        ok_items = list(ok.items())
+        ok_backends = [backend for backend, _ in ok_items]
+        comparison = compare_row_set_batch(
+            [result.rows for _, result in ok_items],
+            column_sets=[result.columns for _, result in ok_items],
+        )
+        if comparison.has_mismatch:
+            suspicious = sorted(comparison.suspicious_labels(ok_backends))
             sig = _signature(case, normalized, "semantic_output_mismatch")
             kind = "semantic_output_mismatch"
             shapes = {b: (len(r.rows), len(r.columns)) for b, r in ok.items()}
-            mismatch_class = _semantic_mismatch_class(ok)
+            mismatch_class = comparison.mismatch_class
             findings.append(Finding(
                 finding_id=f"finding-{sig}",
                 kind=kind,
@@ -837,27 +617,18 @@ def evaluate_case(case: Case, normalized: dict[str, NormalizedResult]) -> list[F
                 signature=sig,
                 root_cause=classify_root_cause(case, normalized, kind),
                 oracle="differential",
-                confidence="high" if len(suspicious) < len(ok) else "medium",
+                confidence=comparison.default_confidence(),
                 mismatch_class=mismatch_class,
             ))
     return findings
 
 
 def _semantic_mismatch_class(ok_results: dict[str, NormalizedResult]) -> str:
-    columns = [tuple(result.columns) for result in ok_results.values()]
-    if len(set(columns)) > 1:
-        return "schema"
-    row_counts = [len(result.rows) for result in ok_results.values()]
-    if len(set(row_counts)) > 1:
-        return "row_count"
-    ordered = [_stable_rows(result.rows) for result in ok_results.values()]
-    if len({tuple(rows) for rows in ordered}) <= 1:
+    result_rows = list(ok_results.values())
+    if len(result_rows) < 2:
         return "none"
-    unordered = [tuple(sorted(rows)) for rows in ordered]
-    if len(set(unordered)) == 1:
-        return "row_order"
-    return "value"
-
-
-def _stable_rows(rows: list[list[Any]]) -> list[str]:
-    return [json.dumps(row, ensure_ascii=False, sort_keys=True) for row in rows]
+    comparison = compare_row_set_batch(
+        [result.rows for result in result_rows],
+        column_sets=[result.columns for result in result_rows],
+    )
+    return comparison.mismatch_class

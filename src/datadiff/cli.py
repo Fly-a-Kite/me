@@ -6,49 +6,103 @@ import os
 import time
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, ThreadPoolExecutor, as_completed, wait
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import get_args
 
 from datadiff.ablation_audit import analyze_ablation_audit
+from datadiff.bug_audit import list_audit_probe_ids, run_probe_audit, write_probe_issue_drafts
+from datadiff.candidate_pipeline import DEFAULT_CANDIDATE_PIPELINE_DIR, build_candidate_pipeline
+from datadiff.bug_status import build_issue_status, write_issue_status_outputs
 from datadiff.classification_oracle import classify_finding
 from datadiff.config import (
     DEFAULT_KNOWN_SATURATED_BUG_FAMILIES,
     DEFAULT_REPLAY_BUG_SOURCE_ISSUES,
+    DiscoveryBias,
     ExperimentConfig,
+    GeneratorProfile,
+    merge_discovery_biases,
 )
 from datadiff.dsl import Case
+from datadiff.experiment_catalog import (
+    EXPERIMENT_EVIDENCE_MODES,
+    FIXTURE_REPLAY_EVIDENCE_MODES,
+    registered_experiment_meta_defaults,
+    registered_experiment_matrix_for_run,
+    registered_experiment_meta_for_run,
+    replay_bug_enabled_by_default,
+)
 from datadiff.experiment_analysis import analyze_experiment
+from datadiff.experiment_metadata import (
+    merge_experiment_meta,
+    normalize_experiment_meta,
+    parse_experiment_meta,
+    resolved_run_semantics,
+)
 from datadiff.final_readiness import (
     DEFAULT_A_LEVEL_READINESS_POLICY,
+    DEFAULT_FINAL_READINESS_MANIFEST_LIMIT,
     ReadinessPolicy,
     ReadinessThresholds,
     analyze_final_readiness,
 )
 from datadiff.fixture_replay import build_fixture_replay_case, load_fixture_replay_spec
-from datadiff.historical import list_historical_bugs
-from datadiff.normalizer import NormalizedResult
+from datadiff.historical import get_historical_bug, list_historical_bugs
+from datadiff.issue_bundle import (
+    DEFAULT_ISSUE_BUNDLE_STATUSES,
+    build_issue_bundle,
+)
+from datadiff.issue_readiness import (
+    build_issue_readiness,
+    write_issue_readiness_outputs,
+)
+from datadiff.live_target_catalog import LIVE_PRESET_TARGETS_BY_NAME
+from datadiff.methodology_report import write_methodology_report
+from datadiff.normalizer import NormalizedResult, normalized_results_from_mapping
 from datadiff.guidance import parse_guidance_targets
-from datadiff.operation_combo import classify_operation_combo
+from datadiff.operation_combo import describe_operation_combo
+from datadiff.operation_semantics import operation_names
 from datadiff.oracle import evaluate_case
 from datadiff.pattern_analysis import analyze_pattern_variants
-from datadiff.reporter import latest_run_file, write_experiment_summary, write_report
+from datadiff.preset_catalog import build_catalog_preset
+from datadiff.preset_catalog import build_experiment_config
+from datadiff.reporter import (
+    latest_run_log_path,
+    write_experiment_summary_report,
+    write_run_report,
+)
 from datadiff.reducer import reduce_case
+from datadiff.review_readiness import (
+    ReviewThresholds,
+    build_review_readiness,
+    write_review_readiness_outputs,
+)
+from datadiff.reward import backend_group_key, offline_finding_bucket
 from datadiff.run_journal import (
     append_run_journal_entries,
     build_run_journal_entry,
     record_run_journal,
     write_run_journal_markdown,
 )
-from datadiff.runner import _compact_log_row, run_fuzz, run_loaded_case
+from datadiff.runner import _compact_log_row, _configured_guidance_targets, run_fuzz, run_loaded_case
 from datadiff.scheduler import AdaptiveBudgetScheduler, AdaptiveScheduleConfig, summarize_batch_run
 from datadiff.seeded_analysis import analyze_seeded_sensitivity
+from datadiff.strategy_registry import (
+    DEFAULT_DISCOVERY_LANE_IDS,
+    discovery_lane_catalog,
+    discovery_lane_spec,
+    discovery_biases_for_lanes,
+)
 from datadiff.targets import (
     TARGETS,
     TARGET_SUITES,
     common_capabilities,
+    describe_methodology,
     describe_targets,
     list_target_suites,
     parse_backend_names,
     resolve_target_backends,
+    target_context,
     target_capability_matrix,
 )
 from datadiff.triage import (
@@ -61,664 +115,38 @@ from datadiff.util import (
     BUGS_DIR,
     CORPUS_DIR,
     JsonlWriter,
+    PROJECT_ROOT,
     REPORTS_DIR,
     RUNS_DIR,
+    closed_loop_state_path,
     dump_json,
     ensure_dirs,
     load_json,
     parse_duration,
     read_jsonl,
+    read_jsonl_partial,
     run_meta_path,
     slugify,
     utc_now,
+    unique_preserve_order,
 )
 
-LIVE_BUGHUNT_TARGETS = [
-    "common_workflow",
-    "operation_combo",
-    "topk",
-    "join",
-    "join_null_truth_filter",
-    "join_null_key_topk",
-    "groupby",
-    "mutate",
-    "filter",
-    "truth_filter",
-    "nulls",
-    "aggregation",
-    "global_aggregation",
-    "sort_limit",
-    "topk_resort",
-    "ordered_groupby_sort",
-    "join_ordered_agg_topk",
-    "global_null_aggregate",
-    "string_count_groupby",
-    "unique_count_groupby",
-    "bool_null_groupby_agg",
-    "large_int_filter_groupby",
-    "large_integer",
-    "boolean_aggregation",
-    "bool_any_all",
-    "set_membership_filter",
-    "null_predicate_filter",
-    "boolean_predicate_filter",
-    "post_topk_range_filter",
-    "tuple_absence_filter",
-    "running_sum_precision",
-    "running_sum",
-    "partitioned_running_sum",
-    "running_sum_partitioned",
-    "path_basename_keyed_pick",
-    "path_projection",
-    "keyed_row_pick",
-    "sortedness_null_placement",
-    "sortedness",
-    "simple_case_random_subject",
-    "random_case_probe",
-    "group_quantile_key_probe",
-    "group_quantile_probe",
-    "scalar_subquery_double_parentheses",
-    "scalar_subquery_probe",
-    "window_avg_rows_frame",
-    "window_avg_probe",
-    "struct_distinct_unnest",
-    "struct_distinct_probe",
-    "bit_compare_unequal_length",
-    "bit_compare_probe",
-    "round_even_float_scale",
-    "round_even_probe",
-    "duckdb_float_literal_precision",
-    "float_literal_precision_probe",
-    "polars_timestamp_precision_filter",
-    "timestamp_precision_filter_probe",
-    "series_rtruediv_operand_order",
-    "series_rtruediv_probe",
-    "polars_reverse_division_columns",
-    "pandas_uint64_isin_precision",
-    "uint64_isin_probe",
-    "duckdb_tuple_anti_null_semantics",
-    "tuple_anti_null_probe",
-    "datafusion_setop_all_duplicate_count",
-    "setop_all_duplicate_probe",
-    "setop_all_duplicates",
-    "duckdb_json_predicate_order_semantics",
-    "json_predicate_order_probe",
-    "pandas_sparse_array_mask_semantics",
-    "sparse_mask_probe",
-    "polars_float_wrap_numerical_semantics",
-    "float_wrap_probe",
-    "pandas_index_bool_result_type",
-    "index_bool_probe",
-    "polars_empty_literal_groupby_semantics",
-    "empty_literal_groupby_probe",
-    "pandas_arrow_string_eq_sum_semantics",
-    "arrow_string_eq_sum_probe",
-    "pandas_arrow_timestamp_loc_slice_semantics",
-    "arrow_timestamp_loc_slice_probe",
-    "pandas_arrow_timestamp_index_attr_semantics",
-    "arrow_timestamp_index_attr_probe",
-    "pandas_eval_inplace_aliasing_semantics",
-    "eval_inplace_alias_probe",
-    "eval_inplace_aliasing",
-    "pandas_bool_reduction_skipna_semantics",
-    "bool_reduction_skipna_probe",
-    "bool_reduction_skipna",
-    "pyarrow_dataset_isin_all_match_semantics",
-    "dataset_isin_all_match_probe",
-    "pyarrow_run_end_null_compute_semantics",
-    "run_end_null_compute_probe",
-    "run_end_null_compute",
-    "pyarrow_large_string_partition_schema_semantics",
-    "large_string_partition_probe",
-    "pyarrow_hash_pivot_wider_order_semantics",
-    "hash_pivot_wider_probe",
-    "hash_pivot_wider",
-    "polars_rolling_mean_by_null_count_semantics",
-    "rolling_mean_by_null_count_probe",
-    "csv_long_numeric_roundtrip",
-    "csv_long_numeric_roundtrip_probe",
-    "csv_numeric_inference",
-    "wide_offset_topk",
-    "empty_filter_groupby",
-    "expressions",
-]
+latest_run_file = latest_run_log_path
+write_report = write_run_report
+write_experiment_summary = write_experiment_summary_report
+available_bug_audit_probe_ids = list_audit_probe_ids
+run_bug_audit = run_probe_audit
+write_bug_audit_issue_drafts = write_probe_issue_drafts
+build_bug_status = build_issue_status
+write_bug_status_outputs = write_issue_status_outputs
 
-LIVE_DATAFUSION_FRESH_TARGETS = [
-    "common_workflow",
-    "operation_combo",
-    "join",
-    "mutate",
-    "filter",
-    "truth_filter",
-    "nulls",
-    "strings",
-    "numeric",
-    "casts",
-    "expressions",
-    "sort",
-    "set_membership_filter",
-    "null_predicate_filter",
-    "boolean_predicate_filter",
-    "tuple_absence_filter",
-    "row_value_absence_filter",
-    "datafusion_setop_all_duplicate_count",
-    "setop_all_duplicate_probe",
-    "setop_all_duplicates",
-    "running_sum_precision",
-    "running_sum",
-    "partitioned_running_sum",
-    "running_sum_partitioned",
-    "path_basename_keyed_pick",
-    "path_projection",
-    "keyed_row_pick",
-    "sortedness_null_placement",
-    "sortedness",
-]
-
-LIVE_ARROW_TARGETS = [
-    "common_workflow",
-    "operation_combo",
-    "join",
-    "join_null_truth_filter",
-    "join_null_key_topk",
-    "groupby",
-    "mutate",
-    "filter",
-    "truth_filter",
-    "strings",
-    "casts",
-    "nulls",
-    "aggregation",
-    "global_aggregation",
-    "sort_limit",
-    "topk",
-    "topk_resort",
-    "ordered_groupby_sort",
-    "join_ordered_agg_topk",
-    "global_null_aggregate",
-    "string_count_groupby",
-    "unique_count_groupby",
-    "bool_null_groupby_agg",
-    "large_int_filter_groupby",
-    "large_integer",
-    "boolean_aggregation",
-    "bool_any_all",
-    "set_membership_filter",
-    "pyarrow_groupby_filter_cast_membership",
-    "null_predicate_filter",
-    "boolean_predicate_filter",
-    "post_topk_range_filter",
-    "tuple_absence_filter",
-    "running_sum_precision",
-    "running_sum",
-    "partitioned_running_sum",
-    "running_sum_partitioned",
-    "path_basename_keyed_pick",
-    "path_projection",
-    "keyed_row_pick",
-    "sortedness_null_placement",
-    "sortedness",
-    "simple_case_random_subject",
-    "random_case_probe",
-    "group_quantile_key_probe",
-    "group_quantile_probe",
-    "scalar_subquery_double_parentheses",
-    "scalar_subquery_probe",
-    "window_avg_rows_frame",
-    "window_avg_probe",
-    "struct_distinct_unnest",
-    "struct_distinct_probe",
-    "bit_compare_unequal_length",
-    "bit_compare_probe",
-    "round_even_float_scale",
-    "round_even_probe",
-    "duckdb_float_literal_precision",
-    "float_literal_precision_probe",
-    "polars_timestamp_precision_filter",
-    "timestamp_precision_filter_probe",
-    "series_rtruediv_operand_order",
-    "series_rtruediv_probe",
-    "pandas_uint64_isin_precision",
-    "uint64_isin_probe",
-    "duckdb_tuple_anti_null_semantics",
-    "tuple_anti_null_probe",
-    "duckdb_json_predicate_order_semantics",
-    "json_predicate_order_probe",
-    "pandas_sparse_array_mask_semantics",
-    "sparse_mask_probe",
-    "polars_float_wrap_numerical_semantics",
-    "float_wrap_probe",
-    "pandas_index_bool_result_type",
-    "index_bool_probe",
-    "polars_empty_literal_groupby_semantics",
-    "empty_literal_groupby_probe",
-    "pandas_arrow_string_eq_sum_semantics",
-    "arrow_string_eq_sum_probe",
-    "pandas_arrow_timestamp_loc_slice_semantics",
-    "arrow_timestamp_loc_slice_probe",
-    "pandas_arrow_timestamp_index_attr_semantics",
-    "arrow_timestamp_index_attr_probe",
-    "pandas_eval_inplace_aliasing_semantics",
-    "eval_inplace_alias_probe",
-    "eval_inplace_aliasing",
-    "pandas_bool_reduction_skipna_semantics",
-    "bool_reduction_skipna_probe",
-    "bool_reduction_skipna",
-    "pyarrow_dataset_isin_all_match_semantics",
-    "dataset_isin_all_match_probe",
-    "pyarrow_run_end_null_compute_semantics",
-    "run_end_null_compute_probe",
-    "run_end_null_compute",
-    "pyarrow_large_string_partition_schema_semantics",
-    "large_string_partition_probe",
-    "pyarrow_hash_pivot_wider_order_semantics",
-    "hash_pivot_wider_probe",
-    "hash_pivot_wider",
-    "polars_rolling_mean_by_null_count_semantics",
-    "rolling_mean_by_null_count_probe",
-    "csv_long_numeric_roundtrip",
-    "csv_long_numeric_roundtrip_probe",
-    "csv_numeric_inference",
-    "wide_offset_topk",
-    "empty_filter_groupby",
-    "expressions",
-]
-
-LIVE_POLARS_LAZY_TARGETS = [
-    "common_workflow",
-    "operation_combo",
-    "filter",
-    "truth_filter",
-    "mutate",
-    "groupby",
-    "casts",
-    "nulls",
-    "global_aggregation",
-    "sort_limit",
-    "topk",
-    "series_rtruediv_operand_order",
-    "series_rtruediv_probe",
-    "polars_reverse_division_columns",
-    "reverse_division",
-    "polars_float_wrap_numerical_semantics",
-    "float_wrap_probe",
-    "polars_empty_literal_groupby_semantics",
-    "empty_literal_groupby_probe",
-    "polars_rolling_mean_by_null_count_semantics",
-    "rolling_mean_by_null_count_probe",
-    "expressions",
-]
-
-LIVE_POLARS_STREAMING_TARGETS = [
-    "common_workflow",
-    "operation_combo",
-    "filter",
-    "truth_filter",
-    "mutate",
-    "groupby",
-    "aggregation",
-    "numeric_mean_aggregate",
-    "global_aggregation",
-    "sort_limit",
-    "topk",
-    "nulls",
-    "numeric",
-    "partitioned_running_sum",
-    "running_sum_partitioned",
-    "running_sum",
-    "path_basename_keyed_pick",
-    "path_projection",
-    "keyed_row_pick",
-    "strings",
-    "casts",
-    "expressions",
-]
-
-LIVE_EMBEDDED_SQL_TARGETS = [
-    "common_workflow",
-    "operation_combo",
-    "join",
-    "join_null_truth_filter",
-    "join_null_key_topk",
-    "filter",
-    "truth_filter",
-    "mutate",
-    "groupby",
-    "nulls",
-    "aggregation",
-    "global_aggregation",
-    "sort_limit",
-    "topk",
-    "topk_resort",
-    "ordered_groupby_sort",
-    "join_ordered_agg_topk",
-    "global_null_aggregate",
-    "string_count_groupby",
-    "unique_count_groupby",
-    "set_membership_filter",
-    "null_predicate_filter",
-    "boolean_predicate_filter",
-    "post_topk_range_filter",
-    "tuple_absence_filter",
-    "row_value_absence_filter",
-    "row_value_absence",
-    "running_sum_precision",
-    "running_sum",
-    "partitioned_running_sum",
-    "running_sum_partitioned",
-    "path_basename_keyed_pick",
-    "path_projection",
-    "keyed_row_pick",
-    "sortedness_null_placement",
-    "sortedness",
-    "simple_case_random_subject",
-    "random_case_probe",
-    "group_quantile_key_probe",
-    "group_quantile_probe",
-    "scalar_subquery_double_parentheses",
-    "scalar_subquery_probe",
-    "window_avg_rows_frame",
-    "window_avg_probe",
-    "struct_distinct_unnest",
-    "struct_distinct_probe",
-    "bit_compare_unequal_length",
-    "bit_compare_probe",
-    "round_even_float_scale",
-    "round_even_probe",
-    "duckdb_float_literal_precision",
-    "float_literal_precision_probe",
-    "polars_timestamp_precision_filter",
-    "timestamp_precision_filter_probe",
-    "series_rtruediv_operand_order",
-    "series_rtruediv_probe",
-    "pandas_uint64_isin_precision",
-    "uint64_isin_probe",
-    "duckdb_tuple_anti_null_semantics",
-    "tuple_anti_null_probe",
-    "duckdb_json_predicate_order_semantics",
-    "json_predicate_order_probe",
-    "pandas_sparse_array_mask_semantics",
-    "sparse_mask_probe",
-    "polars_float_wrap_numerical_semantics",
-    "float_wrap_probe",
-    "pandas_index_bool_result_type",
-    "index_bool_probe",
-    "polars_empty_literal_groupby_semantics",
-    "empty_literal_groupby_probe",
-    "pandas_arrow_string_eq_sum_semantics",
-    "arrow_string_eq_sum_probe",
-    "pandas_arrow_timestamp_loc_slice_semantics",
-    "arrow_timestamp_loc_slice_probe",
-    "pandas_arrow_timestamp_index_attr_semantics",
-    "arrow_timestamp_index_attr_probe",
-    "pandas_eval_inplace_aliasing_semantics",
-    "eval_inplace_alias_probe",
-    "eval_inplace_aliasing",
-    "pandas_bool_reduction_skipna_semantics",
-    "bool_reduction_skipna_probe",
-    "bool_reduction_skipna",
-    "pyarrow_dataset_isin_all_match_semantics",
-    "dataset_isin_all_match_probe",
-    "pyarrow_run_end_null_compute_semantics",
-    "run_end_null_compute_probe",
-    "run_end_null_compute",
-    "pyarrow_large_string_partition_schema_semantics",
-    "large_string_partition_probe",
-    "pyarrow_hash_pivot_wider_order_semantics",
-    "hash_pivot_wider_probe",
-    "hash_pivot_wider",
-    "polars_rolling_mean_by_null_count_semantics",
-    "rolling_mean_by_null_count_probe",
-    "csv_long_numeric_roundtrip",
-    "csv_long_numeric_roundtrip_probe",
-    "csv_numeric_inference",
-    "wide_offset_topk",
-    "empty_filter_groupby",
-    "casts",
-    "expressions",
-]
-
-LIVE_CROSS_FAMILY_TARGETS = [
-    "common_workflow",
-    "operation_combo",
-    "join",
-    "join_null_truth_filter",
-    "join_null_key_topk",
-    "filter",
-    "truth_filter",
-    "mutate",
-    "groupby",
-    "strings",
-    "casts",
-    "nulls",
-    "aggregation",
-    "global_aggregation",
-    "sort_limit",
-    "topk",
-    "topk_resort",
-    "ordered_groupby_sort",
-    "join_ordered_agg_topk",
-    "global_null_aggregate",
-    "string_count_groupby",
-    "unique_count_groupby",
-    "set_membership_filter",
-    "pyarrow_groupby_filter_cast_membership",
-    "null_predicate_filter",
-    "boolean_predicate_filter",
-    "post_topk_range_filter",
-    "tuple_absence_filter",
-    "running_sum_precision",
-    "running_sum",
-    "partitioned_running_sum",
-    "running_sum_partitioned",
-    "path_basename_keyed_pick",
-    "path_projection",
-    "keyed_row_pick",
-    "sortedness_null_placement",
-    "sortedness",
-    "simple_case_random_subject",
-    "random_case_probe",
-    "group_quantile_key_probe",
-    "group_quantile_probe",
-    "scalar_subquery_double_parentheses",
-    "scalar_subquery_probe",
-    "window_avg_rows_frame",
-    "window_avg_probe",
-    "struct_distinct_unnest",
-    "struct_distinct_probe",
-    "bit_compare_unequal_length",
-    "bit_compare_probe",
-    "round_even_float_scale",
-    "round_even_probe",
-    "duckdb_float_literal_precision",
-    "float_literal_precision_probe",
-    "polars_timestamp_precision_filter",
-    "timestamp_precision_filter_probe",
-    "series_rtruediv_operand_order",
-    "series_rtruediv_probe",
-    "polars_reverse_division_columns",
-    "pandas_uint64_isin_precision",
-    "uint64_isin_probe",
-    "duckdb_tuple_anti_null_semantics",
-    "tuple_anti_null_probe",
-    "duckdb_json_predicate_order_semantics",
-    "json_predicate_order_probe",
-    "pandas_sparse_array_mask_semantics",
-    "sparse_mask_probe",
-    "polars_float_wrap_numerical_semantics",
-    "float_wrap_probe",
-    "pandas_index_bool_result_type",
-    "index_bool_probe",
-    "polars_empty_literal_groupby_semantics",
-    "empty_literal_groupby_probe",
-    "pandas_arrow_string_eq_sum_semantics",
-    "arrow_string_eq_sum_probe",
-    "pandas_arrow_timestamp_loc_slice_semantics",
-    "arrow_timestamp_loc_slice_probe",
-    "pandas_arrow_timestamp_index_attr_semantics",
-    "arrow_timestamp_index_attr_probe",
-    "pandas_eval_inplace_aliasing_semantics",
-    "eval_inplace_alias_probe",
-    "eval_inplace_aliasing",
-    "pandas_bool_reduction_skipna_semantics",
-    "bool_reduction_skipna_probe",
-    "bool_reduction_skipna",
-    "pyarrow_dataset_isin_all_match_semantics",
-    "dataset_isin_all_match_probe",
-    "pyarrow_run_end_null_compute_semantics",
-    "run_end_null_compute_probe",
-    "run_end_null_compute",
-    "pyarrow_large_string_partition_schema_semantics",
-    "large_string_partition_probe",
-    "pyarrow_hash_pivot_wider_order_semantics",
-    "hash_pivot_wider_probe",
-    "hash_pivot_wider",
-    "polars_rolling_mean_by_null_count_semantics",
-    "rolling_mean_by_null_count_probe",
-    "csv_long_numeric_roundtrip",
-    "csv_long_numeric_roundtrip_probe",
-    "csv_numeric_inference",
-    "wide_offset_topk",
-    "empty_filter_groupby",
-    "expressions",
-]
-
-LIVE_ISSUE_FOCUS_TARGETS = [
-    "common_workflow",
-    "operation_combo",
-    "join",
-    "filter",
-    "mutate",
-    "groupby",
-    "aggregation",
-    "global_aggregation",
-    "sort_limit",
-    "topk",
-    "nulls",
-    "strings",
-    "numeric",
-    "casts",
-    "expressions",
-    "empty_filter_groupby",
-    "join_filter_groupby",
-    "join_null_sort",
-    "ordered_groupby_sort",
-    "topk_resort",
-    "join_ordered_agg_topk",
-    "global_null_aggregate",
-    "string_count_groupby",
-    "unique_count_groupby",
-    "bool_null_groupby_agg",
-    "large_int_filter_groupby",
-    "large_integer",
-    "boolean_aggregation",
-    "bool_any_all",
-    "set_membership_filter",
-    "pyarrow_groupby_filter_cast_membership",
-    "null_predicate_filter",
-    "row_value_absence_filter",
-    "row_value_absence",
-    "polars_reverse_division_columns",
-    "reverse_division",
-    "pandas_bool_reduction_skipna_semantics",
-    "bool_reduction_skipna_probe",
-    "bool_reduction_skipna",
-    "csv_long_numeric_roundtrip",
-    "csv_long_numeric_roundtrip_probe",
-    "csv_numeric_inference",
-]
-
-LIVE_POLARS_ISSUE_FOCUS_TARGETS = [
-    "operation_combo",
-    "filter",
-    "mutate",
-    "groupby",
-    "sort_limit",
-    "topk",
-    "nulls",
-    "numeric",
-    "casts",
-    "expressions",
-    "empty_filter_groupby",
-    "ordered_groupby_sort",
-    "topk_resort",
-    "global_null_aggregate",
-    "bool_null_groupby_agg",
-    "large_int_filter_groupby",
-    "large_integer",
-    "boolean_aggregation",
-    "bool_any_all",
-    "set_membership_filter",
-    "row_value_absence_filter",
-    "row_value_absence",
-    "polars_reverse_division_columns",
-    "reverse_division",
-    "csv_long_numeric_roundtrip",
-    "csv_long_numeric_roundtrip_probe",
-    "csv_numeric_inference",
-]
-
-LIVE_DUCKDB_ISSUE_FOCUS_TARGETS = [
-    "operation_combo",
-    "join",
-    "filter",
-    "mutate",
-    "groupby",
-    "aggregation",
-    "global_aggregation",
-    "sort_limit",
-    "topk",
-    "nulls",
-    "numeric",
-    "casts",
-    "expressions",
-    "join_filter_groupby",
-    "join_null_sort",
-    "ordered_groupby_sort",
-    "topk_resort",
-    "join_ordered_agg_topk",
-    "global_null_aggregate",
-    "bool_null_groupby_agg",
-    "large_int_filter_groupby",
-    "large_integer",
-    "boolean_aggregation",
-    "bool_any_all",
-    "null_predicate_filter",
-    "row_value_absence_filter",
-    "row_value_absence",
-    "csv_long_numeric_roundtrip",
-    "csv_long_numeric_roundtrip_probe",
-    "csv_numeric_inference",
-]
-
-LIVE_ARROW_ISSUE_FOCUS_TARGETS = [
-    "operation_combo",
-    "filter",
-    "groupby",
-    "aggregation",
-    "sort_limit",
-    "topk",
-    "strings",
-    "casts",
-    "nulls",
-    "expressions",
-    "string_count_groupby",
-    "unique_count_groupby",
-    "bool_null_groupby_agg",
-    "large_int_filter_groupby",
-    "large_integer",
-    "boolean_aggregation",
-    "bool_any_all",
-    "set_membership_filter",
-    "pyarrow_groupby_filter_cast_membership",
-    "global_null_aggregate",
-    "null_predicate_filter",
-    "row_value_absence_filter",
-    "row_value_absence",
-    "csv_long_numeric_roundtrip",
-    "csv_long_numeric_roundtrip_probe",
-    "csv_numeric_inference",
-]
+PROFILE_CHOICES = list(get_args(GeneratorProfile))
+DEFAULT_BUG_SPRINT_HISTORY_WINDOW = 8
+DEFAULT_BUG_SPRINT_SCORE_WEIGHTS = {
+    "yield_rate": 1.0,
+    "novelty_rate": 0.75,
+    "false_positive_penalty": 1.25,
+}
 
 
 def _parse_backends(value: str) -> list[str]:
@@ -1076,16 +504,1100 @@ def cmd_longrun(args: argparse.Namespace) -> int:
 
 
 def cmd_report(args: argparse.Namespace) -> int:
-    run_file = Path(args.run_file) if args.run_file else latest_run_file()
+    run_file = Path(args.run_file) if args.run_file else latest_run_log_path()
     md_path, csv_path = write_report(run_file, csv_limit=args.csv_limit)
     print(f"markdown report: {md_path}")
     print(f"csv findings:    {csv_path}")
     return 0
 
 
+def cmd_bug_audit(args: argparse.Namespace) -> int:
+    probe_ids = parse_guidance_targets(getattr(args, "probes", "") or "")
+    run = run_probe_audit(probe_ids=probe_ids or None)
+    if getattr(args, "write_issues", False):
+        issue_paths = write_probe_issue_drafts(
+            run,
+            issue_dir=Path(getattr(args, "issue_dir", "new_issue/generated")),
+            overwrite=bool(getattr(args, "overwrite_issues", False)),
+        )
+    else:
+        issue_paths = []
+    print(f"bug audit json:     {run.output_json}")
+    print(f"bug audit markdown: {run.output_markdown}")
+    if issue_paths:
+        print("issue drafts:")
+        for path in issue_paths:
+            print(f"- {path}")
+    if run.candidate_bug_families:
+        print("candidate bug families:")
+        for family in run.candidate_bug_families:
+            print(f"- {family}")
+    else:
+        print("candidate bug families: none")
+    if getattr(args, "fail_on_candidate", False) and run.candidate_bug_families:
+        return 2
+    return 0
+
+
+def cmd_discovery_run(args: argparse.Namespace) -> int:
+    ensure_dirs()
+    backends = _resolve_run_backends(args)
+    config = _discovery_run_config_from_args(args)
+    probe_ids = parse_guidance_targets(getattr(args, "probes", "") or "")
+    audit_summary: dict[str, Any] = {"skipped": True}
+
+    if not getattr(args, "skip_bug_audit", False):
+        audit_run = run_probe_audit(probe_ids=probe_ids or None)
+        issue_paths: list[Path] = []
+        if getattr(args, "write_issues", True):
+            issue_paths = write_probe_issue_drafts(
+                audit_run,
+                issue_dir=Path(getattr(args, "issue_dir", "new_issue/generated")),
+                overwrite=bool(getattr(args, "overwrite_issues", True)),
+            )
+        audit_summary = {
+            "skipped": False,
+            "generated_at": audit_run.generated_at,
+            "output_json": _project_relative_cli_path(audit_run.output_json),
+            "output_markdown": _project_relative_cli_path(audit_run.output_markdown),
+            "candidate_bug_families": list(audit_run.candidate_bug_families),
+            "issue_files": [_project_relative_cli_path(path) for path in issue_paths],
+            "environment": dict(audit_run.environment),
+            "results": list(audit_run.results),
+        }
+
+    run_file = run_fuzz(
+        cases=args.cases,
+        seed=args.seed,
+        backends=backends,
+        config=config,
+        duration_s=parse_duration(args.duration),
+    )
+    if getattr(args, "skip_run_report", False):
+        md_path = csv_path = None
+    else:
+        md_path, csv_path = write_report(run_file)
+    classification = _summarize_run_classification(
+        run_file,
+        limit=max(0, int(getattr(args, "classify_limit", 3))),
+        refresh=bool(getattr(args, "refresh_classification", False)),
+    )
+    manifest_path = Path(getattr(args, "output_manifest", "") or "new_issue/generated/bug-hunt-manifest.json")
+    fresh_evidence_path = manifest_path.with_name(f"{manifest_path.stem}-fresh-candidates.json")
+    fresh_evidence = _write_discovery_run_fresh_candidate_evidence(
+        run_file,
+        classification=classification,
+        output_path=fresh_evidence_path,
+    )
+    candidate_pipeline = {}
+    if fresh_evidence.get("candidate_row_count", 0):
+        candidate_pipeline = _run_candidate_pipeline_for_evidence(
+            args,
+            evidence_path=fresh_evidence_path,
+            manifest_path=manifest_path,
+        )
+    manifest = {
+        "schema_version": "bug-hunt-v1",
+        "generated_at": utc_now(),
+        "generated_by": "datadiff bug-hunt",
+        "workflow": [
+            "deterministic_bug_audit",
+            "fresh_guided_fuzz",
+            "run_report",
+            "candidate_classification",
+            "candidate_pipeline",
+        ],
+        "target_suite": getattr(args, "target_suite", "latest_all_engines"),
+        "backends": backends,
+        "preset": str(getattr(args, "preset", "live_deep_organic")),
+        "cases": args.cases,
+        "duration": args.duration,
+        "seed": args.seed,
+        "config": config.to_dict(),
+        "bug_audit": audit_summary,
+        "fuzz_run": {
+            "run_file": _project_relative_cli_path(run_file),
+            "report": _project_relative_cli_path(md_path) if md_path is not None else "",
+            "csv": _project_relative_cli_path(csv_path) if csv_path is not None else "",
+            "fresh_candidate_evidence": _project_relative_cli_path(fresh_evidence_path),
+            "fresh_candidate_evidence_rows": fresh_evidence["candidate_row_count"],
+            "candidate_pipeline": candidate_pipeline,
+        },
+        "classification": classification,
+        "candidate_pipeline": candidate_pipeline,
+    }
+    dump_json(manifest, manifest_path)
+
+    print(f"bug hunt manifest: {manifest_path}")
+    print(f"run log written:   {run_file}")
+    if not getattr(args, "skip_run_report", False):
+        print(f"markdown report:   {md_path}")
+        print(f"csv findings:      {csv_path}")
+    if not audit_summary.get("skipped"):
+        print("audit candidate families:")
+        families = audit_summary.get("candidate_bug_families", [])
+        if families:
+            for family in families:
+                print(f"- {family}")
+        else:
+            print("- none")
+    print("fresh fuzz candidate families:")
+    fresh = classification.get("fresh_candidate_bug_families", {})
+    if fresh:
+        for family, count in fresh.items():
+            print(f"- {family}: {count}")
+    else:
+        print("- none")
+    if candidate_pipeline:
+        print(f"candidate pipeline: {candidate_pipeline.get('manifest_path', candidate_pipeline.get('status', ''))}")
+    print("issue-inspired unsaturated candidate families:")
+    inspired = classification.get("issue_inspired_unsaturated_candidate_bug_families", {})
+    if inspired:
+        for family, count in inspired.items():
+            print(f"- {family}: {count}")
+    else:
+        print("- none")
+    print("known saturated fuzz candidate families:")
+    known = classification.get("known_saturated_candidate_bug_families", {})
+    if known:
+        for family, count in known.items():
+            print(f"- {family}: {count}")
+    else:
+        print("- none")
+    if getattr(args, "fail_on_fresh_candidate", False) and fresh:
+        return 2
+    return 0
+
+
+def _discovery_campaign_score_weights_from_args(args: argparse.Namespace) -> dict[str, float]:
+    return {
+        "yield_rate": max(0.0, float(getattr(args, "lane_yield_weight", DEFAULT_BUG_SPRINT_SCORE_WEIGHTS["yield_rate"]))),
+        "novelty_rate": max(0.0, float(getattr(args, "lane_novelty_weight", DEFAULT_BUG_SPRINT_SCORE_WEIGHTS["novelty_rate"]))),
+        "false_positive_penalty": max(
+            0.0,
+            float(
+                getattr(
+                    args,
+                    "lane_false_positive_penalty",
+                    DEFAULT_BUG_SPRINT_SCORE_WEIGHTS["false_positive_penalty"],
+                )
+            ),
+        ),
+    }
+
+
+def _load_discovery_campaign_history_manifests(
+    generated_issue_dir: Path,
+    *,
+    exclude_manifest: Path | None = None,
+    limit: int = DEFAULT_BUG_SPRINT_HISTORY_WINDOW,
+) -> list[dict[str, Any]]:
+    if limit <= 0 or not generated_issue_dir.is_dir():
+        return []
+    exclude = exclude_manifest.resolve() if exclude_manifest is not None and exclude_manifest.exists() else None
+    paths = sorted(
+        generated_issue_dir.glob("bug-sprint*-manifest.json"),
+        key=lambda path: (path.stat().st_mtime, path.name),
+        reverse=True,
+    )
+    manifests: list[dict[str, Any]] = []
+    for path in paths:
+        if exclude is not None and path.resolve() == exclude:
+            continue
+        data = load_json(path)
+        if isinstance(data, dict):
+            manifests.append(data)
+        if len(manifests) >= limit:
+            break
+    return manifests
+
+
+def _discovery_campaign_scheduler_snapshot(
+    *,
+    selected_lanes: list[dict[str, str]],
+    runs: list[dict[str, Any]],
+    pending_by_lane: dict[str, list[int]],
+    generated_issue_dir: Path,
+    manifest_path: Path,
+    history_limit: int,
+    score_weights: dict[str, float],
+) -> dict[str, Any]:
+    history_manifests = _load_discovery_campaign_history_manifests(
+        generated_issue_dir,
+        exclude_manifest=manifest_path,
+        limit=history_limit,
+    )
+    lane_rows = _discovery_campaign_lane_rows(
+        selected_lanes,
+        history_manifests=history_manifests,
+        current_runs=runs,
+        pending_by_lane=pending_by_lane,
+        score_weights=score_weights,
+    )
+    return {
+        "strategy": "adaptive_lane_yield_novelty_false_positive_weighting",
+        "generated_at": utc_now(),
+        "history_manifest_count": len(history_manifests),
+        "history_window": history_limit,
+        "score_weights": score_weights,
+        "lanes": lane_rows,
+    }
+
+
+def _discovery_campaign_lane_rows(
+    selected_lanes: list[dict[str, str]],
+    *,
+    history_manifests: list[dict[str, Any]],
+    current_runs: list[dict[str, Any]],
+    pending_by_lane: dict[str, list[int]],
+    score_weights: dict[str, float],
+) -> list[dict[str, Any]]:
+    lane_ids = [lane["id"] for lane in selected_lanes]
+    metrics = {
+        lane["id"]: {
+            "lane_id": lane["id"],
+            "theme": lane["theme"],
+            "target_suite": lane["target_suite"],
+            "preset": lane["preset"],
+            "completed_runs": 0,
+            "history_runs": 0,
+            "current_runs": 0,
+            "fresh_candidate_total": 0,
+            "issue_inspired_total": 0,
+            "known_saturated_total": 0,
+            "candidate_total": 0,
+            "false_positive_total": 0,
+            "unique_fresh_families": set(),
+            "first_seen_families": set(),
+        }
+        for lane in selected_lanes
+    }
+    events: list[dict[str, Any]] = []
+
+    def ingest_run(run: dict[str, Any], *, source: str, fallback_timestamp: str) -> None:
+        lane_id = str(run.get("lane_id", ""))
+        if lane_id not in metrics or str(run.get("status", "")) != "completed":
+            return
+        classification = run.get("classification", {}) if isinstance(run.get("classification"), dict) else {}
+        fresh = Counter(classification.get("fresh_candidate_bug_families", {}) or {})
+        issue_inspired = Counter(classification.get("issue_inspired_unsaturated_candidate_bug_families", {}) or {})
+        known = Counter(classification.get("known_saturated_candidate_bug_families", {}) or {})
+        false_positive = Counter(classification.get("false_positive_reasons", {}) or {})
+        candidate_total = sum((classification.get("candidate_bug_families", {}) or {}).values())
+        if not candidate_total:
+            candidate_total = sum(fresh.values()) + sum(issue_inspired.values()) + sum(known.values())
+        row = metrics[lane_id]
+        row["completed_runs"] += 1
+        row[f"{source}_runs"] += 1
+        row["fresh_candidate_total"] += sum(fresh.values())
+        row["issue_inspired_total"] += sum(issue_inspired.values())
+        row["known_saturated_total"] += sum(known.values())
+        row["candidate_total"] += candidate_total
+        row["false_positive_total"] += sum(false_positive.values())
+        row["unique_fresh_families"].update(fresh)
+        events.append(
+            {
+                "lane_id": lane_id,
+                "timestamp": str(run.get("completed_at", "") or run.get("started_at", "") or fallback_timestamp),
+                "families": sorted(fresh),
+            }
+        )
+
+    for manifest in history_manifests:
+        fallback_timestamp = str(manifest.get("generated_at", "") or manifest.get("completed_at", ""))
+        for run in manifest.get("runs", []) or []:
+            if isinstance(run, dict):
+                ingest_run(run, source="history", fallback_timestamp=fallback_timestamp)
+    for run in current_runs:
+        ingest_run(run, source="current", fallback_timestamp=utc_now())
+
+    seen_families: set[str] = set()
+    for event in sorted(
+        events,
+        key=lambda item: (
+            _parse_manifest_utc_timestamp(item.get("timestamp", "")) or datetime.min.replace(tzinfo=timezone.utc),
+            lane_ids.index(item["lane_id"]) if item["lane_id"] in lane_ids else len(lane_ids),
+        ),
+    ):
+        for family in event["families"]:
+            if family in seen_families:
+                continue
+            seen_families.add(family)
+            metrics[event["lane_id"]]["first_seen_families"].add(family)
+
+    rows: list[dict[str, Any]] = []
+    for lane in selected_lanes:
+        row = metrics[lane["id"]]
+        completed_runs = int(row["completed_runs"])
+        unique_fresh_family_count = len(row["unique_fresh_families"])
+        first_seen_family_count = len(row["first_seen_families"])
+        yield_rate = min(3.0, row["fresh_candidate_total"] / completed_runs) if completed_runs else 0.0
+        novelty_rate = (
+            first_seen_family_count / unique_fresh_family_count if unique_fresh_family_count else 0.0
+        )
+        false_positive_rate = (
+            row["false_positive_total"] / (row["candidate_total"] + row["false_positive_total"])
+            if (row["candidate_total"] + row["false_positive_total"]) > 0
+            else 0.0
+        )
+        score = max(
+            0.1,
+            1.0
+            + score_weights["yield_rate"] * yield_rate
+            + score_weights["novelty_rate"] * novelty_rate
+            - score_weights["false_positive_penalty"] * false_positive_rate,
+        )
+        rows.append(
+            {
+                "lane_id": lane["id"],
+                "theme": lane["theme"],
+                "target_suite": lane["target_suite"],
+                "preset": lane["preset"],
+                "pending_runs": len(pending_by_lane.get(lane["id"], [])),
+                "completed_runs": completed_runs,
+                "history_runs": int(row["history_runs"]),
+                "current_runs": int(row["current_runs"]),
+                "fresh_candidate_total": int(row["fresh_candidate_total"]),
+                "unique_fresh_family_count": unique_fresh_family_count,
+                "first_seen_family_count": first_seen_family_count,
+                "issue_inspired_total": int(row["issue_inspired_total"]),
+                "known_saturated_total": int(row["known_saturated_total"]),
+                "candidate_total": int(row["candidate_total"]),
+                "false_positive_total": int(row["false_positive_total"]),
+                "yield_rate": yield_rate,
+                "novelty_rate": novelty_rate,
+                "false_positive_rate": false_positive_rate,
+                "score": score,
+            }
+        )
+
+    avg_score = sum(row["score"] for row in rows) / len(rows) if rows else 1.0
+    ranked = sorted(
+        rows,
+        key=lambda row: (
+            row["pending_runs"] <= 0,
+            -row["score"],
+            -row["novelty_rate"],
+            -row["yield_rate"],
+            row["false_positive_rate"],
+            lane_ids.index(row["lane_id"]) if row["lane_id"] in lane_ids else len(lane_ids),
+        ),
+    )
+    for index, row in enumerate(ranked, start=1):
+        row["priority_rank"] = index
+        row["budget_multiplier"] = max(0.5, min(2.5, row["score"] / avg_score if avg_score else 1.0))
+    return ranked
+
+
+def _next_discovery_campaign_lane(
+    scheduler: dict[str, Any],
+    pending_by_lane: dict[str, list[int]],
+) -> dict[str, Any] | None:
+    for lane in scheduler.get("lanes", []) or []:
+        lane_id = str(lane.get("lane_id", ""))
+        if pending_by_lane.get(lane_id):
+            return lane
+    return None
+
+
+def _aggregate_candidate_pipeline_summary(items: list[dict[str, Any]]) -> dict[str, Any]:
+    aggregate: Counter[str] = Counter()
+    pipeline_count = 0
+    for item in items:
+        summary = item.get("summary", {}) if isinstance(item.get("summary"), dict) else {}
+        if not summary:
+            continue
+        pipeline_count += 1
+        aggregate.update(
+            {
+                "candidate_count": int(summary.get("candidate_count", 0) or 0),
+                "rechecked_count": int(summary.get("rechecked_count", 0) or 0),
+                "reproduced_count": int(summary.get("reproduced_count", 0) or 0),
+                "reduced_count": int(summary.get("reduced_count", 0) or 0),
+                "candidate_bug_verdict_count": int(summary.get("candidate_bug_verdict_count", 0) or 0),
+                "issue_draft_count": int(summary.get("issue_draft_count", 0) or 0),
+                "needs_dedup_check_count": int(summary.get("needs_dedup_check_count", 0) or 0),
+                "already_submitted_or_confirmed_count": int(
+                    summary.get("already_submitted_or_confirmed_count", 0) or 0
+                ),
+            }
+        )
+    return {"pipeline_count": pipeline_count, **dict(aggregate)}
+
+
+def cmd_discovery_campaign(args: argparse.Namespace) -> int:
+    if getattr(args, "list_lanes", False):
+        catalog = _discovery_campaign_lane_catalog()
+        if getattr(args, "json", False):
+            print(json.dumps(catalog, ensure_ascii=False, indent=2, sort_keys=True))
+        else:
+            for lane_id, lane in catalog.items():
+                default_marker = " default" if lane["default"] else ""
+                print(
+                    f"{lane_id}:{default_marker} suite={lane['target_suite']} "
+                    f"preset={lane['preset']} theme={lane['theme']}"
+                )
+        return 0
+
+    ensure_dirs()
+    selected_lanes = _discovery_campaign_lanes_from_args(getattr(args, "lanes", ""))
+    seeds = _parse_seeds(str(getattr(args, "seeds", "1")))
+    duration_s = parse_duration(getattr(args, "duration", None))
+    probe_ids = parse_guidance_targets(getattr(args, "probes", "") or "")
+    audit_summary: dict[str, Any] = {"skipped": True}
+    if not getattr(args, "skip_bug_audit", False):
+        audit_run = run_probe_audit(probe_ids=probe_ids or None)
+        issue_paths: list[Path] = []
+        if getattr(args, "write_issues", True):
+            issue_paths = write_probe_issue_drafts(
+                audit_run,
+                issue_dir=Path(getattr(args, "issue_dir", "new_issue/generated")),
+                overwrite=bool(getattr(args, "overwrite_issues", True)),
+            )
+        audit_summary = {
+            "skipped": False,
+            "generated_at": audit_run.generated_at,
+            "output_json": _project_relative_cli_path(audit_run.output_json),
+            "output_markdown": _project_relative_cli_path(audit_run.output_markdown),
+            "candidate_bug_families": list(audit_run.candidate_bug_families),
+            "issue_files": [_project_relative_cli_path(path) for path in issue_paths],
+            "environment": dict(audit_run.environment),
+            "results": list(audit_run.results),
+        }
+
+    manifest_path = Path(getattr(args, "output_manifest", "") or "new_issue/generated/bug-sprint-manifest.json")
+    runs: list[dict[str, Any]] = []
+    aggregate_fresh: Counter[str] = Counter()
+    aggregate_issue_inspired: Counter[str] = Counter()
+    aggregate_known: Counter[str] = Counter()
+    aggregate_verdicts: Counter[str] = Counter()
+    stopped_by_health = False
+    health_stop_reason = ""
+    started_at = utc_now()
+    total_run_count = len(selected_lanes) * len(seeds)
+    generated_issue_dir = manifest_path.parent
+    score_weights = _discovery_campaign_score_weights_from_args(args)
+    history_limit = max(0, int(getattr(args, "lane_history_window", DEFAULT_BUG_SPRINT_HISTORY_WINDOW)))
+    lane_by_id = {lane["id"]: lane for lane in selected_lanes}
+    pending_by_lane = {lane["id"]: list(seeds) for lane in selected_lanes}
+
+    def write_manifest_snapshot(*, status: str, current_run: dict[str, Any] | None = None) -> None:
+        scheduler = _discovery_campaign_scheduler_snapshot(
+            selected_lanes=selected_lanes,
+            runs=runs,
+            pending_by_lane=pending_by_lane,
+            generated_issue_dir=generated_issue_dir,
+            manifest_path=manifest_path,
+            history_limit=history_limit,
+            score_weights=score_weights,
+        )
+        manifest = _build_discovery_campaign_manifest(
+            manifest_path=manifest_path,
+            selected_lanes=selected_lanes,
+            seeds=seeds,
+            audit_summary=audit_summary,
+            runs=runs,
+            aggregate_fresh=aggregate_fresh,
+            aggregate_issue_inspired=aggregate_issue_inspired,
+            aggregate_known=aggregate_known,
+            aggregate_verdicts=aggregate_verdicts,
+            stopped_by_health=stopped_by_health,
+            health_stop_reason=health_stop_reason,
+            cases_per_lane_seed=int(getattr(args, "cases", 100)),
+            duration=getattr(args, "duration", None),
+            started_at=started_at,
+            status=status,
+            total_run_count=total_run_count,
+            current_run=current_run,
+            scheduler=scheduler,
+        )
+        dump_json(manifest, manifest_path)
+
+    write_manifest_snapshot(status="running")
+
+    while True:
+        scheduler = _discovery_campaign_scheduler_snapshot(
+            selected_lanes=selected_lanes,
+            runs=runs,
+            pending_by_lane=pending_by_lane,
+            generated_issue_dir=generated_issue_dir,
+            manifest_path=manifest_path,
+            history_limit=history_limit,
+            score_weights=score_weights,
+        )
+        next_lane = _next_discovery_campaign_lane(scheduler, pending_by_lane)
+        if next_lane is None:
+            break
+        lane_id = str(next_lane["lane_id"])
+        lane = lane_by_id[lane_id]
+        seed = pending_by_lane[lane_id].pop(0)
+        target_suite = lane["target_suite"]
+        preset = lane["preset"]
+        backends = resolve_target_backends(target_suite=target_suite)
+        config = _discovery_campaign_config_from_args(
+            args,
+            preset,
+            lane_discovery_biases=list(lane.get("discovery_biases", []) or []),
+            lane_semantic_focus_families=list(lane.get("semantic_focus_families", []) or []),
+            lane_semantic_focus_signals=list(lane.get("semantic_focus_signals", []) or []),
+        )
+        run_record = {
+            "lane_id": lane["id"],
+            "theme": lane["theme"],
+            "target_suite": target_suite,
+            "backends": backends,
+            "preset": preset,
+            "semantic_focus_families": list(config.semantic_focus_families),
+            "semantic_focus_signals": list(config.semantic_focus_signals),
+            "seed": seed,
+            "cases": int(getattr(args, "cases", 100)),
+            "duration": getattr(args, "duration", None),
+            "status": "running",
+            "started_at": utc_now(),
+            "scheduler": {
+                "priority_rank": next_lane.get("priority_rank", 0),
+                "score": next_lane.get("score", 0.0),
+                "budget_multiplier": next_lane.get("budget_multiplier", 1.0),
+                "yield_rate": next_lane.get("yield_rate", 0.0),
+                "novelty_rate": next_lane.get("novelty_rate", 0.0),
+                "false_positive_rate": next_lane.get("false_positive_rate", 0.0),
+                "history_runs": next_lane.get("history_runs", 0),
+                "current_runs": next_lane.get("current_runs", 0),
+            },
+        }
+        runs.append(run_record)
+        print(
+            f"starting sprint lane={lane['id']} suite={target_suite} preset={preset} seed={seed} "
+            f"score={next_lane.get('score', 0.0):.2f} budget={next_lane.get('budget_multiplier', 1.0):.2f}",
+            flush=True,
+        )
+        write_manifest_snapshot(status="running", current_run=run_record)
+        run_file = run_fuzz(
+            cases=int(getattr(args, "cases", 100)),
+            seed=int(seed),
+            backends=backends,
+            config=config,
+            duration_s=duration_s,
+        )
+        if getattr(args, "skip_run_report", False):
+            md_path = csv_path = None
+        else:
+            md_path, csv_path = write_report(run_file)
+        classification = _summarize_run_classification(
+            run_file,
+            limit=max(0, int(getattr(args, "classify_limit", 3))),
+            refresh=bool(getattr(args, "refresh_classification", False)),
+        )
+        evidence_path = manifest_path.with_name(
+            f"{manifest_path.stem}-{lane['id']}-seed{seed}-fresh-candidates.json"
+        )
+        fresh_evidence = _write_discovery_run_fresh_candidate_evidence(
+            run_file,
+            classification=classification,
+            output_path=evidence_path,
+        )
+        candidate_pipeline = {}
+        if fresh_evidence.get("candidate_row_count", 0):
+            candidate_pipeline = _run_candidate_pipeline_for_evidence(
+                args,
+                evidence_path=evidence_path,
+                manifest_path=manifest_path,
+            )
+        aggregate_fresh.update(classification.get("fresh_candidate_bug_families", {}))
+        aggregate_issue_inspired.update(
+            classification.get("issue_inspired_unsaturated_candidate_bug_families", {})
+        )
+        aggregate_known.update(classification.get("known_saturated_candidate_bug_families", {}))
+        aggregate_verdicts.update(classification.get("triage_verdicts", {}))
+        health = _summarize_run_health(run_file, limit=max(0, int(getattr(args, "classify_limit", 3))))
+        run_record.update(
+            {
+                "run_file": _project_relative_cli_path(run_file),
+                "report": _project_relative_cli_path(md_path) if md_path is not None else "",
+                "csv": _project_relative_cli_path(csv_path) if csv_path is not None else "",
+                "fresh_candidate_evidence": _project_relative_cli_path(evidence_path),
+                "fresh_candidate_evidence_rows": fresh_evidence["candidate_row_count"],
+                "candidate_pipeline": candidate_pipeline,
+                "classification": classification,
+                "health": health,
+                "status": "completed",
+                "completed_at": utc_now(),
+            }
+        )
+        print(
+            f"sprint lane={lane['id']} suite={target_suite} preset={preset} seed={seed} run={run_file}",
+            flush=True,
+        )
+        write_manifest_snapshot(status="running")
+        if getattr(args, "watch_health", False):
+            if health.get("fresh_candidate_bug_families"):
+                stopped_by_health = True
+                health_stop_reason = "fresh_candidate"
+            elif health.get("statuses", {}).get("bug", 0):
+                stopped_by_health = True
+                health_stop_reason = "bug_status"
+            if stopped_by_health:
+                print(
+                    f"bug-sprint health stop: reason={health_stop_reason} lane={lane['id']} seed={seed}",
+                    flush=True,
+                )
+                break
+
+    write_manifest_snapshot(status="completed")
+
+    print(f"bug sprint manifest: {manifest_path}")
+    print("fresh candidate families:")
+    if aggregate_fresh:
+        for family, count in sorted(aggregate_fresh.items()):
+            print(f"- {family}: {count}")
+    else:
+        print("- none")
+    print("issue-inspired unsaturated candidate families:")
+    if aggregate_issue_inspired:
+        for family, count in sorted(aggregate_issue_inspired.items()):
+            print(f"- {family}: {count}")
+    else:
+        print("- none")
+    print("known saturated candidate families:")
+    if aggregate_known:
+        for family, count in sorted(aggregate_known.items()):
+            print(f"- {family}: {count}")
+    else:
+        print("- none")
+    if getattr(args, "fail_on_fresh_candidate", False) and aggregate_fresh:
+        return 2
+    return 0
+
+
+def _build_discovery_campaign_manifest(
+    *,
+    manifest_path: Path,
+    selected_lanes: list[dict[str, str]],
+    seeds: list[int],
+    audit_summary: dict[str, Any],
+    runs: list[dict[str, Any]],
+    aggregate_fresh: Counter[str],
+    aggregate_issue_inspired: Counter[str],
+    aggregate_known: Counter[str],
+    aggregate_verdicts: Counter[str],
+    stopped_by_health: bool,
+    health_stop_reason: str,
+    cases_per_lane_seed: int,
+    duration: str | None,
+    started_at: str,
+    status: str,
+    total_run_count: int,
+    current_run: dict[str, Any] | None = None,
+    scheduler: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    completed_run_count = sum(1 for run in runs if run.get("status") == "completed")
+    candidate_pipeline_summary = _aggregate_candidate_pipeline_summary(
+        [
+            run.get("candidate_pipeline", {})
+            for run in runs
+            if isinstance(run.get("candidate_pipeline"), dict)
+        ]
+    )
+    return {
+        "schema_version": "bug-sprint-v1",
+        "generated_at": utc_now(),
+        "generated_by": "datadiff bug-sprint",
+        "status": status,
+        "started_at": started_at,
+        "completed_at": utc_now() if status == "completed" else "",
+        "workflow": [
+            "deterministic_bug_audit",
+            "guided_short_sprints",
+            "run_report",
+            "candidate_classification",
+            "fresh_candidate_evidence",
+            "candidate_pipeline",
+        ],
+        "stopped_by_health": stopped_by_health,
+        "health_stop_reason": health_stop_reason,
+        "cases_per_lane_seed": cases_per_lane_seed,
+        "duration": duration,
+        "seeds": seeds,
+        "lane_ids": [lane["id"] for lane in selected_lanes],
+        "lanes": selected_lanes,
+        "bug_audit": audit_summary,
+        "progress": {
+            "planned_run_count": total_run_count,
+            "completed_run_count": completed_run_count,
+            "remaining_run_count": max(0, total_run_count - completed_run_count),
+            "current_lane_id": str((current_run or {}).get("lane_id", "")),
+            "current_seed": (current_run or {}).get("seed", ""),
+        },
+        "scheduler": scheduler or {},
+        "runs": runs,
+        "summary": {
+            "run_count": completed_run_count,
+            "fresh_candidate_bug_families": dict(sorted(aggregate_fresh.items())),
+            "issue_inspired_unsaturated_candidate_bug_families": dict(sorted(aggregate_issue_inspired.items())),
+            "known_saturated_candidate_bug_families": dict(sorted(aggregate_known.items())),
+            "triage_verdicts": dict(aggregate_verdicts.most_common()),
+            "candidate_pipeline": candidate_pipeline_summary,
+        },
+    }
+
+
+def _discovery_campaign_lanes_from_args(value: str) -> list[dict[str, str]]:
+    raw_lane_ids = parse_guidance_targets(value or "")
+    lane_ids = raw_lane_ids or list(DEFAULT_DISCOVERY_LANE_IDS)
+    lanes = []
+    seen = set()
+    for lane_id in lane_ids:
+        if lane_id in seen:
+            continue
+        seen.add(lane_id)
+        lane = discovery_lane_spec(lane_id).to_dict()
+        lanes.append(lane)
+    return lanes
+
+
+def _discovery_campaign_lane_catalog() -> dict[str, dict[str, Any]]:
+    return discovery_lane_catalog()
+
+
+def _discovery_campaign_config_from_args(
+    args: argparse.Namespace,
+    preset: str,
+    *,
+    lane_discovery_biases: list[dict[str, Any]] | None = None,
+    lane_semantic_focus_families: list[str] | None = None,
+    lane_semantic_focus_signals: list[str] | None = None,
+) -> ExperimentConfig:
+    config = _preset_config(preset)
+    config.log_level = str(getattr(args, "log_level", "compact"))
+    config.compress_run_log = not bool(getattr(args, "no_compress_run_log", False))
+    config.artifact_limit = getattr(args, "artifact_limit", None)
+    if getattr(args, "candidate_recheck_count", None) is not None:
+        config.candidate_recheck_count = max(0, int(args.candidate_recheck_count))
+    if getattr(args, "metamorphic_variant_limit", None) is not None:
+        config.metamorphic_variant_limit = max(0, int(args.metamorphic_variant_limit))
+    extra_known = parse_guidance_targets(getattr(args, "extra_known_saturated_bug_families", "") or "")
+    if extra_known:
+        config.known_saturated_bug_families = list(
+            dict.fromkeys([*config.known_saturated_bug_families, *extra_known])
+        )
+    if lane_semantic_focus_families:
+        config.semantic_focus_families = list(
+            dict.fromkeys([*config.semantic_focus_families, *lane_semantic_focus_families])
+        )
+    if lane_semantic_focus_signals:
+        config.semantic_focus_signals = list(
+            dict.fromkeys([*config.semantic_focus_signals, *lane_semantic_focus_signals])
+        )
+    if lane_discovery_biases:
+        config.discovery_biases = merge_discovery_biases(config.discovery_biases, lane_discovery_biases)
+    return config
+
+
+_bug_sprint_score_weights_from_args = _discovery_campaign_score_weights_from_args
+_load_bug_sprint_history_manifests = _load_discovery_campaign_history_manifests
+_bug_sprint_scheduler_snapshot = _discovery_campaign_scheduler_snapshot
+_bug_sprint_lane_rows = _discovery_campaign_lane_rows
+_bug_sprint_next_lane = _next_discovery_campaign_lane
+_build_bug_sprint_manifest = _build_discovery_campaign_manifest
+_bug_sprint_lanes_from_args = _discovery_campaign_lanes_from_args
+_bug_sprint_lane_catalog = _discovery_campaign_lane_catalog
+_bug_sprint_config_from_args = _discovery_campaign_config_from_args
+
+
+def cmd_bug_status(args: argparse.Namespace) -> int:
+    latest_confirmation_files = [
+        Path(item) for item in parse_guidance_targets(getattr(args, "latest_confirmations", "") or "")
+    ]
+    status = build_issue_status(
+        latest_confirmation_files=latest_confirmation_files or None,
+        new_issue_dir=Path(getattr(args, "new_issue_dir", "new_issue")),
+        old_issue_dir=Path(getattr(args, "old_issue_dir", "old_issue")),
+        generated_issue_dir=Path(getattr(args, "generated_issue_dir", "new_issue/generated")),
+    )
+    if getattr(args, "write_report", False):
+        json_path, md_path = write_issue_status_outputs(
+            status,
+            output_dir=Path(getattr(args, "output_dir", "reports")),
+        )
+        status["output_json"] = _project_relative_cli_path(json_path)
+        status["output_markdown"] = _project_relative_cli_path(md_path)
+    if getattr(args, "json", False):
+        print(json.dumps(status, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
+
+    summary = status["summary"]
+    print(f"confirmed latest families: {summary['confirmed_latest_count']}")
+    for family in summary["confirmed_latest_families"]:
+        print(f"- {family}")
+    print(f"audit candidate families: {summary['audit_candidate_family_count']}")
+    for family in summary["audit_candidate_families"]:
+        print(f"- {family}")
+    print(f"currently unsaturated fresh candidate families: {summary['fresh_candidate_family_count']}")
+    fresh = summary["fresh_candidate_families"]
+    if fresh:
+        for family, count in fresh.items():
+            print(f"- {family}: {count}")
+    else:
+        print("- none")
+    print(f"recorded fresh candidate families: {summary['recorded_fresh_candidate_family_count']}")
+    recorded_fresh = summary["recorded_fresh_candidate_families"]
+    if recorded_fresh:
+        for family, count in recorded_fresh.items():
+            print(f"- {family}: {count}")
+    else:
+        print("- none")
+    print(f"bug workflow manifests: {summary.get('bug_workflow_manifest_count', 0)}")
+    print(
+        f"issue bundle: {summary.get('issue_bundle_family_count', 0)} families, "
+        f"{summary.get('issue_bundle_reproducer_count', 0)} reproducers, "
+        f"{summary.get('issue_bundle_compile_failure_count', 0)} compile failures"
+    )
+    print(f"pending manual issue drafts: {summary['pending_manual_issue_draft_count']}")
+    for path in summary["pending_manual_issue_drafts"]:
+        print(f"- {path}")
+    print(f"old known upstream issues: {summary['old_known_upstream_issue_count']}")
+    if getattr(args, "write_report", False):
+        print(f"bug status json:     {status['output_json']}")
+        print(f"bug status markdown: {status['output_markdown']}")
+    return 0
+
+
+def cmd_issue_readiness(args: argparse.Namespace) -> int:
+    latest_confirmation_files = [
+        Path(item) for item in parse_guidance_targets(getattr(args, "latest_confirmations", "") or "")
+    ]
+    audit = build_issue_readiness(
+        latest_confirmation_files=latest_confirmation_files or None,
+        new_issue_dir=Path(getattr(args, "new_issue_dir", "new_issue")),
+        old_issue_dir=Path(getattr(args, "old_issue_dir", "old_issue")),
+        generated_issue_dir=Path(getattr(args, "generated_issue_dir", "new_issue/generated")),
+        include_generated=bool(getattr(args, "include_generated", False)),
+    )
+    if getattr(args, "write_report", False):
+        json_path, md_path = write_issue_readiness_outputs(
+            audit,
+            output_dir=Path(getattr(args, "output_dir", "reports")),
+        )
+        audit["output_json"] = _project_relative_cli_path(json_path)
+        audit["output_markdown"] = _project_relative_cli_path(md_path)
+    if getattr(args, "json", False):
+        print(json.dumps(audit, ensure_ascii=False, indent=2, sort_keys=True))
+        if getattr(args, "fail_on_no_ready", False) and not audit["summary"]["ready_to_submit_count"]:
+            return 2
+        return 0
+
+    summary = audit["summary"]
+    print(f"issue documents: {summary['issue_document_count']}")
+    print(
+        f"ready to submit: {summary['ready_to_submit_count']} documents, "
+        f"{summary['ready_to_submit_family_count']} families"
+    )
+    for path in summary["ready_to_submit"]:
+        print(f"- {path}")
+    print(
+        f"needs dedup check: {summary['needs_dedup_check_count']} documents, "
+        f"{summary['needs_dedup_check_family_count']} families"
+    )
+    for path in summary["needs_dedup_check"]:
+        print(f"- {path}")
+    print(f"needs reproducer/evidence: {summary['needs_reproducer_or_evidence_count']}")
+    for path in summary["needs_reproducer_or_evidence"]:
+        print(f"- {path}")
+    print(f"already submitted or confirmed: {summary['already_submitted_or_confirmed_count']}")
+    print(f"not latest reproducible: {summary['not_latest_reproducible_count']}")
+    if getattr(args, "write_report", False):
+        print(f"issue readiness json:     {audit['output_json']}")
+        print(f"issue readiness markdown: {audit['output_markdown']}")
+    if getattr(args, "fail_on_no_ready", False) and not summary["ready_to_submit_count"]:
+        return 2
+    return 0
+
+
+def cmd_issue_bundle(args: argparse.Namespace) -> int:
+    latest_confirmation_files = [
+        Path(item) for item in parse_guidance_targets(getattr(args, "latest_confirmations", "") or "")
+    ]
+    statuses = parse_guidance_targets(getattr(args, "statuses", "") or "")
+    manifest = build_issue_bundle(
+        latest_confirmation_files=latest_confirmation_files or None,
+        new_issue_dir=Path(getattr(args, "new_issue_dir", "new_issue")),
+        old_issue_dir=Path(getattr(args, "old_issue_dir", "old_issue")),
+        generated_issue_dir=Path(getattr(args, "generated_issue_dir", "new_issue/generated")),
+        output_dir=Path(getattr(args, "output_dir", "new_issue/generated/issue-bundles")),
+        statuses=statuses or list(DEFAULT_ISSUE_BUNDLE_STATUSES),
+        run_reproducers=bool(getattr(args, "run_reproducers", False)),
+        timeout_s=float(getattr(args, "timeout", 20.0)),
+        repeat_count=int(getattr(args, "repeat", 1) or 1),
+        primary_per_family=bool(getattr(args, "primary_per_family", False)),
+    )
+    if getattr(args, "json", False):
+        print(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True))
+    else:
+        summary = manifest["summary"]
+        print(f"issue bundle manifest: {manifest['manifest_path']}")
+        print(f"issue bundle markdown: {manifest['markdown_path']}")
+        print(f"bundled issues: {summary['issue_count']} documents, {summary['family_count']} families")
+        if summary.get("bundled_primary_per_family"):
+            print(
+                f"primary per family: selected {summary.get('selected_issue_count', summary['issue_count'])} "
+                f"of {summary.get('available_issue_count', summary['issue_count'])} eligible documents, "
+                f"skipped supporting drafts: {summary.get('skipped_supporting_duplicate_count', 0)}"
+            )
+        print(f"extracted reproducers: {summary['extracted_reproducer_count']}")
+        print(f"compile failures: {summary['compile_failure_count']}")
+        if summary["executed_reproducer_count"]:
+            print(
+                f"executed reproducers: {summary['executed_reproducer_count']}, "
+                f"attempts: {summary.get('executed_reproducer_attempt_count', summary['executed_reproducer_count'])}, "
+                f"flaky: {summary.get('flaky_reproducer_count', 0)}, "
+                f"nonzero exits: {summary['nonzero_exit_count']}, timeouts: {summary['timeout_count']}"
+            )
+    if getattr(args, "fail_on_missing_reproducer", False) and manifest["summary"]["missing_reproducer_count"]:
+        return 2
+    if getattr(args, "fail_on_compile_error", False) and manifest["summary"]["compile_failure_count"]:
+        return 2
+    return 0
+
+
+def cmd_candidate_pipeline(args: argparse.Namespace) -> int:
+    manifest_file = Path(args.manifest) if getattr(args, "manifest", None) else None
+    evidence_files = [Path(item) for item in parse_guidance_targets(getattr(args, "evidence_files", "") or "")]
+    pipeline = build_candidate_pipeline(
+        evidence_files=evidence_files or None,
+        manifest_file=manifest_file,
+        output_dir=Path(getattr(args, "output_dir", DEFAULT_CANDIDATE_PIPELINE_DIR)),
+        recheck_attempts=max(0, int(getattr(args, "recheck_attempts", 2))),
+        reduce_artifacts=not bool(getattr(args, "no_reduce", False)),
+        standalone_reproducer=not bool(getattr(args, "no_standalone_reproducer", False)),
+    )
+    if getattr(args, "json", False):
+        print(json.dumps(pipeline, ensure_ascii=False, indent=2, sort_keys=True))
+    else:
+        summary = pipeline.get("summary", {})
+        print(f"candidate pipeline manifest: {pipeline.get('manifest_path', '')}")
+        print(f"candidate pipeline markdown: {pipeline.get('markdown_path', '')}")
+        print(
+            f"candidates={summary.get('candidate_count', 0)} "
+            f"reproduced={summary.get('reproduced_count', 0)} "
+            f"reduced={summary.get('reduced_count', 0)} "
+            f"needs_dedup={summary.get('needs_dedup_check_count', 0)}"
+        )
+    if getattr(args, "fail_on_ready", False) and pipeline.get("summary", {}).get("ready_to_submit_count", 0):
+        return 2
+    return 0
+
+
+def _discovery_run_config_from_args(args: argparse.Namespace) -> ExperimentConfig:
+    config = _preset_config(str(getattr(args, "preset", "live_deep_organic")))
+    config.log_level = str(getattr(args, "log_level", "compact"))
+    config.compress_run_log = not bool(getattr(args, "no_compress_run_log", False))
+    config.artifact_limit = getattr(args, "artifact_limit", None)
+    if getattr(args, "candidate_recheck_count", None) is not None:
+        config.candidate_recheck_count = max(0, int(args.candidate_recheck_count))
+    if getattr(args, "metamorphic_variant_limit", None) is not None:
+        config.metamorphic_variant_limit = max(0, int(args.metamorphic_variant_limit))
+    extra_known = parse_guidance_targets(getattr(args, "extra_known_saturated_bug_families", "") or "")
+    if extra_known:
+        config.known_saturated_bug_families = list(
+            dict.fromkeys([*config.known_saturated_bug_families, *extra_known])
+        )
+    return config
+
+
+def _project_relative_cli_path(value: str | Path) -> str:
+    if not value:
+        return ""
+    path = Path(value)
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    try:
+        return str(path.resolve().relative_to(Path.cwd().resolve()))
+    except ValueError:
+        return str(path)
+
+
+def _write_discovery_run_fresh_candidate_evidence(
+    run_file: Path,
+    *,
+    classification: dict[str, Any],
+    output_path: Path,
+) -> dict[str, Any]:
+    fresh_families = set(classification.get("fresh_candidate_bug_families", {}))
+    candidate_rows: list[dict[str, Any]] = []
+    if fresh_families:
+        for row in read_jsonl(run_file):
+            matching_findings = [
+                finding
+                for finding in row.get("findings", [])
+                if _candidate_issue_family_key(finding) in fresh_families
+            ]
+            if matching_findings:
+                candidate_rows.append(
+                    {
+                        "case": row.get("case", {}),
+                        "findings": matching_findings,
+                        "normalized": row.get("normalized", {}),
+                        "raw_results": row.get("raw_results", {}),
+                        "config": row.get("config", {}),
+                        "candidate_recheck": row.get("candidate_recheck", {}),
+                        "bug_dir": row.get("bug_dir", ""),
+                        "status": row.get("status", ""),
+                        "case_index": row.get("case_index", ""),
+                        "elapsed_s": row.get("elapsed_s", ""),
+                    }
+                )
+    evidence = {
+        "schema_version": "bug-hunt-fresh-candidates-v1",
+        "generated_at": utc_now(),
+        "generated_by": "datadiff bug-hunt",
+        "source_run_file": _project_relative_cli_path(run_file),
+        "fresh_candidate_bug_families": classification.get("fresh_candidate_bug_families", {}),
+        "candidate_row_count": len(candidate_rows),
+        "candidate_rows": candidate_rows,
+    }
+    dump_json(evidence, output_path)
+    return evidence
+
+
+def _run_candidate_pipeline_for_evidence(
+    args: argparse.Namespace,
+    *,
+    evidence_path: Path,
+    manifest_path: Path,
+) -> dict[str, Any]:
+    if getattr(args, "skip_candidate_pipeline", False):
+        return {}
+    try:
+        pipeline = build_candidate_pipeline(
+            evidence_files=[evidence_path],
+            manifest_file=manifest_path,
+            output_dir=Path(getattr(args, "candidate_pipeline_output_dir", DEFAULT_CANDIDATE_PIPELINE_DIR)),
+            recheck_attempts=max(0, int(getattr(args, "candidate_pipeline_recheck_attempts", 2))),
+            reduce_artifacts=not bool(getattr(args, "no_candidate_pipeline_reduce", False)),
+            standalone_reproducer=not bool(
+                getattr(args, "no_candidate_pipeline_standalone_reproducer", False)
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "status": "error",
+            "error_type": exc.__class__.__name__,
+            "error": str(exc),
+        }
+    return {
+        "status": "ok",
+        "manifest_path": str(pipeline.get("manifest_path", "")),
+        "markdown_path": str(pipeline.get("markdown_path", "")),
+        "summary": dict(pipeline.get("summary", {}) or {}),
+    }
+
+
 def cmd_experiment_summary(args: argparse.Namespace) -> int:
     manifest_file = Path(args.manifest) if args.manifest else None
-    md_path, csv_path = write_experiment_summary(manifest_file, refresh=bool(getattr(args, "refresh", False)))
+    md_path, csv_path = write_experiment_summary(
+        manifest_file,
+        refresh=bool(getattr(args, "refresh", False)),
+    )
     aggregate_csv_path = md_path.with_name(f"{md_path.stem}-aggregates.csv")
     print(f"markdown summary: {md_path}")
     print(f"csv summary:      {csv_path}")
@@ -1097,9 +1609,12 @@ def cmd_experiment_summary(args: argparse.Namespace) -> int:
 def cmd_analyze_experiment(args: argparse.Namespace) -> int:
     manifest_file = Path(args.manifest) if args.manifest else None
     compare_presets = _parse_presets(args.compare_presets) if args.compare_presets else None
+    reference_preset = getattr(args, "reference_preset", None) or getattr(args, "baseline_preset", "baseline")
     md_path, csv_path = analyze_experiment(
         manifest_file,
-        baseline_preset=args.baseline_preset,
+        reference_preset=reference_preset,
+        legacy_reference_preset=getattr(args, "baseline_preset", None),
+        baseline_preset=getattr(args, "baseline_preset", None),
         compare_presets=compare_presets,
         refresh=bool(getattr(args, "refresh", False)),
     )
@@ -1118,16 +1633,34 @@ def cmd_analyze_seeded_sensitivity(args: argparse.Namespace) -> int:
 
 def cmd_analyze_ablation_audit(args: argparse.Namespace) -> int:
     manifest_file = Path(args.manifest) if args.manifest else None
+    reference_presets = _parse_presets(args.reference_presets) if getattr(args, "reference_presets", None) else None
     trusted_presets = _parse_presets(args.trusted_presets) if args.trusted_presets else None
     ablation_presets = _parse_presets(args.ablation_presets) if args.ablation_presets else None
     md_path, csv_path = analyze_ablation_audit(
         manifest_file,
+        reference_presets=reference_presets,
+        legacy_reference_presets=trusted_presets,
         trusted_presets=trusted_presets,
         ablation_presets=ablation_presets,
         refresh=bool(getattr(args, "refresh", False)),
     )
     print(f"ablation audit markdown: {md_path}")
     print(f"ablation audit csv:      {csv_path}")
+    return 0
+
+
+def cmd_methodology_report(args: argparse.Namespace) -> int:
+    manifest_file = Path(args.manifest) if args.manifest else None
+    md_path, json_path = write_methodology_report(
+        manifest_file,
+        refresh=bool(getattr(args, "refresh", False)),
+        scan_run_logs=not bool(getattr(args, "summary_only", False)),
+    )
+    if getattr(args, "json", False):
+        print(json.dumps(load_json(json_path), ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
+    print(f"methodology report markdown: {md_path}")
+    print(f"methodology report json:     {json_path}")
     return 0
 
 
@@ -1155,16 +1688,81 @@ def cmd_final_readiness(args: argparse.Namespace) -> int:
         min_live_candidate_families=max(0, int(args.min_live_candidate_families)),
         min_confirmed_live_families=max(0, int(args.min_confirmed_live_families)),
         min_historical_confirmed=max(0, int(args.min_historical_confirmed)),
-        require_seeded=not bool(args.no_require_seeded),
+        require_validation=not bool(getattr(args, "no_require_validation", False)),
+        require_seeded=not bool(getattr(args, "no_require_seeded", False)),
+        require_ablation=not bool(getattr(args, "no_require_ablation", False)),
+        require_comparison=not bool(getattr(args, "no_require_comparison", False)),
     )
+    manifest_limit = (
+        None
+        if manifests or getattr(args, "all_manifests", False)
+        else max(1, int(getattr(args, "latest_manifests", DEFAULT_FINAL_READINESS_MANIFEST_LIMIT)))
+    )
+    scan_run_logs = (
+        bool(manifests) or bool(getattr(args, "full_run_log_scan", False))
+    ) and not bool(getattr(args, "summary_only", False))
     md_path, json_path = analyze_final_readiness(
         manifests or None,
         latest_confirmation_files=latest_confirmation_files or None,
+        manifest_limit=manifest_limit,
+        scan_run_logs=scan_run_logs,
         thresholds=thresholds,
         policy=policy,
     )
-    print(f"final readiness markdown: {md_path}")
-    print(f"final readiness json:     {json_path}")
+    audit = load_json(json_path)
+    if getattr(args, "json", False):
+        print(json.dumps(audit, indent=2, sort_keys=True))
+    else:
+        print(f"final readiness markdown: {md_path}")
+        print(f"final readiness json:     {json_path}")
+    return 2 if getattr(args, "fail_on_missing", False) and not audit.get("ready", False) else 0
+
+
+def cmd_review_readiness(args: argparse.Namespace) -> int:
+    latest_confirmation_files = [
+        Path(path) for path in getattr(args, "latest_confirmation_file", [])
+    ]
+    thresholds = ReviewThresholds(
+        target_confirmed_bug_families=max(0, int(getattr(args, "target_confirmed", 20))),
+        min_audit_candidate_families=max(0, int(getattr(args, "min_audit_candidates", 1))),
+        min_bug_workflow_manifests=max(0, int(getattr(args, "min_bug_workflows", 1))),
+        min_generated_issue_drafts=max(0, int(getattr(args, "min_generated_issue_drafts", 1))),
+        min_issue_bundle_families=max(0, int(getattr(args, "min_issue_bundle_families", 1))),
+        min_pending_issue_drafts=max(0, int(getattr(args, "min_pending_issue_drafts", 1))),
+        min_old_known_upstream_issues=max(0, int(getattr(args, "min_old_known_issues", 1))),
+    )
+    audit = build_review_readiness(
+        latest_confirmation_files=latest_confirmation_files or None,
+        thresholds=thresholds,
+    )
+    if getattr(args, "write_report", False):
+        json_path, md_path = write_review_readiness_outputs(
+            audit,
+            output_dir=Path(getattr(args, "output_dir", "reports")),
+        )
+        audit["output_json"] = _project_relative_cli_path(json_path)
+        audit["output_markdown"] = _project_relative_cli_path(md_path)
+    if getattr(args, "json", False):
+        print(json.dumps(audit, ensure_ascii=False, indent=2, sort_keys=True))
+    else:
+        summary = audit["summary"]
+        print(f"review ready: {audit['ready']}")
+        print(f"required gates: {summary['required_passed']}/{summary['required_total']}")
+        print(
+            "confirmed latest families: "
+            f"{summary['confirmed_latest_count']}/{summary['target_confirmed_bug_families']}"
+        )
+        for item in audit["criteria"]:
+            print(f"- {item['id']}: {item['status']} ({item['evidence']})")
+        if audit["recommendations"]:
+            print("recommendations:")
+            for item in audit["recommendations"]:
+                print(f"- {item}")
+        if getattr(args, "write_report", False):
+            print(f"review readiness json:     {audit['output_json']}")
+            print(f"review readiness markdown: {audit['output_markdown']}")
+    if getattr(args, "fail_on_missing", False) and not audit["ready"]:
+        return 2
     return 0
 
 
@@ -1177,10 +1775,12 @@ def cmd_analyze_pattern_variants(args: argparse.Namespace) -> int:
 
 
 def cmd_targets(args: argparse.Namespace) -> int:
+    context = target_context(sorted(TARGETS))
     payload = {
         "suites": list_target_suites(),
-        "targets": [target.to_dict() for target in sorted(TARGETS.values(), key=lambda item: item.name)],
+        "targets": context.target_dicts(),
         "capability_matrix": target_capability_matrix(),
+        "methodology": context.methodology_summary(),
     }
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
@@ -1201,6 +1801,10 @@ def cmd_targets(args: argparse.Namespace) -> int:
             f"layer={target.layer} status={target.status} "
             f"capabilities={len(target.capabilities)} adapter={target.adapter}"
         )
+    print("methodology:")
+    print(f"- name={payload['methodology']['name']}")
+    print(f"- reusable_layers={len(payload['methodology']['reusable_layers'])}")
+    print(f"- shared_extension_contract={len(payload['methodology']['shared_extension_contract'])}")
     return 0
 
 
@@ -1232,7 +1836,7 @@ def cmd_prune_corpus(args: argparse.Namespace) -> int:
 
 
 def cmd_show_bugs(args: argparse.Namespace) -> int:
-    run_file = Path(args.run_file) if args.run_file else latest_run_file()
+    run_file = Path(args.run_file) if args.run_file else latest_run_log_path()
     rows = read_jsonl(run_file)
     shown = 0
     for row in rows:
@@ -1266,44 +1870,54 @@ def cmd_show_bugs(args: argparse.Namespace) -> int:
 
 
 def cmd_classify_run(args: argparse.Namespace) -> int:
-    run_file = Path(args.run_file) if args.run_file else latest_run_file()
-    verdicts: Counter[str] = Counter()
-    candidate_bug_families: Counter[str] = Counter()
-    false_positive_reasons: Counter[str] = Counter()
-    examples: dict[str, list[dict]] = {}
-    cache: dict[tuple, dict] = {}
-
-    for row in read_jsonl(run_file):
-        _classify_run_row(
-            row,
-            verdicts,
-            candidate_bug_families,
-            false_positive_reasons,
-            examples,
-            args.limit,
-            cache,
-            refresh=bool(getattr(args, "refresh", False)),
-        )
-
+    run_file = Path(args.run_file) if args.run_file else latest_run_log_path()
+    summary = _summarize_run_classification(
+        run_file,
+        limit=max(0, int(args.limit)),
+        refresh=bool(getattr(args, "refresh", False)),
+    )
+    if getattr(args, "json", False):
+        print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
     print(f"run_file={run_file}")
-    if getattr(args, "refresh", False):
+    if summary["refresh"]:
         print("refresh=true")
-    print("triage verdicts:")
-    if not verdicts:
+    print("offline paper buckets:")
+    if not summary["offline_buckets"]:
         print("- none")
-    for verdict, count in verdicts.most_common():
+    for bucket, count in summary["offline_buckets"].items():
+        print(f"- {bucket}: {count}")
+    print("triage verdicts:")
+    if not summary["triage_verdicts"]:
+        print("- none")
+    for verdict, count in summary["triage_verdicts"].items():
         print(f"- {verdict}: {count}")
     print("candidate bug families:")
-    if not candidate_bug_families:
+    if not summary["candidate_bug_families"]:
         print("- none")
-    for family, count in candidate_bug_families.most_common():
+    for family, count in summary["candidate_bug_families"].items():
+        print(f"- {family}: {count}")
+    print("fresh candidate bug families:")
+    if not summary["fresh_candidate_bug_families"]:
+        print("- none")
+    for family, count in summary["fresh_candidate_bug_families"].items():
+        print(f"- {family}: {count}")
+    print("issue-inspired unsaturated candidate bug families:")
+    if not summary["issue_inspired_unsaturated_candidate_bug_families"]:
+        print("- none")
+    for family, count in summary["issue_inspired_unsaturated_candidate_bug_families"].items():
+        print(f"- {family}: {count}")
+    print("known saturated candidate bug families:")
+    if not summary["known_saturated_candidate_bug_families"]:
+        print("- none")
+    for family, count in summary["known_saturated_candidate_bug_families"].items():
         print(f"- {family}: {count}")
     print("false positive reasons:")
-    if not false_positive_reasons:
+    if not summary["false_positive_reasons"]:
         print("- none")
-    for reason, count in false_positive_reasons.most_common():
+    for reason, count in summary["false_positive_reasons"].items():
         print(f"- {reason}: {count}")
-    for verdict, items in examples.items():
+    for verdict, items in summary["examples"].items():
         print(f"examples[{verdict}]:")
         for item in items:
             print(
@@ -1314,9 +1928,500 @@ def cmd_classify_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_run_health(args: argparse.Namespace) -> int:
+    run_file = Path(args.run_file) if args.run_file else latest_run_log_path()
+    summary = _summarize_run_health(run_file, limit=max(0, int(args.limit)))
+    if getattr(args, "json", False):
+        print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
+
+    print(f"run_file={summary['run_file']}")
+    print(f"partial={str(summary['partial']).lower()}")
+    print(f"bytes={summary['bytes']}")
+    print(f"rows={summary['rows']}")
+    runtime = summary.get("runtime", {})
+    if runtime:
+        print("runtime:")
+        print(f"- status: {runtime.get('status', '') or '-'}")
+        print(f"- elapsed_s: {runtime.get('elapsed_s', 0.0)}")
+        print(f"- executed_cases: {runtime.get('executed_cases', 0)}")
+        print(f"- throughput_cases_s: {runtime.get('throughput_cases_s', 0.0)}")
+        print(f"- evidence_bytes_per_case: {runtime.get('evidence_bytes_per_case', 0.0)}")
+        print(f"- run_log_bytes: {runtime.get('run_log_bytes', 0)}")
+        if runtime.get("meta_file"):
+            print(f"- meta_file: {runtime['meta_file']}")
+        if runtime.get("checkpoint_file"):
+            print(f"- checkpoint_file: {runtime['checkpoint_file']}")
+        if runtime.get("closed_loop_state_file"):
+            print(f"- closed_loop_state_file: {runtime['closed_loop_state_file']}")
+            print(f"- closed_loop_state_bytes: {runtime.get('closed_loop_state_bytes', 0)}")
+        stage_profile = runtime.get("stage_profile", {})
+        if stage_profile:
+            print("- stage_profile:")
+            avg_ms = stage_profile.get("avg_ms_per_case", {})
+            share = stage_profile.get("share_of_total", {})
+            for key in sorted(avg_ms):
+                print(
+                    f"  - {key}: avg_ms_per_case={float(avg_ms.get(key, 0.0) or 0.0):.6f} "
+                    f"share_of_total={float(share.get(key, 0.0) or 0.0):.6f}"
+                )
+    print("statuses:")
+    if not summary["statuses"]:
+        print("- none")
+    for status, count in summary["statuses"].items():
+        print(f"- {status}: {count}")
+    print("candidate bug families:")
+    if not summary["candidate_bug_families"]:
+        print("- none")
+    for family, count in summary["candidate_bug_families"].items():
+        print(f"- {family}: {count}")
+    print("fresh candidate bug families:")
+    if not summary["fresh_candidate_bug_families"]:
+        print("- none")
+    for family, count in summary["fresh_candidate_bug_families"].items():
+        print(f"- {family}: {count}")
+    print("known saturated candidate bug families:")
+    if not summary["known_saturated_candidate_bug_families"]:
+        print("- none")
+    for family, count in summary["known_saturated_candidate_bug_families"].items():
+        print(f"- {family}: {count}")
+    print("false positive reasons:")
+    if not summary["false_positive_reasons"]:
+        print("- none")
+    for reason, count in summary["false_positive_reasons"].items():
+        print(f"- {reason}: {count}")
+    if summary["examples"]:
+        print("examples:")
+        for item in summary["examples"]:
+            print(
+                f"- {item['case_id']} seed={item['seed']} status={item['status']} "
+                f"kind={item['kind']} root={item['root']} suspicious={item['suspicious']}"
+            )
+    if getattr(args, "fail_on_fresh_candidate", False) and summary["fresh_candidate_bug_families"]:
+        return 2
+    if getattr(args, "fail_on_bug", False) and summary["statuses"].get("bug", 0):
+        return 2
+    return 0
+
+
+def cmd_discovery_campaign_status(args: argparse.Namespace) -> int:
+    manifest_arg = getattr(args, "manifest", "") or "new_issue/generated/bug-sprint-manifest.json"
+    summary = _summarize_discovery_campaign_status(Path(manifest_arg), limit=max(0, int(args.limit)))
+    if getattr(args, "json", False):
+        print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
+    else:
+        print(f"manifest_file={summary['manifest_file']}")
+        print(f"manifest_status={summary['manifest_status']}")
+        print(f"started_at={summary['started_at']}")
+        print(f"completed_at={summary['completed_at'] or '-'}")
+        print(f"stopped_by_health={str(summary['stopped_by_health']).lower()}")
+        print(f"health_stop_reason={summary['health_stop_reason'] or '-'}")
+        progress = summary.get("progress", {})
+        print(f"planned_runs={progress.get('planned_run_count', 0)}")
+        print(f"completed_runs={progress.get('completed_run_count', 0)}")
+        print(f"remaining_runs={progress.get('remaining_run_count', 0)}")
+        print(f"current_lane={progress.get('current_lane_id', '') or '-'}")
+        print(f"current_seed={progress.get('current_seed', '') or '-'}")
+        current_run = summary.get("current_run", {})
+        print(f"current_run_status={current_run.get('status', '') or '-'}")
+        print(f"latest_observed_run_file={summary.get('latest_observed_run_file', '') or '-'}")
+        latest_health = summary.get("latest_observed_run_health", {})
+        if latest_health:
+            print("latest observed run health:")
+            print(f"- partial: {str(latest_health.get('partial', False)).lower()}")
+            print(f"- rows: {latest_health.get('rows', 0)}")
+            print("- statuses:")
+            statuses = latest_health.get("statuses", {})
+            if statuses:
+                for key, count in statuses.items():
+                    print(f"  - {key}: {count}")
+            else:
+                print("  - none")
+        print("aggregate fresh candidate families:")
+        fresh = summary.get("fresh_candidate_bug_families", {})
+        if fresh:
+            for family, count in fresh.items():
+                print(f"- {family}: {count}")
+        else:
+            print("- none")
+        print("aggregate issue-inspired unsaturated candidate families:")
+        inspired = summary.get("issue_inspired_unsaturated_candidate_bug_families", {})
+        if inspired:
+            for family, count in inspired.items():
+                print(f"- {family}: {count}")
+        else:
+            print("- none")
+        print("aggregate known saturated candidate families:")
+        known = summary.get("known_saturated_candidate_bug_families", {})
+        if known:
+            for family, count in known.items():
+                print(f"- {family}: {count}")
+        else:
+            print("- none")
+        print("recent lane yield summary:")
+        lane_summary = summary.get("recent_lane_yield_summary", [])
+        if lane_summary:
+            for lane in lane_summary:
+                print(
+                    "- {lane_id}: rank={rank} score={score:.2f} budget={budget:.2f} "
+                    "yield={yield_rate:.2f} novelty={novelty:.2f} fp={fp:.2f} pending={pending}".format(
+                        lane_id=lane.get("lane_id", ""),
+                        rank=int(lane.get("priority_rank", 0) or 0),
+                        score=float(lane.get("score", 0.0) or 0.0),
+                        budget=float(lane.get("budget_multiplier", 1.0) or 1.0),
+                        yield_rate=float(lane.get("yield_rate", 0.0) or 0.0),
+                        novelty=float(lane.get("novelty_rate", 0.0) or 0.0),
+                        fp=float(lane.get("false_positive_rate", 0.0) or 0.0),
+                        pending=int(lane.get("pending_runs", 0) or 0),
+                    )
+                )
+        else:
+            print("- none")
+        pipeline_summary = summary.get("candidate_pipeline", {})
+        if pipeline_summary:
+            print(
+                "candidate pipeline summary: "
+                f"pipelines={pipeline_summary.get('pipeline_count', 0)} "
+                f"candidates={pipeline_summary.get('candidate_count', 0)} "
+                f"reproduced={pipeline_summary.get('reproduced_count', 0)} "
+                f"needs_dedup={pipeline_summary.get('needs_dedup_check_count', 0)}"
+            )
+    fresh = summary.get("fresh_candidate_bug_families", {}) or summary.get("latest_observed_run_health", {}).get(
+        "fresh_candidate_bug_families", {}
+    )
+    if getattr(args, "fail_on_fresh_candidate", False) and fresh:
+        return 2
+    if getattr(args, "fail_on_bug", False) and summary.get("latest_observed_run_health", {}).get("statuses", {}).get(
+        "bug", 0
+    ):
+        return 2
+    return 0
+
+
+cmd_bug_hunt = cmd_discovery_run
+cmd_bug_sprint = cmd_discovery_campaign
+cmd_bug_sprint_status = cmd_discovery_campaign_status
+_bug_hunt_config_from_args = _discovery_run_config_from_args
+_write_bug_hunt_fresh_candidate_evidence = _write_discovery_run_fresh_candidate_evidence
+
+
+def _summarize_run_health(run_file: Path, *, limit: int = 3) -> dict[str, Any]:
+    rows, partial = read_jsonl_partial(run_file)
+    statuses: Counter[str] = Counter()
+    candidate_bug_families: Counter[str] = Counter()
+    false_positive_reasons: Counter[str] = Counter()
+    examples: list[dict[str, Any]] = []
+    known_saturated = set(DEFAULT_KNOWN_SATURATED_BUG_FAMILIES)
+    candidate_origins: dict[str, Counter[str]] = {
+        "organic": Counter(),
+        "issue_inspired": Counter(),
+    }
+
+    for row in rows:
+        statuses[row.get("status", "unknown")] += 1
+        known_saturated.update(row.get("config", {}).get("known_saturated_bug_families", []) or [])
+        candidate_findings: list[dict] = []
+        for finding in row.get("findings", []) or []:
+            if finding.get("false_positive_reason"):
+                false_positive_reasons[finding["false_positive_reason"]] += 1
+            if _is_candidate_issue_finding(finding):
+                candidate_findings.append(finding)
+                if len(examples) < limit:
+                    examples.append(
+                        {
+                            "case_id": row.get("case", {}).get("case_id", ""),
+                            "seed": row.get("case", {}).get("seed", ""),
+                            "status": row.get("status", ""),
+                            "kind": finding.get("kind", ""),
+                            "root": finding.get("root_cause", "unknown"),
+                            "suspicious": finding.get("suspicious_backends", []),
+                        }
+                    )
+        candidate_keys = _candidate_issue_family_keys(candidate_findings)
+        candidate_bug_families.update(candidate_keys)
+        if candidate_keys:
+            origin = _candidate_row_origin(row, candidate_findings)
+            candidate_origins.setdefault(origin, Counter()).update(candidate_keys)
+
+    candidate_items = dict(candidate_bug_families.most_common())
+    known_items = {
+        family: count
+        for family, count in candidate_items.items()
+        if _is_known_saturated_family_key(family, known_saturated)
+    }
+    unsaturated_items = {
+        family: count
+        for family, count in candidate_items.items()
+        if not _is_known_saturated_family_key(family, known_saturated)
+    }
+    fresh_items = {
+        family: count
+        for family, count in candidate_origins["organic"].most_common()
+        if family in unsaturated_items
+    }
+    runtime = _run_health_runtime_summary(run_file)
+    return {
+        "run_file": _project_relative_cli_path(run_file),
+        "partial": partial,
+        "bytes": run_file.stat().st_size if run_file.exists() else 0,
+        "rows": len(rows),
+        "statuses": dict(statuses.most_common()),
+        "candidate_bug_families": candidate_items,
+        "fresh_candidate_bug_families": fresh_items,
+        "known_saturated_candidate_bug_families": known_items,
+        "false_positive_reasons": dict(false_positive_reasons.most_common()),
+        "examples": examples,
+        "runtime": runtime,
+    }
+
+
+def _run_health_runtime_summary(run_file: Path) -> dict[str, Any]:
+    meta_path = run_meta_path(run_file)
+    meta = load_json(meta_path) if meta_path.exists() else {}
+    checkpoint_text = str(meta.get("checkpoint_file", "") or "").strip() if isinstance(meta, dict) else ""
+    checkpoint_path = Path(checkpoint_text).expanduser() if checkpoint_text else run_file.with_name(
+        f"{run_file.stem.split('.jsonl', 1)[0]}.checkpoint.json"
+    )
+    checkpoint = load_json(checkpoint_path) if checkpoint_path is not None and checkpoint_path.exists() else {}
+    snapshot = checkpoint if isinstance(checkpoint, dict) and checkpoint else meta if isinstance(meta, dict) else {}
+    if not isinstance(snapshot, dict) or not snapshot:
+        return {}
+    elapsed_s = float(snapshot.get("elapsed_s", 0.0) or 0.0)
+    executed = int(snapshot.get("executed_cases", 0) or 0)
+    run_bytes = run_file.stat().st_size if run_file.exists() else 0
+    throughput = float(snapshot.get("throughput_cases_s", 0.0) or 0.0)
+    stage_profile = snapshot.get("stage_profile", {}) if isinstance(snapshot.get("stage_profile", {}), dict) else {}
+    avg_ms = stage_profile.get("avg_ms_per_case", {}) if isinstance(stage_profile.get("avg_ms_per_case", {}), dict) else {}
+    share = stage_profile.get("share_of_total", {}) if isinstance(stage_profile.get("share_of_total", {}), dict) else {}
+    stage_profile_summary = {
+        "avg_ms_per_case": {key: float(value or 0.0) for key, value in avg_ms.items()},
+        "share_of_total": {key: float(value or 0.0) for key, value in share.items()},
+        "case_count": int(stage_profile.get("case_count", executed) or executed),
+    }
+    closed_loop_state_file = str(snapshot.get("closed_loop_state_file", "") or "").strip()
+    state_path = Path(closed_loop_state_file).expanduser() if closed_loop_state_file else None
+    state_bytes = state_path.stat().st_size if state_path is not None and state_path.exists() else 0
+    return {
+        "status": str(snapshot.get("status", "")).strip(),
+        "elapsed_s": elapsed_s,
+        "executed_cases": executed,
+        "throughput_cases_s": throughput,
+        "next_seed": int(snapshot.get("next_seed", 0) or 0),
+        "evidence_bytes_per_case": (run_bytes / executed) if executed else 0.0,
+        "run_log_bytes": run_bytes,
+        "checkpoint_file": (
+            _project_relative_cli_path(checkpoint_path) if checkpoint_path is not None and checkpoint_path.exists() else ""
+        ),
+        "meta_file": _project_relative_cli_path(meta_path) if meta_path.exists() else "",
+        "stage_profile": stage_profile_summary,
+        "closed_loop_state_file": _project_relative_cli_path(state_path) if state_path is not None and state_path.exists() else "",
+        "closed_loop_state_bytes": state_bytes,
+        "closed_loop_state_summary": snapshot.get("closed_loop_state_summary", {}),
+    }
+
+
+def _summarize_discovery_campaign_status(manifest_file: Path, *, limit: int = 3) -> dict[str, Any]:
+    manifest = load_json(manifest_file)
+    lanes = list(manifest.get("lanes", []) or [])
+    pending_by_lane: dict[str, list[int]] = {str(lane.get("id", "")): [] for lane in lanes if lane.get("id")}
+    for run in manifest.get("runs", []) or []:
+        lane_id = str(run.get("lane_id", ""))
+        if not lane_id or lane_id not in pending_by_lane:
+            continue
+        if str(run.get("status", "")) == "completed":
+            continue
+        seed = run.get("seed")
+        if seed not in pending_by_lane[lane_id]:
+            pending_by_lane[lane_id].append(seed)
+    progress = manifest.get("progress", {}) if isinstance(manifest.get("progress"), dict) else {}
+    current_lane_id = str(progress.get("current_lane_id", ""))
+    current_seed = progress.get("current_seed")
+    if current_lane_id and current_seed not in (None, "") and current_seed not in pending_by_lane.get(current_lane_id, []):
+        pending_by_lane.setdefault(current_lane_id, []).insert(0, current_seed)
+    scheduler = manifest.get("scheduler", {}) if isinstance(manifest.get("scheduler"), dict) else {}
+    if lanes:
+        scheduler = _discovery_campaign_scheduler_snapshot(
+            selected_lanes=[lane for lane in lanes if isinstance(lane, dict) and lane.get("id")],
+            runs=[run for run in manifest.get("runs", []) or [] if isinstance(run, dict)],
+            pending_by_lane=pending_by_lane,
+            generated_issue_dir=manifest_file.parent,
+            manifest_path=manifest_file,
+            history_limit=int(scheduler.get("history_window", DEFAULT_BUG_SPRINT_HISTORY_WINDOW) or DEFAULT_BUG_SPRINT_HISTORY_WINDOW),
+            score_weights=dict(scheduler.get("score_weights", {}) or DEFAULT_BUG_SPRINT_SCORE_WEIGHTS),
+        )
+    current_run = _current_discovery_campaign_run(manifest)
+    latest_observed_run_file = _latest_discovery_campaign_run_file(manifest)
+    latest_observed_run_health = (
+        _summarize_run_health(latest_observed_run_file, limit=limit) if latest_observed_run_file is not None else {}
+    )
+    return {
+        "schema_version": "bug-sprint-status-v1",
+        "generated_at": utc_now(),
+        "manifest_file": _project_relative_cli_path(manifest_file),
+        "manifest_status": str(manifest.get("status", "")),
+        "started_at": str(manifest.get("started_at", "")),
+        "completed_at": str(manifest.get("completed_at", "")),
+        "stopped_by_health": bool(manifest.get("stopped_by_health", False)),
+        "health_stop_reason": str(manifest.get("health_stop_reason", "")),
+        "progress": dict(manifest.get("progress", {})),
+        "scheduler": scheduler,
+        "current_run": current_run,
+        "latest_observed_run_file": (
+            _project_relative_cli_path(latest_observed_run_file) if latest_observed_run_file is not None else ""
+        ),
+        "latest_observed_run_health": latest_observed_run_health,
+        "fresh_candidate_bug_families": dict(manifest.get("summary", {}).get("fresh_candidate_bug_families", {})),
+        "issue_inspired_unsaturated_candidate_bug_families": dict(
+            manifest.get("summary", {}).get("issue_inspired_unsaturated_candidate_bug_families", {})
+        ),
+        "known_saturated_candidate_bug_families": dict(
+            manifest.get("summary", {}).get("known_saturated_candidate_bug_families", {})
+        ),
+        "triage_verdicts": dict(manifest.get("summary", {}).get("triage_verdicts", {})),
+        "recent_lane_yield_summary": list(scheduler.get("lanes", []) or []),
+        "candidate_pipeline": dict(manifest.get("summary", {}).get("candidate_pipeline", {}) or {}),
+    }
+
+
+def _current_discovery_campaign_run(manifest: dict[str, Any]) -> dict[str, Any]:
+    runs = list(manifest.get("runs", []) or [])
+    for run in reversed(runs):
+        if run.get("status") == "running":
+            return dict(run)
+    return dict(runs[-1]) if runs else {}
+
+
+def _latest_discovery_campaign_run_file(manifest: dict[str, Any]) -> Path | None:
+    recorded: list[Path] = []
+    for run in manifest.get("runs", []) or []:
+        resolved = _resolve_project_cli_path(run.get("run_file", ""))
+        if resolved is not None and resolved.is_file():
+            recorded.append(resolved)
+    if recorded:
+        return max(recorded, key=lambda path: (path.stat().st_mtime, path.name))
+
+    started_at = _parse_manifest_utc_timestamp(str(manifest.get("started_at", "")))
+    candidates = sorted(
+        [*RUNS_DIR.glob("run-*.jsonl"), *RUNS_DIR.glob("run-*.jsonl.gz")],
+        key=lambda path: (path.stat().st_mtime, path.name),
+    )
+    if not candidates:
+        return None
+    if started_at is None:
+        return candidates[-1]
+    threshold = started_at.timestamp() - 1.0
+    recent = [path for path in candidates if path.stat().st_mtime >= threshold]
+    return recent[-1] if recent else None
+
+
+_summarize_bug_sprint_status = _summarize_discovery_campaign_status
+_current_bug_sprint_run = _current_discovery_campaign_run
+_latest_bug_sprint_run_file = _latest_discovery_campaign_run_file
+
+
+def _resolve_project_cli_path(value: str | Path | None) -> Path | None:
+    if not value:
+        return None
+    path = Path(value)
+    return path if path.is_absolute() else PROJECT_ROOT / path
+
+
+def _parse_manifest_utc_timestamp(value: str) -> datetime | None:
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    try:
+        return datetime.fromisoformat(cleaned.replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
+def _summarize_run_classification(
+    run_file: Path,
+    *,
+    limit: int = 3,
+    refresh: bool = False,
+) -> dict[str, Any]:
+    verdicts: Counter[str] = Counter()
+    offline_buckets: Counter[str] = Counter()
+    candidate_bug_families: Counter[str] = Counter()
+    false_positive_reasons: Counter[str] = Counter()
+    examples: dict[str, list[dict]] = {}
+    cache: dict[tuple, dict] = {}
+    known_saturated = set(DEFAULT_KNOWN_SATURATED_BUG_FAMILIES)
+    candidate_origins: dict[str, Counter[str]] = {
+        "organic": Counter(),
+        "issue_inspired": Counter(),
+    }
+
+    rows = read_jsonl(run_file)
+    for row in rows:
+        known_saturated.update(row.get("config", {}).get("known_saturated_bug_families", []) or [])
+    for row in rows:
+        _classify_run_row(
+            row,
+            verdicts,
+            offline_buckets,
+            candidate_bug_families,
+            false_positive_reasons,
+            examples,
+            limit,
+            cache,
+            refresh=refresh,
+            candidate_origins=candidate_origins,
+            known_saturated_bug_families=known_saturated,
+        )
+    candidate_items = dict(candidate_bug_families.most_common())
+    known_items = {
+        family: count
+        for family, count in candidate_items.items()
+        if _is_known_saturated_family_key(family, known_saturated)
+    }
+    unsaturated_items = {
+        family: count
+        for family, count in candidate_items.items()
+        if not _is_known_saturated_family_key(family, known_saturated)
+    }
+    inspired_items = {
+        family: count
+        for family, count in candidate_origins["issue_inspired"].most_common()
+        if family in unsaturated_items
+    }
+    organic_items = {
+        family: count
+        for family, count in candidate_origins["organic"].most_common()
+        if family in unsaturated_items
+    }
+    return {
+        "run_file": _project_relative_cli_path(run_file),
+        "refresh": refresh,
+        "offline_buckets": dict(offline_buckets.most_common()),
+        "triage_verdicts": dict(verdicts.most_common()),
+        "candidate_bug_families": candidate_items,
+        "unsaturated_candidate_bug_families": unsaturated_items,
+        "fresh_candidate_bug_families": organic_items,
+        "issue_inspired_unsaturated_candidate_bug_families": inspired_items,
+        "known_saturated_candidate_bug_families": known_items,
+        "known_saturated_reference_count": len(known_saturated),
+        "false_positive_reasons": dict(false_positive_reasons.most_common()),
+        "examples": examples,
+    }
+
+
+def _is_known_saturated_family_key(family: str, known_saturated: set[str]) -> bool:
+    if family in known_saturated:
+        return True
+    root, sep, backend_key = family.rpartition("@")
+    if not sep:
+        return False
+    backends = [backend for backend in backend_key.split(",") if backend]
+    return bool(backends) and all(f"{root}@{backend}" in known_saturated for backend in backends)
+
+
 def _classify_run_row(
     row: dict,
     verdicts: Counter[str],
+    offline_buckets: Counter[str],
     candidate_bug_families: Counter[str],
     false_positive_reasons: Counter[str],
     examples: dict[str, list[dict]],
@@ -1324,6 +2429,8 @@ def _classify_run_row(
     cache: dict[tuple, dict],
     *,
     refresh: bool = False,
+    candidate_origins: dict[str, Counter[str]] | None = None,
+    known_saturated_bug_families: set[str] | None = None,
 ) -> None:
     if not row.get("findings"):
         return
@@ -1362,6 +2469,24 @@ def _classify_run_row(
                 cache[cache_key] = classification
         verdict = classification["verdict"]
         verdicts[verdict] += 1
+        classified_finding = dict(finding)
+        classified_finding["triage_verdict"] = verdict
+        classified_finding["false_positive"] = bool(
+            classification.get("false_positive", finding.get("false_positive", False))
+        )
+        if not classified_finding.get("source_issue"):
+            metadata = row.get("case", {}).get("metadata", {}) or {}
+            classified_finding["source_issue"] = (
+                metadata.get("source_issue")
+                or metadata.get("source_issue_alt")
+                or finding.get("source_issue", "")
+            )
+        offline_buckets[
+            offline_finding_bucket(
+                classified_finding,
+                tuple(sorted(known_saturated_bug_families or set())),
+            )
+        ] += 1
         if verdict == "candidate_implementation_bug" and not classification.get("false_positive"):
             candidate_finding = dict(finding)
             candidate_finding["triage_verdict"] = verdict
@@ -1381,41 +2506,58 @@ def _classify_run_row(
                     "evidence": classification.get("evidence", ""),
                 }
             )
-    candidate_bug_families.update(_candidate_bug_family_keys(candidate_findings))
+    candidate_keys = _candidate_issue_family_keys(candidate_findings)
+    candidate_bug_families.update(candidate_keys)
+    if candidate_origins is not None and candidate_keys:
+        origin = _candidate_row_origin(row, candidate_findings)
+        candidate_origins.setdefault(origin, Counter()).update(candidate_keys)
 
 
-def _candidate_bug_family_key(finding: dict) -> str:
-    return next(iter(_candidate_bug_family_keys([finding])), "")
+def _candidate_row_origin(row: dict, candidate_findings: list[dict]) -> str:
+    if any(
+        finding.get("discovery_origin") == "issue_inspired" or finding.get("source_issue")
+        for finding in candidate_findings
+    ):
+        return "issue_inspired"
+    metadata = row.get("case", {}).get("metadata", {})
+    if metadata.get("source_issue") or metadata.get("source_issue_alt"):
+        return "issue_inspired"
+    return "organic"
 
 
-def _candidate_bug_family_keys(findings: list[dict]) -> Counter:
+def _candidate_issue_family_key(finding: dict) -> str:
+    return next(iter(_candidate_issue_family_keys([finding])), "")
+
+
+def _candidate_issue_family_keys(findings: list[dict]) -> Counter:
     keys: Counter = Counter()
-    root_by_suspicious: dict[str, str] = {}
+    root_by_backend_group: dict[str, str] = {}
     for finding in findings:
-        if not _is_candidate_bug_finding(finding):
+        if not _is_candidate_issue_finding(finding):
             continue
         root = str(finding.get("root_cause", "unknown"))
         if root.startswith("metamorphic_"):
             continue
-        suspicious = _suspicious_key(finding)
-        root_by_suspicious.setdefault(suspicious, root)
+        backend_group = backend_group_key(finding)
+        root_by_backend_group.setdefault(backend_group, root)
     for finding in findings:
-        if not _is_candidate_bug_finding(finding):
+        if not _is_candidate_issue_finding(finding):
             continue
         root = str(finding.get("root_cause", "unknown"))
-        suspicious = _suspicious_key(finding)
-        if root.startswith("metamorphic_") and suspicious in root_by_suspicious:
-            root = root_by_suspicious[suspicious]
-        keys[f"{root}@{suspicious}"] += 1
+        backend_group = backend_group_key(finding)
+        if root.startswith("metamorphic_") and backend_group in root_by_backend_group:
+            root = root_by_backend_group[backend_group]
+        keys[f"{root}@{backend_group}"] += 1
     return keys
 
 
-def _is_candidate_bug_finding(finding: dict) -> bool:
+def _is_candidate_issue_finding(finding: dict) -> bool:
     return finding.get("triage_verdict") == "candidate_implementation_bug" and not finding.get("false_positive")
 
 
-def _suspicious_key(finding: dict) -> str:
-    return ",".join(sorted(finding.get("suspicious_backends", []) or [])) or "unknown"
+_candidate_bug_family_key = _candidate_issue_family_key
+_candidate_bug_family_keys = _candidate_issue_family_keys
+_is_candidate_bug_finding = _is_candidate_issue_finding
 
 
 def _classification_cache_key(row: dict, finding: dict) -> tuple:
@@ -1429,7 +2571,7 @@ def _classification_cache_key(row: dict, finding: dict) -> tuple:
         finding.get("confidence", ""),
         tuple(finding.get("suspicious_backends", [])),
         row.get("config", {}).get("generator_profile", ""),
-        tuple(op.get("op", "") for op in program.get("operations", [])),
+        tuple(operation_names(program.get("operations", []))),
         _case_has_special_float_data(tables),
         _case_has_null_data(tables),
         _case_has_non_ascii_data(tables),
@@ -1498,17 +2640,7 @@ def _refresh_differential_findings(
 
 
 def _normalized_from_mapping(mapping: dict) -> dict[str, NormalizedResult]:
-    out = {}
-    for backend, data in mapping.items():
-        out[backend] = NormalizedResult(
-            backend=data.get("backend", backend),
-            status=data.get("status", "unknown"),
-            columns=data.get("columns", []),
-            rows=data.get("rows", []),
-            error_type=data.get("error_type", ""),
-            error=data.get("error", ""),
-        )
-    return out
+    return normalized_results_from_mapping(mapping)
 
 
 def cmd_reproduce(args: argparse.Namespace) -> int:
@@ -1650,8 +2782,20 @@ def cmd_replay_fixture(args: argparse.Namespace) -> int:
     target_version = str(args.target_version or spec.get("target_version") or "")
     run_theme = str(args.run_theme or f"{evidence_mode}-fixture:{known_bug_id or case.case_id}")
     paper_notes = str(args.paper_notes or spec.get("paper_notes") or "")
+    explicit_experiment_meta = parse_experiment_meta(getattr(args, "experiment_meta", None))
+    experiment_meta = normalize_experiment_meta(explicit_experiment_meta)
+    if replay_bug_enabled_by_default(evidence_mode):
+        experiment_defaults = registered_experiment_meta_defaults(
+            evidence_mode=evidence_mode,
+            known_bug_id=known_bug_id,
+            target_suite=suite,
+            target_version=target_version,
+            include_pending_historical=True,
+        )
+        if experiment_defaults:
+            experiment_meta = merge_experiment_meta(experiment_defaults, explicit_experiment_meta)
     config = ExperimentConfig(
-        enable_replay_bug=evidence_mode == "historical",
+        enable_replay_bug=replay_bug_enabled_by_default(evidence_mode),
         enable_artifact=not args.disable_artifact,
         compress_run_log=not args.no_compress_run_log,
         artifact_limit=args.artifact_limit,
@@ -1677,7 +2821,7 @@ def cmd_replay_fixture(args: argparse.Namespace) -> int:
         "depth": 0,
     }
     row["mutation"] = {"operator": "fixture", "detail": "fixture_replay", "changed": False}
-    row["operation_combo"] = classify_operation_combo(case.program.operations)
+    row["operation_combo"] = describe_operation_combo(case.program.operations)
     row["preflight"] = {
         "valid": True,
         "repaired": False,
@@ -1694,6 +2838,7 @@ def cmd_replay_fixture(args: argparse.Namespace) -> int:
     row["candidate_seed_start"] = case.seed
     row["candidate_pool_size"] = 1
     row["is_new_behavior"] = bool(row.get("findings"))
+    row["signal_new_behavior"] = bool(row.get("findings"))
     row["stored_in_feedback_corpus"] = False
     row["feedback_corpus_persisted"] = False
     row["source_reward"] = None
@@ -1718,14 +2863,16 @@ def cmd_replay_fixture(args: argparse.Namespace) -> int:
         "throughput_cases_s": 1 / elapsed_s if elapsed_s else 0.0,
         "findings": len(row.get("findings", [])),
         "new_behavior_cases": int(bool(row.get("findings"))),
+        "signal_new_behavior_cases": int(bool(row.get("findings"))),
         "saved_artifacts": int(bool(row.get("bug_dir"))),
         "preflight": {"fixture_cases": 1},
         "quality_oracles": {},
         "seed": case.seed,
         "next_seed": case.seed + 1,
         "backends": backends,
-        "targets": describe_targets(backends),
-        "common_capabilities": common_capabilities(backends),
+        "targets": target_context(backends).target_dicts(),
+        "common_capabilities": list(target_context(backends).common_capabilities),
+        "target_context": target_context(backends).to_dict(),
         "config": config.to_dict(),
         "environment": row.get("environment", {}),
         "log_level": config.log_level,
@@ -1736,6 +2883,7 @@ def cmd_replay_fixture(args: argparse.Namespace) -> int:
         "target_version": target_version,
         "run_theme": run_theme,
         "paper_notes": paper_notes,
+        "experiment_meta": experiment_meta,
         "fixture_spec": str(args.spec),
         "fixture_path": str(fixture_path),
         "fixture_sha256": case.metadata.get("fixture_sha256", ""),
@@ -1914,1757 +3062,41 @@ def _experiment_target_runs(args: argparse.Namespace) -> list[tuple[str, list[st
     suites = _parse_target_suites(getattr(args, "target_suites", None)) or [args.target_suite]
     return [(suite, resolve_target_backends(target_suite=suite)) for suite in suites]
 
-
-def _live_bughunt_config(
-    *,
-    guidance_targets: list[str],
-    generator_profile: str = "bughunt",
-    candidate_pool: int = 12,
-    local_source_exploration_weight: float = 0.40,
-    metamorphic: bool = False,
-    metamorphic_variant_limit: int = 4,
-    known_saturated_bug_families: list[str] | None = None,
-    replay_bug_source_issues: list[str] | None = None,
-    enable_replay_bug: bool = False,
-    family_saturation_threshold: int = 4,
-    family_saturation_penalty: float = 6.0,
-    saturated_family_reward: float = 0.0,
-    candidate_recheck_count: int = 2,
-    issue_replay_global_saturation_threshold: int = 2,
-    issue_replay_global_saturation_penalty: float = 2.0,
-) -> ExperimentConfig:
-    return ExperimentConfig(
-        enable_replay_bug=enable_replay_bug,
-        generator_profile=generator_profile,
-        enable_metamorphic_oracle=metamorphic,
-        oracle_mode="both" if metamorphic else "differential",
-        guidance_strategy="guided",
-        guidance_candidate_pool=candidate_pool,
-        guidance_targets=list(guidance_targets),
-        enable_local_source_scheduler=True,
-        local_source_exploration_weight=local_source_exploration_weight,
-        metamorphic_variant_limit=metamorphic_variant_limit,
-        family_saturation_threshold=family_saturation_threshold,
-        family_saturation_penalty=family_saturation_penalty,
-        saturated_family_reward=saturated_family_reward,
-        candidate_recheck_count=max(0, int(candidate_recheck_count)),
-        known_saturated_bug_families=list(
-            known_saturated_bug_families or DEFAULT_KNOWN_SATURATED_BUG_FAMILIES
-        ),
-        replay_bug_source_issues=list(replay_bug_source_issues or DEFAULT_REPLAY_BUG_SOURCE_ISSUES),
-        issue_replay_global_saturation_threshold=issue_replay_global_saturation_threshold,
-        issue_replay_global_saturation_penalty=issue_replay_global_saturation_penalty,
-    )
-
-
 def _preset_config(name: str) -> ExperimentConfig:
     if name.endswith("_replay"):
         config = _preset_config(name[: -len("_replay")])
         config.enable_replay_bug = True
         return config
-    if name == "baseline":
-        return ExperimentConfig()
-    if name == "no_type_aware":
-        return ExperimentConfig(enable_type_aware_generation=False)
-    if name == "no_normalizer":
-        return ExperimentConfig(enable_normalizer=False)
-    if name == "no_feedback":
-        return ExperimentConfig(enable_feedback=False)
-    if name == "metamorphic":
-        return ExperimentConfig(enable_metamorphic_oracle=True, oracle_mode="both")
-    if name == "reducer":
-        return ExperimentConfig(enable_reducer=True)
-    if name == "oracle_only_metamorphic":
-        return ExperimentConfig(
-            enable_differential_oracle=False,
-            enable_metamorphic_oracle=True,
-            oracle_mode="metamorphic",
-        )
-    if name == "edge_float":
-        return ExperimentConfig(generator_profile="edge_float")
-    if name == "edge_float_guided":
-        return ExperimentConfig(
-            generator_profile="edge_float",
-            guidance_strategy="guided",
-            guidance_candidate_pool=8,
-            guidance_targets=["edge_float", "numeric", "expressions"],
-        )
-    if name == "edge_float_metamorphic":
-        return ExperimentConfig(
-            generator_profile="edge_float",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-        )
-    if name == "workflow":
-        return ExperimentConfig(generator_profile="workflow")
-    if name == "workflow_metamorphic":
-        return ExperimentConfig(
-            generator_profile="workflow",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-        )
-    if name == "bughunt":
-        return ExperimentConfig(generator_profile="bughunt")
-    if name == "bughunt_no_groupby":
-        return ExperimentConfig(generator_profile="bughunt_no_groupby")
-    if name == "bughunt_guided":
-        return ExperimentConfig(
-            generator_profile="bughunt",
-            guidance_strategy="guided",
-            guidance_candidate_pool=8,
-            guidance_targets=["join", "groupby", "mutate", "filter", "expressions"],
-        )
-    if name == "bughunt_no_groupby_guided":
-        return ExperimentConfig(
-            generator_profile="bughunt_no_groupby",
-            guidance_strategy="guided",
-            guidance_candidate_pool=8,
-            guidance_targets=["join", "mutate", "filter", "expressions", "sort_limit"],
-        )
-    if name == "bughunt_metamorphic":
-        return ExperimentConfig(
-            generator_profile="bughunt",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            metamorphic_variant_limit=8,
-        )
-    if name == "bughunt_no_groupby_metamorphic":
-        return ExperimentConfig(
-            generator_profile="bughunt_no_groupby",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            metamorphic_variant_limit=8,
-        )
-    if name == "bughunt_guided_metamorphic":
-        return ExperimentConfig(
-            generator_profile="bughunt",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=8,
-            guidance_targets=["join", "groupby", "mutate", "filter", "expressions"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "bughunt_no_groupby_guided_metamorphic":
-        return ExperimentConfig(
-            generator_profile="bughunt_no_groupby",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=8,
-            guidance_targets=["join", "mutate", "filter", "expressions", "sort_limit"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "null_groupby_topk":
-        return ExperimentConfig(
-            generator_profile="null_groupby_topk",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["null_groupby_topk", "groupby", "nulls", "sort_limit"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "null_agg_topk":
-        return ExperimentConfig(
-            generator_profile="null_agg_topk",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["null_agg_topk", "groupby", "nulls", "aggregation", "sort_limit"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "filter_null_agg_topk":
-        return ExperimentConfig(
-            generator_profile="filter_null_agg_topk",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=[
-                "filter_null_agg_topk",
-                "filter",
-                "groupby",
-                "nulls",
-                "aggregation",
-                "sort_limit",
-                "expressions",
-            ],
-            metamorphic_variant_limit=4,
-        )
-    if name == "join_null_agg_topk":
-        return ExperimentConfig(
-            generator_profile="join_null_agg_topk",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["join_null_agg_topk", "join", "nulls", "aggregation", "sort_limit", "expressions"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "join_null_key_topk":
-        return ExperimentConfig(
-            generator_profile="join_null_key_topk",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["join_null_key_topk", "join", "groupby", "nulls", "sort_limit", "topk"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "wide_offset_topk":
-        return ExperimentConfig(
-            generator_profile="wide_offset_topk",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["wide_offset_topk", "sort_limit", "sort_offset", "offset", "topk", "nulls"],
-            metamorphic_variant_limit=2,
-        )
-    if name == "empty_filter_groupby":
-        return ExperimentConfig(
-            generator_profile="empty_filter_groupby",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["empty_filter_groupby", "filter", "groupby", "aggregation", "empty", "sort_limit"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "join_filter_groupby":
-        return ExperimentConfig(
-            generator_profile="join_filter_groupby",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["join_filter_groupby", "join", "filter", "groupby", "aggregation", "sort_limit", "expressions"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "join_null_truth_filter":
-        return ExperimentConfig(
-            generator_profile="join_null_truth_filter",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["join_null_truth_filter", "join", "filter", "truth_filter", "nulls"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "join_groupby_stress":
-        return ExperimentConfig(
-            generator_profile="join_groupby_stress",
-            guidance_strategy="guided",
-            guidance_candidate_pool=1,
-            guidance_targets=["join", "groupby", "aggregation", "global_aggregation"],
-            metamorphic_variant_limit=2,
-        )
-    if name == "storage_offset":
-        return ExperimentConfig(
-            generator_profile="storage_offset",
-            guidance_strategy="guided",
-            guidance_candidate_pool=1,
-            guidance_targets=["sort_limit", "sort_offset", "offset"],
-            metamorphic_variant_limit=0,
-        )
-    if name == "null_groupby_topk_metamorphic":
-        return ExperimentConfig(
-            generator_profile="null_groupby_topk",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["null_groupby_topk", "groupby", "nulls", "sort_limit"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "null_agg_topk_metamorphic":
-        return ExperimentConfig(
-            generator_profile="null_agg_topk",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["null_agg_topk", "groupby", "nulls", "aggregation", "sort_limit"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "filter_null_agg_topk_metamorphic":
-        return ExperimentConfig(
-            generator_profile="filter_null_agg_topk",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=[
-                "filter_null_agg_topk",
-                "filter",
-                "groupby",
-                "nulls",
-                "aggregation",
-                "sort_limit",
-                "expressions",
-            ],
-            metamorphic_variant_limit=8,
-        )
-    if name == "join_null_agg_topk_metamorphic":
-        return ExperimentConfig(
-            generator_profile="join_null_agg_topk",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["join_null_agg_topk", "join", "nulls", "aggregation", "sort_limit", "expressions"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "join_null_key_topk_metamorphic":
-        return ExperimentConfig(
-            generator_profile="join_null_key_topk",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["join_null_key_topk", "join", "groupby", "nulls", "sort_limit", "topk"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "wide_offset_topk_metamorphic":
-        return ExperimentConfig(
-            generator_profile="wide_offset_topk",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["wide_offset_topk", "sort_limit", "sort_offset", "offset", "topk", "nulls"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "empty_filter_groupby_metamorphic":
-        return ExperimentConfig(
-            generator_profile="empty_filter_groupby",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["empty_filter_groupby", "filter", "groupby", "aggregation", "empty", "sort_limit"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "join_filter_groupby_metamorphic":
-        return ExperimentConfig(
-            generator_profile="join_filter_groupby",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["join_filter_groupby", "join", "filter", "groupby", "aggregation", "sort_limit", "expressions"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "join_null_truth_filter_metamorphic":
-        return ExperimentConfig(
-            generator_profile="join_null_truth_filter",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["join_null_truth_filter", "join", "filter", "truth_filter", "nulls"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "join_groupby_stress_metamorphic":
-        return ExperimentConfig(
-            generator_profile="join_groupby_stress",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=1,
-            guidance_targets=["join", "groupby", "aggregation", "global_aggregation"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "float_group_key":
-        return ExperimentConfig(
-            generator_profile="float_group_key",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["float_group_key", "join", "mutate", "groupby", "expressions"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "float_group_key_metamorphic":
-        return ExperimentConfig(
-            generator_profile="float_group_key",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["float_group_key", "join", "mutate", "groupby", "expressions"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "join_null_sort":
-        return ExperimentConfig(
-            generator_profile="join_null_sort",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["join_null_sort", "join", "nulls", "sort_limit", "expressions"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "join_null_sort_metamorphic":
-        return ExperimentConfig(
-            generator_profile="join_null_sort",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["join_null_sort", "join", "nulls", "sort_limit", "expressions"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "ordered_groupby_sort":
-        return ExperimentConfig(
-            generator_profile="ordered_groupby_sort",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["ordered_groupby_sort", "groupby", "aggregation", "sort_limit"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "ordered_groupby_sort_metamorphic":
-        return ExperimentConfig(
-            generator_profile="ordered_groupby_sort",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["ordered_groupby_sort", "groupby", "aggregation", "sort_limit"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "topk_resort":
-        return ExperimentConfig(
-            generator_profile="topk_resort",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["topk_resort", "sort_limit", "topk", "nulls"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "topk_resort_metamorphic":
-        return ExperimentConfig(
-            generator_profile="topk_resort",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["topk_resort", "sort_limit", "topk", "nulls"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "join_ordered_agg_topk":
-        return ExperimentConfig(
-            generator_profile="join_ordered_agg_topk",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["join_ordered_agg_topk", "join", "groupby", "aggregation", "sort_limit", "topk"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "join_ordered_agg_topk_metamorphic":
-        return ExperimentConfig(
-            generator_profile="join_ordered_agg_topk",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["join_ordered_agg_topk", "join", "groupby", "aggregation", "sort_limit", "topk"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "global_null_aggregate":
-        return ExperimentConfig(
-            generator_profile="global_null_aggregate",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["global_null_aggregate", "global_aggregation", "aggregation", "nulls", "sort_limit"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "global_null_aggregate_metamorphic":
-        return ExperimentConfig(
-            generator_profile="global_null_aggregate",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["global_null_aggregate", "global_aggregation", "aggregation", "nulls", "sort_limit"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "string_count_groupby":
-        return ExperimentConfig(
-            generator_profile="string_count_groupby",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["string_count_groupby", "groupby", "strings", "nulls", "aggregation", "sort_limit"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "string_count_groupby_metamorphic":
-        return ExperimentConfig(
-            generator_profile="string_count_groupby",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["string_count_groupby", "groupby", "strings", "nulls", "aggregation", "sort_limit"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "unique_count_groupby":
-        return ExperimentConfig(
-            generator_profile="unique_count_groupby",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["unique_count_groupby", "unique_count", "groupby", "strings", "nulls", "aggregation", "sort_limit"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "unique_count_groupby_metamorphic":
-        return ExperimentConfig(
-            generator_profile="unique_count_groupby",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["unique_count_groupby", "unique_count", "groupby", "strings", "nulls", "aggregation", "sort_limit"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "bool_null_groupby_agg":
-        return ExperimentConfig(
-            generator_profile="bool_null_groupby_agg",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=[
-                "bool_null_groupby_agg",
-                "boolean_aggregation",
-                "bool_any_all",
-                "groupby",
-                "nulls",
-                "aggregation",
-                "sort_limit",
-            ],
-            metamorphic_variant_limit=4,
-        )
-    if name == "bool_null_groupby_agg_metamorphic":
-        return ExperimentConfig(
-            generator_profile="bool_null_groupby_agg",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=[
-                "bool_null_groupby_agg",
-                "boolean_aggregation",
-                "bool_any_all",
-                "groupby",
-                "nulls",
-                "aggregation",
-                "sort_limit",
-            ],
-            metamorphic_variant_limit=8,
-        )
-    if name == "large_int_filter_groupby":
-        return ExperimentConfig(
-            generator_profile="large_int_filter_groupby",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=[
-                "large_int_filter_groupby",
-                "large_integer",
-                "filter",
-                "groupby",
-                "numeric",
-                "aggregation",
-                "sort_limit",
-            ],
-            metamorphic_variant_limit=4,
-        )
-    if name == "large_int_filter_groupby_metamorphic":
-        return ExperimentConfig(
-            generator_profile="large_int_filter_groupby",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=[
-                "large_int_filter_groupby",
-                "large_integer",
-                "filter",
-                "groupby",
-                "numeric",
-                "aggregation",
-                "sort_limit",
-            ],
-            metamorphic_variant_limit=8,
-        )
-    if name == "set_membership_filter":
-        return ExperimentConfig(
-            generator_profile="set_membership_filter",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["set_membership_filter", "set_membership", "filter", "strings", "nulls", "aggregation", "sort_limit"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "set_membership_filter_metamorphic":
-        return ExperimentConfig(
-            generator_profile="set_membership_filter",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["set_membership_filter", "set_membership", "filter", "strings", "nulls", "aggregation", "sort_limit"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "pyarrow_groupby_filter_cast_membership":
-        return ExperimentConfig(
-            generator_profile="pyarrow_groupby_filter_cast_membership",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=[
-                "pyarrow_groupby_filter_cast_membership",
-                "set_membership",
-                "filter",
-                "groupby",
-                "casts",
-                "aggregation",
-            ],
-            metamorphic_variant_limit=4,
-        )
-    if name == "pyarrow_groupby_filter_cast_membership_metamorphic":
-        return ExperimentConfig(
-            generator_profile="pyarrow_groupby_filter_cast_membership",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=[
-                "pyarrow_groupby_filter_cast_membership",
-                "set_membership",
-                "filter",
-                "groupby",
-                "casts",
-                "aggregation",
-            ],
-            metamorphic_variant_limit=8,
-        )
-    if name == "null_predicate_filter":
-        return ExperimentConfig(
-            generator_profile="null_predicate_filter",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["null_predicate_filter", "null_predicate", "filter", "nulls", "aggregation", "sort_limit"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "null_predicate_filter_metamorphic":
-        return ExperimentConfig(
-            generator_profile="null_predicate_filter",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["null_predicate_filter", "null_predicate", "filter", "nulls", "aggregation", "sort_limit"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "boolean_predicate_filter":
-        return ExperimentConfig(
-            generator_profile="boolean_predicate_filter",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["boolean_predicate_filter", "boolean_predicate", "truth_filter", "filter", "nulls", "aggregation", "sort_limit"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "boolean_predicate_filter_metamorphic":
-        return ExperimentConfig(
-            generator_profile="boolean_predicate_filter",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["boolean_predicate_filter", "boolean_predicate", "truth_filter", "filter", "nulls", "aggregation", "sort_limit"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "post_topk_range_filter":
-        return ExperimentConfig(
-            generator_profile="post_topk_range_filter",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["post_topk_range_filter", "range_filter", "filter", "sort_limit", "topk", "nulls"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "post_topk_range_filter_metamorphic":
-        return ExperimentConfig(
-            generator_profile="post_topk_range_filter",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["post_topk_range_filter", "range_filter", "filter", "sort_limit", "topk", "nulls"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "tuple_absence_filter":
-        return ExperimentConfig(
-            generator_profile="tuple_absence_filter",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["tuple_absence_filter", "tuple_absence", "filter", "nulls", "join"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "tuple_absence_filter_metamorphic":
-        return ExperimentConfig(
-            generator_profile="tuple_absence_filter",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["tuple_absence_filter", "tuple_absence", "filter", "nulls", "join"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "row_value_absence_filter":
-        return ExperimentConfig(
-            generator_profile="row_value_absence_filter",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["row_value_absence_filter", "row_value_absence", "tuple_absence", "filter", "nulls", "join"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "row_value_absence_filter_metamorphic":
-        return ExperimentConfig(
-            generator_profile="row_value_absence_filter",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["row_value_absence_filter", "row_value_absence", "tuple_absence", "filter", "nulls", "join"],
-            metamorphic_variant_limit=8,
-        )
-    if name == "running_sum_precision":
-        return ExperimentConfig(
-            generator_profile="running_sum_precision",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["running_sum_precision", "running_sum", "numeric", "sort_limit"],
-            metamorphic_variant_limit=2,
-        )
-    if name == "running_sum_precision_metamorphic":
-        return ExperimentConfig(
-            generator_profile="running_sum_precision",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["running_sum_precision", "running_sum", "numeric", "sort_limit"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "partitioned_running_sum":
-        return ExperimentConfig(
-            generator_profile="partitioned_running_sum",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=[
-                "partitioned_running_sum",
-                "running_sum_partitioned",
-                "running_sum",
-                "numeric",
-                "sort_limit",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "partitioned_running_sum_metamorphic":
-        return ExperimentConfig(
-            generator_profile="partitioned_running_sum",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=[
-                "partitioned_running_sum",
-                "running_sum_partitioned",
-                "running_sum",
-                "numeric",
-                "sort_limit",
-            ],
-            metamorphic_variant_limit=4,
-        )
-    if name == "path_basename_keyed_pick":
-        return ExperimentConfig(
-            generator_profile="path_basename_keyed_pick",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=[
-                "path_basename_keyed_pick",
-                "path_projection",
-                "keyed_row_pick",
-                "strings",
-                "sort_limit",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "path_basename_keyed_pick_replay":
-        return ExperimentConfig(
-            generator_profile="path_basename_keyed_pick",
-            enable_replay_bug=True,
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=[
-                "path_basename_keyed_pick",
-                "path_projection",
-                "keyed_row_pick",
-                "strings",
-                "sort_limit",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "sortedness_null_placement":
-        return ExperimentConfig(
-            generator_profile="sortedness_null_placement",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["sortedness_null_placement", "sortedness", "sort_limit", "nulls"],
-            metamorphic_variant_limit=2,
-        )
-    if name == "sortedness_null_placement_metamorphic":
-        return ExperimentConfig(
-            generator_profile="sortedness_null_placement",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=4,
-            guidance_targets=["sortedness_null_placement", "sortedness", "sort_limit", "nulls"],
-            metamorphic_variant_limit=4,
-        )
-    if name == "simple_case_random_subject":
-        return ExperimentConfig(
-            generator_profile="simple_case_random_subject",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["simple_case_random_subject", "random_case_probe", "case_expression"],
-            metamorphic_variant_limit=0,
-        )
-    if name == "simple_case_random_subject_metamorphic":
-        return ExperimentConfig(
-            generator_profile="simple_case_random_subject",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["simple_case_random_subject", "random_case_probe", "case_expression"],
-            metamorphic_variant_limit=2,
-        )
-    if name == "group_quantile_key_probe":
-        return ExperimentConfig(
-            generator_profile="group_quantile_key_probe",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["group_quantile_key_probe", "group_quantile_probe", "dynamic_quantile", "groupby"],
-            metamorphic_variant_limit=0,
-        )
-    if name == "group_quantile_key_probe_metamorphic":
-        return ExperimentConfig(
-            generator_profile="group_quantile_key_probe",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["group_quantile_key_probe", "group_quantile_probe", "dynamic_quantile", "groupby"],
-            metamorphic_variant_limit=2,
-        )
-    if name == "scalar_subquery_double_parentheses":
-        return ExperimentConfig(
-            generator_profile="scalar_subquery_double_parentheses",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["scalar_subquery_double_parentheses", "scalar_subquery_probe", "correlated_subquery"],
-            metamorphic_variant_limit=0,
-        )
-    if name == "scalar_subquery_double_parentheses_metamorphic":
-        return ExperimentConfig(
-            generator_profile="scalar_subquery_double_parentheses",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["scalar_subquery_double_parentheses", "scalar_subquery_probe", "correlated_subquery"],
-            metamorphic_variant_limit=2,
-        )
-    if name == "window_avg_rows_frame":
-        return ExperimentConfig(
-            generator_profile="window_avg_rows_frame",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["window_avg_rows_frame", "window_avg_probe", "window_frame", "numeric"],
-            metamorphic_variant_limit=0,
-        )
-    if name == "window_avg_rows_frame_metamorphic":
-        return ExperimentConfig(
-            generator_profile="window_avg_rows_frame",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["window_avg_rows_frame", "window_avg_probe", "window_frame", "numeric"],
-            metamorphic_variant_limit=2,
-        )
-    if name == "struct_distinct_unnest":
-        return ExperimentConfig(
-            generator_profile="struct_distinct_unnest",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["struct_distinct_unnest", "struct_distinct_probe", "struct_unnest"],
-            metamorphic_variant_limit=0,
-        )
-    if name == "struct_distinct_unnest_metamorphic":
-        return ExperimentConfig(
-            generator_profile="struct_distinct_unnest",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["struct_distinct_unnest", "struct_distinct_probe", "struct_unnest"],
-            metamorphic_variant_limit=2,
-        )
-    if name == "bit_compare_unequal_length":
-        return ExperimentConfig(
-            generator_profile="bit_compare_unequal_length",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["bit_compare_unequal_length", "bit_compare_probe", "bit_ordering"],
-            metamorphic_variant_limit=0,
-        )
-    if name == "bit_compare_unequal_length_metamorphic":
-        return ExperimentConfig(
-            generator_profile="bit_compare_unequal_length",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["bit_compare_unequal_length", "bit_compare_probe", "bit_ordering"],
-            metamorphic_variant_limit=2,
-        )
-    if name == "round_even_float_scale":
-        return ExperimentConfig(
-            generator_profile="round_even_float_scale",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["round_even_float_scale", "round_even_probe", "rounding", "numeric"],
-            metamorphic_variant_limit=0,
-        )
-    if name == "round_even_float_scale_metamorphic":
-        return ExperimentConfig(
-            generator_profile="round_even_float_scale",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=["round_even_float_scale", "round_even_probe", "rounding", "numeric"],
-            metamorphic_variant_limit=2,
-        )
-    if name == "duckdb_float_literal_precision":
-        return ExperimentConfig(
-            generator_profile="duckdb_float_literal_precision",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "duckdb_float_literal_precision",
-                "float_literal_precision_probe",
-                "float_literal_precision",
-                "numeric",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "duckdb_float_literal_precision_metamorphic":
-        return ExperimentConfig(
-            generator_profile="duckdb_float_literal_precision",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "duckdb_float_literal_precision",
-                "float_literal_precision_probe",
-                "float_literal_precision",
-                "numeric",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "polars_timestamp_precision_filter":
-        return ExperimentConfig(
-            generator_profile="polars_timestamp_precision_filter",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "polars_timestamp_precision_filter",
-                "timestamp_precision_filter_probe",
-                "timestamp_precision_filter",
-                "casts",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "polars_timestamp_precision_filter_metamorphic":
-        return ExperimentConfig(
-            generator_profile="polars_timestamp_precision_filter",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "polars_timestamp_precision_filter",
-                "timestamp_precision_filter_probe",
-                "timestamp_precision_filter",
-                "casts",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "series_rtruediv_operand_order":
-        return ExperimentConfig(
-            generator_profile="series_rtruediv_operand_order",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "series_rtruediv_operand_order",
-                "series_rtruediv_probe",
-                "reverse_division",
-                "numeric",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "series_rtruediv_operand_order_metamorphic":
-        return ExperimentConfig(
-            generator_profile="series_rtruediv_operand_order",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "series_rtruediv_operand_order",
-                "series_rtruediv_probe",
-                "reverse_division",
-                "numeric",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "polars_reverse_division_columns":
-        return ExperimentConfig(
-            generator_profile="polars_reverse_division_columns",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "polars_reverse_division_columns",
-                "reverse_division",
-                "numeric",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "polars_reverse_division_columns_metamorphic":
-        return ExperimentConfig(
-            generator_profile="polars_reverse_division_columns",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "polars_reverse_division_columns",
-                "reverse_division",
-                "numeric",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "pandas_uint64_isin_precision":
-        return ExperimentConfig(
-            generator_profile="pandas_uint64_isin_precision",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_uint64_isin_precision",
-                "uint64_isin_probe",
-                "unsigned_membership",
-                "numeric",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "pandas_uint64_isin_precision_metamorphic":
-        return ExperimentConfig(
-            generator_profile="pandas_uint64_isin_precision",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_uint64_isin_precision",
-                "uint64_isin_probe",
-                "unsigned_membership",
-                "numeric",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "duckdb_tuple_anti_null_semantics":
-        return ExperimentConfig(
-            generator_profile="duckdb_tuple_anti_null_semantics",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "duckdb_tuple_anti_null_semantics",
-                "tuple_anti_null_probe",
-                "tuple_null_membership",
-                "nulls",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "duckdb_tuple_anti_null_semantics_metamorphic":
-        return ExperimentConfig(
-            generator_profile="duckdb_tuple_anti_null_semantics",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "duckdb_tuple_anti_null_semantics",
-                "tuple_anti_null_probe",
-                "tuple_null_membership",
-                "nulls",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "datafusion_setop_all_duplicate_count":
-        return ExperimentConfig(
-            generator_profile="datafusion_setop_all_duplicate_count",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "datafusion_setop_all_duplicate_count",
-                "setop_all_duplicate_probe",
-                "setop_all_duplicates",
-                "aggregation",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "datafusion_setop_all_duplicate_count_metamorphic":
-        return ExperimentConfig(
-            generator_profile="datafusion_setop_all_duplicate_count",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "datafusion_setop_all_duplicate_count",
-                "setop_all_duplicate_probe",
-                "setop_all_duplicates",
-                "aggregation",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "duckdb_json_predicate_order_semantics":
-        return ExperimentConfig(
-            generator_profile="duckdb_json_predicate_order_semantics",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "duckdb_json_predicate_order_semantics",
-                "json_predicate_order_probe",
-                "json_predicate_order",
-                "filter",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "duckdb_json_predicate_order_semantics_metamorphic":
-        return ExperimentConfig(
-            generator_profile="duckdb_json_predicate_order_semantics",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "duckdb_json_predicate_order_semantics",
-                "json_predicate_order_probe",
-                "json_predicate_order",
-                "filter",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "pandas_sparse_array_mask_semantics":
-        return ExperimentConfig(
-            generator_profile="pandas_sparse_array_mask_semantics",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_sparse_array_mask_semantics",
-                "sparse_mask_probe",
-                "sparse_masking",
-                "filter",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "pandas_sparse_array_mask_semantics_metamorphic":
-        return ExperimentConfig(
-            generator_profile="pandas_sparse_array_mask_semantics",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_sparse_array_mask_semantics",
-                "sparse_mask_probe",
-                "sparse_masking",
-                "filter",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "polars_float_wrap_numerical_semantics":
-        return ExperimentConfig(
-            generator_profile="polars_float_wrap_numerical_semantics",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "polars_float_wrap_numerical_semantics",
-                "float_wrap_probe",
-                "wrap_numerical",
-                "casts",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "polars_float_wrap_numerical_semantics_metamorphic":
-        return ExperimentConfig(
-            generator_profile="polars_float_wrap_numerical_semantics",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "polars_float_wrap_numerical_semantics",
-                "float_wrap_probe",
-                "wrap_numerical",
-                "casts",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "pandas_index_bool_result_type":
-        return ExperimentConfig(
-            generator_profile="pandas_index_bool_result_type",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_index_bool_result_type",
-                "index_bool_probe",
-                "index_boolean_result",
-                "filter",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "pandas_index_bool_result_type_metamorphic":
-        return ExperimentConfig(
-            generator_profile="pandas_index_bool_result_type",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_index_bool_result_type",
-                "index_bool_probe",
-                "index_boolean_result",
-                "filter",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "polars_empty_literal_groupby_semantics":
-        return ExperimentConfig(
-            generator_profile="polars_empty_literal_groupby_semantics",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "polars_empty_literal_groupby_semantics",
-                "empty_literal_groupby_probe",
-                "literal_empty_groupby",
-                "groupby",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "polars_empty_literal_groupby_semantics_metamorphic":
-        return ExperimentConfig(
-            generator_profile="polars_empty_literal_groupby_semantics",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "polars_empty_literal_groupby_semantics",
-                "empty_literal_groupby_probe",
-                "literal_empty_groupby",
-                "groupby",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "pandas_arrow_string_eq_sum_semantics":
-        return ExperimentConfig(
-            generator_profile="pandas_arrow_string_eq_sum_semantics",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_arrow_string_eq_sum_semantics",
-                "arrow_string_eq_sum_probe",
-                "arrow_string_reduction",
-                "strings",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "pandas_arrow_string_eq_sum_semantics_metamorphic":
-        return ExperimentConfig(
-            generator_profile="pandas_arrow_string_eq_sum_semantics",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_arrow_string_eq_sum_semantics",
-                "arrow_string_eq_sum_probe",
-                "arrow_string_reduction",
-                "strings",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "pandas_arrow_timestamp_loc_slice_semantics":
-        return ExperimentConfig(
-            generator_profile="pandas_arrow_timestamp_loc_slice_semantics",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_arrow_timestamp_loc_slice_semantics",
-                "arrow_timestamp_loc_slice_probe",
-                "arrow_timestamp_indexing",
-                "sort_limit",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "pandas_arrow_timestamp_loc_slice_semantics_metamorphic":
-        return ExperimentConfig(
-            generator_profile="pandas_arrow_timestamp_loc_slice_semantics",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_arrow_timestamp_loc_slice_semantics",
-                "arrow_timestamp_loc_slice_probe",
-                "arrow_timestamp_indexing",
-                "sort_limit",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "pandas_arrow_timestamp_index_attr_semantics":
-        return ExperimentConfig(
-            generator_profile="pandas_arrow_timestamp_index_attr_semantics",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_arrow_timestamp_index_attr_semantics",
-                "arrow_timestamp_index_attr_probe",
-                "arrow_timestamp_attributes",
-                "sort_limit",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "pandas_arrow_timestamp_index_attr_semantics_metamorphic":
-        return ExperimentConfig(
-            generator_profile="pandas_arrow_timestamp_index_attr_semantics",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_arrow_timestamp_index_attr_semantics",
-                "arrow_timestamp_index_attr_probe",
-                "arrow_timestamp_attributes",
-                "sort_limit",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "pyarrow_dataset_isin_all_match_semantics":
-        return ExperimentConfig(
-            generator_profile="pyarrow_dataset_isin_all_match_semantics",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pyarrow_dataset_isin_all_match_semantics",
-                "dataset_isin_all_match_probe",
-                "dataset_membership_filter",
-                "filter",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "pyarrow_dataset_isin_all_match_semantics_metamorphic":
-        return ExperimentConfig(
-            generator_profile="pyarrow_dataset_isin_all_match_semantics",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pyarrow_dataset_isin_all_match_semantics",
-                "dataset_isin_all_match_probe",
-                "dataset_membership_filter",
-                "filter",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "pandas_eval_inplace_aliasing_semantics":
-        return ExperimentConfig(
-            generator_profile="pandas_eval_inplace_aliasing_semantics",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_eval_inplace_aliasing_semantics",
-                "eval_inplace_alias_probe",
-                "eval_inplace_aliasing",
-                "mutate",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "pandas_eval_inplace_aliasing_semantics_metamorphic":
-        return ExperimentConfig(
-            generator_profile="pandas_eval_inplace_aliasing_semantics",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_eval_inplace_aliasing_semantics",
-                "eval_inplace_alias_probe",
-                "eval_inplace_aliasing",
-                "mutate",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "pandas_bool_reduction_skipna_semantics":
-        return ExperimentConfig(
-            generator_profile="pandas_bool_reduction_skipna_semantics",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_bool_reduction_skipna_semantics",
-                "bool_reduction_skipna_probe",
-                "bool_reduction_skipna",
-                "nulls",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "pandas_bool_reduction_skipna_semantics_metamorphic":
-        return ExperimentConfig(
-            generator_profile="pandas_bool_reduction_skipna_semantics",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pandas_bool_reduction_skipna_semantics",
-                "bool_reduction_skipna_probe",
-                "bool_reduction_skipna",
-                "nulls",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "pyarrow_run_end_null_compute_semantics":
-        return ExperimentConfig(
-            generator_profile="pyarrow_run_end_null_compute_semantics",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pyarrow_run_end_null_compute_semantics",
-                "run_end_null_compute_probe",
-                "run_end_null_compute",
-                "nulls",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "pyarrow_run_end_null_compute_semantics_metamorphic":
-        return ExperimentConfig(
-            generator_profile="pyarrow_run_end_null_compute_semantics",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pyarrow_run_end_null_compute_semantics",
-                "run_end_null_compute_probe",
-                "run_end_null_compute",
-                "nulls",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "pyarrow_large_string_partition_schema_semantics":
-        return ExperimentConfig(
-            generator_profile="pyarrow_large_string_partition_schema_semantics",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pyarrow_large_string_partition_schema_semantics",
-                "large_string_partition_probe",
-                "large_string_partition",
-                "strings",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "pyarrow_large_string_partition_schema_semantics_metamorphic":
-        return ExperimentConfig(
-            generator_profile="pyarrow_large_string_partition_schema_semantics",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pyarrow_large_string_partition_schema_semantics",
-                "large_string_partition_probe",
-                "large_string_partition",
-                "strings",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "pyarrow_hash_pivot_wider_order_semantics":
-        return ExperimentConfig(
-            generator_profile="pyarrow_hash_pivot_wider_order_semantics",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pyarrow_hash_pivot_wider_order_semantics",
-                "hash_pivot_wider_probe",
-                "hash_pivot_wider",
-                "aggregation",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "pyarrow_hash_pivot_wider_order_semantics_metamorphic":
-        return ExperimentConfig(
-            generator_profile="pyarrow_hash_pivot_wider_order_semantics",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "pyarrow_hash_pivot_wider_order_semantics",
-                "hash_pivot_wider_probe",
-                "hash_pivot_wider",
-                "aggregation",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "polars_rolling_mean_by_null_count_semantics":
-        return ExperimentConfig(
-            generator_profile="polars_rolling_mean_by_null_count_semantics",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "polars_rolling_mean_by_null_count_semantics",
-                "rolling_mean_by_null_count_probe",
-                "rolling_temporal_nulls",
-                "nulls",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "polars_rolling_mean_by_null_count_semantics_metamorphic":
-        return ExperimentConfig(
-            generator_profile="polars_rolling_mean_by_null_count_semantics",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            guidance_targets=[
-                "polars_rolling_mean_by_null_count_semantics",
-                "rolling_mean_by_null_count_probe",
-                "rolling_temporal_nulls",
-                "nulls",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "csv_long_numeric_roundtrip":
-        return ExperimentConfig(
-            generator_profile="csv_long_numeric_roundtrip",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            candidate_recheck_count=2,
-            guidance_targets=[
-                "csv_long_numeric_roundtrip",
-                "csv_long_numeric_roundtrip_probe",
-                "csv_numeric_inference",
-                "numeric",
-            ],
-            metamorphic_variant_limit=0,
-        )
-    if name == "csv_long_numeric_roundtrip_metamorphic":
-        return ExperimentConfig(
-            generator_profile="csv_long_numeric_roundtrip",
-            enable_metamorphic_oracle=True,
-            oracle_mode="both",
-            guidance_strategy="guided",
-            guidance_candidate_pool=2,
-            candidate_recheck_count=2,
-            guidance_targets=[
-                "csv_long_numeric_roundtrip",
-                "csv_long_numeric_roundtrip_probe",
-                "csv_numeric_inference",
-                "numeric",
-            ],
-            metamorphic_variant_limit=2,
-        )
-    if name == "live_datafusion":
-        return _live_bughunt_config(
-            guidance_targets=list(LIVE_BUGHUNT_TARGETS),
-            local_source_exploration_weight=0.35,
-        )
-    if name == "live_datafusion_metamorphic":
-        return _live_bughunt_config(
-            candidate_pool=8,
-            guidance_targets=list(LIVE_BUGHUNT_TARGETS),
-            local_source_exploration_weight=0.35,
-            metamorphic=True,
-            metamorphic_variant_limit=6,
-        )
-    if name == "live_datafusion_fresh":
-        return _live_bughunt_config(
-            generator_profile="bughunt_no_groupby",
-            guidance_targets=list(LIVE_DATAFUSION_FRESH_TARGETS),
-            local_source_exploration_weight=0.45,
-        )
-    if name == "live_datafusion_fresh_metamorphic":
-        return _live_bughunt_config(
-            generator_profile="bughunt_no_groupby",
-            candidate_pool=8,
-            guidance_targets=list(LIVE_DATAFUSION_FRESH_TARGETS),
-            local_source_exploration_weight=0.45,
-            metamorphic=True,
-            metamorphic_variant_limit=6,
-        )
-    if name == "live_arrow":
-        return _live_bughunt_config(
-            guidance_targets=list(LIVE_ARROW_TARGETS),
-            local_source_exploration_weight=0.45,
-        )
-    if name == "live_arrow_metamorphic":
-        return _live_bughunt_config(
-            candidate_pool=8,
-            guidance_targets=list(LIVE_ARROW_TARGETS),
-            local_source_exploration_weight=0.45,
-            metamorphic=True,
-            metamorphic_variant_limit=6,
-        )
-    if name == "live_polars_lazy":
-        return _live_bughunt_config(
-            guidance_targets=list(LIVE_POLARS_LAZY_TARGETS),
-            local_source_exploration_weight=0.45,
-        )
-    if name == "live_polars_lazy_metamorphic":
-        return _live_bughunt_config(
-            candidate_pool=8,
-            guidance_targets=list(LIVE_POLARS_LAZY_TARGETS),
-            local_source_exploration_weight=0.45,
-            metamorphic=True,
-            metamorphic_variant_limit=8,
-        )
-    if name == "live_polars_streaming":
-        return _live_bughunt_config(
-            guidance_targets=list(LIVE_POLARS_STREAMING_TARGETS),
-            local_source_exploration_weight=0.45,
-        )
-    if name == "live_polars_streaming_metamorphic":
-        return _live_bughunt_config(
-            candidate_pool=8,
-            guidance_targets=list(LIVE_POLARS_STREAMING_TARGETS),
-            local_source_exploration_weight=0.45,
-            metamorphic=True,
-            metamorphic_variant_limit=8,
-        )
-    if name == "live_embedded_sql":
-        return _live_bughunt_config(
-            guidance_targets=list(LIVE_EMBEDDED_SQL_TARGETS),
-            local_source_exploration_weight=0.40,
-        )
-    if name == "live_embedded_sql_metamorphic":
-        return _live_bughunt_config(
-            candidate_pool=8,
-            guidance_targets=list(LIVE_EMBEDDED_SQL_TARGETS),
-            local_source_exploration_weight=0.40,
-            metamorphic=True,
-            metamorphic_variant_limit=8,
-        )
-    if name == "live_cross_family":
-        return _live_bughunt_config(
-            guidance_targets=list(LIVE_CROSS_FAMILY_TARGETS),
-            local_source_exploration_weight=0.40,
-        )
-    if name == "live_cross_family_metamorphic":
-        return _live_bughunt_config(
-            candidate_pool=8,
-            guidance_targets=list(LIVE_CROSS_FAMILY_TARGETS),
-            local_source_exploration_weight=0.40,
-            metamorphic=True,
-            metamorphic_variant_limit=6,
-        )
-    if name == "live_issue_focus":
-        return _live_bughunt_config(
-            generator_profile="issue_focus",
-            candidate_pool=14,
-            guidance_targets=list(LIVE_ISSUE_FOCUS_TARGETS),
-            local_source_exploration_weight=0.50,
-        )
-    if name == "live_issue_focus_metamorphic":
-        return _live_bughunt_config(
-            generator_profile="issue_focus",
-            candidate_pool=10,
-            guidance_targets=list(LIVE_ISSUE_FOCUS_TARGETS),
-            local_source_exploration_weight=0.50,
-            metamorphic=True,
-            metamorphic_variant_limit=6,
-        )
-    if name == "live_polars_issue_focus":
-        return _live_bughunt_config(
-            generator_profile="issue_focus",
-            candidate_pool=12,
-            guidance_targets=list(LIVE_POLARS_ISSUE_FOCUS_TARGETS),
-            local_source_exploration_weight=0.50,
-        )
-    if name == "live_polars_issue_focus_metamorphic":
-        return _live_bughunt_config(
-            generator_profile="issue_focus",
-            candidate_pool=8,
-            guidance_targets=list(LIVE_POLARS_ISSUE_FOCUS_TARGETS),
-            local_source_exploration_weight=0.50,
-            metamorphic=True,
-            metamorphic_variant_limit=8,
-        )
-    if name == "live_duckdb_issue_focus":
-        return _live_bughunt_config(
-            generator_profile="issue_focus",
-            candidate_pool=12,
-            guidance_targets=list(LIVE_DUCKDB_ISSUE_FOCUS_TARGETS),
-            local_source_exploration_weight=0.50,
-        )
-    if name == "live_duckdb_issue_focus_metamorphic":
-        return _live_bughunt_config(
-            generator_profile="issue_focus",
-            candidate_pool=8,
-            guidance_targets=list(LIVE_DUCKDB_ISSUE_FOCUS_TARGETS),
-            local_source_exploration_weight=0.50,
-            metamorphic=True,
-            metamorphic_variant_limit=8,
-        )
-    if name == "live_arrow_issue_focus":
-        return _live_bughunt_config(
-            generator_profile="issue_focus",
-            candidate_pool=12,
-            guidance_targets=list(LIVE_ARROW_ISSUE_FOCUS_TARGETS),
-            local_source_exploration_weight=0.50,
-        )
-    if name == "live_arrow_issue_focus_metamorphic":
-        return _live_bughunt_config(
-            generator_profile="issue_focus",
-            candidate_pool=8,
-            guidance_targets=list(LIVE_ARROW_ISSUE_FOCUS_TARGETS),
-            local_source_exploration_weight=0.50,
-            metamorphic=True,
-            metamorphic_variant_limit=6,
-        )
-    if name == "guided":
-        return ExperimentConfig(guidance_strategy="guided", guidance_candidate_pool=8)
-    if name == "guided_filter":
-        return ExperimentConfig(
-            guidance_strategy="guided",
-            guidance_candidate_pool=8,
-            guidance_targets=["filter"],
-        )
-    if name == "guided_groupby":
-        return ExperimentConfig(
-            guidance_strategy="guided",
-            guidance_candidate_pool=8,
-            guidance_targets=["groupby", "aggregation"],
-        )
-    if name == "guided_join":
-        return ExperimentConfig(
-            generator_profile="bughunt_no_groupby",
-            guidance_strategy="guided",
-            guidance_candidate_pool=8,
-            guidance_targets=["join", "sort_limit"],
-        )
-    if name == "guided_mutate":
-        return ExperimentConfig(
-            guidance_strategy="guided",
-            guidance_candidate_pool=8,
-            guidance_targets=["mutate", "expressions"],
-        )
+    if catalog_config := build_catalog_preset(name):
+        return catalog_config
     raise ValueError(f"unknown experiment preset: {name}")
 
 
+def _job_experiment_meta(job: dict[str, Any]) -> dict[str, Any]:
+    return normalize_experiment_meta(job.get("experiment_meta", {}))
+
+
+def _job_run_semantics(job: dict[str, Any]) -> dict[str, Any]:
+    return resolved_run_semantics(job, _job_experiment_meta(job))
+
+
+def _job_config(job: dict[str, Any]) -> ExperimentConfig:
+    run_semantics = _job_run_semantics(job)
+    base_preset = str(run_semantics.get("base_preset", "") or "").strip()
+    overlays = [str(name).strip() for name in run_semantics.get("overlays", []) if str(name).strip()]
+    if base_preset:
+        try:
+            return build_catalog_preset(base_preset) if not overlays else build_experiment_config(
+                base_preset,
+                overlays,
+            )
+        except ValueError:
+            pass
+    return _preset_config(str(job["preset"]))
+
+
 def _effective_job_local_source_scheduler(job: dict) -> tuple[bool, float]:
-    preset_config = _preset_config(str(job["preset"]))
+    preset_config = _job_config(job)
     job_enabled = bool(job.get("enable_local_source_scheduler", False))
     enabled = preset_config.enable_local_source_scheduler or job_enabled
     if job_enabled:
@@ -3683,6 +3115,16 @@ def cmd_experiment(args: argparse.Namespace) -> int:
     backend_union = sorted({backend for _, backends in target_runs for backend in backends})
     duration_s = parse_duration(args.duration)
     evidence_mode = _resolve_evidence_mode(getattr(args, "evidence_mode", "auto"), suite_names)
+    explicit_experiment_meta = parse_experiment_meta(getattr(args, "experiment_meta", None))
+    default_experiment_meta = _default_experiment_meta_for_runs(
+        evidence_mode=evidence_mode,
+        target_runs=target_runs,
+        presets=presets,
+        known_bug_id=str(getattr(args, "known_bug_id", "") or ""),
+        target_version=str(getattr(args, "target_version", "") or ""),
+        include_pending_historical=True,
+    )
+    experiment_meta = merge_experiment_meta(default_experiment_meta, explicit_experiment_meta)
     planned_runs = [
         {
             "order": order,
@@ -3699,7 +3141,7 @@ def cmd_experiment(args: argparse.Namespace) -> int:
             "metamorphic_variant_limit": args.metamorphic_variant_limit,
             "evidence_mode": evidence_mode,
             "enable_replay_bug": bool(getattr(args, "enable_replay_bug", False))
-            or evidence_mode == "historical",
+            or replay_bug_enabled_by_default(evidence_mode),
             "replay_bug_source_issues": (
                 parse_guidance_targets(getattr(args, "replay_bug_source_issues", ""))
                 or list(DEFAULT_REPLAY_BUG_SOURCE_ISSUES)
@@ -3712,6 +3154,7 @@ def cmd_experiment(args: argparse.Namespace) -> int:
             "local_source_exploration_weight": max(
                 0.0, float(getattr(args, "local_source_exploration_weight", 0.5))
             ),
+            "experiment_meta": experiment_meta,
             "skip_run_reports": args.skip_run_reports,
         }
         for order, (target_suite, backends, preset, seed) in enumerate(
@@ -3722,20 +3165,28 @@ def cmd_experiment(args: argparse.Namespace) -> int:
         )
     ]
     for job in planned_runs:
-        job["enable_replay_bug"] = bool(job.get("enable_replay_bug", False)) or _preset_config(
-            str(job["preset"])
-        ).enable_replay_bug
+        job["enable_replay_bug"] = bool(job.get("enable_replay_bug", False)) or _job_config(job).enable_replay_bug
         job["estimated_cost"] = round(_experiment_job_weight(job), 4)
     parallelism = _resolve_experiment_parallelism(args, planned_runs)
     for job in planned_runs:
         job["worker_thread_limit"] = parallelism["worker_thread_limit"]
     jobs = int(parallelism["worker_count"])
     schedule = _resolve_experiment_schedule(args, jobs=jobs)
+    invalid_live_adaptive_presets = _invalid_live_adaptive_experiment_presets(planned_runs)
+    if schedule == "adaptive" and evidence_mode == "live" and invalid_live_adaptive_presets:
+        names = ",".join(invalid_live_adaptive_presets)
+        print(
+            "adaptive live experiments require guided presets so family-saturation and guidance stay active; "
+            f"invalid presets: {names}. use live_deep_organic, live_cross_family, or another guided/live preset",
+            flush=True,
+        )
+        return 2
     local_source_settings = [_effective_job_local_source_scheduler(job) for job in planned_runs]
     local_source_enabled = schedule == "adaptive" or any(enabled for enabled, _ in local_source_settings)
     local_source_weights = [weight for enabled, weight in local_source_settings if enabled]
     if schedule == "adaptive" and not local_source_weights:
         local_source_weights.append(max(0.0, float(getattr(args, "local_source_exploration_weight", 0.5))))
+    backend_context = target_context(backend_union)
     manifest = {
         "created_at": utc_now(),
         "presets": presets,
@@ -3747,12 +3198,14 @@ def cmd_experiment(args: argparse.Namespace) -> int:
         "target_version": str(getattr(args, "target_version", "") or ""),
         "run_theme": str(getattr(args, "run_theme", "") or ""),
         "paper_notes": str(getattr(args, "paper_notes", "") or ""),
+        "experiment_meta": experiment_meta,
         "backends": backend_union,
         "target_suite": suite_names[0] if len(suite_names) == 1 else ",".join(suite_names),
         "target_suites": suite_names,
         "backends_by_suite": {suite: backends for suite, backends in target_runs},
-        "targets": describe_targets(backend_union),
-        "common_capabilities": common_capabilities(backend_union),
+        "targets": backend_context.target_dicts(),
+        "common_capabilities": list(backend_context.common_capabilities),
+        "target_context": backend_context.to_dict(),
         "log_level": args.log_level,
         "compress_run_log": not args.no_compress_run_log,
         "metamorphic_variant_limit": args.metamorphic_variant_limit,
@@ -3840,6 +3293,7 @@ def _record_experiment_journal(manifest_path: Path, manifest: dict) -> tuple[Pat
             "seed": run.get("seed", ""),
             "backends": run.get("backends", []),
             "manifest_file": str(manifest_path),
+            "experiment_meta": manifest.get("experiment_meta", {}),
         }
         entries.append(build_run_journal_entry(run_file, context))
     append_run_journal_entries(entries, journal_file)
@@ -3854,7 +3308,7 @@ def _experiment_run_theme(manifest: dict, run: dict) -> str:
         return f"{base} | {suffix}"
     evidence_mode = str(run.get("evidence_mode") or manifest.get("evidence_mode", "live"))
     known_bug_id = str(run.get("known_bug_id") or manifest.get("known_bug_id", "") or "")
-    if evidence_mode == "historical" and known_bug_id:
+    if replay_bug_enabled_by_default(evidence_mode) and known_bug_id:
         return f"historical:{known_bug_id}:{suffix}"
     return f"{evidence_mode}:{suffix}"
 
@@ -3884,6 +3338,8 @@ def _run_experiment_adaptive(
         batch_duration_s=batch_duration_s,
         warmup_batches=max(1, int(getattr(args, "warmup_batches", 1))),
         exploration_weight=max(0.0, float(getattr(args, "exploration_weight", 0.75))),
+        group_fairness_weight=max(0.0, float(getattr(args, "group_fairness_weight", 0.40))),
+        max_group_pull_gap=max(0, int(getattr(args, "max_group_pull_gap", 3))),
     )
     scheduler = AdaptiveBudgetScheduler(
         planned_runs,
@@ -3898,6 +3354,9 @@ def _run_experiment_adaptive(
         "batch_duration_s": batch_duration_s,
         "warmup_batches": schedule_config.warmup_batches,
         "exploration_weight": schedule_config.exploration_weight,
+        "group_fairness_weight": schedule_config.group_fairness_weight,
+        "max_group_pull_gap": schedule_config.max_group_pull_gap,
+        "prefer_group_diversity_in_round": schedule_config.prefer_group_diversity_in_round,
         "fine_grained_local_source_scheduler": True,
         "local_source_exploration_weight": max(
             0.0, float(getattr(args, "local_source_exploration_weight", 0.5))
@@ -4000,15 +3459,18 @@ def _complete_adaptive_round(
         observation = summarize_batch_run(run_file)
         meta_path = run_meta_path(run_file)
         meta = load_json(meta_path) if meta_path.exists() else {}
+        loaded_closed_loop_state = _load_closed_loop_state_from_meta(meta, run_file=run_file)
         reward = scheduler.record_result(
             batch,
             observation,
             next_seed=int(meta.get("next_seed", batch.seed + max(1, observation.cases))),
+            closed_loop_state=loaded_closed_loop_state,
         )
         result["run"].update(
             {
                 "schedule_arm_id": batch.arm_id,
                 "batch_index": batch.batch_index,
+                "closed_loop_state_present": isinstance(loaded_closed_loop_state, dict),
                 "scheduler_reward": reward,
                 "scheduler_observation": {
                     "cases": observation.cases,
@@ -4020,9 +3482,29 @@ def _complete_adaptive_round(
                     "semantic_divergence_count": observation.semantic_divergence_count,
                     "false_positive_count": observation.false_positive_count,
                     "new_behavior_cases": observation.new_behavior_cases,
+                    "signal_new_behavior_cases": observation.signal_new_behavior_cases,
                     "first_candidate_bug_case_index": observation.first_candidate_bug_case_index,
                     "first_candidate_bug_elapsed_s": observation.first_candidate_bug_elapsed_s,
                     "candidate_bug_discovery_auc": observation.candidate_bug_discovery_auc,
+                    "feedback_case_count": observation.feedback_case_count,
+                    "feedback_mutation_cases": observation.feedback_mutation_cases,
+                    "stored_in_feedback_corpus_cases": observation.stored_in_feedback_corpus_cases,
+                    "quality_oracle_count": observation.quality_oracle_count,
+                    "quality_pass_count": observation.quality_pass_count,
+                    "quality_fail_count": observation.quality_fail_count,
+                    "quality_score_total": observation.quality_score_total,
+                    "source_reward_adjustment_total": observation.source_reward_adjustment_total,
+                    "guidance_reward_adjustment_total": observation.guidance_reward_adjustment_total,
+                    "seed_schedule_delta_total": observation.seed_schedule_delta_total,
+                    "productive_mutation_cases": observation.productive_mutation_cases,
+                    "invalid_mutation_cases": observation.invalid_mutation_cases,
+                    "redundant_mutation_cases": observation.redundant_mutation_cases,
+                    "feedback_finding_yield_cases": observation.feedback_finding_yield_cases,
+                    "feedback_new_behavior_yield_cases": observation.feedback_new_behavior_yield_cases,
+                    "feedback_redundant_behavior_cases": observation.feedback_redundant_behavior_cases,
+                    "guided_productive_cases": observation.guided_productive_cases,
+                    "guided_target_miss_cases": observation.guided_target_miss_cases,
+                    "guided_redundant_cases": observation.guided_redundant_cases,
                 },
             }
         )
@@ -4040,6 +3522,25 @@ def _complete_adaptive_round(
     return completed
 
 
+def _load_closed_loop_state_from_meta(meta: dict[str, Any], *, run_file: Path) -> dict[str, Any] | None:
+    if not isinstance(meta, dict):
+        return None
+    inline_state = meta.get("closed_loop_state")
+    if isinstance(inline_state, dict):
+        return inline_state
+    state_file = str(meta.get("closed_loop_state_file", "") or "").strip()
+    candidate_paths = [Path(state_file)] if state_file else []
+    candidate_paths.append(closed_loop_state_path(run_file))
+    for path in candidate_paths:
+        if not str(path):
+            continue
+        if path.exists():
+            loaded = load_json(path)
+            if isinstance(loaded, dict):
+                return loaded
+    return None
+
+
 def _resolve_experiment_schedule(args: argparse.Namespace, *, jobs: int) -> str:
     schedule = getattr(args, "schedule", None)
     if schedule:
@@ -4053,6 +3554,54 @@ def _resolve_evidence_mode(value: str, suite_names: list[str]) -> str:
     if suite_names and all(suite.startswith("seeded_") for suite in suite_names):
         return "seeded"
     return "live"
+
+
+def _default_experiment_meta_for_runs(
+    *,
+    evidence_mode: str,
+    target_runs: list[tuple[str, list[str]]],
+    presets: list[str],
+    known_bug_id: str,
+    target_version: str,
+    include_pending_historical: bool = True,
+) -> dict[str, Any]:
+    if evidence_mode == "historical":
+        target_suite = target_runs[0][0] if len(target_runs) == 1 else ",".join(suite for suite, _ in target_runs)
+        return registered_experiment_meta_defaults(
+            evidence_mode=evidence_mode,
+            known_bug_id=known_bug_id,
+            target_suite=target_suite,
+            target_version=target_version,
+            include_pending_historical=include_pending_historical,
+        )
+    target_suites = tuple(dict.fromkeys(str(suite or "").strip() for suite, _ in target_runs if str(suite or "").strip()))
+    if not target_suites:
+        return {}
+    resolved_matrices = []
+    for suite in target_suites:
+        for preset in presets:
+            matrix = registered_experiment_matrix_for_run(
+                evidence_mode=evidence_mode,
+                target_suite=suite,
+                preset=str(preset or "").strip(),
+            )
+            if matrix is None:
+                return {}
+            resolved_matrices.append(matrix)
+    if not resolved_matrices:
+        return {}
+    matrix_ids = {matrix.id for matrix in resolved_matrices}
+    if len(matrix_ids) != 1:
+        return {}
+    return resolved_matrices[0].to_experiment_meta(target_suites=target_suites)
+
+
+def _invalid_live_adaptive_experiment_presets(planned_runs: list[dict[str, Any]]) -> list[str]:
+    invalid: list[str] = []
+    for job in planned_runs:
+        if _job_config(job).guidance_strategy != "guided":
+            invalid.append(str(job["preset"]))
+    return invalid
 
 
 def _experiment_manifest_path() -> Path:
@@ -4117,7 +3666,7 @@ def _experiment_job_sort_key(job: dict) -> tuple[float, int]:
 
 
 def _experiment_job_weight(job: dict) -> float:
-    config = _preset_config(str(job["preset"]))
+    config = _job_config(job)
     backend_cost = sum(_backend_cost(str(backend)) for backend in job["backends"])
     metamorphic_multiplier = 1.0
     if config.enable_metamorphic_oracle:
@@ -4126,6 +3675,7 @@ def _experiment_job_weight(job: dict) -> float:
         "float_group_key": 1.6,
         "join_null_sort": 1.5,
         "bughunt": 1.3,
+        "common_api_workflow": 0.9,
         "bughunt_no_groupby": 1.2,
         "workflow": 1.2,
         "edge_float": 1.1,
@@ -4179,8 +3729,10 @@ def _experiment_job_weight(job: dict) -> float:
         "pyarrow_run_end_null_compute_semantics": 1.0,
         "pyarrow_large_string_partition_schema_semantics": 1.0,
         "pyarrow_hash_pivot_wider_order_semantics": 1.0,
+        "pyarrow_list_flatten_parent_indices_semantics": 1.0,
         "polars_rolling_mean_by_null_count_semantics": 1.0,
         "csv_long_numeric_roundtrip": 1.0,
+        "deep_probe_rotation": 1.0,
         "common": 1.0,
     }.get(config.generator_profile, 1.0)
     guidance_multiplier = 1.0 + 0.03 * max(0, int(config.guidance_candidate_pool) - 1)
@@ -4202,7 +3754,7 @@ def _backend_cost(backend: str) -> float:
 
 def _run_experiment_job(job: dict) -> dict:
     _apply_native_thread_limits(int(job.get("worker_thread_limit", 1) or 1))
-    preset_config = _preset_config(str(job["preset"]))
+    preset_config = _job_config(job)
     preset_config.log_level = str(job["log_level"])
     preset_config.compress_run_log = bool(job["compress_run_log"])
     preset_config.artifact_limit = job["artifact_limit"]
@@ -4219,16 +3771,31 @@ def _run_experiment_job(job: dict) -> dict:
     replay_bug_sources = list(job.get("replay_bug_source_issues", []) or [])
     if replay_bug_sources:
         preset_config.replay_bug_source_issues = replay_bug_sources
+    run_kwargs = {
+        "cases": job["cases"],
+        "seed": int(job["seed"]),
+        "backends": list(job["backends"]),
+        "config": preset_config,
+        "duration_s": job["duration_s"],
+        "checkpoint_interval_s": float(job.get("checkpoint_interval_s", 60.0) or 0.0),
+        "progress_interval_s": float(job.get("progress_interval_s", 60.0) or 0.0),
+    }
+    if bool(job.get("persist_closed_loop_state", False)):
+        run_kwargs["persist_closed_loop_state"] = True
+    if isinstance(job.get("closed_loop_state"), dict):
+        run_kwargs["closed_loop_state"] = job["closed_loop_state"]
     run_file = run_fuzz(
-        cases=job["cases"],
-        seed=int(job["seed"]),
-        backends=list(job["backends"]),
-        config=preset_config,
-        duration_s=job["duration_s"],
+        **run_kwargs,
     )
     md_path = csv_path = ""
     if not job["skip_run_reports"]:
         md_path, csv_path = write_report(run_file)
+    experiment_meta = _job_experiment_meta(job)
+    run_semantics = resolved_run_semantics(job, experiment_meta)
+    preset_semantic_focus_families = list(preset_config.semantic_focus_families)
+    preset_semantic_focus_signals = list(preset_config.semantic_focus_signals)
+    configured_guidance_targets = list(preset_config.guidance_targets)
+    configured_effective_guidance_targets = _configured_guidance_targets(preset_config)
     run = {
         "target_suite": job["target_suite"],
         "backends": job["backends"],
@@ -4241,6 +3808,31 @@ def _run_experiment_job(job: dict) -> dict:
         "schedule_arm_id": job.get("schedule_arm_id", ""),
         "estimated_cost": job.get("estimated_cost", ""),
         "worker_thread_limit": job.get("worker_thread_limit", ""),
+        "closed_loop_state_present": isinstance(job.get("closed_loop_state"), dict),
+        "experiment_meta": experiment_meta,
+        "matrix_id": run_semantics["matrix_id"],
+        "matrix_title": run_semantics["matrix_title"],
+        "comparison_group": run_semantics["comparison_group"],
+        "purpose": run_semantics["purpose"],
+        "counts_as_real_bugs": run_semantics["counts_as_real_bugs"],
+        "rq_tags": list(run_semantics["rq_tags"]),
+        "analysis_tags": list(run_semantics["analysis_tags"]),
+        "variant_id": run_semantics["variant_id"],
+        "variant_title": run_semantics["variant_title"],
+        "base_preset": run_semantics["base_preset"],
+        "comparison_role": run_semantics["comparison_role"],
+        "canonical_comparison_role": run_semantics["canonical_comparison_role"],
+        "component_focus": run_semantics["component_focus"],
+        "overlays": list(run_semantics["overlays"]),
+        "semantic_focus_families": list(run_semantics["semantic_focus_families"]),
+        "semantic_focus_signals": list(run_semantics["semantic_focus_signals"]),
+        "factors": dict(run_semantics["factors"]),
+        "oracle_profile": run_semantics["oracle_profile"],
+        "scope_kind": run_semantics["scope_kind"],
+        "configured_guidance_targets": configured_guidance_targets,
+        "configured_effective_guidance_targets": configured_effective_guidance_targets,
+        "configured_semantic_focus_families": preset_semantic_focus_families,
+        "configured_semantic_focus_signals": preset_semantic_focus_signals,
         "run_file": str(run_file),
         "report": str(md_path),
         "csv": str(csv_path),
@@ -4296,7 +3888,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_fuzz.add_argument("--duration", default=None, help="wall-clock budget such as 10s, 5m, 24h")
     p_fuzz.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_fuzz)
-    p_fuzz.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "issue_focus", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "bool_null_groupby_agg", "large_int_filter_groupby", "set_membership_filter", "pyarrow_groupby_filter_cast_membership", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "row_value_absence_filter", "running_sum_precision", "partitioned_running_sum", "path_basename_keyed_pick", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest", "bit_compare_unequal_length", "round_even_float_scale", "duckdb_float_literal_precision", "polars_timestamp_precision_filter", "series_rtruediv_operand_order", "polars_reverse_division_columns", "pandas_uint64_isin_precision", "duckdb_tuple_anti_null_semantics", "datafusion_setop_all_duplicate_count", "duckdb_json_predicate_order_semantics", "pandas_sparse_array_mask_semantics", "polars_float_wrap_numerical_semantics", "pandas_index_bool_result_type", "polars_empty_literal_groupby_semantics", "pandas_arrow_string_eq_sum_semantics", "pandas_arrow_timestamp_loc_slice_semantics", "pandas_arrow_timestamp_index_attr_semantics", "pandas_eval_inplace_aliasing_semantics", "pandas_bool_reduction_skipna_semantics", "pyarrow_dataset_isin_all_match_semantics", "pyarrow_run_end_null_compute_semantics", "pyarrow_large_string_partition_schema_semantics", "pyarrow_hash_pivot_wider_order_semantics", "polars_rolling_mean_by_null_count_semantics", "csv_long_numeric_roundtrip"], default="common")
+    p_fuzz.add_argument("--profile", choices=PROFILE_CHOICES, default="common")
     add_guidance_flags(p_fuzz, default_strategy="random", default_candidate_pool=8)
     add_ablation_flags(p_fuzz)
     add_paper_journal_flags(p_fuzz)
@@ -4307,7 +3899,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_long.add_argument("--duration", default="24h", help="wall-clock budget such as 10m, 24h, 2d")
     p_long.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_long)
-    p_long.add_argument("--profile", choices=["common", "edge_float", "workflow", "bughunt", "bughunt_no_groupby", "issue_focus", "null_groupby_topk", "null_agg_topk", "filter_null_agg_topk", "join_null_agg_topk", "join_null_key_topk", "wide_offset_topk", "empty_filter_groupby", "join_filter_groupby", "join_null_truth_filter", "join_groupby_stress", "storage_offset", "float_group_key", "join_null_sort", "ordered_groupby_sort", "topk_resort", "join_ordered_agg_topk", "global_null_aggregate", "string_count_groupby", "unique_count_groupby", "bool_null_groupby_agg", "large_int_filter_groupby", "set_membership_filter", "pyarrow_groupby_filter_cast_membership", "null_predicate_filter", "boolean_predicate_filter", "post_topk_range_filter", "tuple_absence_filter", "row_value_absence_filter", "running_sum_precision", "partitioned_running_sum", "path_basename_keyed_pick", "sortedness_null_placement", "simple_case_random_subject", "group_quantile_key_probe", "scalar_subquery_double_parentheses", "window_avg_rows_frame", "struct_distinct_unnest", "bit_compare_unequal_length", "round_even_float_scale", "duckdb_float_literal_precision", "polars_timestamp_precision_filter", "series_rtruediv_operand_order", "polars_reverse_division_columns", "pandas_uint64_isin_precision", "duckdb_tuple_anti_null_semantics", "datafusion_setop_all_duplicate_count", "duckdb_json_predicate_order_semantics", "pandas_sparse_array_mask_semantics", "polars_float_wrap_numerical_semantics", "pandas_index_bool_result_type", "polars_empty_literal_groupby_semantics", "pandas_arrow_string_eq_sum_semantics", "pandas_arrow_timestamp_loc_slice_semantics", "pandas_arrow_timestamp_index_attr_semantics", "pandas_eval_inplace_aliasing_semantics", "pandas_bool_reduction_skipna_semantics", "pyarrow_dataset_isin_all_match_semantics", "pyarrow_run_end_null_compute_semantics", "pyarrow_large_string_partition_schema_semantics", "pyarrow_hash_pivot_wider_order_semantics", "polars_rolling_mean_by_null_count_semantics", "csv_long_numeric_roundtrip"], default="common")
+    p_long.add_argument("--profile", choices=PROFILE_CHOICES, default="common")
     add_guidance_flags(p_long, default_strategy="guided", default_candidate_pool=8)
     p_long.add_argument("--case-log", default=None, help="optional JSONL path for generated test cases")
     p_long.add_argument("--checkpoint-interval", default="60s", help="checkpoint write interval")
@@ -4329,6 +3921,411 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_report.set_defaults(func=cmd_report)
 
+    p_bug_audit = sub.add_parser(
+        "bug-audit",
+        help="run deterministic latest-version bug probes and write a machine-readable evidence manifest",
+    )
+    p_bug_audit.add_argument(
+        "--probes",
+        default="",
+        help=f"comma-separated probe ids; defaults to all: {','.join(list_audit_probe_ids())}",
+    )
+    p_bug_audit.add_argument(
+        "--fail-on-candidate",
+        action="store_true",
+        help="exit with code 2 when any candidate implementation bug is detected",
+    )
+    p_bug_audit.add_argument(
+        "--write-issues",
+        action="store_true",
+        help="write candidate issue drafts into --issue-dir using the automated audit manifest",
+    )
+    p_bug_audit.add_argument(
+        "--issue-dir",
+        default="new_issue/generated",
+        help="directory for --write-issues output; defaults to new_issue/generated",
+    )
+    p_bug_audit.add_argument(
+        "--overwrite-issues",
+        action="store_true",
+        help="overwrite existing audit-generated issue drafts",
+    )
+    p_bug_audit.set_defaults(func=cmd_bug_audit)
+
+    p_bug_hunt = sub.add_parser(
+        "bug-hunt",
+        help="run the integrated latest-version bug hunt workflow: audit, fuzz, report, classify, and manifest",
+    )
+    p_bug_hunt.add_argument("--cases", type=int, default=500, help="fresh fuzz case budget")
+    p_bug_hunt.add_argument("--duration", default=None, help="optional wall-clock budget such as 10m or 24h")
+    p_bug_hunt.add_argument("--seed", type=int, default=1)
+    p_bug_hunt.add_argument(
+        "--target-suite",
+        choices=sorted(TARGET_SUITES),
+        default="latest_all_engines",
+        help="backend target suite for the fresh fuzz stage",
+    )
+    p_bug_hunt.add_argument(
+        "--backends",
+        default=None,
+        help="explicit comma-separated backend targets; overrides --target-suite",
+    )
+    p_bug_hunt.add_argument(
+        "--preset",
+        default="live_deep_organic",
+        help="experiment preset for the fresh fuzz stage; defaults to live_deep_organic",
+    )
+    p_bug_hunt.add_argument(
+        "--probes",
+        default="",
+        help=f"comma-separated audit probe ids; defaults to all: {','.join(list_audit_probe_ids())}",
+    )
+    p_bug_hunt.add_argument("--skip-bug-audit", action="store_true", help="skip deterministic audit stage")
+    p_bug_hunt.add_argument(
+        "--write-issues",
+        dest="write_issues",
+        action="store_true",
+        default=True,
+        help="write audit candidate issue drafts into --issue-dir; enabled by default",
+    )
+    p_bug_hunt.add_argument(
+        "--no-write-issues",
+        dest="write_issues",
+        action="store_false",
+        help="do not write audit issue drafts",
+    )
+    p_bug_hunt.add_argument(
+        "--issue-dir",
+        default="new_issue/generated",
+        help="directory for generated audit issue drafts",
+    )
+    p_bug_hunt.add_argument(
+        "--overwrite-issues",
+        dest="overwrite_issues",
+        action="store_true",
+        default=True,
+        help="overwrite existing generated audit issue drafts; enabled by default",
+    )
+    p_bug_hunt.add_argument(
+        "--no-overwrite-issues",
+        dest="overwrite_issues",
+        action="store_false",
+        help="keep existing generated audit issue drafts",
+    )
+    p_bug_hunt.add_argument(
+        "--output-manifest",
+        default="new_issue/generated/bug-hunt-manifest.json",
+        help="portable manifest for the integrated hunt run",
+    )
+    p_bug_hunt.add_argument("--skip-run-report", action="store_true", help="skip markdown/csv report generation")
+    p_bug_hunt.add_argument("--classify-limit", type=int, default=3, help="example count per triage verdict")
+    p_bug_hunt.add_argument(
+        "--refresh-classification",
+        action="store_true",
+        help="recompute differential findings from stored normalized outputs before classifying",
+    )
+    p_bug_hunt.add_argument(
+        "--extra-known-saturated-bug-families",
+        default="",
+        help="additional comma-separated root@backend families to exclude from fresh counts",
+    )
+    p_bug_hunt.add_argument(
+        "--candidate-recheck-count",
+        type=int,
+        default=None,
+        help="override preset candidate recheck count",
+    )
+    p_bug_hunt.add_argument(
+        "--metamorphic-variant-limit",
+        type=int,
+        default=None,
+        help="override preset metamorphic variant limit",
+    )
+    p_bug_hunt.add_argument("--artifact-limit", type=int, default=None)
+    p_bug_hunt.add_argument("--no-compress-run-log", action="store_true")
+    p_bug_hunt.add_argument(
+        "--log-level",
+        choices=["full", "compact", "minimal"],
+        default="compact",
+        help="fresh fuzz JSONL detail level",
+    )
+    p_bug_hunt.add_argument(
+        "--fail-on-fresh-candidate",
+        action="store_true",
+        help="exit with code 2 when the fuzz stage finds a non-saturated candidate family",
+    )
+    p_bug_hunt.add_argument(
+        "--skip-candidate-pipeline",
+        action="store_true",
+        help="skip the automatic freeze/recheck/reduce/dedup/issue-readiness pipeline for fresh candidates",
+    )
+    p_bug_hunt.add_argument("--candidate-pipeline-recheck-attempts", type=int, default=2)
+    p_bug_hunt.add_argument(
+        "--candidate-pipeline-output-dir",
+        default=str(DEFAULT_CANDIDATE_PIPELINE_DIR.relative_to(PROJECT_ROOT)),
+    )
+    p_bug_hunt.add_argument("--no-candidate-pipeline-reduce", action="store_true")
+    p_bug_hunt.add_argument("--no-candidate-pipeline-standalone-reproducer", action="store_true")
+    p_bug_hunt.set_defaults(func=cmd_discovery_run)
+
+    p_bug_sprint = sub.add_parser(
+        "bug-sprint",
+        help="run multiple narrow latest-version bug-hunt lanes and write one evidence manifest",
+    )
+    p_bug_sprint.add_argument("--cases", type=int, default=100, help="case budget per lane/seed")
+    p_bug_sprint.add_argument("--duration", default=None, help="optional wall-clock budget per lane/seed")
+    p_bug_sprint.add_argument("--seeds", default="1", help="comma-separated seeds for every selected lane")
+    p_bug_sprint.add_argument(
+        "--lanes",
+        default="",
+        help=f"comma-separated lane ids; defaults to: {','.join(DEFAULT_DISCOVERY_LANE_IDS)}",
+    )
+    p_bug_sprint.add_argument("--list-lanes", action="store_true", help="print available bug-sprint lanes and exit")
+    p_bug_sprint.add_argument("--json", action="store_true", help="with --list-lanes, emit lane catalog as JSON")
+    p_bug_sprint.add_argument(
+        "--probes",
+        default="",
+        help=f"comma-separated audit probe ids; defaults to all: {','.join(list_audit_probe_ids())}",
+    )
+    p_bug_sprint.add_argument("--skip-bug-audit", action="store_true", help="skip deterministic audit stage")
+    p_bug_sprint.add_argument(
+        "--write-issues",
+        dest="write_issues",
+        action="store_true",
+        default=True,
+        help="write audit candidate issue drafts into --issue-dir; enabled by default",
+    )
+    p_bug_sprint.add_argument(
+        "--no-write-issues",
+        dest="write_issues",
+        action="store_false",
+        help="do not write audit issue drafts",
+    )
+    p_bug_sprint.add_argument("--issue-dir", default="new_issue/generated")
+    p_bug_sprint.add_argument(
+        "--overwrite-issues",
+        dest="overwrite_issues",
+        action="store_true",
+        default=True,
+        help="overwrite existing generated audit issue drafts; enabled by default",
+    )
+    p_bug_sprint.add_argument(
+        "--no-overwrite-issues",
+        dest="overwrite_issues",
+        action="store_false",
+        help="keep existing generated audit issue drafts",
+    )
+    p_bug_sprint.add_argument(
+        "--output-manifest",
+        default="new_issue/generated/bug-sprint-manifest.json",
+        help="portable manifest for the guided sprint run",
+    )
+    p_bug_sprint.add_argument("--skip-run-report", action="store_true", help="skip markdown/csv report generation")
+    p_bug_sprint.add_argument("--classify-limit", type=int, default=3, help="example count per triage verdict")
+    p_bug_sprint.add_argument(
+        "--refresh-classification",
+        action="store_true",
+        help="recompute differential findings from stored normalized outputs before classifying",
+    )
+    p_bug_sprint.add_argument(
+        "--extra-known-saturated-bug-families",
+        default="",
+        help="additional comma-separated root@backend families to exclude from fresh counts",
+    )
+    p_bug_sprint.add_argument("--candidate-recheck-count", type=int, default=None)
+    p_bug_sprint.add_argument("--metamorphic-variant-limit", type=int, default=None)
+    p_bug_sprint.add_argument("--artifact-limit", type=int, default=None)
+    p_bug_sprint.add_argument("--no-compress-run-log", action="store_true")
+    p_bug_sprint.add_argument(
+        "--log-level",
+        choices=["full", "compact", "minimal"],
+        default="compact",
+        help="fresh fuzz JSONL detail level",
+    )
+    p_bug_sprint.add_argument(
+        "--fail-on-fresh-candidate",
+        action="store_true",
+        help="exit with code 2 when any lane finds a non-saturated candidate family",
+    )
+    p_bug_sprint.add_argument(
+        "--watch-health",
+        action="store_true",
+        help="stop remaining lanes after any completed lane/seed run contains a bug row or organic fresh candidate",
+    )
+    p_bug_sprint.add_argument("--lane-history-window", type=int, default=DEFAULT_BUG_SPRINT_HISTORY_WINDOW)
+    p_bug_sprint.add_argument(
+        "--lane-yield-weight",
+        type=float,
+        default=DEFAULT_BUG_SPRINT_SCORE_WEIGHTS["yield_rate"],
+    )
+    p_bug_sprint.add_argument(
+        "--lane-novelty-weight",
+        type=float,
+        default=DEFAULT_BUG_SPRINT_SCORE_WEIGHTS["novelty_rate"],
+    )
+    p_bug_sprint.add_argument(
+        "--lane-false-positive-penalty",
+        type=float,
+        default=DEFAULT_BUG_SPRINT_SCORE_WEIGHTS["false_positive_penalty"],
+    )
+    p_bug_sprint.add_argument(
+        "--skip-candidate-pipeline",
+        action="store_true",
+        help="skip the automatic freeze/recheck/reduce/dedup/issue-readiness pipeline for fresh candidates",
+    )
+    p_bug_sprint.add_argument("--candidate-pipeline-recheck-attempts", type=int, default=2)
+    p_bug_sprint.add_argument(
+        "--candidate-pipeline-output-dir",
+        default=str(DEFAULT_CANDIDATE_PIPELINE_DIR.relative_to(PROJECT_ROOT)),
+    )
+    p_bug_sprint.add_argument("--no-candidate-pipeline-reduce", action="store_true")
+    p_bug_sprint.add_argument("--no-candidate-pipeline-standalone-reproducer", action="store_true")
+    p_bug_sprint.set_defaults(func=cmd_discovery_campaign)
+
+    p_bug_sprint_status = sub.add_parser(
+        "bug-sprint-status",
+        help="summarize a running or completed bug-sprint manifest and its latest observed run health",
+    )
+    p_bug_sprint_status.add_argument("--manifest", default="new_issue/generated/bug-sprint-manifest.json")
+    p_bug_sprint_status.add_argument("--limit", type=int, default=3, help="candidate examples to show from latest run")
+    p_bug_sprint_status.add_argument("--json", action="store_true", help="emit machine-readable status JSON")
+    p_bug_sprint_status.add_argument(
+        "--fail-on-fresh-candidate",
+        action="store_true",
+        help="exit with code 2 when the sprint manifest or latest observed run contains an unsaturated organic candidate",
+    )
+    p_bug_sprint_status.add_argument(
+        "--fail-on-bug",
+        action="store_true",
+        help="exit with code 2 when the latest observed run contains any status=bug row",
+    )
+    p_bug_sprint_status.set_defaults(func=cmd_discovery_campaign_status)
+
+    p_bug_status = sub.add_parser(
+        "bug-status",
+        help="summarize confirmed, candidate, generated, and old-known bug evidence without scanning run logs",
+    )
+    p_bug_status.add_argument("--json", action="store_true", help="emit machine-readable status JSON")
+    p_bug_status.add_argument(
+        "--latest-confirmations",
+        default="",
+        help="comma-separated latest confirmation JSON files; defaults to experiments/latest_confirmations.json",
+    )
+    p_bug_status.add_argument("--new-issue-dir", default="new_issue")
+    p_bug_status.add_argument("--old-issue-dir", default="old_issue")
+    p_bug_status.add_argument("--generated-issue-dir", default="new_issue/generated")
+    p_bug_status.add_argument("--write-report", action="store_true", help="write reports/bug-status-*.json and .md")
+    p_bug_status.add_argument("--output-dir", default="reports", help="directory for --write-report output")
+    p_bug_status.set_defaults(func=cmd_bug_status)
+
+    p_issue_readiness = sub.add_parser(
+        "issue-readiness",
+        help="audit local issue drafts for submission readiness without scanning run logs",
+    )
+    p_issue_readiness.add_argument("--json", action="store_true", help="emit machine-readable readiness JSON")
+    p_issue_readiness.add_argument(
+        "--latest-confirmations",
+        default="",
+        help="comma-separated latest confirmation JSON files; defaults to experiments/latest_confirmations.json",
+    )
+    p_issue_readiness.add_argument("--new-issue-dir", default="new_issue")
+    p_issue_readiness.add_argument("--old-issue-dir", default="old_issue")
+    p_issue_readiness.add_argument("--generated-issue-dir", default="new_issue/generated")
+    p_issue_readiness.add_argument(
+        "--include-generated",
+        action="store_true",
+        help="also audit raw generated issue drafts under --generated-issue-dir",
+    )
+    p_issue_readiness.add_argument(
+        "--write-report",
+        action="store_true",
+        help="write reports/issue-readiness-*.json and .md",
+    )
+    p_issue_readiness.add_argument("--output-dir", default="reports", help="directory for --write-report output")
+    p_issue_readiness.add_argument(
+        "--fail-on-no-ready",
+        action="store_true",
+        help="exit with code 2 when no local issue draft is ready to submit",
+    )
+    p_issue_readiness.set_defaults(func=cmd_issue_readiness)
+
+    p_issue_bundle = sub.add_parser(
+        "issue-bundle",
+        help="extract local issue reproducers and write a portable evidence manifest",
+    )
+    p_issue_bundle.add_argument("--json", action="store_true", help="emit the generated bundle manifest as JSON")
+    p_issue_bundle.add_argument(
+        "--latest-confirmations",
+        default="",
+        help="comma-separated latest confirmation JSON files; defaults to experiments/latest_confirmations.json",
+    )
+    p_issue_bundle.add_argument("--new-issue-dir", default="new_issue")
+    p_issue_bundle.add_argument("--old-issue-dir", default="old_issue")
+    p_issue_bundle.add_argument("--generated-issue-dir", default="new_issue/generated")
+    p_issue_bundle.add_argument(
+        "--statuses",
+        default=",".join(DEFAULT_ISSUE_BUNDLE_STATUSES),
+        help="comma-separated issue-readiness statuses to bundle",
+    )
+    p_issue_bundle.add_argument(
+        "--output-dir",
+        default="new_issue/generated/issue-bundles",
+        help="directory for manifest and extracted reproducers",
+    )
+    p_issue_bundle.add_argument(
+        "--run-reproducers",
+        action="store_true",
+        help="execute extracted reproducers and capture stdout/stderr in the manifest",
+    )
+    p_issue_bundle.add_argument("--timeout", type=float, default=20.0, help="per-reproducer timeout in seconds")
+    p_issue_bundle.add_argument(
+        "--repeat",
+        type=int,
+        default=1,
+        help="number of times to execute each reproducer when --run-reproducers is set",
+    )
+    p_issue_bundle.add_argument(
+        "--primary-per-family",
+        action="store_true",
+        help="bundle only the primary selected issue draft for each issue-readiness submission family",
+    )
+    p_issue_bundle.add_argument(
+        "--fail-on-missing-reproducer",
+        action="store_true",
+        help="exit with code 2 if any selected issue lacks a Python reproducer block",
+    )
+    p_issue_bundle.add_argument(
+        "--fail-on-compile-error",
+        action="store_true",
+        help="exit with code 2 if any extracted reproducer has a syntax error",
+    )
+    p_issue_bundle.set_defaults(func=cmd_issue_bundle)
+
+    p_candidate_pipeline = sub.add_parser(
+        "candidate-pipeline",
+        help="freeze fresh candidates and run recheck/reduce/dedup/issue-readiness automatically",
+    )
+    p_candidate_pipeline.add_argument("--manifest", default=None)
+    p_candidate_pipeline.add_argument(
+        "--evidence-files",
+        default="",
+        help="comma-separated fresh candidate evidence JSON files; overrides --manifest discovery when provided",
+    )
+    p_candidate_pipeline.add_argument(
+        "--output-dir",
+        default=str(DEFAULT_CANDIDATE_PIPELINE_DIR.relative_to(PROJECT_ROOT)),
+    )
+    p_candidate_pipeline.add_argument("--recheck-attempts", type=int, default=2)
+    p_candidate_pipeline.add_argument("--no-reduce", action="store_true")
+    p_candidate_pipeline.add_argument("--no-standalone-reproducer", action="store_true")
+    p_candidate_pipeline.add_argument("--json", action="store_true")
+    p_candidate_pipeline.add_argument(
+        "--fail-on-ready",
+        action="store_true",
+        help="exit with code 2 when the pipeline produces any ready-to-submit draft",
+    )
+    p_candidate_pipeline.set_defaults(func=cmd_candidate_pipeline)
+
     p_exp_summary = sub.add_parser("experiment-summary", help="summarize an experiment manifest")
     p_exp_summary.add_argument("--manifest", default=None)
     p_exp_summary.add_argument(
@@ -4340,14 +4337,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_exp_analysis = sub.add_parser(
         "analyze-experiment",
-        help="compare experiment aggregate metrics against a baseline preset",
+        help="compare experiment aggregate metrics against a reference preset",
     )
     p_exp_analysis.add_argument("--manifest", default=None)
-    p_exp_analysis.add_argument("--baseline-preset", default="baseline")
+    p_exp_analysis.add_argument("--reference-preset", default="baseline")
+    p_exp_analysis.add_argument(
+        "--baseline-preset",
+        default=None,
+        help="legacy alias for --reference-preset",
+    )
     p_exp_analysis.add_argument(
         "--compare-presets",
         default=None,
-        help="optional comma-separated preset subset to compare against the baseline",
+        help="optional comma-separated preset subset to compare against the reference run",
     )
     p_exp_analysis.add_argument(
         "--refresh",
@@ -4369,9 +4371,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_ablation_audit.add_argument("--manifest", default=None)
     p_ablation_audit.add_argument(
+        "--reference-presets",
+        default=None,
+        help="comma-separated presets treated as the reference soundness boundary",
+    )
+    p_ablation_audit.add_argument(
         "--trusted-presets",
         default=None,
-        help="comma-separated presets considered part of the default soundness boundary",
+        help="legacy alias for --reference-presets",
     )
     p_ablation_audit.add_argument(
         "--ablation-presets",
@@ -4385,6 +4392,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_ablation_audit.set_defaults(func=cmd_analyze_ablation_audit)
 
+    p_methodology_report = sub.add_parser(
+        "methodology-report",
+        help="write a paper-facing methodology report from an experiment manifest",
+    )
+    p_methodology_report.add_argument("--manifest", default=None)
+    p_methodology_report.add_argument(
+        "--refresh",
+        action="store_true",
+        help="recompute experiment summary findings with the current oracle before reporting",
+    )
+    p_methodology_report.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="reuse existing experiment-summary CSVs when available and skip run-log-derived report sections",
+    )
+    p_methodology_report.add_argument("--json", action="store_true", help="emit the generated report JSON")
+    p_methodology_report.set_defaults(func=cmd_methodology_report)
+
     p_final_ready = sub.add_parser(
         "final-readiness",
         help="audit final experiment breadth, depth, replay policy, and bug evidence readiness",
@@ -4393,7 +4418,31 @@ def build_parser() -> argparse.ArgumentParser:
         "--manifest",
         action="append",
         default=[],
-        help="experiment manifest to include; may be repeated; defaults to all runs/experiment-*.json",
+        help=(
+            "experiment manifest to include; may be repeated; when omitted, defaults to the latest "
+            f"{DEFAULT_FINAL_READINESS_MANIFEST_LIMIT} runs/experiment-*.json files"
+        ),
+    )
+    p_final_ready.add_argument(
+        "--latest-manifests",
+        type=int,
+        default=DEFAULT_FINAL_READINESS_MANIFEST_LIMIT,
+        help="number of most-recent experiment manifests to audit when --manifest is omitted",
+    )
+    p_final_ready.add_argument(
+        "--all-manifests",
+        action="store_true",
+        help="audit every runs/experiment-*.json manifest when --manifest is omitted",
+    )
+    p_final_ready.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="skip run-log scans and audit only manifest/meta/confirmation metadata",
+    )
+    p_final_ready.add_argument(
+        "--full-run-log-scan",
+        action="store_true",
+        help="scan run logs even when --manifest is omitted; required for a final paper readiness claim",
     )
     p_final_ready.add_argument(
         "--latest-confirmation-file",
@@ -4419,8 +4468,44 @@ def build_parser() -> argparse.ArgumentParser:
         default=",".join(DEFAULT_A_LEVEL_READINESS_POLICY.required_live_families),
         help="comma-separated backend families required by the top-level experiment policy",
     )
+    p_final_ready.add_argument("--no-require-validation", action="store_true")
     p_final_ready.add_argument("--no-require-seeded", action="store_true")
+    p_final_ready.add_argument("--no-require-ablation", action="store_true")
+    p_final_ready.add_argument("--no-require-comparison", action="store_true")
+    p_final_ready.add_argument("--json", action="store_true", help="emit the generated readiness JSON")
+    p_final_ready.add_argument(
+        "--fail-on-missing",
+        action="store_true",
+        help="exit with code 2 when any required final-readiness gate is not satisfied",
+    )
     p_final_ready.set_defaults(func=cmd_final_readiness)
+
+    p_review_ready = sub.add_parser(
+        "review-readiness",
+        help="audit ISCE-style review readiness from lightweight repository and bug evidence",
+    )
+    p_review_ready.add_argument("--json", action="store_true", help="emit machine-readable readiness JSON")
+    p_review_ready.add_argument("--write-report", action="store_true", help="write reports/review-readiness-*.json and .md")
+    p_review_ready.add_argument("--output-dir", default="reports", help="directory for --write-report output")
+    p_review_ready.add_argument(
+        "--latest-confirmation-file",
+        action="append",
+        default=[],
+        help="latest confirmation JSON file; may be repeated; defaults to experiments/latest_confirmations.json",
+    )
+    p_review_ready.add_argument("--target-confirmed", type=int, default=20)
+    p_review_ready.add_argument("--min-audit-candidates", type=int, default=1)
+    p_review_ready.add_argument("--min-bug-workflows", type=int, default=1)
+    p_review_ready.add_argument("--min-generated-issue-drafts", type=int, default=1)
+    p_review_ready.add_argument("--min-issue-bundle-families", type=int, default=1)
+    p_review_ready.add_argument("--min-pending-issue-drafts", type=int, default=1)
+    p_review_ready.add_argument("--min-old-known-issues", type=int, default=1)
+    p_review_ready.add_argument(
+        "--fail-on-missing",
+        action="store_true",
+        help="exit with code 2 when any required review gate is not satisfied",
+    )
+    p_review_ready.set_defaults(func=cmd_review_readiness)
 
     p_pattern_variants = sub.add_parser(
         "analyze-pattern-variants",
@@ -4447,7 +4532,20 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="recompute differential findings from stored normalized outputs with the current oracle",
     )
+    p_classify.add_argument("--json", action="store_true", help="emit machine-readable classification summary")
     p_classify.set_defaults(func=cmd_classify_run)
+
+    p_health = sub.add_parser("run-health", help="summarize an in-progress or completed run log")
+    p_health.add_argument("--run-file", default=None)
+    p_health.add_argument("--limit", type=int, default=3, help="candidate examples to show")
+    p_health.add_argument("--json", action="store_true", help="emit machine-readable health summary")
+    p_health.add_argument(
+        "--fail-on-fresh-candidate",
+        action="store_true",
+        help="exit with code 2 when the run contains an unsaturated organic candidate family",
+    )
+    p_health.add_argument("--fail-on-bug", action="store_true", help="exit with code 2 when any row has status=bug")
+    p_health.set_defaults(func=cmd_run_health)
 
     p_repro = sub.add_parser("reproduce", help="show reproduce command for a bug artifact")
     p_repro.add_argument("--bug", required=True)
@@ -4515,7 +4613,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_fixture.add_argument(
         "--evidence-mode",
-        choices=["live", "historical", "seeded"],
+        choices=list(FIXTURE_REPLAY_EVIDENCE_MODES),
         default="historical",
         help="paper evidence layer for this replay",
     )
@@ -4525,6 +4623,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_fixture.add_argument("--paper-notes", default="", help="brief paper-facing run notes")
     p_fixture.add_argument("--artifact-limit", type=int, default=None, help="0 disables artifact writes")
     p_fixture.add_argument("--log-level", choices=["full", "compact", "minimal"], default="compact")
+    p_fixture.add_argument(
+        "--experiment-meta",
+        default="",
+        help="JSON object describing structured experiment metadata for this fixture replay",
+    )
     p_fixture.add_argument("--disable-artifact", action="store_true")
     p_fixture.add_argument("--no-compress-run-log", action="store_true")
     p_fixture.set_defaults(func=cmd_replay_fixture)
@@ -4535,9 +4638,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_exp.add_argument("--seeds", default="1,1001,2001")
     p_exp.add_argument(
         "--evidence-mode",
-        choices=["auto", "live", "historical", "seeded"],
+        choices=["auto", *EXPERIMENT_EVIDENCE_MODES],
         default="auto",
-        help="experiment evidence layer: live latest-version finding, historical fixed-bug replay, or seeded fault ablation",
+        help=(
+            "experiment evidence layer: validation smoke, live latest-version finding, "
+            "historical fixed-bug replay, seeded fault sensitivity, module ablation, "
+            "or baseline/related-scope comparison"
+        ),
     )
     p_exp.add_argument(
         "--known-bug-id",
@@ -4604,6 +4711,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="adaptive scheduler exploration weight",
     )
     p_exp.add_argument(
+        "--group-fairness-weight",
+        type=float,
+        default=0.40,
+        help="adaptive scheduler bonus for underrepresented target-suite/preset groups",
+    )
+    p_exp.add_argument(
+        "--max-group-pull-gap",
+        type=int,
+        default=3,
+        help="adaptive scheduler rebalances once a target-suite/preset group trails by this many pulls",
+    )
+    p_exp.add_argument(
         "--enable-local-source-scheduler",
         action="store_true",
         help="enable within-run generated-vs-feedback source scheduling for non-adaptive experiment jobs",
@@ -4640,6 +4759,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--presets",
         default="baseline,no_type_aware,no_normalizer,no_feedback,metamorphic,reducer",
         help="comma-separated presets",
+    )
+    p_exp.add_argument(
+        "--experiment-meta",
+        default="",
+        help="JSON object describing structured experiment catalog metadata for the whole matrix",
     )
     add_paper_journal_flags(p_exp)
     p_exp.set_defaults(func=cmd_experiment)

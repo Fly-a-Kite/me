@@ -13,6 +13,7 @@ def test_build_run_journal_entry_records_paper_facing_summary(tmp_path):
             "case_index": 0,
             "elapsed_s": 1.25,
             "is_new_behavior": True,
+            "signal_new_behavior": False,
             "findings": [
                 {
                     "root_cause": "grouped_topk_null_sort_key",
@@ -50,6 +51,31 @@ def test_build_run_journal_entry_records_paper_facing_summary(tmp_path):
                     "filtered_candidates": 4,
                     "fallback_candidates": 1,
                 },
+                "experiment_meta": {
+                    "matrix_id": "live_discovery",
+                    "comparison_group": "latest_live_discovery",
+                    "analysis_tags": ["live"],
+                    "scope_by_target_suite": {"datafusion_cross": "cross_ecosystem"},
+                    "variant_by_preset": {
+                        "live_datafusion": {
+                            "variant_id": "live_datafusion",
+                            "base_preset": "baseline",
+                            "comparison_role": "targeted",
+                            "analysis_tags": ["guided"],
+                            "oracle_profile": "differential",
+                        }
+                    },
+                },
+                "run_provenance": {
+                    "vcs": {"git_commit": "abc123", "git_branch": "main", "workspace_dirty": False},
+                    "launch": {"source": "closed_loop_tmux", "duration": "24h"},
+                    "harness": {
+                        "authority": True,
+                        "freeze_intent": True,
+                        "latest_code_claim": True,
+                        "evidence_role": "latest_live_authority_24h",
+                    },
+                },
             }
         ),
         encoding="utf-8",
@@ -68,12 +94,25 @@ def test_build_run_journal_entry_records_paper_facing_summary(tmp_path):
 
     assert entry["theme"] == "paper run"
     assert entry["evidence_mode"] == "live"
+    assert entry["matrix_id"] == "live_discovery"
+    assert entry["comparison_group"] == "latest_live_discovery"
+    assert entry["variant_id"] == "live_datafusion"
+    assert entry["variant_label"] == "live_datafusion"
+    assert entry["variant_group_id"] == "datafusion_cross|latest_live_discovery|live_discovery"
+    assert entry["comparison_role"] == "targeted"
+    assert entry["canonical_comparison_role"] == "contrast"
+    assert entry["scope_kind"] == "cross_ecosystem"
+    assert entry["analysis_tags"] == ["guided", "live"]
     assert entry["executed_cases"] == 1
     assert entry["common_capabilities_count"] == 2
     assert entry["result_summary"]["candidate_bug_family_count"] == 1
     assert entry["result_summary"]["candidate_bug_families"] == {
         "grouped_topk_null_sort_key@datafusion": 1
     }
+    assert entry["result_summary"]["new_behavior_cases"] == 1
+    assert entry["result_summary"]["new_behavior_rate"] == 1.0
+    assert entry["result_summary"]["signal_new_behavior_cases"] == 0
+    assert entry["result_summary"]["signal_new_behavior_rate"] == 0.0
     assert entry["result_summary"]["first_candidate_bug_elapsed_s"] == 1.25
     assert entry["config_summary"]["enable_replay_bug"] is False
     assert entry["replay_bug_policy"] == {
@@ -82,6 +121,17 @@ def test_build_run_journal_entry_records_paper_facing_summary(tmp_path):
         "filter_enabled": True,
         "filtered_candidates": 4,
         "fallback_candidates": 1,
+    }
+    assert entry["run_provenance"] == {
+        "git_commit": "abc123",
+        "git_branch": "main",
+        "workspace_dirty": False,
+        "authority": True,
+        "freeze_intent": True,
+        "latest_code_claim": True,
+        "evidence_role": "latest_live_authority_24h",
+        "launch_source": "closed_loop_tmux",
+        "launch_duration": "24h",
     }
 
 
@@ -103,4 +153,91 @@ def test_record_run_journal_appends_jsonl_and_markdown(tmp_path):
     assert rows[0]["result_summary"]["raw_findings"] == 0
     md = Path(md_path).read_text(encoding="utf-8")
     assert "empty live run" in md
+    assert "Raw novelty %" in md
+    assert "Signal novelty %" in md
+    assert "Raw/signal new behavior cases" in md
     assert "Replay policy" in md
+    assert "Experiment identity" in md
+    assert "Variant/preset" in md
+    assert "canonical_role" in md
+
+
+def test_run_journal_marks_validation_as_non_bug_evidence(tmp_path):
+    run_file = tmp_path / "run-validation.jsonl"
+    append_jsonl({"case": {"case_id": "case-3", "seed": 3}, "findings": []}, run_file)
+
+    entry = build_run_journal_entry(
+        run_file,
+        context={"theme": "validation smoke", "evidence_mode": "validation"},
+    )
+
+    assert entry["evidence_mode"] == "validation"
+    assert "do not count as final bug evidence" in entry["counting_policy"]
+
+
+def test_run_journal_marks_ablation_and_comparison_as_rq_only_evidence(tmp_path):
+    run_file = tmp_path / "run-support.jsonl"
+    append_jsonl({"case": {"case_id": "case-4", "seed": 4}, "findings": []}, run_file)
+
+    ablation = build_run_journal_entry(
+        run_file,
+        context={"theme": "module ablation", "evidence_mode": "ablation"},
+    )
+    comparison = build_run_journal_entry(
+        run_file,
+        context={"theme": "baseline comparison", "evidence_mode": "comparison"},
+    )
+
+    assert "RQ tables only" in ablation["counting_policy"]
+    assert "RQ tables only" in comparison["counting_policy"]
+    assert "do not count candidates as live bug evidence" in ablation["counting_policy"]
+    assert "do not count candidates as live bug evidence" in comparison["counting_policy"]
+
+
+def test_run_journal_prefers_context_experiment_meta_over_weak_meta_defaults(tmp_path):
+    run_file = tmp_path / "run-context-meta.jsonl"
+    append_jsonl({"case": {"case_id": "case-5", "seed": 5}, "findings": []}, run_file)
+    run_meta_path(run_file).write_text(
+        json.dumps(
+            {
+                "executed_cases": 1,
+                "elapsed_s": 0.5,
+                "throughput_cases_s": 2.0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    entry = build_run_journal_entry(
+        run_file,
+        context={
+            "theme": "validation structured",
+            "evidence_mode": "validation",
+            "target_suite": "datafusion_cross",
+            "preset": "live_datafusion_fresh",
+            "experiment_meta": {
+                "matrix_id": "final_validation",
+                "comparison_group": "validation_smoke",
+                "analysis_tags": ["validation"],
+                "scope_by_target_suite": {"datafusion_cross": "query_engine"},
+                "variant_by_preset": {
+                    "live_datafusion_fresh": {
+                        "variant_id": "live_datafusion_fresh",
+                        "variant_title": "live_datafusion_fresh",
+                        "base_preset": "live_datafusion",
+                        "comparison_role": "contrast",
+                        "analysis_tags": ["guided"],
+                        "oracle_profile": "differential",
+                        "scope_kind": "query_engine",
+                    }
+                },
+            },
+        },
+    )
+
+    assert entry["matrix_id"] == "final_validation"
+    assert entry["comparison_group"] == "validation_smoke"
+    assert entry["variant_id"] == "live_datafusion_fresh"
+    assert entry["canonical_comparison_role"] == "contrast"
+    assert entry["scope_kind"] == "query_engine"
+    assert entry["analysis_tags"] == ["guided", "validation"]

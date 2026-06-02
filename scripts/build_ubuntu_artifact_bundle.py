@@ -13,6 +13,16 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = PROJECT_ROOT / "reports" / "ubuntu-datafusion-artifact-manifest.json"
 DEFAULT_OUTPUT = PROJECT_ROOT / "reports" / "ubuntu-datafusion-artifact-bundle.tar.gz"
+MANIFEST_PATH_SECTIONS = (
+    "summary_document",
+    "methodology_roadmap",
+    "environment",
+    "primary_artifact",
+    "ablation_audit",
+    "pattern_analyses",
+    "experiments",
+    "harness_evidence",
+)
 
 
 def main() -> int:
@@ -42,24 +52,31 @@ def parse_args() -> argparse.Namespace:
 
 
 def collect_manifest_paths(manifest: dict[str, Any]) -> list[str]:
-    paths = [
-        manifest["summary_document"],
-        manifest.get("methodology_roadmap", ""),
-        *manifest["environment"].values(),
-        *manifest["primary_artifact"].values(),
-        *manifest.get("ablation_audit", {}).values(),
-        *manifest.get("pattern_analyses", {}).values(),
-    ]
-    for experiment in manifest["experiments"]:
-        paths.extend(
-            [
-                experiment["manifest"],
-                experiment["summary"],
-                experiment["analysis"],
-                experiment["aggregate_csv"],
-            ]
-        )
-    return sorted({path for path in paths if path})
+    paths: set[str] = set()
+    for section in MANIFEST_PATH_SECTIONS:
+        paths.update(_collect_paths(manifest.get(section)))
+    return sorted(paths)
+
+
+def _collect_paths(value: Any) -> set[str]:
+    if isinstance(value, str):
+        candidate = value.strip()
+        return {candidate} if _looks_like_repo_path(candidate) else set()
+    if isinstance(value, dict):
+        paths: set[str] = set()
+        for item in value.values():
+            paths.update(_collect_paths(item))
+        return paths
+    if isinstance(value, list):
+        paths: set[str] = set()
+        for item in value:
+            paths.update(_collect_paths(item))
+        return paths
+    return set()
+
+
+def _looks_like_repo_path(value: str) -> bool:
+    return bool(value) and "://" not in value and "/" in value
 
 
 def validate_paths(paths: list[str], *, root: Path) -> None:

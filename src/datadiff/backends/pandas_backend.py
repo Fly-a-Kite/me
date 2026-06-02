@@ -4,6 +4,7 @@ import time
 from typing import Any
 
 from datadiff.backends.base import Backend, BackendResult
+from datadiff.backends.probe_semantics import EXTENDED_FALSE_PROBE_KINDS, resolve_bool_probe
 from datadiff.csv_roundtrip import (
     csv_long_numeric_roundtrip_mismatch,
     csv_long_numeric_values,
@@ -11,6 +12,51 @@ from datadiff.csv_roundtrip import (
 )
 from datadiff.dsl import Program, TableData, normalize_sort_keys
 from datadiff.filtering import evaluate_filter_predicate
+from datadiff.join_keys import join_key_arg, join_key_pairs
+from datadiff.operation_semantics import (
+    aggregate_alias,
+    aggregate_column,
+    aggregate_func,
+    aggregate_specs,
+    case_else_value,
+    case_then_value,
+    coalesce_fallback,
+    coalesce_has_fallback,
+    coalesce_sources,
+    condition_cmp,
+    condition_column,
+    condition_value,
+    expr_index,
+    expr_input_domain,
+    expr_kind,
+    expr_length,
+    expr_lower,
+    expr_needle,
+    expr_new,
+    expr_numerator,
+    expr_old,
+    expr_operator,
+    expr_other,
+    expr_part,
+    expr_separator,
+    expr_source,
+    expr_start,
+    expr_target_type,
+    expr_upper,
+    expr_value,
+    groupby_keys,
+    join_how,
+    op_ascending,
+    op_column,
+    op_columns,
+    op_kind,
+    op_n,
+    op_nulls,
+    op_output_alias,
+    op_source,
+    op_table,
+    op_value,
+)
 from datadiff.pathing import path_basename
 from datadiff.running import (
     running_sum_partition_columns,
@@ -34,6 +80,24 @@ def _bool_reduction(values: Any, func: str) -> bool | None:
     if func == "all":
         return all(valid)
     raise ValueError(func)
+
+
+def _single_bool_frame(pd: Any, alias: str, value: bool) -> Any:
+    return pd.DataFrame([{alias: value}], columns=[alias])
+
+
+def _pandas_bool_probe_handlers(pd: Any, op: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "uint64_isin_probe": lambda: _pandas_uint64_isin_probe_value(pd),
+        "sparse_mask_probe": lambda: _pandas_sparse_mask_probe_mismatch(pd),
+        "index_bool_probe": lambda: _pandas_index_bool_probe_mismatch(pd),
+        "arrow_string_eq_sum_probe": lambda: _pandas_arrow_string_eq_sum_mismatch(pd),
+        "arrow_timestamp_loc_slice_probe": lambda: _pandas_arrow_timestamp_loc_slice_mismatch(pd),
+        "arrow_timestamp_index_attr_probe": lambda: _pandas_arrow_timestamp_index_attr_mismatch(pd),
+        "eval_inplace_alias_probe": lambda: _pandas_eval_inplace_alias_mismatch(pd),
+        "bool_reduction_skipna_probe": lambda: _pandas_bool_reduction_skipna_mismatch(pd),
+        "csv_long_numeric_roundtrip_probe": lambda: _pandas_csv_long_numeric_roundtrip_mismatch(pd, op),
+    }
 
 
 class PandasBackend(Backend):
@@ -61,31 +125,49 @@ class PandasBackend(Backend):
             frames = {table.name: self._to_df(table) for table in tables}
             df = frames[tables[0].name]
             for op in program.operations:
-                kind = op["op"]
+                kind = op_kind(op)
                 if kind == "join":
-                    right = frames[op["table"]]
+                    right = frames[op_table(op)]
                     before_cols = set(df.columns)
+                    left_keys, right_keys = join_key_pairs(op)
                     df = df.merge(
                         right,
-                        how=op["how"],
-                        left_on=op["left_on"],
-                        right_on=op["right_on"],
+                        how=join_how(op),
+                        left_on=join_key_arg(left_keys),
+                        right_on=join_key_arg(right_keys),
                         suffixes=("", "_r"),
                         sort=False,
                     )
                     drop_cols = [c for c in df.columns if str(c).endswith("_r")]
-                    if (
-                        op["right_on"] != op["left_on"]
-                        and op["right_on"] not in before_cols
-                        and op["right_on"] in df.columns
-                    ):
-                        drop_cols.append(op["right_on"])
+                    for left_key, right_key in zip(left_keys, right_keys):
+                        if right_key != left_key and right_key not in before_cols and right_key in df.columns:
+                            drop_cols.append(right_key)
                     if drop_cols:
                         df = df.drop(columns=drop_cols)
+                elif kind == "union_all":
+                    right = frames[op_table(op)]
+                    df = pd.concat([df, right[list(df.columns)]], ignore_index=True)
+                elif kind in {"semi_join", "anti_join"}:
+                    right = frames[op_table(op)]
+                    left_keys, right_keys = join_key_pairs(op)
+                    right_values = {
+                        tuple(values)
+                        for values in right[right_keys].itertuples(index=False, name=None)
+                        if all(evaluate_filter_predicate(value, "is_not_null", None) for value in values)
+                    }
+                    matches = [
+                        all(evaluate_filter_predicate(value, "is_not_null", None) for value in values)
+                        and tuple(values) in right_values
+                        for values in df[left_keys].itertuples(index=False, name=None)
+                    ]
+                    keep = matches if kind == "semi_join" else [not matched for matched in matches]
+                    df = df.loc[pd.Series(keep, index=df.index, dtype=bool)]
+                elif kind == "drop_nulls":
+                    df = df.dropna(subset=op_columns(op))
                 elif kind == "filter":
-                    col = op["column"]
-                    val = op["value"]
-                    comparator = op["cmp"]
+                    col = op_column(op)
+                    val = op_value(op)
+                    comparator = condition_cmp(op)
                     series = df[col]
                     column_values = _predicate_values(series)
                     keep_mask = pd.Series(
@@ -98,10 +180,10 @@ class PandasBackend(Backend):
                     )
                     df = df.loc[keep_mask]
                 elif kind == "tuple_absence_filter":
-                    right = frames[op["table"]]
-                    right_rows = right[list(op["right_columns"])].to_dict("records")
-                    left_columns = list(op["columns"])
-                    right_columns = list(op["right_columns"])
+                    right = frames[op_table(op)]
+                    right_rows = right[list(op.right_columns)].to_dict("records")
+                    left_columns = list(op.columns)
+                    right_columns = list(op.right_columns)
                     keep_mask = pd.Series(
                         [
                             evaluate_tuple_absence(row, left_columns, right_rows, right_columns)
@@ -115,177 +197,180 @@ class PandasBackend(Backend):
                     rows = row_number_filter_rows(df.to_dict("records"), op)
                     df = pd.DataFrame(rows, columns=list(df.columns))
                 elif kind == "running_sum":
-                    columns = [column for column in df.columns if column != op["column"]] + [op["column"]]
+                    out_column = op_column(op)
+                    columns = [column for column in df.columns if column != out_column] + [out_column]
                     rows = sort_rows_for_running(df.to_dict("records"), running_sum_sort_keys(op))
-                    values = stable_running_sum_values(rows, op["source"], running_sum_partition_columns(op))
-                    rows = [{**row, op["column"]: value} for row, value in zip(rows, values)]
+                    values = stable_running_sum_values(rows, op_source(op), running_sum_partition_columns(op))
+                    rows = [{**row, out_column: value} for row, value in zip(rows, values)]
                     df = pd.DataFrame(rows, columns=columns)
                 elif kind == "sortedness_check":
                     ok = is_sorted_values(
-                        df[op["column"]].tolist(),
-                        ascending=bool(op.get("ascending", True)),
-                        nulls=str(op.get("nulls", "last")),
+                        df[op_column(op)].tolist(),
+                        ascending=op_ascending(op),
+                        nulls=op_nulls(op),
                     )
-                    df = pd.DataFrame([{op["as"]: ok}], columns=[op["as"]])
-                elif kind == "random_case_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "group_quantile_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "scalar_subquery_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "window_avg_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "struct_distinct_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "bit_compare_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "round_even_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "float_literal_precision_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "timestamp_precision_filter_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "series_rtruediv_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "uint64_isin_probe":
-                    import numpy as np
-
-                    observed = pd.Series([635554097106142143], dtype="UInt64").isin(
-                        np.array([635554097106142079])
-                    ).iloc[0]
-                    df = pd.DataFrame([{op["as"]: bool(observed)}], columns=[op["as"]])
-                elif kind == "tuple_anti_null_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "setop_all_duplicate_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "json_predicate_order_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "sparse_mask_probe":
-                    import numpy as np
-
-                    sparse = pd.arrays.SparseArray([1, 2, 3, 4, np.nan, np.nan], fill_value=np.nan)
-                    mask = sparse > [3, 3, 4, 1, 0, 0]
-                    observed = sparse[mask].to_numpy().tolist()
-                    expected = [4.0]
-                    mismatch = len(observed) != len(expected) or any(
-                        left != right for left, right in zip(observed, expected)
-                    )
-                    df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
-                elif kind == "float_wrap_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "index_bool_probe":
-                    observed = pd.Index([3, 5, 8], name="i") == 5
-                    df = pd.DataFrame([{op["as"]: not isinstance(observed, pd.Index)}], columns=[op["as"]])
-                elif kind == "empty_literal_groupby_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "arrow_string_eq_sum_probe":
-                    mismatch = _pandas_arrow_string_eq_sum_mismatch(pd)
-                    df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
-                elif kind == "arrow_timestamp_loc_slice_probe":
-                    mismatch = _pandas_arrow_timestamp_loc_slice_mismatch(pd)
-                    df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
-                elif kind == "arrow_timestamp_index_attr_probe":
-                    mismatch = _pandas_arrow_timestamp_index_attr_mismatch(pd)
-                    df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
-                elif kind == "eval_inplace_alias_probe":
-                    mismatch = _pandas_eval_inplace_alias_mismatch(pd)
-                    df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
-                elif kind == "bool_reduction_skipna_probe":
-                    mismatch = _pandas_bool_reduction_skipna_mismatch(pd)
-                    df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
-                elif kind == "dataset_isin_all_match_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "run_end_null_compute_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "large_string_partition_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "hash_pivot_wider_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "rolling_mean_by_null_count_probe":
-                    df = pd.DataFrame([{op["as"]: False}], columns=[op["as"]])
-                elif kind == "csv_long_numeric_roundtrip_probe":
-                    expected_values = csv_long_numeric_values(op)
-                    with long_numeric_csv_path(expected_values) as csv_path:
-                        observed_values = pd.read_csv(csv_path)["value"].tolist()
-                    mismatch = csv_long_numeric_roundtrip_mismatch(observed_values, expected_values)
-                    df = pd.DataFrame([{op["as"]: mismatch}], columns=[op["as"]])
-                elif kind == "select":
-                    df = df[list(op["columns"])]
-                elif kind == "sort":
-                    for key in reversed(normalize_sort_keys(op)):
-                        df = df.sort_values(
-                            key.column,
-                            ascending=key.ascending,
-                            na_position=key.nulls,
-                            kind="mergesort",
-                        )
-                elif kind == "limit":
-                    df = df.head(int(op["n"]))
-                elif kind == "offset":
-                    df = df.iloc[int(op["n"]):]
-                elif kind == "mutate":
-                    expr = op["expr"]
-                    df = df.copy()
-                    if expr["kind"] == "add_const":
-                        df[op["column"]] = df[expr["source"]] + expr["value"]
-                    elif expr["kind"] == "arith_const":
-                        if expr["op"] == "sub":
-                            df[op["column"]] = df[expr["source"]] - expr["value"]
-                        elif expr["op"] == "mul":
-                            df[op["column"]] = df[expr["source"]] * expr["value"]
-                        elif expr["op"] == "div":
-                            df[op["column"]] = df[expr["source"]] / expr["value"]
-                        elif expr["op"] == "mod":
-                            df[op["column"]] = df[expr["source"]] % expr["value"]
-                        else:
-                            raise ValueError(expr["op"])
-                    elif expr["kind"] == "reverse_division_columns":
-                        df[op["column"]] = df[expr["numerator"]] / df[expr["source"]]
-                    elif expr["kind"] == "cast" and expr["to"] == "float":
-                        df[op["column"]] = df[expr["source"]].astype("float64")
-                    elif expr["kind"] == "string_length":
-                        df[op["column"]] = df[expr["source"]].str.len()
-                    elif expr["kind"] == "string_lower":
-                        df[op["column"]] = df[expr["source"]].str.lower()
-                    elif expr["kind"] == "string_basename":
-                        df[op["column"]] = df[expr["source"]].map(path_basename)
-                    else:
-                        raise ValueError(expr["kind"])
-                elif kind == "groupby":
-                    keys = list(op["keys"])
-                    group = df.groupby(keys, dropna=False, sort=False)
-                    pieces = []
-                    for agg in op["aggs"]:
-                        col, func, alias = agg["column"], agg["func"], agg["as"]
-                        if func == "count":
-                            series = group[col].count().rename(alias)
-                        elif func == "nunique":
-                            series = group[col].nunique(dropna=True).rename(alias)
-                        elif func in {"any", "all"}:
-                            series = group[col].agg(lambda values, current_func=func: _bool_reduction(values, current_func)).rename(alias)
-                        elif func == "sum":
-                            series = group[col].sum(min_count=1).rename(alias)
-                        else:
-                            series = getattr(group[col], func)().rename(alias)
-                        pieces.append(series)
-                    df = pd.concat(pieces, axis=1).reset_index()
-                elif kind == "aggregate":
-                    values = {}
-                    for agg in op["aggs"]:
-                        col, func, alias = agg["column"], agg["func"], agg["as"]
-                        if func == "count":
-                            values[alias] = int(df[col].count())
-                        elif func == "nunique":
-                            values[alias] = int(df[col].nunique(dropna=True))
-                        elif func in {"any", "all"}:
-                            values[alias] = _bool_reduction(df[col], func)
-                        elif func == "sum":
-                            values[alias] = df[col].sum(min_count=1)
-                        else:
-                            values[alias] = getattr(df[col], func)()
-                    df = pd.DataFrame([values], columns=[agg["as"] for agg in op["aggs"]])
+                    df = _single_bool_frame(pd, op_output_alias(op), ok)
                 else:
-                    raise ValueError(kind)
+                    probe_value = resolve_bool_probe(
+                        kind,
+                        handlers=_pandas_bool_probe_handlers(pd, op),
+                        fallback_false_kinds=EXTENDED_FALSE_PROBE_KINDS,
+                    )
+                    if probe_value is not None:
+                        df = _single_bool_frame(pd, op_output_alias(op), probe_value)
+                    elif kind == "select":
+                        df = df[op_columns(op)]
+                    elif kind == "distinct":
+                        cols = op_columns(op)
+                        df = df[cols].drop_duplicates().reset_index(drop=True)
+                    elif kind == "fill_null":
+                        df = df.copy()
+                        column = op_column(op)
+                        df[column] = df[column].fillna(op_value(op))
+                    elif kind == "coalesce":
+                        df = df.copy()
+                        alias = op_output_alias(op)
+                        columns = coalesce_sources(op)
+                        values = df[columns[0]].copy()
+                        for column in columns[1:]:
+                            values = values.combine_first(df[column])
+                        if coalesce_has_fallback(op):
+                            values = values.fillna(coalesce_fallback(op))
+                        df[alias] = values
+                    elif kind == "case_when":
+                        alias = op_output_alias(op)
+                        condition_values = _predicate_values(df[condition_column(op)])
+                        df = df.copy()
+                        df[alias] = [
+                            case_then_value(op)
+                            if evaluate_filter_predicate(value, condition_cmp(op), condition_value(op))
+                            else case_else_value(op)
+                            for value in condition_values
+                        ]
+                    elif kind == "sort":
+                        for key in reversed(normalize_sort_keys(op)):
+                            df = df.sort_values(
+                                key.column,
+                                ascending=key.ascending,
+                                na_position=key.nulls,
+                                kind="mergesort",
+                            )
+                    elif kind == "limit":
+                        df = df.head(op_n(op))
+                    elif kind == "offset":
+                        df = df.iloc[op_n(op):]
+                    elif kind == "mutate":
+                        df = df.copy()
+                        out_column = op_column(op)
+                        source = expr_source(op)
+                        if expr_kind(op) == "add_const":
+                            df[out_column] = df[source] + expr_value(op)
+                        elif expr_kind(op) == "arith_const":
+                            if expr_operator(op) == "sub":
+                                df[out_column] = df[source] - expr_value(op)
+                            elif expr_operator(op) == "mul":
+                                df[out_column] = df[source] * expr_value(op)
+                            elif expr_operator(op) == "div":
+                                df[out_column] = df[source] / expr_value(op)
+                            elif expr_operator(op) == "mod":
+                                df[out_column] = df[source] % expr_value(op)
+                            else:
+                                raise ValueError(expr_operator(op))
+                        elif expr_kind(op) == "reverse_division_columns":
+                            df[out_column] = df[expr_numerator(op)] / df[source]
+                        elif expr_kind(op) == "abs":
+                            df[out_column] = df[source].abs()
+                        elif expr_kind(op) == "clip":
+                            df[out_column] = df[source].clip(lower=expr_lower(op), upper=expr_upper(op))
+                        elif expr_kind(op) == "bool_not":
+                            df[out_column] = ~df[source]
+                        elif expr_kind(op) == "cast":
+                            if expr_target_type(op) == "float":
+                                if expr_input_domain(op) in {"numeric_string", "integer_string"}:
+                                    df[out_column] = pd.to_numeric(df[source], errors="raise").astype("float64")
+                                else:
+                                    df[out_column] = df[source].astype("float64")
+                            elif expr_target_type(op) == "int":
+                                df[out_column] = pd.to_numeric(df[source], errors="raise").astype("Int64")
+                            elif expr_target_type(op) == "str":
+                                df[out_column] = df[source].astype("string")
+                            else:
+                                raise ValueError(expr_target_type(op))
+                        elif expr_kind(op) == "string_length":
+                            df[out_column] = df[source].str.len()
+                        elif expr_kind(op) == "string_lower":
+                            df[out_column] = df[source].str.lower()
+                        elif expr_kind(op) == "string_upper":
+                            df[out_column] = df[source].str.upper()
+                        elif expr_kind(op) == "string_strip":
+                            df[out_column] = df[source].str.strip()
+                        elif expr_kind(op) == "string_null_if_empty":
+                            df[out_column] = df[source].mask(df[source] == "")
+                        elif expr_kind(op) == "string_replace":
+                            df[out_column] = df[source].str.replace(expr_old(op), expr_new(op), regex=False)
+                        elif expr_kind(op) == "string_slice":
+                            start = int(expr_start(op))
+                            df[out_column] = df[source].str.slice(start, start + int(expr_length(op)))
+                        elif expr_kind(op) == "string_split_part":
+                            df[out_column] = df[source].str.split(expr_separator(op), n=1, regex=False).str[int(expr_index(op))]
+                        elif expr_kind(op) == "string_concat":
+                            df[out_column] = df[source].str.cat(df[expr_other(op)], sep=expr_separator(op))
+                        elif expr_kind(op) == "string_contains":
+                            df[out_column] = df[source].str.contains(expr_needle(op), regex=False)
+                        elif expr_kind(op) == "string_starts_with":
+                            df[out_column] = df[source].str.startswith(expr_needle(op))
+                        elif expr_kind(op) == "string_ends_with":
+                            df[out_column] = df[source].str.endswith(expr_needle(op))
+                        elif expr_kind(op) == "date_part":
+                            spans = {"year": (0, 4), "month": (5, 7), "day": (8, 10)}
+                            start_idx, stop_idx = spans[expr_part(op)]
+                            extracted = df[source].str.slice(start_idx, stop_idx)
+                            df[out_column] = pd.to_numeric(extracted, errors="coerce").astype("Int64")
+                        elif expr_kind(op) == "string_basename":
+                            df[out_column] = df[source].map(path_basename)
+                        else:
+                            raise ValueError(expr_kind(op))
+                    elif kind == "groupby":
+                        keys = groupby_keys(op)
+                        group = df.groupby(keys, dropna=False, sort=False)
+                        pieces = []
+                        for agg in aggregate_specs(op):
+                            col = aggregate_column(agg)
+                            func = aggregate_func(agg)
+                            alias = aggregate_alias(agg)
+                            if func == "count":
+                                series = group[col].count().rename(alias)
+                            elif func == "nunique":
+                                series = group[col].nunique(dropna=True).rename(alias)
+                            elif func in {"any", "all"}:
+                                series = group[col].agg(lambda values, current_func=func: _bool_reduction(values, current_func)).rename(alias)
+                            elif func == "sum":
+                                series = group[col].sum(min_count=1).rename(alias)
+                            else:
+                                series = getattr(group[col], func)().rename(alias)
+                            pieces.append(series)
+                        df = pd.concat(pieces, axis=1).reset_index()
+                    elif kind == "aggregate":
+                        values = {}
+                        columns = []
+                        for agg in aggregate_specs(op):
+                            col = aggregate_column(agg)
+                            func = aggregate_func(agg)
+                            alias = aggregate_alias(agg)
+                            columns.append(alias)
+                            if func == "count":
+                                values[alias] = int(df[col].count())
+                            elif func == "nunique":
+                                values[alias] = int(df[col].nunique(dropna=True))
+                            elif func in {"any", "all"}:
+                                values[alias] = _bool_reduction(df[col], func)
+                            elif func == "sum":
+                                values[alias] = df[col].sum(min_count=1)
+                            else:
+                                values[alias] = getattr(df[col], func)()
+                        df = pd.DataFrame([values], columns=columns)
+                    else:
+                        raise ValueError(kind)
             return BackendResult(self.name, "ok", data=df, duration_ms=(time.perf_counter()-start)*1000)
         except Exception as exc:  # noqa: BLE001
             return BackendResult(self.name, "error", error_type=type(exc).__name__, error=str(exc), duration_ms=(time.perf_counter()-start)*1000)
@@ -296,6 +381,37 @@ def _predicate_values(series):
     if array is not None:
         return array.tolist()
     return series.tolist()
+
+
+def _pandas_uint64_isin_probe_value(pd) -> bool:
+    import numpy as np
+
+    observed = pd.Series([635554097106142143], dtype="UInt64").isin(
+        np.array([635554097106142079])
+    ).iloc[0]
+    return bool(observed)
+
+
+def _pandas_sparse_mask_probe_mismatch(pd) -> bool:
+    import numpy as np
+
+    sparse = pd.arrays.SparseArray([1, 2, 3, 4, np.nan, np.nan], fill_value=np.nan)
+    mask = sparse > [3, 3, 4, 1, 0, 0]
+    observed = sparse[mask].to_numpy().tolist()
+    expected = [4.0]
+    return len(observed) != len(expected) or any(left != right for left, right in zip(observed, expected))
+
+
+def _pandas_index_bool_probe_mismatch(pd) -> bool:
+    observed = pd.Index([3, 5, 8], name="i") == 5
+    return not isinstance(observed, pd.Index)
+
+
+def _pandas_csv_long_numeric_roundtrip_mismatch(pd, op: dict[str, Any]) -> bool:
+    expected_values = csv_long_numeric_values(op)
+    with long_numeric_csv_path(expected_values) as csv_path:
+        observed_values = pd.read_csv(csv_path)["value"].tolist()
+    return csv_long_numeric_roundtrip_mismatch(observed_values, expected_values)
 
 
 def _pandas_arrow_string_eq_sum_mismatch(pd) -> bool:

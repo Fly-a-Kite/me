@@ -123,6 +123,26 @@ def test_local_source_scheduler_keeps_feedback_mutation_sampling_floor():
     assert scheduler.choose_source(feedback_available=True) == "feedback_mutation"
 
 
+def test_local_source_scheduler_reward_signal_is_bounded_by_confidence():
+    scheduler = LocalSourceScheduler(exploration_weight=0.0)
+
+    scheduler.record_result(
+        "generated",
+        has_finding=True,
+        is_new_behavior=True,
+        preflight_valid=True,
+        fallback_used=False,
+        candidate_bug=True,
+        reward_adjustment=100.0,
+    )
+
+    snapshot = {row["source"]: row for row in scheduler.snapshot()}
+    generated = snapshot["generated"]
+
+    assert generated["mean_reward"] > generated["reward_signal"] > 0.0
+    assert generated["reward_signal"] < 2.5
+
+
 def test_adaptive_budget_scheduler_warmup_then_exploits_high_reward_arm():
     scheduler = AdaptiveBudgetScheduler(
         [
@@ -171,6 +191,135 @@ def test_adaptive_budget_scheduler_warmup_then_exploits_high_reward_arm():
     assert snapshot["b"]["mean_reward"] > snapshot["a"]["mean_reward"]
 
 
+def test_adaptive_budget_scheduler_reward_signal_prefers_repeated_stable_arm_over_single_spike():
+    scheduler = AdaptiveBudgetScheduler(
+        [
+            {"arm_id": "spiky", "target_suite": "core", "preset": "baseline", "seed": 1},
+            {"arm_id": "stable", "target_suite": "dataframe", "preset": "baseline", "seed": 1001},
+        ],
+        total_cases_budget=20,
+        total_duration_budget_s=None,
+        config=AdaptiveScheduleConfig(
+            batch_cases=1,
+            warmup_batches=1,
+            exploration_weight=0.0,
+            freshness_weight=0.0,
+            stale_penalty=0.5,
+            group_fairness_weight=0.0,
+        ),
+    )
+
+    spiky = scheduler.next_batch()
+    assert spiky.arm_id == "spiky"
+    scheduler.record_result(
+        spiky,
+        BatchObservation(
+            cases=1,
+            elapsed_s=0.1,
+            throughput_cases_s=10.0,
+            findings=0,
+            candidate_bug_cases=0,
+            signal_new_behavior_cases=0,
+            quality_oracle_count=1,
+            quality_pass_count=1,
+            quality_fail_count=0,
+            quality_score_total=400.0,
+        ),
+        next_seed=2,
+    )
+
+    stable = scheduler.next_batch()
+    assert stable.arm_id == "stable"
+    scheduler.record_result(
+        stable,
+        BatchObservation(
+            cases=1,
+            elapsed_s=0.1,
+            throughput_cases_s=10.0,
+            findings=0,
+            candidate_bug_cases=0,
+            signal_new_behavior_cases=1,
+            quality_oracle_count=3,
+            quality_pass_count=3,
+            quality_fail_count=0,
+            quality_score_total=6.0,
+            productive_mutation_cases=1,
+            feedback_mutation_cases=1,
+            guided_productive_cases=1,
+            source_reward_adjustment_total=1.5,
+            guidance_reward_adjustment_total=0.5,
+            seed_schedule_delta_total=4.0,
+        ),
+        next_seed=1002,
+    )
+
+    for next_seed in (1003, 1004):
+        stable = scheduler.next_batch()
+        assert stable.arm_id == "stable"
+        scheduler.record_result(
+            stable,
+            BatchObservation(
+                cases=1,
+                elapsed_s=0.1,
+                throughput_cases_s=10.0,
+                findings=0,
+                candidate_bug_cases=0,
+                signal_new_behavior_cases=1,
+                quality_oracle_count=3,
+                quality_pass_count=3,
+                quality_fail_count=0,
+                quality_score_total=6.0,
+                productive_mutation_cases=1,
+                feedback_mutation_cases=1,
+                guided_productive_cases=1,
+                source_reward_adjustment_total=1.5,
+                guidance_reward_adjustment_total=0.5,
+                seed_schedule_delta_total=4.0,
+            ),
+            next_seed=next_seed,
+        )
+
+    snapshot = {row["arm_id"]: row for row in scheduler.snapshot()}
+
+    assert snapshot["spiky"]["mean_reward"] > snapshot["stable"]["mean_reward"]
+    assert snapshot["stable"]["reward_signal"] > snapshot["spiky"]["reward_signal"]
+    assert scheduler.next_batch().arm_id == "stable"
+
+
+def test_adaptive_budget_scheduler_carries_closed_loop_state_between_batches():
+    scheduler = AdaptiveBudgetScheduler(
+        [
+            {"arm_id": "a", "target_suite": "core", "preset": "guided", "seed": 1},
+        ],
+        total_cases_budget=2,
+        total_duration_budget_s=None,
+        config=AdaptiveScheduleConfig(batch_cases=1, warmup_batches=1, exploration_weight=0.0),
+    )
+
+    first = scheduler.next_batch()
+    assert first.job["persist_closed_loop_state"] is True
+    assert "closed_loop_state" not in first.job
+
+    scheduler.record_result(
+        first,
+        BatchObservation(
+            cases=1,
+            elapsed_s=0.1,
+            throughput_cases_s=10.0,
+            findings=0,
+            candidate_bug_cases=0,
+            new_behavior_cases=1,
+        ),
+        next_seed=2,
+        closed_loop_state={"seen_signatures": ["disc-a"]},
+    )
+
+    second = scheduler.next_batch()
+    assert second.job["persist_closed_loop_state"] is True
+    assert second.job["closed_loop_state"] == {"seen_signatures": ["disc-a"]}
+    assert scheduler.snapshot()[0]["closed_loop_state_present"] is True
+
+
 def test_adaptive_budget_scheduler_next_round_uses_unique_arms_and_reserved_budget():
     scheduler = AdaptiveBudgetScheduler(
         [
@@ -191,6 +340,53 @@ def test_adaptive_budget_scheduler_next_round_uses_unique_arms_and_reserved_budg
     assert scheduler.has_budget() is False
 
 
+def test_adaptive_budget_scheduler_rebalances_underrepresented_groups():
+    scheduler = AdaptiveBudgetScheduler(
+        [
+            {"arm_id": "core-a", "target_suite": "core", "preset": "baseline", "seed": 1},
+            {"arm_id": "core-b", "target_suite": "core", "preset": "baseline", "seed": 101},
+            {"arm_id": "df-a", "target_suite": "dataframe", "preset": "baseline", "seed": 1001},
+            {"arm_id": "df-b", "target_suite": "dataframe", "preset": "baseline", "seed": 1101},
+        ],
+        total_cases_budget=24,
+        total_duration_budget_s=None,
+        config=AdaptiveScheduleConfig(
+            batch_cases=1,
+            warmup_batches=1,
+            exploration_weight=0.0,
+            group_fairness_weight=0.0,
+            max_group_pull_gap=3,
+        ),
+    )
+
+    # Warm up every arm once.
+    warmup_batches = [scheduler.next_batch() for _ in range(4)]
+    assert {batch.arm_id for batch in warmup_batches} == {"core-a", "core-b", "df-a", "df-b"}
+    for batch in warmup_batches:
+        scheduler.record_result(
+            batch,
+            BatchObservation(
+                cases=1,
+                elapsed_s=0.1,
+                throughput_cases_s=10.0,
+                findings=0,
+                candidate_bug_cases=0,
+                new_behavior_cases=0,
+            ),
+            next_seed=batch.seed + 1,
+        )
+
+    # Simulate a productive streak that over-concentrated the dataframe group.
+    dominant = scheduler.arms["df-a"]
+    dominant.pulls += 3
+    dominant.total_reward += 12.0
+    dominant.last_reward = 4.0
+    scheduler.total_batches_completed += 3
+
+    rebalanced = scheduler.next_batch()
+    assert rebalanced.group_key == "core:baseline"
+
+
 def test_summarize_batch_run_counts_scheduler_signals(tmp_path: Path):
     run_file = tmp_path / "run-scheduler.jsonl"
     append_jsonl(
@@ -199,6 +395,23 @@ def test_summarize_batch_run_counts_scheduler_signals(tmp_path: Path):
             "case_index": 0,
             "elapsed_s": 0.1,
             "is_new_behavior": True,
+            "signal_new_behavior": False,
+            "candidate_source": "feedback_mutation",
+            "stored_in_feedback_corpus": True,
+            "feedback_summary": {
+                "candidate_source": "feedback_mutation",
+                "stored_in_feedback_corpus": True,
+                "quality_oracle_count": 3,
+                "quality_pass_count": 3,
+                "quality_fail_count": 0,
+                "quality_score_total": 5.5,
+                "source_reward_adjustment": 0.4,
+                "guidance_reward_adjustment": 0.25,
+                "seed_schedule_delta": 3.6,
+                "mutation_oracle_verdict": "productive_mutation",
+                "feedback_oracle_verdict": "finding_yield",
+                "guidance_oracle_verdict": "guided_productive",
+            },
             "findings": [
                 {
                     "root_cause": "grouped_topk_null_sort_key",
@@ -279,7 +492,19 @@ def test_summarize_batch_run_counts_scheduler_signals(tmp_path: Path):
     assert observation.false_positive_count == 1
     assert observation.needs_confirmation_count == 1
     assert observation.new_behavior_cases == 1
+    assert observation.signal_new_behavior_cases == 0
     assert observation.throughput_cases_s == 6.0
     assert observation.first_candidate_bug_case_index == 0
     assert observation.first_candidate_bug_elapsed_s == 0.1
     assert observation.candidate_bug_discovery_auc == 1.0
+    assert observation.feedback_case_count == 4
+    assert observation.feedback_mutation_cases == 1
+    assert observation.stored_in_feedback_corpus_cases == 1
+    assert observation.quality_oracle_count == 3
+    assert observation.quality_pass_count == 3
+    assert observation.source_reward_adjustment_total == 0.4
+    assert observation.guidance_reward_adjustment_total == 0.25
+    assert observation.seed_schedule_delta_total == 2.85
+    assert observation.productive_mutation_cases == 1
+    assert observation.feedback_finding_yield_cases == 1
+    assert observation.guided_productive_cases == 1

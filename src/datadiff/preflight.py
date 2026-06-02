@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any
 
 from datadiff.classification_oracle import validate_case_program
@@ -19,9 +19,13 @@ class PreflightResult:
     errors_after: list[str]
 
     def to_dict(self) -> dict[str, Any]:
-        data = asdict(self)
-        data.pop("case", None)
-        return data
+        return {
+            "valid": self.valid,
+            "repaired": self.repaired,
+            "fallback_used": self.fallback_used,
+            "errors_before": list(self.errors_before),
+            "errors_after": list(self.errors_after),
+        }
 
 
 def preflight_case(

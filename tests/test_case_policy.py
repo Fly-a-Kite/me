@@ -1,6 +1,21 @@
+import re
+from pathlib import Path
+
 from datadiff.case_policy import case_discovery_origin, replay_bug_filter_reason
 from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES
 from datadiff.datagen import generate_case
+
+
+def test_default_replay_sources_cover_all_declared_datagen_source_issues():
+    datagen_path = Path(__file__).resolve().parents[1] / "src" / "datadiff" / "datagen.py"
+    declared_sources = set(
+        re.findall(
+            r"https://github.com/[^\"\\]+/issues/\d+",
+            datagen_path.read_text(encoding="utf-8"),
+        )
+    )
+
+    assert declared_sources.issubset(set(DEFAULT_REPLAY_BUG_SOURCE_ISSUES))
 
 
 def test_replay_policy_is_shared_across_target_projects():

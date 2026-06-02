@@ -1,0 +1,171 @@
+{
+  "backends": [
+    "pandas",
+    "duckdb",
+    "datafusion"
+  ],
+  "bug_audit": {
+    "candidate_bug_families": [
+      "polars_reflected_arithmetic_operand_order@polars",
+      "polars_vector_division_rounding@polars",
+      "pyarrow_sliced_bool_groupby_any_all@pyarrow"
+    ],
+    "issue_files": [
+      "new_issue/generated/polars_reflected_arithmetic_operand_order.md",
+      "new_issue/generated/polars_vector_division_rounding.md",
+      "new_issue/generated/pyarrow_sliced_bool_groupby_any_all.md"
+    ],
+    "output_json": "reports/bug-audit-20260526T141720.json",
+    "output_markdown": "reports/bug-audit-20260526T141720.md",
+    "skipped": false
+  },
+  "cases": 1800,
+  "classification": {
+    "candidate_bug_families": {
+      "negative_zero_comparison@datafusion": 1
+    },
+    "examples": {
+      "candidate_implementation_bug": [
+        {
+          "case_id": "case-00994133-bughunt-no-groupby",
+          "evidence": "Independent DSL reference agrees with ['duckdb', 'pandas'] and disagrees with ['datafusion'].",
+          "kind": "semantic_output_mismatch",
+          "root": "negative_zero_comparison",
+          "seed": 994133,
+          "signature": "0ec080448c5fddf7",
+          "suspicious": [
+            "datafusion"
+          ]
+        }
+      ]
+    },
+    "false_positive_reasons": {},
+    "fresh_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {
+      "negative_zero_comparison@datafusion": 1
+    },
+    "known_saturated_reference_count": 14,
+    "refresh": false,
+    "run_file": "runs/run-20260526T141720-1779805040215945919.jsonl.gz",
+    "triage_verdicts": {
+      "candidate_implementation_bug": 1
+    }
+  },
+  "config": {
+    "artifact_limit": null,
+    "candidate_recheck_count": 2,
+    "compress_run_log": true,
+    "enable_artifact": true,
+    "enable_differential_oracle": true,
+    "enable_family_saturation": true,
+    "enable_feedback": true,
+    "enable_local_source_scheduler": true,
+    "enable_metamorphic_oracle": false,
+    "enable_normalizer": true,
+    "enable_preflight_repair": true,
+    "enable_preflight_validation": true,
+    "enable_reducer": false,
+    "enable_replay_bug": false,
+    "enable_type_aware_generation": true,
+    "family_saturation_penalty": 6.0,
+    "family_saturation_threshold": 4,
+    "feedback_max_cases_per_profile": 6,
+    "feedback_persist_limit": 4096,
+    "generator_profile": "bughunt_no_groupby",
+    "guidance_candidate_pool": 12,
+    "guidance_strategy": "guided",
+    "guidance_targets": [
+      "common_workflow",
+      "operation_combo",
+      "join",
+      "mutate",
+      "filter",
+      "truth_filter",
+      "nulls",
+      "strings",
+      "numeric",
+      "casts",
+      "expressions",
+      "sort",
+      "set_membership_filter",
+      "null_predicate_filter",
+      "boolean_predicate_filter",
+      "tuple_absence_filter",
+      "row_value_absence_filter",
+      "datafusion_setop_all_duplicate_count",
+      "setop_all_duplicate_probe",
+      "setop_all_duplicates",
+      "running_sum_precision",
+      "running_sum",
+      "partitioned_running_sum",
+      "running_sum_partitioned",
+      "path_basename_keyed_pick",
+      "path_projection",
+      "keyed_row_pick",
+      "sortedness_null_placement",
+      "sortedness"
+    ],
+    "issue_inspired_source_saturation_penalty": 1.25,
+    "issue_inspired_source_saturation_threshold": 3,
+    "issue_replay_global_saturation_penalty": 2.0,
+    "issue_replay_global_saturation_threshold": 2,
+    "issue_replay_saturation_penalty": 1.0,
+    "issue_replay_saturation_threshold": 1,
+    "known_saturated_bug_families": [
+      "csv_long_numeric_roundtrip@duckdb",
+      "csv_long_numeric_roundtrip@pyarrow",
+      "groupby_aggregation@datafusion",
+      "grouped_topk_null_sort_key@datafusion",
+      "joined_order_offset_projection@datafusion",
+      "negative_zero_comparison@datafusion",
+      "ordered_topk_projection@datafusion",
+      "outer_join_truth_filter@datafusion",
+      "polars_reflected_arithmetic_operand_order@polars",
+      "polars_vector_division_rounding@polars",
+      "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+      "topk_filter_pushdown@datafusion",
+      "reverse_division_operand_order@polars",
+      "tuple_absence_null_filter@duckdb"
+    ],
+    "local_source_exploration_weight": 0.45,
+    "log_level": "compact",
+    "metamorphic_variant_limit": 4,
+    "oracle_mode": "differential",
+    "persist_feedback_corpus": false,
+    "replay_bug_source_issues": [
+      "https://github.com/apache/datafusion/issues/22190",
+      "https://github.com/apache/datafusion/issues/22489",
+      "https://github.com/apache/datafusion/issues/22441",
+      "https://github.com/apache/datafusion/issues/12956",
+      "https://github.com/apache/datafusion/issues/12955",
+      "https://github.com/duckdb/duckdb/issues/3015",
+      "https://github.com/duckdb/duckdb/issues/11261",
+      "https://github.com/duckdb/duckdb/issues/22075",
+      "https://github.com/duckdb/duckdb/issues/22656",
+      "https://github.com/duckdb/duckdb/issues/22837",
+      "https://github.com/duckdb/duckdb/issues/22849",
+      "https://github.com/duckdb/duckdb/issues/22750",
+      "https://github.com/apache/arrow/issues/32171",
+      "https://github.com/apache/arrow/issues/42231"
+    ],
+    "saturated_family_reward": 0.0
+  },
+  "duration": null,
+  "fuzz_run": {
+    "csv": "reports/findings-run-20260526T141720-1779805040215945919.csv",
+    "report": "reports/report-run-20260526T141720-1779805040215945919.md",
+    "run_file": "runs/run-20260526T141720-1779805040215945919.jsonl.gz"
+  },
+  "generated_at": "2026-05-26T14:19:51Z",
+  "generated_by": "datadiff bug-hunt",
+  "preset": "live_datafusion_fresh",
+  "schema_version": "bug-hunt-v1",
+  "seed": 994001,
+  "target_suite": "datafusion_cross",
+  "workflow": [
+    "deterministic_bug_audit",
+    "fresh_guided_fuzz",
+    "run_report",
+    "candidate_classification"
+  ]
+}

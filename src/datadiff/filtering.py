@@ -6,9 +6,10 @@ from numbers import Real
 from typing import Any
 
 BASE_FILTER_COMPARATORS = (">", ">=", "<", "<=", "==", "!=")
-SET_FILTER_COMPARATORS = ("in_set",)
+SET_FILTER_COMPARATORS = ("in_set", "not_in_set")
 NULL_FILTER_COMPARATORS = ("is_null", "is_not_null")
 RANGE_FILTER_COMPARATORS = ("range_closed",)
+STRING_FILTER_COMPARATORS = ("str_contains", "str_starts_with", "str_ends_with")
 BOOLEAN_FILTER_COMPARATORS = (
     "bool_is_true",
     "bool_is_not_true",
@@ -52,6 +53,7 @@ FILTER_COMPARATORS = frozenset(
     + SET_FILTER_COMPARATORS
     + NULL_FILTER_COMPARATORS
     + RANGE_FILTER_COMPARATORS
+    + STRING_FILTER_COMPARATORS
     + BOOLEAN_FILTER_COMPARATORS
 )
 
@@ -71,6 +73,8 @@ def parse_filter_comparator(raw: Any) -> FilterComparator | None:
     if comparator in NULL_FILTER_COMPARATORS:
         return FilterComparator(comparator)
     if comparator in RANGE_FILTER_COMPARATORS:
+        return FilterComparator(comparator)
+    if comparator in STRING_FILTER_COMPARATORS:
         return FilterComparator(comparator)
     if comparator in BOOLEAN_FILTER_COMPARATORS:
         return FilterComparator("bool_predicate", comparator.removeprefix("bool_"))
@@ -97,6 +101,8 @@ def filter_comparator_supports_type(column_type: str, raw: Any) -> bool:
         return parsed.truth_test is None and column_type in {"int", "float", "str", "bool"}
     if parsed.base in RANGE_FILTER_COMPARATORS:
         return parsed.truth_test is None and column_type in {"int", "float"}
+    if parsed.base in STRING_FILTER_COMPARATORS:
+        return parsed.truth_test is None and column_type == "str"
     if parsed.base == "bool_predicate":
         return column_type == "bool" and parsed.truth_test in TRUTH_TESTS
     if column_type in {"str", "bool"}:
@@ -114,6 +120,12 @@ def evaluate_filter_predicate(left: Any, raw: Any, right: Any) -> bool:
         if not isinstance(right, (list, tuple, frozenset, set)):
             raise ValueError("in_set literal must be a collection")
         return left in right
+    if parsed.base == "not_in_set":
+        if _is_nullish_scalar(left):
+            return False
+        if not isinstance(right, (list, tuple, frozenset, set)):
+            raise ValueError("not_in_set literal must be a collection")
+        return left not in right
     if parsed.base == "is_null":
         return _is_nullish_scalar(left)
     if parsed.base == "is_not_null":
@@ -121,6 +133,24 @@ def evaluate_filter_predicate(left: Any, raw: Any, right: Any) -> bool:
     if parsed.base == "range_closed":
         lower, upper = _range_bounds(right)
         return _compare_three_valued(left, ">=", lower) is True and _compare_three_valued(left, "<=", upper) is True
+    if parsed.base == "str_contains":
+        if _is_nullish_scalar(left):
+            return False
+        if not isinstance(left, str) or not isinstance(right, str) or right == "":
+            raise ValueError("string pattern comparators require a non-empty string literal and string values")
+        return right in left
+    if parsed.base == "str_starts_with":
+        if _is_nullish_scalar(left):
+            return False
+        if not isinstance(left, str) or not isinstance(right, str) or right == "":
+            raise ValueError("string pattern comparators require a non-empty string literal and string values")
+        return left.startswith(right)
+    if parsed.base == "str_ends_with":
+        if _is_nullish_scalar(left):
+            return False
+        if not isinstance(left, str) or not isinstance(right, str) or right == "":
+            raise ValueError("string pattern comparators require a non-empty string literal and string values")
+        return left.endswith(right)
     if parsed.base == "bool_predicate":
         return _apply_truth_test(_bool_three_valued(left), parsed.truth_test or "")
     comparison = _compare_three_valued(left, parsed.base, right)
@@ -135,6 +165,8 @@ def sql_filter_condition(column_sql: str, literal_sql: str, raw: Any) -> str:
         raise ValueError(raw)
     if parsed.base == "in_set":
         return f"{column_sql} IN {literal_sql}"
+    if parsed.base == "not_in_set":
+        return f"{column_sql} IS NOT NULL AND {column_sql} NOT IN {literal_sql}"
     if parsed.base == "is_null":
         return f"{column_sql} IS NULL"
     if parsed.base == "is_not_null":
@@ -142,6 +174,15 @@ def sql_filter_condition(column_sql: str, literal_sql: str, raw: Any) -> str:
     if parsed.base == "range_closed":
         lower_sql, upper_sql = _range_bounds_sql(literal_sql)
         return f"{column_sql} BETWEEN {lower_sql} AND {upper_sql}"
+    if parsed.base == "str_contains":
+        return f"instr({column_sql}, {literal_sql}) > 0"
+    if parsed.base == "str_starts_with":
+        return f"substr({column_sql}, 1, length({literal_sql})) = {literal_sql}"
+    if parsed.base == "str_ends_with":
+        return (
+            f"substr({column_sql}, length({column_sql}) - length({literal_sql}) + 1, "
+            f"length({literal_sql})) = {literal_sql}"
+        )
     if parsed.base == "bool_predicate":
         truth_test = parsed.truth_test
         if truth_test == "is_true":
@@ -232,6 +273,9 @@ def _bool_three_valued(value: Any) -> bool | None:
         return None
     if isinstance(value, bool):
         return value
+    cls = type(value)
+    if cls.__module__.startswith("numpy") and cls.__name__ in {"bool", "bool_"}:
+        return bool(value)
     return None
 
 

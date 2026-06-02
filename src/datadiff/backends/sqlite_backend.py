@@ -4,8 +4,43 @@ import time
 from typing import Any
 
 from datadiff.backends.base import Backend, BackendResult
+from datadiff.backends.dataframe_semantics import running_sum_plan, tuple_absence_plan
+from datadiff.backends.probe_semantics import EXTENDED_FALSE_PROBE_KINDS
+from datadiff.backends.sql_lowering import (
+    SqlDialect,
+    render_aggregate_sql,
+    render_case_when_expr,
+    render_coalesce_expr,
+    render_fill_null_expr,
+    render_groupby_sql,
+    render_mutate_expr,
+)
+from datadiff.backends.sql_runtime import build_subquery_runtime
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
 from datadiff.filtering import sql_filter_condition
+from datadiff.join_keys import join_key_pairs
+from datadiff.operation_semantics import (
+    aggregate_column,
+    aggregate_alias,
+    aggregate_func,
+    aggregate_specs,
+    case_else_value,
+    case_then_value,
+    expr_kind,
+    expr_target_type,
+    groupby_keys,
+    is_default_false_probe_kind,
+    op_ascending,
+    op_column,
+    op_columns,
+    op_comparator,
+    op_kind,
+    op_n,
+    op_nulls,
+    op_output_alias,
+    op_table,
+    op_value,
+)
 from datadiff.pathing import path_basename
 from datadiff.running import running_sum_partition_columns, running_sum_sort_keys
 from datadiff.sortedness import is_sorted_values
@@ -47,13 +82,6 @@ def _sql_type(kind: str) -> str:
     return "TEXT"
 
 
-def _replace_projection(cols: list[str], column: str, expr_sql: str) -> tuple[str, list[str]]:
-    kept_cols = [col for col in cols if col != column]
-    select_parts = [f"q.{_quote(col)}" for col in kept_cols]
-    select_parts.append(f"{expr_sql} AS {_quote(column)}")
-    return ", ".join(select_parts), kept_cols + [column]
-
-
 def _order_clause(sort_keys: list[SortKey]) -> str:
     # Use an explicit discriminator so SQLite follows the common DSL null
     # placement independently of its default ORDER BY behavior.
@@ -86,38 +114,95 @@ def _agg_expr(column: str, func: str) -> str:
     return f"{sql_func}({quoted})"
 
 
-def _agg_result_type(column_types: dict[str, str], agg: dict[str, Any]) -> str:
-    func = str(agg.get("func", ""))
+SQLITE_DIALECT = SqlDialect(
+    float_cast_type="REAL",
+    int_cast_type="INTEGER",
+    str_cast_type="TEXT",
+    string_slice_fn="SUBSTR",
+    string_startswith_fn=lambda source, needle: (
+        f"CASE WHEN {source} IS NULL THEN NULL ELSE SUBSTR({source}, 1, LENGTH({needle})) = {needle} END"
+    ),
+    string_endswith_fn=lambda source, needle: (
+        f"CASE WHEN {source} IS NULL THEN NULL ELSE SUBSTR({source}, LENGTH({source}) - LENGTH({needle}) + 1, LENGTH({needle})) = {needle} END"
+    ),
+    date_part_spans={"year": (1, 4), "month": (6, 2), "day": (9, 2)},
+    basename_sql=lambda source: f"__datadiff_basename({source})",
+    split_part_sql=lambda source, sep, _index: (
+        f"CASE WHEN {source} IS NULL THEN NULL "
+        f"WHEN INSTR({source}, {sep}) > 0 THEN SUBSTR({source}, 1, INSTR({source}, {sep}) - 1) "
+        f"ELSE {source} END"
+    ),
+    division_sql=lambda source, value: f"1.0 * {source} / {value}",
+    reverse_division_sql=lambda numerator, source: f"1.0 * {numerator} / {source}",
+)
+
+
+def _join_condition(op: dict[str, Any]) -> str:
+    left_keys, right_keys = join_key_pairs(op)
+    return " AND ".join(f"q.{_quote(left)} = r.{_quote(right)}" for left, right in zip(left_keys, right_keys))
+
+
+def _semi_anti_join_condition(op: dict[str, Any], kind: str) -> str:
+    left_keys, right_keys = join_key_pairs(op)
+    predicates = [
+        *(f"r.{_quote(right)} IS NOT NULL" for right in right_keys),
+        *(f"q.{_quote(left)} = r.{_quote(right)}" for left, right in zip(left_keys, right_keys)),
+    ]
+    exists_sql = f"EXISTS (SELECT 1 FROM {_quote(op_table(op))} r WHERE {' AND '.join(predicates)})"
+    return exists_sql if kind == "semi_join" else f"NOT {exists_sql}"
+
+
+def _agg_result_type(column_types: dict[str, str], agg: Any) -> str:
+    func = aggregate_func(agg)
     if func in {"count", "nunique"}:
         return "int"
     if func in {"any", "all"}:
         return "bool"
     if func == "mean":
         return "float"
-    return column_types.get(str(agg.get("column", "")), "float")
+    return column_types.get(aggregate_column(agg), "float")
+
+
+def _case_when_sqlite_type(then_value: Any, else_value: Any) -> str:
+    values = [then_value, else_value]
+    if all(isinstance(value, bool) for value in values):
+        return "bool"
+    if all(isinstance(value, int) and not isinstance(value, bool) for value in values):
+        return "int"
+    if all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in values):
+        return "float"
+    return "str"
+
+
+def _dataframe_preserving_sqlite_scalars(pd: Any, rows: list[tuple[Any, ...]], columns: list[str]):
+    # A nullable INTEGER result must not be inferred as float64 before normalization:
+    # values above 2**53 would then be irreversibly rounded.
+    return pd.DataFrame(rows, columns=columns, dtype=object)
 
 
 def _tuple_absence_native_condition(op: dict[str, Any]) -> str:
-    left_sql = ", ".join(f"q.{_quote(column)}" for column in op["columns"])
-    right_sql = ", ".join(_quote(column) for column in op["right_columns"])
-    return f"({left_sql}) NOT IN (SELECT {right_sql} FROM {_quote(op['table'])})"
+    right_table, left_columns, right_columns = tuple_absence_plan(op)
+    left_sql = ", ".join(f"q.{_quote(column)}" for column in left_columns)
+    right_sql = ", ".join(_quote(column) for column in right_columns)
+    return f"({left_sql}) NOT IN (SELECT {right_sql} FROM {_quote(right_table)})"
 
 
 def _running_sum_projection(cols: list[str], op: dict[str, Any]) -> tuple[str, list[str]]:
-    kept_cols = [col for col in cols if col != op["column"]]
+    plan = running_sum_plan(op)
+    kept_cols = [col for col in cols if col != plan.column]
     select_parts = [f"q.{_quote(col)}" for col in kept_cols]
-    order_sql = _order_clause(normalize_sort_keys({"keys": op["order_by"]}))
+    order_sql = _order_clause(running_sum_sort_keys(op))
     partition_columns = running_sum_partition_columns(op)
     partition_sql = ""
     if partition_columns:
         partition_sql = "PARTITION BY " + ", ".join(f"q.{_quote(column)}" for column in partition_columns) + " "
     expr_sql = (
-        f"SUM(CAST(q.{_quote(op['source'])} AS REAL)) OVER ("
+        f"SUM(CAST(q.{_quote(plan.source)} AS REAL)) OVER ("
         f"{partition_sql}ORDER BY {order_sql} ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"
-        f") AS {_quote(op['column'])}"
+        f") AS {_quote(plan.column)}"
     )
     select_parts.append(expr_sql)
-    return ", ".join(select_parts), kept_cols + [op["column"]]
+    return ", ".join(select_parts), kept_cols + [plan.column]
 
 
 def _row_number_window_sql(op: dict[str, Any]) -> str:
@@ -129,11 +214,12 @@ def _row_number_window_sql(op: dict[str, Any]) -> str:
 
 
 def _row_number_filter_condition(op: dict[str, Any], column: str) -> str:
-    comparator = {"==": "=", "<": "<", "<=": "<="}[str(op.get("cmp", "=="))]
-    return f"{_quote(column)} {comparator} {int(op.get('value', 1))}"
+    comparator = {"==": "=", "<": "<", "<=": "<="}[op_comparator(op, "==")]
+    return f"{_quote(column)} {comparator} {int(op_value(op) or 1)}"
 
 
 def _scalar_subquery_probe_sql(op: dict[str, Any]) -> str:
+    alias = op_output_alias(op)
     return (
         "WITH tenk1(unique1, unique2, two, four, ten, twenty, hundred, thousand) AS ("
         "VALUES (1,1,1,1,1,1,1,1), (2,2,2,2,2,2,2,2)"
@@ -141,7 +227,7 @@ def _scalar_subquery_probe_sql(op: dict[str, Any]) -> str:
         "SELECT (SELECT max((SELECT i.unique2 FROM tenk1 i WHERE i.unique1 = o.unique1))) AS probe_value "
         "FROM tenk1 o"
         ") "
-        f"SELECT NOT (COUNT(*) = 1 AND MIN(probe_value) = 2 AND MAX(probe_value) = 2) AS {_quote(op['as'])} "
+        f"SELECT NOT (COUNT(*) = 1 AND MIN(probe_value) = 2 AND MAX(probe_value) = 2) AS {_quote(alias)} "
         "FROM got"
     )
 
@@ -170,419 +256,235 @@ class SQLiteBackend(Backend):
                         [[row.get(c) for c in cols] for row in table.rows],
                     )
             query = "SELECT * FROM t0"
-            pending_order: list[SortKey] | None = None
-            visible_cols = list(current_cols)
-            hidden_order_cols: list[str] = []
+            runtime = build_subquery_runtime(
+                query,
+                current_cols,
+                quote=_quote,
+                order_clause=_order_clause,
+            )
+
+            def _reset_probe_query(alias: str, query_sql: str) -> None:
+                nonlocal query
+                query = runtime.assign_source(query_sql)
+                runtime.reset_source(query_sql, alias)
 
             def visible_projection() -> str:
-                return ", ".join(f"q.{_quote(col)}" for col in visible_cols)
+                return runtime.visible_projection()
 
             def drop_hidden_order_cols() -> None:
-                nonlocal query, current_cols, hidden_order_cols
-                if not hidden_order_cols:
-                    return
-                query = f"SELECT {visible_projection()} FROM ({query}) q"
-                current_cols = list(visible_cols)
-                hidden_order_cols = []
+                nonlocal query
+                if runtime.drop_hidden_order_cols():
+                    query = runtime.source
 
             def materialize_visible_query():
-                if pending_order is not None:
-                    body = (
-                        f"SELECT {visible_projection()} FROM ({query}) q "
-                        f"ORDER BY {_order_clause(pending_order)}"
-                    )
-                else:
-                    drop_hidden_order_cols()
-                    body = f"SELECT {visible_projection()} FROM ({query}) q"
+                body = runtime.materialize_sql()
                 cur = con.execute(body)
                 columns = [desc[0] for desc in cur.description]
-                return pd.DataFrame(cur.fetchall(), columns=columns)
+                return _dataframe_preserving_sqlite_scalars(pd, cur.fetchall(), columns)
 
             def select_with_pending_order(cols: list[str]) -> str:
-                nonlocal pending_order, hidden_order_cols
-                if pending_order is None:
-                    return ", ".join(f"q.{_quote(c)}" for c in cols)
-                projection = [f"q.{_quote(c)}" for c in cols]
-                selected = set(cols)
-                updated_order: list[SortKey] = []
-                for idx, key in enumerate(pending_order):
-                    if key.column in selected:
-                        updated_order.append(key)
-                        continue
-                    hidden = (
-                        key.column
-                        if key.column in hidden_order_cols
-                        else f"__datadiff_order_{len(hidden_order_cols)}_{idx}"
-                    )
-                    if hidden not in hidden_order_cols:
-                        projection.append(f"q.{_quote(key.column)} AS {_quote(hidden)}")
-                        hidden_order_cols.append(hidden)
-                    else:
-                        projection.append(f"q.{_quote(hidden)}")
-                    updated_order.append(SortKey(hidden, key.ascending, key.nulls))
-                pending_order = updated_order
-                return ", ".join(projection)
+                return runtime.select_with_pending_order(cols)
+
+            def freeze_pending_order() -> None:
+                nonlocal query
+                if runtime.freeze_pending_order():
+                    query = runtime.source
 
             for op in program.operations:
-                kind = op["op"]
+                kind = op_kind(op)
                 if kind == "join":
                     drop_hidden_order_cols()
-                    right = table_by_name[op["table"]]
+                    right = table_by_name[op_table(op)]
+                    _, right_keys = join_key_pairs(op)
+                    right_key_set = set(right_keys)
                     right_cols = [
                         f"r.{_quote(c.name)} AS {_quote(c.name)}"
                         for c in right.columns
-                        if c.name != op["right_on"]
+                        if c.name not in right_key_set
                     ]
                     select_right = ", " + ", ".join(right_cols) if right_cols else ""
                     join_kind = "LEFT JOIN" if op["how"] == "left" else "INNER JOIN"
-                    query = (
+                    query = runtime.assign_source(
                         f"SELECT q.*{select_right} FROM ({query}) q {join_kind} {_quote(right.name)} r "
-                        f"ON q.{_quote(op['left_on'])} = r.{_quote(op['right_on'])}"
+                        f"ON {_join_condition(op)}"
                     )
-                    current_cols.extend(
+                    runtime.state.current_cols.extend(
                         c.name
                         for c in right.columns
-                        if c.name != op["right_on"] and c.name not in current_cols
+                        if c.name not in right_key_set and c.name not in runtime.state.current_cols
                     )
-                    visible_cols = list(current_cols)
-                    pending_order = None
+                    runtime.state.visible_cols = list(runtime.state.current_cols)
+                    runtime.state.pending_order = None
+                elif kind == "union_all":
+                    drop_hidden_order_cols()
+                    right_projection = ", ".join(_quote(col) for col in runtime.state.visible_cols)
+                    query = runtime.assign_source(
+                        f"SELECT {visible_projection()} FROM ({query}) q "
+                        f"UNION ALL SELECT {right_projection} FROM {_quote(op_table(op))}"
+                    )
+                    runtime.state.current_cols = list(runtime.state.visible_cols)
+                    runtime.state.pending_order = None
+                elif kind in {"semi_join", "anti_join"}:
+                    condition = _semi_anti_join_condition(op, kind)
+                    query = runtime.assign_source(f"SELECT * FROM ({query}) q WHERE {condition}")
+                elif kind == "drop_nulls":
+                    condition = " AND ".join(f"q.{_quote(column)} IS NOT NULL" for column in op["columns"])
+                    query = runtime.assign_source(f"SELECT * FROM ({query}) q WHERE {condition}")
                 elif kind == "filter":
                     condition = sql_filter_condition(_quote(op["column"]), _lit(op["value"]), op["cmp"])
-                    query = (
+                    query = runtime.assign_source(
                         f"SELECT * FROM ({query}) q "
                         f"WHERE {condition}"
                     )
                 elif kind == "tuple_absence_filter":
-                    query = (
+                    query = runtime.assign_source(
                         f"SELECT * FROM ({query}) q "
                         f"WHERE {_tuple_absence_native_condition(op)}"
                     )
                 elif kind == "row_number_filter":
                     drop_hidden_order_cols()
                     ordinal_col = "__datadiff_row_number"
-                    query = (
+                    query = runtime.assign_source(
                         f"SELECT {visible_projection()} FROM ("
                         f"SELECT q.*, ROW_NUMBER() OVER ({_row_number_window_sql(op)}) AS {_quote(ordinal_col)} "
                         f"FROM ({query}) q"
                         f") q WHERE {_row_number_filter_condition(op, ordinal_col)}"
                     )
-                    current_cols = list(visible_cols)
-                    pending_order = [
+                    runtime.state.current_cols = list(runtime.state.visible_cols)
+                    runtime.state.pending_order = [
                         *(SortKey(column, True, "last") for column in row_number_partition_columns(op)),
                         *row_number_order_keys(op),
                     ]
                 elif kind == "running_sum":
                     drop_hidden_order_cols()
                     order_keys = running_sum_sort_keys(op)
-                    projection, current_cols = _running_sum_projection(current_cols, op)
-                    query = f"SELECT {projection} FROM ({query}) q"
-                    visible_cols = [col for col in visible_cols if col != op["column"]] + [op["column"]]
-                    pending_order = order_keys
+                    projection, runtime.state.current_cols = _running_sum_projection(runtime.state.current_cols, op)
+                    query = runtime.assign_source(f"SELECT {projection} FROM ({query}) q")
+                    out_column = op_column(op)
+                    runtime.state.visible_cols = [col for col in runtime.state.visible_cols if col != out_column] + [out_column]
+                    runtime.state.pending_order = order_keys
                 elif kind == "sortedness_check":
                     materialized = materialize_visible_query()
                     ok = is_sorted_values(
-                        materialized[op["column"]].tolist(),
-                        ascending=bool(op.get("ascending", True)),
-                        nulls=str(op.get("nulls", "last")),
+                        materialized[op_column(op)].tolist(),
+                        ascending=op_ascending(op),
+                        nulls=op_nulls(op),
                     )
-                    query = f"SELECT {1 if ok else 0} AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "random_case_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "group_quantile_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
+                    alias = op_output_alias(op)
+                    _reset_probe_query(alias, f"SELECT {1 if ok else 0} AS {_quote(alias)}")
+                    column_types[alias] = "bool"
                 elif kind == "scalar_subquery_probe":
-                    query = _scalar_subquery_probe_sql(op)
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "window_avg_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "struct_distinct_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "bit_compare_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "round_even_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "float_literal_precision_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "timestamp_precision_filter_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "series_rtruediv_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "uint64_isin_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "tuple_anti_null_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "setop_all_duplicate_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "json_predicate_order_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "sparse_mask_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "float_wrap_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "index_bool_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "empty_literal_groupby_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "arrow_string_eq_sum_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "arrow_timestamp_loc_slice_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "arrow_timestamp_index_attr_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "eval_inplace_alias_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "bool_reduction_skipna_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "dataset_isin_all_match_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "run_end_null_compute_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "large_string_partition_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "hash_pivot_wider_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "rolling_mean_by_null_count_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
-                elif kind == "csv_long_numeric_roundtrip_probe":
-                    query = f"SELECT 0 AS {_quote(op['as'])}"
-                    current_cols = [op["as"]]
-                    visible_cols = [op["as"]]
-                    column_types[op["as"]] = "bool"
-                    hidden_order_cols = []
-                    pending_order = None
+                    alias = op_output_alias(op)
+                    _reset_probe_query(alias, _scalar_subquery_probe_sql(op))
+                    column_types[alias] = "bool"
+                elif kind in EXTENDED_FALSE_PROBE_KINDS or is_default_false_probe_kind(kind):
+                    alias = op_output_alias(op)
+                    _reset_probe_query(alias, f"SELECT 0 AS {_quote(alias)}")
+                    column_types[alias] = "bool"
                 elif kind == "select":
-                    cols = list(op["columns"])
+                    cols = op_columns(op)
                     projection = select_with_pending_order(cols)
-                    query = f"SELECT {projection} FROM ({query}) q"
-                    visible_cols = cols
-                    current_cols = cols + [col for col in hidden_order_cols if col not in cols]
+                    query = runtime.assign_source(f"SELECT {projection} FROM ({query}) q")
+                elif kind == "distinct":
+                    drop_hidden_order_cols()
+                    cols = op_columns(op)
+                    projection = ", ".join(f"q.{_quote(c)}" for c in cols)
+                    query = runtime.assign_source(f"SELECT DISTINCT {projection} FROM ({query}) q")
+                    runtime.state.reset_projection(cols)
+                    column_types = {column: column_types[column] for column in cols if column in column_types}
+                elif kind == "fill_null":
+                    column, expr_sql = render_fill_null_expr(op, _quote, _lit)
+                    if runtime.state.pending_order_mentions(column):
+                        freeze_pending_order()
+                    projection = runtime.state.replace_projection_expr(column, expr_sql, _quote)
+                    query = runtime.assign_source(f"SELECT {projection} FROM ({query}) q")
+                    runtime.state.replace_visible_column(column)
+                    if runtime.state.pending_order_mentions(column):
+                        runtime.state.clear_pending_order()
+                        drop_hidden_order_cols()
+                elif kind == "coalesce":
+                    alias, expr_sql = render_coalesce_expr(op, _quote, _lit)
+                    if runtime.state.pending_order_mentions(alias):
+                        freeze_pending_order()
+                    projection = runtime.state.replace_projection_expr(alias, expr_sql, _quote)
+                    query = runtime.assign_source(f"SELECT {projection} FROM ({query}) q")
+                    runtime.state.replace_visible_column(alias)
+                    sources = op_columns(op)
+                    column_types[alias] = column_types.get(str(sources[0]), "str") if sources else "str"
+                    if runtime.state.pending_order_mentions(alias):
+                        runtime.state.clear_pending_order()
+                        drop_hidden_order_cols()
+                elif kind == "case_when":
+                    alias, expr_sql = render_case_when_expr(op, _quote, _lit)
+                    if runtime.state.pending_order_mentions(alias):
+                        freeze_pending_order()
+                    projection = runtime.state.replace_projection_expr(alias, expr_sql, _quote)
+                    query = runtime.assign_source(f"SELECT {projection} FROM ({query}) q")
+                    runtime.state.replace_visible_column(alias)
+                    column_types[alias] = _case_when_sqlite_type(case_then_value(op), case_else_value(op))
+                    if runtime.state.pending_order_mentions(alias):
+                        runtime.state.clear_pending_order()
+                        drop_hidden_order_cols()
                 elif kind == "sort":
                     drop_hidden_order_cols()
-                    pending_order = normalize_sort_keys(op)
+                    runtime.state.pending_order = normalize_sort_keys(op)
                 elif kind == "limit":
-                    if pending_order is not None:
-                        query = (
+                    if runtime.state.pending_order is not None:
+                        query = runtime.assign_source(
                             f"SELECT * FROM ({query}) q "
-                            f"ORDER BY {_order_clause(pending_order)} LIMIT {int(op['n'])}"
+                            f"ORDER BY {_order_clause(runtime.state.pending_order)} LIMIT {op_n(op)}"
                         )
                     else:
-                        query = f"SELECT * FROM ({query}) q LIMIT {int(op['n'])}"
+                        query = runtime.assign_source(f"SELECT * FROM ({query}) q LIMIT {op_n(op)}")
                 elif kind == "offset":
-                    if pending_order is not None:
-                        query = (
+                    if runtime.state.pending_order is not None:
+                        query = runtime.assign_source(
                             f"SELECT * FROM ({query}) q "
-                            f"ORDER BY {_order_clause(pending_order)} LIMIT -1 OFFSET {int(op['n'])}"
+                            f"ORDER BY {_order_clause(runtime.state.pending_order)} LIMIT -1 OFFSET {op_n(op)}"
                         )
                     else:
-                        query = f"SELECT * FROM ({query}) q LIMIT -1 OFFSET {int(op['n'])}"
+                        query = runtime.assign_source(f"SELECT * FROM ({query}) q LIMIT -1 OFFSET {op_n(op)}")
                 elif kind == "mutate":
-                    expr = op["expr"]
-                    if expr["kind"] == "add_const":
-                        expr_sql = f"q.{_quote(expr['source'])} + {_lit(expr['value'])}"
-                    elif expr["kind"] == "arith_const":
-                        if expr["op"] == "div":
-                            expr_sql = f"1.0 * q.{_quote(expr['source'])} / {_lit(expr['value'])}"
-                        else:
-                            op_sql = {"sub": "-", "mul": "*", "mod": "%"}[expr["op"]]
-                            expr_sql = f"q.{_quote(expr['source'])} {op_sql} {_lit(expr['value'])}"
-                    elif expr["kind"] == "reverse_division_columns":
-                        expr_sql = f"1.0 * q.{_quote(expr['numerator'])} / q.{_quote(expr['source'])}"
-                    elif expr["kind"] == "cast" and expr["to"] == "float":
-                        expr_sql = f"CAST(q.{_quote(expr['source'])} AS REAL)"
-                    elif expr["kind"] == "string_length":
-                        expr_sql = f"LENGTH(q.{_quote(expr['source'])})"
-                    elif expr["kind"] == "string_lower":
-                        expr_sql = f"LOWER(q.{_quote(expr['source'])})"
-                    elif expr["kind"] == "string_basename":
-                        expr_sql = f"__datadiff_basename(q.{_quote(expr['source'])})"
-                    else:
-                        raise ValueError(expr["kind"])
-                    projection, current_cols = _replace_projection(current_cols, op["column"], expr_sql)
-                    query = f"SELECT {projection} FROM ({query}) q"
-                    visible_cols = [col for col in visible_cols if col != op["column"]] + [op["column"]]
-                    if pending_order is not None and op["column"] in {key.column for key in pending_order}:
-                        pending_order = None
+                    out_column, expr_sql = render_mutate_expr(op, SQLITE_DIALECT, _quote, _lit)
+                    if runtime.state.pending_order_mentions(out_column):
+                        freeze_pending_order()
+                    projection = runtime.state.replace_projection_expr(out_column, expr_sql, _quote)
+                    query = runtime.assign_source(f"SELECT {projection} FROM ({query}) q")
+                    runtime.state.replace_visible_column(out_column)
+                    if kind == "mutate":
+                        if expr_kind(op) in {"bool_not", "string_contains", "string_starts_with", "string_ends_with"}:
+                            column_types[out_column] = "bool"
+                        elif expr_kind(op) == "cast":
+                            column_types[out_column] = expr_target_type(op) or column_types.get(out_column, "str")
+                        elif expr_kind(op) == "date_part":
+                            column_types[out_column] = "int"
+                    if runtime.state.pending_order_mentions(out_column):
+                        runtime.state.clear_pending_order()
                         drop_hidden_order_cols()
                 elif kind == "groupby":
                     drop_hidden_order_cols()
-                    keys = list(op["keys"])
-                    key_sql = ", ".join(_quote(k) for k in keys)
-                    agg_sql = []
-                    for agg in op["aggs"]:
-                        agg_sql.append(f"{_agg_expr(agg['column'], agg['func'])} AS {_quote(agg['as'])}")
-                    query = (
-                        f"SELECT {key_sql}, {', '.join(agg_sql)} "
-                        f"FROM ({query}) q GROUP BY {key_sql}"
+                    keys = groupby_keys(op)
+                    select_sql, aliases = render_groupby_sql(op, _agg_expr, _quote, keys)
+                    query = runtime.assign_source(
+                        f"SELECT {select_sql} "
+                        f"FROM ({query}) q GROUP BY {', '.join(_quote(key) for key in keys)}"
                     )
-                    current_cols = keys + [agg["as"] for agg in op["aggs"]]
-                    for agg in op["aggs"]:
-                        column_types[str(agg["as"])] = _agg_result_type(column_types, agg)
-                    visible_cols = list(current_cols)
-                    pending_order = None
+                    for agg in aggregate_specs(op):
+                        column_types[aggregate_alias(agg)] = _agg_result_type(column_types, agg)
+                    runtime.state.reset_projection(keys + aliases)
                 elif kind == "aggregate":
                     drop_hidden_order_cols()
-                    agg_sql = []
-                    for agg in op["aggs"]:
-                        agg_sql.append(f"{_agg_expr(agg['column'], agg['func'])} AS {_quote(agg['as'])}")
-                    query = f"SELECT {', '.join(agg_sql)} FROM ({query}) q"
-                    current_cols = [agg["as"] for agg in op["aggs"]]
-                    for agg in op["aggs"]:
-                        column_types[str(agg["as"])] = _agg_result_type(column_types, agg)
-                    visible_cols = list(current_cols)
-                    pending_order = None
+                    agg_sql, aliases = render_aggregate_sql(op, _agg_expr, _quote)
+                    query = runtime.assign_source(f"SELECT {', '.join(agg_sql)} FROM ({query}) q")
+                    for agg in aggregate_specs(op):
+                        column_types[aggregate_alias(agg)] = _agg_result_type(column_types, agg)
+                    runtime.state.reset_projection(aliases)
                 else:
                     raise ValueError(kind)
-            if pending_order is not None:
-                query = f"SELECT {visible_projection()} FROM ({query}) q ORDER BY {_order_clause(pending_order)}"
-            else:
-                drop_hidden_order_cols()
+            query = runtime.assign_source(runtime.finalize_source())
             cur = con.execute(query)
             columns = [desc[0] for desc in cur.description]
-            out = pd.DataFrame(cur.fetchall(), columns=columns)
+            out = _dataframe_preserving_sqlite_scalars(pd, cur.fetchall(), columns)
             for col in out.columns:
                 if column_types.get(str(col)) == "bool":
                     out[col] = out[col].map(lambda v: None if pd.isna(v) else bool(v))

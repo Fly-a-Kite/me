@@ -17,6 +17,7 @@ CORE_METHOD_CAPABILITIES = {
     "op:limit",
     "expr:arith_const",
     "expr:string_lower",
+    "expr:string_upper",
     "agg:min",
     "agg:mean",
     "agg:count",
@@ -190,6 +191,7 @@ def test_methodology_bottom_layer_does_not_import_middle_policy_modules():
 def test_methodology_replay_source_gate_spans_historical_projects():
     required_sources = {
         "https://github.com/apache/datafusion/issues/22190",
+        "https://github.com/apache/datafusion/issues/22554",
         "https://github.com/duckdb/duckdb/issues/22075",
         "https://github.com/duckdb/duckdb/issues/22656",
         "https://github.com/duckdb/duckdb/issues/22837",
@@ -262,6 +264,9 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     )
     pyarrow_hash_pivot_wider_order_semantics = _preset_config(
         "pyarrow_hash_pivot_wider_order_semantics"
+    )
+    pyarrow_list_flatten_parent_indices_semantics = _preset_config(
+        "pyarrow_list_flatten_parent_indices_semantics"
     )
     polars_rolling_mean_by_null_count_semantics = _preset_config("polars_rolling_mean_by_null_count_semantics")
     csv_long_numeric_roundtrip = _preset_config("csv_long_numeric_roundtrip")
@@ -444,6 +449,13 @@ def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
     )
     assert {"hash_pivot_wider_probe", "hash_pivot_wider", "aggregation"}.issubset(
         pyarrow_hash_pivot_wider_order_semantics.guidance_targets
+    )
+    assert (
+        pyarrow_list_flatten_parent_indices_semantics.generator_profile
+        == "pyarrow_list_flatten_parent_indices_semantics"
+    )
+    assert {"list_flatten_parent_indices_probe", "list_layout", "nulls"}.issubset(
+        pyarrow_list_flatten_parent_indices_semantics.guidance_targets
     )
     assert (
         polars_rolling_mean_by_null_count_semantics.generator_profile
