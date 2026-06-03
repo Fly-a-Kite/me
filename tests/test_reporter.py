@@ -128,6 +128,95 @@ def test_write_report_can_limit_findings_csv_rows(tmp_path, monkeypatch):
     assert len(csv_path.read_text(encoding="utf-8").splitlines()) == 2
 
 
+def test_write_report_summarizes_adaptive_selection_telemetry(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(reporter, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(reporter, "REPORTS_DIR", reports_dir)
+    run_file = runs_dir / "run-adaptive-selection.jsonl.gz"
+    append_jsonl(
+        {
+            "status": "ok",
+            "case": {"case_id": "case-0", "seed": 0, "program": {"operations": []}},
+            "findings": [],
+            "behavior_signature": "sig-0",
+            "backend_status": {},
+            "quality_oracles": [],
+            "is_new_behavior": True,
+            "generator_profile_selection": {
+                "strategy": "contextual_bandit",
+                "profile": "discovery_fresh",
+                "profile_pool": ["common", "discovery_fresh"],
+                "learning_weight": 1.0,
+                "reward": 2.0,
+                "ranked": [
+                    {
+                        "action_id": "discovery_fresh",
+                        "score": 1.4,
+                        "model_prediction": 0.6,
+                        "uncertainty": 0.25,
+                        "exploration_bonus": 0.3,
+                        "version_signal": 0.2,
+                        "continual_priority_signal": 0.1,
+                        "health_penalty": 0.05,
+                    }
+                ],
+            },
+            "semantic_objective_selection": {
+                "strategy": "contextual_bandit_warmup",
+                "scope": "semantic_objective",
+                "action": "objective:join_null_membership",
+                "action_pool": ["objective:join_null_membership"],
+                "learning_weight": 1.0,
+                "reward": 1.5,
+                "ranked": [{"action_id": "objective:join_null_membership", "uncertainty": 1.0}],
+            },
+            "metamorphic_relation_selection": {
+                "strategy": "contextual_bandit",
+                "scope": "metamorphic_relation",
+                "action": "input_partition_union_all",
+                "action_pool": ["input_partition_union_all"],
+                "learning_weight": 1.0,
+                "reward": 0.5,
+                "ranked": [{"action_id": "input_partition_union_all", "exploration_bonus": 0.75}],
+            },
+            "version_pair_selection": {
+                "strategy": "contextual_bandit",
+                "scope": "version_pair",
+                "action": "latest-smoke->fixed-smoke",
+                "action_pool": ["latest-smoke->fixed-smoke"],
+                "learning_weight": 1.0,
+                "reward": 1.0,
+                "ranked": [{"action_id": "latest-smoke->fixed-smoke", "version_signal": 0.8}],
+            },
+            "selected_generator_profile": "discovery_fresh",
+            "selected_semantic_objective": "objective:join_null_membership",
+            "selected_metamorphic_relation": "input_partition_union_all",
+            "selected_version_pair": "latest-smoke->fixed-smoke",
+        },
+        run_file,
+    )
+    dump_json(
+        {
+            "elapsed_s": 0.1,
+            "throughput_cases_s": 10.0,
+            "backends": [],
+            "targets": [],
+            "common_capabilities": [],
+        },
+        run_meta_path(run_file),
+    )
+
+    md_path, _ = reporter.write_report(run_file)
+    md = md_path.read_text(encoding="utf-8")
+
+    assert "## Adaptive Selection" in md
+    assert "| generator_profile | 1 | discovery_fresh:1 | contextual_bandit:1 | 2.00 | 1.00 | 2.00 | 1.40 | 0.60 | 0.25 | 0.30 | 0.20 | 0.10 | 0.05 |" in md
+    assert "objective:join_null_membership:1" in md
+    assert "input_partition_union_all:1" in md
+    assert "latest-smoke->fixed-smoke:1" in md
+
+
 def test_reporter_canonical_helpers_match_compatibility_aliases(tmp_path, monkeypatch):
     runs_dir = tmp_path / "runs"
     reports_dir = tmp_path / "reports"
@@ -1127,6 +1216,127 @@ def test_write_experiment_summary_reports_feedback_operator_selection_telemetry(
     assert aggregate_row["feedback_selected_operator_score_avg"] == "1.75"
 
 
+def test_write_experiment_summary_reports_adaptive_selection_telemetry(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(reporter, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(reporter, "REPORTS_DIR", reports_dir)
+    run_file = runs_dir / "run-adaptive-selection-summary.jsonl.gz"
+    for idx, profile in enumerate(["common", "discovery_fresh"]):
+        append_jsonl(
+            {
+                "status": "ok",
+                "case_index": idx,
+                "case": {"case_id": f"case-{idx}", "seed": idx, "program": {"operations": []}},
+                "findings": [],
+                "behavior_signature": f"sig-{idx}",
+                "backend_status": {},
+                "quality_oracles": [],
+                "is_new_behavior": True,
+                "generator_profile_selection": {
+                    "strategy": "contextual_bandit",
+                    "profile": profile,
+                    "profile_pool": ["common", "discovery_fresh"],
+                    "learning_weight": 1.0,
+                    "reward": 1.0 + idx,
+                    "ranked": [
+                        {
+                            "action_id": profile,
+                            "score": 1.0 + idx,
+                            "model_prediction": 0.5 + idx,
+                            "uncertainty": 0.25 + idx,
+                            "exploration_bonus": 0.4,
+                            "version_signal": 0.2,
+                            "continual_priority_signal": 0.1,
+                            "health_penalty": 0.05,
+                        }
+                    ],
+                },
+                "semantic_objective_selection": {
+                    "strategy": "contextual_bandit",
+                    "scope": "semantic_objective",
+                    "action": "exploration_objective:boundary_depth",
+                    "action_pool": ["exploration_objective:boundary_depth"],
+                    "learning_weight": 1.0,
+                    "reward": 0.5,
+                    "ranked": [{"action_id": "exploration_objective:boundary_depth", "uncertainty": 0.75}],
+                },
+                "metamorphic_relation_selection": {
+                    "strategy": "contextual_bandit_warmup",
+                    "scope": "metamorphic_relation",
+                    "action": "input_partition_union_all",
+                    "action_pool": ["input_partition_union_all"],
+                    "learning_weight": 1.0,
+                    "reward": 0.25,
+                    "ranked": [{"action_id": "input_partition_union_all", "exploration_bonus": 0.9}],
+                },
+                "version_pair_selection": {
+                    "strategy": "contextual_bandit",
+                    "scope": "version_pair",
+                    "action": "latest->fixed",
+                    "action_pool": ["latest->fixed"],
+                    "learning_weight": 1.0,
+                    "reward": 0.75,
+                    "ranked": [{"action_id": "latest->fixed", "version_signal": 0.8}],
+                },
+                "selected_generator_profile": profile,
+                "selected_semantic_objective": "exploration_objective:boundary_depth",
+                "selected_metamorphic_relation": "input_partition_union_all",
+                "selected_version_pair": "latest->fixed",
+            },
+            run_file,
+        )
+    dump_json(
+        {
+            "elapsed_s": 0.2,
+            "throughput_cases_s": 10.0,
+            "backends": [],
+            "targets": [],
+            "common_capabilities": [],
+        },
+        run_meta_path(run_file),
+    )
+    manifest = runs_dir / "experiment-adaptive-selection.json"
+    dump_json(
+        {
+            "presets": ["baseline"],
+            "seeds": [1],
+            "backends": [],
+            "target_suite": "core",
+            "targets": [],
+            "common_capabilities": [],
+            "runs": [{"preset": "baseline", "seed": 1, "run_file": str(run_file), "report": ""}],
+        },
+        manifest,
+    )
+
+    md_path, csv_path = reporter.write_experiment_summary(manifest)
+    row = next(csv.DictReader(csv_path.open(encoding="utf-8")))
+    aggregate_csv_path = reports_dir / "experiment-summary-experiment-adaptive-selection-aggregates.csv"
+    aggregate_json_path = reports_dir / "experiment-summary-experiment-adaptive-selection-aggregates.json"
+    aggregate_row = next(csv.DictReader(aggregate_csv_path.open(encoding="utf-8")))
+    aggregate_payload = json.loads(aggregate_json_path.read_text(encoding="utf-8"))
+    md = md_path.read_text(encoding="utf-8")
+
+    assert "## Adaptive Selection Telemetry" in md
+    assert "common:1; discovery_fresh:1" in md
+    assert "latest->fixed:2" in md
+    assert row["adaptive_selection_total_count"] == "8"
+    assert row["adaptive_selection_total_per_case"] == "4.0"
+    assert row["adaptive_generator_profile_selection_count"] == "2"
+    assert row["adaptive_generator_profile_top_actions"] == "common:1; discovery_fresh:1"
+    assert row["adaptive_generator_profile_avg_reward"] == "1.5"
+    assert row["adaptive_generator_profile_avg_uncertainty"] == "0.75"
+    assert aggregate_row["adaptive_selection_total_count"] == "8"
+    assert aggregate_row["adaptive_selection_total_per_case"] == "4.0"
+    assert aggregate_row["adaptive_version_pair_top_actions"] == "latest->fixed:2"
+    assert aggregate_row["adaptive_version_pair_avg_version_signal"] == "0.8"
+    assert (
+        aggregate_payload["by_target_suite"][0]["adaptive_selection"]["adaptive_selection_total_count"]
+        == 8
+    )
+
+
 def test_write_experiment_summary_reports_preflight_integrity(tmp_path, monkeypatch):
     runs_dir = tmp_path / "runs"
     reports_dir = tmp_path / "reports"
@@ -1345,13 +1555,13 @@ def test_write_experiment_summary_refreshes_from_bug_artifact(tmp_path, monkeypa
     manifest = runs_dir / "experiment-refresh.json"
     dump_json(
         {
-            "presets": ["bughunt"],
+            "presets": ["discovery"],
             "seeds": [14],
             "backends": ["a", "b", "c"],
             "target_suite": "custom",
             "targets": [],
             "common_capabilities": [],
-            "runs": [{"preset": "bughunt", "seed": 14, "run_file": str(run_file), "report": ""}],
+            "runs": [{"preset": "discovery", "seed": 14, "run_file": str(run_file), "report": ""}],
         },
         manifest,
     )

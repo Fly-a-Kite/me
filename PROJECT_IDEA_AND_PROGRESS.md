@@ -34,11 +34,11 @@ Nullable boolean string pattern expressions were completed as a general
 framework extension: `string_starts_with` and `string_ends_with` now mirror
 `string_contains` through backend adapters, type validation, generation,
 mutation, guidance features, operation-combo risks, oracle/classification,
-target capabilities, runner tests, and a short `bug-sprint` manifest. The sprint
+target capabilities, runner tests, and a short `discovery-campaign` manifest. The sprint
 manifest is:
 
 ```text
-new_issue/generated/bug-sprint-string-pattern-expr-s10701-manifest.json
+new_issue/generated/discovery-campaign-string-pattern-expr-s10701-manifest.json
 ```
 
 It reported no fresh, issue-inspired unsaturated, or known saturated candidate
@@ -53,10 +53,10 @@ coalesce_fill_null_groupby_topk
 ```
 
 They are covered by datagen, operation-combo risk classification, runner
-execution tests, and a short sprint manifest:
+execution tests, and a short discovery-campaign manifest:
 
 ```text
-new_issue/generated/bug-sprint-fill-coalesce-interactions-s10839-manifest.json
+new_issue/generated/discovery-campaign-fill-coalesce-interactions-s10839-manifest.json
 ```
 
 The sprint reported no fresh, issue-inspired unsaturated, or known saturated
@@ -88,7 +88,7 @@ date_part_topk
 Sprint manifest:
 
 ```text
-new_issue/generated/bug-sprint-date-part-expr-s10901-manifest.json
+new_issue/generated/discovery-campaign-date-part-expr-s10901-manifest.json
 ```
 
 The sprint reported no fresh, issue-inspired unsaturated, or known saturated
@@ -118,7 +118,7 @@ operation-combo risks, runner tests, and sprint evidence.
 Sprint manifest:
 
 ```text
-new_issue/generated/bug-sprint-nullable-bool-reduction-s11001-manifest.json
+new_issue/generated/discovery-campaign-nullable-bool-reduction-s11001-manifest.json
 ```
 
 The sprint reported no fresh, issue-inspired unsaturated, or known saturated
@@ -152,7 +152,7 @@ type handling; runner tests; and sprint evidence.
 Sprint manifest:
 
 ```text
-new_issue/generated/bug-sprint-type-cast-boundary-s11101-manifest.json
+new_issue/generated/discovery-campaign-type-cast-boundary-s11101-manifest.json
 ```
 
 The sprint reported no fresh, issue-inspired unsaturated, or known saturated
@@ -221,7 +221,7 @@ case-00000150-pyarrow-list-flatten-parent-indices-semantics:
 Sprint manifest:
 
 ```text
-new_issue/generated/bug-sprint-arrow-list-layout-s11201-manifest.json
+new_issue/generated/discovery-campaign-arrow-list-layout-s11201-manifest.json
 ```
 
 The sprint reported no fresh, issue-inspired unsaturated, or known saturated
@@ -291,7 +291,7 @@ case-00000074-common-api-workflow with metamorphic oracle:
 Sprint manifest:
 
 ```text
-new_issue/generated/bug-sprint-string-split-part-s11301-manifest.json
+new_issue/generated/discovery-campaign-string-split-part-s11301-manifest.json
 ```
 
 The sprint reported no fresh, issue-inspired unsaturated, or known saturated
@@ -364,7 +364,7 @@ runs/run-20260527T072715-1779866835345417930.jsonl
 Sprint manifest:
 
 ```text
-new_issue/generated/bug-sprint-string-null-if-empty-s11401-manifest.json
+new_issue/generated/discovery-campaign-string-null-if-empty-s11401-manifest.json
 ```
 
 The sprint reported no fresh, issue-inspired unsaturated, or known saturated
@@ -422,7 +422,7 @@ case-00000079-common-api-workflow: string_length_topk
 Sprint manifest:
 
 ```text
-new_issue/generated/bug-sprint-string-length-s11501-manifest.json
+new_issue/generated/discovery-campaign-string-length-s11501-manifest.json
 ```
 
 The sprint reported no fresh, issue-inspired unsaturated, or known saturated
@@ -911,126 +911,3 @@ Do not modify generator/oracle/scheduler code while the current 24h evidence
 run is intended to count as a frozen final run. If a new code change is truly
 needed, stop the 6 live processes first, implement and test the change, commit
 it, then restart the required 24h run from the new commit.
-
-## Commands For Next Session
-
-Check status:
-
-```bash
-cd /root/datadiff_fuzz_lab
-git status --short
-git log -1 --oneline
-pidfile=$(cat runs/final-live-depth-required.latest)
-cat "$pidfile"
-pids=$(awk '{print $3}' "$pidfile" | paste -sd, -)
-ps -o pid,ppid,etime,stat,pcpu,pmem,cmd -p "$pids"
-```
-
-Parse current live logs:
-
-```bash
-cd /root/datadiff_fuzz_lab
-.venv/bin/python - <<'PY'
-from __future__ import annotations
-import collections, gzip, json, os
-from pathlib import Path
-from datadiff.config import DEFAULT_KNOWN_SATURATED_BUG_FAMILIES
-from datadiff.reward import (
-    candidate_bug_family_key,
-    is_known_saturated_candidate_bug_finding,
-    is_rewardable_candidate_bug_finding,
-)
-
-known = DEFAULT_KNOWN_SATURATED_BUG_FAMILIES
-pidfile = Path(Path("runs/final-live-depth-required.latest").read_text().strip())
-
-for line in pidfile.read_text().splitlines():
-    suite, preset, pid, _nominal_log = line.split(maxsplit=3)
-    run_path = ""
-    fd_dir = Path("/proc") / pid / "fd"
-    if fd_dir.exists():
-        for fd in fd_dir.iterdir():
-            try:
-                target = os.readlink(fd)
-            except OSError:
-                continue
-            if "runs/run-" in target and target.endswith(".jsonl.gz"):
-                run_path = target
-                break
-
-    rows = 0
-    statuses = collections.Counter()
-    reward = collections.Counter()
-    knowns = collections.Counter()
-    verdicts = collections.Counter()
-    examples = {}
-    eof = ""
-
-    if run_path:
-        try:
-            with gzip.open(run_path, "rt") as handle:
-                for raw in handle:
-                    if not raw.strip():
-                        continue
-                    record = json.loads(raw)
-                    rows += 1
-                    statuses[record.get("status", "")] += 1
-                    for finding in record.get("findings") or []:
-                        verdicts[finding.get("triage_verdict", "")] += 1
-                        if is_known_saturated_candidate_bug_finding(finding, known):
-                            knowns[candidate_bug_family_key(finding)] += 1
-                        if is_rewardable_candidate_bug_finding(finding, known):
-                            family = candidate_bug_family_key(finding)
-                            reward[family] += 1
-                            examples.setdefault(family, record.get("bug_dir"))
-        except EOFError:
-            eof = "open_gzip_eof"
-
-    print("SUITE", suite, "PRESET", preset, "PID", pid)
-    print("RUN_PATH", run_path or "missing")
-    print("ROWS", rows)
-    print("STATUSES", dict(statuses))
-    print("REWARD", dict(reward))
-    print("KNOWN", dict(knowns))
-    print("VERDICTS", dict(verdicts), eof)
-    for family, bug_dir in examples.items():
-        print("EXAMPLE", family, bug_dir)
-    print()
-PY
-```
-
-## Next Actions
-
-1. Keep the current 6 required-suite 24h live processes running until they
-   finish, unless the user explicitly asks to stop them or a serious harness
-   correctness problem is found.
-2. After they finish, generate experiment summaries/analyzers for the produced
-   manifests/logs. Do not tune code based on the just-finished run if that run
-   is intended as frozen evidence.
-3. Triage rewardable families in this order:
-   - non-DataFusion families, because DataFusion already has submitted
-     confirmation and fresh evidence should broaden targets;
-   - high-count families with artifact directories;
-   - families that appear across suites but are not listed as known/saturated;
-   - low-count families only after reproducibility recheck.
-4. For each candidate family, reduce/replay with existing tools, inspect the
-   abstract case and backend outputs, check upstream issue duplication, then
-   write upstream-ready repro code only for likely real bugs.
-5. Run `datadiff final-readiness` only after live depth, historical replay, and
-   seeded sensitivity evidence are all present. The project is not ready for
-   final A-conference claims until that audit passes or its remaining gaps are
-   explicitly documented.
-
-## Constraints To Preserve
-
-- Do not add one-off generators that directly target a single submitted bug in
-  fresh mode.
-- Keep replay/submitted bug reproduction separate through `enable_replay_bug`.
-- Do not change bottom or middle layer after starting a final frozen 24h run
-  unless the current run is discarded and restarted.
-- Do not count expected semantic divergences, known saturated families,
-  historical replay cases, or seeded faults as new latest-version bugs.
-- Do not refer to local file paths in upstream issue text.
-- Do not run full tests unless necessary; use focused tests for changed modules.
-- When changing code, keep aliases/names away from Python keywords and
-  backend-reserved terms where practical.

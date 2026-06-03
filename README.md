@@ -42,15 +42,15 @@ python3 -m venv .venv
 ```bash
 .venv/bin/datadiff bug-audit
 .venv/bin/datadiff bug-audit --write-issues
-.venv/bin/datadiff bug-hunt --cases 500 --seed 1
-.venv/bin/datadiff bug-sprint --list-lanes
-.venv/bin/datadiff bug-sprint --cases 100 --seeds 1
-.venv/bin/datadiff bug-sprint --cases 100 --seeds 1 --watch-health
-.venv/bin/datadiff bug-sprint-status --manifest new_issue/generated/bug-sprint-manifest.json
-.venv/bin/datadiff candidate-pipeline --manifest new_issue/generated/bug-sprint-manifest.json
+.venv/bin/datadiff discovery-run --cases 500 --seed 1
+.venv/bin/datadiff discovery-campaign --list-lanes
+.venv/bin/datadiff discovery-campaign --cases 100 --seeds 1
+.venv/bin/datadiff discovery-campaign --cases 100 --seeds 1 --watch-health
+.venv/bin/datadiff discovery-campaign-status --manifest new_issue/generated/discovery-campaign-manifest.json
+.venv/bin/datadiff candidate-pipeline --manifest new_issue/generated/discovery-campaign-manifest.json
 .venv/bin/datadiff run-health
 .venv/bin/datadiff run-health --fail-on-fresh-candidate --fail-on-bug
-.venv/bin/datadiff bug-hunt --cases 2000 --seed 1 --preset live_deep_organic_metamorphic
+.venv/bin/datadiff discovery-run --cases 2000 --seed 1 --preset live_deep_organic_metamorphic
 .venv/bin/datadiff bug-status
 .venv/bin/datadiff bug-status --json --write-report
 .venv/bin/datadiff issue-readiness
@@ -74,42 +74,42 @@ expected/observed、自动 verdict 和 candidate bug family。加 `--write-issue
 `new_issue/` 根目录保留人工整理后的最终上报草稿，`new_issue/generated/` 保留项目命令生成的
 原始证据草稿。
 
-`bug-hunt` 是当前推荐的一体化入口：先运行 `bug-audit`，再用 latest target suite 做 guided
-fresh fuzz。默认 preset 是 `live_deep_organic`，使用 `bughunt_fresh` profile，优先探索新的
+`discovery-run` 是当前推荐的一体化入口：先运行 `bug-audit`，再用 latest target suite 做 guided
+fresh fuzz。默认 preset 是 `live_deep_organic`，使用 `discovery_fresh` profile，优先探索新的
 Python API / Arrow / SQL engine 深层语义风险，而不是主动注入已有 issue 来源。随后命令会
 自动生成报告、分类 candidate family，并把本次运行的审计输出、run log、
-fresh/known-saturated 候选家族写入 `new_issue/generated/bug-hunt-manifest.json`。这样新探索逻辑
+fresh/known-saturated 候选家族写入 `new_issue/generated/discovery-run-manifest.json`。这样新探索逻辑
 和项目 runner、oracle、分类、证据目录保持在同一套代码路径里。若 fuzz 阶段发现 fresh
 candidate，该命令还会将完整 case、后端标准化结果和自动 verdict 导出为配套的
 `*-fresh-candidates.json`，供上传和复现审计。受已有上游 issue 启发生成的候选会单独归为
 `issue_inspired_unsaturated_candidate_bug_families`，默认不算作原创 fresh bug。
 `live_deep_organic_metamorphic` 会叠加 metamorphic oracle，适合 nightly/24h 深层探索。
 
-`bug-sprint` 是更偏发现效率的入口：一次命令按多个窄目标 lane 运行短预算探索。默认 lane
+`discovery-campaign` 是更偏发现效率的入口：一次命令按多个窄目标 lane 运行短预算探索。默认 lane
 是 organic/fresh 版本，例如 `arrow_layout`、`polars_lazy`、`polars_streaming`、
 `datafusion_optimizer`、`datafusion_common_api`、`embedded_sql`、`cross_family` 和 `common_api_workflow`。
 其中 `common_api_workflow` 专门覆盖低复杂度但高频的真实操作组合，例如 filter、字符串 contains/starts-with/ends-with/strip/replace/slice/concat、nullable boolean not、数值 abs/clip、drop-null/dropna、mutate、
-union-all/concat、semi/anti join、fill-null/coalesce、多列 coalesce、case-when、distinct、nullable distinct top-k、join、groupby、sort、limit/offset 和 select；`datafusion_common_api` 用同一组日常低复杂度模板专门压 DataFusion cross suite；其他 organic lane 使用 `bughunt_fresh` 生成器，
+union-all/concat、semi/anti join、fill-null/coalesce、多列 coalesce、case-when、distinct、nullable distinct top-k、join、groupby、sort、limit/offset 和 select；`datafusion_common_api` 用同一组日常低复杂度模板专门压 DataFusion cross suite；其他 organic lane 使用 `discovery_fresh` 生成器，
 不主动注入已有上游 issue。另有 `arrow_probe_stress`、`polars_probe_stress`、
 `duckdb_probe_stress` 这类可手动选择的压力 lane；它们产生的 issue-inspired 结果仍会被
 classification 单独分离，不会自动计入 fresh。每个 lane 使用对应的 target suite 和 live preset，
 只跑较小 case budget，然后把各 lane 的 run log、report、classification、fresh candidate
-evidence 聚合成一个 `new_issue/generated/bug-sprint-manifest.json`。这比直接跑一个 all-engine
+evidence 聚合成一个 `new_issue/generated/discovery-campaign-manifest.json`。这比直接跑一个 all-engine
 长任务更容易定位是哪类深层语义空间产出了候选，也方便后续增加新的 lane。`--list-lanes --json`
 会输出机器可读 lane catalog，便于实验脚本选择目标。
 
-`bug-sprint` 现在会根据最近 lane 的产出率、novelty 和 false-positive 惩罚动态重排下一轮 lane，
+`discovery-campaign` 现在会根据最近 lane 的产出率、novelty 和 false-positive 惩罚动态重排下一轮 lane，
 并把 score、budget multiplier、yield/novelty/fp 摘要写入 manifest，便于后续自动调预算。
-`bug-sprint --watch-health` 会把每个已完成 run 的健康摘要写入 manifest，并在出现 bug 行或
+`discovery-campaign --watch-health` 会把每个已完成 run 的健康摘要写入 manifest，并在出现 bug 行或
 organic fresh candidate 后停止剩余 lane。`run-health` 是长时间探索的轻量看门入口。默认按修改时间读取最新 run 文件，支持仍在写入的
 `.jsonl.gz`，并汇总 status、candidate/fresh/known-saturated family、false-positive reason
 和示例。长跑时可用 `--fail-on-fresh-candidate --fail-on-bug` 作为 watchdog 退出码：一旦出现
-候选就停止 sprint，优先进入 artifact 验证和去重，避免继续在同一热点上消耗 CPU。
-`bug-sprint-status` 读取 sprint manifest，并补充当前/最近 run 的 `run-health` 摘要与最近 lane yield
+候选就停止当前 campaign，优先进入 artifact 验证和去重，避免继续在同一热点上消耗 CPU。
+`discovery-campaign-status` 读取 discovery-campaign manifest，并补充当前/最近 run 的 `run-health` 摘要与最近 lane yield
 摘要，适合监控端到端系统级 fresh 探索是否仍在同一 lane、已经完成多少 lane/seed、下一轮该增减哪些
 lane 预算，以及是否已出现需要马上 triage 的候选。
 
-当 fresh candidate 出现时，`bug-hunt` / `bug-sprint` 会自动串起
+当 fresh candidate 出现时，`discovery-run` / `discovery-campaign` 会自动串起
 freeze -> recheck -> reduce -> dedup -> issue-readiness 流水线，并把结果写到
 `new_issue/generated/candidate-pipelines/`。需要对已有 `*-fresh-candidates.json` 或 manifest
 回放这条后处理链时，可直接运行 `datadiff candidate-pipeline --manifest ...`。
@@ -142,8 +142,8 @@ supporting/duplicate 草稿路径，避免重复 family 的辅助草稿增加待
 flaky、非零退出和 timeout 数量；claim paper readiness 前这些 bundle 执行失败必须为 0。
 
 `review-readiness` 是面向论文/评审的轻量审计入口。它不扫描大型 run log，而是检查当前仓库是否
-具备可评审的关键证据：三层/多层架构文档、target registry 覆盖、自动 bug-audit/bug-hunt/
-bug-sprint 证据、issue-bundle 复现证据、fresh/replay/known 分离、最终实验 protocol
+具备可评审的关键证据：三层/多层架构文档、target registry 覆盖、自动 bug-audit/discovery-run/
+discovery-campaign 证据、issue-bundle 复现证据、fresh/replay/known 分离、最终实验 protocol
 （validation/live/historical/seeded/ablation/comparison）、复现命令、artifact hygiene、方法学契约测试，
 以及 latest confirmed bug family 数量是否达到目标。默认目标是 20 个 confirmed family；
 如果当前未达到，报告会明确列为未完成，而不是把候选数量误当作 confirmed。它还会读取

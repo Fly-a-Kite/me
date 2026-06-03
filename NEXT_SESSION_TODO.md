@@ -1,215 +1,102 @@
 # Next Session TODO
 
-Last updated: 2026-06-01 CST (+0800)
+Last updated: 2026-06-03 14:42 CST (+0800)
+
+Current session id: `icse-final-evidence-20260603T064235Z`
 
 This file is the operational handoff for the next Codex session.
 
-## What Was Completed In This Session
+## Priority Handoff For `icse-final-evidence-20260603T064235Z`
 
-1. `ExperimentConfig` now normalizes and rehydrates `discovery_biases` on construction.
-2. `DiscoveryBias` now has:
-   - input normalization
-   - stable dedup key
-   - noop filtering
-3. Added shared helpers in [src/datadiff/config.py](/root/datadiff_fuzz_lab/src/datadiff/config.py):
-   - `coerce_discovery_bias`
-   - `merge_discovery_biases`
-4. Bug-sprint lane discovery bias metadata was promoted into a reusable source via
-   [src/datadiff/strategy_registry.py](/root/datadiff_fuzz_lab/src/datadiff/strategy_registry.py):
-   - `discovery_biases_for_lanes(...)`
-5. Live presets now reuse lane-level discovery bias instead of leaving that logic only inside bug-sprint:
-   - `live_common_api_workflow(_metamorphic)`
-   - `live_datafusion_common_api_metamorphic`
-   - `live_datafusion_fresh(_metamorphic)`
-   - `live_deep_organic(_metamorphic)`
-   - `live_cross_family_metamorphic`
-   - `live_arrow_deep_organic_metamorphic`
-   - `live_polars_deep_organic_metamorphic`
-   - `live_polars_streaming_deep_organic_metamorphic`
-   - `live_datafusion_deep_organic_metamorphic`
-   - `live_embedded_sql_deep_organic_metamorphic`
-6. Bug-sprint lane bias merge now deduplicates against preset defaults instead of double-applying identical bias.
-7. Tests added/updated for:
-   - preset default discovery bias presence
-   - config round-trip rehydration
-   - candidate pipeline artifact config rehydration
-   - bug-sprint bias dedup behavior
+The adaptive method/code layer is substantially implemented, but the ICSE-final
+claim is not complete until the final experiment evidence passes readiness.
+Current best estimate:
 
-## Verification Completed
+- method/code capability: about 75-85%
+- automation/readiness gates: about 65-75%
+- final ICSE experiment evidence: about 35-45%
+- real 24h authority-run evidence: about 0-10%
+- overall paper-ready completion: about 50-60%
 
-Focused:
+Do not mark the active goal complete until the final readiness audit passes with
+the manifest index and cross-version ledger evidence from real runs.
 
-```bash
-rtk proxy .venv/bin/python -m pytest -q tests/test_cli.py tests/test_candidate_pipeline.py tests/test_guidance.py tests/test_runner.py -k 'discovery_bias or live_common_api_workflow or live_datafusion_deep_organic or candidate_pipeline or recheck or bug_sprint'
-```
+## Immediate TODO To Reach 100%
 
-Result:
+1. Prepare authority run prerequisites.
+   - Make or stage a clean authority worktree state; the 24h launcher requires a clean tree by default.
+   - Preserve provenance: commit hash, strategy snapshot, learning state, run journal, and launcher config.
+   - Use the current launcher name only: `scripts/start_closed_loop_24h_tmux.sh`.
+
+2. Execute the missing final matrix tracks with manifest-index capture.
+   - `module_ablation`
+   - `adaptive_component_ablation`
+   - `baseline_scope_comparison`
+   - Keep using `reports/final-experiment-manifest-index.json`.
+   - Do not rely on stale `runs/experiment-*.json` sweeping.
+
+3. Execute or import real 24h live discovery evidence.
+   - The final report must show `live_depth` passing for the required suites.
+   - The run must have clean frozen provenance and closed-loop state persistence.
+   - The final readiness gates currently fail on live depth/provenance/responsiveness.
+
+4. Build the final cross-version continual-learning ledger.
+   - Use final comparable run logs from at least two target versions.
+   - Output:
+     - `reports/final-version-ledger.json`
+     - `reports/experiment-final-version-ledger.json`
+   - Required ledger schemas:
+     - `version-ledger-v1`
+     - `version-ledger-health-v1`
+     - `version-ledger-health-feedback-report-v1`
+     - `version-ledger-evidence-manifest-v1`
+   - The ledger must include at least two versions, at least one candidate family,
+     and health observations from real run logs.
+
+5. Run final postprocess readiness only after evidence is complete.
+   - Command shape:
+     ```bash
+     rtk .venv/bin/python scripts/run_final_experiments.py \
+       --track postprocess \
+       --execute \
+       --manifest-index reports/final-experiment-manifest-index.json \
+       --ledger-evidence-manifest reports/experiment-final-version-ledger.json
+     ```
+   - The script now refuses postprocess execution when the manifest index is
+     missing required matrices or the final version-ledger evidence manifest.
+
+6. Final completion condition.
+   - `datadiff final-readiness` must exit successfully.
+   - The JSON report must have `ready: true`.
+   - No final gate may be failed.
+   - Only then can the active goal be marked complete.
+
+## Current Known Blockers
+
+- Latest readiness reports are still `ready: false`.
+- Missing matrix IDs in latest substantive evidence:
+  - `module_ablation`
+  - `adaptive_component_ablation`
+  - `baseline_scope_comparison`
+- Latest readiness summary has zero valid cross-version ledgers.
+- Real clean 24h authority-run evidence has not been produced in the current
+  worktree state.
+
+## Verification From This Session
+
+Code and gate hardening completed:
+
+- Added postprocess preflight in `scripts/run_final_experiments.py`.
+- Postprocess now refuses incomplete manifest-index evidence before running the
+  final readiness audit.
+- Cross-version continual ledger health/report path is implemented and tested.
+- Old public discovery naming scan had no legacy matches.
+
+Verification:
 
 ```text
-15 passed, 334 deselected
+tests/test_final_experiment_plan.py: 23 passed
+final_readiness/CLI targeted tests: 50 passed
+full pytest: 1408 passed, 2 warnings
+git diff --check: clean
 ```
-
-Broader touched-area regression:
-
-```bash
-rtk proxy .venv/bin/python -m pytest -q tests/test_cli.py tests/test_candidate_pipeline.py tests/test_guidance.py tests/test_runner.py tests/test_targets.py tests/test_reporter.py tests/test_run_journal.py
-```
-
-Result:
-
-```text
-384 passed in 21.19s
-```
-
-## Current State / Why This Matters
-
-The project now has a better structural path for increasing fresh-bug yield:
-
-1. discovery bias is no longer a bug-sprint-only add-on
-2. saved config JSON can round-trip back into typed bias objects
-3. live presets can push the search toward high-risk semantic boundaries without hardcoding one-off bug scripts
-
-This is still not the final architecture. It is only the first systematic layer for improving bug-finding probability.
-
-## Highest Priority Next Work
-
-### 1. Extract preset registry out of `_preset_config`
-
-Why:
-- `src/datadiff/cli.py::_preset_config()` is still a massive if-chain
-- discovery bias, target suites, methodology categories, and run intent should live in data, not in branch logic
-
-Target outcome:
-- add a typed preset registry module
-- keep `_preset_config()` as a thin compatibility wrapper
-- each preset entry should carry:
-  - preset id
-  - generator profile
-  - metamorphic mode
-  - guidance targets
-  - default discovery bias
-  - target suite affinity
-  - reporting/methodology label
-
-### 2. Push “new bug probability” deeper than preset weighting
-
-Current limitation:
-- discovery bias currently acts at scoring time
-- it does not yet reshape generation/mutation aggressively enough
-
-Next step:
-- connect high-risk semantic families into seed selection and mutation choice
-- do this generically, not per-bug
-
-Concrete work:
-- add a reusable “risk family” layer derived from features/patterns
-- use it in:
-  - seed scheduling
-  - mutation operator selection
-  - candidate-pool composition
-- avoid using raw program complexity as a primary scheduler priority
-
-### 3. Add stage-level performance profiling before any native rewrite
-
-Do this before more Rust/C++ scope expansion.
-
-Measure per case:
-- generate/mutate
-- backend execution
-- normalize
-- oracle/classification
-- scheduler/feedback
-- logging/artifact
-
-Why:
-- right now native descent decisions are still too assumption-driven
-- the most likely high-value native target remains:
-  - canonicalization
-  - row/signature hashing
-  - multiset diff
-  - batch comparison kernel
-
-### 4. Continue shrinking dict-style access at module boundaries
-
-Typed IR migration is not fully complete in semantic layers.
-
-Next convergence areas:
-- `datagen`
-- `metamorphic`
-- `oracle`
-- backend lowering/runtime seams
-
-Goal:
-- fewer ad hoc dict field reads
-- more stable typed semantic accessors
-- easier future Rust lowering and safer mutation logic
-
-### 5. Continue moving result comparison kernel toward native conclusion output
-
-User’s requested direction is still valid:
-- not only “canonical artifacts”
-- native side should increasingly produce comparison conclusions directly
-
-Next narrow target:
-- move from
-  - normalize -> hash -> diff -> python oracle decision
-- toward
-  - native batch compare API returning structured semantic comparison result
-
-But only after stage profiling.
-
-### 6. Strengthen system-level “find new bug” methodology
-
-Add more of these, as reusable architecture rather than test-only patches:
-
-1. cross-layer boundary stress
-2. same-semantics multi-representation execution
-3. metamorphic relation families
-4. native/fallback consistency loops
-5. whole-system smoke around runner/candidate pipeline/artifacts
-6. high-risk low-complexity seed templates
-
-Important:
-- do not add explicit names like `test_methodology_contracts`
-- integrate the methodology into architecture, reporting, and scheduler semantics
-
-## Strong Recommendation For Next Session
-
-Do not start a 12-hour run first.
-
-First do:
-
-1. preset registry extraction
-2. profiling hooks
-3. risk-family-aware scheduling/mutation hooks
-4. focused regression
-
-Then run:
-
-1. short smoke bug-sprint
-2. short live preset run
-3. only then a long concurrent run
-
-## Suggested Execution Order Next Session
-
-1. Read:
-   - `FINAL_GOAL.md`
-   - `PROJECT_IDEA_AND_PROGRESS.md`
-   - `experiments/final_protocol.md`
-   - this file
-2. Extract preset registry
-3. Add stage-level profiling
-4. Thread risk-family metadata into scheduler + mutator
-5. Add focused tests
-6. Run medium regression
-7. Start short integrated live runs
-8. Decide whether native kernel descent should target canonicalization/diff next
-
-## Files Touched This Session
-
-- [src/datadiff/config.py](/root/datadiff_fuzz_lab/src/datadiff/config.py)
-- [src/datadiff/strategy_registry.py](/root/datadiff_fuzz_lab/src/datadiff/strategy_registry.py)
-- [src/datadiff/cli.py](/root/datadiff_fuzz_lab/src/datadiff/cli.py)
-- [tests/test_cli.py](/root/datadiff_fuzz_lab/tests/test_cli.py)
-- [tests/test_candidate_pipeline.py](/root/datadiff_fuzz_lab/tests/test_candidate_pipeline.py)
-

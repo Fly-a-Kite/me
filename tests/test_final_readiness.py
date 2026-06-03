@@ -2,6 +2,14 @@ import os
 from pathlib import Path
 
 from datadiff import final_readiness
+from datadiff.experiment_catalog import (
+    FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX,
+    FINAL_COMPARISON_MATRIX,
+    FINAL_LIVE_DISCOVERY_MATRIX,
+    FINAL_MODULE_ABLATION_MATRIX,
+    FINAL_SEEDED_SENSITIVITY_MATRIX,
+    FINAL_VALIDATION_MATRIX,
+)
 from datadiff.final_readiness import (
     DEFAULT_A_LEVEL_READINESS_POLICY,
     DEFAULT_FINAL_READINESS_MANIFEST_LIMIT,
@@ -10,11 +18,30 @@ from datadiff.final_readiness import (
     build_final_readiness,
 )
 from datadiff.targets import TARGET_SUITES, describe_targets
-from datadiff.util import append_jsonl, dump_json, run_meta_path
+from datadiff.util import append_jsonl, dump_json, load_json, run_meta_path
+from datadiff.version_ledger import VersionObservation, build_version_ledger
+
+
+REQUIRED_ADAPTIVE_COMPONENTS = (
+    "active_learning",
+    "continual_learning",
+    "online_reward_model",
+    "quality_archive",
+    "runtime_cost_learning",
+    "scheduler_annealing",
+    "scheduler_learning",
+)
+
+
+def _adaptive_component_flags(**overrides: bool) -> dict[str, bool]:
+    flags = {component: True for component in REQUIRED_ADAPTIVE_COMPONENTS}
+    flags.update(overrides)
+    return flags
 
 
 def test_final_readiness_passes_when_all_evidence_tracks_are_present(tmp_path):
     manifests = []
+    version_ledger_path = _write_version_ledger(tmp_path)
     manifests.append(
         _write_manifest(
             tmp_path,
@@ -25,6 +52,10 @@ def test_final_readiness_passes_when_all_evidence_tracks_are_present(tmp_path):
             seed=0,
             config={"enable_replay_bug": False},
             replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            experiment_meta=FINAL_VALIDATION_MATRIX.command_experiment_meta(
+                target_suites=("datafusion_cross",),
+                preset=FINAL_VALIDATION_MATRIX.variants[0].preset,
+            ),
         )
     )
     for idx, suite in enumerate(DEFAULT_A_LEVEL_READINESS_POLICY.required_live_suites, start=1):
@@ -50,6 +81,14 @@ def test_final_readiness_passes_when_all_evidence_tracks_are_present(tmp_path):
                 findings=finding,
                 config={"enable_replay_bug": False},
                 replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+                first_candidate_elapsed_s=0.25 if finding else None,
+                first_candidate_case_index=0 if finding else None,
+                candidate_bug_discovery_auc=1.0 if finding else 0.0,
+                experiment_meta=FINAL_LIVE_DISCOVERY_MATRIX.command_experiment_meta(
+                    target_suites=(suite,),
+                    preset=FINAL_LIVE_DISCOVERY_MATRIX.variants[0].preset,
+                    counts_as_real_bugs=True,
+                ),
             )
         )
     manifests.append(
@@ -62,6 +101,11 @@ def test_final_readiness_passes_when_all_evidence_tracks_are_present(tmp_path):
             seed=22075,
             known_bug_id="duckdb-22075",
             config={"enable_replay_bug": True},
+            experiment_meta={
+                "matrix_id": "historical_replay",
+                "comparison_group": "historical_replay",
+                "variant": {"variant_id": "duckdb-22075", "comparison_role": "contrast"},
+            },
         )
     )
     manifests.append(
@@ -74,6 +118,11 @@ def test_final_readiness_passes_when_all_evidence_tracks_are_present(tmp_path):
             seed=22656,
             known_bug_id="duckdb-22656",
             config={"enable_replay_bug": True},
+            experiment_meta={
+                "matrix_id": "historical_replay",
+                "comparison_group": "historical_replay",
+                "variant": {"variant_id": "duckdb-22656", "comparison_role": "contrast"},
+            },
         )
     )
     manifests.append(
@@ -84,18 +133,296 @@ def test_final_readiness_passes_when_all_evidence_tracks_are_present(tmp_path):
             target_suite="seeded_filter",
             preset="guided_filter",
             seed=1,
+            experiment_meta=FINAL_SEEDED_SENSITIVITY_MATRIX.command_experiment_meta(
+                target_suites=("seeded_filter",),
+                preset="guided_filter",
+            ),
         )
     )
     manifests.append(
         _write_manifest(
             tmp_path,
-            name="ablation",
+            name="ablation-module-baseline",
+            evidence_mode="ablation",
+            target_suite="core",
+            preset="baseline",
+            seed=0,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            experiment_meta=FINAL_MODULE_ABLATION_MATRIX.command_experiment_meta(
+                target_suites=("core",),
+                preset="baseline",
+            ),
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-quality-archive",
             evidence_mode="ablation",
             target_suite="core",
             preset="no_normalizer",
             seed=1,
             config={"enable_replay_bug": False},
             replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": {
+                    "scheduler_learning": True,
+                    "quality_archive": False,
+                    "local_source_scheduler": True,
+                },
+                "disabled_adaptive_components": ["quality_archive"],
+            },
+            experiment_meta=FINAL_MODULE_ABLATION_MATRIX.command_experiment_meta(
+                target_suites=("core",),
+                preset="no_normalizer",
+            ),
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-runtime-cost",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=2,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    runtime_cost_learning=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["runtime_cost_learning"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_runtime_cost_learning",
+                    "comparison_role": "contrast",
+                    "component_focus": "runtime_cost_learning",
+                    "factors": {"runtime_cost_learning": False},
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-reference",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=3,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(local_source_scheduler=True),
+                "disabled_adaptive_components": [],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "adaptive_reference",
+                    "comparison_role": "baseline",
+                    "component_focus": "adaptive_closed_loop",
+                    "factors": {
+                        "adaptive_closed_loop": True,
+                        "scheduler_learning": True,
+                        "online_reward_model": True,
+                        "continual_learning": True,
+                        "active_learning": True,
+                        "quality_archive": True,
+                        "runtime_cost_learning": True,
+                        "scheduler_annealing": True,
+                    },
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-scheduler-learning",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=6,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    scheduler_learning=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["scheduler_learning"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_scheduler_learning",
+                    "comparison_role": "contrast",
+                    "component_focus": "scheduler_learning",
+                    "factors": {"scheduler_learning": False},
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-scheduler-annealing",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=9,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    scheduler_annealing=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["scheduler_annealing"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_scheduler_annealing",
+                    "comparison_role": "contrast",
+                    "component_focus": "scheduler_annealing",
+                    "factors": {"scheduler_annealing": False},
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-online-reward-model",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=7,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    online_reward_model=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["online_reward_model"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_online_reward_model",
+                    "comparison_role": "contrast",
+                    "component_focus": "online_reward_model",
+                    "factors": {"online_reward_model": False},
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-continual-learning",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=8,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    continual_learning=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["continual_learning"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_continual_learning",
+                    "comparison_role": "contrast",
+                    "component_focus": "continual_learning",
+                    "factors": {"continual_learning": False},
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-quality-archive",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=4,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    quality_archive=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["quality_archive"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_quality_archive",
+                    "comparison_role": "contrast",
+                    "component_focus": "quality_archive",
+                    "factors": {"quality_archive": False},
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-active-learning",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=5,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    active_learning=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["active_learning"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_active_learning",
+                    "comparison_role": "contrast",
+                    "component_focus": "active_learning",
+                    "factors": {"active_learning": False},
+                },
+            },
         )
     )
     manifests.append(
@@ -108,6 +435,28 @@ def test_final_readiness_passes_when_all_evidence_tracks_are_present(tmp_path):
             seed=1,
             config={"enable_replay_bug": False},
             replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={"version_ledger_file": str(version_ledger_path)},
+            experiment_meta=FINAL_COMPARISON_MATRIX.command_experiment_meta(
+                target_suites=("embedded_sql",),
+                preset="baseline",
+            ),
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="comparison-guided",
+            evidence_mode="comparison",
+            target_suite="embedded_sql",
+            preset="guided",
+            seed=2,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={"version_ledger_file": str(version_ledger_path)},
+            experiment_meta=FINAL_COMPARISON_MATRIX.command_experiment_meta(
+                target_suites=("embedded_sql",),
+                preset="guided",
+            ),
         )
     )
 
@@ -123,12 +472,695 @@ def test_final_readiness_passes_when_all_evidence_tracks_are_present(tmp_path):
     assert {gate["name"]: gate["passed"] for gate in audit["gates"]}["live_suite_breadth"] is True
     assert audit["summary"]["validation_runs"] == 1
     assert audit["summary"]["validation_suites"] == ["datafusion_cross"]
-    assert audit["summary"]["ablation_runs"] == 1
-    assert audit["summary"]["comparison_runs"] == 1
+    assert audit["summary"]["ablation_runs"] == 2
+    assert audit["summary"]["module_ablation_comparison"]["complete_group_count"] == 1
+    assert audit["summary"]["module_ablation_comparison"]["reference_run_count"] == 1
+    assert audit["summary"]["module_ablation_comparison"]["contrast_run_count"] == 1
+    assert audit["summary"]["adaptive_component_ablation"]["reference_run_count"] == 1
+    assert audit["summary"]["adaptive_component_ablation"]["contrast_run_count"] == 7
+    assert audit["summary"]["adaptive_component_ablation"]["disabled_components"] == list(
+        REQUIRED_ADAPTIVE_COMPONENTS
+    )
+    assert audit["summary"]["adaptive_component_ablation"]["reference_metrics"]["cases"] == 1
+    assert audit["summary"]["adaptive_component_ablation"]["contrast_metrics"]["cases"] == 7
+    assert audit["summary"]["final_matrix_coverage"]["missing_matrix_ids"] == []
+    assert audit["summary"]["cross_version_ledger"]["ledger_count"] == 1
+    assert audit["summary"]["cross_version_ledger"]["max_version_count"] == 2
+    assert audit["summary"]["cross_version_ledger"]["transition_counts"]["new"] == 1
+    assert audit["summary"]["discovery_responsiveness"]["best_first_candidate_elapsed_s"] == 0.25
+    assert audit["summary"]["comparison_runs"] == 2
+    assert audit["summary"]["baseline_comparison"]["complete_group_count"] == 1
+    assert audit["summary"]["baseline_comparison"]["reference_run_count"] == 1
+    assert audit["summary"]["baseline_comparison"]["contrast_run_count"] == 1
     assert audit["summary"]["paper_run_journal_covered_runs"] == len(audit["runs"])
     assert audit["summary"]["paper_run_journal_missing_runs"] == []
     assert audit["summary"]["confirmed_live_candidate_families"] == {"confirmed_root@datafusion": 1}
     assert audit["summary"]["historical_confirmed_bug_ids"] == ["duckdb-22075", "duckdb-22656"]
+
+
+def test_final_readiness_requires_adaptive_component_ablation_for_final_claim(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="ablation-without-adaptive-components",
+        evidence_mode="ablation",
+        target_suite="core",
+        preset="no_normalizer",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_comparison=False,
+        ),
+    )
+
+    gates = {gate["name"]: gate for gate in audit["gates"]}
+    assert gates["adaptive_component_ablation"]["passed"] is False
+    assert gates["adaptive_component_ablation"]["disabled_components"] == []
+    assert gates["adaptive_component_ablation"]["missing_required_components"] == list(
+        REQUIRED_ADAPTIVE_COMPONENTS
+    )
+
+
+def test_final_readiness_requires_key_adaptive_component_ablations(tmp_path):
+    manifests = [
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-reference",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=0,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(),
+                "disabled_adaptive_components": [],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "adaptive_reference",
+                    "comparison_role": "baseline",
+                    "component_focus": "adaptive_closed_loop",
+                },
+            },
+        ),
+        _write_manifest(
+            tmp_path,
+            name="ablation-only-quality-archive",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=1,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(quality_archive=False),
+                "disabled_adaptive_components": ["quality_archive"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_quality_archive",
+                    "comparison_role": "contrast",
+                    "component_focus": "quality_archive",
+                    "factors": {"quality_archive": False},
+                },
+            },
+        ),
+    ]
+
+    audit = build_final_readiness(
+        manifests,
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=(), required_live_families=()),
+    )
+
+    gates = {gate["name"]: gate for gate in audit["gates"]}
+    assert gates["adaptive_component_ablation"]["passed"] is False
+    assert gates["adaptive_component_ablation"]["disabled_components"] == ["quality_archive"]
+    assert gates["adaptive_component_ablation"]["missing_required_components"] == [
+        "active_learning",
+        "continual_learning",
+        "online_reward_model",
+        "runtime_cost_learning",
+        "scheduler_annealing",
+        "scheduler_learning",
+    ]
+    assert gates["adaptive_component_ablation"]["reference_run_count"] == 1
+    assert gates["adaptive_component_ablation"]["contrast_run_count"] == 1
+
+
+def test_final_readiness_requires_adaptive_component_reference_run(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="ablation-without-adaptive-reference",
+        evidence_mode="ablation",
+        target_suite="datafusion_cross",
+        preset="live_deep_organic",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        run_updates={
+            "adaptive_components": _adaptive_component_flags(
+                active_learning=False,
+                continual_learning=False,
+                online_reward_model=False,
+                quality_archive=False,
+                runtime_cost_learning=False,
+                scheduler_annealing=False,
+                scheduler_learning=False,
+            ),
+            "disabled_adaptive_components": list(REQUIRED_ADAPTIVE_COMPONENTS),
+        },
+        experiment_meta={
+            **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                target_suites=("datafusion_cross",)
+            ),
+            "variant": {
+                "variant_id": "no_quality_archive_runtime_cost",
+                "comparison_role": "contrast",
+                "component_focus": "adaptive_closed_loop",
+                "factors": {
+                    "active_learning": False,
+                    "continual_learning": False,
+                    "online_reward_model": False,
+                    "quality_archive": False,
+                    "runtime_cost_learning": False,
+                    "scheduler_annealing": False,
+                    "scheduler_learning": False,
+                },
+            },
+        },
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=(), required_live_families=()),
+    )
+
+    gate = {gate["name"]: gate for gate in audit["gates"]}["adaptive_component_ablation"]
+    assert gate["passed"] is False
+    assert gate["missing_required_components"] == []
+    assert gate["reference_run_count"] == 0
+    assert gate["contrast_run_count"] == 1
+
+
+def test_final_readiness_requires_standard_final_matrix_coverage(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="validation-only-matrix",
+        evidence_mode="validation",
+        target_suite="datafusion_cross",
+        preset="validation_smoke",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        experiment_meta=FINAL_VALIDATION_MATRIX.command_experiment_meta(
+            target_suites=("datafusion_cross",),
+            preset=FINAL_VALIDATION_MATRIX.variants[0].preset,
+        ),
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_adaptive_component_ablation=False,
+            require_transferability_scope=False,
+            require_cross_version_ledger=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=(), required_live_families=()),
+    )
+
+    gates = {gate["name"]: gate for gate in audit["gates"]}
+    assert gates["final_matrix_coverage"]["passed"] is False
+    assert gates["final_matrix_coverage"]["observed_matrix_ids"] == ["final_validation"]
+    assert "adaptive_component_ablation" in gates["final_matrix_coverage"]["missing"]
+    assert "live_discovery" in gates["final_matrix_coverage"]["missing"]
+
+
+def test_final_readiness_requires_cross_version_ledger_for_continual_claim(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="validation-without-ledger",
+        evidence_mode="validation",
+        target_suite="datafusion_cross",
+        preset="validation_smoke",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        experiment_meta=FINAL_VALIDATION_MATRIX.command_experiment_meta(
+            target_suites=("datafusion_cross",),
+            preset=FINAL_VALIDATION_MATRIX.variants[0].preset,
+        ),
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+            require_adaptive_component_ablation=False,
+            require_runtime_efficiency=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=(), required_live_families=(), required_final_matrix_ids=()),
+    )
+
+    gate = {gate["name"]: gate for gate in audit["gates"]}["cross_version_continual_learning"]
+    assert gate["passed"] is False
+    assert gate["ledger_files"] == []
+
+
+def test_final_readiness_rejects_invalid_cross_version_ledger(tmp_path):
+    invalid_ledger = tmp_path / "reports" / "invalid-ledger.json"
+    dump_json({"schema_version": "not-a-version-ledger"}, invalid_ledger)
+    manifest = _write_manifest(
+        tmp_path,
+        name="validation-invalid-ledger",
+        evidence_mode="validation",
+        target_suite="datafusion_cross",
+        preset="validation_smoke",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        run_updates={"version_ledger_file": str(invalid_ledger)},
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+            require_adaptive_component_ablation=False,
+            require_runtime_efficiency=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=(), required_live_families=(), required_final_matrix_ids=()),
+    )
+
+    gate = {gate["name"]: gate for gate in audit["gates"]}["cross_version_continual_learning"]
+    assert gate["passed"] is False
+    assert gate["invalid_reasons"][str(invalid_ledger)] == "schema_mismatch"
+
+
+def test_final_readiness_rejects_old_cross_version_ledger_without_health_feedback(tmp_path):
+    old_ledger = tmp_path / "reports" / "old-ledger.json"
+    dump_json(
+        {
+            "schema_version": "version-ledger-v1",
+            "baseline_version": "v1",
+            "version_order": ["v1", "v2"],
+            "summary": {
+                "version_count": 2,
+                "family_count": 1,
+                "transition_counts": {"new": 1},
+                "new_family_count": 1,
+                "fixed_family_count": 0,
+                "regression_family_count": 0,
+                "persistent_family_count": 0,
+            },
+            "families": [
+                {
+                    "family": "new_root@engine",
+                    "status": "new",
+                    "observations": [
+                        {"version_id": "v1", "state": "absent", "count": 0},
+                        {"version_id": "v2", "state": "present", "count": 1},
+                    ],
+                }
+            ],
+        },
+        old_ledger,
+    )
+    manifest = _write_manifest(
+        tmp_path,
+        name="validation-old-ledger",
+        evidence_mode="validation",
+        target_suite="datafusion_cross",
+        preset="validation_smoke",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        run_updates={"version_ledger_file": str(old_ledger)},
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+            require_adaptive_component_ablation=False,
+            require_runtime_efficiency=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=(), required_live_families=(), required_final_matrix_ids=()),
+    )
+
+    gate = {gate["name"]: gate for gate in audit["gates"]}["cross_version_continual_learning"]
+    summary = audit["summary"]["cross_version_ledger"]
+    assert gate["passed"] is False
+    assert gate["invalid_reasons"][str(old_ledger)] == "missing_health_feedback"
+    assert summary["ledger_count"] == 0
+    assert summary["invalid_reasons"][str(old_ledger)] == "missing_health_feedback"
+
+
+def test_final_readiness_rejects_cross_version_ledger_without_latest_health_report(tmp_path):
+    old_report_ledger = tmp_path / "reports" / "old-report-ledger.json"
+    dump_json(
+        {
+            "schema_version": "version-ledger-v1",
+            "baseline_version": "v1",
+            "version_order": ["v1", "v2"],
+            "summary": {
+                "version_count": 2,
+                "family_count": 1,
+                "transition_counts": {"new": 1},
+                "new_family_count": 1,
+                "fixed_family_count": 0,
+                "regression_family_count": 0,
+                "persistent_family_count": 0,
+                "health_observation_count": 2,
+            },
+            "health": {
+                "schema_version": "version-ledger-health-v1",
+                "observation_count": 2,
+                "health_observation_count": 2,
+            },
+            "families": [
+                {
+                    "family": "new_root@engine",
+                    "status": "new",
+                    "observations": [
+                        {"version_id": "v1", "state": "absent", "count": 0},
+                        {"version_id": "v2", "state": "present", "count": 1},
+                    ],
+                }
+            ],
+        },
+        old_report_ledger,
+    )
+    manifest = _write_manifest(
+        tmp_path,
+        name="validation-old-report-ledger",
+        evidence_mode="validation",
+        target_suite="datafusion_cross",
+        preset="validation_smoke",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        run_updates={"version_ledger_file": str(old_report_ledger)},
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+            require_adaptive_component_ablation=False,
+            require_runtime_efficiency=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=(), required_live_families=(), required_final_matrix_ids=()),
+    )
+
+    gate = {gate["name"]: gate for gate in audit["gates"]}["cross_version_continual_learning"]
+    summary = audit["summary"]["cross_version_ledger"]
+    assert gate["passed"] is False
+    assert gate["invalid_reasons"][str(old_report_ledger)] == "missing_health_feedback_report"
+    assert summary["ledger_count"] == 0
+
+
+def test_final_readiness_consumes_postprocess_version_ledger_manifest_without_run_gates(tmp_path):
+    ledger = _write_version_ledger(tmp_path)
+    manifest = tmp_path / "reports" / "experiment-final-version-ledger.json"
+    dump_json(
+        {
+            "schema_version": "version-ledger-evidence-manifest-v1",
+            "evidence_mode": "comparison",
+            "evidence_kind": "postprocess_ledger",
+            "target_suite": "cross_version",
+            "target_suites": ["cross_version"],
+            "runs": [
+                {
+                    "target_suite": "cross_version",
+                    "preset": "version_ledger",
+                    "seed": "",
+                    "run_file": str(tmp_path / "runs" / "run-v2.jsonl"),
+                    "evidence_mode": "comparison",
+                    "evidence_kind": "postprocess_ledger",
+                    "version_ledger_file": str(ledger),
+                }
+            ],
+            "experiment_meta": {
+                "matrix_id": "baseline_scope_comparison",
+                "comparison_group": "cross_version_continual_learning",
+                "variant": {
+                    "variant_id": "version_ledger",
+                    "comparison_role": "support",
+                    "component_focus": "cross_version_continual_learning",
+                },
+            },
+        },
+        manifest,
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+            require_adaptive_component_ablation=False,
+            require_runtime_efficiency=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=(), required_live_families=(), required_final_matrix_ids=()),
+    )
+
+    gates = {gate["name"]: gate for gate in audit["gates"]}
+    assert gates["cross_version_continual_learning"]["passed"] is True
+    assert gates["paper_run_journal"]["passed"] is True
+    assert gates["stage_level_profiling"]["passed"] is True
+    assert audit["summary"]["comparison_runs"] == 0
+    assert audit["summary"]["cross_version_ledger"]["ledger_count"] == 1
+
+
+def test_final_readiness_audits_continual_learning_absorption_when_declared(tmp_path):
+    ledger = _write_version_ledger(tmp_path)
+    manifest = _write_manifest(
+        tmp_path,
+        name="comparison-adaptive-continual",
+        evidence_mode="comparison",
+        target_suite="embedded_sql",
+        preset="guided",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        run_updates={"version_ledger_file": str(ledger)},
+        experiment_meta=FINAL_COMPARISON_MATRIX.command_experiment_meta(
+            target_suites=("embedded_sql",),
+            preset="guided",
+        ),
+    )
+    manifest_payload = load_json(manifest)
+    manifest_payload["schedule"] = "adaptive"
+    manifest_payload["adaptive_config"] = {
+        "continual_learning_sources": [
+            {
+                "path": str(ledger),
+                "loaded": True,
+                "family_count": 2,
+                "feature_count": 4,
+            }
+        ]
+    }
+    manifest_payload["adaptive_learning"] = {
+        "schema_version": "adaptive-learning-v1",
+        "continual_priority_memory": {
+            "imported_ledger_count": 0,
+            "imported_family_count": 0,
+            "family_priorities": {},
+            "feature_counts": {},
+        },
+    }
+    dump_json(manifest_payload, manifest)
+
+    thresholds = ReadinessThresholds(
+        min_live_duration_hours=0.0,
+        min_live_candidate_families=0,
+        min_confirmed_live_families=0,
+        min_historical_confirmed=0,
+        require_validation=False,
+        require_seeded=False,
+        require_ablation=False,
+        require_comparison=False,
+        require_transferability_scope=False,
+        require_adaptive_component_ablation=False,
+        require_runtime_efficiency=False,
+        require_closed_loop_state_persistence=False,
+    )
+    policy = ReadinessPolicy(required_live_suites=(), required_live_families=(), required_final_matrix_ids=())
+
+    audit = build_final_readiness([manifest], thresholds=thresholds, policy=policy)
+    gate = {gate["name"]: gate for gate in audit["gates"]}["continual_learning_absorption"]
+
+    assert gate["passed"] is False
+    assert gate["missing"] == ["comparison:embedded_sql:guided:loaded_sources_not_absorbed"]
+
+    manifest_payload["adaptive_learning"]["continual_priority_memory"] = {
+        "imported_ledger_count": 1,
+        "imported_family_count": 2,
+        "family_priorities": {"new_family@engine": 0.9, "persistent_family@engine": 0.55},
+        "feature_counts": {"family:new_family": 1, "family:persistent_family": 1},
+    }
+    dump_json(manifest_payload, manifest)
+
+    audit = build_final_readiness([manifest], thresholds=thresholds, policy=policy)
+    gate = {gate["name"]: gate for gate in audit["gates"]}["continual_learning_absorption"]
+
+    assert gate["passed"] is True
+    assert gate["absorbed_run_count"] == 1
+    assert gate["max_imported_ledger_count"] == 1
+    assert gate["max_imported_family_count"] == 2
+
+
+def test_final_readiness_requires_transferability_beyond_primary_dataframe_family(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="dataframe-only-live",
+        evidence_mode="live",
+        target_suite="dataframe",
+        preset="live",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_adaptive_component_ablation=False,
+            require_cross_version_ledger=False,
+            require_discovery_responsiveness=False,
+        ),
+        policy=ReadinessPolicy(
+            required_live_suites=("dataframe",),
+            required_live_families=("dataframe",),
+            required_transfer_families=("dataframe", "embedded_sql"),
+        ),
+    )
+
+    gates = {gate["name"]: gate for gate in audit["gates"]}
+    assert gates["transferability_scope"]["passed"] is False
+    assert gates["transferability_scope"]["families"] == ["dataframe"]
+    assert gates["transferability_scope"]["missing"] == ["embedded_sql"]
+
+
+def test_final_readiness_transferability_scope_passes_with_second_target_family(tmp_path):
+    manifests = [
+        _write_manifest(
+            tmp_path,
+            name="dataframe-live",
+            evidence_mode="live",
+            target_suite="dataframe",
+            preset="live",
+            seed=1,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        ),
+        _write_manifest(
+            tmp_path,
+            name="embedded-sql-comparison",
+            evidence_mode="comparison",
+            target_suite="embedded_sql",
+            preset="baseline",
+            seed=2,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        ),
+    ]
+
+    audit = build_final_readiness(
+        manifests,
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_adaptive_component_ablation=False,
+        ),
+        policy=ReadinessPolicy(
+            required_live_suites=("dataframe",),
+            required_live_families=("dataframe",),
+            required_transfer_families=("dataframe", "embedded_sql"),
+        ),
+    )
+
+    gates = {gate["name"]: gate for gate in audit["gates"]}
+    assert gates["transferability_scope"]["passed"] is True
+    assert audit["summary"]["transferability_scope"]["families"] == ["dataframe", "embedded_sql"]
+    assert audit["summary"]["transferability_scope"]["non_primary_families"] == ["embedded_sql"]
 
 
 def test_final_readiness_reports_missing_a_level_evidence(tmp_path):
@@ -189,6 +1221,8 @@ def test_final_readiness_keeps_validation_runs_out_of_live_bug_evidence(tmp_path
             require_seeded=False,
             require_ablation=False,
             require_comparison=False,
+            require_adaptive_component_ablation=False,
+            require_cross_version_ledger=False,
         ),
         policy=ReadinessPolicy(required_live_suites=("datafusion_cross",), required_live_families=("query_engine",)),
     )
@@ -207,6 +1241,20 @@ def test_final_readiness_keeps_support_tracks_out_of_live_bug_evidence(tmp_path)
     manifests = [
         _write_manifest(
             tmp_path,
+            name="ablation-baseline",
+            evidence_mode="ablation",
+            target_suite="core",
+            preset="baseline",
+            seed=3,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            experiment_meta=FINAL_MODULE_ABLATION_MATRIX.command_experiment_meta(
+                target_suites=("core",),
+                preset="baseline",
+            ),
+        ),
+        _write_manifest(
+            tmp_path,
             name="ablation-with-candidate",
             evidence_mode="ablation",
             target_suite="core",
@@ -222,14 +1270,32 @@ def test_final_readiness_keeps_support_tracks_out_of_live_bug_evidence(tmp_path)
             ],
             config={"enable_replay_bug": False},
             replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            experiment_meta=FINAL_MODULE_ABLATION_MATRIX.command_experiment_meta(
+                target_suites=("core",),
+                preset="no_normalizer",
+            ),
+        ),
+        _write_manifest(
+            tmp_path,
+            name="comparison-baseline",
+            evidence_mode="comparison",
+            target_suite="embedded_sql",
+            preset="baseline",
+            seed=5,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            experiment_meta=FINAL_COMPARISON_MATRIX.command_experiment_meta(
+                target_suites=("embedded_sql",),
+                preset="baseline",
+            ),
         ),
         _write_manifest(
             tmp_path,
             name="comparison-with-candidate",
             evidence_mode="comparison",
             target_suite="embedded_sql",
-            preset="baseline",
-            seed=5,
+            preset="guided",
+            seed=6,
             findings=[
                 {
                     "triage_verdict": "candidate_implementation_bug",
@@ -240,6 +1306,10 @@ def test_final_readiness_keeps_support_tracks_out_of_live_bug_evidence(tmp_path)
             ],
             config={"enable_replay_bug": False},
             replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            experiment_meta=FINAL_COMPARISON_MATRIX.command_experiment_meta(
+                target_suites=("embedded_sql",),
+                preset="guided",
+            ),
         ),
     ]
 
@@ -258,8 +1328,8 @@ def test_final_readiness_keeps_support_tracks_out_of_live_bug_evidence(tmp_path)
     gates = {gate["name"]: gate for gate in audit["gates"]}
     assert gates["module_ablation"]["passed"] is True
     assert gates["baseline_comparison"]["passed"] is True
-    assert audit["summary"]["ablation_runs"] == 1
-    assert audit["summary"]["comparison_runs"] == 1
+    assert audit["summary"]["ablation_runs"] == 2
+    assert audit["summary"]["comparison_runs"] == 2
     assert audit["summary"]["live_runs"] == 0
     assert audit["summary"]["rewardable_live_candidate_families"] == {}
     assert audit["summary"]["ignored_evidence_runs"] == 0
@@ -379,6 +1449,628 @@ def test_final_readiness_requires_stage_level_profiling(tmp_path):
     assert gates["stage_level_profiling"]["missing"] == ["seeded:seeded_filter:guided_filter"]
 
 
+def test_final_readiness_rejects_low_throughput_runtime_evidence(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="low-throughput-runtime",
+        evidence_mode="validation",
+        target_suite="datafusion_cross",
+        preset="validation_smoke",
+        seed=17,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+    run_file = Path(final_readiness.load_json(manifest)["runs"][0]["run_file"])
+    meta_path = run_meta_path(run_file)
+    meta = final_readiness.load_json(meta_path)
+    meta["throughput_cases_s"] = 0.0
+    final_readiness.dump_json(meta, meta_path)
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_adaptive_component_ablation=False,
+            require_transferability_scope=False,
+            min_throughput_cases_s=0.1,
+        ),
+        policy=ReadinessPolicy(required_live_suites=(), required_live_families=()),
+    )
+
+    gates = {gate["name"]: gate for gate in audit["gates"]}
+    assert gates["runtime_efficiency"]["passed"] is False
+    assert gates["runtime_efficiency"]["issues"] == [
+        "validation:datafusion_cross:validation_smoke:throughput_below_min"
+    ]
+    assert audit["summary"]["runtime_efficiency"]["min_throughput_cases_s"] == 0.0
+
+
+def test_final_readiness_rejects_high_scheduler_feedback_share(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="high-scheduler-feedback",
+        evidence_mode="validation",
+        target_suite="datafusion_cross",
+        preset="validation_smoke",
+        seed=18,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+    run_file = Path(final_readiness.load_json(manifest)["runs"][0]["run_file"])
+    meta_path = run_meta_path(run_file)
+    meta = final_readiness.load_json(meta_path)
+    meta["stage_profile"]["totals_ms"]["scheduler_feedback_ms"] = 9.0
+    meta["stage_profile"]["totals_ms"]["total_case_wall_ms"] = 10.0
+    final_readiness.dump_json(meta, meta_path)
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_adaptive_component_ablation=False,
+            require_transferability_scope=False,
+            max_scheduler_feedback_share=0.5,
+            min_scheduler_feedback_cases=1,
+        ),
+        policy=ReadinessPolicy(required_live_suites=(), required_live_families=()),
+    )
+
+    gates = {gate["name"]: gate for gate in audit["gates"]}
+    assert gates["runtime_efficiency"]["passed"] is False
+    assert gates["runtime_efficiency"]["issues"] == [
+        "validation:datafusion_cross:validation_smoke:scheduler_feedback_share_high"
+    ]
+    assert audit["summary"]["runtime_efficiency"]["max_scheduler_feedback_share"] == 0.9
+
+
+def test_final_readiness_skips_scheduler_feedback_share_for_short_smoke_runs(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="short-scheduler-feedback-smoke",
+        evidence_mode="validation",
+        target_suite="datafusion_cross",
+        preset="validation_smoke",
+        seed=181,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+    run_file = Path(final_readiness.load_json(manifest)["runs"][0]["run_file"])
+    meta_path = run_meta_path(run_file)
+    meta = final_readiness.load_json(meta_path)
+    meta["executed_cases"] = 1
+    meta["stage_profile"]["totals_ms"]["scheduler_feedback_ms"] = 9.0
+    meta["stage_profile"]["totals_ms"]["total_case_wall_ms"] = 10.0
+    final_readiness.dump_json(meta, meta_path)
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_adaptive_component_ablation=False,
+            require_transferability_scope=False,
+            max_scheduler_feedback_share=0.5,
+            min_scheduler_feedback_cases=10,
+        ),
+        policy=ReadinessPolicy(required_live_suites=(), required_live_families=()),
+    )
+
+    gates = {gate["name"]: gate for gate in audit["gates"]}
+    assert gates["runtime_efficiency"]["passed"] is True
+    assert gates["runtime_efficiency"]["issues"] == []
+    summary = audit["summary"]["runtime_efficiency"]
+    assert summary["max_scheduler_feedback_share"] == 0.0
+    assert summary["scheduler_feedback_share_run_count"] == 0
+    assert summary["scheduler_feedback_share_skipped_run_count"] == 1
+    assert summary["scheduler_feedback_share_skipped_runs"] == [
+        "validation:datafusion_cross:validation_smoke:cases_below_scheduler_share_min:1/10"
+    ]
+
+
+def test_final_readiness_requires_live_discovery_responsiveness_evidence(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="live-without-first-candidate",
+        evidence_mode="live",
+        target_suite="datafusion_cross",
+        preset="live_datafusion",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+            require_adaptive_component_ablation=False,
+            require_cross_version_ledger=False,
+            require_runtime_efficiency=False,
+        ),
+        policy=ReadinessPolicy(
+            required_live_suites=("datafusion_cross",),
+            required_live_families=("query_engine",),
+            required_final_matrix_ids=(),
+        ),
+    )
+
+    gate = {gate["name"]: gate for gate in audit["gates"]}["discovery_responsiveness"]
+    assert gate["passed"] is False
+    assert gate["observed_run_count"] == 0
+
+
+def test_final_readiness_derives_discovery_responsiveness_from_run_log(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="live-with-log-candidate",
+        evidence_mode="live",
+        target_suite="datafusion_cross",
+        preset="live_datafusion",
+        seed=1,
+        findings=[
+            {
+                "triage_verdict": "candidate_implementation_bug",
+                "root_cause": "log_root",
+                "suspicious_backends": ["datafusion"],
+                "discovery_origin": "organic",
+            }
+        ],
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+            require_adaptive_component_ablation=False,
+            require_cross_version_ledger=False,
+            require_runtime_efficiency=False,
+            max_first_candidate_elapsed_s=1.0,
+        ),
+        policy=ReadinessPolicy(
+            required_live_suites=("datafusion_cross",),
+            required_live_families=("query_engine",),
+            required_final_matrix_ids=(),
+        ),
+    )
+
+    gate = {gate["name"]: gate for gate in audit["gates"]}["discovery_responsiveness"]
+    assert gate["passed"] is True
+    assert gate["best_first_candidate_case_index"] == 0
+    assert gate["best_first_candidate_elapsed_s"] == 0.1
+    assert gate["avg_candidate_bug_discovery_auc"] == 1.0
+
+
+def test_final_readiness_rejects_slow_first_candidate_discovery(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="slow-first-candidate",
+        evidence_mode="live",
+        target_suite="datafusion_cross",
+        preset="live_datafusion",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        first_candidate_case_index=42,
+        first_candidate_elapsed_s=7200.0,
+        candidate_bug_discovery_auc=0.1,
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+            require_adaptive_component_ablation=False,
+            require_cross_version_ledger=False,
+            require_runtime_efficiency=False,
+            max_first_candidate_elapsed_s=60.0,
+        ),
+        policy=ReadinessPolicy(
+            required_live_suites=("datafusion_cross",),
+            required_live_families=("query_engine",),
+            required_final_matrix_ids=(),
+        ),
+    )
+
+    gate = {gate["name"]: gate for gate in audit["gates"]}["discovery_responsiveness"]
+    assert gate["passed"] is False
+    assert gate["best_first_candidate_elapsed_s"] == 7200.0
+
+
+def test_final_readiness_requires_closed_loop_state_persistence_for_live_runs(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="live-without-closed-loop-state",
+        evidence_mode="live",
+        target_suite="datafusion_cross",
+        preset="live_datafusion",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        first_candidate_case_index=0,
+        first_candidate_elapsed_s=0.1,
+        include_closed_loop_state=False,
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+            require_adaptive_component_ablation=False,
+            require_cross_version_ledger=False,
+            require_runtime_efficiency=False,
+        ),
+        policy=ReadinessPolicy(
+            required_live_suites=("datafusion_cross",),
+            required_live_families=("query_engine",),
+            required_final_matrix_ids=(),
+        ),
+    )
+
+    gate = {gate["name"]: gate for gate in audit["gates"]}["closed_loop_state_persistence"]
+    assert gate["passed"] is False
+    assert gate["missing"] == ["live:datafusion_cross:live_datafusion:missing_state_file"]
+
+
+def test_final_readiness_requires_adaptive_learning_health_for_live_closed_loop_state(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="live-with-legacy-closed-loop-state",
+        evidence_mode="live",
+        target_suite="datafusion_cross",
+        preset="live_datafusion",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        first_candidate_case_index=0,
+        first_candidate_elapsed_s=0.1,
+    )
+    run_file = tmp_path / "runs" / "run-live-with-legacy-closed-loop-state.jsonl"
+    meta_path = run_meta_path(run_file)
+    meta = load_json(meta_path)
+    meta["closed_loop_state_summary"] = {"seen_signature_count": 1}
+    dump_json(meta, meta_path)
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+            require_adaptive_component_ablation=False,
+            require_cross_version_ledger=False,
+            require_runtime_efficiency=False,
+        ),
+        policy=ReadinessPolicy(
+            required_live_suites=("datafusion_cross",),
+            required_live_families=("query_engine",),
+            required_final_matrix_ids=(),
+        ),
+    )
+
+    gate = {gate["name"]: gate for gate in audit["gates"]}["closed_loop_state_persistence"]
+    assert gate["passed"] is False
+    assert gate["missing"] == []
+    assert gate["weak"] == []
+    assert gate["missing_health"] == [
+        "live:datafusion_cross:live_datafusion:missing_adaptive_learning_health"
+    ]
+
+
+def test_final_readiness_requires_component_level_adaptive_live_evidence(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="live-adaptive-without-component-evidence",
+        evidence_mode="live",
+        target_suite="datafusion_cross",
+        preset="live_datafusion",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        first_candidate_case_index=0,
+        first_candidate_elapsed_s=0.1,
+        run_updates={
+            "adaptive_components": _adaptive_component_flags(local_source_scheduler=True),
+            "disabled_adaptive_components": [],
+        },
+    )
+    run_file = tmp_path / "runs" / "run-live-adaptive-without-component-evidence.jsonl"
+    meta_path = run_meta_path(run_file)
+    meta = load_json(meta_path)
+    meta["closed_loop_state_summary"]["adaptive_learning_health"] = {
+        "schema_version": "adaptive-learning-health-v1",
+        "bandit_count": 1,
+        "arm_count": 1,
+        "total_pulls": 1,
+        "avg_health_penalty": 0.0,
+        "max_health_penalty": 0.0,
+        "avg_uncertainty": 1.0,
+        "exploration_memory": {
+            "total_records": 0,
+            "context_count": 0,
+            "action_count": 0,
+        },
+    }
+    meta["closed_loop_state_summary"].pop("quality_archive_health", None)
+    dump_json(meta, meta_path)
+    manifest_payload = final_readiness.load_json(manifest)
+    manifest_payload["adaptive_state"] = [
+        {
+            "arm_id": "datafusion_cross:live_datafusion:0",
+            "target_suite": "datafusion_cross",
+            "preset": "live_datafusion",
+            "pulls": 1,
+            "learning_signal": 0.1,
+            "annealing_temperature": 0.0,
+        }
+    ]
+    final_readiness.dump_json(manifest_payload, manifest)
+
+    thresholds = ReadinessThresholds(
+        min_live_duration_hours=0.0,
+        min_live_candidate_families=0,
+        min_confirmed_live_families=0,
+        min_historical_confirmed=0,
+        require_validation=False,
+        require_seeded=False,
+        require_ablation=False,
+        require_comparison=False,
+        require_transferability_scope=False,
+        require_adaptive_component_ablation=False,
+        require_cross_version_ledger=False,
+        require_runtime_efficiency=False,
+    )
+    policy = ReadinessPolicy(
+        required_live_suites=("datafusion_cross",),
+        required_live_families=("query_engine",),
+        required_final_matrix_ids=(),
+    )
+
+    audit = build_final_readiness([manifest], thresholds=thresholds, policy=policy)
+    gate = {gate["name"]: gate for gate in audit["gates"]}["adaptive_live_component_evidence"]
+
+    assert gate["passed"] is False
+    assert gate["proven_components"] == ["scheduler_learning"]
+    assert gate["missing"] == [
+        "live:datafusion_cross:live_datafusion:active_learning",
+        "live:datafusion_cross:live_datafusion:continual_learning",
+        "live:datafusion_cross:live_datafusion:online_reward_model",
+        "live:datafusion_cross:live_datafusion:quality_archive",
+        "live:datafusion_cross:live_datafusion:runtime_cost_learning",
+        "live:datafusion_cross:live_datafusion:scheduler_annealing",
+    ]
+
+    meta["closed_loop_state_summary"]["adaptive_learning_health"].update(
+        {
+            "reward_model_update_count": 1,
+            "reward_model_feature_count": 2,
+            "version_memory_key_count": 1,
+            "runtime_cost_observation_count": 1,
+            "runtime_cost_total": 0.1,
+            "continual_priority_memory": {
+                "imported_ledger_count": 1,
+                "imported_family_count": 1,
+                "family_count": 1,
+                "feature_count": 2,
+            },
+            "exploration_memory": {
+                "total_records": 1,
+                "context_count": 2,
+                "action_count": 1,
+            },
+        }
+    )
+    meta["closed_loop_state_summary"]["quality_archive_health"] = {
+        "schema_version": "quality-archive-health-v1",
+        "cell_count": 1,
+        "seed_count": 1,
+        "elite_seed_count": 1,
+        "reward_count": 1,
+        "outcome_count": 1,
+        "invalid_count": 0,
+        "fallback_count": 0,
+        "false_positive_count": 0,
+    }
+    dump_json(meta, meta_path)
+    manifest_payload["adaptive_state"][0]["annealing_temperature"] = 0.2
+    final_readiness.dump_json(manifest_payload, manifest)
+
+    audit = build_final_readiness([manifest], thresholds=thresholds, policy=policy)
+    gate = {gate["name"]: gate for gate in audit["gates"]}["adaptive_live_component_evidence"]
+
+    assert gate["passed"] is True
+    assert gate["missing"] == []
+    assert gate["adaptive_selection_total_count"] == 4
+    assert gate["adaptive_selection_scopes"] == [
+        "generator_profile",
+        "metamorphic_relation",
+        "semantic_objective",
+        "version_pair",
+    ]
+    assert gate["proven_components"] == [
+        "active_learning",
+        "continual_learning",
+        "online_reward_model",
+        "quality_archive",
+        "runtime_cost_learning",
+        "scheduler_annealing",
+        "scheduler_learning",
+    ]
+
+
+def test_final_readiness_requires_adaptive_selection_telemetry_for_live_adaptive_runs(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="live-adaptive-without-selection-telemetry",
+        evidence_mode="live",
+        target_suite="datafusion_cross",
+        preset="live_datafusion",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        first_candidate_case_index=0,
+        first_candidate_elapsed_s=0.1,
+        include_adaptive_selection=False,
+        run_updates={
+            "adaptive_components": _adaptive_component_flags(local_source_scheduler=True),
+            "disabled_adaptive_components": [],
+        },
+    )
+    thresholds = ReadinessThresholds(
+        min_live_duration_hours=0.0,
+        min_live_candidate_families=0,
+        min_confirmed_live_families=0,
+        min_historical_confirmed=0,
+        require_validation=False,
+        require_seeded=False,
+        require_ablation=False,
+        require_comparison=False,
+        require_transferability_scope=False,
+        require_adaptive_component_ablation=False,
+        require_cross_version_ledger=False,
+        require_runtime_efficiency=False,
+    )
+    policy = ReadinessPolicy(
+        required_live_suites=("datafusion_cross",),
+        required_live_families=("query_engine",),
+        required_final_matrix_ids=(),
+    )
+
+    audit = build_final_readiness([manifest], thresholds=thresholds, policy=policy)
+    gate = {gate["name"]: gate for gate in audit["gates"]}["adaptive_live_component_evidence"]
+
+    assert gate["passed"] is False
+    assert "live:datafusion_cross:live_datafusion:adaptive_selection_telemetry" in gate["missing"]
+    assert gate["adaptive_selection_total_count"] == 0
+
+
+def test_final_readiness_infers_adaptive_selection_requirement_from_run_config(tmp_path):
+    config = {
+        "enable_replay_bug": False,
+        "generator_profile_learning_weight": 1.0,
+        "semantic_objective_learning_weight": 1.0,
+        "metamorphic_relation_learning_weight": 1.0,
+        "version_pair_learning_weight": 1.0,
+        "enable_generator_profile_learning": True,
+        "enable_semantic_objective_learning": True,
+        "enable_metamorphic_relation_learning": True,
+        "enable_metamorphic_oracle": True,
+        "enable_quality_archive": False,
+    }
+    manifest = _write_manifest(
+        tmp_path,
+        name="live-adaptive-config-only",
+        evidence_mode="live",
+        target_suite="datafusion_cross",
+        preset="live_datafusion",
+        seed=1,
+        config=config,
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        first_candidate_case_index=0,
+        first_candidate_elapsed_s=0.1,
+    )
+    thresholds = ReadinessThresholds(
+        min_live_duration_hours=0.0,
+        min_live_candidate_families=0,
+        min_confirmed_live_families=0,
+        min_historical_confirmed=0,
+        require_validation=False,
+        require_seeded=False,
+        require_ablation=False,
+        require_comparison=False,
+        require_transferability_scope=False,
+        require_adaptive_component_ablation=False,
+        require_cross_version_ledger=False,
+        require_runtime_efficiency=False,
+    )
+    policy = ReadinessPolicy(
+        required_live_suites=("datafusion_cross",),
+        required_live_families=("query_engine",),
+        required_final_matrix_ids=(),
+    )
+
+    audit = build_final_readiness([manifest], thresholds=thresholds, policy=policy)
+    gate = {gate["name"]: gate for gate in audit["gates"]}["adaptive_live_component_evidence"]
+
+    assert gate["passed"] is True
+    assert gate["declared_components"] == ["scheduler_learning"]
+    assert gate["adaptive_selection_total_count"] == 4
+    assert gate["adaptive_selection_scopes"] == [
+        "generator_profile",
+        "metamorphic_relation",
+        "semantic_objective",
+        "version_pair",
+    ]
+
+    run_file = tmp_path / "runs" / "run-live-adaptive-config-only.jsonl"
+    run_file.write_text(
+        '{"case_index": 0, "elapsed_s": 0.1, "case": {"case_id": "case-live-adaptive-config-only", "seed": 1, "program": {"operations": []}}, "findings": []}\n',
+        encoding="utf-8",
+    )
+
+    audit = build_final_readiness([manifest], thresholds=thresholds, policy=policy)
+    gate = {gate["name"]: gate for gate in audit["gates"]}["adaptive_live_component_evidence"]
+
+    assert gate["passed"] is False
+    assert gate["missing"] == ["live:datafusion_cross:live_datafusion:adaptive_selection_telemetry"]
+
+
 def test_final_readiness_requires_paper_run_journal_coverage(tmp_path):
     manifest = _write_manifest(
         tmp_path,
@@ -415,6 +2107,23 @@ def test_final_readiness_prefers_structured_matrix_identity_for_support_tracks(t
     manifests = [
         _write_manifest(
             tmp_path,
+            name="ablation-baseline-structured",
+            evidence_mode="ablation",
+            target_suite="core",
+            preset="stable_base",
+            seed=10,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "matrix_id": "module_ablation",
+                "comparison_group": "module_ablation",
+                "variant_id": "baseline",
+                "comparison_role": "baseline",
+                "analysis_tags": ["ablation", "baseline"],
+            },
+        ),
+        _write_manifest(
+            tmp_path,
             name="ablation-structured",
             evidence_mode="ablation",
             target_suite="core",
@@ -430,6 +2139,23 @@ def test_final_readiness_prefers_structured_matrix_identity_for_support_tracks(t
                 "comparison_role": "contrast",
                 "component_focus": "semantic_normalizer",
                 "analysis_tags": ["ablation", "noise_control"],
+            },
+        ),
+        _write_manifest(
+            tmp_path,
+            name="comparison-baseline-structured",
+            evidence_mode="comparison",
+            target_suite="embedded_sql",
+            preset="stable_base",
+            seed=13,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "matrix_id": "baseline_scope_comparison",
+                "comparison_group": "scope_comparison",
+                "variant_id": "baseline",
+                "comparison_role": "baseline",
+                "analysis_tags": ["comparison", "baseline"],
             },
         ),
         _write_manifest(
@@ -467,17 +2193,31 @@ def test_final_readiness_prefers_structured_matrix_identity_for_support_tracks(t
     gates = {gate["name"]: gate for gate in audit["gates"]}
     assert gates["module_ablation"]["passed"] is True
     assert gates["module_ablation"]["matrix_ids"] == ["module_ablation"]
-    assert gates["module_ablation"]["variants"] == ["focus_variant"]
+    assert gates["module_ablation"]["variants"] == ["baseline", "focus_variant"]
+    assert gates["module_ablation"]["reference_run_count"] == 1
+    assert gates["module_ablation"]["contrast_run_count"] == 1
     assert gates["baseline_comparison"]["passed"] is True
     assert gates["baseline_comparison"]["matrix_ids"] == ["baseline_scope_comparison"]
-    assert gates["baseline_comparison"]["variants"] == ["scope_variant"]
+    assert gates["baseline_comparison"]["variants"] == ["baseline", "scope_variant"]
+    assert gates["baseline_comparison"]["reference_run_count"] == 1
+    assert gates["baseline_comparison"]["contrast_run_count"] == 1
     assert audit["summary"]["ablation_matrix_ids"] == ["module_ablation"]
-    assert audit["summary"]["ablation_variants"] == ["focus_variant"]
+    assert audit["summary"]["ablation_variants"] == ["baseline", "focus_variant"]
     assert audit["summary"]["comparison_matrix_ids"] == ["baseline_scope_comparison"]
-    assert audit["summary"]["comparison_variants"] == ["scope_variant"]
+    assert audit["summary"]["comparison_variants"] == ["baseline", "scope_variant"]
 
 
 def test_final_readiness_backfills_support_track_identity_from_experiment_meta(tmp_path):
+    ablation_baseline_manifest = _write_manifest(
+        tmp_path,
+        name="ablation-meta-baseline",
+        evidence_mode="ablation",
+        target_suite="core",
+        preset="stable_base",
+        seed=20,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
     ablation_manifest = _write_manifest(
         tmp_path,
         name="ablation-meta-only",
@@ -485,6 +2225,16 @@ def test_final_readiness_backfills_support_track_identity_from_experiment_meta(t
         target_suite="core",
         preset="focus_variant",
         seed=21,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+    comparison_baseline_manifest = _write_manifest(
+        tmp_path,
+        name="comparison-meta-baseline",
+        evidence_mode="comparison",
+        target_suite="embedded_sql",
+        preset="stable_base",
+        seed=23,
         config={"enable_replay_bug": False},
         replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
     )
@@ -505,6 +2255,11 @@ def test_final_readiness_backfills_support_track_identity_from_experiment_meta(t
         "comparison_group": "module_ablation",
         "analysis_tags": ["ablation"],
         "variant_by_preset": {
+            "stable_base": {
+                "variant_id": "baseline",
+                "comparison_role": "baseline",
+                "analysis_tags": ["baseline"],
+            },
             "focus_variant": {
                 "variant_id": "focus_variant",
                 "base_preset": "stable_base",
@@ -515,6 +2270,9 @@ def test_final_readiness_backfills_support_track_identity_from_experiment_meta(t
         },
     }
     final_readiness.dump_json(ablation_payload, ablation_manifest)
+    ablation_baseline_payload = final_readiness.load_json(ablation_baseline_manifest)
+    ablation_baseline_payload["experiment_meta"] = ablation_payload["experiment_meta"]
+    final_readiness.dump_json(ablation_baseline_payload, ablation_baseline_manifest)
 
     comparison_payload = final_readiness.load_json(comparison_manifest)
     comparison_payload["experiment_meta"] = {
@@ -522,6 +2280,11 @@ def test_final_readiness_backfills_support_track_identity_from_experiment_meta(t
         "comparison_group": "scope_comparison",
         "analysis_tags": ["comparison"],
         "variant_by_preset": {
+            "stable_base": {
+                "variant_id": "baseline",
+                "comparison_role": "baseline",
+                "analysis_tags": ["baseline"],
+            },
             "scope_variant": {
                 "variant_id": "scope_variant",
                 "base_preset": "stable_base",
@@ -531,9 +2294,12 @@ def test_final_readiness_backfills_support_track_identity_from_experiment_meta(t
         },
     }
     final_readiness.dump_json(comparison_payload, comparison_manifest)
+    comparison_baseline_payload = final_readiness.load_json(comparison_baseline_manifest)
+    comparison_baseline_payload["experiment_meta"] = comparison_payload["experiment_meta"]
+    final_readiness.dump_json(comparison_baseline_payload, comparison_baseline_manifest)
 
     audit = build_final_readiness(
-        [ablation_manifest, comparison_manifest],
+        [ablation_baseline_manifest, ablation_manifest, comparison_baseline_manifest, comparison_manifest],
         thresholds=ReadinessThresholds(
             min_live_duration_hours=0.0,
             min_live_candidate_families=0,
@@ -548,9 +2314,9 @@ def test_final_readiness_backfills_support_track_identity_from_experiment_meta(t
     assert gates["module_ablation"]["passed"] is True
     assert gates["baseline_comparison"]["passed"] is True
     assert audit["summary"]["ablation_matrix_ids"] == ["module_ablation"]
-    assert audit["summary"]["ablation_variants"] == ["focus_variant"]
+    assert audit["summary"]["ablation_variants"] == ["baseline", "focus_variant"]
     assert audit["summary"]["comparison_matrix_ids"] == ["baseline_scope_comparison"]
-    assert audit["summary"]["comparison_variants"] == ["scope_variant"]
+    assert audit["summary"]["comparison_variants"] == ["baseline", "scope_variant"]
 
 
 def test_final_readiness_records_registered_structured_semantic_focus(tmp_path):
@@ -787,6 +2553,7 @@ def test_final_readiness_summary_only_mode_does_not_claim_paper_readiness(tmp_pa
             require_seeded=False,
             require_ablation=False,
             require_comparison=False,
+            require_adaptive_component_ablation=False,
         ),
         policy=ReadinessPolicy(required_live_suites=("datafusion_cross",), required_live_families=("query_engine",)),
     )
@@ -1087,10 +2854,14 @@ def test_final_readiness_policy_keeps_top_level_requirements_out_of_engine(tmp_p
             require_seeded=False,
             require_ablation=False,
             require_comparison=False,
+            require_adaptive_component_ablation=False,
+            require_cross_version_ledger=False,
+            require_discovery_responsiveness=False,
         ),
         policy=ReadinessPolicy(
             required_live_suites=("datafusion_cross",),
             required_live_families=("dataframe", "embedded_sql", "query_engine"),
+            required_final_matrix_ids=(),
         ),
     )
 
@@ -1128,7 +2899,9 @@ def test_analyze_final_readiness_writes_markdown_and_json(tmp_path, monkeypatch)
 
     assert md_path.exists()
     assert json_path.exists()
-    assert "Final Experiment Readiness" in md_path.read_text(encoding="utf-8")
+    md = md_path.read_text(encoding="utf-8")
+    assert "Final Experiment Readiness" in md
+    assert "Adaptive learning health" in md
 
 
 def test_final_readiness_default_manifest_resolution_uses_latest_limit(tmp_path, monkeypatch):
@@ -1149,6 +2922,17 @@ def test_final_readiness_default_manifest_resolution_uses_latest_limit(tmp_path,
     assert selected == manifests[-DEFAULT_FINAL_READINESS_MANIFEST_LIMIT:]
     assert final_readiness._resolve_manifest_files(None, manifest_limit=None) == manifests
     assert final_readiness._resolve_manifest_files([manifests[0]], manifest_limit=1) == [manifests[0]]
+    extra_manifest = tmp_path / "reports" / "experiment-final-version-ledger.json"
+    extra_manifest.parent.mkdir()
+    extra_manifest.write_text('{"runs": []}\n', encoding="utf-8")
+    assert final_readiness._resolve_manifest_files(
+        None,
+        extra_manifest_files=[extra_manifest],
+    ) == [*manifests[-DEFAULT_FINAL_READINESS_MANIFEST_LIMIT:], extra_manifest]
+    assert final_readiness._resolve_manifest_files(
+        [manifests[0]],
+        extra_manifest_files=[extra_manifest],
+    ) == [manifests[0], extra_manifest]
 
 
 def test_final_readiness_rejects_live_runs_without_latest_frozen_authority_provenance(tmp_path, monkeypatch):
@@ -1213,20 +2997,112 @@ def _write_manifest(
     replay_filter: dict | None = None,
     run_updates: dict | None = None,
     include_stage_profile: bool = True,
+    first_candidate_case_index: int | None = None,
+    first_candidate_elapsed_s: float | None = None,
+    candidate_bug_discovery_auc: float | None = None,
+    include_closed_loop_state: bool | None = None,
+    include_adaptive_selection: bool = True,
     run_provenance: dict | None = None,
     write_paper_run_journal: bool = True,
+    experiment_meta: dict | None = None,
 ) -> Path:
     runs_dir = root / "runs"
     run_file = runs_dir / f"run-{name}.jsonl"
     backends = list(TARGET_SUITES[target_suite])
-    append_jsonl(
-        {
-            "case_index": 0,
-            "case": {"case_id": f"case-{name}", "seed": seed, "program": {"operations": []}},
-            "findings": findings or [],
-        },
-        run_file,
+    row = {
+        "case_index": 0,
+        "elapsed_s": 0.1,
+        "case": {"case_id": f"case-{name}", "seed": seed, "program": {"operations": []}},
+        "findings": findings or [],
+    }
+    adaptive_components = (run_updates or {}).get("adaptive_components", {})
+    adaptive_selection_enabled_by_config = any(
+        float((config or {}).get(key, 0.0) or 0.0) > 0.0
+        for key in (
+            "generator_profile_learning_weight",
+            "semantic_objective_learning_weight",
+            "metamorphic_relation_learning_weight",
+            "version_pair_learning_weight",
+        )
     )
+    if (
+        include_adaptive_selection
+        and (
+            isinstance(adaptive_components, dict)
+            and any(bool(value) for value in adaptive_components.values())
+            or adaptive_selection_enabled_by_config
+        )
+    ):
+        row.update(
+            {
+                "generator_profile_selection": {
+                    "strategy": "contextual_bandit",
+                    "profile": "common",
+                    "profile_pool": ["common"],
+                    "learning_weight": 1.0,
+                    "reward": 0.5,
+                    "ranked": [
+                        {
+                            "action_id": "common",
+                            "score": 0.5,
+                            "model_prediction": 0.25,
+                            "uncertainty": 0.5,
+                            "exploration_bonus": 0.25,
+                            "version_signal": 0.1,
+                            "continual_priority_signal": 0.1,
+                            "health_penalty": 0.0,
+                        }
+                    ],
+                },
+                "semantic_objective_selection": {
+                    "strategy": "contextual_bandit",
+                    "scope": "semantic_objective",
+                    "action": "exploration_objective:boundary_depth",
+                    "action_pool": ["exploration_objective:boundary_depth"],
+                    "learning_weight": 1.0,
+                    "reward": 0.5,
+                    "ranked": [
+                        {
+                            "action_id": "exploration_objective:boundary_depth",
+                            "uncertainty": 0.5,
+                        }
+                    ],
+                },
+                "metamorphic_relation_selection": {
+                    "strategy": "contextual_bandit",
+                    "scope": "metamorphic_relation",
+                    "action": "input_partition_union_all",
+                    "action_pool": ["input_partition_union_all"],
+                    "learning_weight": 1.0,
+                    "reward": 0.5,
+                    "ranked": [
+                        {
+                            "action_id": "input_partition_union_all",
+                            "exploration_bonus": 0.25,
+                        }
+                    ],
+                },
+                "version_pair_selection": {
+                    "strategy": "contextual_bandit",
+                    "scope": "version_pair",
+                    "action": "latest->fixed",
+                    "action_pool": ["latest->fixed"],
+                    "learning_weight": 1.0,
+                    "reward": 0.5,
+                    "ranked": [
+                        {
+                            "action_id": "latest->fixed",
+                            "version_signal": 0.5,
+                        }
+                    ],
+                },
+                "selected_generator_profile": "common",
+                "selected_semantic_objective": "exploration_objective:boundary_depth",
+                "selected_metamorphic_relation": "input_partition_union_all",
+                "selected_version_pair": "latest->fixed",
+            }
+        )
+    append_jsonl(row, run_file)
     run_meta = {
         "executed_cases": 1,
         "elapsed_s": 1.0,
@@ -1268,6 +3144,56 @@ def _write_manifest(
             },
         },
     }
+    if first_candidate_case_index is not None:
+        run_meta["first_candidate_bug_case_index"] = first_candidate_case_index
+    if first_candidate_elapsed_s is not None:
+        run_meta["first_candidate_bug_elapsed_s"] = first_candidate_elapsed_s
+    if candidate_bug_discovery_auc is not None:
+        run_meta["candidate_bug_discovery_auc"] = candidate_bug_discovery_auc
+    should_write_closed_loop_state = evidence_mode == "live" if include_closed_loop_state is None else include_closed_loop_state
+    if should_write_closed_loop_state:
+        state_path = runs_dir / f"run-{name}.state.json"
+        dump_json({"seen_signatures": [f"sig-{name}"], "feedback": {}, "guidance": {}}, state_path)
+        run_meta["closed_loop_state_file"] = str(state_path)
+        run_meta["closed_loop_state_summary"] = {
+            "seen_signature_count": 1,
+            "adaptive_learning_health": {
+                "schema_version": "adaptive-learning-health-v1",
+                "bandit_count": 1,
+                "arm_count": 1,
+                "total_pulls": 1,
+                "reward_model_update_count": 1,
+                "reward_model_feature_count": 2,
+                "version_memory_key_count": 1,
+                "runtime_cost_observation_count": 1,
+                "runtime_cost_total": 0.1,
+                "continual_priority_memory": {
+                    "imported_ledger_count": 1,
+                    "imported_family_count": 1,
+                    "family_count": 1,
+                    "feature_count": 2,
+                },
+                "avg_health_penalty": 0.0,
+                "max_health_penalty": 0.0,
+                "avg_uncertainty": 0.5,
+                "exploration_memory": {
+                    "total_records": 1,
+                    "context_count": 2,
+                    "action_count": 1,
+                },
+            },
+            "quality_archive_health": {
+                "schema_version": "quality-archive-health-v1",
+                "cell_count": 1,
+                "seed_count": 1,
+                "elite_seed_count": 1,
+                "reward_count": 1,
+                "outcome_count": 1,
+                "invalid_count": 0,
+                "fallback_count": 0,
+                "false_positive_count": 0,
+            },
+        }
     reports_dir = root / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
     freeze_artifacts = run_meta["run_provenance"].get("freeze_artifacts", {})
@@ -1323,5 +3249,59 @@ def _write_manifest(
     if evidence_mode is not None:
         manifest_payload["evidence_mode"] = evidence_mode
         run_payload["evidence_mode"] = evidence_mode
+    if experiment_meta is not None:
+        manifest_payload["experiment_meta"] = experiment_meta
+    adaptive_components = run_payload.get("adaptive_components", {})
+    if isinstance(adaptive_components, dict) and any(bool(value) for value in adaptive_components.values()):
+        manifest_payload["adaptive_state"] = [
+            {
+                "arm_id": f"{target_suite}:{preset}:0",
+                "target_suite": target_suite,
+                "preset": preset,
+                "pulls": 1,
+                "learning_signal": 0.5,
+                "annealing_temperature": 0.25
+                if bool(adaptive_components.get("scheduler_annealing", False))
+                else 0.0,
+            }
+        ]
     dump_json(manifest_payload, manifest)
     return manifest
+
+
+def _write_version_ledger(root: Path) -> Path:
+    path = root / "reports" / "version-ledger.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    dump_json(
+        build_version_ledger(
+            [
+                VersionObservation(
+                    version_id="v1",
+                    run_file="runs/v1.jsonl",
+                    case_count=2,
+                    candidate_families={"persistent_family@engine": 1},
+                    invalid_case_count=0,
+                    fallback_case_count=0,
+                    false_positive_count=0,
+                    duration_ms_total=4.0,
+                    throughput_cases_s=5.0,
+                ),
+                VersionObservation(
+                    version_id="v2",
+                    run_file="runs/v2.jsonl",
+                    case_count=2,
+                    candidate_families={
+                        "persistent_family@engine": 1,
+                        "new_family@engine": 1,
+                    },
+                    invalid_case_count=1,
+                    fallback_case_count=0,
+                    false_positive_count=0,
+                    duration_ms_total=5.0,
+                    throughput_cases_s=4.0,
+                ),
+            ]
+        ),
+        path,
+    )
+    return path

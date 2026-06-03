@@ -32,7 +32,15 @@ from datadiff.reward import (
     candidate_issue_family_keys,
     offline_finding_buckets,
 )
-from datadiff.util import PROJECT_ROOT, REPORTS_DIR, dump_json, ensure_dirs, load_json, run_meta_path
+from datadiff.util import (
+    PROJECT_ROOT,
+    REPORTS_DIR,
+    closed_loop_state_path,
+    dump_json,
+    ensure_dirs,
+    load_json,
+    run_meta_path,
+)
 
 OFFLINE_ORACLE_BUCKETS = (
     OFFLINE_BUCKET_NEW_BUG,
@@ -120,7 +128,7 @@ def write_methodology_report(
         "issue_bundle_reproducers": report.get("reproducibility", {})
         .get("issue_bundle", {})
         .get("reproducer_paths", []),
-        "bug_sprint_manifests": report.get("scheduler_effectiveness", {}).get("manifest_paths", []),
+        "discovery_campaign_manifests": report.get("scheduler_effectiveness", {}).get("manifest_paths", []),
         "candidate_pipeline_manifests": report.get("candidate_pipeline", {}).get("manifest_paths", []),
     }
 
@@ -216,6 +224,9 @@ def _build_methodology_report(
     workflow_generated_dir = _workflow_generated_dir(manifest_file)
     scheduler_effectiveness = _scheduler_effectiveness(workflow_generated_dir)
     scheduler_effectiveness.update(_adaptive_scheduler_summary(manifest))
+    adaptive_methodology = _adaptive_methodology_summary(manifest, aggregate_rows, run_rows=run_rows)
+    adaptive_learning_evidence = _adaptive_learning_evidence(manifest, run_rows)
+    adaptive_selection = _adaptive_selection_methodology_summary(run_rows, aggregate_rows)
     candidate_pipeline = _candidate_pipeline_metrics(workflow_generated_dir)
     closed_loop = {
         "raw_new_behavior_cases": sum(_int(row.get("new_behavior_cases")) for row in run_rows),
@@ -228,6 +239,9 @@ def _build_methodology_report(
         ),
         "feedback_semantic_signal_target_count": sum(
             _int(row.get("feedback_semantic_signal_target_count")) for row in run_rows
+        ),
+        "feedback_exploration_objective_target_count": sum(
+            _int(row.get("feedback_exploration_objective_target_count")) for row in run_rows
         ),
         "feedback_operator_affinity_hit_cases": sum(
             _int(row.get("feedback_operator_affinity_hit_cases")) for row in run_rows
@@ -386,6 +400,9 @@ def _build_methodology_report(
         },
         "closed_loop_feedback": closed_loop,
         "scheduler_effectiveness": scheduler_effectiveness,
+        "adaptive_methodology": adaptive_methodology,
+        "adaptive_learning_evidence": adaptive_learning_evidence,
+        "adaptive_selection": adaptive_selection,
         "candidate_pipeline": candidate_pipeline,
         "offline_oracle": offline_oracle,
         "run_log_scan": run_log_evidence["run_log_scan"],
@@ -573,6 +590,460 @@ def _expected_ablation_modules(manifest: dict[str, Any], rows: list[dict[str, st
     )
 
 
+def _adaptive_methodology_summary(
+    manifest: dict[str, Any],
+    aggregate_rows: list[dict[str, str]],
+    *,
+    run_rows: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    configured = manifest.get("adaptive_methodology", {}) if isinstance(manifest.get("adaptive_methodology"), dict) else {}
+    configured_components = _normalize_component_state(configured.get("components", {}))
+    disabled_components = set(_string_list(configured.get("disabled_components", [])))
+    run_component_rows = []
+    run_component_counter: Counter[str] = Counter()
+    enabled_counter: Counter[str] = Counter()
+    disabled_counter: Counter[str] = Counter()
+    disabled_run_counter: Counter[str] = Counter()
+    row_by_key = _aggregate_rows_by_run_key(aggregate_rows)
+    run_row_by_key = _aggregate_rows_by_run_key(run_rows or [])
+    for run in manifest.get("runs", []) or []:
+        if not isinstance(run, dict):
+            continue
+        run_components = _normalize_component_state(run.get("adaptive_components", {}))
+        if not run_components and configured_components:
+            run_components = dict(configured_components)
+        run_disabled = set(_string_list(run.get("disabled_adaptive_components", []))) or disabled_components
+        for component in run_disabled:
+            if component not in run_components:
+                run_components[component] = False
+        if not run_components:
+            continue
+        aggregate = row_by_key.get(_run_key(run), {})
+        run_aggregate = run_row_by_key.get(_run_key(run), {})
+        disabled_for_run = sorted(component for component, enabled in run_components.items() if not enabled)
+        for component, enabled in sorted(run_components.items()):
+            run_component_counter[component] += 1
+            if enabled:
+                enabled_counter[component] += 1
+            else:
+                disabled_counter[component] += 1
+        for component in disabled_for_run:
+            disabled_run_counter[component] += 1
+        run_component_rows.append(
+            {
+                "target_suite": str(run.get("target_suite", "")),
+                "preset": str(run.get("preset", "")),
+                "seed": _int(run.get("seed")),
+                "disabled_components": disabled_for_run,
+                "component_count": len(run_components),
+                "cases": _row_int(aggregate, run_aggregate, "cases"),
+                "candidate_bug_cases": _row_int(aggregate, run_aggregate, "candidate_bug_cases"),
+                "signal_new_behavior_cases": _row_int(aggregate, run_aggregate, "signal_new_behavior_cases"),
+                "throughput_cases_s": _row_float(
+                    aggregate,
+                    run_aggregate,
+                    "avg_throughput_cases_s",
+                    fallback_key="throughput_cases_s",
+                ),
+                "false_positive_count": _row_false_positive_count(aggregate, run_aggregate),
+                "preflight_invalid_cases": _row_int(aggregate, run_aggregate, "preflight_invalid_cases"),
+                "first_candidate_bug_elapsed_s": _row_optional_float(
+                    aggregate,
+                    run_aggregate,
+                    "median_first_candidate_bug_elapsed_s",
+                    fallback_key="first_candidate_bug_elapsed_s",
+                ),
+                "first_candidate_bug_case_index": _row_optional_float(
+                    aggregate,
+                    run_aggregate,
+                    "median_first_candidate_bug_case_index",
+                    fallback_key="first_candidate_bug_case_index",
+                ),
+                "candidate_bug_discovery_auc": _row_float(
+                    aggregate,
+                    run_aggregate,
+                    "avg_candidate_bug_discovery_auc",
+                    fallback_key="candidate_bug_discovery_auc",
+                ),
+            }
+        )
+    components = sorted(set(configured_components) | set(run_component_counter) | disabled_components)
+    component_rows = []
+    for component in components:
+        total = int(run_component_counter[component])
+        enabled = int(enabled_counter[component])
+        disabled = int(disabled_counter[component])
+        configured_enabled = configured_components.get(component)
+        component_rows.append(
+            {
+                "component": component,
+                "configured_enabled": configured_enabled if configured_enabled is not None else component not in disabled_components,
+                "run_count": total,
+                "enabled_run_count": enabled,
+                "disabled_run_count": disabled,
+                "ablation_covered": disabled > 0,
+            }
+        )
+    contrast_rows = [row for row in run_component_rows if row["disabled_components"]]
+    reference_rows = [row for row in run_component_rows if not row["disabled_components"]]
+    component_effects = _adaptive_component_effect_rows(components, reference_rows, run_component_rows)
+    return {
+        "enabled": bool(configured_components or run_component_rows),
+        "components": component_rows,
+        "component_effects": component_effects,
+        "component_count": len(component_rows),
+        "disabled_components": sorted(disabled_components | set(disabled_counter)),
+        "disabled_component_run_counts": dict(sorted(disabled_run_counter.items())),
+        "run_component_rows": run_component_rows[:32],
+        "run_count": len(run_component_rows),
+        "reference_run_count": len(reference_rows),
+        "contrast_run_count": len(contrast_rows),
+        "contrast_candidate_bug_cases": sum(row["candidate_bug_cases"] for row in contrast_rows),
+        "reference_candidate_bug_cases": sum(row["candidate_bug_cases"] for row in reference_rows),
+        "contrast_signal_new_behavior_cases": sum(row["signal_new_behavior_cases"] for row in contrast_rows),
+        "reference_signal_new_behavior_cases": sum(row["signal_new_behavior_cases"] for row in reference_rows),
+        "contrast_avg_throughput_cases_s": (
+            sum(row["throughput_cases_s"] for row in contrast_rows) / len(contrast_rows)
+            if contrast_rows
+            else 0.0
+        ),
+        "reference_avg_throughput_cases_s": (
+            sum(row["throughput_cases_s"] for row in reference_rows) / len(reference_rows)
+            if reference_rows
+            else 0.0
+        ),
+        "contrast_false_positive_rate": _component_rate(contrast_rows, "false_positive_count"),
+        "reference_false_positive_rate": _component_rate(reference_rows, "false_positive_count"),
+        "contrast_invalid_rate": _component_rate(contrast_rows, "preflight_invalid_cases"),
+        "reference_invalid_rate": _component_rate(reference_rows, "preflight_invalid_cases"),
+    }
+
+
+_ADAPTIVE_SELECTION_SCOPES = (
+    ("generator_profile", "adaptive_generator_profile"),
+    ("semantic_objective", "adaptive_semantic_objective"),
+    ("metamorphic_relation", "adaptive_metamorphic_relation"),
+    ("version_pair", "adaptive_version_pair"),
+)
+
+
+def _adaptive_selection_methodology_summary(
+    run_rows: list[dict[str, str]],
+    aggregate_rows: list[dict[str, str]],
+) -> dict[str, Any]:
+    total_cases = sum(_int(row.get("cases")) for row in run_rows)
+    total_count = sum(_int(row.get("adaptive_selection_total_count")) for row in run_rows)
+    row_source = aggregate_rows or run_rows
+    scope_rows: list[dict[str, Any]] = []
+    for scope, prefix in _ADAPTIVE_SELECTION_SCOPES:
+        selection_count = sum(_int(row.get(f"{prefix}_selection_count")) for row in run_rows)
+        if selection_count <= 0:
+            selection_count = sum(_int(row.get(f"{prefix}_selection_count")) for row in aggregate_rows)
+        if selection_count <= 0:
+            continue
+        scope_rows.append(
+            {
+                "scope": scope,
+                "selection_count": selection_count,
+                "selection_rate": selection_count / total_cases if total_cases else _avg_float(
+                    row_source,
+                    f"{prefix}_selection_rate",
+                ),
+                "top_actions": _merge_counter_summaries(row_source, f"{prefix}_top_actions"),
+                "strategies": _merge_counter_summaries(row_source, f"{prefix}_strategies"),
+                "avg_reward": _weighted_avg_by_key(row_source, f"{prefix}_avg_reward", f"{prefix}_selection_count"),
+                "avg_learning_weight": _weighted_avg_by_key(
+                    row_source,
+                    f"{prefix}_avg_learning_weight",
+                    f"{prefix}_selection_count",
+                ),
+                "avg_pool_size": _weighted_avg_by_key(
+                    row_source,
+                    f"{prefix}_avg_pool_size",
+                    f"{prefix}_selection_count",
+                ),
+                "avg_score": _weighted_avg_by_key(row_source, f"{prefix}_avg_score", f"{prefix}_selection_count"),
+                "avg_model_prediction": _weighted_avg_by_key(
+                    row_source,
+                    f"{prefix}_avg_model_prediction",
+                    f"{prefix}_selection_count",
+                ),
+                "avg_uncertainty": _weighted_avg_by_key(
+                    row_source,
+                    f"{prefix}_avg_uncertainty",
+                    f"{prefix}_selection_count",
+                ),
+                "avg_exploration_bonus": _weighted_avg_by_key(
+                    row_source,
+                    f"{prefix}_avg_exploration_bonus",
+                    f"{prefix}_selection_count",
+                ),
+                "avg_version_signal": _weighted_avg_by_key(
+                    row_source,
+                    f"{prefix}_avg_version_signal",
+                    f"{prefix}_selection_count",
+                ),
+                "avg_continual_priority_signal": _weighted_avg_by_key(
+                    row_source,
+                    f"{prefix}_avg_continual_priority_signal",
+                    f"{prefix}_selection_count",
+                ),
+                "avg_health_penalty": _weighted_avg_by_key(
+                    row_source,
+                    f"{prefix}_avg_health_penalty",
+                    f"{prefix}_selection_count",
+                ),
+            }
+        )
+    scope_rows.sort(key=lambda row: (-int(row.get("selection_count", 0) or 0), str(row.get("scope", ""))))
+    total_count = total_count or sum(int(row.get("selection_count", 0) or 0) for row in scope_rows)
+    return {
+        "enabled": total_count > 0,
+        "total_count": total_count,
+        "total_per_case": total_count / total_cases if total_cases else _avg_float(
+            row_source,
+            "adaptive_selection_total_per_case",
+        ),
+        "scope_count": len(scope_rows),
+        "scopes": [str(row.get("scope", "")) for row in scope_rows],
+        "avg_reward": _weighted_scope_avg(scope_rows, "avg_reward"),
+        "avg_uncertainty": _weighted_scope_avg(scope_rows, "avg_uncertainty"),
+        "avg_exploration_bonus": _weighted_scope_avg(scope_rows, "avg_exploration_bonus"),
+        "avg_version_signal": _weighted_scope_avg(scope_rows, "avg_version_signal"),
+        "avg_continual_priority_signal": _weighted_scope_avg(scope_rows, "avg_continual_priority_signal"),
+        "avg_health_penalty": _weighted_scope_avg(scope_rows, "avg_health_penalty"),
+        "top_actions": {
+            str(row.get("scope", "")): dict(row.get("top_actions", {}) or {})
+            for row in scope_rows
+        },
+        "strategies": {
+            str(row.get("scope", "")): dict(row.get("strategies", {}) or {})
+            for row in scope_rows
+        },
+        "scope_rows": scope_rows,
+    }
+
+
+def _adaptive_component_effect_rows(
+    components: list[str],
+    reference_rows: list[dict[str, Any]],
+    run_component_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    reference = _adaptive_component_metric_summary(reference_rows)
+    rows = []
+    for component in components:
+        disabled_rows = [
+            row for row in run_component_rows if component in set(row.get("disabled_components", []))
+        ]
+        covered = bool(disabled_rows)
+        disabled = _adaptive_component_metric_summary(disabled_rows)
+        rows.append(
+            {
+                "component": component,
+                "ablation_covered": covered,
+                "reference_run_count": reference["run_count"],
+                "disabled_run_count": disabled["run_count"],
+                "reference_cases": reference["cases"],
+                "disabled_cases": disabled["cases"],
+                "reference_candidate_bug_case_rate": reference["candidate_bug_case_rate"],
+                "disabled_candidate_bug_case_rate": disabled["candidate_bug_case_rate"],
+                "candidate_bug_case_rate_delta": (
+                    disabled["candidate_bug_case_rate"] - reference["candidate_bug_case_rate"]
+                    if covered
+                    else None
+                ),
+                "reference_signal_new_behavior_rate": reference["signal_new_behavior_rate"],
+                "disabled_signal_new_behavior_rate": disabled["signal_new_behavior_rate"],
+                "signal_new_behavior_rate_delta": (
+                    disabled["signal_new_behavior_rate"] - reference["signal_new_behavior_rate"]
+                    if covered
+                    else None
+                ),
+                "reference_avg_throughput_cases_s": reference["avg_throughput_cases_s"],
+                "disabled_avg_throughput_cases_s": disabled["avg_throughput_cases_s"],
+                "throughput_cases_s_delta": (
+                    disabled["avg_throughput_cases_s"] - reference["avg_throughput_cases_s"]
+                    if covered
+                    else None
+                ),
+                "reference_invalid_rate": reference["invalid_rate"],
+                "disabled_invalid_rate": disabled["invalid_rate"],
+                "invalid_rate_delta": disabled["invalid_rate"] - reference["invalid_rate"] if covered else None,
+                "reference_false_positive_rate": reference["false_positive_rate"],
+                "disabled_false_positive_rate": disabled["false_positive_rate"],
+                "false_positive_rate_delta": (
+                    disabled["false_positive_rate"] - reference["false_positive_rate"]
+                    if covered
+                    else None
+                ),
+                "reference_first_candidate_bug_elapsed_s": reference["first_candidate_bug_elapsed_s"],
+                "disabled_first_candidate_bug_elapsed_s": disabled["first_candidate_bug_elapsed_s"],
+                "first_candidate_bug_elapsed_s_delta": _optional_delta(
+                    disabled["first_candidate_bug_elapsed_s"],
+                    reference["first_candidate_bug_elapsed_s"],
+                )
+                if covered
+                else None,
+                "reference_avg_candidate_bug_discovery_auc": reference["avg_candidate_bug_discovery_auc"],
+                "disabled_avg_candidate_bug_discovery_auc": disabled["avg_candidate_bug_discovery_auc"],
+                "candidate_bug_discovery_auc_delta": (
+                    disabled["avg_candidate_bug_discovery_auc"]
+                    - reference["avg_candidate_bug_discovery_auc"]
+                    if covered
+                    else None
+                ),
+            }
+        )
+    return rows
+
+
+def _adaptive_component_metric_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    cases = sum(_int(row.get("cases")) for row in rows)
+    throughputs = [_float(row.get("throughput_cases_s")) for row in rows if row.get("throughput_cases_s") not in (None, "")]
+    first_elapsed_values = [
+        _float(row.get("first_candidate_bug_elapsed_s"))
+        for row in rows
+        if row.get("first_candidate_bug_elapsed_s") not in (None, "")
+    ]
+    auc_values = [
+        _float(row.get("candidate_bug_discovery_auc"))
+        for row in rows
+        if row.get("candidate_bug_discovery_auc") not in (None, "")
+    ]
+    candidate_bug_cases = sum(_int(row.get("candidate_bug_cases")) for row in rows)
+    signal_new_behavior_cases = sum(_int(row.get("signal_new_behavior_cases")) for row in rows)
+    return {
+        "run_count": len(rows),
+        "cases": cases,
+        "candidate_bug_case_rate": candidate_bug_cases / cases if cases else 0.0,
+        "signal_new_behavior_rate": signal_new_behavior_cases / cases if cases else 0.0,
+        "avg_throughput_cases_s": sum(throughputs) / len(throughputs) if throughputs else 0.0,
+        "invalid_rate": _component_rate(rows, "preflight_invalid_cases"),
+        "false_positive_rate": _component_rate(rows, "false_positive_count"),
+        "first_candidate_bug_elapsed_s": min(first_elapsed_values) if first_elapsed_values else None,
+        "avg_candidate_bug_discovery_auc": sum(auc_values) / len(auc_values) if auc_values else 0.0,
+    }
+
+
+def _component_rate(rows: list[dict[str, Any]], numerator_key: str) -> float:
+    cases = sum(_int(row.get("cases")) for row in rows)
+    if cases <= 0:
+        return 0.0
+    return sum(_int(row.get(numerator_key)) for row in rows) / cases
+
+
+def _row_value(
+    primary: dict[str, Any],
+    fallback: dict[str, Any],
+    key: str,
+    *,
+    fallback_key: str | None = None,
+) -> Any:
+    value = primary.get(key)
+    if value not in (None, ""):
+        return value
+    return fallback.get(fallback_key or key)
+
+
+def _row_int(
+    primary: dict[str, Any],
+    fallback: dict[str, Any],
+    key: str,
+    *,
+    fallback_key: str | None = None,
+) -> int:
+    return _int(_row_value(primary, fallback, key, fallback_key=fallback_key))
+
+
+def _row_float(
+    primary: dict[str, Any],
+    fallback: dict[str, Any],
+    key: str,
+    *,
+    fallback_key: str | None = None,
+) -> float:
+    return _float(_row_value(primary, fallback, key, fallback_key=fallback_key))
+
+
+def _row_optional_float(
+    primary: dict[str, Any],
+    fallback: dict[str, Any],
+    key: str,
+    *,
+    fallback_key: str | None = None,
+) -> float | None:
+    value = _row_value(primary, fallback, key, fallback_key=fallback_key)
+    return None if value in (None, "") else _float(value)
+
+
+def _row_false_positive_count(primary: dict[str, Any], fallback: dict[str, Any]) -> int:
+    value = _row_value(primary, fallback, "false_positive_count")
+    if value not in (None, ""):
+        return _int(value)
+    return _run_row_false_positive_count(fallback)
+
+
+def _optional_delta(current: float | None, reference: float | None) -> float | None:
+    if current is None or reference is None:
+        return None
+    return current - reference
+
+
+def _run_row_false_positive_count(row: dict[str, Any]) -> int:
+    return _int(row.get("false_positive_count")) or (
+        _int(row.get("generator_false_positive_count"))
+        + _int(row.get("normalizer_false_positive_count"))
+    )
+
+
+def _normalize_component_state(value: Any) -> dict[str, bool]:
+    if not isinstance(value, dict):
+        return {}
+    out: dict[str, bool] = {}
+    for key, enabled in value.items():
+        component = str(key).strip()
+        if not component:
+            continue
+        out[component] = bool(enabled)
+    return out
+
+
+def _aggregate_rows_by_run_key(rows: list[dict[str, str]]) -> dict[tuple[str, str, int], dict[str, str]]:
+    out: dict[tuple[str, str, int], dict[str, str]] = {}
+    for row in rows:
+        key = (
+            str(row.get("target_suite", "")),
+            str(row.get("preset", "")),
+            _int(row.get("seed")),
+        )
+        out[key] = row
+    return out
+
+
+def _run_key(run: dict[str, Any]) -> tuple[str, str, int]:
+    return (
+        str(run.get("target_suite", "")),
+        str(run.get("preset", "")),
+        _int(run.get("seed")),
+    )
+
+
+def _string_list(value: Any) -> list[str]:
+    if isinstance(value, str):
+        raw_items = value.split(",")
+    else:
+        raw_items = value or []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw_items:
+        text = str(item).strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        out.append(text)
+    return out
+
+
 def _reference_row_for_group(
     rows: list[dict[str, str]],
     row: dict[str, str],
@@ -591,6 +1062,7 @@ def _render_markdown(
     discovery = report["bug_discovery"]
     soundness = report["soundness"]
     scheduler_effectiveness = report.get("scheduler_effectiveness", {})
+    adaptive_methodology = report.get("adaptive_methodology", {})
     candidate_pipeline = report.get("candidate_pipeline", {})
     run_log_scan = report.get("run_log_scan", {})
     reproducibility = report["reproducibility"]
@@ -599,6 +1071,13 @@ def _render_markdown(
     ablation = report["ablation"]
     offline_oracle = report["offline_oracle"]
     closed_loop = report.get("closed_loop_feedback", {})
+    adaptive_evidence = report.get("adaptive_learning_evidence", {})
+    adaptive_evidence_scheduler = adaptive_evidence.get("scheduler", {})
+    adaptive_evidence_manifest = adaptive_evidence.get("manifest_learning", {})
+    adaptive_evidence_closed_loop = adaptive_evidence.get("closed_loop", {})
+    adaptive_evidence_qd = adaptive_evidence.get("quality_diversity", {})
+    adaptive_evidence_continual = adaptive_evidence.get("continual_learning", {})
+    adaptive_selection = report.get("adaptive_selection", {})
     evidence_chain = report.get("evidence_chain", {})
     lines = [
         "# DataDiffFuzz Methodology Report",
@@ -723,9 +1202,62 @@ def _render_markdown(
             f"- Guidance reward adjustment per case: {_fmt_float(closed_loop.get('guidance_reward_adjustment_per_case', 0.0))}",
             f"- Seed schedule delta per case: {_fmt_float(closed_loop.get('seed_schedule_delta_per_case', 0.0))}",
             "",
+            "## Adaptive Learning Evidence",
+            "",
+            f"- Adaptive evidence schema: {adaptive_evidence.get('schema_version', 'none')}",
+            f"- Adaptive schedule active: {str(adaptive_evidence.get('schedule_adaptive', False)).lower()}",
+            f"- Scheduler arms / pulls: {adaptive_evidence_scheduler.get('arm_count', 0)} / {adaptive_evidence_scheduler.get('pull_total', 0)}",
+            f"- Scheduler avg learning signal: {_fmt_float(adaptive_evidence_scheduler.get('learning_signal_avg', 0.0))}",
+            f"- Scheduler max annealing temperature: {_fmt_float(adaptive_evidence_scheduler.get('annealing_temperature_max', 0.0))}",
+            f"- Manifest bandit scopes / arms / pulls: {adaptive_evidence_manifest.get('bandit_scope_count', 0)} / {adaptive_evidence_manifest.get('bandit_arm_count', 0)} / {adaptive_evidence_manifest.get('bandit_total_pulls', 0)}",
+            f"- Manifest reward-model updates / features: {adaptive_evidence_manifest.get('reward_model_update_count', 0)} / {adaptive_evidence_manifest.get('reward_model_feature_count', 0)}",
+            f"- Manifest exploration records: {adaptive_evidence_manifest.get('exploration_records', 0)}",
+            f"- Closed-loop state files: {adaptive_evidence_closed_loop.get('state_file_count', 0)}/{adaptive_evidence_closed_loop.get('run_count', 0)}",
+            f"- Closed-loop learning pulls / reward-model updates: {adaptive_evidence_closed_loop.get('learning_total_pulls', 0)} / {adaptive_evidence_closed_loop.get('learning_reward_model_updates', 0)}",
+            f"- Closed-loop health pulls / exploration records: {adaptive_evidence_closed_loop.get('health_total_pulls', 0)} / {adaptive_evidence_closed_loop.get('health_exploration_records', 0)}",
+            f"- Quality-diversity archive cells / seeds / elites: {adaptive_evidence_qd.get('archive_cell_count', 0)} / {adaptive_evidence_qd.get('archive_seed_count', 0)} / {adaptive_evidence_qd.get('archive_elite_seed_count', 0)}",
+            f"- Quality-diversity archive outcomes: {adaptive_evidence_qd.get('archive_outcome_count', 0)}",
+            f"- Continual-learning sources loaded: {adaptive_evidence_continual.get('loaded_source_count', 0)}/{adaptive_evidence_continual.get('source_count', 0)}",
+            f"- Continual-learning imported ledgers / families: {adaptive_evidence_continual.get('manifest_imported_ledger_count', 0)} / {adaptive_evidence_continual.get('manifest_imported_family_count', 0)}",
+            "",
+            "## Adaptive Selection",
+            "",
+            f"- Selection telemetry active: {str(adaptive_selection.get('enabled', False)).lower()}",
+            f"- Total selections: {adaptive_selection.get('total_count', 0)} ({_fmt_float(adaptive_selection.get('total_per_case', 0.0))}/case)",
+            f"- Selection scopes covered: {', '.join(adaptive_selection.get('scopes', [])) or 'none'}",
+            f"- Avg reward / uncertainty: {_fmt_float(adaptive_selection.get('avg_reward', 0.0))} / {_fmt_float(adaptive_selection.get('avg_uncertainty', 0.0))}",
+            f"- Avg version / continual / health signals: {_fmt_float(adaptive_selection.get('avg_version_signal', 0.0))} / {_fmt_float(adaptive_selection.get('avg_continual_priority_signal', 0.0))} / {_fmt_float(adaptive_selection.get('avg_health_penalty', 0.0))}",
+            "",
+            "| scope | selections | rate | top actions | strategies | avg reward | avg uncertainty | avg exploration | avg version | avg continual | avg health |",
+            "|---|---:|---:|---|---|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
+    selection_rows = adaptive_selection.get("scope_rows", []) or []
+    if selection_rows:
+        for row in selection_rows:
+            lines.append(
+                "| {scope} | {count} | {rate} | {actions} | {strategies} | {reward} | {uncertainty} | {exploration} | {version} | {continual} | {health} |".format(
+                    scope=row.get("scope", ""),
+                    count=int(row.get("selection_count", 0) or 0),
+                    rate=_fmt_percent(row.get("selection_rate", 0.0)),
+                    actions=_counter_text(row.get("top_actions", {})),
+                    strategies=_counter_text(row.get("strategies", {})),
+                    reward=_fmt_float(row.get("avg_reward", 0.0)),
+                    uncertainty=_fmt_float(row.get("avg_uncertainty", 0.0)),
+                    exploration=_fmt_float(row.get("avg_exploration_bonus", 0.0)),
+                    version=_fmt_float(row.get("avg_version_signal", 0.0)),
+                    continual=_fmt_float(row.get("avg_continual_priority_signal", 0.0)),
+                    health=_fmt_float(row.get("avg_health_penalty", 0.0)),
+                )
+            )
+    else:
+        lines.append("| none | 0 | 0.0% | none | none | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |")
+    lines.extend(
+        [
+            "",
             "## Scheduler Effectiveness",
             "",
-            f"- Bug-sprint manifests: {scheduler_effectiveness.get('manifest_count', 0)}",
+            f"- Discovery-campaign manifests: {scheduler_effectiveness.get('manifest_count', 0)}",
             f"- Completed lane runs: {scheduler_effectiveness.get('completed_run_count', 0)}",
             f"- Lane score samples: {scheduler_effectiveness.get('lane_score_sample_count', 0)}",
             f"- Avg lane score: {_fmt_float(scheduler_effectiveness.get('avg_score', 0.0))}",
@@ -736,6 +1268,68 @@ def _render_markdown(
             f"- Adaptive max reward signal: {_fmt_float(scheduler_effectiveness.get('adaptive_max_reward_signal', 0.0))}",
             f"- Adaptive avg mean reward: {_fmt_float(scheduler_effectiveness.get('adaptive_avg_mean_reward', 0.0))}",
             f"- Local source scheduler: {scheduler_effectiveness.get('local_source_scheduler', {'enabled': False})}",
+            "",
+            "### Adaptive Methodology Components",
+            "",
+            f"- Component tracking enabled: {str(adaptive_methodology.get('enabled', False)).lower()}",
+            f"- Components tracked: {adaptive_methodology.get('component_count', 0)}",
+            f"- Reference component runs: {adaptive_methodology.get('reference_run_count', 0)}",
+            f"- Component-ablation runs: {adaptive_methodology.get('contrast_run_count', 0)}",
+            f"- Disabled components covered: {', '.join(adaptive_methodology.get('disabled_components', [])) or 'none'}",
+            f"- Reference candidate bug cases: {adaptive_methodology.get('reference_candidate_bug_cases', 0)}",
+            f"- Ablation candidate bug cases: {adaptive_methodology.get('contrast_candidate_bug_cases', 0)}",
+            f"- Reference avg throughput: {_fmt_float(adaptive_methodology.get('reference_avg_throughput_cases_s', 0.0))}",
+            f"- Ablation avg throughput: {_fmt_float(adaptive_methodology.get('contrast_avg_throughput_cases_s', 0.0))}",
+            f"- Reference invalid rate: {_fmt_percent(adaptive_methodology.get('reference_invalid_rate', 0.0))}",
+            f"- Ablation invalid rate: {_fmt_percent(adaptive_methodology.get('contrast_invalid_rate', 0.0))}",
+            f"- Reference false positive rate: {_fmt_percent(adaptive_methodology.get('reference_false_positive_rate', 0.0))}",
+            f"- Ablation false positive rate: {_fmt_percent(adaptive_methodology.get('contrast_false_positive_rate', 0.0))}",
+            "",
+            "| component | configured enabled | enabled runs | disabled runs | ablation covered |",
+            "|---|---:|---:|---:|---:|",
+        ]
+    )
+    for component in adaptive_methodology.get("components", []) or []:
+        lines.append(
+            "| {component} | {configured} | {enabled_runs} | {disabled_runs} | {covered} |".format(
+                component=component.get("component", ""),
+                configured=str(component.get("configured_enabled", False)).lower(),
+                enabled_runs=int(component.get("enabled_run_count", 0) or 0),
+                disabled_runs=int(component.get("disabled_run_count", 0) or 0),
+                covered=str(component.get("ablation_covered", False)).lower(),
+            )
+        )
+    if not adaptive_methodology.get("components"):
+        lines.append("| none | false | 0 | 0 | false |")
+    lines.extend(
+        [
+            "",
+            "### Adaptive Component Effects",
+            "",
+            "| component | disabled runs | candidate-rate delta | signal-rate delta | throughput delta | invalid-rate delta | false-positive delta | first-candidate delta s | discovery-AUC delta |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
+    component_effects = adaptive_methodology.get("component_effects", []) or []
+    if component_effects:
+        for effect in component_effects:
+            lines.append(
+                "| {component} | {disabled_runs} | {candidate_delta} | {signal_delta} | {throughput_delta} | {invalid_delta} | {fp_delta} | {first_delta} | {auc_delta} |".format(
+                    component=effect.get("component", ""),
+                    disabled_runs=int(effect.get("disabled_run_count", 0) or 0),
+                    candidate_delta=_fmt_optional_signed_percent(effect.get("candidate_bug_case_rate_delta")),
+                    signal_delta=_fmt_optional_signed_percent(effect.get("signal_new_behavior_rate_delta")),
+                    throughput_delta=_fmt_optional_signed_float(effect.get("throughput_cases_s_delta")),
+                    invalid_delta=_fmt_optional_signed_percent(effect.get("invalid_rate_delta")),
+                    fp_delta=_fmt_optional_signed_percent(effect.get("false_positive_rate_delta")),
+                    first_delta=_fmt_optional_signed_float(effect.get("first_candidate_bug_elapsed_s_delta")),
+                    auc_delta=_fmt_optional_signed_float(effect.get("candidate_bug_discovery_auc_delta")),
+                )
+            )
+    else:
+        lines.append("| none | 0 | +0.0% | +0.0% | +0.00 | +0.0% | +0.0% |  | +0.00 |")
+    lines.extend(
+        [
             "",
             "| lane | completed runs | fresh candidates | unique fresh families | avg score | avg budget | avg yield | avg novelty | avg fp |",
             "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
@@ -864,7 +1458,7 @@ def _render_markdown(
             f"- Artifact dirs indexed: {len(evidence_chain.get('artifact_dirs', []))}",
             f"- Issue bundle manifest: `{evidence_chain.get('issue_bundle_manifest', '')}`",
             f"- Issue bundle reproducers indexed: {len(evidence_chain.get('issue_bundle_reproducers', []))}",
-            f"- Bug-sprint manifests indexed: {len(evidence_chain.get('bug_sprint_manifests', []))}",
+            f"- Discovery-campaign manifests indexed: {len(evidence_chain.get('discovery_campaign_manifests', []))}",
             f"- Candidate pipeline manifests indexed: {len(evidence_chain.get('candidate_pipeline_manifests', []))}",
             "",
             "## Ablation And Comparisons",
@@ -1305,7 +1899,11 @@ def _scheduler_effectiveness(generated_dir: Path) -> dict[str, Any]:
             "avg_budget_multiplier": 0.0,
             "lane_yield": [],
         }
-    paths = sorted(generated_dir.glob("bug-sprint*-manifest.json"))
+    paths = sorted(
+        dict.fromkeys(
+            [*generated_dir.glob("discovery-campaign*-manifest.json")]
+        )
+    )
     lane_stats: dict[str, dict[str, Any]] = {}
     total_score = 0.0
     total_budget = 0.0
@@ -1432,6 +2030,301 @@ def _adaptive_scheduler_summary(manifest: dict[str, Any]) -> dict[str, Any]:
         "adaptive_avg_mean_reward": sum(mean_rewards) / len(mean_rewards) if mean_rewards else 0.0,
         "adaptive_final_arms": arm_rows[:8],
     }
+
+
+def _adaptive_learning_evidence(manifest: dict[str, Any], run_rows: list[dict[str, str]]) -> dict[str, Any]:
+    manifest_learning = _adaptive_learning_state_summary(manifest.get("adaptive_learning", {}))
+    scheduler = _adaptive_scheduler_learning_evidence(manifest.get("adaptive_state", []))
+    adaptive_config = manifest.get("adaptive_config", {}) if isinstance(manifest.get("adaptive_config", {}), dict) else {}
+    continual_sources = [
+        source
+        for source in adaptive_config.get("continual_learning_sources", []) or []
+        if isinstance(source, dict)
+    ]
+    run_evidence_rows: list[dict[str, Any]] = []
+    for row in run_rows:
+        run_file = _resolve_existing_path(row.get("run_file", ""))
+        if run_file is None:
+            continue
+        meta_path = run_meta_path(run_file)
+        meta = load_json(meta_path) if meta_path.is_file() else {}
+        state_file = _closed_loop_state_file_for_run(meta, run_file)
+        state = load_json(state_file) if state_file is not None and state_file.is_file() else {}
+        summary = meta.get("closed_loop_state_summary", {}) if isinstance(meta.get("closed_loop_state_summary", {}), dict) else {}
+        feedback_state = state.get("feedback", {}) if isinstance(state.get("feedback", {}), dict) else {}
+        run_evidence_rows.append(
+            {
+                "label": _run_row_label(row),
+                "run_file": str(run_file),
+                "state_file": str(state_file) if state_file is not None else "",
+                "state_file_present": bool(state_file is not None and state_file.is_file()),
+                "summary_health": _adaptive_health_summary_from_closed_loop_summary(summary),
+                "learning_state": _adaptive_learning_state_summary(feedback_state.get("adaptive_learning", {})),
+                "quality_archive": _quality_archive_state_summary(feedback_state.get("quality_archive", {})),
+            }
+        )
+    closed_loop = _closed_loop_adaptive_evidence_rollup(run_evidence_rows)
+    return {
+        "schema_version": "adaptive-learning-evidence-v1",
+        "schedule_adaptive": manifest.get("schedule") == "adaptive",
+        "scheduler": scheduler,
+        "manifest_learning": manifest_learning,
+        "closed_loop": closed_loop,
+        "quality_diversity": {
+            "state_file_count": closed_loop["state_file_count"],
+            "archive_state_run_count": closed_loop["quality_archive_run_count"],
+            "archive_cell_count": closed_loop["quality_archive_cell_count"],
+            "archive_seed_count": closed_loop["quality_archive_seed_count"],
+            "archive_elite_seed_count": closed_loop["quality_archive_elite_seed_count"],
+            "archive_outcome_count": closed_loop["quality_archive_outcome_count"],
+            "archive_cluster_coverage": (
+                closed_loop["quality_archive_cell_count"] / closed_loop["state_file_count"]
+                if closed_loop["state_file_count"]
+                else 0.0
+            ),
+        },
+        "continual_learning": {
+            "source_count": len(continual_sources),
+            "loaded_source_count": sum(1 for source in continual_sources if bool(source.get("loaded"))),
+            "source_family_count": sum(_int(source.get("family_count")) for source in continual_sources),
+            "source_feature_count": sum(_int(source.get("feature_count")) for source in continual_sources),
+            "manifest_imported_ledger_count": manifest_learning["continual_imported_ledger_count"],
+            "manifest_imported_family_count": manifest_learning["continual_imported_family_count"],
+            "manifest_priority_family_count": manifest_learning["continual_family_count"],
+            "manifest_priority_feature_count": manifest_learning["continual_feature_count"],
+        },
+        "run_rows": run_evidence_rows[:32],
+    }
+
+
+def _adaptive_scheduler_learning_evidence(value: Any) -> dict[str, Any]:
+    rows = [row for row in value or [] if isinstance(row, dict)] if isinstance(value, list) else []
+    temperatures = [
+        _float(row.get("annealing_temperature"))
+        for row in rows
+        if row.get("annealing_temperature") not in (None, "")
+    ]
+    learning_signals = [
+        _float(row.get("learning_signal"))
+        for row in rows
+        if row.get("learning_signal") not in (None, "")
+    ]
+    return {
+        "arm_count": len(rows),
+        "pull_total": sum(_int(row.get("pulls")) for row in rows),
+        "reward_signal_avg": _mean(_float(row.get("reward_signal")) for row in rows),
+        "learning_signal_avg": _mean(learning_signals),
+        "learning_signal_max": max(learning_signals) if learning_signals else 0.0,
+        "annealing_temperature_last": temperatures[-1] if temperatures else 0.0,
+        "annealing_temperature_max": max(temperatures) if temperatures else 0.0,
+        "closed_loop_state_arm_count": sum(1 for row in rows if bool(row.get("closed_loop_state_present"))),
+    }
+
+
+def _adaptive_learning_state_summary(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or str(value.get("schema_version", "") or "") != "adaptive-learning-v1":
+        return _empty_adaptive_learning_state_summary()
+    bandits = value.get("bandits", {}) if isinstance(value.get("bandits", {}), dict) else {}
+    scope_rows: list[dict[str, Any]] = []
+    arm_count = 0
+    total_pulls = 0
+    reward_model_update_count = 0
+    reward_model_feature_count = 0
+    for scope, bandit in sorted(bandits.items()):
+        if not isinstance(bandit, dict):
+            continue
+        arms = [arm for arm in bandit.get("arms", []) or [] if isinstance(arm, dict)]
+        reward_model = bandit.get("reward_model", {}) if isinstance(bandit.get("reward_model", {}), dict) else {}
+        feature_counts = reward_model.get("feature_counts", {}) if isinstance(reward_model.get("feature_counts", {}), dict) else {}
+        scope_pull_total = sum(_int(arm.get("pulls")) for arm in arms)
+        arm_count += len(arms)
+        total_pulls += scope_pull_total
+        reward_model_update_count += _int(reward_model.get("total_updates"))
+        reward_model_feature_count += len(feature_counts)
+        scope_rows.append(
+            {
+                "scope": str(scope),
+                "arm_count": len(arms),
+                "pull_total": scope_pull_total,
+                "reward_model_updates": _int(reward_model.get("total_updates")),
+                "reward_model_feature_count": len(feature_counts),
+                "top_actions": [
+                    {
+                        "action_id": str(arm.get("action_id", "")),
+                        "pulls": _int(arm.get("pulls")),
+                        "mean_reward": (
+                            _float(arm.get("total_reward")) / _int(arm.get("pulls"))
+                            if _int(arm.get("pulls")) > 0
+                            else 0.0
+                        ),
+                    }
+                    for arm in sorted(
+                        arms,
+                        key=lambda item: (
+                            _int(item.get("pulls")),
+                            _float(item.get("total_reward")),
+                            str(item.get("action_id", "")),
+                        ),
+                        reverse=True,
+                    )[:5]
+                ],
+            }
+        )
+    version_memory = value.get("version_memory", {}) if isinstance(value.get("version_memory", {}), dict) else {}
+    exploration_memory = value.get("exploration_memory", {}) if isinstance(value.get("exploration_memory", {}), dict) else {}
+    continual = value.get("continual_priority_memory", {}) if isinstance(value.get("continual_priority_memory", {}), dict) else {}
+    return {
+        "present": True,
+        "bandit_scope_count": len(bandits),
+        "bandit_arm_count": arm_count,
+        "bandit_total_pulls": total_pulls,
+        "reward_model_update_count": reward_model_update_count,
+        "reward_model_feature_count": reward_model_feature_count,
+        "version_memory_key_count": _dict_len(version_memory.get("reward_counts", {})),
+        "exploration_records": _int(exploration_memory.get("total_records")),
+        "exploration_context_count": _dict_len(exploration_memory.get("context_counts", {})),
+        "exploration_action_count": _dict_len(exploration_memory.get("action_counts", {})),
+        "continual_imported_ledger_count": _int(continual.get("imported_ledger_count")),
+        "continual_imported_family_count": _int(continual.get("imported_family_count")),
+        "continual_family_count": _dict_len(continual.get("family_priorities", {})),
+        "continual_feature_count": _dict_len(continual.get("feature_counts", {})),
+        "top_scopes": sorted(scope_rows, key=lambda row: (row["pull_total"], row["scope"]), reverse=True)[:8],
+    }
+
+
+def _empty_adaptive_learning_state_summary() -> dict[str, Any]:
+    return {
+        "present": False,
+        "bandit_scope_count": 0,
+        "bandit_arm_count": 0,
+        "bandit_total_pulls": 0,
+        "reward_model_update_count": 0,
+        "reward_model_feature_count": 0,
+        "version_memory_key_count": 0,
+        "exploration_records": 0,
+        "exploration_context_count": 0,
+        "exploration_action_count": 0,
+        "continual_imported_ledger_count": 0,
+        "continual_imported_family_count": 0,
+        "continual_family_count": 0,
+        "continual_feature_count": 0,
+        "top_scopes": [],
+    }
+
+
+def _adaptive_health_summary_from_closed_loop_summary(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    health = value.get("adaptive_learning_health", {})
+    if not isinstance(health, dict):
+        return {}
+    exploration = health.get("exploration_memory", {}) if isinstance(health.get("exploration_memory", {}), dict) else {}
+    return {
+        "present": str(health.get("schema_version", "") or "") == "adaptive-learning-health-v1",
+        "bandit_count": _int(health.get("bandit_count")),
+        "arm_count": _int(health.get("arm_count")),
+        "total_pulls": _int(health.get("total_pulls")),
+        "avg_health_penalty": _float(health.get("avg_health_penalty")),
+        "max_health_penalty": _float(health.get("max_health_penalty")),
+        "avg_uncertainty": _float(health.get("avg_uncertainty")),
+        "exploration_records": _int(exploration.get("total_records")),
+        "exploration_context_count": _int(exploration.get("context_count")),
+        "exploration_action_count": _int(exploration.get("action_count")),
+    }
+
+
+def _quality_archive_state_summary(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or str(value.get("schema_version", "") or "") != "quality-diversity-archive-v1":
+        return _empty_quality_archive_state_summary()
+    cells = [cell for cell in value.get("cells", []) or [] if isinstance(cell, dict)]
+    seed_count = 0
+    elite_seed_count = 0
+    reward_count = 0
+    outcome_count = 0
+    invalid_count = 0
+    false_positive_count = 0
+    for cell in cells:
+        seeds = [seed for seed in cell.get("seeds", []) or [] if isinstance(seed, dict)]
+        max_elites = max(0, _int(cell.get("max_elites", value.get("max_elites_per_cluster", 4))))
+        seed_count += len(seeds)
+        elite_seed_count += min(len(seeds), max_elites)
+        reward_count += _int(cell.get("reward_count"))
+        outcome_count += _int(cell.get("outcome_count"))
+        invalid_count += _int(cell.get("invalid_count"))
+        false_positive_count += _int(cell.get("false_positive_count"))
+    return {
+        "present": True,
+        "cell_count": len(cells),
+        "seed_count": seed_count,
+        "elite_seed_count": elite_seed_count,
+        "reward_count": reward_count,
+        "outcome_count": outcome_count,
+        "invalid_count": invalid_count,
+        "false_positive_count": false_positive_count,
+    }
+
+
+def _empty_quality_archive_state_summary() -> dict[str, Any]:
+    return {
+        "present": False,
+        "cell_count": 0,
+        "seed_count": 0,
+        "elite_seed_count": 0,
+        "reward_count": 0,
+        "outcome_count": 0,
+        "invalid_count": 0,
+        "false_positive_count": 0,
+    }
+
+
+def _closed_loop_adaptive_evidence_rollup(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    health_rows = [row.get("summary_health", {}) for row in rows if row.get("summary_health", {}).get("present")]
+    learning_rows = [row.get("learning_state", {}) for row in rows if row.get("learning_state", {}).get("present")]
+    archive_rows = [row.get("quality_archive", {}) for row in rows if row.get("quality_archive", {}).get("present")]
+    return {
+        "run_count": len(rows),
+        "state_file_count": sum(1 for row in rows if bool(row.get("state_file_present"))),
+        "health_summary_run_count": len(health_rows),
+        "health_total_pulls": sum(_int(row.get("total_pulls")) for row in health_rows),
+        "health_exploration_records": sum(_int(row.get("exploration_records")) for row in health_rows),
+        "health_avg_uncertainty": _mean(_float(row.get("avg_uncertainty")) for row in health_rows),
+        "learning_state_run_count": len(learning_rows),
+        "learning_bandit_scope_count": sum(_int(row.get("bandit_scope_count")) for row in learning_rows),
+        "learning_bandit_arm_count": sum(_int(row.get("bandit_arm_count")) for row in learning_rows),
+        "learning_total_pulls": sum(_int(row.get("bandit_total_pulls")) for row in learning_rows),
+        "learning_reward_model_updates": sum(_int(row.get("reward_model_update_count")) for row in learning_rows),
+        "learning_reward_model_feature_count": sum(_int(row.get("reward_model_feature_count")) for row in learning_rows),
+        "learning_exploration_records": sum(_int(row.get("exploration_records")) for row in learning_rows),
+        "quality_archive_run_count": len(archive_rows),
+        "quality_archive_cell_count": sum(_int(row.get("cell_count")) for row in archive_rows),
+        "quality_archive_seed_count": sum(_int(row.get("seed_count")) for row in archive_rows),
+        "quality_archive_elite_seed_count": sum(_int(row.get("elite_seed_count")) for row in archive_rows),
+        "quality_archive_outcome_count": sum(_int(row.get("outcome_count")) for row in archive_rows),
+        "quality_archive_invalid_count": sum(_int(row.get("invalid_count")) for row in archive_rows),
+        "quality_archive_false_positive_count": sum(_int(row.get("false_positive_count")) for row in archive_rows),
+        "rows": rows[:32],
+    }
+
+
+def _closed_loop_state_file_for_run(meta: Any, run_file: Path) -> Path | None:
+    if not isinstance(meta, dict):
+        return None
+    raw_state_file = str(meta.get("closed_loop_state_file", "") or "").strip()
+    candidates = [_resolve_path(raw_state_file)] if raw_state_file else []
+    candidates.append(closed_loop_state_path(run_file))
+    for path in candidates:
+        if path.is_file():
+            return path
+    return candidates[0] if candidates else None
+
+
+def _dict_len(value: Any) -> int:
+    return len(value) if isinstance(value, dict) else 0
+
+
+def _mean(values: Any) -> float:
+    materialized = [float(value) for value in values]
+    return sum(materialized) / len(materialized) if materialized else 0.0
 
 
 def _candidate_pipeline_metrics(generated_dir: Path) -> dict[str, Any]:
@@ -1593,6 +2486,34 @@ def _avg_float(rows: list[dict[str, str]], key: str) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
+def _weighted_avg_by_key(rows: list[dict[str, str]], value_key: str, weight_key: str) -> float:
+    weighted_total = 0.0
+    total_weight = 0.0
+    for row in rows:
+        value = row.get(value_key)
+        if value in (None, ""):
+            continue
+        weight = _float(row.get(weight_key))
+        if weight <= 0.0:
+            weight = 1.0
+        weighted_total += _float(value) * weight
+        total_weight += weight
+    return weighted_total / total_weight if total_weight else 0.0
+
+
+def _weighted_scope_avg(rows: list[dict[str, Any]], value_key: str) -> float:
+    weighted_total = 0.0
+    total_weight = 0.0
+    for row in rows:
+        weight = _float(row.get("selection_count"))
+        value = row.get(value_key)
+        if value in (None, "") or weight <= 0.0:
+            continue
+        weighted_total += _float(value) * weight
+        total_weight += weight
+    return weighted_total / total_weight if total_weight else 0.0
+
+
 def _ratio(numerator: float, denominator: float) -> float | None:
     return None if denominator == 0 else numerator / denominator
 
@@ -1619,12 +2540,30 @@ def _fmt_signed_float(value: float) -> str:
     return f"{value:+.2f}"
 
 
+def _fmt_optional_signed_float(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    try:
+        return f"{float(value):+.2f}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
 def _fmt_percent(value: float) -> str:
     return f"{value:.1%}"
 
 
 def _fmt_signed_percent(value: float) -> str:
     return f"{value:+.1%}"
+
+
+def _fmt_optional_signed_percent(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    try:
+        return f"{float(value):+.1%}"
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def _fmt_optional_number(value: Any) -> str:

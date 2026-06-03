@@ -1,0 +1,1527 @@
+{
+  "candidate_row_count": 4,
+  "candidate_rows": [
+    {
+      "case": {
+        "case_id": "case-00000025-common-api-workflow",
+        "metadata": {
+          "discovery_origin": "organic",
+          "generator_profile": "common_api_workflow",
+          "workflow_template": "distinct_null_topk"
+        },
+        "program": {
+          "operations": [
+            {
+              "columns": [
+                "s"
+              ],
+              "op": "distinct"
+            },
+            {
+              "keys": [
+                {
+                  "ascending": true,
+                  "column": "s",
+                  "nulls": "first"
+                }
+              ],
+              "op": "sort"
+            },
+            {
+              "n": 1,
+              "op": "limit"
+            }
+          ],
+          "program_id": "prog-00000025-common-api-workflow",
+          "seed": 25
+        },
+        "seed": 25,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "g",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "x",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "y",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "flag",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "s",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "flag": null,
+                "g": "b",
+                "id": 0,
+                "s": null,
+                "x": null,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "c",
+                "id": 1,
+                "s": "",
+                "x": 10,
+                "y": -0.5
+              },
+              {
+                "flag": true,
+                "g": "space value",
+                "id": 2,
+                "s": "",
+                "x": 1,
+                "y": 0.0
+              },
+              {
+                "flag": false,
+                "g": "",
+                "id": 3,
+                "s": "  padded  ",
+                "x": 2,
+                "y": -0.5
+              },
+              {
+                "flag": true,
+                "g": " padded ",
+                "id": 4,
+                "s": "  padded  ",
+                "x": 1,
+                "y": 0.5
+              },
+              {
+                "flag": null,
+                "g": "a",
+                "id": 5,
+                "s": "Alpha",
+                "x": 0,
+                "y": 0.5
+              },
+              {
+                "flag": true,
+                "g": null,
+                "id": 6,
+                "s": "Alpha",
+                "x": 0,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "space value",
+                "id": 2,
+                "s": " alpha ",
+                "x": null,
+                "y": -0.5
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": null,
+        "candidate_recheck_count": 2,
+        "compress_run_log": true,
+        "enable_artifact": true,
+        "enable_differential_oracle": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_normalizer": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_type_aware_generation": true,
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "generator_profile": "common_api_workflow",
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "common_api_workflow",
+          "daily_api",
+          "common_workflow",
+          "operation_combo",
+          "distinct_null_topk",
+          "distinct",
+          "duplicate_elimination",
+          "sort_limit",
+          "nulls",
+          "strings",
+          "numeric"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.35,
+        "log_level": "compact",
+        "metamorphic_variant_limit": 6,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0
+      },
+      "findings": [
+        {
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Backends returned different canonical tables; mismatch_class=value; shapes={'pandas': (1, 1), 'duckdb': (1, 1), 'datafusion': (1, 1)}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-d855d4804663a92b",
+          "kind": "semantic_output_mismatch",
+          "mismatch_class": "value",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the artifact and make a backend-specific reproducer.",
+            "Check backend documentation/release notes, then file upstream if behavior contradicts the expected semantics."
+          ],
+          "root_cause": "distinct_null_topk",
+          "severity": "critical",
+          "signature": "d855d4804663a92b",
+          "source_issue": "",
+          "suspicious_backends": [
+            "datafusion"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Clear suspicious minority backend(s): ['datafusion']",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "datafusion": {
+          "backend": "datafusion",
+          "columns": [
+            "s"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              ""
+            ]
+          ],
+          "status": "ok"
+        },
+        "duckdb": {
+          "backend": "duckdb",
+          "columns": [
+            "s"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "s"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null
+            ]
+          ],
+          "status": "ok"
+        }
+      },
+      "raw_results": {
+        "datafusion": {
+          "backend": "datafusion",
+          "duration_ms": 31.788913998752832,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "duckdb": {
+          "backend": "duckdb",
+          "duration_ms": 48.70383098023012,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 243.30887099495158,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        }
+      }
+    },
+    {
+      "case": {
+        "case_id": "case-00000025-common-api-workflow-mut-35",
+        "metadata": {
+          "candidate_source": "feedback_mutation",
+          "generator_profile": "common_api_workflow",
+          "mutation": {
+            "changed": true,
+            "detail": "shuffle_rows:t0",
+            "operator": "shuffle_rows"
+          },
+          "seed_lineage": {
+            "depth": 1,
+            "mutation_seed": 35,
+            "parent_case_id": "case-00000025-common-api-workflow",
+            "parent_seed": 25,
+            "root_seed": 25
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "columns": [
+                "s"
+              ],
+              "op": "distinct"
+            },
+            {
+              "keys": [
+                {
+                  "ascending": true,
+                  "column": "s",
+                  "nulls": "first"
+                }
+              ],
+              "op": "sort"
+            },
+            {
+              "n": 1,
+              "op": "limit"
+            }
+          ],
+          "program_id": "prog-00000025-common-api-workflow-mut-35",
+          "seed": 35
+        },
+        "seed": 35,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "g",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "x",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "y",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "flag",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "s",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "flag": false,
+                "g": "space value",
+                "id": 2,
+                "s": " alpha ",
+                "x": null,
+                "y": -0.5
+              },
+              {
+                "flag": null,
+                "g": "a",
+                "id": 5,
+                "s": "Alpha",
+                "x": 0,
+                "y": 0.5
+              },
+              {
+                "flag": true,
+                "g": " padded ",
+                "id": 4,
+                "s": "  padded  ",
+                "x": 1,
+                "y": 0.5
+              },
+              {
+                "flag": false,
+                "g": "",
+                "id": 3,
+                "s": "  padded  ",
+                "x": 2,
+                "y": -0.5
+              },
+              {
+                "flag": true,
+                "g": null,
+                "id": 6,
+                "s": "Alpha",
+                "x": 0,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "c",
+                "id": 1,
+                "s": "",
+                "x": 10,
+                "y": -0.5
+              },
+              {
+                "flag": null,
+                "g": "b",
+                "id": 0,
+                "s": null,
+                "x": null,
+                "y": null
+              },
+              {
+                "flag": true,
+                "g": "space value",
+                "id": 2,
+                "s": "",
+                "x": 1,
+                "y": 0.0
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": null,
+        "candidate_recheck_count": 2,
+        "compress_run_log": true,
+        "enable_artifact": true,
+        "enable_differential_oracle": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_normalizer": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_type_aware_generation": true,
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "generator_profile": "common_api_workflow",
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "common_api_workflow",
+          "daily_api",
+          "common_workflow",
+          "operation_combo",
+          "distinct_null_topk",
+          "distinct",
+          "duplicate_elimination",
+          "sort_limit",
+          "nulls",
+          "strings",
+          "numeric"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.35,
+        "log_level": "compact",
+        "metamorphic_variant_limit": 6,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0
+      },
+      "findings": [
+        {
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Backends returned different canonical tables; mismatch_class=value; shapes={'pandas': (1, 1), 'duckdb': (1, 1), 'datafusion': (1, 1)}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-d855d4804663a92b",
+          "kind": "semantic_output_mismatch",
+          "mismatch_class": "value",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the artifact and make a backend-specific reproducer.",
+            "Check backend documentation/release notes, then file upstream if behavior contradicts the expected semantics."
+          ],
+          "root_cause": "distinct_null_topk",
+          "severity": "critical",
+          "signature": "d855d4804663a92b",
+          "source_issue": "",
+          "suspicious_backends": [
+            "datafusion"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Clear suspicious minority backend(s): ['datafusion']",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "datafusion": {
+          "backend": "datafusion",
+          "columns": [
+            "s"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              ""
+            ]
+          ],
+          "status": "ok"
+        },
+        "duckdb": {
+          "backend": "duckdb",
+          "columns": [
+            "s"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "s"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null
+            ]
+          ],
+          "status": "ok"
+        }
+      },
+      "raw_results": {
+        "datafusion": {
+          "backend": "datafusion",
+          "duration_ms": 3.73766798293218,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "duckdb": {
+          "backend": "duckdb",
+          "duration_ms": 16.326711978763342,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 2.2807930363342166,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        }
+      }
+    },
+    {
+      "case": {
+        "case_id": "case-00000064-common-api-workflow",
+        "metadata": {
+          "discovery_origin": "organic",
+          "generator_profile": "common_api_workflow",
+          "workflow_template": "distinct_null_topk"
+        },
+        "program": {
+          "operations": [
+            {
+              "columns": [
+                "s"
+              ],
+              "op": "distinct"
+            },
+            {
+              "keys": [
+                {
+                  "ascending": true,
+                  "column": "s",
+                  "nulls": "first"
+                }
+              ],
+              "op": "sort"
+            },
+            {
+              "n": 1,
+              "op": "limit"
+            }
+          ],
+          "program_id": "prog-00000064-common-api-workflow",
+          "seed": 64
+        },
+        "seed": 64,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "g",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "x",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "y",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "flag",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "s",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "flag": null,
+                "g": "a",
+                "id": 0,
+                "s": null,
+                "x": null,
+                "y": null
+              },
+              {
+                "flag": true,
+                "g": "c",
+                "id": 1,
+                "s": "",
+                "x": 2,
+                "y": -1.5
+              },
+              {
+                "flag": true,
+                "g": "space value",
+                "id": 2,
+                "s": "",
+                "x": 1,
+                "y": 0.0
+              },
+              {
+                "flag": true,
+                "g": null,
+                "id": 3,
+                "s": "space value",
+                "x": 2,
+                "y": -0.5
+              },
+              {
+                "flag": true,
+                "g": "",
+                "id": 4,
+                "s": null,
+                "x": -2,
+                "y": 0.0
+              },
+              {
+                "flag": null,
+                "g": "b",
+                "id": 5,
+                "s": "  padded  ",
+                "x": 2,
+                "y": -0.5
+              },
+              {
+                "flag": false,
+                "g": null,
+                "id": 6,
+                "s": null,
+                "x": 10,
+                "y": null
+              },
+              {
+                "flag": true,
+                "g": "c",
+                "id": 2,
+                "s": "Beta",
+                "x": null,
+                "y": 0.5
+              },
+              {
+                "flag": false,
+                "g": " padded ",
+                "id": 3,
+                "s": "Beta",
+                "x": 2,
+                "y": 1.5
+              },
+              {
+                "flag": true,
+                "g": " padded ",
+                "id": 2,
+                "s": "Beta",
+                "x": -10,
+                "y": -1.5
+              },
+              {
+                "flag": null,
+                "g": "space value",
+                "id": 3,
+                "s": "space value",
+                "x": -2,
+                "y": 1.5
+              },
+              {
+                "flag": true,
+                "g": "a",
+                "id": 4,
+                "s": "space value",
+                "x": 10,
+                "y": 10.0
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": null,
+        "candidate_recheck_count": 2,
+        "compress_run_log": true,
+        "enable_artifact": true,
+        "enable_differential_oracle": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_normalizer": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_type_aware_generation": true,
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "generator_profile": "common_api_workflow",
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "common_api_workflow",
+          "daily_api",
+          "common_workflow",
+          "operation_combo",
+          "distinct_null_topk",
+          "distinct",
+          "duplicate_elimination",
+          "sort_limit",
+          "nulls",
+          "strings",
+          "numeric"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.35,
+        "log_level": "compact",
+        "metamorphic_variant_limit": 6,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0
+      },
+      "findings": [
+        {
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Backends returned different canonical tables; mismatch_class=value; shapes={'pandas': (1, 1), 'duckdb': (1, 1), 'datafusion': (1, 1)}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-d855d4804663a92b",
+          "kind": "semantic_output_mismatch",
+          "mismatch_class": "value",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the artifact and make a backend-specific reproducer.",
+            "Check backend documentation/release notes, then file upstream if behavior contradicts the expected semantics."
+          ],
+          "root_cause": "distinct_null_topk",
+          "severity": "critical",
+          "signature": "d855d4804663a92b",
+          "source_issue": "",
+          "suspicious_backends": [
+            "datafusion"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Clear suspicious minority backend(s): ['datafusion']",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "datafusion": {
+          "backend": "datafusion",
+          "columns": [
+            "s"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              ""
+            ]
+          ],
+          "status": "ok"
+        },
+        "duckdb": {
+          "backend": "duckdb",
+          "columns": [
+            "s"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "s"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null
+            ]
+          ],
+          "status": "ok"
+        }
+      },
+      "raw_results": {
+        "datafusion": {
+          "backend": "datafusion",
+          "duration_ms": 4.361629020422697,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "duckdb": {
+          "backend": "duckdb",
+          "duration_ms": 16.236961993854493,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 2.4000330013222992,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        }
+      }
+    },
+    {
+      "case": {
+        "case_id": "case-00000142-common-api-workflow",
+        "metadata": {
+          "discovery_origin": "organic",
+          "generator_profile": "common_api_workflow",
+          "workflow_template": "distinct_null_topk"
+        },
+        "program": {
+          "operations": [
+            {
+              "columns": [
+                "s"
+              ],
+              "op": "distinct"
+            },
+            {
+              "keys": [
+                {
+                  "ascending": true,
+                  "column": "s",
+                  "nulls": "first"
+                }
+              ],
+              "op": "sort"
+            },
+            {
+              "n": 1,
+              "op": "limit"
+            }
+          ],
+          "program_id": "prog-00000142-common-api-workflow",
+          "seed": 142
+        },
+        "seed": 142,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "g",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "x",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "y",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "flag",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "s",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "flag": null,
+                "g": "b",
+                "id": 0,
+                "s": null,
+                "x": null,
+                "y": null
+              },
+              {
+                "flag": true,
+                "g": "space value",
+                "id": 1,
+                "s": "",
+                "x": 0,
+                "y": -0.5
+              },
+              {
+                "flag": true,
+                "g": "",
+                "id": 2,
+                "s": "space value",
+                "x": -10,
+                "y": 10.0
+              },
+              {
+                "flag": false,
+                "g": "",
+                "id": 3,
+                "s": "",
+                "x": -1,
+                "y": 0.0
+              },
+              {
+                "flag": false,
+                "g": " padded ",
+                "id": 4,
+                "s": "space value",
+                "x": -10,
+                "y": 1.5
+              },
+              {
+                "flag": null,
+                "g": "b",
+                "id": 5,
+                "s": "Alpha",
+                "x": 0,
+                "y": 0.5
+              },
+              {
+                "flag": false,
+                "g": "a",
+                "id": 6,
+                "s": "Alpha",
+                "x": 2,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "c",
+                "id": 7,
+                "s": " alpha ",
+                "x": null,
+                "y": -0.5
+              },
+              {
+                "flag": false,
+                "g": " padded ",
+                "id": 1,
+                "s": "",
+                "x": 5,
+                "y": -0.5
+              },
+              {
+                "flag": true,
+                "g": "c",
+                "id": 2,
+                "s": "",
+                "x": 1,
+                "y": 10.0
+              },
+              {
+                "flag": null,
+                "g": "",
+                "id": 10,
+                "s": "space value",
+                "x": 2,
+                "y": 10.0
+              },
+              {
+                "flag": false,
+                "g": "",
+                "id": 1,
+                "s": "space value",
+                "x": 10,
+                "y": 1.5
+              },
+              {
+                "flag": true,
+                "g": null,
+                "id": 2,
+                "s": "Alpha",
+                "x": 5,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 6,
+                "s": null,
+                "x": 1,
+                "y": 10.0
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": null,
+        "candidate_recheck_count": 2,
+        "compress_run_log": true,
+        "enable_artifact": true,
+        "enable_differential_oracle": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_normalizer": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_type_aware_generation": true,
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "generator_profile": "common_api_workflow",
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "common_api_workflow",
+          "daily_api",
+          "common_workflow",
+          "operation_combo",
+          "distinct_null_topk",
+          "distinct",
+          "duplicate_elimination",
+          "sort_limit",
+          "nulls",
+          "strings",
+          "numeric"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.35,
+        "log_level": "compact",
+        "metamorphic_variant_limit": 6,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0
+      },
+      "findings": [
+        {
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Backends returned different canonical tables; mismatch_class=value; shapes={'pandas': (1, 1), 'duckdb': (1, 1), 'datafusion': (1, 1)}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-d855d4804663a92b",
+          "kind": "semantic_output_mismatch",
+          "mismatch_class": "value",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the artifact and make a backend-specific reproducer.",
+            "Check backend documentation/release notes, then file upstream if behavior contradicts the expected semantics."
+          ],
+          "root_cause": "distinct_null_topk",
+          "severity": "critical",
+          "signature": "d855d4804663a92b",
+          "source_issue": "",
+          "suspicious_backends": [
+            "datafusion"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Clear suspicious minority backend(s): ['datafusion']",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "datafusion": {
+          "backend": "datafusion",
+          "columns": [
+            "s"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              ""
+            ]
+          ],
+          "status": "ok"
+        },
+        "duckdb": {
+          "backend": "duckdb",
+          "columns": [
+            "s"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "s"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null
+            ]
+          ],
+          "status": "ok"
+        }
+      },
+      "raw_results": {
+        "datafusion": {
+          "backend": "datafusion",
+          "duration_ms": 4.22015500953421,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "duckdb": {
+          "backend": "duckdb",
+          "duration_ms": 16.307409037835896,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 2.34217697288841,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        }
+      }
+    }
+  ],
+  "fresh_candidate_bug_families": {
+    "distinct_null_topk@datafusion": 4
+  },
+  "generated_at": "2026-05-26T23:29:36Z",
+  "generated_by": "datadiff discovery-run",
+  "schema_version": "discovery-run-fresh-candidates-v1",
+  "source_run_file": "runs/run-20260526T232930-1779838170269623522.jsonl.gz"
+}

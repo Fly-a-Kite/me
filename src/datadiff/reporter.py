@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,45 @@ from datadiff.reward import (
 )
 from datadiff.targets import target_context
 from datadiff.util import REPORTS_DIR, RUNS_DIR, ensure_dirs, jsonl_log_stem, load_json, read_jsonl, run_meta_path
+
+
+_ADAPTIVE_SELECTION_SCOPE_SPECS = (
+    (
+        "generator_profile",
+        "generator_profile_selection",
+        ("profile", "action"),
+        "selected_generator_profile",
+        "profile_pool",
+    ),
+    (
+        "semantic_objective",
+        "semantic_objective_selection",
+        ("action",),
+        "selected_semantic_objective",
+        "action_pool",
+    ),
+    (
+        "metamorphic_relation",
+        "metamorphic_relation_selection",
+        ("action",),
+        "selected_metamorphic_relation",
+        "action_pool",
+    ),
+    ("version_pair", "version_pair_selection", ("action",), "selected_version_pair", "action_pool"),
+)
+
+_ADAPTIVE_SELECTION_AVG_FIELDS = (
+    "avg_reward",
+    "avg_learning_weight",
+    "avg_pool_size",
+    "avg_score",
+    "avg_model_prediction",
+    "avg_uncertainty",
+    "avg_exploration_bonus",
+    "avg_version_signal",
+    "avg_continual_priority_signal",
+    "avg_health_penalty",
+)
 
 
 def latest_run_log_path() -> Path:
@@ -88,6 +128,156 @@ def _discovery_bias_summary_item(item) -> str:
 def _config_discovery_biases_summary(value) -> str:
     items = [_discovery_bias_summary_item(item) for item in (value or []) if _discovery_bias_summary_item(item)]
     return "; ".join(items) if items else "none"
+
+
+def _adaptive_selection_report_rows(rows: list[dict]) -> list[dict[str, Any]]:
+    metric_keys = (
+        "score",
+        "model_prediction",
+        "uncertainty",
+        "exploration_bonus",
+        "version_signal",
+        "continual_priority_signal",
+        "health_penalty",
+    )
+    out: list[dict[str, Any]] = []
+    for scope, selection_key, action_keys, fallback_key, pool_key in _ADAPTIVE_SELECTION_SCOPE_SPECS:
+        actions: Counter[str] = Counter()
+        strategies: Counter[str] = Counter()
+        rewards: list[float] = []
+        learning_weights: list[float] = []
+        pool_sizes: list[float] = []
+        metrics: dict[str, list[float]] = {key: [] for key in metric_keys}
+        selection_count = 0
+        for row in rows:
+            selection = row.get(selection_key, {})
+            if not isinstance(selection, dict) or not selection:
+                continue
+            action = _selection_action(selection, action_keys, row.get(fallback_key, ""))
+            strategy = str(selection.get("strategy", "") or "").strip()
+            if not action and not strategy:
+                continue
+            selection_count += 1
+            if action:
+                actions[action] += 1
+            if strategy:
+                strategies[strategy] += 1
+            reward = _finite_float(selection.get("reward"))
+            if reward is not None:
+                rewards.append(reward)
+            learning_weight = _finite_float(selection.get("learning_weight"))
+            if learning_weight is not None:
+                learning_weights.append(learning_weight)
+            pool_values = selection.get(pool_key, selection.get("action_pool", []))
+            if isinstance(pool_values, (list, tuple, set)):
+                pool_sizes.append(float(len(pool_values)))
+            rank_row = _selection_rank_row(selection.get("ranked", []), action)
+            if rank_row is None:
+                continue
+            for key in metric_keys:
+                value = _finite_float(rank_row.get(key))
+                if value is not None:
+                    metrics[key].append(value)
+        if not selection_count:
+            continue
+        out.append(
+            {
+                "scope": scope,
+                "selection_count": selection_count,
+                "actions": _counter_summary_limited(actions),
+                "strategies": _counter_summary_limited(strategies),
+                "avg_reward": _mean_or_none(rewards),
+                "avg_learning_weight": _mean_or_none(learning_weights),
+                "avg_pool_size": _mean_or_none(pool_sizes),
+                **{f"avg_{key}": _mean_or_none(values) for key, values in metrics.items()},
+            }
+        )
+    return out
+
+
+def _adaptive_selection_summary_fields(rows: list[dict]) -> dict[str, Any]:
+    total_cases = len(rows)
+    summaries = {
+        str(row.get("scope", "") or ""): row
+        for row in _adaptive_selection_report_rows(rows)
+        if str(row.get("scope", "") or "")
+    }
+    total_selection_count = sum(int(row.get("selection_count", 0) or 0) for row in summaries.values())
+    out: dict[str, Any] = {
+        "adaptive_selection_total_count": total_selection_count,
+        "adaptive_selection_total_per_case": total_selection_count / total_cases if total_cases else 0.0,
+        "adaptive_selection_scope_count": len(summaries),
+    }
+    for scope, *_ in _ADAPTIVE_SELECTION_SCOPE_SPECS:
+        prefix = _adaptive_selection_prefix(scope)
+        summary = summaries.get(scope, {})
+        selection_count = int(summary.get("selection_count", 0) or 0)
+        out[f"{prefix}_selection_count"] = selection_count
+        out[f"{prefix}_selection_rate"] = selection_count / total_cases if total_cases else 0.0
+        out[f"{prefix}_top_actions"] = summary.get("actions", "none") or "none"
+        out[f"{prefix}_strategies"] = summary.get("strategies", "none") or "none"
+        for avg_key in _ADAPTIVE_SELECTION_AVG_FIELDS:
+            out[f"{prefix}_{avg_key}"] = summary.get(avg_key) if summary else None
+    return out
+
+
+def _adaptive_selection_summary_fieldnames() -> list[str]:
+    fields = [
+        "adaptive_selection_total_count",
+        "adaptive_selection_total_per_case",
+        "adaptive_selection_scope_count",
+    ]
+    for scope, *_ in _ADAPTIVE_SELECTION_SCOPE_SPECS:
+        prefix = _adaptive_selection_prefix(scope)
+        fields.extend(
+            [
+                f"{prefix}_selection_count",
+                f"{prefix}_selection_rate",
+                f"{prefix}_top_actions",
+                f"{prefix}_strategies",
+                *(f"{prefix}_{avg_key}" for avg_key in _ADAPTIVE_SELECTION_AVG_FIELDS),
+            ]
+        )
+    return fields
+
+
+def _adaptive_selection_prefix(scope: str) -> str:
+    return f"adaptive_{scope}"
+
+
+def _selection_action(selection: dict[str, Any], keys: tuple[str, ...], fallback: Any = "") -> str:
+    for key in keys:
+        value = str(selection.get(key, "") or "").strip()
+        if value:
+            return value
+    return str(fallback or "").strip()
+
+
+def _selection_rank_row(ranked: Any, action: str) -> dict[str, Any] | None:
+    if not isinstance(ranked, list):
+        return None
+    if action:
+        for row in ranked:
+            if isinstance(row, dict) and str(row.get("action_id", "") or "").strip() == action:
+                return row
+    for row in ranked:
+        if isinstance(row, dict):
+            return row
+    return None
+
+
+def _finite_float(value: Any) -> float | None:
+    if isinstance(value, bool) or value in (None, ""):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _mean_or_none(values: list[float]) -> float | None:
+    return sum(values) / len(values) if values else None
 
 
 def write_run_report(run_file: Path | None = None, csv_limit: int | None = None) -> tuple[Path, Path]:
@@ -175,6 +365,7 @@ def write_run_report(run_file: Path | None = None, csv_limit: int | None = None)
 
     total = len(rows)
     bug_rows = [r for r in rows if r.get("findings")]
+    adaptive_selection_rows = _adaptive_selection_report_rows(rows)
     lines = [
         "# DataDiffFuzz Report",
         "",
@@ -274,6 +465,40 @@ def write_run_report(run_file: Path | None = None, csv_limit: int | None = None)
         lines.append("Pass/fail:")
         for key, count in quality_oracle_pass_fail.most_common():
             lines.append(f"- {key}: {count}")
+    else:
+        lines.append("- none")
+    lines.append("")
+    lines.append("## Adaptive Selection")
+    if adaptive_selection_rows:
+        lines.extend(
+            [
+                "| scope | selections | actions | strategies | avg reward | avg learning weight | avg pool | avg score | avg model | avg uncertainty | avg exploration bonus | avg version signal | avg continual priority | avg health penalty |",
+                "|---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for row in adaptive_selection_rows:
+            lines.append(
+                "| {scope} | {selection_count} | {actions} | {strategies} | {avg_reward} | "
+                "{avg_learning_weight} | {avg_pool_size} | {avg_score} | {avg_model_prediction} | "
+                "{avg_uncertainty} | {avg_exploration_bonus} | {avg_version_signal} | "
+                "{avg_continual_priority_signal} | {avg_health_penalty} |".format(
+                    **{
+                        **row,
+                        "avg_reward": _fmt_optional_float(row["avg_reward"]),
+                        "avg_learning_weight": _fmt_optional_float(row["avg_learning_weight"]),
+                        "avg_pool_size": _fmt_optional_float(row["avg_pool_size"]),
+                        "avg_score": _fmt_optional_float(row["avg_score"]),
+                        "avg_model_prediction": _fmt_optional_float(row["avg_model_prediction"]),
+                        "avg_uncertainty": _fmt_optional_float(row["avg_uncertainty"]),
+                        "avg_exploration_bonus": _fmt_optional_float(row["avg_exploration_bonus"]),
+                        "avg_version_signal": _fmt_optional_float(row["avg_version_signal"]),
+                        "avg_continual_priority_signal": _fmt_optional_float(
+                            row["avg_continual_priority_signal"]
+                        ),
+                        "avg_health_penalty": _fmt_optional_float(row["avg_health_penalty"]),
+                    }
+                )
+            )
     else:
         lines.append("- none")
     lines.append("")
@@ -449,6 +674,7 @@ def write_experiment_summary_report(
         candidate_bug_discovery_auc = _candidate_bug_discovery_auc(run_rows)
         guidance_metrics = _guidance_metrics(run_rows)
         feedback_metrics = _feedback_metrics(run_rows, known_bug_families)
+        adaptive_selection_metrics = _adaptive_selection_summary_fields(run_rows)
         new_behavior_cases = int(meta.get("new_behavior_cases", sum(1 for row in run_rows if row.get("is_new_behavior"))))
         signal_new_behavior_cases = int(
             meta.get(
@@ -562,6 +788,7 @@ def write_experiment_summary_report(
                 "stage_logging_artifact_share": float(stage_share.get("logging_artifact_ms", 0.0) or 0.0),
                 **guidance_metrics,
                 **feedback_metrics,
+                **adaptive_selection_metrics,
                 "top_root_causes": _counter_summary(root_causes),
                 "top_finding_kinds": _counter_summary(finding_kinds),
                 "top_triage_verdicts": _counter_summary(triage_verdicts),
@@ -742,6 +969,40 @@ def write_experiment_summary_report(
                         row["guidance_reward_adjustment_per_case"]
                     ),
                     "seed_schedule_delta_per_case": _fmt_float(row["seed_schedule_delta_per_case"]),
+                }
+            )
+        )
+    lines.extend(
+        [
+            "",
+            "## Adaptive Selection Telemetry",
+            "",
+            "These rows expose which learned action pools were actually used inside each run, so adaptive ablations can distinguish configured components from executed choices.",
+            "",
+            "| target suite | variant | preset | selections/case | profile actions | objective actions | MR actions | version pairs | avg reward | avg uncertainty | avg version signal | avg health penalty |",
+            "|---|---|---|---:|---|---|---|---|---:|---:|---:|---:|",
+        ]
+    )
+    for row in aggregate_rows:
+        lines.append(
+            "| {target_suite} | {variant_label} | {preset} | {adaptive_selection_total_per_case} | "
+            "{adaptive_generator_profile_top_actions} | {adaptive_semantic_objective_top_actions} | "
+            "{adaptive_metamorphic_relation_top_actions} | {adaptive_version_pair_top_actions} | "
+            "{avg_adaptive_selection_reward} | {avg_adaptive_selection_uncertainty} | "
+            "{avg_adaptive_selection_version_signal} | {avg_adaptive_selection_health_penalty} |".format(
+                **{
+                    **row,
+                    "adaptive_selection_total_per_case": _fmt_float(row["adaptive_selection_total_per_case"]),
+                    "avg_adaptive_selection_reward": _fmt_float(_avg_adaptive_scope_metric(row, "avg_reward")),
+                    "avg_adaptive_selection_uncertainty": _fmt_float(
+                        _avg_adaptive_scope_metric(row, "avg_uncertainty")
+                    ),
+                    "avg_adaptive_selection_version_signal": _fmt_float(
+                        _avg_adaptive_scope_metric(row, "avg_version_signal")
+                    ),
+                    "avg_adaptive_selection_health_penalty": _fmt_float(
+                        _avg_adaptive_scope_metric(row, "avg_health_penalty")
+                    ),
                 }
             )
         )
@@ -1039,6 +1300,7 @@ def write_experiment_summary_report(
                 "feedback_target_key_count",
                 "feedback_semantic_family_target_count",
                 "feedback_semantic_signal_target_count",
+                "feedback_exploration_objective_target_count",
                 "feedback_operator_affinity_hit_cases",
                 "feedback_operator_affinity_hit_rate",
                 "feedback_selected_operator_count",
@@ -1073,6 +1335,7 @@ def write_experiment_summary_report(
                 "guided_redundant_cases",
                 "guided_productive_rate",
                 "guided_target_miss_rate",
+                *_adaptive_selection_summary_fieldnames(),
                 "preflight_repaired_cases",
                 "preflight_fallback_cases",
                 "preflight_invalid_cases",
@@ -1224,6 +1487,7 @@ def write_experiment_summary_report(
                 "feedback_target_key_count",
                 "feedback_semantic_family_target_count",
                 "feedback_semantic_signal_target_count",
+                "feedback_exploration_objective_target_count",
                 "feedback_operator_affinity_hit_cases",
                 "feedback_operator_affinity_hit_rate",
                 "feedback_selected_operator_count",
@@ -1258,6 +1522,7 @@ def write_experiment_summary_report(
                 "guided_redundant_cases",
                 "guided_productive_rate",
                 "guided_target_miss_rate",
+                *_adaptive_selection_summary_fieldnames(),
                 "preflight_repaired_cases",
                 "preflight_fallback_cases",
                 "preflight_invalid_cases",
@@ -1515,6 +1780,22 @@ def _fmt_optional_number(value) -> str:
     return str(value)
 
 
+def _avg_adaptive_scope_metric(row: dict[str, Any], metric_key: str) -> float:
+    weighted_total = 0.0
+    total_weight = 0.0
+    for scope, *_ in _ADAPTIVE_SELECTION_SCOPE_SPECS:
+        prefix = _adaptive_selection_prefix(scope)
+        value = _float_or_none(row.get(f"{prefix}_{metric_key}"))
+        if value is None:
+            continue
+        weight = _float_or_none(row.get(f"{prefix}_selection_count")) or 0.0
+        if weight <= 0.0:
+            continue
+        weighted_total += value * weight
+        total_weight += weight
+    return weighted_total / total_weight if total_weight else 0.0
+
+
 def _first_case_index(rows: list[dict], predicate) -> int | None:
     for idx, row in enumerate(rows):
         for finding in row.get("findings", []):
@@ -1677,6 +1958,7 @@ def _aggregate_experiment_rows(rows: list[dict]) -> list[dict]:
         semantic_signal_counter = Counter()
         feedback_selected_operator_counter = Counter()
         feedback_semantic_target_key_counter = Counter()
+        adaptive_selection_totals = _aggregate_adaptive_selection_fields(items, cases=cases)
         for row in items:
             matched_target_counter.update(_parse_counter_summary(str(row.get("top_matched_semantic_targets", ""))))
             discovery_bias_counter.update(_parse_counter_summary(str(row.get("top_discovery_bias_hits", ""))))
@@ -1783,6 +2065,9 @@ def _aggregate_experiment_rows(rows: list[dict]) -> list[dict]:
                 "feedback_semantic_signal_target_count": sum(
                     int(row.get("feedback_semantic_signal_target_count", 0) or 0) for row in items
                 ),
+                "feedback_exploration_objective_target_count": sum(
+                    int(row.get("feedback_exploration_objective_target_count", 0) or 0) for row in items
+                ),
                 "feedback_operator_affinity_hit_cases": sum(
                     int(row.get("feedback_operator_affinity_hit_cases", 0) or 0) for row in items
                 ),
@@ -1838,6 +2123,7 @@ def _aggregate_experiment_rows(rows: list[dict]) -> list[dict]:
                 "guided_redundant_cases": guided_redundant_cases,
                 "guided_productive_rate": guided_productive_cases / cases if cases else 0.0,
                 "guided_target_miss_rate": guided_target_miss_cases / cases if cases else 0.0,
+                **adaptive_selection_totals,
                 "new_behavior_cases": new_behavior_cases,
                 "signal_new_behavior_cases": signal_new_behavior_cases,
                 "preflight_repaired_cases": preflight_repaired_cases,
@@ -2049,6 +2335,7 @@ def _group_run_summary(
         for factor_name, factor_value in row_factor_map(row).items():
             if factor_value not in factor_values[factor_name]:
                 factor_values[factor_name].append(factor_value)
+    adaptive_selection = _aggregate_adaptive_selection_fields(rows, cases=cases)
     summary = {
         "group_type": group_type,
         "group_key": group_key,
@@ -2092,6 +2379,7 @@ def _group_run_summary(
             "avg_ms_per_case": stage_avg,
             "share_of_total": stage_share,
         },
+        "adaptive_selection": adaptive_selection,
     }
     if group_type == "factor":
         summary["factor_name"] = group_key
@@ -2170,6 +2458,55 @@ def _avg_value(rows: list[dict], key: str) -> float:
     values = [_float_or_none(row.get(key)) for row in rows]
     values = [value for value in values if value is not None]
     return sum(values) / len(values) if values else 0.0
+
+
+def _aggregate_adaptive_selection_fields(rows: list[dict], *, cases: int | None = None) -> dict[str, Any]:
+    total_cases = sum(int(row.get("cases", 0) or 0) for row in rows) if cases is None else int(cases or 0)
+    total_selection_count = sum(int(row.get("adaptive_selection_total_count", 0) or 0) for row in rows)
+    out: dict[str, Any] = {
+        "adaptive_selection_total_count": total_selection_count,
+        "adaptive_selection_total_per_case": total_selection_count / total_cases if total_cases else 0.0,
+        "adaptive_selection_scope_count": sum(
+            1
+            for scope, *_ in _ADAPTIVE_SELECTION_SCOPE_SPECS
+            if sum(int(row.get(f"{_adaptive_selection_prefix(scope)}_selection_count", 0) or 0) for row in rows)
+        ),
+    }
+    for scope, *_ in _ADAPTIVE_SELECTION_SCOPE_SPECS:
+        prefix = _adaptive_selection_prefix(scope)
+        selection_count_key = f"{prefix}_selection_count"
+        selection_count = sum(int(row.get(selection_count_key, 0) or 0) for row in rows)
+        action_counter = Counter()
+        strategy_counter = Counter()
+        for row in rows:
+            action_counter.update(_parse_counter_summary(str(row.get(f"{prefix}_top_actions", ""))))
+            strategy_counter.update(_parse_counter_summary(str(row.get(f"{prefix}_strategies", ""))))
+        out[selection_count_key] = selection_count
+        out[f"{prefix}_selection_rate"] = selection_count / total_cases if total_cases else 0.0
+        out[f"{prefix}_top_actions"] = _counter_summary_limited(action_counter)
+        out[f"{prefix}_strategies"] = _counter_summary_limited(strategy_counter)
+        for avg_key in _ADAPTIVE_SELECTION_AVG_FIELDS:
+            out[f"{prefix}_{avg_key}"] = _weighted_avg_by_key(
+                rows,
+                f"{prefix}_{avg_key}",
+                weight_key=selection_count_key,
+            )
+    return out
+
+
+def _weighted_avg_by_key(rows: list[dict], key: str, *, weight_key: str) -> float:
+    weighted_total = 0.0
+    total_weight = 0.0
+    for row in rows:
+        value = _float_or_none(row.get(key))
+        if value is None:
+            continue
+        weight = _float_or_none(row.get(weight_key))
+        if weight is None or weight <= 0.0:
+            weight = 1.0
+        weighted_total += value * weight
+        total_weight += weight
+    return weighted_total / total_weight if total_weight else 0.0
 
 
 def _csv_set_union(rows: list[dict], key: str, *, delimiter: str = ",") -> list[str]:

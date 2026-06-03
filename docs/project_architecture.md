@@ -31,14 +31,14 @@ L4 Triage And Classification
   fresh candidate / issue-inspired candidate / known saturated / false positive
         |
 L5 Evidence Artifact
-  bug-hunt manifest / fresh-candidates JSON / generated issue drafts
+  discovery-run manifest / fresh-candidates JSON / generated issue drafts
 ```
 
 ## 各层职责
 
 L0 Target Registry 负责声明每个被测系统是什么、属于哪个 family、支持哪些 DSL 能力。例如 pandas 和 Polars 属于 DataFrame family，PyArrow 属于 Arrow family，DuckDB 和 SQLite 属于 embedded SQL family，DataFusion 属于 query engine family。
 
-L1 Case Generation 负责生成测试任务。普通 `bughunt` 偏向通用工作流，`issue_focus` 用于已知根因扩展，`bughunt_fresh` 用于 organic 探索，不主动注入已有 issue 来源。当前新增的 `live_deep_organic` 和 `live_deep_organic_metamorphic` 就建立在 `bughunt_fresh` 上。
+L1 Case Generation 负责生成测试任务。普通 `discovery` 偏向通用工作流，`issue_focus` 用于已知根因扩展，`discovery_fresh` 用于 organic 探索，不主动注入已有 issue 来源。当前新增的 `live_deep_organic` 和 `live_deep_organic_metamorphic` 就建立在 `discovery_fresh` 上。
 
 L2 Execution Adapter 负责把同一个 DSL 程序转换成不同系统能执行的形式。pandas/Polars 转成 DataFrame API 调用，PyArrow 转成 Arrow Table/compute 操作，DuckDB/SQLite 转成 SQL，DataFusion 转成查询表和执行计划。
 
@@ -46,7 +46,7 @@ L3 Oracle 负责判断结果是否有问题。差分 oracle 比较不同目标�
 
 L4 Triage And Classification 负责降低误报。它会区分 fresh candidate、issue-inspired candidate、known saturated family 和 adapter false positive。已有上游 issue 启发的结果不会自动算原创 bug。
 
-L5 Evidence Artifact 负责把一次运行变成可复现证据。`datadiff bug-hunt` 会写出 `new_issue/generated/bug-hunt-manifest.json`，fresh 候选还会写出完整 case、后端标准化输出和自动 verdict。
+L5 Evidence Artifact 负责把一次运行变成可复现证据。`datadiff discovery-run` 会写出 `new_issue/generated/discovery-run-manifest.json`，fresh 候选还会写出完整 case、后端标准化输出和自动 verdict。
 
 ## 表示层与语义层
 
@@ -155,7 +155,7 @@ L5 Evidence Artifact 负责把一次运行变成可复现证据。`datadiff bug-
 
 ## 时间效率和低复杂度设计
 
-项目避免把所有风险都写成独立脚本，而是统一走 `datadiff bug-hunt`：
+项目避免把所有风险都写成独立脚本，而是统一走 `datadiff discovery-run`：
 
 - guided candidate pool 只执行更可能触发目标风险的候选 case。
 - family saturation 会降低已知家族的继续奖励，避免长时间重复同一根因。
@@ -174,7 +174,7 @@ DataDiffFuzz 的方法论是一条闭环，而不是单次随机测试：
 
 1. 先用 Target Registry 把目标按执行模型分层：DataFrame API、Arrow Table compute、embedded SQL、query engine。每个 target 只声明能力和 adapter，不把 bug 逻辑写进 target。
 2. Case Generation 只生成低复杂度但语义密度高的短 workflow。优先组合真实数据处理操作，例如 filter、nullable 聚合、string normalization、dtype cast、union/concat、semi/anti join、sort/top-k、lazy/streaming 边界，而不是盲目加深 SQL。
-3. Scheduler 把预算分给不同 lane 和目标族。`bug-sprint` 用窄 lane 覆盖 Arrow layout、Polars eager/lazy/streaming、DataFusion optimizer/common API、DuckDB/SQLite storage、cross-family daily workflows；`--watch-health` 在已完成 run 出现 bug/fresh candidate 后停止剩余 lane。
+3. Scheduler 把预算分给不同 lane 和目标族。`discovery-campaign` 用窄 lane 覆盖 Arrow layout、Polars eager/lazy/streaming、DataFusion optimizer/common API、DuckDB/SQLite storage、cross-family daily workflows；`--watch-health` 在已完成 run 出现 bug/fresh candidate 后停止剩余 lane。
 4. Execution Adapter 保持同一 DSL 在不同目标上的语义一致。发现 adapter dtype、schema、列跟踪误差时，先修 adapter/generator false positive，再继续探索，避免把 CPU 消耗在内部噪声上。
 5. Oracle 分三层判定：differential 比较跨目标输出，metamorphic 比较等价变换，deterministic audit probe 固化已知高价值不变量。三类 oracle 共享 normalizer、classification 和 artifact。
 6. Triage/Classification 把结果分成 organic fresh、issue-inspired、known saturated、semantic boundary、false positive。只有 latest-version、稳定复现、去重后的 family 才进入 reportable/confirmed 路线。

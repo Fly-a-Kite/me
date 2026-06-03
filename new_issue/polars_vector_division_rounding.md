@@ -93,7 +93,7 @@ The next-up value `0x3ff6666666666667` is farther from the exact rational
 
 - Live run: `runs/run-20260525T072821-1779694101242817526.jsonl.gz`
 - Case index: `120427`
-- Case id: `case-01909290-bughunt`
+- Case id: `case-01909290-discovery`
 - Original operation sequence:
   `join -> mutate -> mutate -> groupby -> sort -> select -> limit`
 - Differential result: pandas, DuckDB, SQLite, and PyArrow returned `1.4`;

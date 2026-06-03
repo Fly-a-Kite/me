@@ -27,8 +27,8 @@ def _write_minimal_review_project(root):
             [
                 "datadiff targets",
                 "datadiff bug-audit",
-                "datadiff bug-hunt",
-                "datadiff bug-sprint",
+                "datadiff discovery-run",
+                "datadiff discovery-campaign",
                 "datadiff classify-run",
                 "datadiff bug-status",
                 "datadiff issue-bundle",
@@ -156,10 +156,10 @@ def method_comparison_command(args):
         encoding="utf-8",
     )
     (root / "new_issue/generated/audit_family.md").write_text("# Generated\n", encoding="utf-8")
-    (root / "new_issue/generated/bug-sprint-manifest.json").write_text(
+    (root / "new_issue/generated/discovery-campaign-manifest.json").write_text(
         json.dumps(
             {
-                "schema_version": "bug-sprint-v1",
+                "schema_version": "discovery-campaign-v1",
                 "lane_ids": ["arrow_layout"],
                 "seeds": [1],
                 "summary": {"run_count": 1, "fresh_candidate_bug_families": {}},
@@ -352,7 +352,7 @@ def test_build_review_readiness_reports_confirmed_bug_gap(tmp_path):
     assert "Need 1 more upstream-confirmed" in audit["recommendations"][0]
 
 
-def test_build_review_readiness_uses_focused_sprint_wording_for_empty_fresh_queue(tmp_path):
+def test_build_review_readiness_uses_focused_discovery_wording_for_empty_fresh_queue(tmp_path):
     _write_minimal_review_project(tmp_path)
 
     audit = build_review_readiness(
@@ -361,7 +361,7 @@ def test_build_review_readiness_uses_focused_sprint_wording_for_empty_fresh_queu
         thresholds=ReviewThresholds(target_confirmed_bug_families=2),
     )
 
-    assert any("focused organic sprint lanes" in item for item in audit["recommendations"])
+    assert any("focused discovery lanes" in item for item in audit["recommendations"])
 
 
 def test_build_review_readiness_requires_complete_final_experiment_protocol(tmp_path):

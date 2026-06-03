@@ -476,7 +476,7 @@ def test_annotate_findings_marks_issue_replay_origin():
         root_cause="group_quantile_key_expression",
     )
 
-    annotate_findings(case, [finding], {}, {}, {"generator_profile": "bughunt"}, ["pandas", "polars"])
+    annotate_findings(case, [finding], {}, {}, {"generator_profile": "discovery"}, ["pandas", "polars"])
 
     assert finding.discovery_origin == "issue_replay"
     assert finding.source_issue == "https://github.com/example/project/issues/1"
@@ -500,7 +500,7 @@ def test_annotate_findings_marks_structural_issue_inspired_origin():
         root_cause="filter_predicate",
     )
 
-    annotate_findings(case, [finding], {}, {}, {"generator_profile": "bughunt"}, ["pandas", "duckdb"])
+    annotate_findings(case, [finding], {}, {}, {"generator_profile": "discovery"}, ["pandas", "duckdb"])
 
     assert finding.discovery_origin == "issue_inspired"
     assert finding.source_issue == "https://github.com/example/project/issues/2"
@@ -1140,7 +1140,7 @@ def test_classification_marks_float_precision_order_boundary_not_candidate_bug()
         ),
     }
 
-    classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "bughunt"}, ["pandas", "duckdb"])
+    classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "discovery"}, ["pandas", "duckdb"])
 
     assert classification.verdict == "expected_semantic_divergence"
     assert classification.paper_status == "valid_finding_not_bug"

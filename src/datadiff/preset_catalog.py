@@ -21,7 +21,7 @@ from datadiff.strategy_registry import discovery_lane_spec
 @dataclass(frozen=True, slots=True)
 class LivePresetSpec:
     target_key: str
-    generator_profile: str = "bughunt"
+    generator_profile: str = "discovery"
     candidate_pool: int = 12
     local_source_exploration_weight: float = 0.40
     metamorphic_variant_limit: int = 4
@@ -183,7 +183,7 @@ CONFIG_OVERLAYS: dict[str, ConfigOverlay] = {
     "target_join": ConfigOverlay(
         overlay_id="target_join",
         updates={
-            "generator_profile": "bughunt_no_groupby",
+            "generator_profile": "discovery_no_groupby",
             "guidance_targets": ["join", "sort_limit"],
         },
         notes="Focus guidance on join and ordered top-k semantics.",
@@ -193,15 +193,15 @@ CONFIG_OVERLAYS: dict[str, ConfigOverlay] = {
         updates={"guidance_targets": ["mutate", "expressions"]},
         notes="Focus guidance on mutate/expression semantics.",
     ),
-    "target_bughunt_guided": ConfigOverlay(
-        overlay_id="target_bughunt_guided",
+    "target_discovery_guided": ConfigOverlay(
+        overlay_id="target_discovery_guided",
         updates={"guidance_targets": ["join", "groupby", "mutate", "filter", "expressions"]},
-        notes="Use the standard bughunt guided semantic target set.",
+        notes="Use the standard discovery guided semantic target set.",
     ),
-    "generator_bughunt": ConfigOverlay(
-        overlay_id="generator_bughunt",
-        updates={"generator_profile": "bughunt"},
-        notes="Switch the generator profile to bughunt.",
+    "generator_discovery": ConfigOverlay(
+        overlay_id="generator_discovery",
+        updates={"generator_profile": "discovery"},
+        notes="Switch the generator profile to discovery.",
     ),
     "generator_workflow": ConfigOverlay(
         overlay_id="generator_workflow",
@@ -892,24 +892,24 @@ PRESET_CATALOG: dict[str, PresetSpec] = {
     ),
     "workflow": _overlay_preset(base_preset="baseline", overlays=("generator_workflow",)),
     "workflow_metamorphic": _metamorphic_overlay(base_preset="workflow", variant_limit=4),
-    "bughunt": _overlay_preset(base_preset="baseline", overlays=("generator_bughunt",)),
-    "bughunt_no_groupby": _config_spec(generator_profile="bughunt_no_groupby"),
-    "bughunt_guided": _overlay_preset(base_preset="bughunt", overlays=("enable_guidance", "target_bughunt_guided")),
-    "bughunt_no_groupby_guided": _guided_profile(
-        generator_profile="bughunt_no_groupby",
+    "discovery": _overlay_preset(base_preset="baseline", overlays=("generator_discovery",)),
+    "discovery_no_groupby": _config_spec(generator_profile="discovery_no_groupby"),
+    "discovery_guided": _overlay_preset(base_preset="discovery", overlays=("enable_guidance", "target_discovery_guided")),
+    "discovery_no_groupby_guided": _guided_profile(
+        generator_profile="discovery_no_groupby",
         guidance_targets=["join", "mutate", "filter", "expressions", "sort_limit"],
     ),
-    "bughunt_metamorphic": _metamorphic_overlay(base_preset="bughunt", variant_limit=8),
-    "bughunt_no_groupby_metamorphic": _metamorphic_overlay(
-        base_preset="bughunt_no_groupby",
+    "discovery_metamorphic": _metamorphic_overlay(base_preset="discovery", variant_limit=8),
+    "discovery_no_groupby_metamorphic": _metamorphic_overlay(
+        base_preset="discovery_no_groupby",
         variant_limit=8,
     ),
-    "bughunt_guided_metamorphic": _metamorphic_overlay(
-        base_preset="bughunt_guided",
+    "discovery_guided_metamorphic": _metamorphic_overlay(
+        base_preset="discovery_guided",
         variant_limit=8,
     ),
-    "bughunt_no_groupby_guided_metamorphic": _metamorphic_overlay(
-        base_preset="bughunt_no_groupby_guided",
+    "discovery_no_groupby_guided_metamorphic": _metamorphic_overlay(
+        base_preset="discovery_no_groupby_guided",
         variant_limit=8,
     ),
     "guided": _overlay_preset(base_preset="baseline", overlays=("enable_guidance",)),
@@ -928,7 +928,7 @@ PRESET_CATALOG: dict[str, PresetSpec] = {
     ),
     "live_datafusion_fresh": _live_preset(
         "live_datafusion_fresh",
-        generator_profile="bughunt_no_groupby",
+        generator_profile="discovery_no_groupby",
         local_source_exploration_weight=0.45,
         discovery_lanes=("datafusion_optimizer",),
     ),
@@ -987,7 +987,7 @@ PRESET_CATALOG: dict[str, PresetSpec] = {
     ),
     "live_deep_organic": _live_preset(
         "live_deep_organic",
-        generator_profile="bughunt_fresh",
+        generator_profile="discovery_fresh",
         candidate_pool=14,
         local_source_exploration_weight=0.45,
         discovery_lanes=("cross_family",),
@@ -1025,7 +1025,7 @@ PRESET_CATALOG: dict[str, PresetSpec] = {
     ),
     "live_arrow_deep_organic": _live_preset(
         "live_arrow_deep_organic",
-        generator_profile="bughunt_fresh",
+        generator_profile="discovery_fresh",
         candidate_pool=10,
         local_source_exploration_weight=0.45,
     ),
@@ -1039,7 +1039,7 @@ PRESET_CATALOG: dict[str, PresetSpec] = {
     ),
     "live_polars_deep_organic": _live_preset(
         "live_polars_deep_organic",
-        generator_profile="bughunt_fresh",
+        generator_profile="discovery_fresh",
         candidate_pool=10,
         local_source_exploration_weight=0.45,
     ),
@@ -1053,7 +1053,7 @@ PRESET_CATALOG: dict[str, PresetSpec] = {
     ),
     "live_polars_streaming_deep_organic": _live_preset(
         "live_polars_streaming_deep_organic",
-        generator_profile="bughunt_fresh",
+        generator_profile="discovery_fresh",
         candidate_pool=10,
         local_source_exploration_weight=0.45,
     ),
@@ -1067,7 +1067,7 @@ PRESET_CATALOG: dict[str, PresetSpec] = {
     ),
     "live_datafusion_deep_organic": _live_preset(
         "live_datafusion_deep_organic",
-        generator_profile="bughunt_fresh",
+        generator_profile="discovery_fresh",
         candidate_pool=10,
         local_source_exploration_weight=0.45,
     ),
@@ -1081,7 +1081,7 @@ PRESET_CATALOG: dict[str, PresetSpec] = {
     ),
     "live_embedded_sql_deep_organic": _live_preset(
         "live_embedded_sql_deep_organic",
-        generator_profile="bughunt_fresh",
+        generator_profile="discovery_fresh",
         candidate_pool=10,
         local_source_exploration_weight=0.45,
     ),
@@ -1171,6 +1171,237 @@ def catalog_preset_semantic_focus(name: str) -> tuple[tuple[str, ...], tuple[str
     if not normalized_name:
         return (), ()
     return _resolved_semantic_focus(normalized_name, trail=())
+
+
+def catalog_preset_metadata(
+    name: str,
+    *,
+    base_preset: str = "",
+    overlays: Sequence[str] | None = None,
+    live_targets_by_name: Mapping[str, Sequence[str]] | None = None,
+) -> dict[str, Any]:
+    preset_id = str(name or "").strip()
+    normalized_base = str(base_preset or "").strip()
+    overlay_list = [str(item).strip() for item in overlays or () if str(item).strip()]
+    replay_overlay = False
+    catalog_name = preset_id
+    if catalog_name.endswith("_replay"):
+        catalog_name = catalog_name[: -len("_replay")]
+        replay_overlay = True
+    if not normalized_base and overlay_list:
+        normalized_base = catalog_name
+    config: ExperimentConfig | None
+    registered = False
+    if normalized_base or overlay_list:
+        try:
+            config = build_experiment_config(
+                normalized_base,
+                overlay_list,
+                live_targets_by_name=live_targets_by_name,
+            )
+            registered = bool(normalized_base in PRESET_CATALOG)
+        except ValueError:
+            config = None
+    else:
+        config = build_catalog_preset(catalog_name, live_targets_by_name=live_targets_by_name)
+        registered = config is not None
+        normalized_base = catalog_name
+    if config is None:
+        return {
+            "schema_version": "preset-methodology-metadata-v1",
+            "preset_id": preset_id,
+            "registered": False,
+            "base_catalog_preset": normalized_base,
+            "overlays": overlay_list,
+            "is_replay_overlay": replay_overlay,
+        }
+    if replay_overlay:
+        config.enable_replay_bug = True
+    base_spec = PRESET_CATALOG.get(normalized_base)
+    resolved_base_spec = _resolved_terminal_spec(normalized_base, trail=()) if normalized_base else None
+    live_spec = _resolved_live_spec(normalized_base, trail=()) if normalized_base else None
+    families, signals = _metadata_semantic_focus(
+        normalized_base,
+        overlay_list,
+        config=config,
+    )
+    discovery_biases = [bias.to_dict() for bias in config.discovery_biases]
+    methodology_tags = _methodology_tags(
+        preset_id=preset_id,
+        base_preset=normalized_base,
+        overlays=overlay_list,
+        config=config,
+        live_spec=live_spec,
+        replay_overlay=replay_overlay,
+    )
+    return {
+        "schema_version": "preset-methodology-metadata-v1",
+        "preset_id": preset_id,
+        "registered": registered,
+        "base_catalog_preset": normalized_base,
+        "base_preset": base_spec.base_preset if base_spec is not None else "",
+        "resolved_catalog_preset": _resolved_catalog_preset_id(normalized_base, trail=()),
+        "overlays": overlay_list or (list(base_spec.overlays) if base_spec is not None else []),
+        "catalog_overlays": list(base_spec.overlays) if base_spec is not None else [],
+        "is_replay_overlay": replay_overlay,
+        "is_live_preset": live_spec is not None,
+        "live_target_key": live_spec.target_key if live_spec is not None else "",
+        "discovery_lanes": list(live_spec.discovery_lanes) if live_spec is not None else [],
+        "target_suite_affinity": _target_suite_affinity(live_spec),
+        "generator_profile": str(config.generator_profile or ""),
+        "generator_profile_pool": list(config.generator_profile_pool),
+        "guidance_strategy": str(config.guidance_strategy or ""),
+        "guidance_candidate_pool": int(config.guidance_candidate_pool or 0),
+        "guidance_targets": list(config.guidance_targets),
+        "semantic_focus_families": list(families),
+        "semantic_focus_signals": list(signals),
+        "discovery_bias_count": len(discovery_biases),
+        "discovery_biases": discovery_biases,
+        "discovery_bias_targets": _discovery_bias_targets(config.discovery_biases),
+        "enable_differential_oracle": bool(config.enable_differential_oracle),
+        "enable_metamorphic_oracle": bool(config.enable_metamorphic_oracle),
+        "oracle_mode": str(config.oracle_mode or ""),
+        "metamorphic_variant_limit": int(config.metamorphic_variant_limit or 0),
+        "enable_feedback": bool(config.enable_feedback),
+        "enable_replay_bug": bool(config.enable_replay_bug),
+        "enable_local_source_scheduler": bool(config.enable_local_source_scheduler),
+        "local_source_exploration_weight": float(config.local_source_exploration_weight or 0.0),
+        "candidate_recheck_count": int(config.candidate_recheck_count or 0),
+        "known_saturated_bug_family_count": len(config.known_saturated_bug_families),
+        "replay_bug_source_issue_count": len(config.replay_bug_source_issues),
+        "methodology_tags": methodology_tags,
+        "methodology_claim": _metadata_methodology_claim(methodology_tags),
+        "resolved_from_live_base": (
+            resolved_base_spec.live is not None
+            if resolved_base_spec is not None
+            else False
+        ),
+    }
+
+
+def _resolved_terminal_spec(name: str, *, trail: tuple[str, ...]) -> PresetSpec | None:
+    spec = PRESET_CATALOG.get(name)
+    if spec is None:
+        return None
+    if name in trail:
+        chain = " -> ".join((*trail, name))
+        raise ValueError(f"cyclic preset catalog chain: {chain}")
+    if spec.base_preset:
+        return _resolved_terminal_spec(spec.base_preset, trail=(*trail, name)) or spec
+    return spec
+
+
+def _resolved_live_spec(name: str, *, trail: tuple[str, ...]) -> LivePresetSpec | None:
+    spec = PRESET_CATALOG.get(name)
+    if spec is None:
+        return None
+    if name in trail:
+        chain = " -> ".join((*trail, name))
+        raise ValueError(f"cyclic preset catalog chain: {chain}")
+    if spec.live is not None:
+        return spec.live
+    if spec.base_preset:
+        return _resolved_live_spec(spec.base_preset, trail=(*trail, name))
+    return None
+
+
+def _resolved_catalog_preset_id(name: str, *, trail: tuple[str, ...]) -> str:
+    spec = PRESET_CATALOG.get(name)
+    if spec is None:
+        return ""
+    if name in trail:
+        chain = " -> ".join((*trail, name))
+        raise ValueError(f"cyclic preset catalog chain: {chain}")
+    if spec.live is not None or not spec.base_preset:
+        return name
+    return _resolved_catalog_preset_id(spec.base_preset, trail=(*trail, name)) or name
+
+
+def _metadata_semantic_focus(
+    base_preset: str,
+    overlays: Sequence[str],
+    *,
+    config: ExperimentConfig,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    families, signals = catalog_preset_semantic_focus(base_preset)
+    if overlays:
+        families = tuple(dict.fromkeys([*families, *config.semantic_focus_families]))
+        signals = tuple(dict.fromkeys([*signals, *config.semantic_focus_signals]))
+    return families, signals
+
+
+def _target_suite_affinity(live_spec: LivePresetSpec | None) -> list[str]:
+    if live_spec is None:
+        return []
+    suites = []
+    if live_spec.target_key:
+        suites.append(live_spec.target_key)
+    for lane_id in live_spec.discovery_lanes:
+        lane = discovery_lane_spec(lane_id)
+        if lane.target_suite and lane.target_suite not in suites:
+            suites.append(lane.target_suite)
+    return suites
+
+
+def _discovery_bias_targets(discovery_biases: Sequence[DiscoveryBias]) -> list[str]:
+    targets: list[str] = []
+    for bias in discovery_biases:
+        for target in bias.targets:
+            if target and target not in targets:
+                targets.append(target)
+    return targets
+
+
+def _methodology_tags(
+    *,
+    preset_id: str,
+    base_preset: str,
+    overlays: Sequence[str],
+    config: ExperimentConfig,
+    live_spec: LivePresetSpec | None,
+    replay_overlay: bool,
+) -> list[str]:
+    tags: list[str] = []
+    name_parts = [preset_id, base_preset, *(str(item) for item in overlays)]
+    joined = " ".join(name_parts)
+    if live_spec is not None or preset_id.startswith("live_"):
+        tags.append("latest_live_discovery")
+    if replay_overlay or config.enable_replay_bug:
+        tags.append("cross_version_replay")
+    if config.guidance_strategy == "guided":
+        tags.append("guided_search")
+    if config.enable_feedback:
+        tags.append("closed_loop_feedback")
+    if config.enable_metamorphic_oracle or config.oracle_mode in {"metamorphic", "both"}:
+        tags.append("metamorphic_oracle")
+    if config.enable_differential_oracle:
+        tags.append("differential_oracle")
+    if config.enable_local_source_scheduler:
+        tags.append("local_source_scheduler")
+    if config.discovery_biases:
+        tags.append("discovery_bias")
+    if "common_api" in joined:
+        tags.append("common_api_workflow")
+    if "deep_organic" in joined:
+        tags.append("deep_organic")
+    if "issue_focus" in joined:
+        tags.append("issue_inspired")
+    if "ablation" in joined or any(str(item).startswith("disable_") for item in overlays):
+        tags.append("ablation_support")
+    if not (replay_overlay or config.enable_replay_bug):
+        tags.append("fresh_candidate_discovery")
+    return list(dict.fromkeys(tags))
+
+
+def _metadata_methodology_claim(tags: Sequence[str]) -> str:
+    tag_set = set(tags)
+    if "cross_version_replay" in tag_set:
+        return "Replay-oriented preset metadata supports cross-version rediscovery and regression accounting."
+    if "latest_live_discovery" in tag_set:
+        return "Live preset metadata records the generator, guidance, oracle, and bias choices used for latest-version discovery."
+    if "ablation_support" in tag_set:
+        return "Ablation preset metadata records controlled component changes for paper comparison tables."
+    return "Preset metadata records the reproducible harness configuration used by the experiment run."
 
 
 def _resolved_semantic_focus(name: str, *, trail: tuple[str, ...]) -> tuple[tuple[str, ...], tuple[str, ...]]:

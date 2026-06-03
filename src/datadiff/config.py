@@ -6,14 +6,19 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 from typing import Literal
 
+from datadiff.exploration_objectives import (
+    ExplorationObjectiveRule,
+    merge_exploration_objective_rules,
+)
+
 OracleMode = Literal["differential", "metamorphic", "both"]
 GeneratorProfile = Literal[
     "common",
     "edge_float",
     "workflow",
-    "bughunt",
-    "bughunt_fresh",
-    "bughunt_no_groupby",
+    "discovery",
+    "discovery_fresh",
+    "discovery_no_groupby",
     "common_api_workflow",
     "issue_focus",
     "deep_probe_rotation",
@@ -271,11 +276,24 @@ class ExperimentConfig:
     artifact_limit: int | None = None
     oracle_mode: OracleMode = "differential"
     generator_profile: GeneratorProfile = "common"
+    generator_profile_pool: list[str] = field(default_factory=list)
+    version_pair_pool: list[str] = field(default_factory=list)
+    generator_profile_learning_weight: float = 0.0
+    semantic_objective_learning_weight: float = 0.0
+    metamorphic_relation_learning_weight: float = 0.0
+    version_pair_learning_weight: float = 0.0
+    enable_generator_profile_learning: bool = True
+    enable_profile_capability_filter: bool = True
+    enable_semantic_objective_learning: bool = True
+    enable_metamorphic_relation_learning: bool = True
+    enable_mutation_operator_learning: bool = True
+    enable_quality_archive: bool = True
     guidance_strategy: GuidanceStrategy = "random"
     guidance_candidate_pool: int = 1
     guidance_targets: list[str] = field(default_factory=list)
     semantic_focus_families: list[str] = field(default_factory=list)
     semantic_focus_signals: list[str] = field(default_factory=list)
+    exploration_objective_rules: list[ExplorationObjectiveRule] = field(default_factory=list)
     discovery_biases: list[DiscoveryBias] = field(default_factory=list)
     enable_family_saturation: bool = True
     family_saturation_threshold: int = 8
@@ -293,6 +311,9 @@ class ExperimentConfig:
     issue_inspired_source_saturation_penalty: float = 1.25
     candidate_recheck_count: int = 0
     metamorphic_variant_limit: int = 4
+    metamorphic_relation_order: list[str] = field(default_factory=list)
+    target_version: str = ""
+    fixed_version: str = ""
     log_level: LogLevel = "compact"
     strategy_snapshot_path: str = ""
     strategy_learning_path: str = ""
@@ -302,6 +323,24 @@ class ExperimentConfig:
         self.guidance_targets = _normalize_string_list(self.guidance_targets)
         self.semantic_focus_families = _normalize_string_list(self.semantic_focus_families)
         self.semantic_focus_signals = _normalize_string_list(self.semantic_focus_signals)
+        self.generator_profile_pool = _normalize_string_list(self.generator_profile_pool)
+        self.version_pair_pool = _normalize_string_list(self.version_pair_pool)
+        self.generator_profile_learning_weight = max(0.0, float(self.generator_profile_learning_weight or 0.0))
+        self.semantic_objective_learning_weight = max(0.0, float(self.semantic_objective_learning_weight or 0.0))
+        self.metamorphic_relation_learning_weight = max(0.0, float(self.metamorphic_relation_learning_weight or 0.0))
+        self.version_pair_learning_weight = max(0.0, float(self.version_pair_learning_weight or 0.0))
+        self.enable_generator_profile_learning = bool(self.enable_generator_profile_learning)
+        self.enable_profile_capability_filter = bool(self.enable_profile_capability_filter)
+        self.enable_semantic_objective_learning = bool(self.enable_semantic_objective_learning)
+        self.enable_metamorphic_relation_learning = bool(self.enable_metamorphic_relation_learning)
+        self.enable_mutation_operator_learning = bool(self.enable_mutation_operator_learning)
+        self.enable_quality_archive = bool(self.enable_quality_archive)
+        self.metamorphic_relation_order = _normalize_string_list(self.metamorphic_relation_order)
+        self.target_version = str(self.target_version or "").strip()
+        self.fixed_version = str(self.fixed_version or "").strip()
+        self.exploration_objective_rules = merge_exploration_objective_rules(
+            self.exploration_objective_rules
+        )
         self.discovery_biases = merge_discovery_biases(self.discovery_biases)
         self.known_saturated_bug_families = _normalize_string_list(self.known_saturated_bug_families)
         self.replay_bug_source_issues = _normalize_string_list(self.replay_bug_source_issues)
@@ -312,4 +351,7 @@ class ExperimentConfig:
     def to_dict(self) -> dict:
         payload = asdict(self)
         payload["discovery_biases"] = [bias.to_dict() for bias in self.discovery_biases]
+        payload["exploration_objective_rules"] = [
+            rule.to_dict() for rule in self.exploration_objective_rules
+        ]
         return payload

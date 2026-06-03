@@ -1,0 +1,9 @@
+{
+  "candidate_row_count": 0,
+  "candidate_rows": [],
+  "fresh_candidate_bug_families": {},
+  "generated_at": "2026-05-27T00:02:21Z",
+  "generated_by": "datadiff discovery-run",
+  "schema_version": "discovery-run-fresh-candidates-v1",
+  "source_run_file": "runs/run-20260527T000123-1779840083364063578.jsonl.gz"
+}

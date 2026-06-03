@@ -19,9 +19,18 @@ from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES, ExperimentConfig
 from datadiff.datagen import generate_case
 from datadiff.dsl import Case
 from datadiff.env import collect_environment
+from datadiff.exploration_objectives import (
+    EXPLORATION_OBJECTIVE_PREFIX,
+    derive_exploration_objective_features,
+    objective_features_for_rules,
+)
 from datadiff.feedback import FeedbackState
-from datadiff.guidance import GuidanceState
-from datadiff.metamorphic import build_metamorphic_variants, evaluate_metamorphic_variants
+from datadiff.guidance import GuidanceState, derive_case_features
+from datadiff.metamorphic import (
+    all_metamorphic_variants,
+    evaluate_metamorphic_variants,
+    select_metamorphic_variants,
+)
 from datadiff.normalizer import normalize_result
 from datadiff.oracle import Finding, evaluate_case
 from datadiff.operation_combo import combo_semantic_signals, describe_operation_combo
@@ -37,6 +46,7 @@ from datadiff.reward import (
 )
 from datadiff.run_provenance import collect_run_provenance
 from datadiff.scheduler import LocalSourceScheduler
+from datadiff.semantic_registry import filter_generator_profiles_by_capability
 from datadiff.semantic_signal import canonical_target_key, legacy_target_key_alias, semantic_signal_feature
 from datadiff.targets import describe_targets, target_context
 from datadiff.util import (
@@ -101,6 +111,8 @@ def _configured_guidance_targets(config: ExperimentConfig) -> list[str]:
         semantic_target = str(canonical_target_key(semantic_signal_feature(signal))).strip()
         if semantic_target:
             _append(semantic_target)
+    for objective in objective_features_for_rules(config.exploration_objective_rules):
+        _append(objective)
     return configured
 
 
@@ -123,6 +135,7 @@ def _selected_candidate_metadata(
         "mutation": generated_metadata["mutation"],
         "feedback_selection": {},
         "feedback_decision": {},
+        "quality_archive_context": {},
         "operation_combo": describe_operation_combo(case.program.operations),
         "preflight": {
             "valid": True,
@@ -298,15 +311,141 @@ def _guidance_summary(guidance: dict[str, Any]) -> dict[str, Any]:
 def _closed_loop_state_summary(state: dict[str, Any]) -> dict[str, Any]:
     feedback_state = state.get("feedback") if isinstance(state.get("feedback"), dict) else {}
     guidance_state = state.get("guidance") if isinstance(state.get("guidance"), dict) else {}
+    adaptive_learning = feedback_state.get("adaptive_learning", {}) if isinstance(feedback_state, dict) else {}
+    quality_archive = feedback_state.get("quality_archive", {}) if isinstance(feedback_state, dict) else {}
     return {
         "seen_signature_count": len(state.get("seen_signatures", []) or []),
         "signal_seen_signature_count": len(state.get("signal_seen_signatures", []) or []),
         "feedback_interesting_case_count": len(feedback_state.get("interesting_cases", []) or []),
         "feedback_stored_candidate_family_count": len(feedback_state.get("stored_candidate_bug_families", {}) or {}),
         "feedback_stored_target_key_count": len(feedback_state.get("stored_target_keys", {}) or {}),
+        "adaptive_learning_health": _adaptive_learning_health_summary(adaptive_learning),
+        "quality_archive_health": _quality_archive_health_summary(quality_archive),
         "guidance_feature_count": len(guidance_state.get("feature_counts", {}) or {}),
         "guidance_frontier_bucket_count": len(guidance_state.get("frontier_bucket_counts", {}) or {}),
         "guidance_candidate_bug_family_count": len(guidance_state.get("candidate_bug_family_counts", {}) or {}),
+    }
+
+
+def _adaptive_learning_health_summary(state: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(state, dict) or str(state.get("schema_version", "") or "") != "adaptive-learning-v1":
+        return {}
+    bandits = state.get("bandits", {}) if isinstance(state.get("bandits", {}), dict) else {}
+    arm_count = 0
+    total_pulls = 0
+    reward_model_update_count = 0
+    reward_model_feature_count = 0
+    runtime_cost_observation_count = 0
+    runtime_cost_total = 0.0
+    health_penalties: list[float] = []
+    uncertainties: list[float] = []
+    for bandit in bandits.values():
+        if not isinstance(bandit, dict):
+            continue
+        for arm in bandit.get("arms", []) or []:
+            if not isinstance(arm, dict):
+                continue
+            arm_count += 1
+            arm_pulls = int(arm.get("pulls", 0) or 0)
+            total_pulls += arm_pulls
+            pulls = max(1, arm_pulls)
+            arm_runtime_cost = float(arm.get("runtime_cost_total", 0.0) or 0.0)
+            runtime_cost_total += arm_runtime_cost
+            if arm_pulls > 0:
+                runtime_cost_observation_count += arm_pulls
+            runtime_cost = arm_runtime_cost / pulls
+            false_positive = float(arm.get("false_positive_count", 0) or 0) / pulls
+            invalid = float(arm.get("invalid_count", 0) or 0) / pulls
+            health_penalties.append(min(1.5, 0.35 * runtime_cost + 0.60 * false_positive + 0.25 * invalid))
+        reward_model = bandit.get("reward_model", {}) if isinstance(bandit.get("reward_model", {}), dict) else {}
+        reward_model_update_count += int(reward_model.get("total_updates", 0) or 0)
+        feature_counts = reward_model.get("feature_counts", {})
+        if isinstance(feature_counts, dict):
+            reward_model_feature_count += len(feature_counts)
+            uncertainties.extend(1.0 / ((1.0 + float(count or 0.0)) ** 0.5) for count in feature_counts.values())
+    version_memory = state.get("version_memory", {})
+    version_memory_key_count = 0
+    if isinstance(version_memory, dict):
+        reward_counts = version_memory.get("reward_counts", {})
+        version_memory_key_count = len(reward_counts) if isinstance(reward_counts, dict) else 0
+    continual_memory = state.get("continual_priority_memory", {})
+    continual_summary = {}
+    if isinstance(continual_memory, dict):
+        family_priorities = continual_memory.get("family_priorities", {})
+        feature_counts = continual_memory.get("feature_counts", {})
+        continual_summary = {
+            "imported_ledger_count": int(continual_memory.get("imported_ledger_count", 0) or 0),
+            "imported_family_count": int(continual_memory.get("imported_family_count", 0) or 0),
+            "imported_health_feedback_count": int(
+                continual_memory.get("imported_health_feedback_count", 0) or 0
+            ),
+            "family_count": len(family_priorities) if isinstance(family_priorities, dict) else 0,
+            "feature_count": len(feature_counts) if isinstance(feature_counts, dict) else 0,
+            "health_feedback_feature_count": len(
+                continual_memory.get("feature_health_counts", {})
+                if isinstance(continual_memory.get("feature_health_counts", {}), dict)
+                else {}
+            ),
+        }
+    exploration_memory = state.get("exploration_memory", {})
+    exploration_summary = {}
+    if isinstance(exploration_memory, dict):
+        context_counts = exploration_memory.get("context_counts", {})
+        action_counts = exploration_memory.get("action_counts", {})
+        exploration_summary = {
+            "total_records": int(exploration_memory.get("total_records", 0) or 0),
+            "context_count": len(context_counts) if isinstance(context_counts, dict) else 0,
+            "action_count": len(action_counts) if isinstance(action_counts, dict) else 0,
+        }
+    return {
+        "schema_version": "adaptive-learning-health-v1",
+        "bandit_count": len(bandits),
+        "arm_count": arm_count,
+        "total_pulls": total_pulls,
+        "reward_model_update_count": reward_model_update_count,
+        "reward_model_feature_count": reward_model_feature_count,
+        "version_memory_key_count": version_memory_key_count,
+        "runtime_cost_observation_count": runtime_cost_observation_count,
+        "runtime_cost_total": runtime_cost_total,
+        "continual_priority_memory": continual_summary,
+        "avg_health_penalty": sum(health_penalties) / len(health_penalties) if health_penalties else 0.0,
+        "max_health_penalty": max(health_penalties) if health_penalties else 0.0,
+        "avg_uncertainty": sum(uncertainties) / len(uncertainties) if uncertainties else 0.0,
+        "exploration_memory": exploration_summary,
+    }
+
+
+def _quality_archive_health_summary(state: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(state, dict) or str(state.get("schema_version", "") or "") != "quality-diversity-archive-v1":
+        return {}
+    cells = [cell for cell in state.get("cells", []) or [] if isinstance(cell, dict)]
+    seed_count = 0
+    elite_seed_count = 0
+    reward_count = 0
+    outcome_count = 0
+    invalid_count = 0
+    fallback_count = 0
+    false_positive_count = 0
+    for cell in cells:
+        seeds = [seed for seed in cell.get("seeds", []) or [] if isinstance(seed, dict)]
+        max_elites = max(0, int(cell.get("max_elites", state.get("max_elites_per_cluster", 4)) or 0))
+        seed_count += len(seeds)
+        elite_seed_count += min(len(seeds), max_elites)
+        reward_count += int(cell.get("reward_count", 0) or 0)
+        outcome_count += int(cell.get("outcome_count", 0) or 0)
+        invalid_count += int(cell.get("invalid_count", 0) or 0)
+        fallback_count += int(cell.get("fallback_count", 0) or 0)
+        false_positive_count += int(cell.get("false_positive_count", 0) or 0)
+    return {
+        "schema_version": "quality-archive-health-v1",
+        "cell_count": len(cells),
+        "seed_count": seed_count,
+        "elite_seed_count": elite_seed_count,
+        "reward_count": reward_count,
+        "outcome_count": outcome_count,
+        "invalid_count": invalid_count,
+        "fallback_count": fallback_count,
+        "false_positive_count": false_positive_count,
     }
 
 
@@ -348,6 +487,332 @@ def _source_scheduler_snapshot(feedback: FeedbackState | None) -> list[dict[str,
     return scheduler.snapshot()
 
 
+def _version_pair_id(config: ExperimentConfig) -> str:
+    target_version = str(getattr(config, "target_version", "") or "").strip()
+    fixed_version = str(getattr(config, "fixed_version", "") or "").strip()
+    if target_version and fixed_version:
+        return f"{target_version}->{fixed_version}"
+    return target_version or fixed_version
+
+
+def _parse_version_pair(value: str) -> tuple[str, str]:
+    text = str(value or "").strip()
+    if not text:
+        return "", ""
+    if "->" in text:
+        target, fixed = text.split("->", 1)
+        return str(target).strip(), str(fixed).strip()
+    return text, ""
+
+
+def _version_pair_pool(config: ExperimentConfig) -> tuple[tuple[str, ...], dict[str, Any]]:
+    configured = [str(item).strip() for item in getattr(config, "version_pair_pool", []) if str(item).strip()]
+    default_pair = _version_pair_id(config)
+    if default_pair and default_pair not in configured:
+        configured.insert(0, default_pair)
+    selected = tuple(_unique_nonempty_strings(configured))
+    if not selected and default_pair:
+        selected = (default_pair,)
+    metadata = {
+        "requested": list(configured),
+        "selected": list(selected),
+        "default_pair": default_pair,
+    }
+    return selected, metadata
+
+
+def _config_for_version_pair(config: ExperimentConfig, version_pair: str) -> ExperimentConfig:
+    if not version_pair:
+        return config
+    target_version, fixed_version = _parse_version_pair(version_pair)
+    if target_version == str(getattr(config, "target_version", "") or "").strip() and fixed_version == str(
+        getattr(config, "fixed_version", "") or ""
+    ).strip():
+        return config
+    config_data = config.to_dict()
+    config_data["target_version"] = target_version
+    config_data["fixed_version"] = fixed_version
+    return ExperimentConfig(**config_data)
+
+
+def _config_payload_for_version_pair(config_payload: dict[str, Any], version_pair: str) -> dict[str, Any]:
+    payload = dict(config_payload)
+    if not version_pair:
+        return payload
+    target_version, fixed_version = _parse_version_pair(version_pair)
+    payload["target_version"] = target_version
+    payload["fixed_version"] = fixed_version
+    payload["selected_version_pair"] = version_pair
+    return payload
+
+
+def _case_learning_context_features(
+    case: Case,
+    config: ExperimentConfig,
+    *,
+    backends: list[str],
+    target_capabilities: list[str] | tuple[str, ...] = (),
+    operation_combo: dict[str, Any] | None = None,
+    guidance_row: dict[str, Any] | None = None,
+) -> tuple[str, ...]:
+    features: list[str] = [
+        f"oracle_mode:{config.oracle_mode}",
+        f"guidance_strategy:{config.guidance_strategy}",
+        _bucket_feature("backend_count", len(backends), [(0, "none"), (1, "single"), (3, "few")], "many"),
+    ]
+    if config.enable_metamorphic_oracle:
+        features.append("metamorphic:enabled")
+    if config.enable_feedback:
+        features.append("feedback:enabled")
+    version_pair = _version_pair_id(config)
+    if version_pair:
+        features.append("version_pair:present")
+    for backend in backends[:8]:
+        features.append(f"backend:{backend}")
+    for capability in target_capabilities[:24]:
+        features.append(f"capability:{capability}")
+    if isinstance(guidance_row, dict):
+        for target in guidance_row.get("matched_targets", []) or []:
+            text = str(target).strip()
+            if text:
+                features.append(f"matched_target:{text}")
+        for feature in guidance_row.get("features", []) or []:
+            text = str(feature).strip()
+            if text:
+                features.append(text)
+    case_features = derive_case_features(
+        case,
+        operation_combo=operation_combo,
+        exploration_objective_rules=config.exploration_objective_rules,
+    )
+    features.extend(sorted(case_features))
+    return tuple(_unique_nonempty_strings(features))
+
+
+def _version_pair_context_features(
+    *,
+    config: ExperimentConfig,
+    backends: list[str],
+    target_capabilities: list[str] | tuple[str, ...] = (),
+) -> tuple[str, ...]:
+    features = [
+        f"oracle_mode:{config.oracle_mode}",
+        f"guidance_strategy:{config.guidance_strategy}",
+        _bucket_feature("backend_count", len(backends), [(0, "none"), (1, "single"), (3, "few")], "many"),
+    ]
+    if config.enable_feedback:
+        features.append("feedback:enabled")
+    if config.enable_metamorphic_oracle:
+        features.append("metamorphic:enabled")
+    for backend in backends[:8]:
+        features.append(f"backend:{backend}")
+    for capability in target_capabilities[:24]:
+        features.append(f"capability:{capability}")
+    for family in config.semantic_focus_families[:8]:
+        features.append(f"semantic_family:{family}")
+    for signal in config.semantic_focus_signals[:8]:
+        features.append(f"semantic_signal:{signal}")
+    return tuple(_unique_nonempty_strings(features))
+
+
+def _semantic_objective_pool(
+    case_features: tuple[str, ...],
+    config: ExperimentConfig,
+    guidance_row: dict[str, Any],
+) -> tuple[str, ...]:
+    candidates: list[str] = []
+    for feature in case_features:
+        text = str(feature).strip()
+        if text.startswith(EXPLORATION_OBJECTIVE_PREFIX):
+            candidates.append(text)
+    for target in guidance_row.get("matched_targets", []) or []:
+        text = str(target).strip()
+        if text.startswith(EXPLORATION_OBJECTIVE_PREFIX):
+            candidates.append(text)
+    candidates.extend(objective_features_for_rules(config.exploration_objective_rules))
+    candidates.extend(derive_exploration_objective_features(case_features, rules=config.exploration_objective_rules))
+    return tuple(_unique_nonempty_strings(candidates))
+
+
+def _select_adaptive_action(
+    feedback: FeedbackState | None,
+    *,
+    scope: str,
+    action_pool: tuple[str, ...],
+    context_features: tuple[str, ...],
+    version_id: str,
+    learning_weight: float,
+    enabled: bool,
+    fixed_strategy: str = "fixed",
+) -> tuple[str, dict[str, Any]]:
+    if not action_pool:
+        return "", {
+            "strategy": "none",
+            "scope": scope,
+            "action": "",
+            "action_pool": [],
+            "learning_weight": 0.0,
+            "ranked": [],
+        }
+    if not enabled or feedback is None or learning_weight <= 0.0:
+        action = action_pool[0]
+        return action, {
+            "strategy": fixed_strategy,
+            "scope": scope,
+            "action": action,
+            "action_pool": list(action_pool),
+            "learning_weight": 0.0,
+            "ranked": [],
+        }
+    learning = getattr(feedback, "adaptive_learning", None)
+    if learning is None:
+        action = action_pool[0]
+        return action, {
+            "strategy": "fixed_no_learning_state",
+            "scope": scope,
+            "action": action,
+            "action_pool": list(action_pool),
+            "learning_weight": 0.0,
+            "ranked": [],
+        }
+    bandit = learning.bandits.get(scope)
+    if bandit is not None:
+        for action in action_pool:
+            arm = bandit.arms.get(action)
+            if arm is None or arm.pulls <= 0:
+                return action, {
+                    "strategy": "contextual_bandit_warmup",
+                    "scope": scope,
+                    "action": action,
+                    "action_pool": list(action_pool),
+                    "learning_weight": float(learning_weight),
+                    "ranked": learning.rank(
+                        scope,
+                        action_pool,
+                        context_features=context_features,
+                        version_id=version_id,
+                    )[:8],
+                }
+    else:
+        action = action_pool[0]
+        return action, {
+            "strategy": "contextual_bandit_warmup",
+            "scope": scope,
+            "action": action,
+            "action_pool": list(action_pool),
+            "learning_weight": float(learning_weight),
+            "ranked": [],
+        }
+    ranked = learning.rank(
+        scope,
+        action_pool,
+        context_features=context_features,
+        version_id=version_id,
+    )
+    action = str(ranked[0]["action_id"]) if ranked else action_pool[0]
+    return action, {
+        "strategy": "contextual_bandit",
+        "scope": scope,
+        "action": action,
+        "action_pool": list(action_pool),
+        "learning_weight": float(learning_weight),
+        "ranked": ranked[:8],
+    }
+
+
+def _record_adaptive_action_feedback(
+    feedback: FeedbackState | None,
+    selection: dict[str, Any],
+    row: dict[str, Any],
+    *,
+    context_features: tuple[str, ...],
+    version_id: str,
+    reward_signals: dict[str, Any],
+) -> float | None:
+    learning = getattr(feedback, "adaptive_learning", None) if feedback is not None else None
+    if learning is None or not isinstance(selection, dict):
+        return None
+    if str(selection.get("strategy", "") or "") not in {"contextual_bandit", "contextual_bandit_warmup"}:
+        return None
+    scope = str(selection.get("scope", "") or "").strip()
+    action = str(selection.get("action", "") or "").strip()
+    if not scope or not action:
+        return None
+    reward = _adaptive_exploration_reward(row, reward_signals=reward_signals)
+    preflight = row.get("preflight", {}) if isinstance(row.get("preflight", {}), dict) else {}
+    learning.record_outcome(
+        scope,
+        action,
+        context_features=context_features,
+        version_id=version_id,
+        reward=reward,
+        runtime_cost=_runtime_cost_signal(row),
+        preflight_valid=bool(preflight.get("valid", True)),
+        fallback_used=bool(preflight.get("fallback_used", False)),
+        false_positive=bool(reward_signals.get("false_positive", False)),
+    )
+    return reward
+
+
+def _adaptive_exploration_reward(row: dict[str, Any], *, reward_signals: dict[str, Any]) -> float:
+    return _generator_profile_reward(row, reward_signals=reward_signals)
+
+
+def _runtime_cost_signal(row: dict[str, Any]) -> float:
+    duration_ms = float(row.get("duration_ms", 0.0) or 0.0)
+    return min(2.0, max(0.0, duration_ms / 1000.0))
+
+
+def _metamorphic_relation_order_from_selection(
+    selected_relation: str,
+    *,
+    configured_order: list[str] | tuple[str, ...],
+) -> list[str]:
+    ordered = []
+    if selected_relation:
+        ordered.append(selected_relation)
+    ordered.extend(str(item).strip() for item in configured_order if str(item).strip())
+    return _unique_nonempty_strings(ordered)
+
+
+def _candidate_target_keys_from_metadata(metadata: dict[str, Any]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    if not isinstance(metadata, dict):
+        return out
+    for section_name in ("feedback_decision", "feedback_selection"):
+        section = metadata.get(section_name)
+        if not isinstance(section, dict):
+            continue
+        values = section.get("target_keys")
+        if not isinstance(values, list):
+            continue
+        for value in values:
+            text = str(value).strip()
+            if not text or text in seen:
+                continue
+            out.append(text)
+            seen.add(text)
+    return out
+
+
+def _candidate_quality_context(
+    feedback: FeedbackState | None,
+    case: Case,
+    metadata: dict[str, Any],
+    *,
+    target_capabilities: list[str] | tuple[str, ...] = (),
+) -> dict[str, Any]:
+    if feedback is None:
+        return {}
+    context_getter = getattr(feedback, "candidate_quality_context", None)
+    if context_getter is None:
+        return {}
+    target_keys = _candidate_target_keys_from_metadata(metadata)
+    target_keys.extend(_capability_target_keys(target_capabilities))
+    return dict(context_getter(case, target_keys=target_keys or None) or {})
+
+
 def _compact_log_row(row: dict[str, Any], log_level: str) -> dict[str, Any]:
     if log_level == "full":
         return row
@@ -377,6 +842,17 @@ def _compact_log_row(row: dict[str, Any], log_level: str) -> dict[str, Any]:
         "mutation": row.get("mutation", {}),
         "feedback_selection": row.get("feedback_selection", row.get("feedback_decision", {})),
         "feedback_decision": row.get("feedback_decision", {}),
+        "quality_archive_context": row.get("quality_archive_context", {}),
+        "generator_profile_selection": row.get("generator_profile_selection", {}),
+        "selected_generator_profile": row.get("selected_generator_profile", ""),
+        "semantic_objective_selection": row.get("semantic_objective_selection", {}),
+        "selected_semantic_objective": row.get("selected_semantic_objective", ""),
+        "metamorphic_relation_selection": row.get("metamorphic_relation_selection", {}),
+        "selected_metamorphic_relation": row.get("selected_metamorphic_relation", ""),
+        "version_pair_selection": row.get("version_pair_selection", {}),
+        "selected_version_pair": row.get("selected_version_pair", ""),
+        "case_learning_context": row.get("case_learning_context", []),
+        "metamorphic_selection": row.get("metamorphic_selection", {}),
         "operation_combo": row.get("operation_combo", {}),
         "source_reward": row.get("source_reward"),
         "source_scheduler": row.get("source_scheduler", []),
@@ -530,7 +1006,12 @@ def _feedback_storage_decision(
     return True, ""
 
 
-def _feedback_target_keys(guidance_row: dict[str, Any], operation_combo: dict[str, Any]) -> list[str]:
+def _feedback_target_keys(
+    guidance_row: dict[str, Any],
+    operation_combo: dict[str, Any],
+    *,
+    target_capabilities: list[str] | tuple[str, ...] = (),
+) -> list[str]:
     broad_targets = {
         "strings",
         "numeric",
@@ -554,6 +1035,7 @@ def _feedback_target_keys(guidance_row: dict[str, Any], operation_combo: dict[st
         if value and (
             value.startswith("pattern:")
             or value.startswith("semantic_family:")
+            or value.startswith(EXPLORATION_OBJECTIVE_PREFIX)
             or value.startswith("source:")
             or value.startswith("profile:")
         ):
@@ -564,6 +1046,8 @@ def _feedback_target_keys(guidance_row: dict[str, Any], operation_combo: dict[st
     for family in guidance_row.get("features", []) or []:
         value = str(family).strip()
         if value.startswith("semantic_family:"):
+            keys.append(value)
+        elif value.startswith(EXPLORATION_OBJECTIVE_PREFIX):
             keys.append(value)
     for signal in combo_semantic_signals(operation_combo):
         value = str(signal).strip()
@@ -586,6 +1070,7 @@ def _feedback_target_keys(guidance_row: dict[str, Any], operation_combo: dict[st
             legacy_key = legacy_target_key_alias(semantic_key)
             if legacy_key:
                 keys.append(legacy_key)
+    keys.extend(_capability_target_keys(target_capabilities))
     out: list[str] = []
     seen: set[str] = set()
     for key in keys:
@@ -594,6 +1079,21 @@ def _feedback_target_keys(guidance_row: dict[str, Any], operation_combo: dict[st
         out.append(key)
         seen.add(key)
     return out
+
+
+def _capability_target_keys(target_capabilities: list[str] | tuple[str, ...]) -> list[str]:
+    keys: list[str] = []
+    seen: set[str] = set()
+    for capability in target_capabilities:
+        value = str(capability).strip()
+        if not value:
+            continue
+        key = f"capability:{value}"
+        if key in seen:
+            continue
+        keys.append(key)
+        seen.add(key)
+    return keys[:24]
 
 
 def _known_replay_source_filter_reason(case_item: Case, config: ExperimentConfig) -> str:
@@ -609,6 +1109,235 @@ _replay_bug_filter_reason = _known_replay_source_filter_reason
 
 def _effective_generator_profile(config: ExperimentConfig) -> str:
     return config.generator_profile
+
+
+def _generator_profile_pool(
+    config: ExperimentConfig,
+    *,
+    target_capabilities: list[str] | tuple[str, ...] = (),
+) -> tuple[tuple[str, ...], dict[str, Any]]:
+    configured = [str(item).strip() for item in config.generator_profile_pool if str(item).strip()]
+    if not configured:
+        configured = [str(config.generator_profile or "common").strip()]
+    elif str(config.generator_profile or "").strip() not in configured:
+        configured.insert(0, str(config.generator_profile or "common").strip())
+    out: list[str] = []
+    seen: set[str] = set()
+    for profile in configured:
+        if not profile or profile in seen:
+            continue
+        out.append(profile)
+        seen.add(profile)
+    original = out or ["common"]
+    filter_result = filter_generator_profiles_by_capability(original, target_capabilities)
+    if not config.enable_profile_capability_filter:
+        filter_result = {
+            "selected": list(original),
+            "dropped": [],
+            "target_capability_count": len(tuple(target_capabilities)),
+        }
+    selected = list(filter_result.get("selected", []) or [])
+    if not selected:
+        selected = [str(config.generator_profile or "common").strip() or "common"]
+    metadata = {
+        "requested": list(original),
+        "selected": selected,
+        "dropped": list(filter_result.get("dropped", []) or []),
+        "target_capability_count": int(filter_result.get("target_capability_count", 0) or 0),
+        "capability_aware": bool(target_capabilities) and config.enable_profile_capability_filter,
+        "capability_filter_enabled": config.enable_profile_capability_filter,
+    }
+    return tuple(selected), metadata
+
+
+def _generator_profile_context_features(
+    *,
+    config: ExperimentConfig,
+    backends: list[str],
+    target_specs: list[dict[str, Any]],
+    target_capabilities: list[str],
+    candidate_pool: int,
+) -> tuple[str, ...]:
+    features = [
+        f"oracle_mode:{config.oracle_mode}",
+        f"guidance_strategy:{config.guidance_strategy}",
+        _bucket_feature("candidate_pool", candidate_pool, [(1, "single"), (4, "small"), (8, "medium")], "large"),
+        _bucket_feature("backend_count", len(backends), [(0, "none"), (1, "single"), (3, "few")], "many"),
+    ]
+    if config.enable_metamorphic_oracle:
+        features.append("metamorphic:enabled")
+    if config.enable_feedback:
+        features.append("feedback:enabled")
+    for backend in backends[:8]:
+        features.append(f"backend:{backend}")
+    for target in target_specs[:8]:
+        if isinstance(target, dict):
+            family = str(target.get("family", "") or "").strip()
+            layer = str(target.get("layer", "") or "").strip()
+            if family:
+                features.append(f"target_family:{family}")
+            if layer:
+                features.append(f"target_layer:{layer}")
+    for capability in target_capabilities[:24]:
+        features.append(f"capability:{capability}")
+    for family in config.semantic_focus_families[:8]:
+        features.append(f"semantic_family:{family}")
+    for signal in config.semantic_focus_signals[:8]:
+        features.append(f"semantic_signal:{signal}")
+    for target in config.guidance_targets[:8]:
+        features.append(f"guidance_target:{target}")
+    return tuple(_unique_nonempty_strings(features))
+
+
+def _select_generator_profile(
+    feedback: FeedbackState | None,
+    profile_pool: tuple[str, ...],
+    *,
+    context_features: tuple[str, ...],
+    learning_weight: float,
+    pool_metadata: dict[str, Any] | None = None,
+) -> tuple[str, dict[str, Any]]:
+    metadata = dict(pool_metadata or {})
+    if len(profile_pool) <= 1 or feedback is None or learning_weight <= 0.0:
+        profile = profile_pool[0] if profile_pool else "common"
+        return profile, {
+            "strategy": "fixed",
+            "profile": profile,
+            "profile_pool": list(profile_pool),
+            "profile_pool_metadata": metadata,
+            "learning_weight": 0.0,
+            "ranked": [],
+        }
+    learning = getattr(feedback, "adaptive_learning", None)
+    if learning is None:
+        profile = profile_pool[0]
+        return profile, {
+            "strategy": "fixed_no_learning_state",
+            "profile": profile,
+            "profile_pool": list(profile_pool),
+            "profile_pool_metadata": metadata,
+            "learning_weight": 0.0,
+            "ranked": [],
+        }
+    bandit = learning.bandits.get("generator_profile")
+    if bandit is not None:
+        for profile in profile_pool:
+            arm = bandit.arms.get(profile)
+            if arm is None or arm.pulls <= 0:
+                return profile, {
+                    "strategy": "contextual_bandit_warmup",
+                    "profile": profile,
+                    "profile_pool": list(profile_pool),
+                    "profile_pool_metadata": metadata,
+                    "learning_weight": float(learning_weight),
+                    "ranked": learning.rank(
+                        "generator_profile",
+                        profile_pool,
+                        context_features=context_features,
+                    )[:8],
+                }
+    else:
+        profile = profile_pool[0]
+        return profile, {
+            "strategy": "contextual_bandit_warmup",
+            "profile": profile,
+            "profile_pool": list(profile_pool),
+            "profile_pool_metadata": metadata,
+            "learning_weight": float(learning_weight),
+            "ranked": [],
+        }
+    ranked = learning.rank(
+        "generator_profile",
+        profile_pool,
+        context_features=context_features,
+    )
+    profile = ranked[0]["action_id"] if ranked else profile_pool[0]
+    return profile, {
+        "strategy": "contextual_bandit",
+        "profile": profile,
+        "profile_pool": list(profile_pool),
+        "profile_pool_metadata": metadata,
+        "learning_weight": float(learning_weight),
+        "ranked": ranked[:8],
+    }
+
+
+def _record_generator_profile_feedback(
+    feedback: FeedbackState | None,
+    selected_meta: dict[str, Any],
+    row: dict[str, Any],
+    *,
+    context_features: tuple[str, ...],
+    reward_signals: dict[str, Any],
+) -> float | None:
+    learning = getattr(feedback, "adaptive_learning", None) if feedback is not None else None
+    if learning is None:
+        return None
+    profile_selection = selected_meta.get("generator_profile_selection", {})
+    if not isinstance(profile_selection, dict):
+        return None
+    if str(profile_selection.get("strategy", "") or "") not in {
+        "contextual_bandit",
+        "contextual_bandit_warmup",
+    }:
+        return None
+    profile = str(profile_selection.get("profile", "") or "").strip()
+    if not profile:
+        return None
+    reward = _generator_profile_reward(row, reward_signals=reward_signals)
+    learning.record_outcome(
+        "generator_profile",
+        profile,
+        context_features=context_features,
+        reward=reward,
+        preflight_valid=bool(row.get("preflight", {}).get("valid", True)),
+        fallback_used=bool(row.get("preflight", {}).get("fallback_used", False)),
+        false_positive=bool(reward_signals.get("false_positive", False)),
+    )
+    return reward
+
+
+def _generator_profile_reward(row: dict[str, Any], *, reward_signals: dict[str, Any]) -> float:
+    findings = row.get("findings", []) or []
+    finding_count = len(findings)
+    candidate_bug = bool(reward_signals.get("candidate_bug", False))
+    rewardable_semantic = bool(reward_signals.get("rewardable_semantic_divergence", False))
+    false_positive = bool(reward_signals.get("false_positive", False))
+    new_behavior = bool(row.get("signal_new_behavior", row.get("is_new_behavior", False)))
+    preflight = row.get("preflight", {}) if isinstance(row.get("preflight", {}), dict) else {}
+    throughput_hint = 0.0
+    duration_ms = float(row.get("duration_ms", 0.0) or 0.0)
+    if duration_ms > 0.0:
+        throughput_hint = min(0.25, 1.0 / duration_ms)
+    return (
+        (3.0 if candidate_bug else 0.0)
+        + (0.7 if rewardable_semantic else 0.0)
+        + (0.45 if new_behavior else 0.0)
+        + min(0.4, 0.05 * finding_count)
+        + throughput_hint
+        - (2.5 if false_positive else 0.0)
+        - (0.5 if not bool(preflight.get("valid", True)) else 0.0)
+        - (0.25 if bool(preflight.get("fallback_used", False)) else 0.0)
+    )
+
+
+def _bucket_feature(prefix: str, value: int, limits: list[tuple[int, str]], fallback: str) -> str:
+    for limit, name in limits:
+        if value <= limit:
+            return f"{prefix}:{name}"
+    return f"{prefix}:{fallback}"
+
+
+def _unique_nonempty_strings(values: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        item = str(value).strip()
+        if not item or item in seen:
+            continue
+        out.append(item)
+        seen.add(item)
+    return out
 
 
 def _restore_closed_loop_state(
@@ -659,6 +1388,8 @@ def _restore_closed_loop_state(
                 max_persisted=config.feedback_persist_limit,
                 max_cases_per_profile=config.feedback_max_cases_per_profile,
                 source_scheduler=scheduler_state,
+                enable_mutation_operator_learning=config.enable_mutation_operator_learning,
+                enable_quality_archive=config.enable_quality_archive,
             )
         else:
             feedback = FeedbackState(
@@ -666,6 +1397,8 @@ def _restore_closed_loop_state(
                 max_persisted=config.feedback_persist_limit,
                 max_cases_per_profile=config.feedback_max_cases_per_profile,
                 source_scheduler=scheduler_state,
+                enable_mutation_operator_learning=config.enable_mutation_operator_learning,
+                enable_quality_archive=config.enable_quality_archive,
             )
     if guidance_enabled:
         effective_guidance_targets = _effective_guidance_targets(config)
@@ -675,6 +1408,7 @@ def _restore_closed_loop_state(
                 raw_guidance_state,
                 targets=effective_guidance_targets,
                 discovery_biases=list(config.discovery_biases),
+                exploration_objective_rules=list(config.exploration_objective_rules),
                 enable_family_saturation=config.enable_family_saturation,
                 family_saturation_threshold=config.family_saturation_threshold,
                 family_saturation_penalty=config.family_saturation_penalty,
@@ -692,6 +1426,7 @@ def _restore_closed_loop_state(
             guidance = GuidanceState(
                 targets=effective_guidance_targets,
                 discovery_biases=list(config.discovery_biases),
+                exploration_objective_rules=list(config.exploration_objective_rules),
                 enable_family_saturation=config.enable_family_saturation,
                 family_saturation_threshold=config.family_saturation_threshold,
                 family_saturation_penalty=config.family_saturation_penalty,
@@ -752,6 +1487,45 @@ def _execute_case(
     return raw_results, normalized
 
 
+def _invoke_run_loaded_case(
+    case: Case,
+    *,
+    backends: list[str],
+    config: ExperimentConfig,
+    save_artifact: bool,
+    backend_instances: dict[str, Backend] | None,
+    environment: dict[str, str] | None,
+    target_specs: list[dict[str, Any]],
+    config_payload: dict[str, Any],
+    metamorphic_relation_order: list[str] | tuple[str, ...],
+) -> dict[str, Any]:
+    try:
+        return run_loaded_case(
+            case,
+            backends=backends,
+            config=config,
+            save_artifact=save_artifact,
+            backend_instances=backend_instances,
+            environment=environment,
+            target_specs=target_specs,
+            config_payload=config_payload,
+            metamorphic_relation_order=metamorphic_relation_order,
+        )
+    except TypeError as exc:
+        if "metamorphic_relation_order" not in str(exc):
+            raise
+        return run_loaded_case(
+            case,
+            backends=backends,
+            config=config,
+            save_artifact=save_artifact,
+            backend_instances=backend_instances,
+            environment=environment,
+            target_specs=target_specs,
+            config_payload=config_payload,
+        )
+
+
 def run_loaded_case(
     case: Case,
     backends: list[str],
@@ -761,6 +1535,7 @@ def run_loaded_case(
     environment: dict[str, str] | None = None,
     target_specs: list[dict[str, Any]] | None = None,
     config_payload: dict[str, Any] | None = None,
+    metamorphic_relation_order: list[str] | tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     config = config or ExperimentConfig()
     resolved_config_payload = dict(config_payload) if isinstance(config_payload, dict) else _config_payload_with_effective_guidance_targets(config)
@@ -780,9 +1555,15 @@ def run_loaded_case(
     if config.enable_differential_oracle:
         findings = evaluate_case(case, normalized)
     metamorphic_rows: dict[str, Any] = {}
+    metamorphic_selection: dict[str, Any] = {}
     if config.enable_metamorphic_oracle:
         variant_results = {}
-        for variant in build_metamorphic_variants(case, limit=max(0, config.metamorphic_variant_limit)):
+        variants = select_metamorphic_variants(
+            all_metamorphic_variants(case),
+            limit=max(0, config.metamorphic_variant_limit),
+            relation_order=metamorphic_relation_order or config.metamorphic_relation_order,
+        )
+        for variant in variants:
             variant_raw, variant_norm = _execute_case(
                 variant.case,
                 backends,
@@ -797,6 +1578,12 @@ def run_loaded_case(
                 "normalized": {k: v.to_dict() for k, v in variant_norm.items()},
             }
         findings.extend(evaluate_metamorphic_variants(case, normalized, variant_results))
+        if metamorphic_rows:
+            metamorphic_selection = {
+                "relation_order": list(metamorphic_relation_order or config.metamorphic_relation_order),
+                "executed_relations": [row["relation"] for row in metamorphic_rows.values() if isinstance(row, dict)],
+                "variant_limit": max(0, int(config.metamorphic_variant_limit)),
+            }
     if findings:
         annotate_findings(
             case,
@@ -831,6 +1618,7 @@ def run_loaded_case(
         "raw_results": raw_results,
         "normalized": {k: v.to_dict() for k, v in normalized.items()},
         "metamorphic": metamorphic_rows,
+        "metamorphic_selection": metamorphic_selection,
         "findings": [f.to_dict() for f in findings],
         "candidate_recheck": recheck,
         "config": resolved_config_payload,
@@ -1011,6 +1799,23 @@ def run_fuzz(
     saturated_family_filter_fallback_count = 0
     quality_oracle_counts: dict[str, int] = {}
     effective_generator_profile = _effective_generator_profile(config)
+    generator_profile_pool, generator_profile_pool_metadata = _generator_profile_pool(
+        config,
+        target_capabilities=targets.common_capabilities,
+    )
+    version_pair_pool, version_pair_pool_metadata = _version_pair_pool(config)
+    generator_profile_context_features = _generator_profile_context_features(
+        config=config,
+        backends=backends,
+        target_specs=target_specs,
+        target_capabilities=list(targets.common_capabilities),
+        candidate_pool=candidate_pool,
+    )
+    version_pair_context_features = _version_pair_context_features(
+        config=config,
+        backends=backends,
+        target_capabilities=list(targets.common_capabilities),
+    )
     persisted_closed_loop_state_path = closed_loop_state_path(run_file) if persist_closed_loop_state else None
 
     def snapshot(status: str) -> dict[str, Any]:
@@ -1055,6 +1860,17 @@ def run_fuzz(
                 "targets": config.guidance_targets,
             },
             "effective_generator_profile": effective_generator_profile,
+            "generator_profile_pool": list(generator_profile_pool),
+            "generator_profile_pool_metadata": dict(generator_profile_pool_metadata),
+            "version_pair_pool": list(version_pair_pool),
+            "version_pair_pool_metadata": dict(version_pair_pool_metadata),
+            "generator_profile_learning_weight": config.generator_profile_learning_weight,
+            "semantic_objective_learning_weight": config.semantic_objective_learning_weight,
+            "metamorphic_relation_learning_weight": config.metamorphic_relation_learning_weight,
+            "version_pair_learning_weight": config.version_pair_learning_weight,
+            "version_pair": _version_pair_id(config),
+            "target_version": config.target_version,
+            "fixed_version": config.fixed_version,
             "backends": backends,
             "targets": target_specs,
             "common_capabilities": list(targets.common_capabilities),
@@ -1131,10 +1947,21 @@ def run_fuzz(
             while True:
                 case_seed = candidate_seed_cursor
                 candidate_seed_cursor += 1
+                selected_profile, profile_selection = _select_generator_profile(
+                    feedback,
+                    generator_profile_pool,
+                    context_features=generator_profile_context_features,
+                    learning_weight=(
+                        config.generator_profile_learning_weight
+                        if config.enable_generator_profile_learning
+                        else 0.0
+                    ),
+                    pool_metadata=generator_profile_pool_metadata,
+                )
                 generated = generate_case(
                     case_seed,
                     type_aware=config.enable_type_aware_generation,
-                    profile=effective_generator_profile,
+                    profile=selected_profile,
                 )
                 if feedback is not None:
                     feedback_selector = getattr(feedback, "select_case", None) or getattr(feedback, "choose_case")
@@ -1179,6 +2006,14 @@ def run_fuzz(
                         type_aware=config.enable_type_aware_generation,
                         profile="common",
                     )
+                    profile_selection = {
+                        "strategy": "saturation_fallback",
+                        "profile": "common",
+                        "profile_pool": list(generator_profile_pool),
+                        "profile_pool_metadata": dict(generator_profile_pool_metadata),
+                        "learning_weight": 0.0,
+                        "ranked": [],
+                    }
                     selected = generated
                     source = "generated_saturation_fallback"
                     metadata = _generated_candidate_metadata(generated)
@@ -1217,6 +2052,14 @@ def run_fuzz(
                     type_aware=config.enable_type_aware_generation,
                     profile="common",
                 )
+                profile_selection = {
+                    "strategy": "fresh_fallback",
+                    "profile": "common",
+                    "profile_pool": list(generator_profile_pool),
+                    "profile_pool_metadata": dict(generator_profile_pool_metadata),
+                    "learning_weight": 0.0,
+                    "ranked": [],
+                }
                 selected = generated
                 source = "generated_fresh_fallback"
                 metadata = _generated_candidate_metadata(generated)
@@ -1231,6 +2074,14 @@ def run_fuzz(
                     replay_filtered_candidate_count += 1
                     raise RuntimeError(f"fresh fallback generated replay candidate: {replay_skip_reason}")
                 break
+            quality_archive_context = _candidate_quality_context(
+                feedback,
+                candidate,
+                metadata,
+                target_capabilities=targets.common_capabilities,
+            )
+            if quality_archive_context:
+                candidate.metadata["quality_archive_context"] = quality_archive_context
             candidate_meta[id(candidate)] = {
                 "source": source,
                 "generated_seed": case_seed,
@@ -1238,6 +2089,8 @@ def run_fuzz(
                 "mutation": metadata.get("mutation", {}),
                 "feedback_selection": metadata.get("feedback_selection", metadata.get("feedback_decision", {})),
                 "feedback_decision": metadata.get("feedback_decision", metadata.get("feedback_selection", {})),
+                "quality_archive_context": quality_archive_context,
+                "generator_profile_selection": profile_selection,
                 "preflight": preflight.to_dict(),
                 "replay_filter": {
                     "enabled": not config.enable_replay_bug,
@@ -1289,9 +2142,73 @@ def run_fuzz(
                 config,
                 bool(guidance is not None and config.enable_family_saturation),
             )
+        if not selected_meta.get("quality_archive_context"):
+            selected_meta["quality_archive_context"] = _candidate_quality_context(
+                feedback,
+                case,
+                selected_meta,
+                target_capabilities=targets.common_capabilities,
+            )
+            if selected_meta["quality_archive_context"]:
+                case.metadata["quality_archive_context"] = selected_meta["quality_archive_context"]
         selected_meta["operation_combo"] = selected_operation_combo or describe_operation_combo(case.program.operations)
         preflight_row = selected_meta["preflight"]
         case_seed = case.seed
+        selected_version_pair, version_pair_selection = _select_adaptive_action(
+            feedback,
+            scope="version_pair",
+            action_pool=version_pair_pool,
+            context_features=version_pair_context_features,
+            version_id=_version_pair_id(config),
+            learning_weight=config.version_pair_learning_weight,
+            enabled=bool(version_pair_pool),
+        )
+        effective_config = _config_for_version_pair(config, selected_version_pair)
+        effective_config_payload = _config_payload_for_version_pair(config_payload, selected_version_pair)
+        version_pair_id = _version_pair_id(effective_config)
+        case_learning_context = _case_learning_context_features(
+            case,
+            effective_config,
+            backends=backends,
+            target_capabilities=targets.common_capabilities,
+            operation_combo=selected_meta["operation_combo"],
+            guidance_row=guidance_row,
+        )
+        semantic_objective_pool = _semantic_objective_pool(case_learning_context, config, guidance_row)
+        selected_semantic_objective, semantic_objective_selection = _select_adaptive_action(
+            feedback,
+            scope="semantic_objective",
+            action_pool=semantic_objective_pool,
+            context_features=case_learning_context,
+            version_id=version_pair_id,
+            learning_weight=config.semantic_objective_learning_weight,
+            enabled=config.enable_semantic_objective_learning,
+        )
+        all_mr_variants = all_metamorphic_variants(case) if config.enable_metamorphic_oracle else []
+        metamorphic_relation_pool = tuple(
+            _unique_nonempty_strings([variant.relation for variant in all_mr_variants])
+        )
+        selected_metamorphic_relation, metamorphic_relation_selection = _select_adaptive_action(
+            feedback,
+            scope="metamorphic_relation",
+            action_pool=metamorphic_relation_pool,
+            context_features=case_learning_context,
+            version_id=version_pair_id,
+            learning_weight=config.metamorphic_relation_learning_weight,
+            enabled=config.enable_metamorphic_relation_learning and config.enable_metamorphic_oracle,
+        )
+        selected_meta["semantic_objective_selection"] = semantic_objective_selection
+        selected_meta["selected_semantic_objective"] = selected_semantic_objective
+        selected_meta["metamorphic_relation_selection"] = metamorphic_relation_selection
+        selected_meta["selected_metamorphic_relation"] = selected_metamorphic_relation
+        selected_meta["version_pair_selection"] = version_pair_selection
+        selected_meta["selected_version_pair"] = selected_version_pair
+        selected_meta["version_pair_pool_metadata"] = dict(version_pair_pool_metadata)
+        selected_meta["case_learning_context"] = list(case_learning_context)
+        selected_meta["metamorphic_relation_order"] = _metamorphic_relation_order_from_selection(
+            selected_metamorphic_relation,
+            configured_order=config.metamorphic_relation_order,
+        )
         if case_writer is not None:
             case_writer.write(
                 {
@@ -1312,6 +2229,13 @@ def run_fuzz(
                         "feedback_decision",
                         selected_meta.get("feedback_selection", {}),
                     ),
+                    "quality_archive_context": selected_meta.get("quality_archive_context", {}),
+                    "generator_profile_selection": selected_meta.get("generator_profile_selection", {}),
+                    "semantic_objective_selection": selected_meta.get("semantic_objective_selection", {}),
+                    "metamorphic_relation_selection": selected_meta.get("metamorphic_relation_selection", {}),
+                    "version_pair_selection": selected_meta.get("version_pair_selection", {}),
+                    "selected_version_pair": selected_meta.get("selected_version_pair", ""),
+                    "case_learning_context": selected_meta.get("case_learning_context", []),
                     "operation_combo": selected_meta["operation_combo"],
                     "preflight": preflight_row,
                     "replay_filter": selected_meta["replay_filter"],
@@ -1321,15 +2245,16 @@ def run_fuzz(
                 }
             )
         save_artifact_for_case = _artifact_budget_available(config, artifact_saved_count)
-        row = run_loaded_case(
+        row = _invoke_run_loaded_case(
             case,
             backends=backends,
-            config=config,
+            config=effective_config,
             save_artifact=not config.enable_reducer and save_artifact_for_case,
             backend_instances=backend_instances,
             environment=environment,
             target_specs=target_specs,
-            config_payload=config_payload,
+            config_payload=effective_config_payload,
+            metamorphic_relation_order=selected_meta.get("metamorphic_relation_order", []),
         )
         row_stage_profile = _stage_profile_with_total(row.get("stage_profile", {}))
         row_stage_profile["generate_mutate_ms"] += generate_mutate_elapsed_ms
@@ -1342,16 +2267,18 @@ def run_fuzz(
                 case,
                 backends=backends,
                 config=ExperimentConfig(
-                    enable_type_aware_generation=config.enable_type_aware_generation,
-                    enable_normalizer=config.enable_normalizer,
-                    enable_differential_oracle=config.enable_differential_oracle,
-                    enable_metamorphic_oracle=config.enable_metamorphic_oracle,
+                    enable_type_aware_generation=effective_config.enable_type_aware_generation,
+                    enable_normalizer=effective_config.enable_normalizer,
+                    enable_differential_oracle=effective_config.enable_differential_oracle,
+                    enable_metamorphic_oracle=effective_config.enable_metamorphic_oracle,
                     enable_feedback=False,
                     enable_reducer=False,
                     enable_artifact=False,
-                    oracle_mode=config.oracle_mode,
-                    generator_profile=config.generator_profile,
-                    metamorphic_variant_limit=config.metamorphic_variant_limit,
+                    oracle_mode=effective_config.oracle_mode,
+                    generator_profile=effective_config.generator_profile,
+                    metamorphic_variant_limit=effective_config.metamorphic_variant_limit,
+                    target_version=effective_config.target_version,
+                    fixed_version=effective_config.fixed_version,
                 ),
                 target_kinds=[finding["kind"] for finding in countable_row_findings],
                 target_roots=[finding.get("root_cause", "unknown") for finding in countable_row_findings],
@@ -1360,12 +2287,12 @@ def run_fuzz(
             reduced_row = run_loaded_case(
                 reduced,
                 backends=backends,
-                config=config,
+                config=effective_config,
                 save_artifact=_artifact_budget_available(config, artifact_saved_count),
                 backend_instances=backend_instances,
                 environment=environment,
                 target_specs=target_specs,
-                config_payload=config_payload,
+                config_payload=effective_config_payload,
             )
             reduced_row["original_case"] = case.to_dict()
             reduced_row["reduction"] = {
@@ -1399,6 +2326,16 @@ def run_fuzz(
         row["mutation"] = selected_meta["mutation"]
         row["feedback_selection"] = selected_meta.get("feedback_selection", selected_meta.get("feedback_decision", {}))
         row["feedback_decision"] = selected_meta.get("feedback_decision", selected_meta.get("feedback_selection", {}))
+        row["quality_archive_context"] = selected_meta.get("quality_archive_context", {})
+        row["generator_profile_selection"] = selected_meta.get("generator_profile_selection", {})
+        row["selected_generator_profile"] = str(row["generator_profile_selection"].get("profile", "") or "")
+        row["semantic_objective_selection"] = selected_meta.get("semantic_objective_selection", {})
+        row["selected_semantic_objective"] = str(selected_meta.get("selected_semantic_objective", "") or "")
+        row["metamorphic_relation_selection"] = selected_meta.get("metamorphic_relation_selection", {})
+        row["selected_metamorphic_relation"] = str(selected_meta.get("selected_metamorphic_relation", "") or "")
+        row["version_pair_selection"] = selected_meta.get("version_pair_selection", {})
+        row["selected_version_pair"] = str(selected_meta.get("selected_version_pair", "") or "")
+        row["case_learning_context"] = selected_meta.get("case_learning_context", [])
         row["operation_combo"] = selected_meta["operation_combo"]
         row["preflight"] = preflight_row
         row["replay_filter"] = selected_meta["replay_filter"]
@@ -1463,7 +2400,11 @@ def run_fuzz(
             )
             if feedback_eligible:
                 feedback_started = time.perf_counter()
-                row_target_keys = _feedback_target_keys(guidance_row, selected_meta["operation_combo"])
+                row_target_keys = _feedback_target_keys(
+                    guidance_row,
+                    selected_meta["operation_combo"],
+                    target_capabilities=targets.common_capabilities,
+                )
                 row["stored_in_feedback_corpus"] = feedback.record(
                     case,
                     sig,
@@ -1505,6 +2446,30 @@ def run_fuzz(
                 candidate_bug_signatures=row_candidate_signatures,
                 reward_adjustment=float(feedback_summary.get("source_reward_adjustment", 0.0) or 0.0),
             )
+            profile_reward = _record_generator_profile_feedback(
+                feedback,
+                selected_meta,
+                row,
+                context_features=generator_profile_context_features,
+                reward_signals=reward_signals,
+            )
+            if profile_reward is not None:
+                row["generator_profile_selection"]["reward"] = profile_reward
+            for selection_key in (
+                "semantic_objective_selection",
+                "metamorphic_relation_selection",
+                "version_pair_selection",
+            ):
+                learning_reward = _record_adaptive_action_feedback(
+                    feedback,
+                    row.get(selection_key, {}),
+                    row,
+                    context_features=tuple(row.get("case_learning_context", []) or ()),
+                    version_id=version_pair_id,
+                    reward_signals=reward_signals,
+                )
+                if learning_reward is not None and isinstance(row.get(selection_key), dict):
+                    row[selection_key]["reward"] = learning_reward
             scheduler_feedback_elapsed_ms += (time.perf_counter() - source_reward_started) * 1000
             row["source_scheduler"] = _source_scheduler_snapshot(feedback)
         else:

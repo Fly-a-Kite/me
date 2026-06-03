@@ -82,6 +82,12 @@ from datadiff.program_patterns import (
     has_sortedness_null_placement_pattern,
     program_pattern_features,
 )
+from datadiff.exploration_objectives import (
+    ExplorationObjectiveRule,
+    active_exploration_objective_rules,
+    derive_exploration_objective_features,
+    merge_exploration_objective_rules,
+)
 from datadiff.semantic_family import derive_semantic_family_features
 from datadiff.semantic_signal import (
     alias_expanded_semantic_features,
@@ -676,6 +682,7 @@ def derive_case_features(
     *,
     operation_combo: dict[str, Any] | None = None,
     frontier_buckets: list[str] | None = None,
+    exploration_objective_rules: list[ExplorationObjectiveRule] | tuple[ExplorationObjectiveRule, ...] | None = None,
 ) -> set[str]:
     features: set[str] = set()
     table = case.tables[0]
@@ -700,6 +707,7 @@ def derive_case_features(
         operator_name = str(mutation.get("operator", "")).strip()
         if operator_name and operator_name != "generated":
             features.add(f"mutation_op:{operator_name}")
+    features.update(_quality_archive_context_features(case.metadata.get("quality_archive_context", {})))
     row_count = len(table.rows)
     col_count = len(table.columns)
     features.add(_bucket("rows", row_count, [(0, "empty"), (3, "tiny"), (10, "small"), (20, "medium")], "large"))
@@ -1414,6 +1422,12 @@ def derive_case_features(
     if has_csv_long_numeric_roundtrip_probe:
         features.add("pattern:csv_long_numeric_roundtrip")
     features.update(derive_semantic_family_features(features))
+    features.update(
+        derive_exploration_objective_features(
+            features,
+            rules=exploration_objective_rules,
+        )
+    )
     return features
 
 
@@ -1835,6 +1849,7 @@ class GuidanceState:
     family_saturation_penalty: float = 1.25
     saturated_family_reward: float = 0.02
     known_saturated_bug_families: list[str] = field(default_factory=list)
+    exploration_objective_rules: list[ExplorationObjectiveRule] = field(default_factory=list)
     issue_replay_saturation_threshold: int = 1
     issue_replay_saturation_penalty: float = 1.0
     issue_replay_global_saturation_threshold: int = 4
@@ -1849,12 +1864,15 @@ class GuidanceState:
     _known_saturated_roots: set[str] = field(default_factory=set, repr=False)
     _candidate_bug_root_hits: Counter[str] = field(default_factory=Counter, repr=False)
     _issue_replay_root_hits: Counter[str] = field(default_factory=Counter, repr=False)
-    _case_analysis_cache: OrderedDict[int, CaseAnalysis] = field(default_factory=OrderedDict, repr=False)
+    _case_analysis_cache: OrderedDict[tuple[int, tuple[Any, ...]], CaseAnalysis] = field(default_factory=OrderedDict, repr=False)
     _max_cached_case_analyses: int = field(default=128, repr=False)
     _compiled_discovery_biases: tuple[CompiledDiscoveryBias, ...] = field(default_factory=tuple, repr=False)
     _discovery_bias_keys: tuple[tuple[Any, ...], ...] = field(default_factory=tuple, repr=False)
 
     def __post_init__(self) -> None:
+        self.exploration_objective_rules = merge_exploration_objective_rules(
+            self.exploration_objective_rules
+        )
         self._sync_compiled_discovery_biases()
         self._sync_family_saturation_state()
 
@@ -2440,7 +2458,11 @@ class GuidanceState:
         return decision
 
     def _case_analysis(self, case: Case) -> CaseAnalysis:
-        key = id(case)
+        objective_rule_keys = tuple(
+            rule.key()
+            for rule in active_exploration_objective_rules(self.exploration_objective_rules)
+        )
+        key = (id(case), objective_rule_keys)
         cached = self._case_analysis_cache.get(key)
         if cached is not None:
             self._case_analysis_cache.move_to_end(key)
@@ -2451,6 +2473,7 @@ class GuidanceState:
             case,
             operation_combo=operation_combo,
             frontier_buckets=frontier_buckets,
+            exploration_objective_rules=self.exploration_objective_rules,
         )
         canonical_features = _canonical_features(features)
         expanded_features = frozenset(_alias_expanded_features(canonical_features))
@@ -2484,7 +2507,7 @@ class GuidanceState:
         learnable_features = tuple(
             feature
             for feature in canonical_features
-            if feature in path_features or feature in data_features
+            if _is_learnable_weight_feature(feature)
         )
         learnable_feature_prefix_pairs = tuple(
             (feature, _feature_prefix(feature))
@@ -2711,6 +2734,9 @@ class GuidanceState:
             "family_saturation_penalty": self.family_saturation_penalty,
             "saturated_family_reward": self.saturated_family_reward,
             "known_saturated_bug_families": list(self.known_saturated_bug_families),
+            "exploration_objective_rules": [
+                rule.to_dict() for rule in self.exploration_objective_rules
+            ],
             "issue_replay_saturation_threshold": self.issue_replay_saturation_threshold,
             "issue_replay_saturation_penalty": self.issue_replay_saturation_penalty,
             "issue_replay_global_saturation_threshold": self.issue_replay_global_saturation_threshold,
@@ -2733,6 +2759,7 @@ class GuidanceState:
         family_saturation_penalty: float | None = None,
         saturated_family_reward: float | None = None,
         known_saturated_bug_families: list[str] | None = None,
+        exploration_objective_rules: list[ExplorationObjectiveRule] | None = None,
         issue_replay_saturation_threshold: int | None = None,
         issue_replay_saturation_penalty: float | None = None,
         issue_replay_global_saturation_threshold: int | None = None,
@@ -2776,6 +2803,11 @@ class GuidanceState:
                 known_saturated_bug_families
                 if known_saturated_bug_families is not None
                 else data.get("known_saturated_bug_families", []) or []
+            ),
+            exploration_objective_rules=merge_exploration_objective_rules(
+                exploration_objective_rules
+                if exploration_objective_rules is not None
+                else data.get("exploration_objective_rules", []) or []
             ),
             issue_replay_saturation_threshold=int(
                 issue_replay_saturation_threshold
@@ -3474,6 +3506,64 @@ def _bucket(prefix: str, value: int, limits: list[tuple[int, str]], fallback: st
     return f"{prefix}:{fallback}"
 
 
+def _quality_archive_context_features(context: Any) -> set[str]:
+    if not isinstance(context, dict) or not context:
+        return set()
+    prefix = "quality_archive"
+    features = {
+        f"{prefix}:{'known' if bool(context.get('archive_known', False)) else 'unknown'}",
+        _bucket(f"{prefix}:seed_count", _as_nonnegative_int(context.get("archive_seed_count")), [(0, "zero"), (1, "one"), (3, "few")], "many"),
+        _bucket(f"{prefix}:outcome_count", _as_nonnegative_int(context.get("archive_outcome_count")), [(0, "zero"), (2, "few"), (8, "some")], "many"),
+        _bucket(f"{prefix}:cluster_count", _as_nonnegative_int(context.get("cluster_count")), [(0, "zero"), (1, "one"), (4, "few")], "many"),
+        _bucket(f"{prefix}:recent_cluster_pulls", _as_nonnegative_int(context.get("recent_cluster_pulls")), [(0, "zero"), (2, "few"), (6, "some")], "many"),
+    }
+    features.add(f"{prefix}:reward:{_signed_signal_bucket(context.get('archive_cluster_reward'))}")
+    features.add(f"{prefix}:feedback_reward:{_signed_signal_bucket(context.get('cluster_feedback_reward'))}")
+    features.add(f"{prefix}:health:{_nonnegative_signal_bucket(context.get('archive_health_penalty'))}")
+    features.add(f"{prefix}:novelty:{_nonnegative_signal_bucket(context.get('cluster_novelty_score'))}")
+    elite_indexes = context.get("archive_elite_indexes")
+    features.add(f"{prefix}:elite:{'present' if isinstance(elite_indexes, list) and elite_indexes else 'absent'}")
+    return features
+
+
+def _as_nonnegative_int(value: Any) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _as_float(value: Any) -> float:
+    try:
+        return float(value or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _signed_signal_bucket(value: Any) -> str:
+    number = _as_float(value)
+    if number <= -0.5:
+        return "negative"
+    if number < -0.05:
+        return "weak_negative"
+    if number < 0.05:
+        return "neutral"
+    if number < 0.5:
+        return "weak_positive"
+    return "positive"
+
+
+def _nonnegative_signal_bucket(value: Any) -> str:
+    number = max(0.0, _as_float(value))
+    if number <= 0.0:
+        return "zero"
+    if number < 0.15:
+        return "low"
+    if number < 0.5:
+        return "medium"
+    return "high"
+
+
 def _literal_feature_type(*values: Any) -> str:
     types = set()
     for value in values:
@@ -4077,6 +4167,7 @@ def _is_path_feature_cached(feature: str) -> bool:
             "combo_risk:",
             "semantic_signal:",
             "semantic_family:",
+            "exploration_objective:",
         )
     )
 
@@ -4089,6 +4180,8 @@ def _path_feature_weight_base(feature: str) -> float:
         return 1.6
     if feature.startswith("semantic_family:"):
         return 1.3
+    if feature.startswith("exploration_objective:"):
+        return 1.2
     if feature.startswith("op:"):
         return 1.0
     if feature.startswith(("combo:", "combo_risk:", "semantic_signal:")):
@@ -4172,6 +4265,8 @@ def _saturation_feature_weight_base(feature: str) -> float:
         return 1.0
     if feature.startswith("semantic_family:"):
         return 0.8
+    if feature.startswith("exploration_objective:"):
+        return 0.75
     if feature.startswith("semantic_signal:"):
         return 0.7
     if feature.startswith("op:"):
@@ -4187,7 +4282,17 @@ def _saturation_feature_weight_base(feature: str) -> float:
 def _discovery_bucket_weight_cached(bucket: str) -> float:
     if bucket.startswith(("target:", "pattern:", "common_api_template:", "mixed_generator_profile:")):
         return 1.0
-    if bucket.startswith(("opseq:", "frontier:", "materialization:", "combo_risk:", "semantic_signal:", "semantic_family:")):
+    if bucket.startswith(
+        (
+            "opseq:",
+            "frontier:",
+            "materialization:",
+            "combo_risk:",
+            "semantic_signal:",
+            "semantic_family:",
+            "exploration_objective:",
+        )
+    ):
         return 0.85
     if bucket.startswith(("agg:", "cast:", "cmp:", "expr:", "filter:", "combo:", "source_issue:", "mutation_op:")):
         return 0.65
@@ -4208,7 +4313,11 @@ def _bounded_confident_mean_reward(total_reward: float, pulls: float, *, max_abs
 
 
 def _is_learnable_weight_feature(feature: str) -> bool:
-    return _is_path_feature_cached(feature) or _is_data_sensitivity_feature_cached(feature)
+    return (
+        _is_path_feature_cached(feature)
+        or _is_data_sensitivity_feature_cached(feature)
+        or feature.startswith("quality_archive:")
+    )
 
 
 def _feature_prefix(feature: str) -> str:

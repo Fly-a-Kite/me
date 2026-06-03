@@ -25,7 +25,7 @@
 
 - Run: `runs/run-20260525T072821-1779694101239751859.jsonl.gz`
 - Case index: `31283`
-- Case id: `case-00384793-bughunt-no-groupby`
+- Case id: `case-00384793-discovery-no-groupby`
 - 触发流程：`cast(x as float) -> multiply by -2 -> IN-set filter`
 
 代表输入中 `x = 0`，因此派生列是 `-0.0`。pandas 与 DuckDB 在

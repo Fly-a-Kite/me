@@ -19,7 +19,7 @@ REVIEW_READINESS_SCHEMA_VERSION = "review-readiness-v1"
 class ReviewThresholds:
     target_confirmed_bug_families: int = 20
     min_audit_candidate_families: int = 1
-    min_bug_workflow_manifests: int = 1
+    min_discovery_workflow_manifests: int = 1
     min_generated_issue_drafts: int = 1
     min_issue_bundle_families: int = 1
     min_pending_issue_drafts: int = 1
@@ -50,8 +50,8 @@ REQUIRED_PIPELINE_PATHS = (
 REQUIRED_REPRO_COMMAND_MARKERS = (
     "datadiff targets",
     "datadiff bug-audit",
-    "datadiff bug-hunt",
-    "datadiff bug-sprint",
+    "datadiff discovery-run",
+    "datadiff discovery-campaign",
     "datadiff classify-run",
     "datadiff bug-status",
     "datadiff issue-bundle",
@@ -332,8 +332,8 @@ def _criterion_automated_bug_pipeline(status: dict[str, Any], thresholds: Review
     failures = []
     if summary["audit_candidate_family_count"] < thresholds.min_audit_candidate_families:
         failures.append("deterministic audit candidate evidence")
-    if summary["bug_workflow_manifest_count"] < thresholds.min_bug_workflow_manifests:
-        failures.append("bug-hunt/bug-sprint workflow manifests")
+    if summary["discovery_workflow_manifest_count"] < thresholds.min_discovery_workflow_manifests:
+        failures.append("discovery-run/discovery-campaign workflow manifests")
     if summary["generated_issue_draft_count"] < thresholds.min_generated_issue_drafts:
         failures.append("generated issue drafts")
     if summary.get("issue_bundle_family_count", 0) < thresholds.min_issue_bundle_families:
@@ -352,7 +352,7 @@ def _criterion_automated_bug_pipeline(status: dict[str, Any], thresholds: Review
         "automated_bug_detection_pipeline",
         status="pass" if not failures else "fail",
         evidence=(
-            "audit_candidates={audit_candidate_family_count}, workflows={bug_workflow_manifest_count}, "
+            "audit_candidates={audit_candidate_family_count}, workflows={discovery_workflow_manifest_count}, "
             "generated_issue_drafts={generated_issue_draft_count}, "
             "issue_bundle_families={issue_bundle_family_count}, "
             "issue_bundle_reproducers={issue_bundle_reproducer_count}, "
@@ -393,7 +393,7 @@ def _criterion_reproducibility_commands(root: Path) -> dict[str, Any]:
         "reproducibility_commands_documented",
         status="pass" if not missing else "fail",
         evidence=(
-            "README contains target/audit/hunt/sprint/classify/status/issue-bundle/"
+            "README contains target/audit/discovery/classify/status/issue-bundle/"
             "methodology/final-plan/readiness commands"
         )
         if not missing
@@ -464,7 +464,7 @@ def _recommendations(
             f"Need {target - confirmed} more upstream-confirmed latest bug families to reach the paper target."
         )
     if not status["summary"].get("fresh_candidate_families"):
-        out.append("Current status has no unsaturated fresh candidate family; run longer or add more focused organic sprint lanes.")
+        out.append("Current status has no unsaturated fresh candidate family; run longer or add more focused discovery lanes.")
     issue_summary = issue_queue.get("summary", {})
     ready_families = issue_summary.get("ready_to_submit_families", []) or []
     if ready_families:

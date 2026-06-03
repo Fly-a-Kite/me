@@ -124,8 +124,6 @@ These remain because they already flow through manifests, tests, logs, or guidan
 - `baseline_preset`
 - `trusted_count`
 - `targeted_*`
-- `bug_sprint_*`
-- `bug_hunt_*`
 - `family_saturation_*`
 - `candidate_bug_*`
 - `feedback_selection`
@@ -146,7 +144,8 @@ Completed:
 - common-api workflow template backed target bundles in `src/datadiff/guidance.py` now route through shared semantic/template bundle helpers instead of repeated mixed literal sets.
 - `src/datadiff/strategy_registry.py` common-API discovery-bias prefixes now expose `semantic_signal:` first, while retaining `combo_risk:` for preset / CLI compatibility.
 - `src/datadiff/semantic_signal.py` now centralizes canonical semantic-signal naming, legacy alias expansion, prefix normalization, and target-key weighting so guidance/feedback/runner/registry do not each re-encode the same compatibility rules.
-- `src/datadiff/strategy_registry.py` now uses neutral `DiscoveryLaneSpec` / `discovery_lane_*` naming internally, while retaining `bug_sprint_*` aliases for CLI and manifest compatibility.
+- `src/datadiff/strategy_registry.py` now uses neutral `DiscoveryLaneSpec` / `discovery_lane_*` naming.
+- `discovery-run`, `discovery-campaign`, and `discovery-campaign-status` are the canonical CLI surfaces; previous discovery workflow entrypoints, manifest defaults, and report aliases are no longer emitted by new outputs.
 - `src/datadiff/preset_catalog.py` now expresses more legacy harness presets as explicit `base_preset + overlays` catalog structure instead of resolver-side special cases, reducing if-chain drift in final-harness config assembly.
 - `src/datadiff/experiment_catalog.py` now marks baseline/reference variants explicitly in the final matrices, and `src/datadiff/ablation_audit.py` now derives its canonical ablation default selections from the final module-ablation catalog before falling back to legacy compatibility lists.
 - `src/datadiff/experiment_analysis.py` and `src/datadiff/methodology_report.py` now prefer structured contrast/reference roles when selecting default comparison rows, falling back to preset-era broad comparisons only when no structured contrast identity is present.
@@ -155,22 +154,22 @@ Completed:
 - ablation audit internal reference selection now prefers `reference_presets` naming; `trusted_presets` is retained only as a compatibility surface.
 - feedback/operator-affinity now treat `semantic_signal:*` as the canonical combo-level scheduling key, with legacy `risk:*` keys normalized as compatibility aliases.
 - experiment analysis / methodology / seeded analysis now prefer `reference_*`, `comparison_variant_*`, and `is_contrast_run` naming internally while retaining legacy preset/targeted exports for report compatibility.
-- `src/datadiff/cli.py` now uses `discovery_campaign_*` helper naming internally for lane scheduling, manifest assembly, and status summaries, while retaining `bug_sprint_*` helper aliases and the external `bug-sprint` CLI surface.
+- `src/datadiff/cli.py` now exposes `discovery-run`, `discovery-campaign`, and `discovery-campaign-status` as the public CLI surface.
 - `src/datadiff/bug_status.py` now exposes issue-centric canonical public helpers while retaining bug-status aliases for compatibility.
 - `src/datadiff/bug_audit.py` now exposes probe-audit canonical public helpers while retaining bug-audit aliases for compatibility.
 - `src/datadiff/candidate_pipeline.py` now prefers `artifact_*` helper naming for candidate evidence directories while retaining `bug_dir` helper aliases for compatibility.
 - `src/datadiff/experiment_analysis.py` now emits canonical `reference_*` comparison fields alongside legacy `baseline_*` compatibility fields.
 - `src/datadiff/seeded_analysis.py` now emits canonical `reference_expected_fault_case_rate` / `reference_preset` alongside legacy `baseline_*` and `targeted_*` compatibility fields.
-- `src/datadiff/bug_status.py` and `src/datadiff/final_readiness.py` now use neutral internal helper naming for discovery-campaign manifest collection and comparison-scope reference runs, with compatibility aliases retained where needed.
-- `src/datadiff/cli.py`, `src/datadiff/bug_status.py`, and `src/datadiff/guidance.py` now prefer `discovery_*`, `reference/contrast`, and `family_diversity_guard` helper naming internally while retaining bug-hunt / bug-sprint / family-saturation compatibility aliases and persisted fields.
+- `src/datadiff/bug_status.py` and `src/datadiff/final_readiness.py` now use neutral internal helper naming for discovery-campaign manifest collection and comparison-scope reference runs, while still reading historical manifest filenames where needed.
+- `src/datadiff/cli.py`, `src/datadiff/bug_status.py`, and `src/datadiff/guidance.py` now prefer `discovery_*`, `reference/contrast`, and `family_diversity_guard` helper naming internally; old workflow names are limited to historical artifact compatibility.
 - reward/guidance/final-readiness/run-journal/candidate-pipeline internals now prefer `candidate_issue_*` naming for unconfirmed findings, while retaining `candidate_bug_*` compatibility aliases and report fields.
-- `src/datadiff/datagen.py` now prefers `discovery_*` helper naming internally for discovery-profile detection, mixed-case routing, and order-projection probes, while retaining `bughunt_*` aliases for compatibility.
+- `src/datadiff/datagen.py` now prefers `discovery_*` helper naming internally for discovery-profile detection, mixed-case routing, and order-projection probes, while retaining `discovery_*` aliases for compatibility.
 
 Still mixed:
 
 - `guidance.py` target alias tables still rely heavily on `combo_risk:*`.
 - tests assert many legacy names directly.
-- bug-sprint / CLI command surfaces still use older workflow wording and remain a compatibility shell over newer internal `discovery lane` naming.
+- historical report fields and old manifest filename globs remain for compatibility with earlier evidence.
 - some replay-policy and feedback metadata compatibility keys remain intentionally duplicated as `*_selection` / `*_decision` until freeze-safe migration becomes worthwhile.
 
 ## Suggested Next Passes

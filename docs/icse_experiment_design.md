@@ -2416,7 +2416,7 @@ command:
   datadiff experiment
     --cases 300
     --seeds 1,1001,2001,3001,4001
-    --presets null_groupby_topk,null_agg_topk,bughunt_no_groupby_guided_metamorphic
+    --presets null_groupby_topk,null_agg_topk,discovery_no_groupby_guided_metamorphic
     --target-suites datafusion_cross
     --log-level minimal
     --artifact-limit 1
@@ -2439,7 +2439,7 @@ total:
 |---|---:|---:|---:|---:|---:|---|
 | `null_groupby_topk` | 1500 | 1173 | 78.2% | 0 | 0 | `grouped_topk_null_sort_key` |
 | `null_agg_topk` | 1500 | 925 | 61.7% | 1 | 0 | `grouped_topk_null_sort_key` |
-| `bughunt_no_groupby_guided_metamorphic` | 1500 | 0 | 0.0% | n/a | 0 | none |
+| `discovery_no_groupby_guided_metamorphic` | 1500 | 0 | 0.0% | n/a | 0 | none |
 
 论文计数建议：
 
@@ -2453,7 +2453,7 @@ null_groupby_topk:
 null_agg_topk:
   覆盖非 NULL group key + NULL aggregate sort key 变体。
 
-bughunt_no_groupby_guided_metamorphic:
+discovery_no_groupby_guided_metamorphic:
   阴性对照，说明去掉 groupby 后没有继续出现同类污染或新误报。
 ```
 

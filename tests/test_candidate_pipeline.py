@@ -81,9 +81,9 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
     evidence_file = generated_issue_dir / "fresh-candidates.json"
     dump_json(
         {
-            "schema_version": "bug-hunt-fresh-candidates-v1",
+            "schema_version": "discovery-run-fresh-candidates-v1",
             "generated_at": "2026-05-31T00:00:00Z",
-            "generated_by": "datadiff bug-hunt",
+            "generated_by": "datadiff discovery-run",
             "source_run_file": "runs/run-fresh.jsonl.gz",
             "fresh_candidate_bug_families": {family: 1},
             "candidate_row_count": 1,
@@ -99,7 +99,7 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
                         "pandas": {"status": "ok", "rows": [[1], [2]]},
                         "duckdb": {"status": "ok", "rows": [[1], [3]]},
                     },
-                    "config": {"generator_profile": "bughunt_fresh"},
+                    "config": {"generator_profile": "discovery_fresh"},
                     "candidate_recheck": {"enabled": True, "attempts": 2, "non_reproduced_keys": []},
                 }
             ],

@@ -1,6 +1,6 @@
 # Final Goal
 
-This project is now oriented toward a reproducible paper-grade experiment, not ad-hoc bug hunting.
+This project is now oriented toward a reproducible paper-grade experiment, not ad-hoc bug discovery.
 
 ## Primary Objective
 

@@ -174,10 +174,10 @@ def test_generate_case_is_deterministic():
     assert a["tables"][0]["rows"] or a["tables"][0]["columns"]
 
 
-def test_bughunt_fresh_skips_known_replay_source_mixins():
-    replay_mixed = generate_case(20, profile="bughunt")
-    fresh = generate_case(20, profile="bughunt_fresh")
-    organic_groupby = generate_case(1, profile="bughunt_fresh")
+def test_discovery_fresh_skips_known_replay_source_mixins():
+    replay_mixed = generate_case(20, profile="discovery")
+    fresh = generate_case(20, profile="discovery_fresh")
+    organic_groupby = generate_case(1, profile="discovery_fresh")
 
     assert replay_mixed.metadata["mixed_generator_profile"] == "wide_offset_topk"
     assert case_discovery_origin(replay_mixed) == "issue_inspired"
@@ -208,15 +208,15 @@ def test_workflow_profile_covers_named_workflow_families():
     assert families == {"etl", "log", "feature", "join", "null"}
 
 
-def test_generate_case_bughunt_profile_is_supported_and_valid():
-    case = generate_case(123, profile="bughunt")
-    assert case.case_id == "case-00000123-bughunt"
+def test_generate_case_discovery_profile_is_supported_and_valid():
+    case = generate_case(123, profile="discovery")
+    assert case.case_id == "case-00000123-discovery"
     assert case.program.operations
     assert validate_case_program(case) == []
 
 
-def test_bughunt_profile_covers_per_column_sort_null_order():
-    cases = [generate_case(seed, profile="bughunt") for seed in range(50)]
+def test_discovery_profile_covers_per_column_sort_null_order():
+    cases = [generate_case(seed, profile="discovery") for seed in range(50)]
     sort_ops = [
         op
         for case in cases
@@ -229,8 +229,8 @@ def test_bughunt_profile_covers_per_column_sort_null_order():
     assert all(validate_case_program(case) == [] for case in cases)
 
 
-def test_bughunt_profile_mixes_issue_inspired_templates():
-    cases = [generate_case(seed, profile="bughunt") for seed in range(120)]
+def test_discovery_profile_mixes_issue_inspired_templates():
+    cases = [generate_case(seed, profile="discovery") for seed in range(120)]
     features = [extract_case_features(case) for case in cases]
     mixed_profiles = {case.metadata.get("mixed_generator_profile") for case in cases}
 
@@ -288,12 +288,12 @@ def test_bughunt_profile_mixes_issue_inspired_templates():
         "csv_long_numeric_roundtrip",
     }.issubset(mixed_profiles)
     assert all(validate_case_program(case) == [] for case in cases)
-    assert all(case.metadata.get("generator_profile", "bughunt") == "bughunt" for case in cases)
+    assert all(case.metadata.get("generator_profile", "discovery") == "discovery" for case in cases)
 
 
-def test_generate_case_bughunt_no_groupby_profile_is_supported_and_valid():
-    case = generate_case(123, profile="bughunt_no_groupby")
-    assert case.case_id == "case-00000123-bughunt-no-groupby"
+def test_generate_case_discovery_no_groupby_profile_is_supported_and_valid():
+    case = generate_case(123, profile="discovery_no_groupby")
+    assert case.case_id == "case-00000123-discovery-no-groupby"
     assert case.program.operations
     assert all(op["op"] != "groupby" for op in case.program.operations)
     assert validate_case_program(case) == []
@@ -350,8 +350,8 @@ def test_generate_case_deep_probe_rotation_profile_covers_deep_targets_with_poli
     assert {"", "issue_replay_probe"}.issubset(filter_reasons)
 
 
-def test_bughunt_no_groupby_profile_excludes_groupby_without_type_aware_generation():
-    cases = [generate_case(seed, type_aware=False, profile="bughunt_no_groupby") for seed in range(100)]
+def test_discovery_no_groupby_profile_excludes_groupby_without_type_aware_generation():
+    cases = [generate_case(seed, type_aware=False, profile="discovery_no_groupby") for seed in range(100)]
 
     assert all("groupby" not in {op["op"] for op in case.program.operations} for case in cases)
 
@@ -1970,16 +1970,16 @@ def test_repair_operations_keeps_safe_string_aggregations_only():
     assert [agg["as"] for agg in repaired[0]["aggs"]] == ["count_s", "uniq_s_count", "sum_x"]
 
 
-def test_bughunt_profile_biases_toward_multi_table_and_deeper_programs():
-    cases = [generate_case(seed, profile="bughunt") for seed in range(50)]
+def test_discovery_profile_biases_toward_multi_table_and_deeper_programs():
+    cases = [generate_case(seed, profile="discovery") for seed in range(50)]
     multi_table_count = sum(1 for case in cases if len(case.tables) > 1)
     avg_ops = sum(len(case.program.operations) for case in cases) / len(cases)
     assert multi_table_count >= 30
     assert avg_ops >= 3.0
 
 
-def test_bughunt_profile_biases_toward_join_mutate_groupby_paths():
-    cases = [generate_case(seed, profile="bughunt") for seed in range(100)]
+def test_discovery_profile_biases_toward_join_mutate_groupby_paths():
+    cases = [generate_case(seed, profile="discovery") for seed in range(100)]
     combined = 0
     covered_joins = 0
     for case in cases:
@@ -1993,8 +1993,8 @@ def test_bughunt_profile_biases_toward_join_mutate_groupby_paths():
     assert covered_joins >= 50
 
 
-def test_bughunt_no_groupby_profile_biases_join_mutate_filter_without_groupby():
-    cases = [generate_case(seed, profile="bughunt_no_groupby") for seed in range(100)]
+def test_discovery_no_groupby_profile_biases_join_mutate_filter_without_groupby():
+    cases = [generate_case(seed, profile="discovery_no_groupby") for seed in range(100)]
     assert all("groupby" not in {op["op"] for op in case.program.operations} for case in cases)
     joined = 0
     mut_filter = 0
@@ -2006,8 +2006,8 @@ def test_bughunt_no_groupby_profile_biases_join_mutate_filter_without_groupby():
     assert mut_filter >= 50
 
 
-def test_bughunt_profile_injects_order_projection_probes():
-    cases = [generate_case(seed, profile="bughunt") for seed in range(100)]
+def test_discovery_profile_injects_order_projection_probes():
+    cases = [generate_case(seed, profile="discovery") for seed in range(100)]
     probe_count = 0
     for case in cases:
         ops = case.program.operations

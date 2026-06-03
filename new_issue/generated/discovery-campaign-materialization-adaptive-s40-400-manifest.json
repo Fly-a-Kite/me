@@ -1,0 +1,241 @@
+{
+  "bug_audit": {
+    "skipped": true
+  },
+  "cases_per_lane_seed": 200,
+  "duration": null,
+  "generated_at": "2026-05-27T17:38:03Z",
+  "generated_by": "datadiff discovery-campaign",
+  "lane_ids": [
+    "common_api_workflow",
+    "datafusion_common_api"
+  ],
+  "lanes": [
+    {
+      "id": "common_api_workflow",
+      "preset": "live_common_api_workflow_metamorphic",
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, string clean/replace/slice/concat/pattern flags, ISO date-part extraction, int/float/string casts, nullable boolean not/reductions, drop-null, mutate, union-all, semi/anti join, fill-null/coalesce, case-when, distinct, join, groupby, sort, and slice"
+    },
+    {
+      "id": "datafusion_common_api",
+      "preset": "live_datafusion_common_api_metamorphic",
+      "target_suite": "datafusion_cross",
+      "theme": "DataFusion daily low-complexity SQL/DataFrame workflows, including nullable DISTINCT top-k"
+    }
+  ],
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "pyarrow",
+        "polars",
+        "polars_lazy",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 200,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 17,
+        "refresh": true,
+        "run_file": "runs/run-20260527T173407-1779903247345701415.jsonl",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-materialization-adaptive-s40-400-manifest-common_api_workflow-seed40-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "common_api_workflow",
+      "preset": "live_common_api_workflow_metamorphic",
+      "report": "",
+      "run_file": "runs/run-20260527T173407-1779903247345701415.jsonl",
+      "seed": 40,
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, string clean/replace/slice/concat/pattern flags, ISO date-part extraction, int/float/string casts, nullable boolean not/reductions, drop-null, mutate, union-all, semi/anti join, fill-null/coalesce, case-when, distinct, join, groupby, sort, and slice"
+    },
+    {
+      "backends": [
+        "pandas",
+        "pyarrow",
+        "polars",
+        "polars_lazy",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 200,
+      "classification": {
+        "candidate_bug_families": {
+          "groupby_aggregation@pyarrow": 4
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000407-common-api-workflow-mut-424",
+              "evidence": "Independent DSL reference agrees with ['duckdb', 'pandas', 'polars', 'polars_lazy', 'sqlite'] and disagrees with ['pyarrow'].",
+              "kind": "accept_reject_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 424,
+              "signature": "5ef1f5b4ad01f8a2",
+              "suspicious": [
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00000407-common-api-workflow-mut-1182",
+              "evidence": "Independent DSL reference agrees with ['duckdb', 'pandas', 'polars', 'polars_lazy', 'sqlite'] and disagrees with ['pyarrow'].",
+              "kind": "accept_reject_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1182,
+              "signature": "5a49fa9202175bea",
+              "suspicious": [
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00000407-common-api-workflow-mut-1194",
+              "evidence": "Independent DSL reference agrees with ['duckdb', 'pandas', 'polars', 'polars_lazy', 'sqlite'] and disagrees with ['pyarrow'].",
+              "kind": "accept_reject_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1194,
+              "signature": "5a49fa9202175bea",
+              "suspicious": [
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00000407-common-api-workflow-mut-1218",
+              "evidence": "Independent DSL reference agrees with ['duckdb', 'pandas', 'polars', 'polars_lazy', 'sqlite'] and disagrees with ['pyarrow'].",
+              "kind": "accept_reject_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1218,
+              "signature": "5a49fa9202175bea",
+              "suspicious": [
+                "pyarrow"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "groupby_aggregation@pyarrow": 4
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 17,
+        "refresh": true,
+        "run_file": "runs/run-20260527T173504-1779903304478611058.jsonl",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 4
+        },
+        "unsaturated_candidate_bug_families": {
+          "groupby_aggregation@pyarrow": 4
+        }
+      },
+      "csv": "",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-materialization-adaptive-s40-400-manifest-common_api_workflow-seed400-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 4,
+      "lane_id": "common_api_workflow",
+      "preset": "live_common_api_workflow_metamorphic",
+      "report": "",
+      "run_file": "runs/run-20260527T173504-1779903304478611058.jsonl",
+      "seed": 400,
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, string clean/replace/slice/concat/pattern flags, ISO date-part extraction, int/float/string casts, nullable boolean not/reductions, drop-null, mutate, union-all, semi/anti join, fill-null/coalesce, case-when, distinct, join, groupby, sort, and slice"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "datafusion"
+      ],
+      "cases": 200,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 17,
+        "refresh": true,
+        "run_file": "runs/run-20260527T173604-1779903364293808162.jsonl",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-materialization-adaptive-s40-400-manifest-datafusion_common_api-seed40-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "datafusion_common_api",
+      "preset": "live_datafusion_common_api_metamorphic",
+      "report": "",
+      "run_file": "runs/run-20260527T173604-1779903364293808162.jsonl",
+      "seed": 40,
+      "target_suite": "datafusion_cross",
+      "theme": "DataFusion daily low-complexity SQL/DataFrame workflows, including nullable DISTINCT top-k"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "datafusion"
+      ],
+      "cases": 200,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 17,
+        "refresh": true,
+        "run_file": "runs/run-20260527T173704-1779903424228716509.jsonl",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-materialization-adaptive-s40-400-manifest-datafusion_common_api-seed400-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "datafusion_common_api",
+      "preset": "live_datafusion_common_api_metamorphic",
+      "report": "",
+      "run_file": "runs/run-20260527T173704-1779903424228716509.jsonl",
+      "seed": 400,
+      "target_suite": "datafusion_cross",
+      "theme": "DataFusion daily low-complexity SQL/DataFrame workflows, including nullable DISTINCT top-k"
+    }
+  ],
+  "schema_version": "discovery-campaign-v1",
+  "seeds": [
+    40,
+    400
+  ],
+  "summary": {
+    "fresh_candidate_bug_families": {
+      "groupby_aggregation@pyarrow": 4
+    },
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {},
+    "run_count": 4,
+    "triage_verdicts": {
+      "candidate_implementation_bug": 4
+    }
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "targeted_short_sprints",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence"
+  ]
+}

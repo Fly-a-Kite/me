@@ -13,6 +13,11 @@ PRESETS=""
 EXPLORATION_WEIGHT=""
 GROUP_FAIRNESS_WEIGHT=""
 MAX_GROUP_PULL_GAP=""
+ADAPTIVE_LEARNING_WEIGHT=""
+SCHEDULER_ANNEALING_TEMPERATURE=""
+SCHEDULER_ANNEALING_DECAY=""
+SCHEDULER_ANNEALING_MIN_TEMPERATURE=""
+CONTINUAL_LEARNING_LEDGERS=""
 LOCAL_SOURCE_EXPLORATION_WEIGHT=""
 ARTIFACT_LIMIT=""
 LOG_LEVEL=""
@@ -37,6 +42,9 @@ RUN_PROVENANCE_STRATEGY_SNAPSHOT=""
 RUN_PROVENANCE_STRATEGY_LEARNING=""
 REQUIRE_CLEAN_WORKTREE=""
 POST_RUN_EVIDENCE_HOOK=""
+FINAL_READINESS_MANIFEST_INDEX=""
+FINAL_READINESS_EXTRA_MANIFESTS=""
+FINAL_READINESS_FAIL_ON_MISSING=""
 POST_RUN_STATUS=""
 EXPERIMENT_MANIFEST_PATH=""
 EXPERIMENT_SUMMARY_MARKDOWN=""
@@ -46,8 +54,12 @@ EXPERIMENT_ANALYSIS_MARKDOWN=""
 EXPERIMENT_ANALYSIS_CSV=""
 METHODOLOGY_REPORT_MARKDOWN=""
 METHODOLOGY_REPORT_JSON=""
+FINAL_READINESS_MARKDOWN=""
+FINAL_READINESS_JSON=""
 CLASSIFY_RUN_DIR=""
 CLASSIFY_RUN_COUNT=""
+EXPERIMENT_COMMAND=()
+FINAL_READINESS_COMMAND=()
 
 refresh_config() {
   ROOT_DIR="${DATADIFF_ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -62,6 +74,11 @@ refresh_config() {
   EXPLORATION_WEIGHT="${DATADIFF_EXPLORATION_WEIGHT:-0.2}"
   GROUP_FAIRNESS_WEIGHT="${DATADIFF_GROUP_FAIRNESS_WEIGHT:-0.4}"
   MAX_GROUP_PULL_GAP="${DATADIFF_MAX_GROUP_PULL_GAP:-3}"
+  ADAPTIVE_LEARNING_WEIGHT="${DATADIFF_ADAPTIVE_LEARNING_WEIGHT:-0.75}"
+  SCHEDULER_ANNEALING_TEMPERATURE="${DATADIFF_SCHEDULER_ANNEALING_TEMPERATURE:-0.35}"
+  SCHEDULER_ANNEALING_DECAY="${DATADIFF_SCHEDULER_ANNEALING_DECAY:-0.985}"
+  SCHEDULER_ANNEALING_MIN_TEMPERATURE="${DATADIFF_SCHEDULER_ANNEALING_MIN_TEMPERATURE:-0.02}"
+  CONTINUAL_LEARNING_LEDGERS="${DATADIFF_CONTINUAL_LEARNING_LEDGERS:-}"
   LOCAL_SOURCE_EXPLORATION_WEIGHT="${DATADIFF_LOCAL_SOURCE_EXPLORATION_WEIGHT:-0.1}"
   ARTIFACT_LIMIT="${DATADIFF_ARTIFACT_LIMIT:-10}"
   LOG_LEVEL="${DATADIFF_LOG_LEVEL:-minimal}"
@@ -86,6 +103,9 @@ refresh_config() {
   RUN_PROVENANCE_STRATEGY_LEARNING="${DATADIFF_RUN_PROVENANCE_STRATEGY_LEARNING:-}"
   REQUIRE_CLEAN_WORKTREE="${DATADIFF_REQUIRE_CLEAN_WORKTREE:-1}"
   POST_RUN_EVIDENCE_HOOK="${DATADIFF_POST_RUN_EVIDENCE_HOOK:-}"
+  FINAL_READINESS_MANIFEST_INDEX="${DATADIFF_FINAL_READINESS_MANIFEST_INDEX:-}"
+  FINAL_READINESS_EXTRA_MANIFESTS="${DATADIFF_FINAL_READINESS_EXTRA_MANIFESTS:-}"
+  FINAL_READINESS_FAIL_ON_MISSING="${DATADIFF_FINAL_READINESS_FAIL_ON_MISSING:-0}"
 }
 
 write_config_file() {
@@ -104,6 +124,11 @@ write_config_file() {
     printf 'DATADIFF_EXPLORATION_WEIGHT=%q\n' "${EXPLORATION_WEIGHT}"
     printf 'DATADIFF_GROUP_FAIRNESS_WEIGHT=%q\n' "${GROUP_FAIRNESS_WEIGHT}"
     printf 'DATADIFF_MAX_GROUP_PULL_GAP=%q\n' "${MAX_GROUP_PULL_GAP}"
+    printf 'DATADIFF_ADAPTIVE_LEARNING_WEIGHT=%q\n' "${ADAPTIVE_LEARNING_WEIGHT}"
+    printf 'DATADIFF_SCHEDULER_ANNEALING_TEMPERATURE=%q\n' "${SCHEDULER_ANNEALING_TEMPERATURE}"
+    printf 'DATADIFF_SCHEDULER_ANNEALING_DECAY=%q\n' "${SCHEDULER_ANNEALING_DECAY}"
+    printf 'DATADIFF_SCHEDULER_ANNEALING_MIN_TEMPERATURE=%q\n' "${SCHEDULER_ANNEALING_MIN_TEMPERATURE}"
+    printf 'DATADIFF_CONTINUAL_LEARNING_LEDGERS=%q\n' "${CONTINUAL_LEARNING_LEDGERS}"
     printf 'DATADIFF_LOCAL_SOURCE_EXPLORATION_WEIGHT=%q\n' "${LOCAL_SOURCE_EXPLORATION_WEIGHT}"
     printf 'DATADIFF_ARTIFACT_LIMIT=%q\n' "${ARTIFACT_LIMIT}"
     printf 'DATADIFF_LOG_LEVEL=%q\n' "${LOG_LEVEL}"
@@ -132,6 +157,9 @@ write_config_file() {
     printf 'DATADIFF_RUN_PROVENANCE_STRATEGY_LEARNING=%q\n' "${RUN_PROVENANCE_STRATEGY_LEARNING}"
     printf 'DATADIFF_REQUIRE_CLEAN_WORKTREE=%q\n' "${REQUIRE_CLEAN_WORKTREE}"
     printf 'DATADIFF_POST_RUN_EVIDENCE_HOOK=%q\n' "${POST_RUN_EVIDENCE_HOOK}"
+    printf 'DATADIFF_FINAL_READINESS_MANIFEST_INDEX=%q\n' "${FINAL_READINESS_MANIFEST_INDEX}"
+    printf 'DATADIFF_FINAL_READINESS_EXTRA_MANIFESTS=%q\n' "${FINAL_READINESS_EXTRA_MANIFESTS}"
+    printf 'DATADIFF_FINAL_READINESS_FAIL_ON_MISSING=%q\n' "${FINAL_READINESS_FAIL_ON_MISSING}"
   } > "${config_file}"
 }
 
@@ -191,6 +219,19 @@ write_status_file() {
     if [[ -n "${METHODOLOGY_REPORT_JSON}" ]]; then
       printf 'methodology_report_json=%s\n' "${METHODOLOGY_REPORT_JSON}"
     fi
+    if [[ -n "${FINAL_READINESS_MARKDOWN}" ]]; then
+      printf 'final_readiness_markdown=%s\n' "${FINAL_READINESS_MARKDOWN}"
+    fi
+    if [[ -n "${FINAL_READINESS_JSON}" ]]; then
+      printf 'final_readiness_json=%s\n' "${FINAL_READINESS_JSON}"
+    fi
+    if [[ -n "${FINAL_READINESS_MANIFEST_INDEX}" ]]; then
+      printf 'final_readiness_manifest_index=%s\n' "${FINAL_READINESS_MANIFEST_INDEX}"
+    fi
+    if [[ -n "${FINAL_READINESS_EXTRA_MANIFESTS}" ]]; then
+      printf 'final_readiness_extra_manifests=%s\n' "${FINAL_READINESS_EXTRA_MANIFESTS}"
+    fi
+    printf 'final_readiness_fail_on_missing=%s\n' "${FINAL_READINESS_FAIL_ON_MISSING}"
     if [[ -n "${CLASSIFY_RUN_DIR}" ]]; then
       printf 'classify_run_dir=%s\n' "${CLASSIFY_RUN_DIR}"
     fi
@@ -325,6 +366,12 @@ PY
     printf 'target_suites=%s\n' "${TARGET_SUITES}"
     printf 'presets=%s\n' "${PRESETS}"
     printf 'seeds=%s\n' "${SEEDS}"
+    printf 'adaptive_learning_weight=%s\n' "${ADAPTIVE_LEARNING_WEIGHT}"
+    printf 'scheduler_annealing_temperature=%s\n' "${SCHEDULER_ANNEALING_TEMPERATURE}"
+    printf 'scheduler_annealing_decay=%s\n' "${SCHEDULER_ANNEALING_DECAY}"
+    printf 'scheduler_annealing_min_temperature=%s\n' "${SCHEDULER_ANNEALING_MIN_TEMPERATURE}"
+    printf 'continual_learning_ledgers=%s\n' "${CONTINUAL_LEARNING_LEDGERS}"
+    printf 'persist_closed_loop_state=1\n'
     printf 'log_level=%s\n' "${LOG_LEVEL}"
     printf 'authority=%s\n' "${RUN_PROVENANCE_AUTHORITY}"
     printf 'freeze_intent=%s\n' "${RUN_PROVENANCE_FREEZE_INTENT}"
@@ -336,6 +383,9 @@ PY
     printf 'workspace_dirty=%s\n' "${workspace_dirty_before_snapshot}"
     printf 'strategy_snapshot=%s\n' "${RUN_PROVENANCE_STRATEGY_SNAPSHOT}"
     printf 'strategy_learning=%s\n' "${RUN_PROVENANCE_STRATEGY_LEARNING}"
+    printf 'final_readiness_manifest_index=%s\n' "${FINAL_READINESS_MANIFEST_INDEX}"
+    printf 'final_readiness_extra_manifests=%s\n' "${FINAL_READINESS_EXTRA_MANIFESTS}"
+    printf 'final_readiness_fail_on_missing=%s\n' "${FINAL_READINESS_FAIL_ON_MISSING}"
   } > "${RUN_PROVENANCE_LAUNCH_ENV}"
   FREEZE_MANIFEST_PATH="${RUN_PROVENANCE_FREEZE_MANIFEST}" \
   FREEZE_ROOT_DIR="${ROOT_DIR}" \
@@ -346,6 +396,12 @@ PY
   FREEZE_TARGET_SUITES="${TARGET_SUITES}" \
   FREEZE_PRESETS="${PRESETS}" \
   FREEZE_SEEDS="${SEEDS}" \
+  FREEZE_ADAPTIVE_LEARNING_WEIGHT="${ADAPTIVE_LEARNING_WEIGHT}" \
+  FREEZE_SCHEDULER_ANNEALING_TEMPERATURE="${SCHEDULER_ANNEALING_TEMPERATURE}" \
+  FREEZE_SCHEDULER_ANNEALING_DECAY="${SCHEDULER_ANNEALING_DECAY}" \
+  FREEZE_SCHEDULER_ANNEALING_MIN_TEMPERATURE="${SCHEDULER_ANNEALING_MIN_TEMPERATURE}" \
+  FREEZE_CONTINUAL_LEARNING_LEDGERS="${CONTINUAL_LEARNING_LEDGERS}" \
+  FREEZE_PERSIST_CLOSED_LOOP_STATE="1" \
   FREEZE_LOG_LEVEL="${LOG_LEVEL}" \
   FREEZE_AUTHORITY="${RUN_PROVENANCE_AUTHORITY}" \
   FREEZE_FREEZE_INTENT="${RUN_PROVENANCE_FREEZE_INTENT}" \
@@ -361,6 +417,9 @@ PY
   FREEZE_LAUNCH_ENV="${RUN_PROVENANCE_LAUNCH_ENV}" \
   FREEZE_STRATEGY_SNAPSHOT="${RUN_PROVENANCE_STRATEGY_SNAPSHOT}" \
   FREEZE_STRATEGY_LEARNING="${RUN_PROVENANCE_STRATEGY_LEARNING}" \
+  FREEZE_FINAL_READINESS_MANIFEST_INDEX="${FINAL_READINESS_MANIFEST_INDEX}" \
+  FREEZE_FINAL_READINESS_EXTRA_MANIFESTS="${FINAL_READINESS_EXTRA_MANIFESTS}" \
+  FREEZE_FINAL_READINESS_FAIL_ON_MISSING="${FINAL_READINESS_FAIL_ON_MISSING}" \
   "${python_cmd}" - <<'PY'
 import json
 import os
@@ -379,6 +438,14 @@ payload = {
     "presets": env("FREEZE_PRESETS"),
     "seeds": env("FREEZE_SEEDS"),
     "log_level": env("FREEZE_LOG_LEVEL"),
+    "adaptive_config": {
+        "adaptive_learning_weight": env("FREEZE_ADAPTIVE_LEARNING_WEIGHT"),
+        "scheduler_annealing_temperature": env("FREEZE_SCHEDULER_ANNEALING_TEMPERATURE"),
+        "scheduler_annealing_decay": env("FREEZE_SCHEDULER_ANNEALING_DECAY"),
+        "scheduler_annealing_min_temperature": env("FREEZE_SCHEDULER_ANNEALING_MIN_TEMPERATURE"),
+        "continual_learning_ledgers": env("FREEZE_CONTINUAL_LEARNING_LEDGERS"),
+        "persist_closed_loop_state": env("FREEZE_PERSIST_CLOSED_LOOP_STATE") == "1",
+    },
     "authority": env("FREEZE_AUTHORITY") == "1",
     "freeze_intent": env("FREEZE_FREEZE_INTENT") == "1",
     "latest_code_claim": env("FREEZE_LATEST_CODE_CLAIM") == "1",
@@ -395,9 +462,48 @@ payload = {
         "strategy_snapshot": env("FREEZE_STRATEGY_SNAPSHOT"),
         "strategy_learning": env("FREEZE_STRATEGY_LEARNING"),
     },
+    "post_run_readiness_config": {
+        "manifest_index": env("FREEZE_FINAL_READINESS_MANIFEST_INDEX"),
+        "extra_manifests": env("FREEZE_FINAL_READINESS_EXTRA_MANIFESTS"),
+        "fail_on_missing": env("FREEZE_FINAL_READINESS_FAIL_ON_MISSING") == "1",
+    },
 }
 Path(env("FREEZE_MANIFEST_PATH")).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 PY
+}
+
+_build_experiment_command() {
+  EXPERIMENT_COMMAND=(
+    .venv/bin/python -m datadiff.cli experiment
+    --target-suites "${TARGET_SUITES}"
+    --presets "${PRESETS}"
+    --seeds "${SEEDS}"
+    --duration "${DURATION}"
+    --schedule adaptive
+    --batch-duration "${BATCH_DURATION}"
+    --exploration-weight "${EXPLORATION_WEIGHT}"
+    --group-fairness-weight "${GROUP_FAIRNESS_WEIGHT}"
+    --max-group-pull-gap "${MAX_GROUP_PULL_GAP}"
+    --adaptive-learning-weight "${ADAPTIVE_LEARNING_WEIGHT}"
+    --scheduler-annealing-temperature "${SCHEDULER_ANNEALING_TEMPERATURE}"
+    --scheduler-annealing-decay "${SCHEDULER_ANNEALING_DECAY}"
+    --scheduler-annealing-min-temperature "${SCHEDULER_ANNEALING_MIN_TEMPERATURE}"
+    --jobs "${JOBS}"
+    --max-parallel-cost "${MAX_PARALLEL_COST}"
+    --local-source-exploration-weight "${LOCAL_SOURCE_EXPLORATION_WEIGHT}"
+    --artifact-limit "${ARTIFACT_LIMIT}"
+    --log-level "${LOG_LEVEL}"
+    --strategy-snapshot "${RUN_PROVENANCE_STRATEGY_SNAPSHOT}"
+    --strategy-learning "${RUN_PROVENANCE_STRATEGY_LEARNING}"
+    --freeze-strategy-snapshot
+    --run-theme "${RUN_THEME}"
+    --paper-notes "${PAPER_NOTES}"
+    --persist-closed-loop-state
+    --skip-run-reports
+  )
+  if [[ -n "${CONTINUAL_LEARNING_LEDGERS}" ]]; then
+    EXPERIMENT_COMMAND+=(--continual-learning-ledgers "${CONTINUAL_LEARNING_LEDGERS}")
+  fi
 }
 
 _print_command() {
@@ -405,28 +511,8 @@ _print_command() {
     printf '%q ' bash -lc "${COMMAND_OVERRIDE}"
     return
   fi
-  printf '%q ' \
-    .venv/bin/python -m datadiff.cli experiment \
-    --target-suites "${TARGET_SUITES}" \
-    --presets "${PRESETS}" \
-    --seeds "${SEEDS}" \
-    --duration "${DURATION}" \
-    --schedule adaptive \
-    --batch-duration "${BATCH_DURATION}" \
-    --exploration-weight "${EXPLORATION_WEIGHT}" \
-    --group-fairness-weight "${GROUP_FAIRNESS_WEIGHT}" \
-    --max-group-pull-gap "${MAX_GROUP_PULL_GAP}" \
-    --jobs "${JOBS}" \
-    --max-parallel-cost "${MAX_PARALLEL_COST}" \
-    --local-source-exploration-weight "${LOCAL_SOURCE_EXPLORATION_WEIGHT}" \
-    --artifact-limit "${ARTIFACT_LIMIT}" \
-    --log-level "${LOG_LEVEL}" \
-    --strategy-snapshot "${RUN_PROVENANCE_STRATEGY_SNAPSHOT}" \
-    --strategy-learning "${RUN_PROVENANCE_STRATEGY_LEARNING}" \
-    --freeze-strategy-snapshot \
-    --run-theme "${RUN_THEME}" \
-    --paper-notes "${PAPER_NOTES}" \
-    --skip-run-reports
+  _build_experiment_command
+  printf '%q ' "${EXPERIMENT_COMMAND[@]}"
 }
 
 _start_command() {
@@ -438,51 +524,11 @@ _start_command() {
     fi
     return
   fi
+  _build_experiment_command
   if command -v setsid >/dev/null 2>&1; then
-    setsid \
-      .venv/bin/python -m datadiff.cli experiment \
-      --target-suites "${TARGET_SUITES}" \
-      --presets "${PRESETS}" \
-      --seeds "${SEEDS}" \
-      --duration "${DURATION}" \
-      --schedule adaptive \
-      --batch-duration "${BATCH_DURATION}" \
-      --exploration-weight "${EXPLORATION_WEIGHT}" \
-      --group-fairness-weight "${GROUP_FAIRNESS_WEIGHT}" \
-      --max-group-pull-gap "${MAX_GROUP_PULL_GAP}" \
-      --jobs "${JOBS}" \
-      --max-parallel-cost "${MAX_PARALLEL_COST}" \
-      --local-source-exploration-weight "${LOCAL_SOURCE_EXPLORATION_WEIGHT}" \
-      --artifact-limit "${ARTIFACT_LIMIT}" \
-      --log-level "${LOG_LEVEL}" \
-      --strategy-snapshot "${RUN_PROVENANCE_STRATEGY_SNAPSHOT}" \
-      --strategy-learning "${RUN_PROVENANCE_STRATEGY_LEARNING}" \
-      --freeze-strategy-snapshot \
-      --run-theme "${RUN_THEME}" \
-      --paper-notes "${PAPER_NOTES}" \
-      --skip-run-reports &
+    setsid "${EXPERIMENT_COMMAND[@]}" &
   else
-    .venv/bin/python -m datadiff.cli experiment \
-      --target-suites "${TARGET_SUITES}" \
-      --presets "${PRESETS}" \
-      --seeds "${SEEDS}" \
-      --duration "${DURATION}" \
-      --schedule adaptive \
-      --batch-duration "${BATCH_DURATION}" \
-      --exploration-weight "${EXPLORATION_WEIGHT}" \
-      --group-fairness-weight "${GROUP_FAIRNESS_WEIGHT}" \
-      --max-group-pull-gap "${MAX_GROUP_PULL_GAP}" \
-      --jobs "${JOBS}" \
-      --max-parallel-cost "${MAX_PARALLEL_COST}" \
-      --local-source-exploration-weight "${LOCAL_SOURCE_EXPLORATION_WEIGHT}" \
-      --artifact-limit "${ARTIFACT_LIMIT}" \
-      --log-level "${LOG_LEVEL}" \
-      --strategy-snapshot "${RUN_PROVENANCE_STRATEGY_SNAPSHOT}" \
-      --strategy-learning "${RUN_PROVENANCE_STRATEGY_LEARNING}" \
-      --freeze-strategy-snapshot \
-      --run-theme "${RUN_THEME}" \
-      --paper-notes "${PAPER_NOTES}" \
-      --skip-run-reports &
+    "${EXPERIMENT_COMMAND[@]}" &
   fi
 }
 
@@ -534,6 +580,12 @@ _launch_signature() {
   printf 'exploration_weight=%s\n' "${EXPLORATION_WEIGHT}"
   printf 'group_fairness_weight=%s\n' "${GROUP_FAIRNESS_WEIGHT}"
   printf 'max_group_pull_gap=%s\n' "${MAX_GROUP_PULL_GAP}"
+  printf 'adaptive_learning_weight=%s\n' "${ADAPTIVE_LEARNING_WEIGHT}"
+  printf 'scheduler_annealing_temperature=%s\n' "${SCHEDULER_ANNEALING_TEMPERATURE}"
+  printf 'scheduler_annealing_decay=%s\n' "${SCHEDULER_ANNEALING_DECAY}"
+  printf 'scheduler_annealing_min_temperature=%s\n' "${SCHEDULER_ANNEALING_MIN_TEMPERATURE}"
+  printf 'continual_learning_ledgers=%s\n' "${CONTINUAL_LEARNING_LEDGERS}"
+  printf 'persist_closed_loop_state=1\n'
   printf 'local_source_exploration_weight=%s\n' "${LOCAL_SOURCE_EXPLORATION_WEIGHT}"
   printf 'artifact_limit=%s\n' "${ARTIFACT_LIMIT}"
   printf 'log_level=%s\n' "${LOG_LEVEL}"
@@ -597,6 +649,117 @@ for run in payload.get("runs", []):
 PY
 }
 
+_ensure_final_readiness_manifest_index() {
+  local manifest_path="$1"
+  local index_path="${FINAL_READINESS_MANIFEST_INDEX%%,*}"
+  if [[ -z "${index_path}" ]]; then
+    return 0
+  fi
+  INDEX_PATH="${index_path}" \
+  MANIFEST_PATH="${manifest_path}" \
+  RUN_ID_VALUE="${run_id}" \
+  LOG_FILE_VALUE="${log_file}" \
+  SESSION_VALUE="${SESSION_NAME}" \
+  DURATION_VALUE="${DURATION}" \
+  BATCH_DURATION_VALUE="${BATCH_DURATION}" \
+  EVIDENCE_ROLE_VALUE="${RUN_PROVENANCE_EVIDENCE_ROLE}" \
+  LAUNCH_SCRIPT_VALUE="${RUN_PROVENANCE_LAUNCH_SCRIPT}" \
+  "${ROOT_DIR}/.venv/bin/python" - <<'PY'
+import json
+import os
+from pathlib import Path
+from datetime import datetime, timezone
+
+def env(name: str) -> str:
+    return str(os.environ.get(name, "") or "")
+
+def unique(values):
+    seen = set()
+    out = []
+    for value in values:
+        text = str(value or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        out.append(text)
+    return out
+
+index_path = Path(env("INDEX_PATH"))
+manifest_path = env("MANIFEST_PATH")
+now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+if index_path.exists():
+    payload = json.loads(index_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        payload = {}
+else:
+    payload = {}
+payload.setdefault("schema_version", "final-experiment-manifest-index-v1")
+payload.setdefault("created_at", now)
+payload["updated_at"] = now
+payload["manifest_files"] = unique([*payload.get("manifest_files", []), manifest_path])
+payload["extra_manifest_files"] = unique(payload.get("extra_manifest_files", []))
+commands = payload.setdefault("commands", [])
+if not isinstance(commands, list):
+    commands = []
+    payload["commands"] = commands
+shell = f"closed-loop-launcher {env('LAUNCH_SCRIPT_VALUE')} run_id={env('RUN_ID_VALUE')}"
+if not any(str(item.get("shell", "")) == shell for item in commands if isinstance(item, dict)):
+    commands.append(
+        {
+            "track": "live",
+            "name": "closed_loop_authority_run",
+            "status": "completed",
+            "returncode": 0,
+            "manifest_files": [manifest_path],
+            "extra_manifest_files": [],
+            "final_readiness_files": [],
+            "shell": shell,
+            "launcher": {
+                "run_id": env("RUN_ID_VALUE"),
+                "session": env("SESSION_VALUE"),
+                "duration": env("DURATION_VALUE"),
+                "batch_duration": env("BATCH_DURATION_VALUE"),
+                "log_file": env("LOG_FILE_VALUE"),
+                "evidence_role": env("EVIDENCE_ROLE_VALUE"),
+            },
+        }
+    )
+index_path.parent.mkdir(parents=True, exist_ok=True)
+index_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+}
+
+_append_csv_flags() {
+  local -n command_ref="$1"
+  local flag="$2"
+  local csv_value="$3"
+  local item
+  IFS=',' read -ra items <<< "${csv_value}"
+  for item in "${items[@]}"; do
+    item="${item#"${item%%[![:space:]]*}"}"
+    item="${item%"${item##*[![:space:]]}"}"
+    if [[ -n "${item}" ]]; then
+      command_ref+=("${flag}" "${item}")
+    fi
+  done
+}
+
+_final_readiness_command() {
+  local manifest_path="$1"
+  FINAL_READINESS_COMMAND=("${ROOT_DIR}/.venv/bin/python" -m datadiff.cli final-readiness)
+  if [[ -n "${FINAL_READINESS_MANIFEST_INDEX}" ]]; then
+    _append_csv_flags FINAL_READINESS_COMMAND "--manifest-index" "${FINAL_READINESS_MANIFEST_INDEX}"
+  else
+    FINAL_READINESS_COMMAND+=(--manifest "${manifest_path}")
+  fi
+  if [[ -n "${FINAL_READINESS_EXTRA_MANIFESTS}" ]]; then
+    _append_csv_flags FINAL_READINESS_COMMAND "--extra-manifest" "${FINAL_READINESS_EXTRA_MANIFESTS}"
+  fi
+  if [[ "${FINAL_READINESS_FAIL_ON_MISSING}" == "1" ]]; then
+    FINAL_READINESS_COMMAND+=(--fail-on-missing)
+  fi
+}
+
 _apply_post_run_hook_output() {
   local hook_output="$1"
   local line
@@ -611,6 +774,8 @@ _apply_post_run_hook_output() {
       experiment_analysis_csv=*) EXPERIMENT_ANALYSIS_CSV="${line#experiment_analysis_csv=}" ;;
       methodology_report_markdown=*) METHODOLOGY_REPORT_MARKDOWN="${line#methodology_report_markdown=}" ;;
       methodology_report_json=*) METHODOLOGY_REPORT_JSON="${line#methodology_report_json=}" ;;
+      final_readiness_markdown=*) FINAL_READINESS_MARKDOWN="${line#final_readiness_markdown=}" ;;
+      final_readiness_json=*) FINAL_READINESS_JSON="${line#final_readiness_json=}" ;;
       classify_run_dir=*) CLASSIFY_RUN_DIR="${line#classify_run_dir=}" ;;
       classify_run_count=*) CLASSIFY_RUN_COUNT="${line#classify_run_count=}" ;;
     esac
@@ -622,6 +787,7 @@ _refresh_paper_evidence() {
   local summary_output=""
   local analysis_output=""
   local methodology_output=""
+  local readiness_output=""
   local classify_output=""
   local run_file=""
   local run_stem=""
@@ -674,6 +840,13 @@ _refresh_paper_evidence() {
   printf '%s\n' "${methodology_output}"
   METHODOLOGY_REPORT_MARKDOWN="$(_extract_output_field "${methodology_output}" "methodology report markdown: " || true)"
   METHODOLOGY_REPORT_JSON="$(_extract_output_field "${methodology_output}" "methodology report json:     " || true)"
+
+  _ensure_final_readiness_manifest_index "${manifest_path}"
+  _final_readiness_command "${manifest_path}"
+  readiness_output="$("${FINAL_READINESS_COMMAND[@]}")"
+  printf '%s\n' "${readiness_output}"
+  FINAL_READINESS_MARKDOWN="$(_extract_output_field "${readiness_output}" "final readiness markdown: " || true)"
+  FINAL_READINESS_JSON="$(_extract_output_field "${readiness_output}" "final readiness json:     " || true)"
 
   CLASSIFY_RUN_DIR="${ROOT_DIR}/reports/classify-run-$(basename "${manifest_path%.*}")"
   mkdir -p "${CLASSIFY_RUN_DIR}"

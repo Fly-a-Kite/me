@@ -5,7 +5,7 @@
 | Item | Value |
 | --- | --- |
 | Project family labels observed | `metamorphic_limit_idempotence@datafusion`, `datafusion_limit_idempotence@datafusion` |
-| First automated signal | 2026-05-26 22:45 CST, `bug-hunt-deep-existing-manifest.json` |
+| First automated signal | 2026-05-26 22:45 CST, `discovery-run-deep-existing-manifest.json` |
 | Deterministic audit record | 2026-05-26 22:53:51 CST, `datadiff bug-audit --probes datafusion_limit_idempotence` |
 | How found | DataDiffFuzz generated a top-k/sort/offset workflow and the metamorphic oracle duplicated an already applied ordered `LIMIT`. The base and transformed programs should be equivalent, but DataFusion returned fewer rows after the duplicate `LIMIT`. |
 | Current status | Submitted upstream as [apache/datafusion#22541](https://github.com/apache/datafusion/issues/22541); upstream issue is open, labeled `bug`, and assigned. |
@@ -117,8 +117,8 @@ Both queries should return the same three rows as the base query.
 
 ## DataDiffFuzz Evidence
 
-- Integrated manifest: `new_issue/generated/bug-hunt-deep-existing-manifest.json`
-- Fresh candidate evidence: `new_issue/generated/bug-hunt-deep-existing-manifest-fresh-candidates.json`
+- Integrated manifest: `new_issue/generated/discovery-run-deep-existing-manifest.json`
+- Fresh candidate evidence: `new_issue/generated/discovery-run-deep-existing-manifest-fresh-candidates.json`
 - First example artifact: `bugs/bug_1bf9d3c0ae839abf`
 - Generated audit draft: `new_issue/generated/datafusion_limit_idempotence.md`
 - Deterministic probe: `src/datadiff/bug_audit.py`, probe id `datafusion_limit_idempotence`

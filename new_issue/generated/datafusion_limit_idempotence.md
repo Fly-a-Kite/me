@@ -74,7 +74,7 @@
 ```json
 {
   "base_sql": "SELECT * FROM (\n  SELECT * FROM (\n    SELECT * FROM t0 ORDER BY s ASC NULLS FIRST, id ASC NULLS LAST LIMIT 5\n  ) q ORDER BY x DESC NULLS FIRST, id ASC NULLS LAST OFFSET 2\n) q ORDER BY x DESC NULLS FIRST, id ASC NULLS LAST",
-  "discovered_by": "datadiff bug-hunt --cases 1200 --seed 998001 --target-suite latest_all_engines --preset live_cross_family_metamorphic",
+  "discovered_by": "datadiff discovery-run --cases 1200 --seed 998001 --target-suite latest_all_engines --preset live_cross_family_metamorphic",
   "duplicate_limit_sql": "SELECT * FROM (\n  SELECT * FROM (\n    SELECT * FROM (\n      SELECT * FROM t0 ORDER BY s ASC NULLS FIRST, id ASC NULLS LAST LIMIT 5\n    ) q ORDER BY s ASC NULLS FIRST, id ASC NULLS LAST LIMIT 5\n  ) q ORDER BY x DESC NULLS FIRST, id ASC NULLS LAST OFFSET 2\n) q ORDER BY x DESC NULLS FIRST, id ASC NULLS LAST",
   "fresh_family": "metamorphic_limit_idempotence@datafusion"
 }

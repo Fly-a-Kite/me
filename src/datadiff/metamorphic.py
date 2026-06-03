@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterable
 
 from datadiff.canonicalization import dedupe_by_canonical_key, short_canonical_hash
 from datadiff.dsl import Case, ColumnSpec, Program, TableData, sort_columns
@@ -57,7 +57,20 @@ def _as_plain_mapping(value: Any) -> dict[str, Any]:
     return dict(value)
 
 
-def build_metamorphic_variants(case: Case, limit: int = 4) -> list[MetamorphicVariant]:
+def build_metamorphic_variants(
+    case: Case,
+    limit: int = 4,
+    *,
+    relation_order: Iterable[Any] | None = None,
+) -> list[MetamorphicVariant]:
+    return select_metamorphic_variants(
+        all_metamorphic_variants(case),
+        limit=limit,
+        relation_order=relation_order,
+    )
+
+
+def all_metamorphic_variants(case: Case) -> list[MetamorphicVariant]:
     variants: list[MetamorphicVariant] = []
     variants.extend(_filter_input_materialization_variants(case))
     variants.extend(_cleanup_input_materialization_variants(case))
@@ -101,7 +114,35 @@ def build_metamorphic_variants(case: Case, limit: int = 4) -> list[MetamorphicVa
     variants.extend(_groupby_key_permutation_variants(case))
     variants.extend(_filter_commutativity_variants(case))
     variants.extend(_select_idempotence_variants(case))
-    return variants[:limit]
+    return variants
+
+
+def select_metamorphic_variants(
+    variants: Iterable[MetamorphicVariant],
+    *,
+    limit: int,
+    relation_order: Iterable[Any] | None = None,
+) -> list[MetamorphicVariant]:
+    rows = list(variants)
+    if limit <= 0:
+        return []
+    order = _relation_order_index(relation_order)
+    if not order:
+        return rows[:limit]
+    ranked = sorted(
+        enumerate(rows),
+        key=lambda item: (order.get(item[1].relation, len(order)), item[0]),
+    )
+    return [variant for _index, variant in ranked[:limit]]
+
+
+def _relation_order_index(relation_order: Iterable[Any] | None) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for value in relation_order or []:
+        relation = str(value).strip()
+        if relation and relation not in out:
+            out[relation] = len(out)
+    return out
 
 
 def evaluate_metamorphic_variants(

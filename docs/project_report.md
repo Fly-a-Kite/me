@@ -48,7 +48,7 @@ DataDiffFuzz 是一个面向 DataFrame、Arrow、嵌入式 SQL 与分析型查�
 
 DataDiffFuzz 提出一种语义差分 fuzzing 方法：自动生成类型感知的数据表和抽象操作序列，将其翻译到多个后端执行，并通过语义归一化和差分/变形 oracle 检测跨后端不一致。框架进一步引入 fresh/replay 分离策略、候选 bug family 去重、已知饱和 bug 过滤、即时 recheck、reducer、paper run journal 和 final readiness audit，从而区分真实可报告 bug、历史复现、seeded sensitivity 和预期语义差异。
 
-项目最终目标是形成一套可发表的实验方法，而不是一次性 bug hunting。目标贡献包括：一个跨 DataFrame/SQL/Arrow 后端的统一语义 fuzzing harness，一套降低误报的语义 oracle 与分类机制，一套 fresh 最新版本探索与 historical replay 共用底层/中间层的实验证据体系，以及多目标后端上的真实 bug 发现和复现数据。
+项目最终目标是形成一套可发表的实验方法，而不是一次性 bug discovery。目标贡献包括：一个跨 DataFrame/SQL/Arrow 后端的统一语义 fuzzing harness，一套降低误报的语义 oracle 与分类机制，一套 fresh 最新版本探索与 historical replay 共用底层/中间层的实验证据体系，以及多目标后端上的真实 bug 发现和复现数据。
 
 ## 3. Motivation
 

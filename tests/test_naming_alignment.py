@@ -18,7 +18,6 @@ def test_canonical_naming_aliases_remain_equivalent() -> None:
         is guidance._predicted_family_saturation_penalty
     )
     assert guidance._family_diversity_guard_penalty is guidance._family_saturation
-    assert bug_status._collect_discovery_run_manifests is bug_status._collect_bug_hunt_manifests
     assert bug_status.build_issue_status is bug_status.build_bug_status
     assert bug_status.write_issue_status_outputs is bug_status.write_bug_status_outputs
     assert bug_status.render_issue_status_markdown is bug_status.render_bug_status_markdown
@@ -26,14 +25,6 @@ def test_canonical_naming_aliases_remain_equivalent() -> None:
     assert bug_audit.run_probe_audit is bug_audit.run_bug_audit
     assert bug_audit.write_probe_audit_outputs is bug_audit.write_bug_audit_outputs
     assert bug_audit.write_probe_issue_drafts is bug_audit.write_bug_audit_issue_drafts
-    assert cli.cmd_discovery_run is cli.cmd_bug_hunt
-    assert cli.cmd_discovery_campaign is cli.cmd_bug_sprint
-    assert cli.cmd_discovery_campaign_status is cli.cmd_bug_sprint_status
-    assert cli._discovery_run_config_from_args is cli._bug_hunt_config_from_args
-    assert (
-        cli._write_discovery_run_fresh_candidate_evidence
-        is cli._write_bug_hunt_fresh_candidate_evidence
-    )
     assert reward.is_candidate_issue_finding is reward.is_candidate_bug_finding
     assert reward.candidate_issue_family_key is reward.candidate_bug_family_key
     assert reward.candidate_issue_family_keys is reward.candidate_bug_family_keys
@@ -50,15 +41,6 @@ def test_canonical_naming_aliases_remain_equivalent() -> None:
         reward.issue_replay_candidate_issue_family_keys
         is reward.issue_replay_candidate_bug_family_keys
     )
-    assert datagen._is_discovery_profile is datagen._is_bughunt_profile
-    assert datagen._discovery_profile_allows_groupby is datagen._bughunt_allows_groupby
-    assert datagen._add_discovery_order_projection_probe is datagen._add_bughunt_order_projection_probe
-    assert datagen._discovery_issue_inspired_case is datagen._bughunt_issue_inspired_case
-    assert (
-        datagen._discovery_no_groupby_issue_inspired_case
-        is datagen._bughunt_no_groupby_issue_inspired_case
-    )
-    assert datagen._as_discovery_mixed_case is datagen._as_bughunt_mixed_case
     assert reporter._candidate_issue_family_keys is reporter._candidate_bug_family_keys
     assert reporter._is_candidate_issue_finding is reporter._is_candidate_bug_finding
     assert (
@@ -104,3 +86,19 @@ def test_canonical_naming_aliases_remain_equivalent() -> None:
     assert artifact._render_issue_artifact_report is artifact._bug_report
     assert methodology_report._reference_variant_comparisons is methodology_report._reference_comparisons
     assert methodology_report._known_saturated_families_for_run is methodology_report._run_known_saturated_bug_families
+
+
+def test_legacy_discovery_cli_entrypoints_are_removed() -> None:
+    parser = cli.build_parser()
+    legacy_commands = [
+        "bug-" + suffix
+        for suffix in ("hunt", "sprint", "sprint-status")
+    ]
+
+    for command in legacy_commands:
+        try:
+            parser.parse_args([command])
+        except SystemExit as exc:
+            assert exc.code == 2
+        else:
+            raise AssertionError(f"legacy command should be rejected: {command}")

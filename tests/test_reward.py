@@ -262,6 +262,7 @@ def test_feedback_summary_tracks_semantic_affinity_hits_and_selected_operator():
             "target_keys": [
                 "semantic_family:conditional_semantics",
                 "semantic_signal:left_join_case_when_membership",
+                "exploration_objective:cross_model_consistency",
             ],
             "selected_operator": "append_left_join_case_membership",
             "selected_operator_score": 1.75,
@@ -271,12 +272,14 @@ def test_feedback_summary_tracks_semantic_affinity_hits_and_selected_operator():
 
     summary = feedback_summary_for_case(row)
 
-    assert summary["feedback_target_key_count"] == 2
+    assert summary["feedback_target_key_count"] == 3
     assert summary["feedback_semantic_family_target_count"] == 1
     assert summary["feedback_semantic_signal_target_count"] == 1
+    assert summary["feedback_exploration_objective_target_count"] == 1
     assert summary["feedback_selected_operator"] == "append_left_join_case_membership"
     assert summary["feedback_operator_family_affinity_hit"] is True
     assert summary["feedback_operator_signal_affinity_hit"] is True
+    assert summary["feedback_operator_objective_affinity_hit"] is True
     assert summary["feedback_operator_affinity_hit"] is True
 
 

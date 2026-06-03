@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import time
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, ThreadPoolExecutor, as_completed, wait
 from collections import Counter
@@ -11,6 +12,7 @@ from pathlib import Path
 from typing import get_args
 
 from datadiff.ablation_audit import analyze_ablation_audit
+from datadiff.adaptive_learning import AdaptiveLearningState, ContinualPriorityMemory
 from datadiff.bug_audit import list_audit_probe_ids, run_probe_audit, write_probe_issue_drafts
 from datadiff.candidate_pipeline import DEFAULT_CANDIDATE_PIPELINE_DIR, build_candidate_pipeline
 from datadiff.bug_status import build_issue_status, write_issue_status_outputs
@@ -39,6 +41,11 @@ from datadiff.experiment_metadata import (
     parse_experiment_meta,
     resolved_run_semantics,
 )
+from datadiff.exploration_objectives import (
+    ExplorationObjectiveRule,
+    merge_exploration_objective_rules,
+    objective_feature,
+)
 from datadiff.final_readiness import (
     DEFAULT_A_LEVEL_READINESS_POLICY,
     DEFAULT_FINAL_READINESS_MANIFEST_LIMIT,
@@ -66,6 +73,7 @@ from datadiff.oracle import evaluate_case
 from datadiff.pattern_analysis import analyze_pattern_variants
 from datadiff.preset_catalog import build_catalog_preset
 from datadiff.preset_catalog import build_experiment_config
+from datadiff.preset_catalog import catalog_preset_metadata
 from datadiff.reporter import (
     latest_run_log_path,
     write_experiment_summary_report,
@@ -87,6 +95,7 @@ from datadiff.run_journal import (
 from datadiff.runner import _compact_log_row, _configured_guidance_targets, run_fuzz, run_loaded_case
 from datadiff.scheduler import AdaptiveBudgetScheduler, AdaptiveScheduleConfig, summarize_batch_run
 from datadiff.seeded_analysis import analyze_seeded_sensitivity
+from datadiff.semantic_registry import semantic_registry_payload
 from datadiff.strategy_registry import (
     DEFAULT_DISCOVERY_LANE_IDS,
     discovery_lane_catalog,
@@ -130,6 +139,10 @@ from datadiff.util import (
     utc_now,
     unique_preserve_order,
 )
+from datadiff.version_ledger import (
+    build_version_ledger,
+    observations_from_run_logs,
+)
 
 latest_run_file = latest_run_log_path
 write_report = write_run_report
@@ -141,8 +154,25 @@ build_bug_status = build_issue_status
 write_bug_status_outputs = write_issue_status_outputs
 
 PROFILE_CHOICES = list(get_args(GeneratorProfile))
-DEFAULT_BUG_SPRINT_HISTORY_WINDOW = 8
-DEFAULT_BUG_SPRINT_SCORE_WEIGHTS = {
+ADAPTIVE_COMPONENTS = (
+    "scheduler_learning",
+    "profile_learning",
+    "semantic_objective_learning",
+    "metamorphic_relation_learning",
+    "version_pair_learning",
+    "profile_capability_filter",
+    "mutation_operator_learning",
+    "quality_archive",
+    "local_source_scheduler",
+    "runtime_cost_learning",
+    "active_learning",
+    "online_reward_model",
+    "continual_learning",
+    "scheduler_annealing",
+)
+DEFAULT_FINAL_READINESS_THRESHOLDS = ReadinessThresholds()
+DEFAULT_DISCOVERY_CAMPAIGN_HISTORY_WINDOW = 8
+DEFAULT_DISCOVERY_CAMPAIGN_SCORE_WEIGHTS = {
     "yield_rate": 1.0,
     "novelty_rate": 0.75,
     "false_positive_penalty": 1.25,
@@ -163,6 +193,35 @@ def _parse_jobs(value: str) -> int | str:
     return jobs
 
 
+def _parse_exploration_objective_rules(value: str | None) -> list[ExplorationObjectiveRule]:
+    text = str(value or "").strip()
+    if not text:
+        return []
+    try:
+        payload = load_json(Path(text[1:])) if text.startswith("@") else json.loads(text)
+    except Exception as exc:  # noqa: BLE001
+        raise argparse.ArgumentTypeError(
+            f"invalid exploration objective rule payload: {exc}"
+        ) from exc
+    if isinstance(payload, dict):
+        if isinstance(payload.get("exploration_objective_rules"), list):
+            payload = payload["exploration_objective_rules"]
+        elif isinstance(payload.get("rules"), list):
+            payload = payload["rules"]
+        else:
+            payload = [payload]
+    if not isinstance(payload, list):
+        raise argparse.ArgumentTypeError(
+            "--exploration-objective-rules must be a JSON object/list or @path"
+        )
+    try:
+        return merge_exploration_objective_rules(payload)
+    except Exception as exc:  # noqa: BLE001
+        raise argparse.ArgumentTypeError(
+            f"invalid exploration objective rule payload: {exc}"
+        ) from exc
+
+
 def _resolve_run_backends(args: argparse.Namespace) -> list[str]:
     return resolve_target_backends(
         getattr(args, "backends", None),
@@ -170,7 +229,97 @@ def _resolve_run_backends(args: argparse.Namespace) -> list[str]:
     )
 
 
+def _parse_adaptive_components(value: str | list[str] | tuple[str, ...] | set[str] | None) -> set[str]:
+    raw_items: list[str] = []
+    if isinstance(value, str):
+        raw_items = [item.strip() for item in value.split(",")]
+    elif value:
+        raw_items = [str(item).strip() for item in value]
+    aliases = {
+        "scheduler": "scheduler_learning",
+        "bandit": "scheduler_learning",
+        "contextual_bandit": "scheduler_learning",
+        "generator_profile_learning": "profile_learning",
+        "semantic_objective": "semantic_objective_learning",
+        "semantic_objective_learning": "semantic_objective_learning",
+        "objective_learning": "semantic_objective_learning",
+        "metamorphic_relation": "metamorphic_relation_learning",
+        "metamorphic_relation_learning": "metamorphic_relation_learning",
+        "mr_learning": "metamorphic_relation_learning",
+        "mr_type_learning": "metamorphic_relation_learning",
+        "version_pair": "version_pair_learning",
+        "version_pair_learning": "version_pair_learning",
+        "cross_version_pair_learning": "version_pair_learning",
+        "profile_filter": "profile_capability_filter",
+        "capability_filter": "profile_capability_filter",
+        "mutation_learning": "mutation_operator_learning",
+        "operator_learning": "mutation_operator_learning",
+        "map_elites": "quality_archive",
+        "quality_diversity": "quality_archive",
+        "source_scheduler": "local_source_scheduler",
+        "feedback_source_scheduler": "local_source_scheduler",
+        "runtime_cost": "runtime_cost_learning",
+        "cost_learning": "runtime_cost_learning",
+        "cost_aware_learning": "runtime_cost_learning",
+        "runtime_cost_penalty": "runtime_cost_learning",
+        "active": "active_learning",
+        "active_learning": "active_learning",
+        "uncertainty_sampling": "active_learning",
+        "online_exploration": "active_learning",
+        "exploration_memory": "active_learning",
+        "reward_model": "online_reward_model",
+        "online_reward": "online_reward_model",
+        "online_reward_model": "online_reward_model",
+        "statistical_reward_model": "online_reward_model",
+        "continual": "continual_learning",
+        "continual_learning": "continual_learning",
+        "cross_version_learning": "continual_learning",
+        "version_transfer": "continual_learning",
+        "annealing": "scheduler_annealing",
+        "scheduler_annealing": "scheduler_annealing",
+        "simulated_annealing": "scheduler_annealing",
+        "annealed_scheduler": "scheduler_annealing",
+    }
+    components: set[str] = set()
+    for raw in raw_items:
+        item = raw.strip().lower().replace("-", "_")
+        if not item or item in {"none", "off", "false", "0"}:
+            continue
+        resolved = aliases.get(item, item)
+        if resolved not in ADAPTIVE_COMPONENTS:
+            allowed = ",".join(ADAPTIVE_COMPONENTS)
+            raise argparse.ArgumentTypeError(
+                f"unknown adaptive component '{raw}'; expected one of: {allowed}"
+            )
+        components.add(resolved)
+    return components
+
+
+def _parse_adaptive_component_tuple(value: str | list[str] | tuple[str, ...] | set[str] | None) -> tuple[str, ...]:
+    raw_items: list[str] = []
+    if isinstance(value, str):
+        raw_items = [item.strip() for item in value.split(",")]
+    elif value:
+        for item in value:
+            raw_items.extend(part.strip() for part in str(item).split(","))
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_items:
+        for component in _parse_adaptive_components(raw):
+            if component not in seen:
+                ordered.append(component)
+                seen.add(component)
+    return tuple(ordered)
+
+
+def _adaptive_component_config(disabled_components: set[str]) -> dict[str, bool]:
+    return {component: component not in disabled_components for component in ADAPTIVE_COMPONENTS}
+
+
 def _config_from_args(args: argparse.Namespace) -> ExperimentConfig:
+    disabled_adaptive_components = _parse_adaptive_components(
+        getattr(args, "disable_adaptive_components", "")
+    )
     return ExperimentConfig(
         enable_type_aware_generation=not args.disable_type_aware_generation,
         enable_normalizer=not args.disable_normalizer,
@@ -192,9 +341,36 @@ def _config_from_args(args: argparse.Namespace) -> ExperimentConfig:
         artifact_limit=args.artifact_limit,
         oracle_mode="both" if args.enable_metamorphic_oracle else "differential",
         generator_profile=args.profile,
+        generator_profile_pool=parse_guidance_targets(getattr(args, "profile_pool", "")),
+        version_pair_pool=parse_guidance_targets(getattr(args, "version_pair_pool", "")),
+        generator_profile_learning_weight=max(
+            0.0,
+            float(getattr(args, "profile_learning_weight", 0.0) or 0.0),
+        ),
+        semantic_objective_learning_weight=max(
+            0.0,
+            float(getattr(args, "semantic_objective_learning_weight", 0.0) or 0.0),
+        ),
+        metamorphic_relation_learning_weight=max(
+            0.0,
+            float(getattr(args, "metamorphic_relation_learning_weight", 0.0) or 0.0),
+        ),
+        version_pair_learning_weight=max(
+            0.0,
+            float(getattr(args, "version_pair_learning_weight", 0.0) or 0.0),
+        ),
+        enable_generator_profile_learning="profile_learning" not in disabled_adaptive_components,
+        enable_semantic_objective_learning="semantic_objective_learning" not in disabled_adaptive_components,
+        enable_metamorphic_relation_learning="metamorphic_relation_learning" not in disabled_adaptive_components,
+        enable_profile_capability_filter="profile_capability_filter" not in disabled_adaptive_components,
+        enable_mutation_operator_learning="mutation_operator_learning" not in disabled_adaptive_components,
+        enable_quality_archive="quality_archive" not in disabled_adaptive_components,
         guidance_strategy=getattr(args, "strategy", "random"),
         guidance_candidate_pool=max(1, int(getattr(args, "candidate_pool", 1))),
         guidance_targets=parse_guidance_targets(getattr(args, "targets", "")),
+        exploration_objective_rules=_parse_exploration_objective_rules(
+            getattr(args, "exploration_objective_rules", "")
+        ),
         enable_family_saturation=not bool(getattr(args, "disable_family_saturation", False)),
         family_saturation_threshold=max(1, int(getattr(args, "family_saturation_threshold", 8))),
         family_saturation_penalty=max(0.0, float(getattr(args, "family_saturation_penalty", 1.25))),
@@ -226,11 +402,33 @@ def _config_from_args(args: argparse.Namespace) -> ExperimentConfig:
         ),
         candidate_recheck_count=max(0, int(getattr(args, "candidate_recheck_count", 0))),
         metamorphic_variant_limit=max(0, int(getattr(args, "metamorphic_variant_limit", 4))),
+        metamorphic_relation_order=parse_guidance_targets(getattr(args, "metamorphic_relation_order", "")),
+        target_version=str(getattr(args, "target_version", "") or ""),
+        fixed_version=str(getattr(args, "fixed_version", "") or ""),
         log_level=getattr(args, "log_level", "compact"),
         strategy_snapshot_path=str(getattr(args, "strategy_snapshot", "") or ""),
         strategy_learning_path=str(getattr(args, "strategy_learning", "") or ""),
         freeze_strategy_snapshot=bool(getattr(args, "freeze_strategy_snapshot", False)),
     )
+
+
+def _apply_adaptive_component_config(config: ExperimentConfig, disabled_components: set[str]) -> None:
+    config.enable_generator_profile_learning = "profile_learning" not in disabled_components
+    config.enable_semantic_objective_learning = "semantic_objective_learning" not in disabled_components
+    config.enable_metamorphic_relation_learning = "metamorphic_relation_learning" not in disabled_components
+    config.enable_profile_capability_filter = "profile_capability_filter" not in disabled_components
+    config.enable_mutation_operator_learning = "mutation_operator_learning" not in disabled_components
+    config.enable_quality_archive = "quality_archive" not in disabled_components
+    if "profile_learning" in disabled_components:
+        config.generator_profile_learning_weight = 0.0
+    if "semantic_objective_learning" in disabled_components:
+        config.semantic_objective_learning_weight = 0.0
+    if "metamorphic_relation_learning" in disabled_components:
+        config.metamorphic_relation_learning_weight = 0.0
+    if "version_pair_learning" in disabled_components:
+        config.version_pair_learning_weight = 0.0
+    if "local_source_scheduler" in disabled_components:
+        config.enable_local_source_scheduler = False
 
 
 def add_ablation_flags(parser: argparse.ArgumentParser) -> None:
@@ -266,6 +464,15 @@ def add_ablation_flags(parser: argparse.ArgumentParser) -> None:
         default=0.5,
         help="exploration weight for the within-run generated-vs-feedback source scheduler",
     )
+    parser.add_argument(
+        "--disable-adaptive-components",
+        type=_parse_adaptive_components,
+        default="",
+        help=(
+            "comma-separated adaptive components to disable for ablation: "
+            + ",".join(ADAPTIVE_COMPONENTS)
+        ),
+    )
     parser.add_argument("--no-compress-run-log", action="store_true")
     parser.add_argument(
         "--artifact-limit",
@@ -278,6 +485,29 @@ def add_ablation_flags(parser: argparse.ArgumentParser) -> None:
         type=int,
         default=4,
         help="maximum metamorphic variants to execute per base case",
+    )
+    parser.add_argument(
+        "--metamorphic-relation-order",
+        default="",
+        help="comma-separated MR relation priority order used before adaptive per-case MR learning",
+    )
+    parser.add_argument(
+        "--semantic-objective-learning-weight",
+        type=float,
+        default=0.0,
+        help="per-case semantic objective contextual-learning weight; 0 keeps objective selection observational",
+    )
+    parser.add_argument(
+        "--metamorphic-relation-learning-weight",
+        type=float,
+        default=0.0,
+        help="per-case MR type contextual-learning weight; 0 keeps configured MR order",
+    )
+    parser.add_argument(
+        "--version-pair-learning-weight",
+        type=float,
+        default=0.0,
+        help="per-case target-version-pair contextual-learning weight; 0 records no version-pair arm feedback",
     )
     parser.add_argument(
         "--candidate-recheck-count",
@@ -300,6 +530,14 @@ def add_ablation_flags(parser: argparse.ArgumentParser) -> None:
         "--strategy-learning",
         default="",
         help="path to a strategy-learning ledger used for evidence-driven updates outside frozen runs",
+    )
+    parser.add_argument(
+        "--exploration-objective-rules",
+        default="",
+        help=(
+            "JSON or @path defining neutral exploration objective rules; "
+            "each rule has objective, exact_features, prefix_features, and fragments"
+        ),
     )
     parser.add_argument(
         "--freeze-strategy-snapshot",
@@ -600,7 +838,7 @@ def cmd_discovery_run(args: argparse.Namespace) -> int:
         limit=max(0, int(getattr(args, "classify_limit", 3))),
         refresh=bool(getattr(args, "refresh_classification", False)),
     )
-    manifest_path = Path(getattr(args, "output_manifest", "") or "new_issue/generated/bug-hunt-manifest.json")
+    manifest_path = Path(getattr(args, "output_manifest", "") or "new_issue/generated/discovery-run-manifest.json")
     fresh_evidence_path = manifest_path.with_name(f"{manifest_path.stem}-fresh-candidates.json")
     fresh_evidence = _write_discovery_run_fresh_candidate_evidence(
         run_file,
@@ -615,9 +853,9 @@ def cmd_discovery_run(args: argparse.Namespace) -> int:
             manifest_path=manifest_path,
         )
     manifest = {
-        "schema_version": "bug-hunt-v1",
+        "schema_version": "discovery-run-v1",
         "generated_at": utc_now(),
-        "generated_by": "datadiff bug-hunt",
+        "generated_by": "datadiff discovery-run",
         "workflow": [
             "deterministic_bug_audit",
             "fresh_guided_fuzz",
@@ -646,7 +884,7 @@ def cmd_discovery_run(args: argparse.Namespace) -> int:
     }
     dump_json(manifest, manifest_path)
 
-    print(f"bug hunt manifest: {manifest_path}")
+    print(f"discovery run manifest: {manifest_path}")
     print(f"run log written:   {run_file}")
     if not getattr(args, "skip_run_report", False):
         print(f"markdown report:   {md_path}")
@@ -689,15 +927,15 @@ def cmd_discovery_run(args: argparse.Namespace) -> int:
 
 def _discovery_campaign_score_weights_from_args(args: argparse.Namespace) -> dict[str, float]:
     return {
-        "yield_rate": max(0.0, float(getattr(args, "lane_yield_weight", DEFAULT_BUG_SPRINT_SCORE_WEIGHTS["yield_rate"]))),
-        "novelty_rate": max(0.0, float(getattr(args, "lane_novelty_weight", DEFAULT_BUG_SPRINT_SCORE_WEIGHTS["novelty_rate"]))),
+        "yield_rate": max(0.0, float(getattr(args, "lane_yield_weight", DEFAULT_DISCOVERY_CAMPAIGN_SCORE_WEIGHTS["yield_rate"]))),
+        "novelty_rate": max(0.0, float(getattr(args, "lane_novelty_weight", DEFAULT_DISCOVERY_CAMPAIGN_SCORE_WEIGHTS["novelty_rate"]))),
         "false_positive_penalty": max(
             0.0,
             float(
                 getattr(
                     args,
                     "lane_false_positive_penalty",
-                    DEFAULT_BUG_SPRINT_SCORE_WEIGHTS["false_positive_penalty"],
+                    DEFAULT_DISCOVERY_CAMPAIGN_SCORE_WEIGHTS["false_positive_penalty"],
                 )
             ),
         ),
@@ -708,13 +946,13 @@ def _load_discovery_campaign_history_manifests(
     generated_issue_dir: Path,
     *,
     exclude_manifest: Path | None = None,
-    limit: int = DEFAULT_BUG_SPRINT_HISTORY_WINDOW,
+    limit: int = DEFAULT_DISCOVERY_CAMPAIGN_HISTORY_WINDOW,
 ) -> list[dict[str, Any]]:
     if limit <= 0 or not generated_issue_dir.is_dir():
         return []
     exclude = exclude_manifest.resolve() if exclude_manifest is not None and exclude_manifest.exists() else None
     paths = sorted(
-        generated_issue_dir.glob("bug-sprint*-manifest.json"),
+        [*generated_issue_dir.glob("discovery-campaign*-manifest.json")],
         key=lambda path: (path.stat().st_mtime, path.name),
         reverse=True,
     )
@@ -983,7 +1221,7 @@ def cmd_discovery_campaign(args: argparse.Namespace) -> int:
             "results": list(audit_run.results),
         }
 
-    manifest_path = Path(getattr(args, "output_manifest", "") or "new_issue/generated/bug-sprint-manifest.json")
+    manifest_path = Path(getattr(args, "output_manifest", "") or "new_issue/generated/discovery-campaign-manifest.json")
     runs: list[dict[str, Any]] = []
     aggregate_fresh: Counter[str] = Counter()
     aggregate_issue_inspired: Counter[str] = Counter()
@@ -995,7 +1233,7 @@ def cmd_discovery_campaign(args: argparse.Namespace) -> int:
     total_run_count = len(selected_lanes) * len(seeds)
     generated_issue_dir = manifest_path.parent
     score_weights = _discovery_campaign_score_weights_from_args(args)
-    history_limit = max(0, int(getattr(args, "lane_history_window", DEFAULT_BUG_SPRINT_HISTORY_WINDOW)))
+    history_limit = max(0, int(getattr(args, "lane_history_window", DEFAULT_DISCOVERY_CAMPAIGN_HISTORY_WINDOW)))
     lane_by_id = {lane["id"]: lane for lane in selected_lanes}
     pending_by_lane = {lane["id"]: list(seeds) for lane in selected_lanes}
 
@@ -1085,7 +1323,7 @@ def cmd_discovery_campaign(args: argparse.Namespace) -> int:
         }
         runs.append(run_record)
         print(
-            f"starting sprint lane={lane['id']} suite={target_suite} preset={preset} seed={seed} "
+            f"starting discovery-campaign lane={lane['id']} suite={target_suite} preset={preset} seed={seed} "
             f"score={next_lane.get('score', 0.0):.2f} budget={next_lane.get('budget_multiplier', 1.0):.2f}",
             flush=True,
         )
@@ -1143,7 +1381,7 @@ def cmd_discovery_campaign(args: argparse.Namespace) -> int:
             }
         )
         print(
-            f"sprint lane={lane['id']} suite={target_suite} preset={preset} seed={seed} run={run_file}",
+            f"discovery-campaign lane={lane['id']} suite={target_suite} preset={preset} seed={seed} run={run_file}",
             flush=True,
         )
         write_manifest_snapshot(status="running")
@@ -1156,14 +1394,14 @@ def cmd_discovery_campaign(args: argparse.Namespace) -> int:
                 health_stop_reason = "bug_status"
             if stopped_by_health:
                 print(
-                    f"bug-sprint health stop: reason={health_stop_reason} lane={lane['id']} seed={seed}",
+            f"discovery-campaign health stop: reason={health_stop_reason} lane={lane['id']} seed={seed}",
                     flush=True,
                 )
                 break
 
     write_manifest_snapshot(status="completed")
 
-    print(f"bug sprint manifest: {manifest_path}")
+    print(f"discovery campaign manifest: {manifest_path}")
     print("fresh candidate families:")
     if aggregate_fresh:
         for family, count in sorted(aggregate_fresh.items()):
@@ -1217,15 +1455,15 @@ def _build_discovery_campaign_manifest(
         ]
     )
     return {
-        "schema_version": "bug-sprint-v1",
+        "schema_version": "discovery-campaign-v1",
         "generated_at": utc_now(),
-        "generated_by": "datadiff bug-sprint",
+        "generated_by": "datadiff discovery-campaign",
         "status": status,
         "started_at": started_at,
         "completed_at": utc_now() if status == "completed" else "",
         "workflow": [
             "deterministic_bug_audit",
-            "guided_short_sprints",
+            "guided_discovery_campaign",
             "run_report",
             "candidate_classification",
             "fresh_candidate_evidence",
@@ -1311,17 +1549,6 @@ def _discovery_campaign_config_from_args(
     return config
 
 
-_bug_sprint_score_weights_from_args = _discovery_campaign_score_weights_from_args
-_load_bug_sprint_history_manifests = _load_discovery_campaign_history_manifests
-_bug_sprint_scheduler_snapshot = _discovery_campaign_scheduler_snapshot
-_bug_sprint_lane_rows = _discovery_campaign_lane_rows
-_bug_sprint_next_lane = _next_discovery_campaign_lane
-_build_bug_sprint_manifest = _build_discovery_campaign_manifest
-_bug_sprint_lanes_from_args = _discovery_campaign_lanes_from_args
-_bug_sprint_lane_catalog = _discovery_campaign_lane_catalog
-_bug_sprint_config_from_args = _discovery_campaign_config_from_args
-
-
 def cmd_bug_status(args: argparse.Namespace) -> int:
     latest_confirmation_files = [
         Path(item) for item in parse_guidance_targets(getattr(args, "latest_confirmations", "") or "")
@@ -1364,7 +1591,7 @@ def cmd_bug_status(args: argparse.Namespace) -> int:
             print(f"- {family}: {count}")
     else:
         print("- none")
-    print(f"bug workflow manifests: {summary.get('bug_workflow_manifest_count', 0)}")
+    print(f"discovery workflow manifests: {summary.get('discovery_workflow_manifest_count', 0)}")
     print(
         f"issue bundle: {summary.get('issue_bundle_family_count', 0)} families, "
         f"{summary.get('issue_bundle_reproducer_count', 0)} reproducers, "
@@ -1565,9 +1792,9 @@ def _write_discovery_run_fresh_candidate_evidence(
                     }
                 )
     evidence = {
-        "schema_version": "bug-hunt-fresh-candidates-v1",
+        "schema_version": "discovery-run-fresh-candidates-v1",
         "generated_at": utc_now(),
-        "generated_by": "datadiff bug-hunt",
+        "generated_by": "datadiff discovery-run",
         "source_run_file": _project_relative_cli_path(run_file),
         "fresh_candidate_bug_families": classification.get("fresh_candidate_bug_families", {}),
         "candidate_row_count": len(candidate_rows),
@@ -1682,8 +1909,63 @@ def cmd_methodology_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _final_readiness_manifest_index_files(
+    index_files: list[str] | tuple[str, ...],
+) -> tuple[list[Path], list[Path], list[Path]]:
+    manifest_files: list[Path] = []
+    extra_manifest_files: list[Path] = []
+    paper_run_journal_files: list[Path] = []
+    for raw_path in index_files or []:
+        index_path = Path(raw_path)
+        data = load_json(index_path)
+        if not isinstance(data, dict):
+            raise ValueError(f"manifest index is not a JSON object: {index_path}")
+        manifest_files.extend(_paths_from_index_value(data.get("manifest_files", [])))
+        extra_manifest_files.extend(_paths_from_index_value(data.get("extra_manifest_files", [])))
+        for command in data.get("commands", []) or []:
+            if not isinstance(command, dict):
+                continue
+            manifest_files.extend(_paths_from_index_value(command.get("manifest_files", [])))
+            extra_manifest_files.extend(_paths_from_index_value(command.get("extra_manifest_files", [])))
+            paper_run_journal_files.extend(_paths_from_index_value(command.get("paper_run_journal_files", [])))
+    return (
+        _dedupe_paths(manifest_files),
+        _dedupe_paths(extra_manifest_files),
+        _dedupe_paths(paper_run_journal_files),
+    )
+
+
+def _paths_from_index_value(value: object) -> list[Path]:
+    if isinstance(value, str):
+        items = [part.strip() for part in value.split(",")]
+    elif isinstance(value, (list, tuple, set)):
+        items = [str(item).strip() for item in value]
+    else:
+        items = []
+    return [Path(item) for item in items if item]
+
+
+def _dedupe_paths(paths: list[Path]) -> list[Path]:
+    seen: set[str] = set()
+    deduped: list[Path] = []
+    for path in paths:
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(path)
+    return deduped
+
+
 def cmd_final_readiness(args: argparse.Namespace) -> int:
     manifests = [Path(path) for path in getattr(args, "manifest", [])]
+    extra_manifests = [Path(path) for path in getattr(args, "extra_manifest", [])]
+    index_manifests, index_extra_manifests, index_paper_run_journals = _final_readiness_manifest_index_files(
+        getattr(args, "manifest_index", [])
+    )
+    manifests = _dedupe_paths([*manifests, *index_manifests])
+    extra_manifests = _dedupe_paths([*extra_manifests, *index_extra_manifests])
+    paper_run_journal_files = index_paper_run_journals or None
     latest_confirmation_files = [Path(path) for path in getattr(args, "latest_confirmation_file", [])]
     required_live_suites = (
         tuple(_parse_presets(args.required_live_suites))
@@ -1710,6 +1992,35 @@ def cmd_final_readiness(args: argparse.Namespace) -> int:
         require_seeded=not bool(getattr(args, "no_require_seeded", False)),
         require_ablation=not bool(getattr(args, "no_require_ablation", False)),
         require_comparison=not bool(getattr(args, "no_require_comparison", False)),
+        require_adaptive_component_ablation=not bool(
+            getattr(args, "no_require_adaptive_component_ablation", False)
+        ),
+        min_adaptive_component_ablations=max(0, int(args.min_adaptive_component_ablations)),
+        required_adaptive_component_ablations=_parse_adaptive_component_tuple(
+            getattr(args, "required_adaptive_component_ablations", "")
+        ),
+        require_transferability_scope=not bool(getattr(args, "no_require_transferability_scope", False)),
+        min_transfer_target_families=max(0, int(args.min_transfer_target_families)),
+        require_cross_version_ledger=not bool(getattr(args, "no_require_cross_version_ledger", False)),
+        min_cross_version_ledger_versions=max(0, int(args.min_cross_version_ledger_versions)),
+        min_cross_version_ledger_families=max(0, int(args.min_cross_version_ledger_families)),
+        require_cross_version_health_feedback=not bool(
+            getattr(args, "no_require_cross_version_health_feedback", False)
+        ),
+        require_runtime_efficiency=not bool(getattr(args, "no_require_runtime_efficiency", False)),
+        min_throughput_cases_s=max(0.0, float(args.min_throughput_cases_s)),
+        max_scheduler_feedback_share=max(0.0, float(args.max_scheduler_feedback_share)),
+        min_scheduler_feedback_cases=max(1, int(args.min_scheduler_feedback_cases)),
+        require_discovery_responsiveness=not bool(
+            getattr(args, "no_require_discovery_responsiveness", False)
+        ),
+        max_first_candidate_elapsed_s=max(0.0, float(args.max_first_candidate_elapsed_s)),
+        require_closed_loop_state_persistence=not bool(
+            getattr(args, "no_require_closed_loop_state_persistence", False)
+        ),
+        require_adaptive_live_component_evidence=not bool(
+            getattr(args, "no_require_adaptive_live_component_evidence", False)
+        ),
     )
     manifest_limit = (
         None
@@ -1721,7 +2032,9 @@ def cmd_final_readiness(args: argparse.Namespace) -> int:
     ) and not bool(getattr(args, "summary_only", False))
     md_path, json_path = analyze_final_readiness(
         manifests or None,
+        extra_manifest_files=extra_manifests or None,
         latest_confirmation_files=latest_confirmation_files or None,
+        paper_run_journal_files=paper_run_journal_files,
         manifest_limit=manifest_limit,
         scan_run_logs=scan_run_logs,
         thresholds=thresholds,
@@ -1743,7 +2056,7 @@ def cmd_review_readiness(args: argparse.Namespace) -> int:
     thresholds = ReviewThresholds(
         target_confirmed_bug_families=max(0, int(getattr(args, "target_confirmed", 20))),
         min_audit_candidate_families=max(0, int(getattr(args, "min_audit_candidates", 1))),
-        min_bug_workflow_manifests=max(0, int(getattr(args, "min_bug_workflows", 1))),
+        min_discovery_workflow_manifests=max(0, int(getattr(args, "min_discovery_workflows", 1))),
         min_generated_issue_drafts=max(0, int(getattr(args, "min_generated_issue_drafts", 1))),
         min_issue_bundle_families=max(0, int(getattr(args, "min_issue_bundle_families", 1))),
         min_pending_issue_drafts=max(0, int(getattr(args, "min_pending_issue_drafts", 1))),
@@ -1824,6 +2137,233 @@ def cmd_targets(args: argparse.Namespace) -> int:
     print(f"- reusable_layers={len(payload['methodology']['reusable_layers'])}")
     print(f"- shared_extension_contract={len(payload['methodology']['shared_extension_contract'])}")
     return 0
+
+
+def cmd_semantic_registry(args: argparse.Namespace) -> int:
+    backends = _resolve_run_backends(args) if getattr(args, "backends", None) else sorted(TARGETS)
+    context = target_context(backends)
+    objective_rules = _parse_exploration_objective_rules(
+        getattr(args, "exploration_objective_rules", "")
+    )
+    if not objective_rules:
+        objective_rules = list(ExperimentConfig().exploration_objective_rules)
+    payload = semantic_registry_payload(
+        objective_rules=objective_rules,
+        target_context=context,
+        metadata={
+            "target_suite": str(getattr(args, "target_suite", "core") or "core"),
+            "backends": backends,
+        },
+    )
+    if getattr(args, "json", False):
+        print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
+    print(f"schema={payload['schema_version']}")
+    print(f"objectives={len(payload['objectives'])}")
+    print(f"semantic_families={len(payload['semantic_families'])}")
+    print(f"target_capabilities={len(payload['target_capabilities'])}")
+    for objective in payload["objectives"]:
+        print(
+            f"- {objective['feature']}: "
+            f"rules={len(objective['rules'])} "
+            f"operators={len(objective['mutation_operator_affinity'])} "
+            f"oracles={','.join(objective['oracle_roles'])}"
+        )
+    return 0
+
+
+def cmd_version_ledger(args: argparse.Namespace) -> int:
+    run_files = [Path(item) for item in parse_guidance_targets(getattr(args, "run_files", ""))]
+    if not run_files and getattr(args, "run_file", None):
+        run_files = [Path(getattr(args, "run_file"))]
+    versions = parse_guidance_targets(getattr(args, "versions", ""))
+    manifest_indexes = list(getattr(args, "manifest_index", []) or [])
+    if not run_files:
+        run_files, auto_versions = _version_ledger_runs_from_manifest_indexes(
+            manifest_indexes
+        )
+        if auto_versions and not versions:
+            versions = auto_versions
+        if manifest_indexes and not run_files:
+            print("no run logs found in --manifest-index for version-ledger", file=sys.stderr)
+            return 2
+    if not run_files:
+        run_files = [latest_run_log_path()]
+    observations = observations_from_run_logs(run_files, versions=versions)
+    unique_versions = [
+        observation.version_id
+        for observation in observations
+        if str(observation.version_id).strip()
+    ]
+    unique_versions = list(dict.fromkeys(unique_versions))
+    if (manifest_indexes or evidence_manifest_requested(args)) and len(unique_versions) < 2:
+        print(
+            "version-ledger evidence requires run logs from at least two versions",
+            file=sys.stderr,
+        )
+        return 2
+    previous_ledger = {}
+    previous_ledger_text = str(getattr(args, "previous_ledger", "") or "").strip()
+    if previous_ledger_text:
+        previous_ledger_path = Path(previous_ledger_text)
+        if previous_ledger_path.is_file():
+            loaded = load_json(previous_ledger_path)
+            previous_ledger = loaded if isinstance(loaded, dict) else {}
+    payload = build_version_ledger(
+        observations,
+        baseline_version=str(getattr(args, "baseline_version", "") or ""),
+        previous_ledger=previous_ledger,
+    )
+    output = str(getattr(args, "output", "") or "").strip()
+    if output:
+        dump_json(payload, Path(output))
+    evidence_manifest_output = str(getattr(args, "evidence_manifest_output", "") or "").strip()
+    if evidence_manifest_output:
+        if not output:
+            raise SystemExit("--evidence-manifest-output requires --output")
+        _write_version_ledger_evidence_manifest(
+            Path(evidence_manifest_output),
+            ledger_file=Path(output),
+            run_files=run_files,
+            versions=versions,
+        )
+    if getattr(args, "json", False):
+        print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
+    summary = payload["summary"]
+    print(f"schema={payload['schema_version']}")
+    print(f"versions={summary['version_count']}")
+    print(f"families={summary['family_count']}")
+    print(f"new={summary['new_family_count']}")
+    print(f"fixed={summary['fixed_family_count']}")
+    print(f"regression={summary['regression_family_count']}")
+    print(f"persistent={summary['persistent_family_count']}")
+    print(f"health_observations={summary.get('health_observation_count', 0)}")
+    print(f"invalid_cases={summary.get('invalid_case_count', 0)}")
+    print(f"fallback_cases={summary.get('fallback_case_count', 0)}")
+    print(f"false_positives={summary.get('false_positive_count', 0)}")
+    print(f"min_throughput_cases_s={summary.get('min_throughput_cases_s', 0.0):.6g}")
+    print(f"max_invalid_rate={summary.get('max_invalid_rate', 0.0):.6g}")
+    print(f"max_false_positive_rate={summary.get('max_false_positive_rate', 0.0):.6g}")
+    if output:
+        print(f"ledger={output}")
+    if evidence_manifest_output:
+        print(f"evidence_manifest={evidence_manifest_output}")
+    return 0
+
+
+def evidence_manifest_requested(args: argparse.Namespace) -> bool:
+    return bool(str(getattr(args, "evidence_manifest_output", "") or "").strip())
+
+
+def _version_ledger_runs_from_manifest_indexes(index_files: list[str] | tuple[str, ...]) -> tuple[list[Path], list[str]]:
+    manifest_files, _, _ = _final_readiness_manifest_index_files(index_files)
+    candidates: list[tuple[Path, str]] = []
+    for manifest_file in manifest_files:
+        if not manifest_file.is_file():
+            continue
+        manifest = load_json(manifest_file)
+        if not isinstance(manifest, dict):
+            continue
+        manifest_target_version = str(manifest.get("target_version", "") or "").strip()
+        manifest_evidence_mode = str(manifest.get("evidence_mode", "") or "").strip()
+        for run in manifest.get("runs", []) or []:
+            if not isinstance(run, dict):
+                continue
+            if str(run.get("evidence_kind", "") or manifest.get("evidence_kind", "") or "").strip():
+                continue
+            run_file_text = str(run.get("run_file", "") or "").strip()
+            if not run_file_text:
+                continue
+            run_file = Path(run_file_text)
+            version = (
+                str(run.get("target_version", "") or "").strip()
+                or manifest_target_version
+                or _manifest_run_version_label(manifest, run)
+            )
+            if not version:
+                continue
+            candidates.append((run_file, version))
+    seen: set[tuple[str, str]] = set()
+    run_files: list[Path] = []
+    versions: list[str] = []
+    for run_file, version in candidates:
+        key = (str(run_file), version)
+        if key in seen:
+            continue
+        seen.add(key)
+        run_files.append(run_file)
+        versions.append(version)
+    return run_files, versions
+
+
+def _manifest_run_version_label(manifest: dict[str, Any], run: dict[str, Any]) -> str:
+    for source in (run, manifest):
+        experiment_meta = source.get("experiment_meta", {}) if isinstance(source, dict) else {}
+        if not isinstance(experiment_meta, dict):
+            continue
+        historical = experiment_meta.get("historical", {})
+        if isinstance(historical, dict):
+            version = str(historical.get("target_version", "") or "").strip()
+            if version:
+                return version
+        variant = experiment_meta.get("variant", {})
+        if isinstance(variant, dict):
+            version = str(variant.get("target_version", "") or "").strip()
+            if version:
+                return version
+    return ""
+
+
+def _write_version_ledger_evidence_manifest(
+    manifest_path: Path,
+    *,
+    ledger_file: Path,
+    run_files: list[Path],
+    versions: list[str],
+) -> None:
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    run_payload = {
+        "target_suite": "cross_version",
+        "preset": "version_ledger",
+        "seed": "",
+        "run_file": str(run_files[-1]) if run_files else "",
+        "backends": [],
+        "report": "",
+        "evidence_mode": "comparison",
+        "evidence_kind": "postprocess_ledger",
+        "version_ledger_file": str(ledger_file),
+    }
+    dump_json(
+        {
+            "schema_version": "version-ledger-evidence-manifest-v1",
+            "created_at": utc_now(),
+            "evidence_mode": "comparison",
+            "evidence_kind": "postprocess_ledger",
+            "target_suite": "cross_version",
+            "target_suites": ["cross_version"],
+            "backends": [],
+            "targets": [],
+            "runs": [run_payload],
+            "version_ledger_file": str(ledger_file),
+            "version_ledger_inputs": {
+                "run_files": [str(path) for path in run_files],
+                "versions": versions,
+            },
+            "experiment_meta": {
+                "matrix_id": "baseline_scope_comparison",
+                "comparison_group": "cross_version_continual_learning",
+                "variant": {
+                    "variant_id": "version_ledger",
+                    "comparison_role": "support",
+                    "component_focus": "cross_version_continual_learning",
+                },
+                "analysis_tags": ["cross_version", "continual_learning", "regression_ledger"],
+                "counts_as_real_bugs": False,
+            },
+        },
+        manifest_path,
+    )
 
 
 def cmd_prune_corpus(args: argparse.Namespace) -> int:
@@ -2023,7 +2563,7 @@ def cmd_run_health(args: argparse.Namespace) -> int:
 
 
 def cmd_discovery_campaign_status(args: argparse.Namespace) -> int:
-    manifest_arg = getattr(args, "manifest", "") or "new_issue/generated/bug-sprint-manifest.json"
+    manifest_arg = getattr(args, "manifest", "") or "new_issue/generated/discovery-campaign-manifest.json"
     summary = _summarize_discovery_campaign_status(Path(manifest_arg), limit=max(0, int(args.limit)))
     if getattr(args, "json", False):
         print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
@@ -2114,13 +2654,6 @@ def cmd_discovery_campaign_status(args: argparse.Namespace) -> int:
     ):
         return 2
     return 0
-
-
-cmd_bug_hunt = cmd_discovery_run
-cmd_bug_sprint = cmd_discovery_campaign
-cmd_bug_sprint_status = cmd_discovery_campaign_status
-_bug_hunt_config_from_args = _discovery_run_config_from_args
-_write_bug_hunt_fresh_candidate_evidence = _write_discovery_run_fresh_candidate_evidence
 
 
 def _summarize_run_health(run_file: Path, *, limit: int = 3) -> dict[str, Any]:
@@ -2264,8 +2797,11 @@ def _summarize_discovery_campaign_status(manifest_file: Path, *, limit: int = 3)
             pending_by_lane=pending_by_lane,
             generated_issue_dir=manifest_file.parent,
             manifest_path=manifest_file,
-            history_limit=int(scheduler.get("history_window", DEFAULT_BUG_SPRINT_HISTORY_WINDOW) or DEFAULT_BUG_SPRINT_HISTORY_WINDOW),
-            score_weights=dict(scheduler.get("score_weights", {}) or DEFAULT_BUG_SPRINT_SCORE_WEIGHTS),
+            history_limit=int(
+                scheduler.get("history_window", DEFAULT_DISCOVERY_CAMPAIGN_HISTORY_WINDOW)
+                or DEFAULT_DISCOVERY_CAMPAIGN_HISTORY_WINDOW
+            ),
+            score_weights=dict(scheduler.get("score_weights", {}) or DEFAULT_DISCOVERY_CAMPAIGN_SCORE_WEIGHTS),
         )
     current_run = _current_discovery_campaign_run(manifest)
     latest_observed_run_file = _latest_discovery_campaign_run_file(manifest)
@@ -2273,7 +2809,7 @@ def _summarize_discovery_campaign_status(manifest_file: Path, *, limit: int = 3)
         _summarize_run_health(latest_observed_run_file, limit=limit) if latest_observed_run_file is not None else {}
     )
     return {
-        "schema_version": "bug-sprint-status-v1",
+        "schema_version": "discovery-campaign-status-v1",
         "generated_at": utc_now(),
         "manifest_file": _project_relative_cli_path(manifest_file),
         "manifest_status": str(manifest.get("status", "")),
@@ -2330,11 +2866,6 @@ def _latest_discovery_campaign_run_file(manifest: dict[str, Any]) -> Path | None
     threshold = started_at.timestamp() - 1.0
     recent = [path for path in candidates if path.stat().st_mtime >= threshold]
     return recent[-1] if recent else None
-
-
-_summarize_bug_sprint_status = _summarize_discovery_campaign_status
-_current_bug_sprint_run = _current_discovery_campaign_run
-_latest_bug_sprint_run_file = _latest_discovery_campaign_run_file
 
 
 def _resolve_project_cli_path(value: str | Path | None) -> Path | None:
@@ -2819,6 +3350,8 @@ def cmd_replay_fixture(args: argparse.Namespace) -> int:
         artifact_limit=args.artifact_limit,
         log_level=args.log_level,
     )
+    disabled_components = _parse_adaptive_components(getattr(args, "disable_adaptive_components", ""))
+    adaptive_components = _adaptive_component_config(disabled_components)
     started = time.perf_counter()
     row = run_loaded_case(
         case,
@@ -2868,10 +3401,116 @@ def cmd_replay_fixture(args: argparse.Namespace) -> int:
     with JsonlWriter(run_file, compresslevel=1) as writer:
         writer.write(_compact_log_row(row, config.log_level))
 
+    backend_context = target_context(backends)
+    manifest_path = _experiment_manifest_path()
+    run_identity = {
+        "target_suite": suite,
+        "backends": backends,
+        "preset": "fixture_replay",
+        "seed": case.seed,
+        "evidence_mode": evidence_mode,
+        "known_bug_id": known_bug_id,
+        "target_version": target_version,
+        "experiment_meta": experiment_meta,
+    }
+    run_semantics = resolved_run_semantics(run_identity, experiment_meta)
+    preset_metadata = catalog_preset_metadata(
+        "fixture_replay",
+        base_preset=str(run_semantics.get("base_preset", "") or ""),
+        overlays=list(run_semantics.get("overlays", []) or []),
+    )
+    configured_guidance_targets = list(config.guidance_targets)
+    configured_effective_guidance_targets = _configured_guidance_targets(config)
+    run_payload = {
+        "target_suite": suite,
+        "backends": backends,
+        "preset": "fixture_replay",
+        "seed": case.seed,
+        "evidence_mode": evidence_mode,
+        "known_bug_id": known_bug_id,
+        "target_version": target_version,
+        "batch_index": None,
+        "schedule_arm_id": "",
+        "estimated_cost": "",
+        "worker_thread_limit": "",
+        "closed_loop_state_present": False,
+        "adaptive_components": dict(adaptive_components),
+        "disabled_adaptive_components": sorted(disabled_components),
+        "experiment_meta": experiment_meta,
+        "matrix_id": run_semantics["matrix_id"],
+        "matrix_title": run_semantics["matrix_title"],
+        "comparison_group": run_semantics["comparison_group"],
+        "purpose": run_semantics["purpose"],
+        "counts_as_real_bugs": run_semantics["counts_as_real_bugs"],
+        "rq_tags": list(run_semantics["rq_tags"]),
+        "analysis_tags": list(run_semantics["analysis_tags"]),
+        "variant_id": run_semantics["variant_id"],
+        "variant_title": run_semantics["variant_title"],
+        "base_preset": run_semantics["base_preset"],
+        "comparison_role": run_semantics["comparison_role"],
+        "canonical_comparison_role": run_semantics["canonical_comparison_role"],
+        "component_focus": run_semantics["component_focus"],
+        "overlays": list(run_semantics["overlays"]),
+        "semantic_focus_families": list(run_semantics["semantic_focus_families"]),
+        "semantic_focus_signals": list(run_semantics["semantic_focus_signals"]),
+        "factors": dict(run_semantics["factors"]),
+        "oracle_profile": run_semantics["oracle_profile"],
+        "scope_kind": run_semantics["scope_kind"],
+        "preset_metadata": preset_metadata,
+        "configured_guidance_targets": configured_guidance_targets,
+        "configured_effective_guidance_targets": configured_effective_guidance_targets,
+        "configured_semantic_focus_families": list(config.semantic_focus_families),
+        "configured_semantic_focus_signals": list(config.semantic_focus_signals),
+        "fixture_spec": str(args.spec),
+        "fixture_path": str(fixture_path),
+        "fixture_sha256": case.metadata.get("fixture_sha256", ""),
+        "run_file": str(run_file),
+        "report": "",
+        "csv": "",
+    }
+    manifest = {
+        "created_at": utc_now(),
+        "presets": ["fixture_replay"],
+        "seeds": [case.seed],
+        "cases": 1,
+        "duration_s": None,
+        "evidence_mode": evidence_mode,
+        "known_bug_id": known_bug_id,
+        "target_version": target_version,
+        "run_theme": run_theme,
+        "paper_notes": paper_notes,
+        "experiment_meta": experiment_meta,
+        "backends": backends,
+        "target_suite": suite,
+        "target_suites": [suite],
+        "backends_by_suite": {suite: backends},
+        "targets": backend_context.target_dicts(),
+        "common_capabilities": list(backend_context.common_capabilities),
+        "target_context": backend_context.to_dict(),
+        "log_level": config.log_level,
+        "compress_run_log": config.compress_run_log,
+        "metamorphic_variant_limit": config.metamorphic_variant_limit,
+        "replay_bug_policy": {
+            "enable_replay_bug": config.enable_replay_bug,
+            "source_issues": list(config.replay_bug_source_issues),
+        },
+        "fixture_spec": str(args.spec),
+        "fixture_path": str(fixture_path),
+        "fixture_sha256": case.metadata.get("fixture_sha256", ""),
+        "jobs": 1,
+        "parallelism": {"requested_jobs": 1, "worker_count": 1},
+        "schedule": "fixture_replay",
+        "adaptive_methodology": {
+            "components": dict(adaptive_components),
+            "disabled_components": sorted(disabled_components),
+        },
+        "runs": [run_payload],
+    }
     meta = {
         "run_id": run_id,
         "status": "completed",
         "run_file": str(run_file),
+        "manifest_file": str(manifest_path),
         "case_log_file": "",
         "checkpoint_file": "",
         "requested_cases": 1,
@@ -2888,9 +3527,9 @@ def cmd_replay_fixture(args: argparse.Namespace) -> int:
         "seed": case.seed,
         "next_seed": case.seed + 1,
         "backends": backends,
-        "targets": target_context(backends).target_dicts(),
-        "common_capabilities": list(target_context(backends).common_capabilities),
-        "target_context": target_context(backends).to_dict(),
+        "targets": backend_context.target_dicts(),
+        "common_capabilities": list(backend_context.common_capabilities),
+        "target_context": backend_context.to_dict(),
         "config": config.to_dict(),
         "environment": row.get("environment", {}),
         "log_level": config.log_level,
@@ -2908,6 +3547,7 @@ def cmd_replay_fixture(args: argparse.Namespace) -> int:
         "updated_at": utc_now(),
     }
     dump_json(meta, run_meta_path(run_file))
+    dump_json(manifest, manifest_path)
     journal_path, journal_md = record_run_journal(
         run_file,
         context={
@@ -2921,6 +3561,8 @@ def cmd_replay_fixture(args: argparse.Namespace) -> int:
             "preset": "fixture_replay",
             "seed": case.seed,
             "backends": backends,
+            "manifest_file": str(manifest_path),
+            "experiment_meta": experiment_meta,
         },
         journal_file=REPORTS_DIR / "paper-run-journal.jsonl",
     )
@@ -2928,6 +3570,7 @@ def cmd_replay_fixture(args: argparse.Namespace) -> int:
     print(f"status={row['status']}")
     print(f"run_file={run_file}")
     print(f"meta_file={run_meta_path(run_file)}")
+    print(f"experiment manifest: {manifest_path}")
     print(f"paper_run_journal={journal_path}")
     print(f"paper_run_journal_markdown={journal_md}")
     for finding in row.get("findings", []):
@@ -3102,18 +3745,81 @@ def _job_config(job: dict[str, Any]) -> ExperimentConfig:
     run_semantics = _job_run_semantics(job)
     base_preset = str(run_semantics.get("base_preset", "") or "").strip()
     overlays = [str(name).strip() for name in run_semantics.get("overlays", []) if str(name).strip()]
+    config: ExperimentConfig | None = None
     if base_preset:
         try:
-            return build_catalog_preset(base_preset) if not overlays else build_experiment_config(
+            config = build_catalog_preset(base_preset) if not overlays else build_experiment_config(
                 base_preset,
                 overlays,
             )
         except ValueError:
             pass
-    return _preset_config(str(job["preset"]))
+    if config is None:
+        config = _preset_config(str(job["preset"]))
+    _apply_job_config_overrides(config, job)
+    return config
+
+
+def _apply_job_config_overrides(config: ExperimentConfig, job: dict[str, Any]) -> None:
+    config.target_version = str(job.get("target_version", config.target_version) or "").strip()
+    config.fixed_version = str(job.get("fixed_version", config.fixed_version) or "").strip()
+    version_pair_pool = parse_guidance_targets(str(job.get("version_pair_pool", "") or ""))
+    if version_pair_pool:
+        config.version_pair_pool = version_pair_pool
+    config.semantic_objective_learning_weight = max(
+        0.0,
+        float(job.get("semantic_objective_learning_weight", config.semantic_objective_learning_weight) or 0.0),
+    )
+    config.metamorphic_relation_learning_weight = max(
+        0.0,
+        float(job.get("metamorphic_relation_learning_weight", config.metamorphic_relation_learning_weight) or 0.0),
+    )
+    config.version_pair_learning_weight = max(
+        0.0,
+        float(job.get("version_pair_learning_weight", config.version_pair_learning_weight) or 0.0),
+    )
+    relation_order = parse_guidance_targets(str(job.get("metamorphic_relation_order", "") or ""))
+    if relation_order:
+        config.metamorphic_relation_order = relation_order
+    disabled_components = _parse_adaptive_components(job.get("disable_adaptive_components", ""))
+    _apply_adaptive_component_config(config, disabled_components)
+
+
+def _populate_job_learning_metadata(job: dict[str, Any]) -> None:
+    config = _job_config(job)
+    override_limit = job.get("metamorphic_variant_limit")
+    effective_metamorphic_limit = (
+        override_limit
+        if override_limit is not None
+        else config.metamorphic_variant_limit
+    )
+    job["scheduler_generator_profile"] = str(config.generator_profile or "")
+    job["scheduler_guidance_strategy"] = str(config.guidance_strategy or "")
+    job["scheduler_oracle_mode"] = str(config.oracle_mode or "")
+    job["target_version"] = str(job.get("target_version", config.target_version) or "")
+    job["fixed_version"] = str(job.get("fixed_version", config.fixed_version) or "")
+    job["version_pair_pool"] = ",".join(config.version_pair_pool)
+    job["scheduler_enable_feedback"] = bool(config.enable_feedback)
+    job["scheduler_enable_metamorphic_oracle"] = bool(config.enable_metamorphic_oracle)
+    job["scheduler_effective_metamorphic_variant_limit"] = (
+        max(0, int(effective_metamorphic_limit or 0))
+        if config.enable_metamorphic_oracle
+        else 0
+    )
+    job["scheduler_guidance_targets"] = list(config.guidance_targets)
+    job["scheduler_semantic_focus_families"] = list(config.semantic_focus_families)
+    job["scheduler_semantic_focus_signals"] = list(config.semantic_focus_signals)
+    job["scheduler_semantic_objectives"] = [
+        objective_feature(getattr(rule, "objective", ""))
+        for rule in config.exploration_objective_rules
+        if objective_feature(getattr(rule, "objective", ""))
+    ]
 
 
 def _effective_job_local_source_scheduler(job: dict) -> tuple[bool, float]:
+    disabled_components = _parse_adaptive_components(job.get("disable_adaptive_components", ""))
+    if "local_source_scheduler" in disabled_components:
+        return False, 0.0
     preset_config = _job_config(job)
     job_enabled = bool(job.get("enable_local_source_scheduler", False))
     enabled = preset_config.enable_local_source_scheduler or job_enabled
@@ -3133,6 +3839,10 @@ def cmd_experiment(args: argparse.Namespace) -> int:
     backend_union = sorted({backend for _, backends in target_runs for backend in backends})
     duration_s = parse_duration(args.duration)
     evidence_mode = _resolve_evidence_mode(getattr(args, "evidence_mode", "auto"), suite_names)
+    disabled_adaptive_components = _parse_adaptive_components(
+        getattr(args, "disable_adaptive_components", "")
+    )
+    adaptive_components = _adaptive_component_config(disabled_adaptive_components)
     explicit_experiment_meta = parse_experiment_meta(getattr(args, "experiment_meta", None))
     default_experiment_meta = _default_experiment_meta_for_runs(
         evidence_mode=evidence_mode,
@@ -3166,12 +3876,30 @@ def cmd_experiment(args: argparse.Namespace) -> int:
             ),
             "known_bug_id": str(getattr(args, "known_bug_id", "") or ""),
             "target_version": str(getattr(args, "target_version", "") or ""),
+            "fixed_version": str(getattr(args, "fixed_version", "") or ""),
+            "version_pair_pool": str(getattr(args, "version_pair_pool", "") or ""),
+            "semantic_objective_learning_weight": max(
+                0.0,
+                float(getattr(args, "semantic_objective_learning_weight", 0.0) or 0.0),
+            ),
+            "metamorphic_relation_learning_weight": max(
+                0.0,
+                float(getattr(args, "metamorphic_relation_learning_weight", 0.0) or 0.0),
+            ),
+            "version_pair_learning_weight": max(
+                0.0,
+                float(getattr(args, "version_pair_learning_weight", 0.0) or 0.0),
+            ),
+            "metamorphic_relation_order": str(getattr(args, "metamorphic_relation_order", "") or ""),
             "run_theme": str(getattr(args, "run_theme", "") or ""),
             "paper_notes": str(getattr(args, "paper_notes", "") or ""),
+            "persist_closed_loop_state": bool(getattr(args, "persist_closed_loop_state", False)),
             "enable_local_source_scheduler": bool(getattr(args, "enable_local_source_scheduler", False)),
             "local_source_exploration_weight": max(
                 0.0, float(getattr(args, "local_source_exploration_weight", 0.5))
             ),
+            "disable_adaptive_components": sorted(disabled_adaptive_components),
+            "adaptive_components": dict(adaptive_components),
             "experiment_meta": experiment_meta,
             "skip_run_reports": args.skip_run_reports,
         }
@@ -3183,6 +3911,7 @@ def cmd_experiment(args: argparse.Namespace) -> int:
         )
     ]
     for job in planned_runs:
+        _populate_job_learning_metadata(job)
         job["enable_replay_bug"] = bool(job.get("enable_replay_bug", False)) or _job_config(job).enable_replay_bug
         job["estimated_cost"] = round(_experiment_job_weight(job), 4)
     parallelism = _resolve_experiment_parallelism(args, planned_runs)
@@ -3200,9 +3929,11 @@ def cmd_experiment(args: argparse.Namespace) -> int:
         )
         return 2
     local_source_settings = [_effective_job_local_source_scheduler(job) for job in planned_runs]
-    local_source_enabled = schedule == "adaptive" or any(enabled for enabled, _ in local_source_settings)
+    local_source_enabled = (
+        schedule == "adaptive" and adaptive_components["local_source_scheduler"]
+    ) or any(enabled for enabled, _ in local_source_settings)
     local_source_weights = [weight for enabled, weight in local_source_settings if enabled]
-    if schedule == "adaptive" and not local_source_weights:
+    if schedule == "adaptive" and adaptive_components["local_source_scheduler"] and not local_source_weights:
         local_source_weights.append(max(0.0, float(getattr(args, "local_source_exploration_weight", 0.5))))
     backend_context = target_context(backend_union)
     manifest = {
@@ -3244,6 +3975,10 @@ def cmd_experiment(args: argparse.Namespace) -> int:
             "enabled": local_source_enabled,
             "exploration_weight": max(local_source_weights) if local_source_weights else 0.0,
         },
+        "adaptive_methodology": {
+            "components": dict(adaptive_components),
+            "disabled_components": sorted(disabled_adaptive_components),
+        },
         "runs": [],
     }
     if schedule == "adaptive":
@@ -3251,6 +3986,7 @@ def cmd_experiment(args: argparse.Namespace) -> int:
         for result in completed_runs:
             manifest["runs"].append(result["run"])
         manifest["adaptive_state"] = completed_runs[-1]["scheduler_state"] if completed_runs else []
+        manifest["adaptive_learning"] = completed_runs[-1]["adaptive_learning"] if completed_runs else {}
         manifest_path = _experiment_manifest_path()
         dump_json(manifest, manifest_path)
         print(f"experiment manifest: {manifest_path}")
@@ -3339,6 +4075,10 @@ def _run_experiment_adaptive(
     *,
     jobs: int,
 ) -> list[dict[str, Any]]:
+    disabled_components = _parse_adaptive_components(
+        getattr(args, "disable_adaptive_components", "")
+    )
+    adaptive_components = _adaptive_component_config(disabled_components)
     default_batch_cases = min(100, max(1, int(args.cases or 100)))
     batch_cases = max(1, int(getattr(args, "batch_cases", 0) or default_batch_cases))
     batch_duration_s = parse_duration(getattr(args, "batch_duration", None))
@@ -3358,12 +4098,36 @@ def _run_experiment_adaptive(
         exploration_weight=max(0.0, float(getattr(args, "exploration_weight", 0.75))),
         group_fairness_weight=max(0.0, float(getattr(args, "group_fairness_weight", 0.40))),
         max_group_pull_gap=max(0, int(getattr(args, "max_group_pull_gap", 3))),
+        learning_weight=(
+            max(0.0, float(getattr(args, "adaptive_learning_weight", 0.0)))
+            if adaptive_components["scheduler_learning"]
+            else 0.0
+        ),
+        record_learning_feedback=adaptive_components["scheduler_learning"],
+        enable_runtime_cost_learning=adaptive_components["runtime_cost_learning"],
+        enable_active_learning=adaptive_components["active_learning"],
+        enable_online_reward_model=adaptive_components["online_reward_model"],
+        enable_continual_learning=adaptive_components["continual_learning"],
+        annealing_initial_temperature=(
+            max(0.0, float(getattr(args, "scheduler_annealing_temperature", 0.0) or 0.0))
+            if adaptive_components["scheduler_annealing"]
+            else 0.0
+        ),
+        annealing_decay=max(0.0, float(getattr(args, "scheduler_annealing_decay", 0.985) or 0.0)),
+        annealing_min_temperature=max(
+            0.0,
+            float(getattr(args, "scheduler_annealing_min_temperature", 0.02) or 0.0),
+        ),
+    )
+    learning_state, continual_learning_sources = _adaptive_learning_state_from_ledgers(
+        getattr(args, "continual_learning_ledgers", "")
     )
     scheduler = AdaptiveBudgetScheduler(
         planned_runs,
         total_cases_budget=total_cases_budget,
         total_duration_budget_s=total_duration_budget_s,
         config=schedule_config,
+        learning_state=learning_state,
     )
     manifest["adaptive_config"] = {
         "total_cases_budget": total_cases_budget,
@@ -3375,10 +4139,26 @@ def _run_experiment_adaptive(
         "group_fairness_weight": schedule_config.group_fairness_weight,
         "max_group_pull_gap": schedule_config.max_group_pull_gap,
         "prefer_group_diversity_in_round": schedule_config.prefer_group_diversity_in_round,
-        "fine_grained_local_source_scheduler": True,
+        "learning_weight": schedule_config.learning_weight,
+        "record_learning_feedback": schedule_config.record_learning_feedback,
+        "runtime_cost_learning": schedule_config.enable_runtime_cost_learning,
+        "active_learning": schedule_config.enable_active_learning,
+        "online_reward_model": schedule_config.enable_online_reward_model,
+        "continual_learning": schedule_config.enable_continual_learning,
+        "scheduler_annealing": adaptive_components["scheduler_annealing"],
+        "annealing_initial_temperature": schedule_config.annealing_initial_temperature,
+        "annealing_decay": schedule_config.annealing_decay,
+        "annealing_min_temperature": schedule_config.annealing_min_temperature,
+        "fine_grained_local_source_scheduler": adaptive_components["local_source_scheduler"],
         "local_source_exploration_weight": max(
-            0.0, float(getattr(args, "local_source_exploration_weight", 0.5))
+            0.0,
+            float(getattr(args, "local_source_exploration_weight", 0.5))
+            if adaptive_components["local_source_scheduler"]
+            else 0.0,
         ),
+        "components": dict(adaptive_components),
+        "disabled_components": sorted(disabled_components),
+        "continual_learning_sources": continual_learning_sources,
         "jobs": jobs,
         "parallelism": manifest.get("parallelism", {}),
     }
@@ -3398,6 +4178,65 @@ def _run_experiment_adaptive(
         print("process parallelism unavailable; falling back to threaded workers", flush=True)
         completed_runs.extend(_run_experiment_adaptive_parallel(ThreadPoolExecutor, worker_count, scheduler))
     return completed_runs
+
+
+def _adaptive_learning_state_from_ledgers(value: Any) -> tuple[AdaptiveLearningState, list[dict[str, Any]]]:
+    state = AdaptiveLearningState()
+    sources: list[dict[str, Any]] = []
+    for path_text in parse_guidance_targets(str(value or "")):
+        path = Path(path_text)
+        if not path.is_file():
+            sources.append({"path": str(path), "loaded": False, "reason": "missing"})
+            continue
+        payload = load_json(path)
+        if not isinstance(payload, dict):
+            sources.append({"path": str(path), "loaded": False, "reason": "not_object"})
+            continue
+        ledger_error = _continual_learning_ledger_validation_error(payload)
+        if ledger_error:
+            sources.append(
+                {
+                    "path": str(path),
+                    "loaded": False,
+                    "reason": ledger_error,
+                    "schema_version": str(payload.get("schema_version", "") or ""),
+                }
+            )
+            continue
+        seed = payload.get("adaptive_learning_seed", {})
+        if isinstance(seed, dict) and isinstance(seed.get("continual_priority_memory"), dict):
+            summary = state.continual_priority_memory.merge(
+                ContinualPriorityMemory.from_state_dict(seed.get("continual_priority_memory"))
+            )
+        else:
+            summary = state.ingest_continual_ledger(payload)
+        sources.append(
+            {
+                "path": str(path),
+                "loaded": True,
+                "schema_version": str(payload.get("schema_version", "") or ""),
+                "family_count": int(summary.get("family_count", 0) or 0),
+                "feature_count": int(summary.get("feature_count", 0) or 0),
+                "status_counts": dict(summary.get("status_counts", {}) or {}),
+            }
+        )
+    return state, sources
+
+
+def _continual_learning_ledger_validation_error(payload: dict[str, Any]) -> str:
+    if str(payload.get("schema_version", "") or "") != "version-ledger-v1":
+        return "schema_mismatch"
+    health = payload.get("health", {}) if isinstance(payload.get("health", {}), dict) else {}
+    if str(health.get("schema_version", "") or "") != "version-ledger-health-v1":
+        return "missing_health_feedback"
+    report = (
+        payload.get("health_feedback_report", {})
+        if isinstance(payload.get("health_feedback_report", {}), dict)
+        else {}
+    )
+    if str(report.get("schema_version", "") or "") != "version-ledger-health-feedback-report-v1":
+        return "missing_health_feedback_report"
+    return ""
 
 
 def _resolve_experiment_parallelism(args: argparse.Namespace, planned_runs: list[dict[str, Any]]) -> dict[str, Any]:
@@ -3458,7 +4297,8 @@ def _run_experiment_adaptive_parallel(
 
 def _adaptive_job(batch: Any) -> dict[str, Any]:
     job = dict(batch.job)
-    job["enable_local_source_scheduler"] = True
+    disabled_components = _parse_adaptive_components(job.get("disable_adaptive_components", ""))
+    job["enable_local_source_scheduler"] = "local_source_scheduler" not in disabled_components
     return job
 
 
@@ -3530,6 +4370,7 @@ def _complete_adaptive_round(
             {
                 **result,
                 "scheduler_state": scheduler.snapshot(),
+                "adaptive_learning": scheduler.learning_state.to_state_dict(),
                 "message": (
                     f"{result['message']} batch={batch.batch_index} "
                     f"reward={reward:.3f} remaining_cases={scheduler.remaining_cases_budget} "
@@ -3692,9 +4533,9 @@ def _experiment_job_weight(job: dict) -> float:
     profile_multiplier = {
         "float_group_key": 1.6,
         "join_null_sort": 1.5,
-        "bughunt": 1.3,
+        "discovery": 1.3,
         "common_api_workflow": 0.9,
-        "bughunt_no_groupby": 1.2,
+        "discovery_no_groupby": 1.2,
         "workflow": 1.2,
         "edge_float": 1.1,
         "null_groupby_topk": 1.0,
@@ -3773,16 +4614,23 @@ def _backend_cost(backend: str) -> float:
 def _run_experiment_job(job: dict) -> dict:
     _apply_native_thread_limits(int(job.get("worker_thread_limit", 1) or 1))
     preset_config = _job_config(job)
+    disabled_components = _parse_adaptive_components(job.get("disable_adaptive_components", ""))
+    adaptive_components = _adaptive_component_config(disabled_components)
+    _apply_adaptive_component_config(preset_config, disabled_components)
     preset_config.log_level = str(job["log_level"])
     preset_config.compress_run_log = bool(job["compress_run_log"])
     preset_config.artifact_limit = job["artifact_limit"]
     job_source_scheduler_enabled = bool(job.get("enable_local_source_scheduler", False))
-    preset_config.enable_local_source_scheduler = preset_config.enable_local_source_scheduler or job_source_scheduler_enabled
+    preset_config.enable_local_source_scheduler = (
+        preset_config.enable_local_source_scheduler or job_source_scheduler_enabled
+    ) and adaptive_components["local_source_scheduler"]
     if job_source_scheduler_enabled:
         preset_config.local_source_exploration_weight = max(
             0.0,
             float(job.get("local_source_exploration_weight", preset_config.local_source_exploration_weight)),
         )
+    if not adaptive_components["local_source_scheduler"]:
+        preset_config.local_source_exploration_weight = 0.0
     if job["metamorphic_variant_limit"] is not None:
         preset_config.metamorphic_variant_limit = max(0, int(job["metamorphic_variant_limit"]))
     preset_config.enable_replay_bug = preset_config.enable_replay_bug or bool(job.get("enable_replay_bug", False))
@@ -3810,6 +4658,11 @@ def _run_experiment_job(job: dict) -> dict:
         md_path, csv_path = write_report(run_file)
     experiment_meta = _job_experiment_meta(job)
     run_semantics = resolved_run_semantics(job, experiment_meta)
+    preset_metadata = catalog_preset_metadata(
+        str(job["preset"]),
+        base_preset=str(run_semantics.get("base_preset", "") or ""),
+        overlays=list(run_semantics.get("overlays", []) or []),
+    )
     preset_semantic_focus_families = list(preset_config.semantic_focus_families)
     preset_semantic_focus_signals = list(preset_config.semantic_focus_signals)
     configured_guidance_targets = list(preset_config.guidance_targets)
@@ -3827,6 +4680,8 @@ def _run_experiment_job(job: dict) -> dict:
         "estimated_cost": job.get("estimated_cost", ""),
         "worker_thread_limit": job.get("worker_thread_limit", ""),
         "closed_loop_state_present": isinstance(job.get("closed_loop_state"), dict),
+        "adaptive_components": dict(adaptive_components),
+        "disabled_adaptive_components": sorted(disabled_components),
         "experiment_meta": experiment_meta,
         "matrix_id": run_semantics["matrix_id"],
         "matrix_title": run_semantics["matrix_title"],
@@ -3847,6 +4702,7 @@ def _run_experiment_job(job: dict) -> dict:
         "factors": dict(run_semantics["factors"]),
         "oracle_profile": run_semantics["oracle_profile"],
         "scope_kind": run_semantics["scope_kind"],
+        "preset_metadata": preset_metadata,
         "configured_guidance_targets": configured_guidance_targets,
         "configured_effective_guidance_targets": configured_effective_guidance_targets,
         "configured_semantic_focus_families": preset_semantic_focus_families,
@@ -3891,6 +4747,46 @@ def build_parser() -> argparse.ArgumentParser:
     p_targets.add_argument("--json", action="store_true", help="emit target registry as JSON")
     p_targets.set_defaults(func=cmd_targets)
 
+    p_semantic_registry = sub.add_parser(
+        "semantic-registry",
+        help="emit the reusable semantic objective/capability/oracle methodology registry",
+    )
+    add_target_suite_flags(p_semantic_registry)
+    p_semantic_registry.add_argument(
+        "--exploration-objective-rules",
+        default="",
+        help="JSON or @path defining extra neutral exploration objective rules",
+    )
+    p_semantic_registry.add_argument("--json", action="store_true", help="emit registry as JSON")
+    p_semantic_registry.set_defaults(func=cmd_semantic_registry)
+
+    p_version_ledger = sub.add_parser(
+        "version-ledger",
+        help="build a cross-version candidate-family ledger from one or more run logs",
+    )
+    p_version_ledger.add_argument("--run-file", default=None, help="single run log; defaults to latest run")
+    p_version_ledger.add_argument("--run-files", default="", help="comma-separated run logs in version order")
+    p_version_ledger.add_argument(
+        "--manifest-index",
+        action="append",
+        default=[],
+        help=(
+            "final experiment manifest index to scan for run logs when --run-files is omitted; "
+            "may be repeated"
+        ),
+    )
+    p_version_ledger.add_argument("--versions", default="", help="comma-separated version ids matching --run-files")
+    p_version_ledger.add_argument("--baseline-version", default="", help="baseline version id; defaults to first run")
+    p_version_ledger.add_argument("--previous-ledger", default="", help="previous ledger JSON for regression detection")
+    p_version_ledger.add_argument("--output", default="", help="optional ledger JSON output path")
+    p_version_ledger.add_argument(
+        "--evidence-manifest-output",
+        default="",
+        help="optional final-readiness evidence manifest that references the written ledger",
+    )
+    p_version_ledger.add_argument("--json", action="store_true", help="emit ledger as JSON")
+    p_version_ledger.set_defaults(func=cmd_version_ledger)
+
     p_prune = sub.add_parser("prune-corpus", help="dry-run prune of persisted feedback corpus cases")
     p_prune.add_argument(
         "--keep",
@@ -3907,6 +4803,24 @@ def build_parser() -> argparse.ArgumentParser:
     p_fuzz.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_fuzz)
     p_fuzz.add_argument("--profile", choices=PROFILE_CHOICES, default="common")
+    p_fuzz.add_argument(
+        "--profile-pool",
+        default="",
+        help="comma-separated generator profiles for adaptive per-case profile selection",
+    )
+    p_fuzz.add_argument(
+        "--profile-learning-weight",
+        type=float,
+        default=0.0,
+        help="per-case generator profile contextual-learning weight; 0 keeps fixed --profile",
+    )
+    p_fuzz.add_argument(
+        "--version-pair-pool",
+        default="",
+        help="comma-separated target-version pairs for adaptive per-case cross-version selection",
+    )
+    p_fuzz.add_argument("--target-version", default="", help="target backend/dependency version label for learning context")
+    p_fuzz.add_argument("--fixed-version", default="", help="fixed/backend comparison version label for learning context")
     add_guidance_flags(p_fuzz, default_strategy="random", default_candidate_pool=8)
     add_ablation_flags(p_fuzz)
     add_paper_journal_flags(p_fuzz)
@@ -3918,6 +4832,24 @@ def build_parser() -> argparse.ArgumentParser:
     p_long.add_argument("--seed", type=int, default=1)
     add_target_suite_flags(p_long)
     p_long.add_argument("--profile", choices=PROFILE_CHOICES, default="common")
+    p_long.add_argument(
+        "--profile-pool",
+        default="",
+        help="comma-separated generator profiles for adaptive per-case profile selection",
+    )
+    p_long.add_argument(
+        "--profile-learning-weight",
+        type=float,
+        default=0.0,
+        help="per-case generator profile contextual-learning weight; 0 keeps fixed --profile",
+    )
+    p_long.add_argument(
+        "--version-pair-pool",
+        default="",
+        help="comma-separated target-version pairs for adaptive per-case cross-version selection",
+    )
+    p_long.add_argument("--target-version", default="", help="target backend/dependency version label for learning context")
+    p_long.add_argument("--fixed-version", default="", help="fixed/backend comparison version label for learning context")
     add_guidance_flags(p_long, default_strategy="guided", default_candidate_pool=8)
     p_long.add_argument("--case-log", default=None, help="optional JSONL path for generated test cases")
     p_long.add_argument("--checkpoint-interval", default="60s", help="checkpoint write interval")
@@ -3970,254 +4902,254 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_bug_audit.set_defaults(func=cmd_bug_audit)
 
-    p_bug_hunt = sub.add_parser(
-        "bug-hunt",
-        help="run the integrated latest-version bug hunt workflow: audit, fuzz, report, classify, and manifest",
+    p_discovery_run = sub.add_parser(
+        "discovery-run",
+        help="run the integrated latest-version discovery workflow: audit, fuzz, report, classify, and manifest",
     )
-    p_bug_hunt.add_argument("--cases", type=int, default=500, help="fresh fuzz case budget")
-    p_bug_hunt.add_argument("--duration", default=None, help="optional wall-clock budget such as 10m or 24h")
-    p_bug_hunt.add_argument("--seed", type=int, default=1)
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument("--cases", type=int, default=500, help="fresh fuzz case budget")
+    p_discovery_run.add_argument("--duration", default=None, help="optional wall-clock budget such as 10m or 24h")
+    p_discovery_run.add_argument("--seed", type=int, default=1)
+    p_discovery_run.add_argument(
         "--target-suite",
         choices=sorted(TARGET_SUITES),
         default="latest_all_engines",
         help="backend target suite for the fresh fuzz stage",
     )
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument(
         "--backends",
         default=None,
         help="explicit comma-separated backend targets; overrides --target-suite",
     )
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument(
         "--preset",
         default="live_deep_organic",
         help="experiment preset for the fresh fuzz stage; defaults to live_deep_organic",
     )
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument(
         "--probes",
         default="",
         help=f"comma-separated audit probe ids; defaults to all: {','.join(list_audit_probe_ids())}",
     )
-    p_bug_hunt.add_argument("--skip-bug-audit", action="store_true", help="skip deterministic audit stage")
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument("--skip-bug-audit", action="store_true", help="skip deterministic audit stage")
+    p_discovery_run.add_argument(
         "--write-issues",
         dest="write_issues",
         action="store_true",
         default=True,
         help="write audit candidate issue drafts into --issue-dir; enabled by default",
     )
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument(
         "--no-write-issues",
         dest="write_issues",
         action="store_false",
         help="do not write audit issue drafts",
     )
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument(
         "--issue-dir",
         default="new_issue/generated",
         help="directory for generated audit issue drafts",
     )
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument(
         "--overwrite-issues",
         dest="overwrite_issues",
         action="store_true",
         default=True,
         help="overwrite existing generated audit issue drafts; enabled by default",
     )
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument(
         "--no-overwrite-issues",
         dest="overwrite_issues",
         action="store_false",
         help="keep existing generated audit issue drafts",
     )
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument(
         "--output-manifest",
-        default="new_issue/generated/bug-hunt-manifest.json",
-        help="portable manifest for the integrated hunt run",
+        default="new_issue/generated/discovery-run-manifest.json",
+        help="portable manifest for the integrated discovery run",
     )
-    p_bug_hunt.add_argument("--skip-run-report", action="store_true", help="skip markdown/csv report generation")
-    p_bug_hunt.add_argument("--classify-limit", type=int, default=3, help="example count per triage verdict")
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument("--skip-run-report", action="store_true", help="skip markdown/csv report generation")
+    p_discovery_run.add_argument("--classify-limit", type=int, default=3, help="example count per triage verdict")
+    p_discovery_run.add_argument(
         "--refresh-classification",
         action="store_true",
         help="recompute differential findings from stored normalized outputs before classifying",
     )
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument(
         "--extra-known-saturated-bug-families",
         default="",
         help="additional comma-separated root@backend families to exclude from fresh counts",
     )
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument(
         "--candidate-recheck-count",
         type=int,
         default=None,
         help="override preset candidate recheck count",
     )
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument(
         "--metamorphic-variant-limit",
         type=int,
         default=None,
         help="override preset metamorphic variant limit",
     )
-    p_bug_hunt.add_argument("--artifact-limit", type=int, default=None)
-    p_bug_hunt.add_argument("--no-compress-run-log", action="store_true")
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument("--artifact-limit", type=int, default=None)
+    p_discovery_run.add_argument("--no-compress-run-log", action="store_true")
+    p_discovery_run.add_argument(
         "--log-level",
         choices=["full", "compact", "minimal"],
         default="compact",
         help="fresh fuzz JSONL detail level",
     )
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument(
         "--fail-on-fresh-candidate",
         action="store_true",
         help="exit with code 2 when the fuzz stage finds a non-saturated candidate family",
     )
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument(
         "--skip-candidate-pipeline",
         action="store_true",
         help="skip the automatic freeze/recheck/reduce/dedup/issue-readiness pipeline for fresh candidates",
     )
-    p_bug_hunt.add_argument("--candidate-pipeline-recheck-attempts", type=int, default=2)
-    p_bug_hunt.add_argument(
+    p_discovery_run.add_argument("--candidate-pipeline-recheck-attempts", type=int, default=2)
+    p_discovery_run.add_argument(
         "--candidate-pipeline-output-dir",
         default=str(DEFAULT_CANDIDATE_PIPELINE_DIR.relative_to(PROJECT_ROOT)),
     )
-    p_bug_hunt.add_argument("--no-candidate-pipeline-reduce", action="store_true")
-    p_bug_hunt.add_argument("--no-candidate-pipeline-standalone-reproducer", action="store_true")
-    p_bug_hunt.set_defaults(func=cmd_discovery_run)
+    p_discovery_run.add_argument("--no-candidate-pipeline-reduce", action="store_true")
+    p_discovery_run.add_argument("--no-candidate-pipeline-standalone-reproducer", action="store_true")
+    p_discovery_run.set_defaults(func=cmd_discovery_run)
 
-    p_bug_sprint = sub.add_parser(
-        "bug-sprint",
-        help="run multiple narrow latest-version bug-hunt lanes and write one evidence manifest",
+    p_discovery_campaign = sub.add_parser(
+        "discovery-campaign",
+        help="run multiple narrow latest-version discovery lanes and write one evidence manifest",
     )
-    p_bug_sprint.add_argument("--cases", type=int, default=100, help="case budget per lane/seed")
-    p_bug_sprint.add_argument("--duration", default=None, help="optional wall-clock budget per lane/seed")
-    p_bug_sprint.add_argument("--seeds", default="1", help="comma-separated seeds for every selected lane")
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument("--cases", type=int, default=100, help="case budget per lane/seed")
+    p_discovery_campaign.add_argument("--duration", default=None, help="optional wall-clock budget per lane/seed")
+    p_discovery_campaign.add_argument("--seeds", default="1", help="comma-separated seeds for every selected lane")
+    p_discovery_campaign.add_argument(
         "--lanes",
         default="",
         help=f"comma-separated lane ids; defaults to: {','.join(DEFAULT_DISCOVERY_LANE_IDS)}",
     )
-    p_bug_sprint.add_argument("--list-lanes", action="store_true", help="print available bug-sprint lanes and exit")
-    p_bug_sprint.add_argument("--json", action="store_true", help="with --list-lanes, emit lane catalog as JSON")
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument("--list-lanes", action="store_true", help="print available discovery lanes and exit")
+    p_discovery_campaign.add_argument("--json", action="store_true", help="with --list-lanes, emit lane catalog as JSON")
+    p_discovery_campaign.add_argument(
         "--probes",
         default="",
         help=f"comma-separated audit probe ids; defaults to all: {','.join(list_audit_probe_ids())}",
     )
-    p_bug_sprint.add_argument("--skip-bug-audit", action="store_true", help="skip deterministic audit stage")
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument("--skip-bug-audit", action="store_true", help="skip deterministic audit stage")
+    p_discovery_campaign.add_argument(
         "--write-issues",
         dest="write_issues",
         action="store_true",
         default=True,
         help="write audit candidate issue drafts into --issue-dir; enabled by default",
     )
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument(
         "--no-write-issues",
         dest="write_issues",
         action="store_false",
         help="do not write audit issue drafts",
     )
-    p_bug_sprint.add_argument("--issue-dir", default="new_issue/generated")
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument("--issue-dir", default="new_issue/generated")
+    p_discovery_campaign.add_argument(
         "--overwrite-issues",
         dest="overwrite_issues",
         action="store_true",
         default=True,
         help="overwrite existing generated audit issue drafts; enabled by default",
     )
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument(
         "--no-overwrite-issues",
         dest="overwrite_issues",
         action="store_false",
         help="keep existing generated audit issue drafts",
     )
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument(
         "--output-manifest",
-        default="new_issue/generated/bug-sprint-manifest.json",
-        help="portable manifest for the guided sprint run",
+        default="new_issue/generated/discovery-campaign-manifest.json",
+        help="portable manifest for the guided discovery campaign",
     )
-    p_bug_sprint.add_argument("--skip-run-report", action="store_true", help="skip markdown/csv report generation")
-    p_bug_sprint.add_argument("--classify-limit", type=int, default=3, help="example count per triage verdict")
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument("--skip-run-report", action="store_true", help="skip markdown/csv report generation")
+    p_discovery_campaign.add_argument("--classify-limit", type=int, default=3, help="example count per triage verdict")
+    p_discovery_campaign.add_argument(
         "--refresh-classification",
         action="store_true",
         help="recompute differential findings from stored normalized outputs before classifying",
     )
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument(
         "--extra-known-saturated-bug-families",
         default="",
         help="additional comma-separated root@backend families to exclude from fresh counts",
     )
-    p_bug_sprint.add_argument("--candidate-recheck-count", type=int, default=None)
-    p_bug_sprint.add_argument("--metamorphic-variant-limit", type=int, default=None)
-    p_bug_sprint.add_argument("--artifact-limit", type=int, default=None)
-    p_bug_sprint.add_argument("--no-compress-run-log", action="store_true")
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument("--candidate-recheck-count", type=int, default=None)
+    p_discovery_campaign.add_argument("--metamorphic-variant-limit", type=int, default=None)
+    p_discovery_campaign.add_argument("--artifact-limit", type=int, default=None)
+    p_discovery_campaign.add_argument("--no-compress-run-log", action="store_true")
+    p_discovery_campaign.add_argument(
         "--log-level",
         choices=["full", "compact", "minimal"],
         default="compact",
         help="fresh fuzz JSONL detail level",
     )
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument(
         "--fail-on-fresh-candidate",
         action="store_true",
         help="exit with code 2 when any lane finds a non-saturated candidate family",
     )
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument(
         "--watch-health",
         action="store_true",
         help="stop remaining lanes after any completed lane/seed run contains a bug row or organic fresh candidate",
     )
-    p_bug_sprint.add_argument("--lane-history-window", type=int, default=DEFAULT_BUG_SPRINT_HISTORY_WINDOW)
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument("--lane-history-window", type=int, default=DEFAULT_DISCOVERY_CAMPAIGN_HISTORY_WINDOW)
+    p_discovery_campaign.add_argument(
         "--lane-yield-weight",
         type=float,
-        default=DEFAULT_BUG_SPRINT_SCORE_WEIGHTS["yield_rate"],
+        default=DEFAULT_DISCOVERY_CAMPAIGN_SCORE_WEIGHTS["yield_rate"],
     )
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument(
         "--lane-novelty-weight",
         type=float,
-        default=DEFAULT_BUG_SPRINT_SCORE_WEIGHTS["novelty_rate"],
+        default=DEFAULT_DISCOVERY_CAMPAIGN_SCORE_WEIGHTS["novelty_rate"],
     )
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument(
         "--lane-false-positive-penalty",
         type=float,
-        default=DEFAULT_BUG_SPRINT_SCORE_WEIGHTS["false_positive_penalty"],
+        default=DEFAULT_DISCOVERY_CAMPAIGN_SCORE_WEIGHTS["false_positive_penalty"],
     )
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument(
         "--skip-candidate-pipeline",
         action="store_true",
         help="skip the automatic freeze/recheck/reduce/dedup/issue-readiness pipeline for fresh candidates",
     )
-    p_bug_sprint.add_argument("--candidate-pipeline-recheck-attempts", type=int, default=2)
-    p_bug_sprint.add_argument(
+    p_discovery_campaign.add_argument("--candidate-pipeline-recheck-attempts", type=int, default=2)
+    p_discovery_campaign.add_argument(
         "--candidate-pipeline-output-dir",
         default=str(DEFAULT_CANDIDATE_PIPELINE_DIR.relative_to(PROJECT_ROOT)),
     )
-    p_bug_sprint.add_argument("--no-candidate-pipeline-reduce", action="store_true")
-    p_bug_sprint.add_argument("--no-candidate-pipeline-standalone-reproducer", action="store_true")
-    p_bug_sprint.set_defaults(func=cmd_discovery_campaign)
+    p_discovery_campaign.add_argument("--no-candidate-pipeline-reduce", action="store_true")
+    p_discovery_campaign.add_argument("--no-candidate-pipeline-standalone-reproducer", action="store_true")
+    p_discovery_campaign.set_defaults(func=cmd_discovery_campaign)
 
-    p_bug_sprint_status = sub.add_parser(
-        "bug-sprint-status",
-        help="summarize a running or completed bug-sprint manifest and its latest observed run health",
+    p_discovery_campaign_status = sub.add_parser(
+        "discovery-campaign-status",
+        help="summarize a running or completed discovery-campaign manifest and its latest observed run health",
     )
-    p_bug_sprint_status.add_argument("--manifest", default="new_issue/generated/bug-sprint-manifest.json")
-    p_bug_sprint_status.add_argument("--limit", type=int, default=3, help="candidate examples to show from latest run")
-    p_bug_sprint_status.add_argument("--json", action="store_true", help="emit machine-readable status JSON")
-    p_bug_sprint_status.add_argument(
+    p_discovery_campaign_status.add_argument("--manifest", default="new_issue/generated/discovery-campaign-manifest.json")
+    p_discovery_campaign_status.add_argument("--limit", type=int, default=3, help="candidate examples to show from latest run")
+    p_discovery_campaign_status.add_argument("--json", action="store_true", help="emit machine-readable status JSON")
+    p_discovery_campaign_status.add_argument(
         "--fail-on-fresh-candidate",
         action="store_true",
-        help="exit with code 2 when the sprint manifest or latest observed run contains an unsaturated organic candidate",
+        help="exit with code 2 when the discovery-campaign manifest or latest observed run contains an unsaturated organic candidate",
     )
-    p_bug_sprint_status.add_argument(
+    p_discovery_campaign_status.add_argument(
         "--fail-on-bug",
         action="store_true",
         help="exit with code 2 when the latest observed run contains any status=bug row",
     )
-    p_bug_sprint_status.set_defaults(func=cmd_discovery_campaign_status)
+    p_discovery_campaign_status.set_defaults(func=cmd_discovery_campaign_status)
 
     p_bug_status = sub.add_parser(
         "bug-status",
@@ -4442,6 +5374,24 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     p_final_ready.add_argument(
+        "--extra-manifest",
+        action="append",
+        default=[],
+        help=(
+            "additional support manifest to audit alongside the default/latest run manifests; "
+            "use this for reports/experiment-final-version-ledger.json"
+        ),
+    )
+    p_final_ready.add_argument(
+        "--manifest-index",
+        action="append",
+        default=[],
+        help=(
+            "JSON manifest index produced by scripts/run_final_experiments.py --execute; "
+            "may be repeated and is used instead of sweeping stale runs/experiment-*.json files"
+        ),
+    )
+    p_final_ready.add_argument(
         "--latest-manifests",
         type=int,
         default=DEFAULT_FINAL_READINESS_MANIFEST_LIMIT,
@@ -4490,6 +5440,63 @@ def build_parser() -> argparse.ArgumentParser:
     p_final_ready.add_argument("--no-require-seeded", action="store_true")
     p_final_ready.add_argument("--no-require-ablation", action="store_true")
     p_final_ready.add_argument("--no-require-comparison", action="store_true")
+    p_final_ready.add_argument("--no-require-adaptive-component-ablation", action="store_true")
+    p_final_ready.add_argument(
+        "--min-adaptive-component-ablations",
+        type=int,
+        default=DEFAULT_FINAL_READINESS_THRESHOLDS.min_adaptive_component_ablations,
+    )
+    p_final_ready.add_argument(
+        "--required-adaptive-component-ablations",
+        default=",".join(DEFAULT_FINAL_READINESS_THRESHOLDS.required_adaptive_component_ablations),
+        help=(
+            "comma-separated adaptive components that must each have an ablation contrast; "
+            "hyphenated aliases are accepted"
+        ),
+    )
+    p_final_ready.add_argument("--no-require-transferability-scope", action="store_true")
+    p_final_ready.add_argument(
+        "--min-transfer-target-families",
+        type=int,
+        default=DEFAULT_FINAL_READINESS_THRESHOLDS.min_transfer_target_families,
+    )
+    p_final_ready.add_argument("--no-require-cross-version-ledger", action="store_true")
+    p_final_ready.add_argument(
+        "--min-cross-version-ledger-versions",
+        type=int,
+        default=DEFAULT_FINAL_READINESS_THRESHOLDS.min_cross_version_ledger_versions,
+    )
+    p_final_ready.add_argument(
+        "--min-cross-version-ledger-families",
+        type=int,
+        default=DEFAULT_FINAL_READINESS_THRESHOLDS.min_cross_version_ledger_families,
+    )
+    p_final_ready.add_argument("--no-require-cross-version-health-feedback", action="store_true")
+    p_final_ready.add_argument("--no-require-runtime-efficiency", action="store_true")
+    p_final_ready.add_argument(
+        "--min-throughput-cases-s",
+        type=float,
+        default=DEFAULT_FINAL_READINESS_THRESHOLDS.min_throughput_cases_s,
+    )
+    p_final_ready.add_argument(
+        "--max-scheduler-feedback-share",
+        type=float,
+        default=DEFAULT_FINAL_READINESS_THRESHOLDS.max_scheduler_feedback_share,
+    )
+    p_final_ready.add_argument(
+        "--min-scheduler-feedback-cases",
+        type=int,
+        default=DEFAULT_FINAL_READINESS_THRESHOLDS.min_scheduler_feedback_cases,
+        help="minimum executed cases before scheduler feedback share is enforced for a run",
+    )
+    p_final_ready.add_argument("--no-require-discovery-responsiveness", action="store_true")
+    p_final_ready.add_argument(
+        "--max-first-candidate-elapsed-s",
+        type=float,
+        default=DEFAULT_FINAL_READINESS_THRESHOLDS.max_first_candidate_elapsed_s,
+    )
+    p_final_ready.add_argument("--no-require-closed-loop-state-persistence", action="store_true")
+    p_final_ready.add_argument("--no-require-adaptive-live-component-evidence", action="store_true")
     p_final_ready.add_argument("--json", action="store_true", help="emit the generated readiness JSON")
     p_final_ready.add_argument(
         "--fail-on-missing",
@@ -4513,7 +5520,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_review_ready.add_argument("--target-confirmed", type=int, default=20)
     p_review_ready.add_argument("--min-audit-candidates", type=int, default=1)
-    p_review_ready.add_argument("--min-bug-workflows", type=int, default=1)
+    p_review_ready.add_argument("--min-discovery-workflows", type=int, default=1)
     p_review_ready.add_argument("--min-generated-issue-drafts", type=int, default=1)
     p_review_ready.add_argument("--min-issue-bundle-families", type=int, default=1)
     p_review_ready.add_argument("--min-pending-issue-drafts", type=int, default=1)
@@ -4639,15 +5646,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_fixture.add_argument("--target-version", default="", help="target dependency version or commit under replay")
     p_fixture.add_argument("--run-theme", default="", help="short paper-facing run theme")
     p_fixture.add_argument("--paper-notes", default="", help="brief paper-facing run notes")
-    p_fixture.add_argument("--artifact-limit", type=int, default=None, help="0 disables artifact writes")
-    p_fixture.add_argument("--log-level", choices=["full", "compact", "minimal"], default="compact")
     p_fixture.add_argument(
         "--experiment-meta",
         default="",
         help="JSON object describing structured experiment metadata for this fixture replay",
     )
-    p_fixture.add_argument("--disable-artifact", action="store_true")
-    p_fixture.add_argument("--no-compress-run-log", action="store_true")
     add_ablation_flags(p_fixture)
     p_fixture.set_defaults(func=cmd_replay_fixture)
 
@@ -4674,6 +5677,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--target-version",
         default="",
         help="target dependency version or commit used by a historical replay run",
+    )
+    p_exp.add_argument(
+        "--version-pair-pool",
+        default="",
+        help="comma-separated target-version pairs for adaptive per-case cross-version selection",
+    )
+    p_exp.add_argument(
+        "--fixed-version",
+        default="",
+        help="fixed dependency version or commit paired with --target-version for cross-version learning",
     )
     add_target_suite_flags(p_exp)
     p_exp.add_argument(
@@ -4742,6 +5755,44 @@ def build_parser() -> argparse.ArgumentParser:
         help="adaptive scheduler rebalances once a target-suite/preset group trails by this many pulls",
     )
     p_exp.add_argument(
+        "--adaptive-learning-weight",
+        type=float,
+        default=0.0,
+        help="adaptive scheduler contextual-learning score weight; 0 keeps legacy adaptive scheduling",
+    )
+    p_exp.add_argument(
+        "--scheduler-annealing-temperature",
+        type=float,
+        default=0.0,
+        help="initial adaptive scheduler annealing temperature; 0 keeps deterministic greedy selection",
+    )
+    p_exp.add_argument(
+        "--scheduler-annealing-decay",
+        type=float,
+        default=0.985,
+        help="per-completed-batch decay for adaptive scheduler annealing temperature",
+    )
+    p_exp.add_argument(
+        "--scheduler-annealing-min-temperature",
+        type=float,
+        default=0.02,
+        help="minimum nonzero adaptive scheduler annealing temperature",
+    )
+    p_exp.add_argument(
+        "--continual-learning-ledgers",
+        default="",
+        help="comma-separated version-ledger JSON files used to cold-start adaptive continual-learning priority",
+    )
+    p_exp.add_argument(
+        "--disable-adaptive-components",
+        type=_parse_adaptive_components,
+        default="",
+        help=(
+            "comma-separated adaptive components to disable for ablation: "
+            + ",".join(ADAPTIVE_COMPONENTS)
+        ),
+    )
+    p_exp.add_argument(
         "--enable-local-source-scheduler",
         action="store_true",
         help="enable within-run generated-vs-feedback source scheduling for non-adaptive experiment jobs",
@@ -4769,6 +5820,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="comma-separated upstream issue URLs treated as known replay bugs in fresh experiment mode",
     )
     p_exp.add_argument("--no-compress-run-log", action="store_true")
+    p_exp.add_argument(
+        "--persist-closed-loop-state",
+        action="store_true",
+        help="write a resumable closed-loop learning state file for each experiment run",
+    )
     p_exp.add_argument(
         "--skip-run-reports",
         action="store_true",

@@ -103,7 +103,7 @@ def test_methodology_experiment_presets_cover_required_ablation_axes():
     assert metamorphic.oracle_mode == "both"
     assert guided.guidance_strategy == "guided"
     assert guided.guidance_candidate_pool > 1
-    assert guided_join.generator_profile == "bughunt_no_groupby"
+    assert guided_join.generator_profile == "discovery_no_groupby"
     assert "join" in guided_join.guidance_targets
 
 
@@ -201,7 +201,7 @@ def test_methodology_replay_source_gate_spans_historical_projects():
     assert required_sources.issubset(set(DEFAULT_REPLAY_BUG_SOURCE_ISSUES))
 
 
-def test_methodology_bug_hunting_presets_target_distinct_semantic_risks():
+def test_methodology_discovery_presets_target_distinct_semantic_risks():
     null_groupby = _preset_config("null_groupby_topk")
     null_agg = _preset_config("null_agg_topk")
     filter_null_agg = _preset_config("filter_null_agg_topk")

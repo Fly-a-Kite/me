@@ -606,7 +606,7 @@ SELECT * FROM (
             "base_sql": base_sql.strip(),
             "duplicate_limit_sql": duplicate_limit_sql.strip(),
             "discovered_by": (
-                "datadiff bug-hunt --cases 1200 --seed 998001 "
+                "datadiff discovery-run --cases 1200 --seed 998001 "
                 "--target-suite latest_all_engines --preset live_cross_family_metamorphic"
             ),
             "fresh_family": "metamorphic_limit_idempotence@datafusion",

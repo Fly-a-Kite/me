@@ -1,0 +1,357 @@
+{
+  "bug_audit": {
+    "skipped": true
+  },
+  "cases_per_lane_seed": 500000,
+  "completed_at": "2026-05-30T17:20:45Z",
+  "duration": "25m",
+  "generated_at": "2026-05-30T17:20:45Z",
+  "generated_by": "datadiff discovery-campaign",
+  "health_stop_reason": "fresh_candidate",
+  "lane_ids": [
+    "common_api_workflow",
+    "embedded_sql",
+    "duckdb_storage",
+    "datafusion_optimizer",
+    "datafusion_common_api",
+    "polars_lazy",
+    "polars_streaming",
+    "arrow_layout",
+    "cross_family"
+  ],
+  "lanes": [
+    {
+      "id": "common_api_workflow",
+      "preset": "live_common_api_workflow_metamorphic",
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, string clean/replace/slice/concat/pattern flags, ISO date-part extraction, int/float/string casts, nullable boolean not/reductions, drop-null, mutate, union-all, semi/anti join, fill-null/coalesce, case-when, distinct, join, groupby, sort, and slice"
+    },
+    {
+      "id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    },
+    {
+      "id": "duckdb_storage",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "target_suite": "duckdb_storage_cross",
+      "theme": "DuckDB persistent database execution path versus pandas references, including storage-backed joins, aggregation, sort, and projection"
+    },
+    {
+      "id": "datafusion_optimizer",
+      "preset": "live_datafusion_deep_organic_metamorphic",
+      "target_suite": "datafusion_cross",
+      "theme": "Organic DataFusion optimizer, join/filter/projection, and SQL metamorphic equivalence"
+    },
+    {
+      "id": "datafusion_common_api",
+      "preset": "live_datafusion_common_api_metamorphic",
+      "target_suite": "datafusion_cross",
+      "theme": "DataFusion daily low-complexity SQL/DataFrame workflows, including nullable DISTINCT top-k"
+    },
+    {
+      "id": "polars_lazy",
+      "preset": "live_polars_deep_organic_metamorphic",
+      "target_suite": "polars_cross",
+      "theme": "Organic Polars eager/lazy state, sortedness, nullable dtype, and expression equivalence"
+    },
+    {
+      "id": "polars_streaming",
+      "preset": "live_polars_streaming_deep_organic_metamorphic",
+      "target_suite": "polars_streaming_cross",
+      "theme": "Organic Polars lazy versus streaming execution state equivalence"
+    },
+    {
+      "id": "arrow_layout",
+      "preset": "live_arrow_deep_organic_metamorphic",
+      "target_suite": "arrow_cross",
+      "theme": "Organic Arrow table/list layout, nullable aggregation, string/cast, and compute equivalence"
+    },
+    {
+      "id": "cross_family",
+      "preset": "live_deep_organic_metamorphic",
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic cross-family Python API, Arrow, DataFrame, and embedded SQL semantics without DataFusion saturation"
+    }
+  ],
+  "progress": {
+    "completed_run_count": 3,
+    "current_lane_id": "",
+    "current_seed": "",
+    "planned_run_count": 18,
+    "remaining_run_count": 15
+  },
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "pyarrow",
+        "polars",
+        "polars_lazy",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 500000,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {},
+        "refresh": false,
+        "run_file": "runs/run-20260530T160536-1780157136694117989.jsonl.gz",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "completed_at": "2026-05-30T16:30:39Z",
+      "csv": "reports/findings-run-20260530T160536-1780157136694117989.csv",
+      "duration": "25m",
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-system-fresh-20260531T0010-manifest-common_api_workflow-seed53001-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "health": {
+        "bytes": 5392325,
+        "candidate_bug_families": {},
+        "examples": [],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 7784,
+        "run_file": "runs/run-20260530T160536-1780157136694117989.jsonl.gz",
+        "statuses": {
+          "ok": 7784
+        }
+      },
+      "lane_id": "common_api_workflow",
+      "preset": "live_common_api_workflow_metamorphic",
+      "report": "reports/report-run-20260530T160536-1780157136694117989.md",
+      "run_file": "runs/run-20260530T160536-1780157136694117989.jsonl.gz",
+      "seed": 53001,
+      "started_at": "2026-05-30T16:05:36Z",
+      "status": "completed",
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, string clean/replace/slice/concat/pattern flags, ISO date-part extraction, int/float/string casts, nullable boolean not/reductions, drop-null, mutate, union-all, semi/anti join, fill-null/coalesce, case-when, distinct, join, groupby, sort, and slice"
+    },
+    {
+      "backends": [
+        "pandas",
+        "pyarrow",
+        "polars",
+        "polars_lazy",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 500000,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {},
+        "refresh": false,
+        "run_file": "runs/run-20260530T163039-1780158639531174664.jsonl.gz",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "completed_at": "2026-05-30T16:55:42Z",
+      "csv": "reports/findings-run-20260530T163039-1780158639531174664.csv",
+      "duration": "25m",
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-system-fresh-20260531T0010-manifest-common_api_workflow-seed53002-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "health": {
+        "bytes": 5405459,
+        "candidate_bug_families": {},
+        "examples": [],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 7832,
+        "run_file": "runs/run-20260530T163039-1780158639531174664.jsonl.gz",
+        "statuses": {
+          "ok": 7832
+        }
+      },
+      "lane_id": "common_api_workflow",
+      "preset": "live_common_api_workflow_metamorphic",
+      "report": "reports/report-run-20260530T163039-1780158639531174664.md",
+      "run_file": "runs/run-20260530T163039-1780158639531174664.jsonl.gz",
+      "seed": 53002,
+      "started_at": "2026-05-30T16:30:39Z",
+      "status": "completed",
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, string clean/replace/slice/concat/pattern flags, ISO date-part extraction, int/float/string casts, nullable boolean not/reductions, drop-null, mutate, union-all, semi/anti join, fill-null/coalesce, case-when, distinct, join, groupby, sort, and slice"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 500000,
+      "classification": {
+        "candidate_bug_families": {
+          "metamorphic_groupby_neutral_mutation@duckdb": 2,
+          "metamorphic_semi_anti_join_rewrite@duckdb": 1
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00056174-discovery-fresh-mut-56887",
+              "evidence": "Single backend violates a semantics-preserving metamorphic relation: duckdb",
+              "kind": "metamorphic_semi_anti_join_rewrite_violation",
+              "root": "metamorphic_semi_anti_join_rewrite",
+              "seed": 56887,
+              "signature": "67eaec8004a0f8ef",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00054113-discovery-fresh-mut-61559",
+              "evidence": "Single backend violates a semantics-preserving metamorphic relation: duckdb",
+              "kind": "metamorphic_groupby_neutral_mutation_violation",
+              "root": "metamorphic_groupby_neutral_mutation",
+              "seed": 61559,
+              "signature": "6106a2d4ad837c90",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00054113-discovery-fresh-mut-62827",
+              "evidence": "Single backend violates a semantics-preserving metamorphic relation: duckdb",
+              "kind": "metamorphic_groupby_neutral_mutation_violation",
+              "root": "metamorphic_groupby_neutral_mutation",
+              "seed": 62827,
+              "signature": "af8a33b4e73b5276",
+              "suspicious": [
+                "duckdb"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "metamorphic_groupby_neutral_mutation@duckdb": 2,
+          "metamorphic_semi_anti_join_rewrite@duckdb": 1
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 3
+        },
+        "refresh": false,
+        "run_file": "runs/run-20260530T165542-1780160142319932143.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 3
+        },
+        "unsaturated_candidate_bug_families": {
+          "metamorphic_groupby_neutral_mutation@duckdb": 2,
+          "metamorphic_semi_anti_join_rewrite@duckdb": 1
+        }
+      },
+      "completed_at": "2026-05-30T17:20:45Z",
+      "csv": "reports/findings-run-20260530T165542-1780160142319932143.csv",
+      "duration": "25m",
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-system-fresh-20260531T0010-manifest-embedded_sql-seed53001-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 3,
+      "health": {
+        "bytes": 4504837,
+        "candidate_bug_families": {
+          "metamorphic_groupby_neutral_mutation@duckdb": 2,
+          "metamorphic_semi_anti_join_rewrite@duckdb": 1
+        },
+        "examples": [
+          {
+            "case_id": "case-00056174-discovery-fresh-mut-56887",
+            "kind": "metamorphic_semi_anti_join_rewrite_violation",
+            "root": "metamorphic_semi_anti_join_rewrite",
+            "seed": 56887,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          },
+          {
+            "case_id": "case-00054113-discovery-fresh-mut-61559",
+            "kind": "metamorphic_groupby_neutral_mutation_violation",
+            "root": "metamorphic_groupby_neutral_mutation",
+            "seed": 61559,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          },
+          {
+            "case_id": "case-00054113-discovery-fresh-mut-62827",
+            "kind": "metamorphic_groupby_neutral_mutation_violation",
+            "root": "metamorphic_groupby_neutral_mutation",
+            "seed": 62827,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          }
+        ],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "metamorphic_groupby_neutral_mutation@duckdb": 2,
+          "metamorphic_semi_anti_join_rewrite@duckdb": 1
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 6684,
+        "run_file": "runs/run-20260530T165542-1780160142319932143.jsonl.gz",
+        "statuses": {
+          "bug": 3,
+          "ok": 6681
+        }
+      },
+      "lane_id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "report": "reports/report-run-20260530T165542-1780160142319932143.md",
+      "run_file": "runs/run-20260530T165542-1780160142319932143.jsonl.gz",
+      "seed": 53001,
+      "started_at": "2026-05-30T16:55:42Z",
+      "status": "completed",
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    }
+  ],
+  "schema_version": "discovery-campaign-v1",
+  "seeds": [
+    53001,
+    53002
+  ],
+  "started_at": "2026-05-30T16:05:36Z",
+  "status": "completed",
+  "stopped_by_health": true,
+  "summary": {
+    "fresh_candidate_bug_families": {
+      "metamorphic_groupby_neutral_mutation@duckdb": 2,
+      "metamorphic_semi_anti_join_rewrite@duckdb": 1
+    },
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {},
+    "run_count": 3,
+    "triage_verdicts": {
+      "candidate_implementation_bug": 3
+    }
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "targeted_short_sprints",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence"
+  ]
+}

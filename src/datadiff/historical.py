@@ -124,7 +124,7 @@ HISTORICAL_BUGS: tuple[HistoricalBugSpec, ...] = (
         issue_url="https://github.com/apache/datafusion/issues/22190",
         default_presets=(
             "baseline",
-            "bughunt_guided",
+            "discovery_guided",
             "filter_null_agg_topk",
             "join_null_agg_topk",
             "join_null_key_topk",
@@ -192,7 +192,7 @@ HISTORICAL_BUGS: tuple[HistoricalBugSpec, ...] = (
         issue_url="https://github.com/apache/datafusion/issues/22441",
         default_presets=(
             "join_null_truth_filter",
-            "bughunt_guided",
+            "discovery_guided",
         ),
         default_cases=500,
         default_seeds=(1, 1001, 2001),

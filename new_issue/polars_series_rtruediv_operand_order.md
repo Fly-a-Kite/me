@@ -70,7 +70,7 @@ how Polars behaves for scalar right division and how the lazy expression
 
 - First live run: `runs/run-20260523T184954-1779562194466079119.jsonl.gz`
 - First recorded case index: `9`
-- First recorded case id: `case-00009412-bughunt-polars-reverse-division-columns`
+- First recorded case id: `case-00009412-discovery-polars-reverse-division-columns`
 - Later artifact: `bugs/bug_2cc0dbdcd7bedbc7`
 - Primary executable reproducer for the merged reflected-arithmetic family:
   `new_issue/generated/issue-bundles/reproducers/polars_series_reflected_arithmetic_operand_order.py`

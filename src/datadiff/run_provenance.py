@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from pathlib import Path
 from typing import Any
 
 from datadiff.util import PROJECT_ROOT
@@ -50,10 +51,17 @@ def collect_run_provenance() -> dict[str, Any]:
     }
 
 
+def _git_root() -> Path:
+    configured_root = _env_text("DATADIFF_ROOT_DIR")
+    if configured_root:
+        return Path(configured_root).expanduser()
+    return PROJECT_ROOT
+
+
 def _workspace_dirty() -> bool | None:
     try:
         proc = subprocess.run(
-            ["git", "-C", str(PROJECT_ROOT), "status", "--porcelain"],
+            ["git", "-C", str(_git_root()), "status", "--porcelain"],
             check=True,
             capture_output=True,
             text=True,
@@ -66,7 +74,7 @@ def _workspace_dirty() -> bool | None:
 def _git_stdout(*args: str) -> str:
     try:
         proc = subprocess.run(
-            ["git", "-C", str(PROJECT_ROOT), *args],
+            ["git", "-C", str(_git_root()), *args],
             check=True,
             capture_output=True,
             text=True,

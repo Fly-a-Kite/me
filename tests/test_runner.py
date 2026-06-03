@@ -3873,7 +3873,7 @@ def test_polars_backend_preserves_empty_table_schema():
 
 @pytest.mark.skipif(importlib.util.find_spec("polars") is None, reason="polars is not installed")
 def test_polars_lazy_backend_matches_polars_eager_on_common_case():
-    case = generate_case(91, profile="bughunt")
+    case = generate_case(91, profile="discovery")
 
     row = run_loaded_case(case, ["polars", "polars_lazy"], save_artifact=False)
 
@@ -3980,6 +3980,7 @@ def test_feedback_target_keys_include_guidance_targets_and_operation_risks():
         "features": [
             "pattern:semi_anti_join_rewrite",
             "semantic_family:join_membership",
+            "exploration_objective:cross_model_consistency",
             "combo_risk:groupby_aggregation",
             "rows:many",
         ],
@@ -3993,18 +3994,26 @@ def test_feedback_target_keys_include_guidance_targets_and_operation_risks():
         "correctness_risks": ["semi_anti_join_filter_pushdown", "groupby_aggregation"],
     }
 
-    keys = runner_module._feedback_target_keys(guidance_row, operation_combo)
+    keys = runner_module._feedback_target_keys(
+        guidance_row,
+        operation_combo,
+        target_capabilities=["op:join", "table:multi"],
+    )
 
     assert "target:semi_anti_join_rewrite" in keys
     assert "feature:pattern:semi_anti_join_rewrite" in keys
     assert "feature:semantic_family:join_membership" in keys
+    assert "feature:exploration_objective:cross_model_consistency" in keys
     assert "semantic_family:join_membership" in keys
+    assert "exploration_objective:cross_model_consistency" in keys
     assert "combo:join_filter_groupby" in keys
     assert "semantic_signal:semi_anti_join_filter_pushdown" in keys
     assert "risk:semi_anti_join_filter_pushdown" in keys
     assert "semantic_family:conditional_semantics" in keys
     assert "semantic_signal:left_join_case_when_membership" in keys
     assert "risk:left_join_case_when_membership" in keys
+    assert "capability:op:join" in keys
+    assert "capability:table:multi" in keys
     assert "rows:many" not in keys
     assert "target:strings" not in keys
     assert "target:groupby" not in keys
@@ -4016,6 +4025,9 @@ def test_configured_guidance_targets_include_structured_semantic_focus_targets()
         guidance_targets=["groupby"],
         semantic_focus_families=["conditional_semantics"],
         semantic_focus_signals=["left_join_case_when_membership"],
+        exploration_objective_rules=[
+            {"objective": "adaptive consistency", "exact_features": ["op:join"]}
+        ],
     )
 
     targets = runner_module._configured_guidance_targets(config)
@@ -4023,6 +4035,7 @@ def test_configured_guidance_targets_include_structured_semantic_focus_targets()
     assert "groupby" in targets
     assert "semantic_family:conditional_semantics" in targets
     assert "semantic_signal:left_join_case_when_membership" in targets
+    assert "exploration_objective:adaptive_consistency" in targets
     assert "conditional_semantics" not in targets
     assert "left_join_case_when_membership" not in targets
 
@@ -4190,17 +4203,17 @@ def test_run_fuzz_fresh_policy_filters_replay_profile(tmp_path):
     assert meta["replay_bug_filter"]["filtered_candidates"] > 0
 
 
-def test_run_fuzz_fresh_bughunt_uses_generation_time_replay_gate(tmp_path):
-    case_log = tmp_path / "fresh-bughunt.cases.jsonl"
-    config = ExperimentConfig(generator_profile="bughunt", enable_replay_bug=False)
+def test_run_fuzz_fresh_discovery_uses_generation_time_replay_gate(tmp_path):
+    case_log = tmp_path / "fresh-discovery.cases.jsonl"
+    config = ExperimentConfig(generator_profile="discovery", enable_replay_bug=False)
 
     run_file = run_fuzz(cases=1, seed=20, backends=[], config=config, case_log_file=case_log)
 
     row = read_jsonl(run_file)[0]
     case_log_row = read_jsonl(case_log)[0]
     meta = load_json(run_meta_path(run_file))
-    assert meta["config"]["generator_profile"] == "bughunt"
-    assert meta["effective_generator_profile"] == "bughunt"
+    assert meta["config"]["generator_profile"] == "discovery"
+    assert meta["effective_generator_profile"] == "discovery"
     assert meta["replay_bug_filter"]["filtered_candidates"] > 0
     assert row["case"].get("metadata", {}).get("mixed_generator_profile") != "wide_offset_topk"
     assert row["replay_filter"]["filtered_before_candidate"] > 0
@@ -4211,7 +4224,7 @@ def test_run_fuzz_fresh_bughunt_uses_generation_time_replay_gate(tmp_path):
 def test_run_fuzz_custom_replay_source_gate_keeps_requested_generator_profile(tmp_path):
     case_log = tmp_path / "custom-source-gate.cases.jsonl"
     config = ExperimentConfig(
-        generator_profile="bughunt",
+        generator_profile="discovery",
         enable_replay_bug=False,
         replay_bug_source_issues=[],
     )
@@ -4220,7 +4233,7 @@ def test_run_fuzz_custom_replay_source_gate_keeps_requested_generator_profile(tm
 
     case_log_row = read_jsonl(case_log)[0]
     meta = load_json(run_meta_path(run_file))
-    assert meta["effective_generator_profile"] == "bughunt"
+    assert meta["effective_generator_profile"] == "discovery"
     assert meta["replay_bug_filter"]["filtered_candidates"] == 0
     assert case_log_row["case"]["metadata"]["mixed_generator_profile"] == "wide_offset_topk"
 
@@ -4255,6 +4268,7 @@ def test_run_fuzz_uses_feedback_source_marker_for_candidate_source(tmp_path, mon
             self.last_candidate_metadata = {}
             self.source_scheduler = None
             self.recorded_sources = []
+            self.quality_context_calls = []
             instances.append(self)
 
         def choose_case(self, seed, generated):
@@ -4280,9 +4294,36 @@ def test_run_fuzz_uses_feedback_source_marker_for_candidate_source(tmp_path, mon
                     "schedule_score": 1.0,
                     "mutation_pulls": 1,
                     "selected_operator": "value",
+                    "target_keys": ["semantic_family:cast_semantics"],
                 },
             }
             return generated
+
+        def candidate_quality_context(self, case, *, target_keys=None, profile_key=None):
+            self.quality_context_calls.append(
+                {
+                    "case_id": case.case_id,
+                    "target_keys": list(target_keys or []),
+                    "profile_key": profile_key or "",
+                }
+            )
+            return {
+                "cluster_key": "profile=generic|targets=semantic_family_cast_semantics|ops=empty",
+                "profile_key": "generic",
+                "target_keys": list(target_keys or []),
+                "target_key_count": len(target_keys or []),
+                "archive_known": True,
+                "archive_elite_indexes": [0],
+                "archive_seed_count": 1,
+                "archive_outcome_count": 2,
+                "archive_cluster_reward": 0.75,
+                "archive_health_penalty": 0.05,
+                "cluster_count": 3,
+                "cluster_feedback_reward": 0.5,
+                "cluster_feedback_count": 2,
+                "cluster_novelty_score": 0.1,
+                "recent_cluster_pulls": 1,
+            }
 
         def record(
             self,
@@ -4317,6 +4358,13 @@ def test_run_fuzz_uses_feedback_source_marker_for_candidate_source(tmp_path, mon
     assert row["mutation"]["operator"] == "value"
     assert row["feedback_decision"]["parent_case_id"] == "case-parent"
     assert row["feedback_decision"]["schedule_score"] == 1.0
+    assert row["quality_archive_context"]["archive_known"] is True
+    assert row["quality_archive_context"]["archive_cluster_reward"] == 0.75
+    assert row["quality_archive_context"]["target_keys"][0] == "semantic_family:cast_semantics"
+    assert any(
+        key.startswith("capability:")
+        for key in row["quality_archive_context"]["target_keys"]
+    )
     assert row["operation_combo"]["operation_count"] == len(row["case"]["program"]["operations"])
     assert row["source_reward"] == 1.25
     assert row["stored_in_feedback_corpus"] is False
@@ -4324,8 +4372,17 @@ def test_run_fuzz_uses_feedback_source_marker_for_candidate_source(tmp_path, mon
     assert case_log_row["seed_lineage"]["parent_case_id"] == "case-parent"
     assert case_log_row["mutation"]["operator"] == "value"
     assert case_log_row["feedback_decision"]["selected_operator"] == "value"
+    assert case_log_row["quality_archive_context"] == row["quality_archive_context"]
+    assert case_log_row["case"]["metadata"]["quality_archive_context"] == row["quality_archive_context"]
     assert "operation_combo" in case_log_row
     assert instances[0].recorded_sources == ["feedback_mutation"]
+    assert instances[0].quality_context_calls == [
+        {
+            "case_id": "case-00000047",
+            "target_keys": row["quality_archive_context"]["target_keys"],
+            "profile_key": "",
+        }
+    ]
 
 
 def test_run_fuzz_compact_log_omits_repeated_run_metadata():
@@ -4524,6 +4581,439 @@ def test_run_fuzz_persists_closed_loop_state_across_runs(monkeypatch):
     assert second_state["signal_seen_signatures"] == first_state["signal_seen_signatures"]
 
 
+def test_run_fuzz_adaptive_profile_pool_learns_and_persists(monkeypatch):
+    generated_profiles: list[str] = []
+
+    def fake_generate_case(seed, *, type_aware=True, profile="common"):
+        generated_profiles.append(profile)
+        return Case(
+            case_id=f"case-{seed}-{profile}",
+            seed=seed,
+            tables=[TableData("t0", [ColumnSpec("x", "int")], [{"x": seed}])],
+            program=Program(f"prog-{seed}", seed, [{"op": "select", "columns": ["x"]}]),
+            metadata={"generator_profile": profile},
+        )
+
+    def fake_run_loaded_case(
+        case,
+        backends,
+        config=None,
+        save_artifact=True,
+        backend_instances=None,
+        environment=None,
+        target_specs=None,
+        config_payload=None,
+    ):
+        profile = case.metadata.get("generator_profile", "common")
+        findings = []
+        status = "ok"
+        if profile == "discovery_fresh":
+            status = "bug"
+            findings = [
+                {
+                    "kind": "differential_mismatch",
+                    "root_cause": "adaptive_profile_probe",
+                    "triage_verdict": "candidate_implementation_bug",
+                    "suspicious_backends": ["engine"],
+                    "signature": f"sig-{case.seed}",
+                }
+            ]
+        return {
+            "run_at": "2026-05-31T00:00:00Z",
+            "case": case.to_dict(),
+            "targets": [],
+            "raw_results": {},
+            "normalized": {},
+            "metamorphic": {},
+            "findings": findings,
+            "candidate_recheck": {"enabled": False, "attempts": 0, "reproduced_keys": [], "non_reproduced_keys": []},
+            "config": config_payload or (config or ExperimentConfig()).to_dict(),
+            "environment": {},
+            "status": status,
+            "duration_ms": 0.1,
+            "behavior_signature": f"behavior-{case.case_id}",
+            "discovery_signature": f"discovery-{case.case_id}",
+        }
+
+    monkeypatch.setattr(runner_module, "generate_case", fake_generate_case)
+    monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
+
+    config = ExperimentConfig(
+        enable_feedback=True,
+        generator_profile="common",
+        generator_profile_pool=["common", "discovery_fresh"],
+        generator_profile_learning_weight=1.0,
+        log_level="minimal",
+    )
+    first_run = run_fuzz(
+        cases=2,
+        seed=91,
+        backends=[],
+        config=config,
+        persist_closed_loop_state=True,
+    )
+    first_state = load_json(closed_loop_state_path(first_run))
+    first_rows = read_jsonl(first_run)
+    first_meta = load_json(run_meta_path(first_run))
+
+    generated_profiles.clear()
+    second_run = run_fuzz(
+        cases=1,
+        seed=101,
+        backends=[],
+        config=config,
+        closed_loop_state=first_state,
+        persist_closed_loop_state=True,
+    )
+    second_row = read_jsonl(second_run)[0]
+    second_state = load_json(closed_loop_state_path(second_run))
+
+    assert {row["selected_generator_profile"] for row in first_rows} == {"common", "discovery_fresh"}
+    assert "generator_profile" in first_state["feedback"]["adaptive_learning"]["bandits"]
+    assert (
+        first_meta["closed_loop_state_summary"]["adaptive_learning_health"]["schema_version"]
+        == "adaptive-learning-health-v1"
+    )
+    assert first_meta["closed_loop_state_summary"]["adaptive_learning_health"]["total_pulls"] >= 2
+    assert generated_profiles[0] == "discovery_fresh"
+    assert second_row["generator_profile_selection"]["strategy"] == "contextual_bandit"
+    assert second_row["selected_generator_profile"] == "discovery_fresh"
+    assert second_state["feedback"]["adaptive_learning"]["bandits"]["generator_profile"]["total_pulls"] >= 3
+
+
+def test_run_fuzz_profile_pool_filters_profiles_by_target_capability(monkeypatch):
+    generated_profiles: list[str] = []
+
+    class FakeTargetContext:
+        common_capabilities = ("table:single", "op:filter", "op:join", "op:sort", "op:limit")
+
+        def target_dicts(self):
+            return []
+
+        def to_dict(self):
+            return {"common_capabilities": list(self.common_capabilities)}
+
+    def fake_generate_case(seed, *, type_aware=True, profile="common"):
+        generated_profiles.append(profile)
+        return Case(
+            case_id=f"case-{seed}-{profile}",
+            seed=seed,
+            tables=[TableData("t0", [ColumnSpec("x", "int")], [{"x": seed}])],
+            program=Program(f"prog-{seed}", seed, [{"op": "select", "columns": ["x"]}]),
+            metadata={"generator_profile": profile},
+        )
+
+    def fake_run_loaded_case(
+        case,
+        backends,
+        config=None,
+        save_artifact=True,
+        backend_instances=None,
+        environment=None,
+        target_specs=None,
+        config_payload=None,
+    ):
+        return {
+            "run_at": "2026-05-31T00:00:00Z",
+            "case": case.to_dict(),
+            "targets": [],
+            "raw_results": {},
+            "normalized": {},
+            "metamorphic": {},
+            "findings": [],
+            "candidate_recheck": {"enabled": False, "attempts": 0, "reproduced_keys": [], "non_reproduced_keys": []},
+            "config": config_payload or (config or ExperimentConfig()).to_dict(),
+            "environment": {},
+            "status": "ok",
+            "duration_ms": 0.1,
+            "behavior_signature": f"behavior-{case.case_id}",
+            "discovery_signature": f"discovery-{case.case_id}",
+        }
+
+    monkeypatch.setattr(runner_module, "target_context", lambda backends: FakeTargetContext())
+    monkeypatch.setattr(runner_module, "generate_case", fake_generate_case)
+    monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
+
+    config = ExperimentConfig(
+        generator_profile="common",
+        generator_profile_pool=["common", "partitioned_running_sum", "join_null_sort"],
+        generator_profile_learning_weight=1.0,
+        log_level="compact",
+    )
+    run_file = run_fuzz(cases=2, seed=111, backends=[], config=config)
+    rows = read_jsonl(run_file)
+    meta = load_json(run_meta_path(run_file))
+
+    assert "partitioned_running_sum" not in generated_profiles
+    assert set(generated_profiles).issubset({"common", "join_null_sort"})
+    assert meta["generator_profile_pool"] == ["common", "join_null_sort"]
+    dropped = meta["generator_profile_pool_metadata"]["dropped"]
+    assert dropped[0]["profile"] == "partitioned_running_sum"
+    assert "op:running_sum" in dropped[0]["missing"]
+    assert rows[0]["generator_profile_selection"]["profile_pool_metadata"]["dropped"] == dropped
+
+
+def test_run_fuzz_profile_capability_filter_can_be_disabled(monkeypatch):
+    generated_profiles: list[str] = []
+
+    class FakeTargetContext:
+        common_capabilities = ("table:single", "op:filter", "op:join", "op:sort", "op:limit")
+
+        def target_dicts(self):
+            return []
+
+        def to_dict(self):
+            return {"common_capabilities": list(self.common_capabilities)}
+
+    def fake_generate_case(seed, *, type_aware=True, profile="common"):
+        generated_profiles.append(profile)
+        return Case(
+            case_id=f"case-{seed}-{profile}",
+            seed=seed,
+            tables=[TableData("t0", [ColumnSpec("x", "int")], [{"x": seed}])],
+            program=Program(f"prog-{seed}", seed, [{"op": "select", "columns": ["x"]}]),
+            metadata={"generator_profile": profile},
+        )
+
+    def fake_run_loaded_case(
+        case,
+        backends,
+        config=None,
+        save_artifact=True,
+        backend_instances=None,
+        environment=None,
+        target_specs=None,
+        config_payload=None,
+    ):
+        return {
+            "run_at": "2026-05-31T00:00:00Z",
+            "case": case.to_dict(),
+            "targets": [],
+            "raw_results": {},
+            "normalized": {},
+            "metamorphic": {},
+            "findings": [],
+            "candidate_recheck": {"enabled": False, "attempts": 0, "reproduced_keys": [], "non_reproduced_keys": []},
+            "config": config_payload or (config or ExperimentConfig()).to_dict(),
+            "environment": {},
+            "status": "ok",
+            "duration_ms": 0.1,
+            "behavior_signature": f"behavior-{case.case_id}",
+            "discovery_signature": f"discovery-{case.case_id}",
+        }
+
+    monkeypatch.setattr(runner_module, "target_context", lambda backends: FakeTargetContext())
+    monkeypatch.setattr(runner_module, "generate_case", fake_generate_case)
+    monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
+
+    config = ExperimentConfig(
+        generator_profile="common",
+        generator_profile_pool=["common", "partitioned_running_sum"],
+        generator_profile_learning_weight=1.0,
+        enable_profile_capability_filter=False,
+        log_level="compact",
+    )
+    run_file = run_fuzz(cases=2, seed=211, backends=[], config=config)
+    rows = read_jsonl(run_file)
+    meta = load_json(run_meta_path(run_file))
+
+    assert "partitioned_running_sum" in generated_profiles
+    assert meta["generator_profile_pool"] == ["common", "partitioned_running_sum"]
+    assert meta["generator_profile_pool_metadata"]["dropped"] == []
+    assert meta["generator_profile_pool_metadata"]["capability_filter_enabled"] is False
+    assert rows[0]["generator_profile_selection"]["profile_pool_metadata"]["capability_aware"] is False
+
+
+def test_run_fuzz_records_per_case_objective_mr_and_version_learning(monkeypatch):
+    received_relation_orders: list[list[str]] = []
+
+    def fake_generate_case(seed, *, type_aware=True, profile="common"):
+        return Case(
+            case_id=f"case-{seed}",
+            seed=seed,
+            tables=[
+                TableData(
+                    "t0",
+                    [ColumnSpec("id", "int", nullable=False), ColumnSpec("x", "int")],
+                    [{"id": 1, "x": 1}, {"id": 2, "x": 2}],
+                )
+            ],
+            program=Program(f"prog-{seed}", seed, [{"op": "select", "columns": ["id", "x"]}]),
+            metadata={"generator_profile": profile},
+        )
+
+    def fake_run_loaded_case(
+        case,
+        backends,
+        config=None,
+        save_artifact=True,
+        backend_instances=None,
+        environment=None,
+        target_specs=None,
+        config_payload=None,
+        metamorphic_relation_order=None,
+    ):
+        received_relation_orders.append(list(metamorphic_relation_order or []))
+        return {
+            "run_at": "2026-05-31T00:00:00Z",
+            "case": case.to_dict(),
+            "targets": target_specs or [],
+            "raw_results": {},
+            "normalized": {},
+            "metamorphic": {},
+            "findings": [],
+            "candidate_recheck": {"enabled": False, "attempts": 0, "reproduced_keys": [], "non_reproduced_keys": []},
+            "config": config_payload or (config or ExperimentConfig()).to_dict(),
+            "environment": environment or {},
+            "status": "ok",
+            "duration_ms": 0.1,
+            "behavior_signature": f"behavior-{case.case_id}",
+            "discovery_signature": f"discovery-{case.case_id}",
+        }
+
+    monkeypatch.setattr(runner_module, "generate_case", fake_generate_case)
+    monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
+
+    config = ExperimentConfig(
+        enable_feedback=True,
+        enable_metamorphic_oracle=True,
+        metamorphic_variant_limit=1,
+        semantic_objective_learning_weight=1.0,
+        metamorphic_relation_learning_weight=1.0,
+        version_pair_learning_weight=1.0,
+        target_version="latest",
+        fixed_version="fixed",
+        persist_feedback_corpus=False,
+        log_level="compact",
+    )
+    run_file = run_fuzz(
+        cases=1,
+        seed=91,
+        backends=[],
+        config=config,
+        persist_closed_loop_state=True,
+    )
+    row = read_jsonl(run_file)[0]
+    state = load_json(closed_loop_state_path(run_file))
+    bandits = state["feedback"]["adaptive_learning"]["bandits"]
+
+    assert row["semantic_objective_selection"]["strategy"] == "contextual_bandit_warmup"
+    assert row["metamorphic_relation_selection"]["action"] == "input_partition_union_all"
+    assert row["version_pair_selection"]["action"] == "latest->fixed"
+    assert row["selected_version_pair"] == "latest->fixed"
+    assert received_relation_orders[0][0] == "input_partition_union_all"
+    assert bandits["semantic_objective"]["total_pulls"] == 1
+    assert bandits["metamorphic_relation"]["total_pulls"] == 1
+    assert bandits["version_pair"]["total_pulls"] == 1
+
+
+def test_run_fuzz_version_pair_pool_learns_and_updates_case_config(monkeypatch):
+    observed_version_pairs: list[str] = []
+
+    def fake_generate_case(seed, *, type_aware=True, profile="common"):
+        return Case(
+            case_id=f"case-{seed}",
+            seed=seed,
+            tables=[
+                TableData(
+                    "t0",
+                    [ColumnSpec("id", "int", nullable=False), ColumnSpec("x", "int")],
+                    [{"id": 1, "x": 1}, {"id": 2, "x": 2}],
+                )
+            ],
+            program=Program(f"prog-{seed}", seed, [{"op": "select", "columns": ["id", "x"]}]),
+            metadata={"generator_profile": profile},
+        )
+
+    def fake_run_loaded_case(
+        case,
+        backends,
+        config=None,
+        save_artifact=True,
+        backend_instances=None,
+        environment=None,
+        target_specs=None,
+        config_payload=None,
+        metamorphic_relation_order=None,
+    ):
+        payload = config_payload or (config or ExperimentConfig()).to_dict()
+        pair = f"{payload.get('target_version', '')}->{payload.get('fixed_version', '')}".rstrip("->")
+        observed_version_pairs.append(pair)
+        findings = []
+        status = "ok"
+        if pair == "latest->preview":
+            status = "bug"
+            findings = [
+                {
+                    "kind": "differential_mismatch",
+                    "root_cause": "version_pair_probe",
+                    "triage_verdict": "candidate_implementation_bug",
+                    "suspicious_backends": ["engine"],
+                    "signature": f"sig-{case.seed}",
+                }
+            ]
+        return {
+            "run_at": "2026-05-31T00:00:00Z",
+            "case": case.to_dict(),
+            "targets": target_specs or [],
+            "raw_results": {},
+            "normalized": {},
+            "metamorphic": {},
+            "findings": findings,
+            "candidate_recheck": {"enabled": False, "attempts": 0, "reproduced_keys": [], "non_reproduced_keys": []},
+            "config": payload,
+            "environment": environment or {},
+            "status": status,
+            "duration_ms": 0.1,
+            "behavior_signature": f"behavior-{case.case_id}-{pair}",
+            "discovery_signature": f"discovery-{case.case_id}-{pair}",
+        }
+
+    monkeypatch.setattr(runner_module, "generate_case", fake_generate_case)
+    monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
+
+    config = ExperimentConfig(
+        enable_feedback=True,
+        version_pair_pool=["latest->fixed", "latest->preview"],
+        version_pair_learning_weight=1.0,
+        target_version="latest",
+        fixed_version="fixed",
+        persist_feedback_corpus=False,
+        log_level="compact",
+    )
+    first_run = run_fuzz(
+        cases=2,
+        seed=191,
+        backends=[],
+        config=config,
+        persist_closed_loop_state=True,
+    )
+    first_rows = read_jsonl(first_run)
+    first_meta = load_json(run_meta_path(first_run))
+    first_state = load_json(closed_loop_state_path(first_run))
+
+    observed_version_pairs.clear()
+    second_run = run_fuzz(
+        cases=1,
+        seed=201,
+        backends=[],
+        config=config,
+        closed_loop_state=first_state,
+        persist_closed_loop_state=True,
+    )
+    second_row = read_jsonl(second_run)[0]
+    second_state = load_json(closed_loop_state_path(second_run))
+
+    assert {row["selected_version_pair"] for row in first_rows} == {"latest->fixed", "latest->preview"}
+    assert first_meta["version_pair_pool"] == ["latest->fixed", "latest->preview"]
+    assert second_row["version_pair_selection"]["strategy"] == "contextual_bandit"
+    assert second_row["selected_version_pair"] == "latest->preview"
+    assert observed_version_pairs[0] == "latest->preview"
+    assert second_row["config"]["target_version"] == "latest"
+    assert second_row["config"]["fixed_version"] == "preview"
+    assert second_state["feedback"]["adaptive_learning"]["bandits"]["version_pair"]["total_pulls"] >= 3
+
+
 def test_run_fuzz_signal_new_behavior_uses_coarser_signal_signature(monkeypatch):
     call_index = {"value": 0}
 
@@ -4578,10 +5068,27 @@ def test_run_fuzz_signal_new_behavior_uses_coarser_signal_signature(monkeypatch)
 
 
 def test_run_loaded_case_honors_metamorphic_variant_limit():
-    case = generate_case(61, profile="bughunt")
+    case = generate_case(61, profile="discovery")
     config = ExperimentConfig(enable_metamorphic_oracle=True, metamorphic_variant_limit=2)
 
     row = run_loaded_case(case, [], config=config, save_artifact=False)
 
     assert len(row["metamorphic"]) <= 2
     assert row["config"]["metamorphic_variant_limit"] == 2
+
+
+def test_run_loaded_case_prioritizes_configured_metamorphic_relation_order():
+    case = generate_case(7)
+    case.program = Program(case.program.program_id, case.program.seed, [{"op": "select", "columns": ["id"]}])
+    config = ExperimentConfig(enable_metamorphic_oracle=True, metamorphic_variant_limit=1)
+
+    row = run_loaded_case(
+        case,
+        [],
+        config=config,
+        save_artifact=False,
+        metamorphic_relation_order=["row_permutation"],
+    )
+
+    assert row["metamorphic"]["row_permutation:reverse"]["relation"] == "row_permutation"
+    assert row["metamorphic_selection"]["relation_order"] == ["row_permutation"]

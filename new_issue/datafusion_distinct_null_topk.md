@@ -7,10 +7,10 @@
 | Candidate family | `distinct_null_topk@datafusion` |
 | First automated signal | 2026-05-27 07:07:33 CST |
 | First deterministic audit | 2026-05-27 07:21:17 CST |
-| How found | Integrated DataDiffFuzz bug-sprint found `join_semantics@datafusion`; minimization showed join was unnecessary and the real trigger was `DISTINCT + ORDER BY NULLS FIRST + LIMIT`. The new `datadiff bug-audit` probe now reproduces it automatically. |
+| How found | Integrated DataDiffFuzz discovery-campaign found `join_semantics@datafusion`; minimization showed join was unnecessary and the real trigger was `DISTINCT + ORDER BY NULLS FIRST + LIMIT`. The new `datadiff bug-audit` probe now reproduces it automatically. |
 | Evidence artifact | `bugs/bug_e9e3a5c96a9390d1` |
-| Fresh candidate manifest | `new_issue/generated/bug-sprint-bool-not-organic-s8902-manifest-datafusion_optimizer-seed8902-fresh-candidates.json` |
-| Integrated focused sprint | `new_issue/generated/bug-sprint-datafusion-common-api-distinct-null-topk-focused-s25-manifest.json` |
+| Fresh candidate manifest | `new_issue/generated/discovery-campaign-bool-not-organic-s8902-manifest-datafusion_optimizer-seed8902-fresh-candidates.json` |
+| Integrated focused sprint | `new_issue/generated/discovery-campaign-datafusion-common-api-distinct-null-topk-focused-s25-manifest.json` |
 | Deterministic audit manifest | `new_issue/generated/manifest.json` |
 | Deterministic report | `reports/bug-audit-20260526T232117.md` |
 | Target backend/version | DataFusion `53.0.0` |
@@ -91,7 +91,7 @@ The focused integrated sprint also reproduces the same family through the
 normal runner/oracle/classification/evidence path:
 
 ```bash
-datadiff bug-sprint --cases 20 --seeds 25 --lanes datafusion_common_api --skip-bug-audit --output-manifest new_issue/generated/bug-sprint-datafusion-common-api-distinct-null-topk-focused-s25-manifest.json --classify-limit 10
+datadiff discovery-campaign --cases 20 --seeds 25 --lanes datafusion_common_api --skip-bug-audit --output-manifest new_issue/generated/discovery-campaign-datafusion-common-api-distinct-null-topk-focused-s25-manifest.json --classify-limit 10
 ```
 
 That run produced `distinct_null_topk@datafusion: 4` fresh candidates. The
@@ -168,6 +168,6 @@ code as:
 - `src/datadiff/oracle.py`: `distinct_null_topk` root-cause classifier.
 - `src/datadiff/guidance.py`: `pattern:distinct_null_topk` target feature.
 - `src/datadiff/datagen.py`: common API workflow template `distinct_null_topk`.
-- `src/datadiff/cli.py`: `datafusion_common_api` bug-sprint lane for low-complexity DataFusion workflows.
+- `src/datadiff/cli.py`: `datafusion_common_api` discovery-campaign lane for low-complexity DataFusion workflows.
 - `tests/test_bug_audit.py`, `tests/test_oracle.py`, `tests/test_guidance.py`,
   `tests/test_operation_combo.py`, and `tests/test_datagen.py`: regression tests.

@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import random
 import string
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 from .csv_roundtrip import DEFAULT_LONG_NUMERIC_CSV_VALUES, csv_long_numeric_values
 from .dsl import Case, ColumnSpec, Program, SortKey, TableData, coerce_expression, normalize_sort_keys
@@ -62,9 +62,9 @@ GeneratorProfile = Literal[
     "common",
     "edge_float",
     "workflow",
-    "bughunt",
-    "bughunt_fresh",
-    "bughunt_no_groupby",
+    "discovery",
+    "discovery_fresh",
+    "discovery_no_groupby",
     "common_api_workflow",
     "issue_focus",
     "deep_probe_rotation",
@@ -135,11 +135,11 @@ GeneratorProfile = Literal[
 
 
 def _is_discovery_profile(profile: GeneratorProfile) -> bool:
-    return profile in {"bughunt", "bughunt_fresh", "bughunt_no_groupby", "issue_focus", "deep_probe_rotation"}
+    return profile in {"discovery", "discovery_fresh", "discovery_no_groupby", "issue_focus", "deep_probe_rotation"}
 
 
 def _discovery_profile_allows_groupby(profile: GeneratorProfile) -> bool:
-    return profile in {"bughunt", "bughunt_fresh", "issue_focus", "deep_probe_rotation"}
+    return profile in {"discovery", "discovery_fresh", "issue_focus", "deep_probe_rotation"}
 
 
 def _aggregate_accepts_type(source_type: str, func: str, is_numeric_column: bool) -> bool:
@@ -483,7 +483,7 @@ def generate_program(
                     rnd,
                     table,
                     available_cols,
-                    allow_groupby=profile != "bughunt_no_groupby",
+                    allow_groupby=profile != "discovery_no_groupby",
                 )
             )
             continue
@@ -1790,149 +1790,113 @@ def _valid_float_literal_text(value: Any) -> bool:
     return True
 
 
-def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile = "common") -> Case:
-    if profile == "bughunt" and type_aware:
-        mixed = _discovery_issue_inspired_case(seed)
-        if mixed is not None:
-            return mixed
-    if profile == "null_groupby_topk" and type_aware:
-        return generate_null_groupby_topk_case(seed)
-    if profile == "null_agg_topk" and type_aware:
-        return generate_null_agg_topk_case(seed)
-    if profile == "filter_null_agg_topk" and type_aware:
-        return generate_filter_null_agg_topk_case(seed)
-    if profile == "join_null_agg_topk" and type_aware:
-        return generate_join_null_agg_topk_case(seed)
-    if profile == "join_null_key_topk" and type_aware:
-        return generate_join_null_key_topk_case(seed)
-    if profile == "wide_offset_topk" and type_aware:
-        return generate_wide_offset_topk_case(seed)
-    if profile == "empty_filter_groupby" and type_aware:
-        return generate_empty_filter_groupby_case(seed)
-    if profile == "join_filter_groupby" and type_aware:
-        return generate_join_filter_groupby_case(seed)
-    if profile == "join_null_truth_filter" and type_aware:
-        return generate_join_null_truth_filter_case(seed)
-    if profile == "join_groupby_stress" and type_aware:
-        return generate_join_groupby_stress_case(seed)
-    if profile == "storage_offset" and type_aware:
-        return generate_storage_offset_case(seed)
-    if profile == "float_group_key" and type_aware:
-        return generate_float_group_key_case(seed)
-    if profile == "join_null_sort" and type_aware:
-        return generate_join_null_sort_case(seed)
-    if profile == "ordered_groupby_sort" and type_aware:
-        return generate_ordered_groupby_sort_case(seed)
-    if profile == "topk_resort" and type_aware:
-        return generate_topk_resort_case(seed)
-    if profile == "join_ordered_agg_topk" and type_aware:
-        return generate_join_ordered_agg_topk_case(seed)
-    if profile == "global_null_aggregate" and type_aware:
-        return generate_global_null_aggregate_case(seed)
-    if profile == "string_count_groupby" and type_aware:
-        return generate_string_count_groupby_case(seed)
-    if profile == "unique_count_groupby" and type_aware:
-        return generate_unique_count_groupby_case(seed)
-    if profile == "bool_null_groupby_agg" and type_aware:
-        return generate_bool_null_groupby_agg_case(seed)
-    if profile == "large_int_filter_groupby" and type_aware:
-        return generate_large_int_filter_groupby_case(seed)
-    if profile == "set_membership_filter" and type_aware:
-        return generate_set_membership_filter_case(seed)
-    if profile == "pyarrow_groupby_filter_cast_membership" and type_aware:
-        return generate_pyarrow_groupby_filter_cast_membership_case(seed)
-    if profile == "null_predicate_filter" and type_aware:
-        return generate_null_predicate_filter_case(seed)
-    if profile == "boolean_predicate_filter" and type_aware:
-        return generate_boolean_predicate_filter_case(seed)
-    if profile == "post_topk_range_filter" and type_aware:
-        return generate_post_topk_range_filter_case(seed)
-    if profile == "tuple_absence_filter" and type_aware:
-        return generate_tuple_absence_filter_case(seed)
-    if profile == "row_value_absence_filter" and type_aware:
-        return generate_row_value_absence_filter_case(seed)
-    if profile == "running_sum_precision" and type_aware:
-        return generate_running_sum_precision_case(seed)
-    if profile == "partitioned_running_sum" and type_aware:
-        return generate_partitioned_running_sum_case(seed)
-    if profile == "path_basename_keyed_pick" and type_aware:
-        return generate_path_basename_keyed_pick_case(seed)
-    if profile == "sortedness_null_placement" and type_aware:
-        return generate_sortedness_null_placement_case(seed)
-    if profile == "simple_case_random_subject" and type_aware:
-        return generate_simple_case_random_subject_case(seed)
-    if profile == "group_quantile_key_probe" and type_aware:
-        return generate_group_quantile_key_probe_case(seed)
-    if profile == "scalar_subquery_double_parentheses" and type_aware:
-        return generate_scalar_subquery_double_parentheses_case(seed)
-    if profile == "window_avg_rows_frame" and type_aware:
-        return generate_window_avg_rows_frame_case(seed)
-    if profile == "struct_distinct_unnest" and type_aware:
-        return generate_struct_distinct_unnest_case(seed)
-    if profile == "bit_compare_unequal_length" and type_aware:
-        return generate_bit_compare_unequal_length_case(seed)
-    if profile == "round_even_float_scale" and type_aware:
-        return generate_round_even_float_scale_case(seed)
-    if profile == "duckdb_float_literal_precision" and type_aware:
-        return generate_duckdb_float_literal_precision_case(seed)
-    if profile == "polars_timestamp_precision_filter" and type_aware:
-        return generate_polars_timestamp_precision_filter_case(seed)
-    if profile == "series_rtruediv_operand_order" and type_aware:
-        return generate_series_rtruediv_operand_order_case(seed)
-    if profile == "polars_reverse_division_columns" and type_aware:
-        return generate_polars_reverse_division_columns_case(seed)
-    if profile == "pandas_uint64_isin_precision" and type_aware:
-        return generate_pandas_uint64_isin_precision_case(seed)
-    if profile == "duckdb_tuple_anti_null_semantics" and type_aware:
-        return generate_duckdb_tuple_anti_null_semantics_case(seed)
-    if profile == "datafusion_setop_all_duplicate_count" and type_aware:
-        return generate_datafusion_setop_all_duplicate_count_case(seed)
-    if profile == "duckdb_json_predicate_order_semantics" and type_aware:
-        return generate_duckdb_json_predicate_order_semantics_case(seed)
-    if profile == "pandas_sparse_array_mask_semantics" and type_aware:
-        return generate_pandas_sparse_array_mask_semantics_case(seed)
-    if profile == "polars_float_wrap_numerical_semantics" and type_aware:
-        return generate_polars_float_wrap_numerical_semantics_case(seed)
-    if profile == "pandas_index_bool_result_type" and type_aware:
-        return generate_pandas_index_bool_result_type_case(seed)
-    if profile == "polars_empty_literal_groupby_semantics" and type_aware:
-        return generate_polars_empty_literal_groupby_semantics_case(seed)
-    if profile == "pandas_arrow_string_eq_sum_semantics" and type_aware:
-        return generate_pandas_arrow_string_eq_sum_semantics_case(seed)
-    if profile == "pandas_arrow_timestamp_loc_slice_semantics" and type_aware:
-        return generate_pandas_arrow_timestamp_loc_slice_semantics_case(seed)
-    if profile == "pandas_arrow_timestamp_index_attr_semantics" and type_aware:
-        return generate_pandas_arrow_timestamp_index_attr_semantics_case(seed)
-    if profile == "pandas_eval_inplace_aliasing_semantics" and type_aware:
-        return generate_pandas_eval_inplace_aliasing_semantics_case(seed)
-    if profile == "pandas_bool_reduction_skipna_semantics" and type_aware:
-        return generate_pandas_bool_reduction_skipna_semantics_case(seed)
-    if profile == "pyarrow_dataset_isin_all_match_semantics" and type_aware:
-        return generate_pyarrow_dataset_isin_all_match_semantics_case(seed)
-    if profile == "pyarrow_run_end_null_compute_semantics" and type_aware:
-        return generate_pyarrow_run_end_null_compute_semantics_case(seed)
-    if profile == "pyarrow_large_string_partition_schema_semantics" and type_aware:
-        return generate_pyarrow_large_string_partition_schema_semantics_case(seed)
-    if profile == "pyarrow_hash_pivot_wider_order_semantics" and type_aware:
-        return generate_pyarrow_hash_pivot_wider_order_semantics_case(seed)
-    if profile == "pyarrow_list_flatten_parent_indices_semantics" and type_aware:
-        return generate_pyarrow_list_flatten_parent_indices_semantics_case(seed)
-    if profile == "polars_rolling_mean_by_null_count_semantics" and type_aware:
-        return generate_polars_rolling_mean_by_null_count_semantics_case(seed)
-    if profile == "csv_long_numeric_roundtrip" and type_aware:
-        return generate_csv_long_numeric_roundtrip_case(seed)
-    if profile == "workflow" and type_aware:
-        return generate_workflow_case(seed)
-    if profile == "bughunt_no_groupby" and type_aware:
+_TYPE_AWARE_PROFILE_GENERATORS: dict[str, Callable[[int], Case]] | None = None
+_GENERIC_CASE_SUFFIXES = {
+    "discovery": "-discovery",
+    "discovery_fresh": "-discovery-fresh",
+    "discovery_no_groupby": "-discovery-no-groupby",
+    "common_api_workflow": "-common-api-workflow",
+    "issue_focus": "-issue-focus",
+    "deep_probe_rotation": "-deep-probe-rotation",
+}
+
+
+def _type_aware_profile_generators() -> dict[str, Callable[[int], Case]]:
+    global _TYPE_AWARE_PROFILE_GENERATORS
+    if _TYPE_AWARE_PROFILE_GENERATORS is None:
+        _TYPE_AWARE_PROFILE_GENERATORS = {
+            "null_groupby_topk": generate_null_groupby_topk_case,
+            "null_agg_topk": generate_null_agg_topk_case,
+            "filter_null_agg_topk": generate_filter_null_agg_topk_case,
+            "join_null_agg_topk": generate_join_null_agg_topk_case,
+            "join_null_key_topk": generate_join_null_key_topk_case,
+            "wide_offset_topk": generate_wide_offset_topk_case,
+            "empty_filter_groupby": generate_empty_filter_groupby_case,
+            "join_filter_groupby": generate_join_filter_groupby_case,
+            "join_null_truth_filter": generate_join_null_truth_filter_case,
+            "join_groupby_stress": generate_join_groupby_stress_case,
+            "storage_offset": generate_storage_offset_case,
+            "float_group_key": generate_float_group_key_case,
+            "join_null_sort": generate_join_null_sort_case,
+            "ordered_groupby_sort": generate_ordered_groupby_sort_case,
+            "topk_resort": generate_topk_resort_case,
+            "join_ordered_agg_topk": generate_join_ordered_agg_topk_case,
+            "global_null_aggregate": generate_global_null_aggregate_case,
+            "string_count_groupby": generate_string_count_groupby_case,
+            "unique_count_groupby": generate_unique_count_groupby_case,
+            "bool_null_groupby_agg": generate_bool_null_groupby_agg_case,
+            "large_int_filter_groupby": generate_large_int_filter_groupby_case,
+            "set_membership_filter": generate_set_membership_filter_case,
+            "pyarrow_groupby_filter_cast_membership": generate_pyarrow_groupby_filter_cast_membership_case,
+            "null_predicate_filter": generate_null_predicate_filter_case,
+            "boolean_predicate_filter": generate_boolean_predicate_filter_case,
+            "post_topk_range_filter": generate_post_topk_range_filter_case,
+            "tuple_absence_filter": generate_tuple_absence_filter_case,
+            "row_value_absence_filter": generate_row_value_absence_filter_case,
+            "running_sum_precision": generate_running_sum_precision_case,
+            "partitioned_running_sum": generate_partitioned_running_sum_case,
+            "path_basename_keyed_pick": generate_path_basename_keyed_pick_case,
+            "sortedness_null_placement": generate_sortedness_null_placement_case,
+            "simple_case_random_subject": generate_simple_case_random_subject_case,
+            "group_quantile_key_probe": generate_group_quantile_key_probe_case,
+            "scalar_subquery_double_parentheses": generate_scalar_subquery_double_parentheses_case,
+            "window_avg_rows_frame": generate_window_avg_rows_frame_case,
+            "struct_distinct_unnest": generate_struct_distinct_unnest_case,
+            "bit_compare_unequal_length": generate_bit_compare_unequal_length_case,
+            "round_even_float_scale": generate_round_even_float_scale_case,
+            "duckdb_float_literal_precision": generate_duckdb_float_literal_precision_case,
+            "polars_timestamp_precision_filter": generate_polars_timestamp_precision_filter_case,
+            "series_rtruediv_operand_order": generate_series_rtruediv_operand_order_case,
+            "polars_reverse_division_columns": generate_polars_reverse_division_columns_case,
+            "pandas_uint64_isin_precision": generate_pandas_uint64_isin_precision_case,
+            "duckdb_tuple_anti_null_semantics": generate_duckdb_tuple_anti_null_semantics_case,
+            "datafusion_setop_all_duplicate_count": generate_datafusion_setop_all_duplicate_count_case,
+            "duckdb_json_predicate_order_semantics": generate_duckdb_json_predicate_order_semantics_case,
+            "pandas_sparse_array_mask_semantics": generate_pandas_sparse_array_mask_semantics_case,
+            "polars_float_wrap_numerical_semantics": generate_polars_float_wrap_numerical_semantics_case,
+            "pandas_index_bool_result_type": generate_pandas_index_bool_result_type_case,
+            "polars_empty_literal_groupby_semantics": generate_polars_empty_literal_groupby_semantics_case,
+            "pandas_arrow_string_eq_sum_semantics": generate_pandas_arrow_string_eq_sum_semantics_case,
+            "pandas_arrow_timestamp_loc_slice_semantics": generate_pandas_arrow_timestamp_loc_slice_semantics_case,
+            "pandas_arrow_timestamp_index_attr_semantics": generate_pandas_arrow_timestamp_index_attr_semantics_case,
+            "pandas_eval_inplace_aliasing_semantics": generate_pandas_eval_inplace_aliasing_semantics_case,
+            "pandas_bool_reduction_skipna_semantics": generate_pandas_bool_reduction_skipna_semantics_case,
+            "pyarrow_dataset_isin_all_match_semantics": generate_pyarrow_dataset_isin_all_match_semantics_case,
+            "pyarrow_run_end_null_compute_semantics": generate_pyarrow_run_end_null_compute_semantics_case,
+            "pyarrow_large_string_partition_schema_semantics": generate_pyarrow_large_string_partition_schema_semantics_case,
+            "pyarrow_hash_pivot_wider_order_semantics": generate_pyarrow_hash_pivot_wider_order_semantics_case,
+            "pyarrow_list_flatten_parent_indices_semantics": generate_pyarrow_list_flatten_parent_indices_semantics_case,
+            "polars_rolling_mean_by_null_count_semantics": generate_polars_rolling_mean_by_null_count_semantics_case,
+            "csv_long_numeric_roundtrip": generate_csv_long_numeric_roundtrip_case,
+            "workflow": generate_workflow_case,
+            "common_api_workflow": generate_common_api_workflow_case,
+            "deep_probe_rotation": _deep_probe_rotation_case,
+            "issue_focus": _issue_focus_case,
+        }
+    return _TYPE_AWARE_PROFILE_GENERATORS
+
+
+def _profile_dispatch_case(seed: int, profile: str, *, type_aware: bool) -> Case | None:
+    if not type_aware:
+        return None
+    if profile == "discovery":
+        return _discovery_issue_inspired_case(seed)
+    if profile == "discovery_no_groupby":
         mixed = _discovery_no_groupby_issue_inspired_case(seed)
         if mixed is not None:
             return mixed
-    if profile == "common_api_workflow" and type_aware:
-        return generate_common_api_workflow_case(seed)
-    if profile == "deep_probe_rotation" and type_aware:
-        return _deep_probe_rotation_case(seed)
-    if profile == "issue_focus" and type_aware:
-        return _issue_focus_case(seed)
+    generator = _type_aware_profile_generators().get(profile)
+    return generator(seed) if generator is not None else None
+
+
+def _generic_case_suffix(profile: str) -> str:
+    return _GENERIC_CASE_SUFFIXES.get(profile, "")
+
+
+def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile = "common") -> Case:
+    dispatched = _profile_dispatch_case(seed, profile, type_aware=type_aware)
+    if dispatched is not None:
+        return dispatched
     discovery_profile = _is_discovery_profile(profile)
     table = generate_table(
         seed,
@@ -1954,21 +1918,7 @@ def generate_case(seed: int, type_aware: bool = True, profile: GeneratorProfile 
         extra_tables=extra_tables,
         profile=profile,
     )
-    suffix = (
-        "-bughunt"
-        if profile == "bughunt"
-        else "-bughunt-fresh"
-        if profile == "bughunt_fresh"
-        else "-bughunt-no-groupby"
-        if profile == "bughunt_no_groupby"
-        else "-common-api-workflow"
-        if profile == "common_api_workflow"
-        else "-issue-focus"
-        if profile == "issue_focus"
-        else "-deep-probe-rotation"
-        if profile == "deep_probe_rotation"
-        else ""
-    )
+    suffix = _generic_case_suffix(profile)
     return Case(case_id=f"case-{seed:08d}{suffix}", seed=seed, tables=[table] + extra_tables, program=program)
 
 
@@ -2065,11 +2015,11 @@ def _issue_focus_case(seed: int) -> Case:
             mixed_profile,
             generator_profile="issue_focus",
         )
-    fallback = generate_case(seed, profile="bughunt_fresh")
+    fallback = generate_case(seed, profile="discovery_fresh")
     return _as_discovery_mixed_case(
         fallback,
         seed,
-        "bughunt_fresh",
+        "discovery_fresh",
         generator_profile="issue_focus",
     )
 
@@ -2305,7 +2255,7 @@ def _discovery_no_groupby_issue_inspired_case(seed: int) -> Case | None:
             generate_datafusion_setop_all_duplicate_count_case(seed),
             seed,
             "datafusion_setop_all_duplicate_count",
-            generator_profile="bughunt_no_groupby",
+            generator_profile="discovery_no_groupby",
         )
     return None
 
@@ -2315,7 +2265,7 @@ def _as_discovery_mixed_case(
     seed: int,
     mixed_profile: str,
     *,
-    generator_profile: str = "bughunt",
+    generator_profile: str = "discovery",
 ) -> Case:
     metadata = dict(case.metadata)
     metadata["generator_profile"] = generator_profile
@@ -2328,14 +2278,6 @@ def _as_discovery_mixed_case(
         program=case.program,
         metadata=metadata,
     )
-
-
-_is_bughunt_profile = _is_discovery_profile
-_bughunt_allows_groupby = _discovery_profile_allows_groupby
-_add_bughunt_order_projection_probe = _add_discovery_order_projection_probe
-_bughunt_issue_inspired_case = _discovery_issue_inspired_case
-_bughunt_no_groupby_issue_inspired_case = _discovery_no_groupby_issue_inspired_case
-_as_bughunt_mixed_case = _as_discovery_mixed_case
 
 
 COMMON_API_WORKFLOW_TEMPLATES = (

@@ -54,6 +54,11 @@ BOOLEAN_PROBE_OUTPUT_PREFIXES = (
 )
 
 IMMUTABLE_VALUE_TYPES = (str, bytes, int, float, bool, type(None))
+NUMERIC_ALIAS_PREFIXES = ("m_", "sum_", "min_", "max_", "count_", "nunique_", "uniq_")
+BOOLEAN_ALIAS_PREFIXES = ("any_", "all_")
+MUTATION_OPERATOR_ANNEALING_BASE_TEMPERATURE = 0.12
+MUTATION_OPERATOR_ANNEALING_MIN_TEMPERATURE = 0.02
+MUTATION_OPERATOR_ANNEALING_DECAY = 0.85
 
 
 @dataclass(slots=True)
@@ -68,6 +73,7 @@ class MutationOperator:
     apply: Callable[[list[TableData], list[dict[str, Any]], random.Random], str]
     semantic_family_affinity: tuple[str, ...]
     semantic_signal_affinity: tuple[str, ...]
+    exploration_objective_affinity: tuple[str, ...]
 
     def __init__(
         self,
@@ -75,6 +81,7 @@ class MutationOperator:
         apply: Callable[[list[TableData], list[dict[str, Any]], random.Random], str],
         semantic_family_affinity: tuple[str, ...] = (),
         semantic_signal_affinity: tuple[str, ...] = (),
+        exploration_objective_affinity: tuple[str, ...] = (),
         *,
         semantic_affinity: tuple[str, ...] | None = None,
     ) -> None:
@@ -83,6 +90,11 @@ class MutationOperator:
         family_affinity = semantic_family_affinity if semantic_affinity is None else semantic_affinity
         object.__setattr__(self, "semantic_family_affinity", tuple(family_affinity))
         object.__setattr__(self, "semantic_signal_affinity", tuple(semantic_signal_affinity))
+        object.__setattr__(
+            self,
+            "exploration_objective_affinity",
+            tuple(exploration_objective_affinity),
+        )
 
     @property
     def semantic_affinity(self) -> tuple[str, ...]:
@@ -106,6 +118,24 @@ class MutationSchema:
 
     def column_has_null(self, name: str) -> bool:
         return name in self.nullable_columns
+
+
+@dataclass(frozen=True, slots=True)
+class MutationOperationContext:
+    table: TableData
+    schema: MutationSchema
+    available: tuple[str, ...]
+    numeric: tuple[str, ...]
+    bools: tuple[str, ...]
+    strings: tuple[str, ...]
+    date_strings: tuple[str, ...]
+    numeric_strings: tuple[str, ...]
+
+    def column_type(self, name: str) -> str:
+        return self.schema.column_type(name)
+
+    def column_has_null(self, name: str) -> bool:
+        return self.schema.column_has_null(name)
 
 
 def mutate_case(case: Case, seed: int) -> Case:
@@ -166,6 +196,11 @@ def mutate_case_with_metadata(
                 "detail": detail,
                 "changed": changed,
             },
+            "mutation_selection": _mutation_selection_metadata(
+                choice,
+                attempt_order,
+                operator_scores=operator_scores,
+            ),
         }
     )
     program = Program(
@@ -193,7 +228,7 @@ def _mutation_attempt_order(
     if not operator_scores:
         return order
     untried_score = float(operator_scores.get("__untried__", 0.0))
-    return sorted(
+    ranked = sorted(
         order,
         key=lambda operator: (
             float(operator_scores.get(operator.name, untried_score)),
@@ -201,6 +236,112 @@ def _mutation_attempt_order(
         ),
         reverse=True,
     )
+    if len(ranked) <= 2:
+        return ranked
+    temperature = _mutation_annealing_temperature(
+        ranked[1:],
+        operator_scores=operator_scores,
+        untried_score=untried_score,
+    )
+    return [
+        ranked[0],
+        *_annealed_operator_tail(
+            ranked[1:],
+            rnd,
+            operator_scores=operator_scores,
+            untried_score=untried_score,
+            temperature=temperature,
+        ),
+    ]
+
+
+def _annealed_operator_tail(
+    ranked_tail: list[MutationOperator],
+    rnd: random.Random,
+    *,
+    operator_scores: Mapping[str, float],
+    untried_score: float,
+    temperature: float,
+) -> list[MutationOperator]:
+    """Diversify near-tied mutation operators without displacing the best arm."""
+
+    remaining = list(ranked_tail)
+    selected: list[MutationOperator] = []
+    current_temperature = max(0.0, float(temperature))
+    while remaining:
+        if current_temperature <= 0.0 or len(remaining) == 1:
+            selected.extend(remaining)
+            break
+        best = remaining[0]
+        proposal_index = rnd.randrange(len(remaining))
+        proposal = remaining[proposal_index]
+        best_score = float(operator_scores.get(best.name, untried_score))
+        proposal_score = float(operator_scores.get(proposal.name, untried_score))
+        delta = proposal_score - best_score
+        accept = proposal_index == 0 or delta >= 0.0 or rnd.random() < math.exp(delta / current_temperature)
+        selected.append(remaining.pop(proposal_index if accept else 0))
+        current_temperature *= MUTATION_OPERATOR_ANNEALING_DECAY
+    return selected
+
+
+def _mutation_annealing_temperature(
+    ranked_tail: list[MutationOperator],
+    *,
+    operator_scores: Mapping[str, float],
+    untried_score: float,
+) -> float:
+    if len(ranked_tail) <= 1:
+        return 0.0
+    scores = [float(operator_scores.get(operator.name, untried_score)) for operator in ranked_tail]
+    spread = max(scores) - min(scores)
+    # Wider score separation means feedback is confident; near-ties keep more exploration.
+    return max(
+        MUTATION_OPERATOR_ANNEALING_MIN_TEMPERATURE,
+        MUTATION_OPERATOR_ANNEALING_BASE_TEMPERATURE / (1.0 + max(0.0, spread)),
+    )
+
+
+def _mutation_selection_metadata(
+    selected_operator: str,
+    attempt_order: list[MutationOperator],
+    *,
+    operator_scores: Mapping[str, float] | None,
+) -> dict[str, Any]:
+    if not operator_scores:
+        return {
+            "strategy": "random_operator_shuffle",
+            "candidate_count": len(attempt_order),
+            "selected_operator": selected_operator,
+        }
+    untried_score = float(operator_scores.get("__untried__", 0.0))
+    scored = [
+        {
+            "operator": operator.name,
+            "score": float(operator_scores.get(operator.name, untried_score)),
+        }
+        for operator in attempt_order
+    ]
+    ranked = sorted(scored, key=lambda row: (row["score"], row["operator"]), reverse=True)
+    selected_score = float(operator_scores.get(selected_operator, untried_score))
+    selected_rank = next(
+        (index + 1 for index, row in enumerate(ranked) if row["operator"] == selected_operator),
+        0,
+    )
+    tail = [operator for operator in attempt_order if operator.name != ranked[0]["operator"]]
+    return {
+        "strategy": "feedback_score_with_annealed_tail",
+        "candidate_count": len(attempt_order),
+        "selected_operator": selected_operator,
+        "selected_operator_score": selected_score,
+        "selected_score_rank": selected_rank,
+        "annealing_temperature": _mutation_annealing_temperature(
+            tail,
+            operator_scores=operator_scores,
+            untried_score=untried_score,
+        ),
+        "annealing_decay": MUTATION_OPERATOR_ANNEALING_DECAY,
+        "top_operators": ranked[:8],
+    }
 
 
 def mutation_operator_profiles(
@@ -2061,25 +2202,50 @@ def _append_multi_key_membership_case_aggregate(
     return f"append_multi_key_membership_case_aggregate:{join_kind}:{','.join(left_keys)}"
 
 
-def _random_operation(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> dict[str, Any] | None:
-    table = tables[0]
-    available = _available_columns(tables, operations)
+def _mutation_operation_context(
+    tables: list[TableData],
+    operations: list[dict[str, Any]],
+) -> MutationOperationContext | None:
+    if not tables:
+        return None
+    schema = _mutation_schema(tables, operations)
+    available = tuple(schema.available)
     if not available:
         return None
-    numeric = [
-        c
-        for c in available
-        if _column_type(tables, c) in {"int", "float"}
-        or c.startswith(("m_", "sum_", "min_", "max_", "count_", "nunique_", "uniq_"))
-    ]
-    bools = [
-        c
-        for c in available
-        if _column_type(tables, c) == "bool" or c.startswith(("any_", "all_"))
-    ]
-    strings = [c for c in available if _column_type(tables, c) == "str"]
-    date_strings = [c for c in strings if _looks_like_date_column(c)]
-    numeric_strings = [c for c in strings if _looks_like_numeric_string_column(c)]
+    numeric = tuple(
+        column
+        for column in available
+        if schema.column_type(column) in {"int", "float"} or column.startswith(NUMERIC_ALIAS_PREFIXES)
+    )
+    bools = tuple(
+        column
+        for column in available
+        if schema.column_type(column) == "bool" or column.startswith(BOOLEAN_ALIAS_PREFIXES)
+    )
+    strings = tuple(column for column in available if schema.column_type(column) == "str")
+    return MutationOperationContext(
+        table=tables[0],
+        schema=schema,
+        available=available,
+        numeric=numeric,
+        bools=bools,
+        strings=strings,
+        date_strings=tuple(column for column in strings if _looks_like_date_column(column)),
+        numeric_strings=tuple(column for column in strings if _looks_like_numeric_string_column(column)),
+    )
+
+
+def _random_operation(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> dict[str, Any] | None:
+    context = _mutation_operation_context(tables, operations)
+    if context is None:
+        return None
+    table = context.table
+    available = context.available
+    numeric = context.numeric
+    bools = context.bools
+    strings = context.strings
+    date_strings = context.date_strings
+    numeric_strings = context.numeric_strings
     choices = ["filter", "select", "sort", "limit"]
     if numeric or strings:
         choices.append("mutate")
@@ -2089,7 +2255,7 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
     kind = rnd.choice(choices)
     if kind == "filter":
         col = rnd.choice(available)
-        typ = _column_type(tables, col)
+        typ = context.column_type(col)
         cmp = rnd.choice(["==", "!="] if typ in {"str", "bool"} else [">", ">=", "<", "<=", "==", "!="])
         if typ in {"int", "float"} and rnd.random() < 0.20:
             cmp = rnd.choice(["gt_is_not_true", "ge_is_not_true", "lt_is_not_false", "le_is_not_false"])
@@ -2169,7 +2335,7 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
                 numerator = rnd.choice([column for column in numeric if column != src])
                 expr = {"kind": "reverse_division_columns", "source": src, "numerator": numerator}
             elif rnd.random() < 0.25:
-                if _column_type(tables, src) == "int":
+                if context.column_type(src) == "int":
                     expr = {"kind": "cast", "source": src, "to": rnd.choice(["float", "str"])}
                 else:
                     expr = {"kind": "cast", "source": src, "to": "float"}
@@ -2291,11 +2457,19 @@ def _available_columns(tables: list[TableData], operations: list[dict[str, Any]]
 
 
 def _column_type(tables: list[TableData], name: str) -> str:
-    return _mutation_schema(tables, []).column_type(name)
+    for table in tables:
+        for column in table.columns:
+            if column.name == name:
+                return column.type
+    return _fallback_column_type(name)
 
 
 def _column_has_null(tables: list[TableData], name: str) -> bool:
-    return _mutation_schema(tables, []).column_has_null(name)
+    for table in tables:
+        for column in table.columns:
+            if column.name == name and column.nullable:
+                return True
+    return _base_table_column_has_null(tables, name)
 
 
 def _literal_for_type(typ: str, rnd: random.Random) -> Any:
@@ -2468,6 +2642,59 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("drop_op", _drop_operation),
     MutationOperator("tweak_op", _tweak_random_operation),
 )
+
+
+def _with_inferred_objective_affinity(
+    operators: tuple[MutationOperator, ...],
+) -> tuple[MutationOperator, ...]:
+    return tuple(_operator_with_inferred_objective_affinity(operator) for operator in operators)
+
+
+def _operator_with_inferred_objective_affinity(operator: MutationOperator) -> MutationOperator:
+    if operator.exploration_objective_affinity:
+        return operator
+    inferred = _infer_operator_objective_affinity(operator)
+    if not inferred:
+        return operator
+    return MutationOperator(
+        operator.name,
+        operator.apply,
+        semantic_family_affinity=operator.semantic_family_affinity,
+        semantic_signal_affinity=operator.semantic_signal_affinity,
+        exploration_objective_affinity=inferred,
+    )
+
+
+def _infer_operator_objective_affinity(operator: MutationOperator) -> tuple[str, ...]:
+    tokens = {
+        operator.name,
+        *operator.semantic_family_affinity,
+        *operator.semantic_signal_affinity,
+    }
+    text = " ".join(tokens)
+    objectives: list[str] = []
+
+    def add(*values: str) -> None:
+        for value in values:
+            if value not in objectives:
+                objectives.append(value)
+
+    if operator.name in {"value", "nullify_value", "duplicate_row", "drop_row", "shuffle_rows"}:
+        add("representation_variance", "coverage_breadth")
+    if any(fragment in text for fragment in ("filter", "boolean", "case", "predicate", "truth")):
+        add("predicate_logic", "boundary_depth")
+    if any(fragment in text for fragment in ("join", "membership", "groupby", "aggregate", "distinct", "topk", "union")):
+        add("cross_model_consistency", "boundary_depth")
+    if any(fragment in text for fragment in ("running", "window", "sortedness", "quantile", "rolling")):
+        add("stateful_semantics")
+    if any(fragment in text for fragment in ("cast", "string", "csv", "arrow", "sparse", "timestamp", "layout", "numeric")):
+        add("representation_variance")
+    if operator.name in {"append_op", "drop_op", "tweak_op"} or operator.name.endswith("_probe"):
+        add("coverage_breadth")
+    return tuple(objectives)
+
+
+MUTATION_OPERATORS = _with_inferred_objective_affinity(MUTATION_OPERATORS)
 PROBE_MUTATION_OPERATOR_NAMES = frozenset(
     operator.name
     for operator in MUTATION_OPERATORS

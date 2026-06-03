@@ -538,7 +538,7 @@ FINAL_VALIDATION_MATRIX = ExperimentMatrix(
             preset="live_deep_organic_metamorphic",
             base_preset="live_deep_organic",
             overlays=("enable_metamorphic_oracle", "candidate_pool_10", "metamorphic_variant_limit_8"),
-            factors={"generator_profile": "bughunt", "guidance": "guided", "metamorphic_oracle": True},
+            factors={"generator_profile": "discovery", "guidance": "guided", "metamorphic_oracle": True},
             oracle_profile="both",
             analysis_tags=("guided", "metamorphic", "validation"),
         ),
@@ -772,11 +772,11 @@ FINAL_SEEDED_SENSITIVITY_MATRIX = ExperimentMatrix(
         ExperimentVariant(
             id="guided_join",
             preset="guided_join",
-            base_preset="bughunt_no_groupby",
+            base_preset="discovery_no_groupby",
             comparison_role="contrast",
             overlays=("enable_guidance", "target_join"),
             factors={
-                "generator_profile": "bughunt_no_groupby",
+                "generator_profile": "discovery_no_groupby",
                 "guidance": "guided",
                 "guidance_targets": ["join", "sort_limit"],
             },
@@ -903,6 +903,155 @@ FINAL_MODULE_ABLATION_MATRIX = ExperimentMatrix(
 )
 
 
+FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX = ExperimentMatrix(
+    id="adaptive_component_ablation",
+    title="Adaptive Component Ablation",
+    track="ablation",
+    purpose=(
+        "Quantify closed-loop adaptive components while keeping the generator profile, "
+        "target suite, oracle mode, and seed budget fixed."
+    ),
+    evidence_mode="ablation",
+    target_suites=("datafusion_cross",),
+    variants=(
+        ExperimentVariant(
+            id="adaptive_reference",
+            preset="live_deep_organic",
+            comparison_role="baseline",
+            component_focus="adaptive_closed_loop",
+            factors={
+                "adaptive_closed_loop": True,
+                "scheduler_learning": True,
+                "online_reward_model": True,
+                "continual_learning": True,
+                "active_learning": True,
+                "quality_archive": True,
+                "runtime_cost_learning": True,
+                "scheduler_annealing": True,
+            },
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "reference"),
+            notes="Reference adaptive run with all adaptive components enabled.",
+        ),
+        ExperimentVariant(
+            id="no_scheduler_learning",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="scheduler_learning",
+            factors={"scheduler_learning": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "contextual_bandit"),
+            notes=(
+                "Disable the cross-batch contextual scheduler while preserving the same "
+                "generator preset, target suite, oracle, and seed budget."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_scheduler_annealing",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="scheduler_annealing",
+            factors={"scheduler_annealing": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "annealing"),
+            notes=(
+                "Disable annealed scheduler selection while keeping contextual bandit, "
+                "online reward, continual learning, and quality-diversity enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_online_reward_model",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="online_reward_model",
+            factors={"online_reward_model": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "online_reward_model"),
+            notes=(
+                "Disable online reward-model prediction and weight updates while keeping "
+                "basic contextual-bandit arm statistics enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_continual_learning",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="continual_learning",
+            factors={"continual_learning": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "continual_learning"),
+            notes=(
+                "Disable cross-version transfer and continual-priority signals while keeping "
+                "the same live adaptive schedule and local learning feedback."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_runtime_cost_learning",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="runtime_cost_learning",
+            factors={"runtime_cost_learning": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "efficiency"),
+            notes=(
+                "Disable runtime-cost feedback while leaving scheduler learning enabled, "
+                "isolating throughput/invalid-rate contribution from cost-aware learning."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_quality_archive",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="quality_archive",
+            factors={"quality_archive": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "quality_diversity"),
+            notes=(
+                "Disable the MAP-Elites quality-diversity archive while keeping the adaptive "
+                "scheduler and runtime-cost learning enabled, isolating diversity preservation."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_active_learning",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="active_learning",
+            factors={"active_learning": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "active_learning"),
+            notes=(
+                "Disable uncertainty-driven online exploration while keeping contextual bandit, "
+                "runtime-cost learning, and quality-diversity archive enabled."
+            ),
+        ),
+    ),
+    comparison_group="adaptive_component_ablation",
+    rq_tags=("RQ4", "RQ6"),
+    analysis_tags=("ablation", "adaptive_component"),
+    counts_as_real_bugs=False,
+    notes=(
+        "Adaptive-component ablations use support evidence only; candidate bugs require "
+        "the same live confirmation pipeline before they can be counted as real bugs."
+    ),
+    scope_by_target_suite=_suite_scope_map(("datafusion_cross",)),
+)
+
+
 FINAL_COMPARISON_MATRIX = ExperimentMatrix(
     id="baseline_scope_comparison",
     title="Baseline and Scope Comparison",
@@ -932,22 +1081,22 @@ FINAL_COMPARISON_MATRIX = ExperimentMatrix(
             analysis_tags=("comparison", "guided"),
         ),
         ExperimentVariant(
-            id="bughunt",
-            preset="bughunt",
+            id="discovery",
+            preset="discovery",
             base_preset="baseline",
             comparison_role="contrast",
-            overlays=("generator_bughunt",),
-            factors={"generator_profile": "bughunt"},
+            overlays=("generator_discovery",),
+            factors={"generator_profile": "discovery"},
             oracle_profile="differential",
             analysis_tags=("comparison", "generator"),
         ),
         ExperimentVariant(
-            id="bughunt_guided",
-            preset="bughunt_guided",
-            base_preset="bughunt",
+            id="discovery_guided",
+            preset="discovery_guided",
+            base_preset="discovery",
             comparison_role="contrast",
-            overlays=("enable_guidance", "target_bughunt_guided"),
-            factors={"generator_profile": "bughunt", "guidance": "guided"},
+            overlays=("enable_guidance", "target_discovery_guided"),
+            factors={"generator_profile": "discovery", "guidance": "guided"},
             oracle_profile="differential",
             analysis_tags=("comparison", "generator", "guided"),
         ),
@@ -1018,6 +1167,7 @@ FINAL_EXPERIMENT_MATRICES: tuple[ExperimentMatrix, ...] = (
     FINAL_LIVE_DISCOVERY_MATRIX,
     FINAL_SEEDED_SENSITIVITY_MATRIX,
     FINAL_MODULE_ABLATION_MATRIX,
+    FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX,
     FINAL_COMPARISON_MATRIX,
 )
 

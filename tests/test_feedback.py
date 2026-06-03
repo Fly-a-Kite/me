@@ -338,6 +338,221 @@ def test_feedback_schedule_score_rewards_rare_target_keys_without_changing_reten
     assert state.case_target_keys[rare_index] == ["target:rare"]
 
 
+def test_feedback_cluster_keys_group_similar_seed_structure():
+    state = FeedbackState()
+    first = _case(1)
+    second = _case(2)
+    different_target = _case(3)
+
+    assert state.record(first, "0000000000000001", False, target_keys=["semantic_family:null_semantics"])
+    assert state.record(second, "0000000000000002", False, target_keys=["semantic_family:null_semantics"])
+    assert state.record(
+        different_target,
+        "0000000000000003",
+        False,
+        target_keys=["semantic_family:ordering_semantics"],
+    )
+
+    first_index = state.interesting_cases.index(first)
+    second_index = state.interesting_cases.index(second)
+    different_index = state.interesting_cases.index(different_target)
+
+    assert state.case_cluster_keys[first_index] == state.case_cluster_keys[second_index]
+    assert state.case_cluster_keys[first_index] != state.case_cluster_keys[different_index]
+    assert state.stored_cluster_keys[state.case_cluster_keys[first_index]] == 2
+
+
+def test_feedback_cluster_keys_include_capability_dimension_before_truncation():
+    state = FeedbackState()
+    first = _case(1)
+    same = _case(2)
+    different_capability = _case(3)
+
+    target_keys = [
+        "target:common_a",
+        "target:common_b",
+        "target:common_c",
+        "capability:op:join",
+    ]
+    assert state.record(first, "0000000000000001", False, target_keys=target_keys)
+    assert state.record(same, "0000000000000002", False, target_keys=target_keys)
+    assert state.record(
+        different_capability,
+        "0000000000000003",
+        False,
+        target_keys=[
+            "target:common_a",
+            "target:common_b",
+            "target:common_c",
+            "capability:op:sort",
+        ],
+    )
+
+    first_index = state.interesting_cases.index(first)
+    same_index = state.interesting_cases.index(same)
+    different_index = state.interesting_cases.index(different_capability)
+
+    assert state.case_cluster_keys[first_index] == state.case_cluster_keys[same_index]
+    assert state.case_cluster_keys[first_index] != state.case_cluster_keys[different_index]
+    assert "capability_op_join" in state.case_cluster_keys[first_index]
+    assert "capability_op_sort" in state.case_cluster_keys[different_index]
+
+
+def test_feedback_cluster_schedule_cools_recently_reused_seed_family():
+    state = FeedbackState()
+    first = _case(1)
+    second = _case(2)
+    assert state.record(first, "0000000000000001", False, target_keys=["semantic_family:null_semantics"])
+    assert state.record(second, "0000000000000002", False, target_keys=["semantic_family:null_semantics"])
+    first_index = state.interesting_cases.index(first)
+    second_index = state.interesting_cases.index(second)
+
+    before = state._case_seed_schedule_score(second_index)
+    state._record_mutation_seed_pull(first_index)
+    after = state._case_seed_schedule_score(second_index)
+
+    assert state._recent_cluster_pull_count(state.case_cluster_keys[second_index]) == 1
+    assert after < before
+
+
+def test_feedback_cluster_reward_transfers_to_similar_seed_and_round_trips():
+    state = FeedbackState()
+    first = _case(1)
+    second = _case(2)
+    assert state.record(first, "0000000000000001", False, target_keys=["semantic_family:cast_semantics"])
+    assert state.record(second, "0000000000000002", False, target_keys=["semantic_family:cast_semantics"])
+    first_index = state.interesting_cases.index(first)
+    second_index = state.interesting_cases.index(second)
+    cluster_key = state.case_cluster_keys[first_index]
+
+    baseline = state._case_seed_schedule_score(second_index)
+    state.last_feedback_parent_index = first_index
+    state.record_feedback_candidate_reward("feedback_mutation", 3.0)
+
+    assert state.cluster_schedule_feedback_totals[cluster_key] == 3.0
+    assert state.cluster_schedule_feedback_counts[cluster_key] == 1
+    assert state._case_seed_schedule_score(second_index) > baseline
+
+    state._record_mutation_seed_pull(first_index)
+    restored = FeedbackState.from_state_dict(
+        state.to_state_dict(),
+        persist_to_disk=False,
+        max_persisted=0,
+        max_cases_per_profile=16,
+        source_scheduler=None,
+    )
+
+    assert restored.case_cluster_keys == state.case_cluster_keys
+    assert restored.stored_cluster_keys == state.stored_cluster_keys
+    assert restored.cluster_schedule_feedback_totals == state.cluster_schedule_feedback_totals
+    assert restored.cluster_schedule_feedback_counts == state.cluster_schedule_feedback_counts
+    assert restored.quality_archive.to_state_dict() == state.quality_archive.to_state_dict()
+    assert restored._recent_cluster_pull_count(cluster_key) == 1
+
+
+def test_feedback_quality_archive_is_rebuilt_from_legacy_state_dict():
+    legacy_case = _case(11)
+    state_dict = {
+        "seen_signatures": ["disc-11"],
+        "interesting_cases": [legacy_case.to_dict()],
+        "case_utilities": [2.0],
+        "case_family_keys": [[]],
+        "case_profile_keys": [""],
+        "case_target_keys": [["semantic_family:null_semantics"]],
+        "case_mutation_pulls": [0],
+        "case_schedule_rewards": [0.0],
+    }
+
+    restored = FeedbackState.from_state_dict(
+        state_dict,
+        persist_to_disk=False,
+        max_persisted=0,
+        max_cases_per_profile=16,
+        source_scheduler=None,
+    )
+    cluster_key = restored.case_cluster_keys[0]
+
+    assert not restored.quality_archive.is_empty()
+    assert restored.quality_archive.elite_indexes(cluster_key) == [0]
+    assert restored.quality_archive.seed_elite_bonus(cluster_key, 0) > 0.0
+
+
+def test_feedback_quality_archive_health_penalty_lowers_cluster_schedule_score():
+    state = FeedbackState()
+    assert state.record(_case(1), "0000000000000001", False, target_keys=["semantic_family:cast_semantics"])
+    index = 0
+    cluster_key = state.case_cluster_keys[index]
+    baseline = state._case_seed_schedule_score(index)
+    state.last_feedback_parent_index = index
+
+    state.record_feedback_outcome_reward(
+        "feedback_mutation",
+        0.0,
+        preflight_valid=False,
+        fallback_used=True,
+        false_positive=True,
+    )
+
+    assert state.quality_archive.cluster_health_penalty(cluster_key) > 0.0
+    assert state._case_seed_schedule_score(index) < baseline
+
+
+def test_feedback_quality_archive_can_be_disabled_for_ablation():
+    state = FeedbackState(enable_quality_archive=False)
+
+    assert state.record(
+        _case(1),
+        "0000000000000001",
+        False,
+        target_keys=["semantic_family:filtering"],
+    )
+    context = state.candidate_quality_context(
+        _case(2),
+        target_keys=["semantic_family:filtering"],
+    )
+    state.last_feedback_parent_index = 0
+    state.record_feedback_outcome_reward("feedback_mutation", 2.0)
+
+    assert state.quality_archive.is_empty()
+    assert context["archive_enabled"] is False
+    assert "archive_known" not in context
+    assert state.to_state_dict()["enable_quality_archive"] is False
+
+
+def test_feedback_candidate_quality_context_reports_archive_signals_without_mutating_archive():
+    state = FeedbackState()
+    assert state.record(_case(1), "0000000000000001", False, target_keys=["semantic_family:cast_semantics"])
+    cluster_key = state.case_cluster_keys[0]
+    state.last_feedback_parent_index = 0
+    state.record_feedback_outcome_reward("feedback_mutation", 2.0)
+
+    known_before = state.quality_archive.to_state_dict()
+    known_context = state.candidate_quality_context(
+        _case(2),
+        target_keys=["semantic_family:cast_semantics"],
+    )
+
+    assert known_context["cluster_key"] == cluster_key
+    assert known_context["archive_known"] is True
+    assert known_context["archive_elite_indexes"] == [0]
+    assert known_context["archive_seed_count"] == 1
+    assert known_context["archive_outcome_count"] == 1
+    assert known_context["archive_cluster_reward"] > 0.0
+    assert known_context["cluster_count"] == 1
+    assert state.quality_archive.to_state_dict() == known_before
+
+    unknown_before = state.quality_archive.to_state_dict()
+    unknown_context = state.candidate_quality_context(
+        _case(3),
+        target_keys=["semantic_family:ordering_semantics"],
+    )
+
+    assert unknown_context["archive_known"] is False
+    assert unknown_context["archive_seed_count"] == 0
+    assert unknown_context["archive_outcome_count"] == 0
+    assert state.quality_archive.to_state_dict() == unknown_before
+
+
 def test_feedback_candidate_reward_updates_parent_and_operator_scores():
     state = FeedbackState()
     state.record(_case(1), "0000000000000001", False)
@@ -354,6 +569,58 @@ def test_feedback_candidate_reward_updates_parent_and_operator_scores():
     assert state.mutation_operator_rewards["value"] == 2.5
     score = state._mutation_operator_score_snapshot()["value"]
     assert 1.0 < score < 1.2
+    assert state.adaptive_learning.bandits["mutation_operator"].arms["value"].pulls == 1
+
+
+def test_feedback_mutation_operator_learning_state_round_trips_and_influences_scores():
+    state = FeedbackState()
+    assert state.record(
+        _case(1),
+        "0000000000000001",
+        False,
+        target_keys=["semantic_family:filtering"],
+    )
+    state.last_feedback_parent_index = 0
+    state.last_feedback_operator = "append_range_filter"
+    state.record_feedback_outcome_reward("feedback_mutation", 3.0)
+
+    restored = FeedbackState.from_state_dict(
+        state.to_state_dict(),
+        persist_to_disk=False,
+        max_persisted=0,
+        max_cases_per_profile=16,
+        source_scheduler=None,
+    )
+    scores = restored._mutation_operator_score_snapshot(target_keys=["semantic_family:filtering"])
+
+    assert "mutation_operator" in restored.adaptive_learning.bandits
+    assert restored.adaptive_learning.bandits["mutation_operator"].arms["append_range_filter"].pulls == 1
+    assert scores["append_range_filter"] > scores["append_order_projection"]
+
+
+def test_feedback_mutation_operator_learning_can_be_disabled_for_ablation():
+    state = FeedbackState(enable_mutation_operator_learning=False)
+    assert state.record(
+        _case(1),
+        "0000000000000001",
+        False,
+        target_keys=["semantic_family:filtering"],
+    )
+    state.last_feedback_parent_index = 0
+    state.last_feedback_operator = "append_range_filter"
+
+    state.record_feedback_outcome_reward("feedback_mutation", 3.0)
+
+    assert "mutation_operator" not in state.adaptive_learning.bandits
+    assert state.mutation_operator_pulls["append_range_filter"] == 1
+    restored = FeedbackState.from_state_dict(
+        state.to_state_dict(),
+        persist_to_disk=False,
+        max_persisted=0,
+        max_cases_per_profile=16,
+        source_scheduler=None,
+    )
+    assert restored.enable_mutation_operator_learning is False
 
 
 def test_feedback_canonical_method_aliases_match_legacy_behavior():
@@ -508,6 +775,18 @@ def test_feedback_operator_score_snapshot_uses_structural_semantic_signal_affini
 
     scores = state._mutation_operator_score_snapshot(
         target_keys=["semantic_signal:left_join_case_when_membership"]
+    )
+
+    assert scores["append_left_join_case_membership"] > scores["append_range_filter"]
+
+
+def test_feedback_operator_score_snapshot_uses_structural_objective_affinity_for_untried_operator():
+    state = FeedbackState()
+    state.mutation_operator_pulls["append_range_filter"] = 4
+    state.mutation_operator_rewards["append_range_filter"] = 0.4
+
+    scores = state._mutation_operator_score_snapshot(
+        target_keys=["exploration_objective:cross_model_consistency"]
     )
 
     assert scores["append_left_join_case_membership"] > scores["append_range_filter"]

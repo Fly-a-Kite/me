@@ -1,0 +1,92 @@
+{
+  "bug_audit": {
+    "skipped": true
+  },
+  "cases_per_lane_seed": 2,
+  "duration": "5s",
+  "generated_at": "2026-05-30T15:55:12Z",
+  "generated_by": "datadiff discovery-campaign",
+  "health_stop_reason": "",
+  "lane_ids": [
+    "common_api_workflow"
+  ],
+  "lanes": [
+    {
+      "id": "common_api_workflow",
+      "preset": "live_common_api_workflow_metamorphic",
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, string clean/replace/slice/concat/pattern flags, ISO date-part extraction, int/float/string casts, nullable boolean not/reductions, drop-null, mutate, union-all, semi/anti join, fill-null/coalesce, case-when, distinct, join, groupby, sort, and slice"
+    }
+  ],
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "pyarrow",
+        "polars",
+        "polars_lazy",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 2,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {},
+        "refresh": false,
+        "run_file": "runs/run-20260530T155511-1780156511451260499.jsonl.gz",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260530T155511-1780156511451260499.csv",
+      "duration": "5s",
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-system-smoke-manifest-common_api_workflow-seed53001-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "health": {
+        "bytes": 3158,
+        "candidate_bug_families": {},
+        "examples": [],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 2,
+        "run_file": "runs/run-20260530T155511-1780156511451260499.jsonl.gz",
+        "statuses": {
+          "ok": 2
+        }
+      },
+      "lane_id": "common_api_workflow",
+      "preset": "live_common_api_workflow_metamorphic",
+      "report": "reports/report-run-20260530T155511-1780156511451260499.md",
+      "run_file": "runs/run-20260530T155511-1780156511451260499.jsonl.gz",
+      "seed": 53001,
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, string clean/replace/slice/concat/pattern flags, ISO date-part extraction, int/float/string casts, nullable boolean not/reductions, drop-null, mutate, union-all, semi/anti join, fill-null/coalesce, case-when, distinct, join, groupby, sort, and slice"
+    }
+  ],
+  "schema_version": "discovery-campaign-v1",
+  "seeds": [
+    53001
+  ],
+  "stopped_by_health": false,
+  "summary": {
+    "fresh_candidate_bug_families": {},
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {},
+    "run_count": 1,
+    "triage_verdicts": {}
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "targeted_short_sprints",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence"
+  ]
+}

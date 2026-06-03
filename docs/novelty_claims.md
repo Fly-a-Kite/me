@@ -13,7 +13,7 @@
 
 - 被测系统组合的独特性
 - 统一语义层和统一证据链
-- latest-version bug-hunting methodology
+- latest-version bug discovery methodology
 - DataFrame / Arrow / embedded analytical engines 的跨生态整合
 
 ## 一、可以直接说的 claim
@@ -201,7 +201,7 @@
 
 ### 证据 claim
 
-> Unlike prior work that mainly focuses on query generation or individual logic-bug oracles, our system also provides an end-to-end evidence pipeline for fresh/latest-version bug hunting, issue bundling, family-level deduplication, and confirmation tracking.
+> Unlike prior work that mainly focuses on query generation or individual logic-bug oracles, our system also provides an end-to-end evidence pipeline for fresh/latest-version bug discovery, issue bundling, family-level deduplication, and confirmation tracking.
 
 ### 结果 claim
 

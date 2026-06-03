@@ -41,10 +41,13 @@ def test_polars_nan_filter_divergence_is_documented_not_bug():
     config = ExperimentConfig(generator_profile="edge_float")
     result = run_loaded_case(case, REQUIRED_BACKENDS, config=config, save_artifact=False)
 
-    assert result["status"] == "bug"
+    assert result["status"] == "ok"
     assert result["findings"][0]["kind"] == "semantic_output_mismatch"
     assert result["findings"][0]["root_cause"] == "nan_inf_semantics"
     assert result["findings"][0]["suspicious_backends"] == ["polars"]
+    assert result["findings"][0]["triage_verdict"] == "documented_semantic_divergence"
+    assert result["findings"][0]["adjudication"]["countable_as_bug_evidence"] is False
+    assert result["candidate_recheck"]["skip_reason"] == "no_countable_candidate_findings"
 
     report = build_triage_report(
         case,
@@ -90,7 +93,12 @@ def test_polars_nan_groupby_count_divergence_is_documented_not_bug():
     config = ExperimentConfig(generator_profile="edge_float")
     result = run_loaded_case(case, REQUIRED_BACKENDS, config=config, save_artifact=False)
 
-    assert result["status"] == "bug"
+    assert result["status"] == "ok"
+    assert result["findings"][0]["kind"] == "semantic_output_mismatch"
+    assert result["findings"][0]["root_cause"] == "nan_inf_semantics"
+    assert result["findings"][0]["triage_verdict"] == "documented_semantic_divergence"
+    assert result["findings"][0]["adjudication"]["countable_as_bug_evidence"] is False
+    assert result["candidate_recheck"]["skip_reason"] == "no_countable_candidate_findings"
     assert result["normalized"]["polars"]["rows"] == [[1, False]]
     assert result["normalized"]["pandas"]["rows"] == [[0, False]]
     assert result["normalized"]["duckdb"]["rows"] == [[0, False]]

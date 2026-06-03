@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from datadiff import scheduler as scheduler_module
 from datadiff.scheduler import (
     AdaptiveBudgetScheduler,
     AdaptiveScheduleConfig,
@@ -7,6 +8,7 @@ from datadiff.scheduler import (
     LocalSourceScheduler,
     summarize_batch_run,
 )
+from datadiff.adaptive_learning import AdaptiveLearningState
 from datadiff.util import append_jsonl, dump_json, run_meta_path
 
 
@@ -286,6 +288,50 @@ def test_adaptive_budget_scheduler_reward_signal_prefers_repeated_stable_arm_ove
     assert scheduler.next_batch().arm_id == "stable"
 
 
+def test_batch_reward_penalizes_runtime_cost_without_losing_signal_terms():
+    lean = BatchObservation(
+        cases=4,
+        elapsed_s=1.0,
+        throughput_cases_s=4.0,
+        findings=0,
+        candidate_bug_cases=0,
+        signal_new_behavior_cases=2,
+        feedback_mutation_cases=2,
+        productive_mutation_cases=2,
+        guided_productive_cases=2,
+        scheduler_feedback_share=0.02,
+    )
+    costly = BatchObservation(
+        cases=4,
+        elapsed_s=1.0,
+        throughput_cases_s=4.0,
+        findings=0,
+        candidate_bug_cases=0,
+        signal_new_behavior_cases=2,
+        feedback_mutation_cases=2,
+        productive_mutation_cases=2,
+        guided_productive_cases=2,
+        invalid_mutation_cases=1,
+        redundant_mutation_cases=1,
+        guided_redundant_cases=2,
+        scheduler_feedback_share=0.80,
+    )
+
+    lean_reward = scheduler_module._batch_reward(
+        lean,
+        new_global_family_count=0,
+        new_local_family_count=0,
+    )
+    costly_reward = scheduler_module._batch_reward(
+        costly,
+        new_global_family_count=0,
+        new_local_family_count=0,
+    )
+
+    assert lean_reward > costly_reward
+    assert scheduler_module._runtime_cost_penalty(costly) > scheduler_module._runtime_cost_penalty(lean)
+
+
 def test_adaptive_budget_scheduler_carries_closed_loop_state_between_batches():
     scheduler = AdaptiveBudgetScheduler(
         [
@@ -318,6 +364,504 @@ def test_adaptive_budget_scheduler_carries_closed_loop_state_between_batches():
     assert second.job["persist_closed_loop_state"] is True
     assert second.job["closed_loop_state"] == {"seen_signatures": ["disc-a"]}
     assert scheduler.snapshot()[0]["closed_loop_state_present"] is True
+
+
+def test_adaptive_budget_scheduler_records_transferable_learning_actions():
+    learning = AdaptiveLearningState()
+    scheduler = AdaptiveBudgetScheduler(
+        [
+            {
+                "arm_id": "guided-a",
+                "target_suite": "core",
+                "preset": "guided",
+                "seed": 1,
+                "generator_profile": "discovery",
+                "guidance_targets": ["semantic_family:null_semantics"],
+                "semantic_objectives": ["partition"],
+                "mutation_operators": ["append_range_filter"],
+                "metamorphic_relations": ["order"],
+                "target_version": "v2",
+                "fixed_version": "v1",
+            },
+        ],
+        total_cases_budget=1,
+        total_duration_budget_s=None,
+        config=AdaptiveScheduleConfig(batch_cases=1, warmup_batches=1, exploration_weight=0.0),
+        learning_state=learning,
+    )
+
+    batch = scheduler.next_batch()
+    scheduler.record_result(
+        batch,
+        BatchObservation(
+            cases=1,
+            elapsed_s=0.1,
+            throughput_cases_s=10.0,
+            findings=1,
+            candidate_bug_cases=1,
+            candidate_bug_families={"family@engine"},
+            new_behavior_cases=1,
+        ),
+        next_seed=2,
+    )
+
+    assert {"batch_arm", "generator_profile", "semantic_objective", "mutation_operator", "metamorphic_relation", "version_pair"}.issubset(
+        learning.bandits
+    )
+    assert learning.bandits["mutation_operator"].arms["append_range_filter"].pulls == 1
+    assert learning.bandits["metamorphic_relation"].arms["order"].pulls == 1
+    assert learning.bandits["version_pair"].arms["v2->v1"].pulls == 1
+
+
+def test_adaptive_budget_scheduler_records_runtime_cost_in_learning_health():
+    learning = AdaptiveLearningState()
+    scheduler = AdaptiveBudgetScheduler(
+        [
+            {
+                "arm_id": "guided-a",
+                "target_suite": "core",
+                "preset": "guided",
+                "seed": 1,
+                "generator_profile": "discovery",
+            },
+        ],
+        total_cases_budget=1,
+        total_duration_budget_s=None,
+        config=AdaptiveScheduleConfig(batch_cases=1, warmup_batches=1, exploration_weight=0.0),
+        learning_state=learning,
+    )
+
+    batch = scheduler.next_batch()
+    scheduler.record_result(
+        batch,
+        BatchObservation(
+            cases=1,
+            elapsed_s=0.1,
+            throughput_cases_s=10.0,
+            findings=0,
+            candidate_bug_cases=0,
+            signal_new_behavior_cases=1,
+            feedback_mutation_cases=1,
+            invalid_mutation_cases=1,
+            scheduler_feedback_share=0.90,
+        ),
+        next_seed=2,
+    )
+
+    arm = learning.bandits["batch_arm"].arms["guided-a"]
+    score = learning.score_action(
+        "batch_arm",
+        "guided-a",
+        context_features=("target_suite:core", "preset:guided"),
+    )
+
+    assert arm.runtime_cost_total > 0.0
+    assert score["health_penalty"] > 0.0
+
+
+def test_adaptive_budget_scheduler_can_ablate_runtime_cost_learning():
+    learning = AdaptiveLearningState()
+    scheduler = AdaptiveBudgetScheduler(
+        [
+            {
+                "arm_id": "guided-a",
+                "target_suite": "core",
+                "preset": "guided",
+                "seed": 1,
+            },
+        ],
+        total_cases_budget=1,
+        total_duration_budget_s=None,
+        config=AdaptiveScheduleConfig(
+            batch_cases=1,
+            warmup_batches=1,
+            exploration_weight=0.0,
+            enable_runtime_cost_learning=False,
+        ),
+        learning_state=learning,
+    )
+
+    batch = scheduler.next_batch()
+    scheduler.record_result(
+        batch,
+        BatchObservation(
+            cases=1,
+            elapsed_s=0.1,
+            throughput_cases_s=10.0,
+            findings=0,
+            candidate_bug_cases=0,
+            signal_new_behavior_cases=1,
+            feedback_mutation_cases=1,
+            invalid_mutation_cases=1,
+            scheduler_feedback_share=0.90,
+        ),
+        next_seed=2,
+    )
+
+    assert learning.bandits["batch_arm"].arms["guided-a"].runtime_cost_total == 0.0
+
+
+def test_adaptive_budget_scheduler_can_ablate_online_reward_model_updates():
+    learning = AdaptiveLearningState()
+    scheduler = AdaptiveBudgetScheduler(
+        [
+            {
+                "arm_id": "guided-a",
+                "target_suite": "core",
+                "preset": "guided",
+                "seed": 1,
+                "generator_profile": "discovery",
+            },
+        ],
+        total_cases_budget=1,
+        total_duration_budget_s=None,
+        config=AdaptiveScheduleConfig(
+            batch_cases=1,
+            warmup_batches=1,
+            exploration_weight=0.0,
+            enable_online_reward_model=False,
+        ),
+        learning_state=learning,
+    )
+
+    batch = scheduler.next_batch()
+    scheduler.record_result(
+        batch,
+        BatchObservation(
+            cases=1,
+            elapsed_s=0.1,
+            throughput_cases_s=10.0,
+            findings=1,
+            candidate_bug_cases=1,
+            candidate_bug_families={"family@engine"},
+            signal_new_behavior_cases=1,
+        ),
+        next_seed=2,
+    )
+
+    arm_bandit = learning.bandits["batch_arm"]
+    profile_bandit = learning.bandits["generator_profile"]
+    score = learning.score_action(
+        "batch_arm",
+        "guided-a",
+        context_features=("target_suite:core", "preset:guided"),
+        enable_reward_model=False,
+    )
+
+    assert arm_bandit.arms["guided-a"].pulls == 1
+    assert profile_bandit.arms["discovery"].pulls == 1
+    assert arm_bandit.reward_model.total_updates == 0
+    assert profile_bandit.reward_model.total_updates == 0
+    assert score["model_prediction"] == 0.0
+    assert score["uncertainty"] == 0.0
+
+
+def test_adaptive_budget_scheduler_learning_signal_can_rank_prior_rewarded_arm():
+    learning = AdaptiveLearningState()
+    learning.record_outcome(
+        "batch_arm",
+        "b",
+        context_features=("target_suite:core", "preset:guided"),
+        reward=4.0,
+    )
+    scheduler = AdaptiveBudgetScheduler(
+        [
+            {"arm_id": "a", "target_suite": "core", "preset": "guided", "seed": 1},
+            {"arm_id": "b", "target_suite": "core", "preset": "guided", "seed": 1001},
+        ],
+        total_cases_budget=2,
+        total_duration_budget_s=None,
+        config=AdaptiveScheduleConfig(
+            batch_cases=1,
+            warmup_batches=0,
+            exploration_weight=0.0,
+            freshness_weight=0.0,
+            stale_penalty=0.0,
+            group_fairness_weight=0.0,
+            learning_weight=1.0,
+        ),
+        learning_state=learning,
+    )
+    for arm in scheduler.arms.values():
+        arm.pulls = 1
+    scheduler.total_batches_completed = 2
+
+    assert scheduler.next_batch().arm_id == "b"
+
+
+def test_adaptive_budget_scheduler_uses_transferable_action_learning_to_rank_arms():
+    learning = AdaptiveLearningState()
+    learning.record_outcome(
+        "generator_profile",
+        "productive_profile",
+        context_features=("target_suite:core", "preset:guided"),
+        reward=5.0,
+    )
+    learning.record_outcome(
+        "generator_profile",
+        "stale_profile",
+        context_features=("target_suite:core", "preset:guided"),
+        reward=-2.0,
+    )
+    scheduler = AdaptiveBudgetScheduler(
+        [
+            {
+                "arm_id": "stale-arm",
+                "target_suite": "core",
+                "preset": "guided",
+                "seed": 1,
+                "generator_profile": "stale_profile",
+            },
+            {
+                "arm_id": "productive-arm",
+                "target_suite": "core",
+                "preset": "guided",
+                "seed": 1001,
+                "generator_profile": "productive_profile",
+            },
+        ],
+        total_cases_budget=2,
+        total_duration_budget_s=None,
+        config=AdaptiveScheduleConfig(
+            batch_cases=1,
+            warmup_batches=0,
+            exploration_weight=0.0,
+            freshness_weight=0.0,
+            stale_penalty=0.0,
+            group_fairness_weight=0.0,
+            learning_weight=1.0,
+        ),
+        learning_state=learning,
+    )
+    for arm in scheduler.arms.values():
+        arm.pulls = 1
+    scheduler.total_batches_completed = 2
+
+    assert scheduler.next_batch().arm_id == "productive-arm"
+
+
+def test_adaptive_budget_scheduler_uses_continual_priority_to_rank_arms():
+    learning = AdaptiveLearningState()
+    learning.ingest_continual_ledger(
+        {
+            "families": [
+                {"family": "cast_semantics@engine", "status": "fixed"},
+                {"family": "null_semantics@engine", "status": "regression"},
+            ]
+        }
+    )
+    scheduler = AdaptiveBudgetScheduler(
+        [
+            {
+                "arm_id": "cast-arm",
+                "target_suite": "engine",
+                "preset": "guided",
+                "seed": 1,
+                "semantic_focus_families": ["cast_semantics"],
+            },
+            {
+                "arm_id": "null-arm",
+                "target_suite": "engine",
+                "preset": "guided",
+                "seed": 1001,
+                "semantic_focus_families": ["null_semantics"],
+            },
+        ],
+        total_cases_budget=2,
+        total_duration_budget_s=None,
+        config=AdaptiveScheduleConfig(
+            batch_cases=1,
+            warmup_batches=0,
+            exploration_weight=0.0,
+            freshness_weight=0.0,
+            stale_penalty=0.0,
+            group_fairness_weight=0.0,
+            learning_weight=1.0,
+        ),
+        learning_state=learning,
+    )
+    for arm in scheduler.arms.values():
+        arm.pulls = 1
+    scheduler.total_batches_completed = 2
+
+    assert scheduler.next_batch().arm_id == "null-arm"
+    null_score = learning.score_action(
+        "semantic_objective",
+        "semantic_family:null_semantics",
+        context_features=("target_suite:engine",),
+    )
+    cast_score = learning.score_action(
+        "semantic_objective",
+        "semantic_family:cast_semantics",
+        context_features=("target_suite:engine",),
+    )
+    assert null_score["continual_priority_signal"] > cast_score["continual_priority_signal"]
+
+
+def test_adaptive_budget_scheduler_can_ablate_continual_learning_priority():
+    learning = AdaptiveLearningState()
+    learning.ingest_continual_ledger(
+        {
+            "families": [
+                {"family": "null_semantics@engine", "status": "regression"},
+            ]
+        }
+    )
+    scheduler = AdaptiveBudgetScheduler(
+        [
+            {
+                "arm_id": "neutral-arm",
+                "target_suite": "engine",
+                "preset": "guided",
+                "seed": 1,
+                "semantic_focus_families": ["cast_semantics"],
+            },
+            {
+                "arm_id": "priority-arm",
+                "target_suite": "engine",
+                "preset": "guided",
+                "seed": 1001,
+                "semantic_focus_families": ["null_semantics"],
+            },
+        ],
+        total_cases_budget=2,
+        total_duration_budget_s=None,
+        config=AdaptiveScheduleConfig(
+            batch_cases=1,
+            warmup_batches=0,
+            exploration_weight=0.0,
+            freshness_weight=0.0,
+            stale_penalty=0.0,
+            group_fairness_weight=0.0,
+            learning_weight=1.0,
+            enable_continual_learning=False,
+        ),
+        learning_state=learning,
+    )
+    for arm in scheduler.arms.values():
+        arm.pulls = 1
+    scheduler.total_batches_completed = 2
+
+    priority_score = learning.score_action(
+        "semantic_objective",
+        "semantic_family:null_semantics",
+        context_features=("target_suite:engine",),
+        enable_continual_learning=False,
+    )
+
+    assert priority_score["version_signal"] == 0.0
+    assert priority_score["continual_priority_signal"] == 0.0
+    assert scheduler.next_batch().arm_id == "neutral-arm"
+
+
+def test_adaptive_budget_scheduler_uses_active_learning_bonus_for_cold_contexts():
+    learning = AdaptiveLearningState()
+    for _ in range(8):
+        learning.record_outcome(
+            "generator_profile",
+            "known_profile",
+            context_features=("target_suite:core", "preset:guided"),
+            version_id="v1",
+            reward=0.1,
+        )
+    scheduler = AdaptiveBudgetScheduler(
+        [
+            {
+                "arm_id": "known-arm",
+                "target_suite": "core",
+                "preset": "guided",
+                "seed": 1,
+                "generator_profile": "known_profile",
+                "target_version": "v1",
+            },
+            {
+                "arm_id": "cold-arm",
+                "target_suite": "embedded_sql_cross",
+                "preset": "guided",
+                "seed": 1001,
+                "generator_profile": "cold_profile",
+                "target_version": "v2",
+            },
+        ],
+        total_cases_budget=2,
+        total_duration_budget_s=None,
+        config=AdaptiveScheduleConfig(
+            batch_cases=1,
+            warmup_batches=0,
+            exploration_weight=0.0,
+            freshness_weight=0.0,
+            stale_penalty=0.0,
+            group_fairness_weight=0.0,
+            learning_weight=1.0,
+        ),
+        learning_state=learning,
+    )
+    for arm in scheduler.arms.values():
+        arm.pulls = 1
+    scheduler.total_batches_completed = 2
+
+    assert scheduler.next_batch().arm_id == "cold-arm"
+    cold_signal = scheduler.snapshot()[0]["learning_signal"]
+    assert cold_signal >= 0.0
+
+
+def test_adaptive_budget_scheduler_can_ablate_active_learning_bonus():
+    learning = AdaptiveLearningState()
+    for _ in range(8):
+        learning.record_outcome(
+            "generator_profile",
+            "known_profile",
+            context_features=("target_suite:core", "preset:guided"),
+            version_id="v1",
+            reward=0.1,
+        )
+    scheduler = AdaptiveBudgetScheduler(
+        [
+            {
+                "arm_id": "known-arm",
+                "target_suite": "core",
+                "preset": "guided",
+                "seed": 1,
+                "generator_profile": "known_profile",
+                "target_version": "v1",
+            },
+            {
+                "arm_id": "cold-arm",
+                "target_suite": "embedded_sql_cross",
+                "preset": "guided",
+                "seed": 1001,
+                "generator_profile": "cold_profile",
+                "target_version": "v2",
+            },
+        ],
+        total_cases_budget=2,
+        total_duration_budget_s=None,
+        config=AdaptiveScheduleConfig(
+            batch_cases=1,
+            warmup_batches=0,
+            exploration_weight=0.0,
+            freshness_weight=0.0,
+            stale_penalty=0.0,
+            group_fairness_weight=0.0,
+            learning_weight=1.0,
+            enable_active_learning=False,
+        ),
+        learning_state=learning,
+    )
+    for arm in scheduler.arms.values():
+        arm.pulls = 1
+    scheduler.total_batches_completed = 2
+
+    cold_score = learning.score_action(
+        "generator_profile",
+        "cold_profile",
+        context_features=("target_suite:embedded_sql_cross", "preset:guided"),
+        version_id="v2",
+        enable_active_learning=False,
+    )
+
+    assert cold_score["exploration_bonus"] == 0.0
+    assert scheduler.next_batch().arm_id == "known-arm"
 
 
 def test_adaptive_budget_scheduler_next_round_uses_unique_arms_and_reserved_budget():
@@ -385,6 +929,45 @@ def test_adaptive_budget_scheduler_rebalances_underrepresented_groups():
 
     rebalanced = scheduler.next_batch()
     assert rebalanced.group_key == "core:baseline"
+
+
+def test_adaptive_budget_scheduler_annealing_can_choose_non_greedy_arm():
+    def build_scheduler(temperature: float) -> AdaptiveBudgetScheduler:
+        scheduler = AdaptiveBudgetScheduler(
+            [
+                {"arm_id": "best", "target_suite": "core", "preset": "baseline", "seed": 1},
+                {"arm_id": "mid", "target_suite": "core", "preset": "baseline", "seed": 1001},
+                {"arm_id": "low", "target_suite": "core", "preset": "baseline", "seed": 2001},
+            ],
+            total_cases_budget=3,
+            total_duration_budget_s=None,
+            config=AdaptiveScheduleConfig(
+                batch_cases=1,
+                warmup_batches=1,
+                exploration_weight=0.0,
+                freshness_weight=0.0,
+                stale_penalty=0.0,
+                group_fairness_weight=0.0,
+                max_group_pull_gap=0,
+                annealing_initial_temperature=temperature,
+                annealing_decay=1.0,
+                annealing_min_temperature=0.0,
+            ),
+        )
+        for arm_id, total_reward in {"best": 20.0, "mid": 12.0, "low": 4.0}.items():
+            arm = scheduler.arms[arm_id]
+            arm.pulls = 4
+            arm.total_reward = total_reward
+            arm.last_reward = total_reward / 4.0
+        scheduler.total_batches_completed = 3
+        return scheduler
+
+    greedy = build_scheduler(temperature=0.0)
+    annealed = build_scheduler(temperature=100.0)
+
+    assert greedy.next_batch().arm_id == "best"
+    assert annealed.next_batch().arm_id == "low"
+    assert {row["annealing_temperature"] for row in annealed.snapshot()} == {100.0}
 
 
 def test_summarize_batch_run_counts_scheduler_signals(tmp_path: Path):
@@ -478,6 +1061,18 @@ def test_summarize_batch_run_counts_scheduler_signals(tmp_path: Path):
         {
             "elapsed_s": 0.5,
             "throughput_cases_s": 6.0,
+            "stage_profile": {
+                "totals_ms": {
+                    "generate_mutate_ms": 1.0,
+                    "backend_execution_ms": 5.0,
+                    "normalize_ms": 1.0,
+                    "oracle_classification_ms": 1.0,
+                    "scheduler_feedback_ms": 2.0,
+                    "logging_artifact_ms": 0.0,
+                    "total_case_wall_ms": 10.0,
+                },
+                "share_of_total": {"scheduler_feedback_ms": 0.2},
+            },
         },
         run_meta_path(run_file),
     )
@@ -497,6 +1092,7 @@ def test_summarize_batch_run_counts_scheduler_signals(tmp_path: Path):
     assert observation.first_candidate_bug_case_index == 0
     assert observation.first_candidate_bug_elapsed_s == 0.1
     assert observation.candidate_bug_discovery_auc == 1.0
+    assert observation.scheduler_feedback_share == 0.2
     assert observation.feedback_case_count == 4
     assert observation.feedback_mutation_cases == 1
     assert observation.stored_in_feedback_corpus_cases == 1

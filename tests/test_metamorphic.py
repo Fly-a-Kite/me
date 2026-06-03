@@ -1,6 +1,11 @@
 from datadiff.datagen import generate_case
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
-from datadiff.metamorphic import build_metamorphic_variants, evaluate_metamorphic_variants
+from datadiff.metamorphic import (
+    all_metamorphic_variants,
+    build_metamorphic_variants,
+    evaluate_metamorphic_variants,
+    select_metamorphic_variants,
+)
 from datadiff.normalizer import NormalizedResult
 
 
@@ -9,6 +14,20 @@ def test_metamorphic_builds_row_permutation_without_limit():
     case.program = Program(case.program.program_id, case.program.seed, [{"op": "select", "columns": ["id"]}])
     variants = build_metamorphic_variants(case, limit=20)
     assert any(v.relation == "row_permutation" for v in variants)
+
+
+def test_metamorphic_relation_order_prioritizes_requested_relation_under_limit():
+    case = generate_case(7)
+    case.program = Program(case.program.program_id, case.program.seed, [{"op": "select", "columns": ["id"]}])
+    variants = all_metamorphic_variants(case)
+
+    selected = select_metamorphic_variants(
+        variants,
+        limit=1,
+        relation_order=["row_permutation"],
+    )
+
+    assert [variant.relation for variant in selected] == ["row_permutation"]
 
 
 def test_metamorphic_ignores_float_precision_only_differences():

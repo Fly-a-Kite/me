@@ -102,7 +102,7 @@ def test_standalone_reproducer_supports_known_root_causes():
     ) is False
     assert supports_standalone_reproducer(
         {
-            "generator_profile": "bughunt",
+            "generator_profile": "discovery",
             "features": {"contains_nan": False, "contains_inf": False},
             "reproduced_roots": ["groupby_aggregation"],
             "suspicious_backends": ["datafusion"],
@@ -110,7 +110,7 @@ def test_standalone_reproducer_supports_known_root_causes():
     ) is True
     assert supports_standalone_reproducer(
         {
-            "generator_profile": "bughunt",
+            "generator_profile": "discovery",
             "features": {"contains_nan": False, "contains_inf": False},
             "reproduced_roots": ["outer_join_truth_filter"],
             "suspicious_backends": ["datafusion"],
@@ -118,7 +118,7 @@ def test_standalone_reproducer_supports_known_root_causes():
     ) is True
     assert supports_standalone_reproducer(
         {
-            "generator_profile": "bughunt",
+            "generator_profile": "discovery",
             "features": {"contains_nan": False, "contains_inf": False},
             "reproduced_roots": ["joined_order_offset_projection"],
             "suspicious_backends": ["datafusion"],

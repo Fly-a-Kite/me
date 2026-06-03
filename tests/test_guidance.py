@@ -5,6 +5,7 @@ import pytest
 from datadiff.datagen import generate_case
 from datadiff.config import DiscoveryBias
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
+from datadiff.exploration_objectives import ExplorationObjectiveRule
 from datadiff.guidance import (
     GuidanceState,
     _apply_candidate_pool_discovery_balance,
@@ -46,16 +47,16 @@ def _case(seed: int, operations: list[dict]) -> Case:
     )
 
 
-def _organic_bughunt_case_matching_pattern(pattern: str) -> Case:
+def _organic_discovery_case_matching_pattern(pattern: str) -> Case:
     for seed in range(260000, 260500):
-        case = generate_case(seed, profile="bughunt")
+        case = generate_case(seed, profile="discovery")
         if "source_issue" in case.metadata:
             continue
         if case.metadata.get("mixed_generator_profile") == pattern:
             continue
         if f"pattern:{pattern}" in extract_case_features(case):
             return case
-    raise AssertionError(f"no organic bughunt case matched pattern:{pattern}")
+    raise AssertionError(f"no organic discovery case matched pattern:{pattern}")
 
 
 def _common_api_workflow_case_matching_template(template: str) -> Case:
@@ -91,6 +92,52 @@ def test_derive_case_features_matches_compatibility_alias():
     case = _case(99, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}])
 
     assert derive_case_features(case) == extract_case_features(case)
+
+
+def test_guidance_features_bucket_quality_archive_context_without_cluster_identity():
+    case = _case(101, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}])
+    case.metadata["quality_archive_context"] = {
+        "cluster_key": "profile=generic|targets=semantic_family_cast_semantics|ops=filter",
+        "archive_known": True,
+        "archive_elite_indexes": [3, 7],
+        "archive_seed_count": 2,
+        "archive_outcome_count": 5,
+        "archive_cluster_reward": 0.8,
+        "archive_health_penalty": 0.2,
+        "cluster_count": 4,
+        "cluster_feedback_reward": -0.2,
+        "cluster_novelty_score": 0.1,
+        "recent_cluster_pulls": 3,
+    }
+
+    features = extract_case_features(case)
+
+    assert "quality_archive:known" in features
+    assert "quality_archive:seed_count:few" in features
+    assert "quality_archive:outcome_count:some" in features
+    assert "quality_archive:cluster_count:few" in features
+    assert "quality_archive:recent_cluster_pulls:some" in features
+    assert "quality_archive:reward:positive" in features
+    assert "quality_archive:feedback_reward:weak_negative" in features
+    assert "quality_archive:health:medium" in features
+    assert "quality_archive:novelty:low" in features
+    assert "quality_archive:elite:present" in features
+    assert not any("profile=generic" in feature for feature in features)
+    assert not any("semantic_family_cast_semantics" in feature for feature in features)
+
+
+def test_guidance_matches_dynamic_exploration_objective_rule():
+    rule = ExplorationObjectiveRule("adaptive_predicate", exact_features=frozenset({"op:filter"}))
+    case = _case(100, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}])
+    guidance = GuidanceState(
+        targets=["exploration_objective:adaptive_predicate"],
+        exploration_objective_rules=[rule],
+    )
+
+    decision = guidance.choose_case([case])
+
+    assert "exploration_objective:adaptive_predicate" in decision.features
+    assert decision.matched_targets == ["exploration_objective:adaptive_predicate"]
 
 
 def test_extract_case_features_tracks_string_contains_filter():
@@ -2153,7 +2200,7 @@ def test_guidance_prioritizes_specific_pattern_target_over_generic_target_count(
             {"op": "limit", "n": 2},
         ],
     )
-    pattern_case = generate_case(40, profile="bughunt")
+    pattern_case = generate_case(40, profile="discovery")
     guidance_targets = [
         "common_workflow",
         "operation_combo",
@@ -2182,8 +2229,8 @@ def test_guidance_prioritizes_specific_pattern_target_over_generic_target_count(
 
 
 def test_guidance_prioritizes_issue_template_over_organic_pattern_match():
-    template_case = generate_case(260020, profile="bughunt")
-    organic_case = _organic_bughunt_case_matching_pattern("join_null_key_topk")
+    template_case = generate_case(260020, profile="discovery")
+    organic_case = _organic_discovery_case_matching_pattern("join_null_key_topk")
     guidance_targets = [
         "common_workflow",
         "operation_combo",
@@ -2213,8 +2260,8 @@ def test_guidance_prioritizes_issue_template_over_organic_pattern_match():
 
 
 def test_guidance_template_priority_decays_after_repeated_template_selection():
-    template_case = generate_case(260020, profile="bughunt")
-    organic_case = _organic_bughunt_case_matching_pattern("join_null_key_topk")
+    template_case = generate_case(260020, profile="discovery")
+    organic_case = _organic_discovery_case_matching_pattern("join_null_key_topk")
     guidance = GuidanceState(
         targets=[
             "common_workflow",
@@ -2325,6 +2372,38 @@ def test_guidance_updates_online_feature_weights_from_feedback():
     assert after.online_weights
 
 
+def test_guidance_online_weights_learn_quality_archive_context_features():
+    case = _case(304, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}])
+    case.metadata["quality_archive_context"] = {
+        "cluster_key": "profile=generic|targets=semantic_family_cast_semantics|ops=filter",
+        "archive_known": True,
+        "archive_elite_indexes": [0],
+        "archive_seed_count": 1,
+        "archive_outcome_count": 3,
+        "archive_cluster_reward": 0.7,
+        "archive_health_penalty": 0.0,
+        "cluster_count": 2,
+        "cluster_feedback_reward": 0.6,
+        "cluster_novelty_score": 0.05,
+        "recent_cluster_pulls": 0,
+    }
+    guidance = GuidanceState()
+
+    guidance.record_result(
+        case,
+        {
+            "findings": [{"kind": "semantic_output_mismatch", "root_cause": "cast_semantics"}],
+            "is_new_behavior": True,
+            "preflight": {"valid": True, "fallback_used": False},
+        },
+    )
+
+    assert "quality_archive:known" in guidance.online_weights.feature_stats
+    assert "quality_archive:reward:positive" in guidance.online_weights.feature_stats
+    assert guidance.online_weights.multiplier("quality_archive:known") > 1.0
+    assert guidance.online_weights.prefix_stats["quality_archive"].pulls > 0
+
+
 def test_guidance_online_weights_do_not_overreact_to_single_large_reward():
     combo_case = _case(
         303,
@@ -2406,20 +2485,20 @@ def test_guidance_reward_discounts_repeated_candidate_bug_family():
 
 
 def test_guidance_features_keep_feedback_mutation_issue_profile():
-    base = generate_case(260000, profile="bughunt")
+    base = generate_case(260000, profile="discovery")
 
     mutated = mutate_case_with_metadata(base, 260001).case
     features = extract_case_features(mutated)
 
     assert "source:feedback_mutation" in features
     assert "mutation_depth:one" in features
-    assert "generator_profile:bughunt" in features
+    assert "generator_profile:discovery" in features
     assert f"mixed_generator_profile:{base.metadata['mixed_generator_profile']}" in features
 
 
-def test_guidance_moves_off_repeated_bughunt_template_findings():
-    repeated_template = generate_case(55, profile="bughunt")
-    alternate_template = generate_case(56, profile="bughunt")
+def test_guidance_moves_off_repeated_discovery_template_findings():
+    repeated_template = generate_case(55, profile="discovery")
+    alternate_template = generate_case(56, profile="discovery")
     guidance = GuidanceState(
         targets=[
             "common_workflow",

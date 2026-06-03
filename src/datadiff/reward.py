@@ -4,6 +4,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any
 
+from datadiff.exploration_objectives import EXPLORATION_OBJECTIVE_PREFIX
 from datadiff.mutator import mutation_operator_profiles
 from datadiff.semantic_signal import CANONICAL_SEMANTIC_SIGNAL_PREFIX, canonical_target_key
 
@@ -414,6 +415,7 @@ def aggregate_feedback_summary(
         "feedback_target_key_count": 0,
         "feedback_semantic_family_target_count": 0,
         "feedback_semantic_signal_target_count": 0,
+        "feedback_exploration_objective_target_count": 0,
         "feedback_operator_affinity_hit_cases": 0,
         "feedback_selected_operator_count": 0,
         "feedback_selected_operator_score_total": 0.0,
@@ -440,6 +442,9 @@ def aggregate_feedback_summary(
         out["feedback_target_key_count"] += int(summary.get("feedback_target_key_count", 0) or 0)
         out["feedback_semantic_family_target_count"] += int(summary.get("feedback_semantic_family_target_count", 0) or 0)
         out["feedback_semantic_signal_target_count"] += int(summary.get("feedback_semantic_signal_target_count", 0) or 0)
+        out["feedback_exploration_objective_target_count"] += int(
+            summary.get("feedback_exploration_objective_target_count", 0) or 0
+        )
         out["feedback_operator_affinity_hit_cases"] += int(bool(summary.get("feedback_operator_affinity_hit", False)))
         selected_operator = str(summary.get("feedback_selected_operator", "")).strip()
         if selected_operator:
@@ -578,6 +583,7 @@ def _feedback_decision_summary(row: dict[str, Any]) -> dict[str, Any]:
     target_keys = [item for item in target_keys if item]
     semantic_family_targets: list[str] = []
     semantic_signal_targets: list[str] = []
+    exploration_objective_targets: list[str] = []
     semantic_target_keys: list[str] = []
     for key in target_keys:
         if key.startswith("semantic_family:"):
@@ -590,11 +596,19 @@ def _feedback_decision_summary(row: dict[str, Any]) -> dict[str, Any]:
             if signal:
                 semantic_signal_targets.append(signal)
                 semantic_target_keys.append(f"semantic_signal:{signal}")
+        elif key.startswith(EXPLORATION_OBJECTIVE_PREFIX):
+            objective = key.removeprefix(EXPLORATION_OBJECTIVE_PREFIX).strip()
+            if objective:
+                exploration_objective_targets.append(objective)
         elif key.startswith("feature:semantic_family:"):
             family = key.removeprefix("feature:semantic_family:").strip()
             if family:
                 semantic_family_targets.append(family)
                 semantic_target_keys.append(f"semantic_family:{family}")
+        elif key.startswith(f"feature:{EXPLORATION_OBJECTIVE_PREFIX}"):
+            objective = key.removeprefix(f"feature:{EXPLORATION_OBJECTIVE_PREFIX}").strip()
+            if objective:
+                exploration_objective_targets.append(objective)
     selected_operator = str(selection.get("selected_operator", "")).strip()
     selected_operator_score = float(selection.get("selected_operator_score", 0.0) or 0.0)
     operator_profiles = mutation_operator_profiles(allow_probe_operators=False)
@@ -609,8 +623,16 @@ def _feedback_decision_summary(row: dict[str, Any]) -> dict[str, Any]:
         if selected_profile is not None
         else ()
     )
+    operator_objective_affinity = _string_items(
+        getattr(selected_profile, "exploration_objective_affinity", ())
+        if selected_profile is not None
+        else ()
+    )
     family_affinity_hit = bool(set(operator_family_affinity) & set(semantic_family_targets))
     signal_affinity_hit = bool(set(operator_signal_affinity) & set(semantic_signal_targets))
+    objective_affinity_hit = bool(
+        set(operator_objective_affinity) & set(exploration_objective_targets)
+    )
     return {
         "feedback_parent_case_id": str(selection.get("parent_case_id", "")).strip(),
         "feedback_selected_operator": selected_operator,
@@ -618,14 +640,20 @@ def _feedback_decision_summary(row: dict[str, Any]) -> dict[str, Any]:
         "feedback_target_key_count": len(target_keys),
         "feedback_semantic_family_target_count": len(semantic_family_targets),
         "feedback_semantic_signal_target_count": len(semantic_signal_targets),
+        "feedback_exploration_objective_target_count": len(exploration_objective_targets),
         "feedback_semantic_family_targets": semantic_family_targets,
         "feedback_semantic_signal_targets": semantic_signal_targets,
+        "feedback_exploration_objective_targets": exploration_objective_targets,
         "feedback_semantic_target_keys": semantic_target_keys,
         "feedback_operator_family_affinity": operator_family_affinity,
         "feedback_operator_signal_affinity": operator_signal_affinity,
+        "feedback_operator_objective_affinity": operator_objective_affinity,
         "feedback_operator_family_affinity_hit": family_affinity_hit,
         "feedback_operator_signal_affinity_hit": signal_affinity_hit,
-        "feedback_operator_affinity_hit": family_affinity_hit or signal_affinity_hit,
+        "feedback_operator_objective_affinity_hit": objective_affinity_hit,
+        "feedback_operator_affinity_hit": (
+            family_affinity_hit or signal_affinity_hit or objective_affinity_hit
+        ),
     }
 
 

@@ -11,6 +11,7 @@ from datadiff.preset_catalog import build_experiment_config
 from datadiff.preset_catalog import PRESET_CATALOG
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.util import append_jsonl, closed_loop_state_path, dump_json, run_meta_path
+from datadiff.version_ledger import VersionObservation, build_version_ledger
 
 
 def test_cli_parses_fuzz_ablation_flags():
@@ -60,6 +61,437 @@ def test_cli_parses_fuzz_ablation_flags():
     assert args.no_compress_run_log is False
 
 
+def test_cli_config_parses_exploration_objective_rules():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "fuzz",
+            "--exploration-objective-rules",
+            json.dumps(
+                {
+                    "objective": "adaptive consistency",
+                    "exact_features": ["op:join"],
+                }
+            ),
+        ]
+    )
+
+    config = cli._config_from_args(args)
+
+    assert [rule.objective for rule in config.exploration_objective_rules] == [
+        "adaptive_consistency"
+    ]
+    assert config.exploration_objective_rules[0].exact_features == frozenset({"op:join"})
+
+
+def test_cli_semantic_registry_command_emits_json(capsys):
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "semantic-registry",
+            "--target-suite",
+            "core",
+            "--exploration-objective-rules",
+            json.dumps({"objective": "adaptive consistency", "exact_features": ["op:join"]}),
+            "--json",
+        ]
+    )
+
+    assert args.func(args) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["schema_version"] == "semantic-registry-v1"
+    assert payload["objectives"][0]["feature"] == "exploration_objective:adaptive_consistency"
+
+
+def test_cli_version_ledger_command_emits_json(tmp_path, capsys):
+    run_a = tmp_path / "run-a.jsonl"
+    run_b = tmp_path / "run-b.jsonl"
+    append_jsonl(
+        {
+            "status": "bug",
+            "findings": [
+                {
+                    "triage_verdict": "candidate_implementation_bug",
+                    "root_cause": "new_root",
+                    "suspicious_backends": ["engine"],
+                    "signature": "sig",
+                }
+            ],
+        },
+        run_b,
+    )
+    run_a.write_text("", encoding="utf-8")
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "version-ledger",
+            "--run-files",
+            f"{run_a},{run_b}",
+            "--versions",
+            "v1,v2",
+            "--json",
+        ]
+    )
+
+    assert args.func(args) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["schema_version"] == "version-ledger-v1"
+    assert payload["summary"]["new_family_count"] == 1
+
+
+def test_cli_version_ledger_extracts_health_feedback_from_run_logs(tmp_path, capsys):
+    run_a = tmp_path / "run-a.jsonl"
+    run_b = tmp_path / "run-b.jsonl.gz"
+    append_jsonl(
+        {
+            "duration_ms": 4.0,
+            "preflight": {"valid": True, "fallback_used": False},
+            "findings": [
+                {
+                    "triage_verdict": "candidate_implementation_bug",
+                    "root_cause": "persistent_root",
+                    "suspicious_backends": ["engine"],
+                }
+            ],
+        },
+        run_a,
+    )
+    append_jsonl(
+        {
+            "duration_ms": 6.0,
+            "preflight": {"valid": False, "fallback_used": True},
+            "findings": [
+                {
+                    "triage_verdict": "candidate_implementation_bug",
+                    "root_cause": "persistent_root",
+                    "suspicious_backends": ["engine"],
+                },
+                {
+                    "triage_verdict": "candidate_implementation_bug",
+                    "root_cause": "new_root",
+                    "suspicious_backends": ["engine"],
+                },
+                {
+                    "triage_verdict": "generator_false_positive",
+                    "root_cause": "generator_noise",
+                    "suspicious_backends": ["engine"],
+                },
+            ],
+        },
+        run_b,
+    )
+    append_jsonl(
+        {
+            "duration_ms": 2.0,
+            "preflight": {"valid": False, "fallback_used": True},
+            "findings": [],
+        },
+        run_b,
+    )
+    append_jsonl(
+        {
+            "duration_ms": 1.0,
+            "preflight": {"valid": True, "fallback_used": True},
+            "findings": [],
+        },
+        run_b,
+    )
+    dump_json({"throughput_cases_s": 8.0}, run_meta_path(run_a))
+    dump_json(
+        {
+            "preflight": {"invalid_cases": 2, "fallback_cases": 3},
+            "throughput_cases_s": 4.0,
+        },
+        run_meta_path(run_b),
+    )
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "version-ledger",
+            "--run-files",
+            f"{run_a},{run_b}",
+            "--versions",
+            "v1,v2",
+            "--json",
+        ]
+    )
+
+    assert args.func(args) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["summary"]["new_family_count"] == 1
+    assert payload["summary"]["persistent_family_count"] == 1
+    assert payload["summary"]["health_observation_count"] == 2
+    assert payload["summary"]["invalid_case_count"] == 2
+    assert payload["summary"]["fallback_case_count"] == 3
+    assert payload["summary"]["false_positive_count"] == 1
+    assert payload["summary"]["min_throughput_cases_s"] == pytest.approx(4.0)
+    assert payload["summary"]["max_invalid_rate"] == pytest.approx(2 / 3)
+    assert payload["summary"]["max_false_positive_rate"] == pytest.approx(1 / 3)
+    assert payload["health"]["schema_version"] == "version-ledger-health-v1"
+    assert payload["health_feedback_report"]["schema_version"] == (
+        "version-ledger-health-feedback-report-v1"
+    )
+    assert payload["health_feedback_report"]["has_health_feedback"] is True
+    assert payload["versions"][1]["run_file"] == str(run_b)
+    assert payload["versions"][1]["health"]["invalid_case_count"] == 2
+    assert payload["versions"][1]["health"]["fallback_case_count"] == 3
+    assert payload["versions"][1]["health"]["false_positive_count"] == 1
+    assert payload["families"][0]["health_observations"]
+    assert payload["continual_learning"]["schema_version"] == "cross-version-continual-learning-v1"
+    assert payload["adaptive_learning_seed"]["continual_priority_memory"]["imported_family_count"] >= 1
+
+
+def test_cli_version_ledger_extracts_health_feedback_from_real_fuzz_run(
+    tmp_path, monkeypatch, capsys
+):
+    from datadiff import runner as runner_module
+    from datadiff import util as util_module
+
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    bugs_dir = tmp_path / "bugs"
+    corpus_dir = tmp_path / "corpus"
+    monkeypatch.setattr(util_module, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(util_module, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(util_module, "BUGS_DIR", bugs_dir)
+    monkeypatch.setattr(util_module, "CORPUS_DIR", corpus_dir)
+    monkeypatch.setattr(runner_module, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(runner_module, "CORPUS_DIR", corpus_dir)
+    monkeypatch.setattr(cli, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(cli, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(cli, "BUGS_DIR", bugs_dir)
+    monkeypatch.setattr(cli, "CORPUS_DIR", corpus_dir)
+
+    parser = build_parser()
+    fuzz_args = parser.parse_args(
+        [
+            "fuzz",
+            "--cases",
+            "1",
+            "--seed",
+            "1337",
+            "--backends",
+            "pandas,sqlite",
+            "--target-version",
+            "engine==real-smoke",
+            "--no-compress-run-log",
+            "--disable-artifact",
+            "--skip-paper-journal",
+            "--log-level",
+            "minimal",
+        ]
+    )
+
+    assert fuzz_args.func(fuzz_args) == 0
+    capsys.readouterr()
+    run_file = next(runs_dir.glob("run-*.jsonl"))
+    meta = json.loads(run_meta_path(run_file).read_text(encoding="utf-8"))
+
+    ledger_args = parser.parse_args(
+        [
+            "version-ledger",
+            "--run-file",
+            str(run_file),
+            "--versions",
+            "engine==real-smoke",
+            "--json",
+        ]
+    )
+
+    assert ledger_args.func(ledger_args) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert meta["executed_cases"] == 1
+    assert meta["throughput_cases_s"] > 0.0
+    assert payload["version_order"] == ["engine==real-smoke"]
+    assert payload["summary"]["version_count"] == 1
+    assert payload["summary"]["health_observation_count"] == 1
+    assert payload["summary"]["min_throughput_cases_s"] == pytest.approx(
+        meta["throughput_cases_s"]
+    )
+    assert payload["health_feedback_report"]["has_health_feedback"] is True
+    assert payload["versions"][0]["health"]["duration_ms_total"] > 0.0
+    assert payload["versions"][0]["health"]["throughput_cases_s"] == pytest.approx(
+        meta["throughput_cases_s"]
+    )
+
+
+def test_cli_version_ledger_reads_run_logs_from_manifest_index(tmp_path, capsys):
+    run_a = tmp_path / "runs" / "run-v1.jsonl"
+    run_b = tmp_path / "runs" / "run-v2.jsonl"
+    append_jsonl({"duration_ms": 2.0, "findings": []}, run_a)
+    append_jsonl(
+        {
+            "duration_ms": 3.0,
+            "findings": [
+                {
+                    "triage_verdict": "candidate_implementation_bug",
+                    "root_cause": "indexed_root",
+                    "suspicious_backends": ["engine"],
+                }
+            ],
+        },
+        run_b,
+    )
+    dump_json({"target_version": "engine-v1", "throughput_cases_s": 2.0}, run_meta_path(run_a))
+    dump_json({"target_version": "engine-v2", "throughput_cases_s": 3.0}, run_meta_path(run_b))
+    manifest_a = tmp_path / "runs" / "experiment-v1.json"
+    manifest_b = tmp_path / "runs" / "experiment-v2.json"
+    dump_json(
+        {
+            "evidence_mode": "historical",
+            "target_version": "engine-v1",
+            "runs": [{"run_file": str(run_a), "target_version": "engine-v1"}],
+        },
+        manifest_a,
+    )
+    dump_json(
+        {
+            "evidence_mode": "historical",
+            "target_version": "engine-v2",
+            "runs": [{"run_file": str(run_b), "target_version": "engine-v2"}],
+        },
+        manifest_b,
+    )
+    index = tmp_path / "reports" / "final-index.json"
+    dump_json(
+        {
+            "schema_version": "final-experiment-manifest-index-v1",
+            "manifest_files": [str(manifest_a), str(manifest_b)],
+            "commands": [],
+        },
+        index,
+    )
+    parser = build_parser()
+    args = parser.parse_args(["version-ledger", "--manifest-index", str(index), "--json"])
+
+    assert args.func(args) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["version_order"] == ["engine-v1", "engine-v2"]
+    assert payload["summary"]["new_family_count"] == 1
+    assert payload["summary"]["health_observation_count"] == 2
+    assert payload["versions"][1]["run_file"] == str(run_b)
+    assert payload["health_feedback_report"]["has_health_feedback"] is True
+
+
+def test_cli_version_ledger_manifest_index_does_not_fallback_to_latest_run(
+    tmp_path, monkeypatch, capsys
+):
+    runs_dir = tmp_path / "runs"
+    monkeypatch.setattr(cli, "RUNS_DIR", runs_dir)
+    latest_run = runs_dir / "run-latest.jsonl"
+    append_jsonl(
+        {
+            "findings": [
+                {
+                    "triage_verdict": "candidate_implementation_bug",
+                    "root_cause": "latest_root",
+                    "suspicious_backends": ["engine"],
+                }
+            ]
+        },
+        latest_run,
+    )
+    dump_json({"target_version": "latest-version"}, run_meta_path(latest_run))
+    index = tmp_path / "reports" / "empty-index.json"
+    dump_json(
+        {
+            "schema_version": "final-experiment-manifest-index-v1",
+            "manifest_files": [],
+            "commands": [],
+        },
+        index,
+    )
+    parser = build_parser()
+    args = parser.parse_args(["version-ledger", "--manifest-index", str(index), "--json"])
+
+    assert args.func(args) == 2
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+    assert "no run logs found in --manifest-index" in captured.err
+
+
+def test_cli_version_ledger_evidence_manifest_requires_two_versions(tmp_path, capsys):
+    run_a = tmp_path / "run-a.jsonl"
+    append_jsonl({"duration_ms": 2.0, "findings": []}, run_a)
+    ledger = tmp_path / "reports" / "ledger.json"
+    manifest = tmp_path / "reports" / "experiment-ledger.json"
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "version-ledger",
+            "--run-file",
+            str(run_a),
+            "--versions",
+            "v1",
+            "--output",
+            str(ledger),
+            "--evidence-manifest-output",
+            str(manifest),
+        ]
+    )
+
+    assert args.func(args) == 2
+    captured = capsys.readouterr()
+
+    assert captured.out == ""
+    assert "requires run logs from at least two versions" in captured.err
+    assert not ledger.exists()
+    assert not manifest.exists()
+
+
+def test_cli_version_ledger_writes_final_readiness_evidence_manifest(tmp_path, capsys):
+    run_a = tmp_path / "run-a.jsonl"
+    run_b = tmp_path / "run-b.jsonl"
+    run_a.write_text("", encoding="utf-8")
+    append_jsonl(
+        {
+            "findings": [
+                {
+                    "triage_verdict": "candidate_implementation_bug",
+                    "root_cause": "new_root",
+                    "suspicious_backends": ["engine"],
+                }
+            ],
+        },
+        run_b,
+    )
+    ledger = tmp_path / "reports" / "ledger.json"
+    manifest = tmp_path / "reports" / "experiment-ledger.json"
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "version-ledger",
+            "--run-files",
+            f"{run_a},{run_b}",
+            "--versions",
+            "v1,v2",
+            "--output",
+            str(ledger),
+            "--evidence-manifest-output",
+            str(manifest),
+        ]
+    )
+
+    assert args.func(args) == 0
+    output = capsys.readouterr().out
+    payload = json.loads(ledger.read_text(encoding="utf-8"))
+    evidence = json.loads(manifest.read_text(encoding="utf-8"))
+
+    assert "evidence_manifest=" in output
+    assert payload["schema_version"] == "version-ledger-v1"
+    assert evidence["schema_version"] == "version-ledger-evidence-manifest-v1"
+    assert evidence["evidence_kind"] == "postprocess_ledger"
+    assert evidence["runs"][0]["evidence_kind"] == "postprocess_ledger"
+    assert evidence["runs"][0]["version_ledger_file"] == str(ledger)
+    assert evidence["experiment_meta"]["comparison_group"] == "cross_version_continual_learning"
+
+
 def test_cli_parses_no_compress_run_log():
     parser = build_parser()
     args = parser.parse_args(["fuzz", "--no-compress-run-log"])
@@ -89,11 +521,11 @@ def test_cli_parses_bug_audit_options():
     assert args.fail_on_candidate is True
 
 
-def test_cli_parses_bug_hunt_options():
+def test_cli_parses_discovery_run_options():
     parser = build_parser()
     args = parser.parse_args(
         [
-            "bug-hunt",
+            "discovery-run",
             "--cases",
             "10",
             "--seed",
@@ -108,7 +540,7 @@ def test_cli_parses_bug_hunt_options():
             "--fail-on-fresh-candidate",
         ]
     )
-    assert args.cmd == "bug-hunt"
+    assert args.cmd == "discovery-run"
     assert args.cases == 10
     assert args.seed == 5
     assert args.target_suite == "latest_no_datafusion"
@@ -119,11 +551,11 @@ def test_cli_parses_bug_hunt_options():
     assert args.fail_on_fresh_candidate is True
 
 
-def test_cli_parses_bug_sprint_options():
+def test_cli_parses_discovery_campaign_options():
     parser = build_parser()
     args = parser.parse_args(
         [
-            "bug-sprint",
+            "discovery-campaign",
             "--cases",
             "12",
             "--seeds",
@@ -139,7 +571,7 @@ def test_cli_parses_bug_sprint_options():
             "--watch-health",
         ]
     )
-    assert args.cmd == "bug-sprint"
+    assert args.cmd == "discovery-campaign"
     assert args.cases == 12
     assert args.seeds == "3,5"
     assert args.lanes == "arrow_layout,datafusion_optimizer"
@@ -152,7 +584,7 @@ def test_cli_parses_bug_sprint_options():
     assert args.watch_health is True
 
 
-def test_cli_bug_hunt_writes_integrated_manifest(tmp_path, monkeypatch):
+def test_cli_discovery_run_writes_integrated_manifest(tmp_path, monkeypatch):
     from datadiff.bug_audit import BugAuditRun
 
     run_file = tmp_path / "run.jsonl"
@@ -182,7 +614,7 @@ def test_cli_bug_hunt_writes_integrated_manifest(tmp_path, monkeypatch):
         assert cases == 7
         assert seed == 9
         assert backends
-        assert config.generator_profile == "bughunt_fresh"
+        assert config.generator_profile == "discovery_fresh"
         assert "pyarrow_sliced_bool_groupby_any_all@pyarrow" in config.known_saturated_bug_families
         assert duration_s is None
         append_jsonl(
@@ -235,7 +667,7 @@ def test_cli_bug_hunt_writes_integrated_manifest(tmp_path, monkeypatch):
     parser = build_parser()
     args = parser.parse_args(
         [
-            "bug-hunt",
+            "discovery-run",
             "--cases",
             "7",
             "--seed",
@@ -247,8 +679,8 @@ def test_cli_bug_hunt_writes_integrated_manifest(tmp_path, monkeypatch):
 
     assert args.func(args) == 0
     manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
-    assert manifest["schema_version"] == "bug-hunt-v1"
-    assert manifest["generated_by"] == "datadiff bug-hunt"
+    assert manifest["schema_version"] == "discovery-run-v1"
+    assert manifest["generated_by"] == "datadiff discovery-run"
     assert manifest["bug_audit"]["candidate_bug_families"] == ["audit_family@pyarrow"]
     assert manifest["classification"]["fresh_candidate_bug_families"] == {"new_family@polars": 1}
     assert manifest["fuzz_run"]["run_file"]
@@ -259,7 +691,7 @@ def test_cli_bug_hunt_writes_integrated_manifest(tmp_path, monkeypatch):
     assert evidence["candidate_rows"][0]["case"]["case_id"] == "case-fresh"
 
 
-def test_cli_bug_sprint_writes_targeted_manifest(tmp_path, monkeypatch):
+def test_cli_discovery_campaign_writes_targeted_manifest(tmp_path, monkeypatch):
     from datadiff.bug_audit import BugAuditRun
 
     run_file = tmp_path / "run-sprint.jsonl"
@@ -289,7 +721,7 @@ def test_cli_bug_sprint_writes_targeted_manifest(tmp_path, monkeypatch):
         assert cases == 7
         assert seed == 9
         assert backends == ["pandas", "duckdb", "pyarrow"]
-        assert config.generator_profile == "bughunt_fresh"
+        assert config.generator_profile == "discovery_fresh"
         assert config.enable_metamorphic_oracle is True
         assert duration_s is None
         append_jsonl(
@@ -343,7 +775,7 @@ def test_cli_bug_sprint_writes_targeted_manifest(tmp_path, monkeypatch):
     parser = build_parser()
     args = parser.parse_args(
         [
-            "bug-sprint",
+            "discovery-campaign",
             "--cases",
             "7",
             "--seeds",
@@ -357,8 +789,8 @@ def test_cli_bug_sprint_writes_targeted_manifest(tmp_path, monkeypatch):
 
     assert args.func(args) == 0
     manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
-    assert manifest["schema_version"] == "bug-sprint-v1"
-    assert manifest["generated_by"] == "datadiff bug-sprint"
+    assert manifest["schema_version"] == "discovery-campaign-v1"
+    assert manifest["generated_by"] == "datadiff discovery-campaign"
     assert manifest["status"] == "completed"
     assert manifest["bug_audit"]["candidate_bug_families"] == ["audit_family@pyarrow"]
     assert manifest["lane_ids"] == ["arrow_layout"]
@@ -395,7 +827,7 @@ def test_cli_bug_sprint_writes_targeted_manifest(tmp_path, monkeypatch):
     assert evidence["candidate_rows"][0]["case"]["case_id"] == "case-sprint"
 
 
-def test_cli_bug_sprint_writes_running_manifest_before_lane_executes(tmp_path, monkeypatch):
+def test_cli_discovery_campaign_writes_running_manifest_before_lane_executes(tmp_path, monkeypatch):
     run_file = tmp_path / "run-progress.jsonl"
     manifest_file = tmp_path / "sprint-progress.json"
 
@@ -449,7 +881,7 @@ def test_cli_bug_sprint_writes_running_manifest_before_lane_executes(tmp_path, m
 
     args = build_parser().parse_args(
         [
-            "bug-sprint",
+            "discovery-campaign",
             "--skip-bug-audit",
             "--cases",
             "7",
@@ -469,9 +901,9 @@ def test_cli_bug_sprint_writes_running_manifest_before_lane_executes(tmp_path, m
     assert manifest["runs"][0]["status"] == "completed"
 
 
-def test_cli_bug_sprint_watch_health_stops_remaining_lanes(tmp_path, monkeypatch):
+def test_cli_discovery_campaign_watch_health_stops_remaining_lanes(tmp_path, monkeypatch):
     run_file = tmp_path / "run-watch.jsonl"
-    manifest_file = tmp_path / "sprint-watch.json"
+    manifest_file = tmp_path / "discovery-campaign-watch.json"
     calls = []
 
     def fake_run_fuzz(*, cases, seed, backends, config, duration_s, **kwargs):
@@ -518,7 +950,7 @@ def test_cli_bug_sprint_watch_health_stops_remaining_lanes(tmp_path, monkeypatch
     parser = build_parser()
     args = parser.parse_args(
         [
-            "bug-sprint",
+            "discovery-campaign",
             "--skip-bug-audit",
             "--cases",
             "7",
@@ -545,9 +977,9 @@ def test_cli_bug_sprint_watch_health_stops_remaining_lanes(tmp_path, monkeypatch
     assert manifest["runs"][0]["health"]["fresh_candidate_bug_families"] == {"fresh_family@pyarrow": 1}
 
 
-def test_cli_bug_sprint_lists_lanes_as_json(capsys):
+def test_cli_discovery_campaign_lists_lanes_as_json(capsys):
     parser = build_parser()
-    args = parser.parse_args(["bug-sprint", "--list-lanes", "--json"])
+    args = parser.parse_args(["discovery-campaign", "--list-lanes", "--json"])
 
     assert args.func(args) == 0
     catalog = json.loads(capsys.readouterr().out)
@@ -587,13 +1019,13 @@ def test_cli_targets_json_exposes_hidden_methodology_and_extension_contract(caps
     assert buggy_join["adapter_args"] == ["buggy_join", "join"]
 
 
-def test_cli_parses_bug_sprint_status_command():
+def test_cli_parses_discovery_campaign_status_command():
     parser = build_parser()
     args = parser.parse_args(
         [
-            "bug-sprint-status",
+            "discovery-campaign-status",
             "--manifest",
-            "new_issue/generated/bug-sprint-live.json",
+            "new_issue/generated/discovery-campaign-live.json",
             "--limit",
             "2",
             "--json",
@@ -601,8 +1033,8 @@ def test_cli_parses_bug_sprint_status_command():
             "--fail-on-bug",
         ]
     )
-    assert args.cmd == "bug-sprint-status"
-    assert args.manifest == "new_issue/generated/bug-sprint-live.json"
+    assert args.cmd == "discovery-campaign-status"
+    assert args.manifest == "new_issue/generated/discovery-campaign-live.json"
     assert args.limit == 2
     assert args.json is True
     assert args.fail_on_fresh_candidate is True
@@ -615,7 +1047,7 @@ def test_cli_parses_candidate_pipeline_command():
         [
             "candidate-pipeline",
             "--manifest",
-            "new_issue/generated/bug-sprint-live.json",
+            "new_issue/generated/discovery-campaign-live.json",
             "--evidence-files",
             "new_issue/generated/a.json,new_issue/generated/b.json",
             "--output-dir",
@@ -629,7 +1061,7 @@ def test_cli_parses_candidate_pipeline_command():
         ]
     )
     assert args.cmd == "candidate-pipeline"
-    assert args.manifest == "new_issue/generated/bug-sprint-live.json"
+    assert args.manifest == "new_issue/generated/discovery-campaign-live.json"
     assert args.evidence_files == "new_issue/generated/a.json,new_issue/generated/b.json"
     assert args.output_dir == "new_issue/generated/candidate-pipelines"
     assert args.recheck_attempts == 3
@@ -639,11 +1071,11 @@ def test_cli_parses_candidate_pipeline_command():
     assert args.fail_on_ready is True
 
 
-def test_cli_bug_sprint_status_summarizes_running_manifest(tmp_path, monkeypatch, capsys):
-    manifest_file = tmp_path / "bug-sprint-running.json"
+def test_cli_discovery_campaign_status_summarizes_running_manifest(tmp_path, monkeypatch, capsys):
+    manifest_file = tmp_path / "discovery-campaign-running.json"
     runs_dir = tmp_path / "runs"
     runs_dir.mkdir()
-    historical_manifest = tmp_path / "bug-sprint-history-manifest.json"
+    historical_manifest = tmp_path / "discovery-campaign-history-manifest.json"
     run_file = runs_dir / "run-live.jsonl.gz"
     append_jsonl(
         {
@@ -663,7 +1095,7 @@ def test_cli_bug_sprint_status_summarizes_running_manifest(tmp_path, monkeypatch
     historical_manifest.write_text(
         json.dumps(
             {
-                "schema_version": "bug-sprint-v1",
+                "schema_version": "discovery-campaign-v1",
                 "generated_at": "1999-12-31T23:00:00Z",
                 "runs": [
                     {
@@ -683,7 +1115,7 @@ def test_cli_bug_sprint_status_summarizes_running_manifest(tmp_path, monkeypatch
     manifest_file.write_text(
         json.dumps(
                 {
-                    "schema_version": "bug-sprint-v1",
+                    "schema_version": "discovery-campaign-v1",
                     "status": "running",
                     "started_at": "2000-01-01T00:00:00Z",
                 "completed_at": "",
@@ -732,7 +1164,7 @@ def test_cli_bug_sprint_status_summarizes_running_manifest(tmp_path, monkeypatch
 
     monkeypatch.setattr(cli, "RUNS_DIR", runs_dir)
 
-    args = build_parser().parse_args(["bug-sprint-status", "--manifest", str(manifest_file), "--json"])
+    args = build_parser().parse_args(["discovery-campaign-status", "--manifest", str(manifest_file), "--json"])
     assert args.func(args) == 0
     summary = json.loads(capsys.readouterr().out)
     assert summary["manifest_status"] == "running"
@@ -747,7 +1179,7 @@ def test_cli_bug_sprint_status_summarizes_running_manifest(tmp_path, monkeypatch
     assert lane_summary["arrow_layout"]["score"] > lane_summary["common_api_workflow"]["score"]
 
     args = build_parser().parse_args(
-        ["bug-sprint-status", "--manifest", str(manifest_file), "--fail-on-fresh-candidate"]
+        ["discovery-campaign-status", "--manifest", str(manifest_file), "--fail-on-fresh-candidate"]
     )
     assert args.func(args) == 2
 
@@ -788,29 +1220,71 @@ def test_cli_parses_workflow_profile():
     assert args.profile == "workflow"
 
 
-def test_cli_parses_bughunt_profile():
+def test_cli_parses_discovery_profile():
     parser = build_parser()
-    args = parser.parse_args(["fuzz", "--profile", "bughunt"])
+    args = parser.parse_args(["fuzz", "--profile", "discovery"])
     assert args.cmd == "fuzz"
-    assert args.profile == "bughunt"
+    assert args.profile == "discovery"
 
 
-def test_cli_parses_bughunt_fresh_profile():
+def test_cli_parses_adaptive_profile_pool_flags():
     parser = build_parser()
-    args = parser.parse_args(["fuzz", "--profile", "bughunt_fresh"])
-    assert args.cmd == "fuzz"
-    assert args.profile == "bughunt_fresh"
+    args = parser.parse_args(
+        [
+            "fuzz",
+            "--profile",
+            "common",
+            "--profile-pool",
+            "common,discovery_fresh",
+            "--profile-learning-weight",
+            "0.7",
+            "--version-pair-pool",
+            "latest->fixed,latest->preview",
+            "--semantic-objective-learning-weight",
+            "0.5",
+            "--metamorphic-relation-learning-weight",
+            "0.6",
+            "--version-pair-learning-weight",
+            "0.8",
+            "--metamorphic-relation-order",
+            "row_permutation,filter_idempotence",
+            "--target-version",
+            "latest",
+            "--fixed-version",
+            "fixed",
+        ]
+    )
+    config = cli._config_from_args(args)
 
-    args = parser.parse_args(["longrun", "--profile", "bughunt_fresh"])
+    assert args.profile_pool == "common,discovery_fresh"
+    assert args.profile_learning_weight == 0.7
+    assert config.generator_profile_pool == ["common", "discovery_fresh"]
+    assert config.version_pair_pool == ["latest->fixed", "latest->preview"]
+    assert config.generator_profile_learning_weight == 0.7
+    assert config.semantic_objective_learning_weight == 0.5
+    assert config.metamorphic_relation_learning_weight == 0.6
+    assert config.version_pair_learning_weight == 0.8
+    assert config.metamorphic_relation_order == ["row_permutation", "filter_idempotence"]
+    assert config.target_version == "latest"
+    assert config.fixed_version == "fixed"
+
+
+def test_cli_parses_discovery_fresh_profile():
+    parser = build_parser()
+    args = parser.parse_args(["fuzz", "--profile", "discovery_fresh"])
+    assert args.cmd == "fuzz"
+    assert args.profile == "discovery_fresh"
+
+    args = parser.parse_args(["longrun", "--profile", "discovery_fresh"])
     assert args.cmd == "longrun"
-    assert args.profile == "bughunt_fresh"
+    assert args.profile == "discovery_fresh"
 
 
-def test_cli_parses_bughunt_no_groupby_profile():
+def test_cli_parses_discovery_no_groupby_profile():
     parser = build_parser()
-    args = parser.parse_args(["fuzz", "--profile", "bughunt_no_groupby"])
+    args = parser.parse_args(["fuzz", "--profile", "discovery_no_groupby"])
     assert args.cmd == "fuzz"
-    assert args.profile == "bughunt_no_groupby"
+    assert args.profile == "discovery_no_groupby"
 
 
 def test_cli_parses_pyarrow_groupby_filter_cast_membership_profile():
@@ -983,7 +1457,7 @@ def test_cli_parses_join_null_sort_profile():
     assert args.profile == "join_null_sort"
 
 
-def test_cli_parses_order_sensitive_bug_hunt_profiles():
+def test_cli_parses_order_sensitive_discovery_run_profiles():
     parser = build_parser()
     for profile in [
         "ordered_groupby_sort",
@@ -1183,7 +1657,7 @@ def test_cli_catalog_does_not_expose_unregistered_profile_overlays():
 
 def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("guided_filter").guidance_targets == ["filter"]
-    assert _preset_config("guided_join").generator_profile == "bughunt_no_groupby"
+    assert _preset_config("guided_join").generator_profile == "discovery_no_groupby"
     assert _preset_config("guided_join").guidance_targets == ["join", "sort_limit"]
     assert _preset_config("guided_mutate").guidance_targets == ["mutate", "expressions"]
     assert _preset_config("null_groupby_topk").generator_profile == "null_groupby_topk"
@@ -1445,17 +1919,17 @@ def test_cli_parses_targeted_guided_experiment_presets():
     assert _preset_config("join_null_sort_metamorphic").enable_metamorphic_oracle is True
 
 
-def test_cli_parses_bughunt_guided_metamorphic_preset():
-    config = _preset_config("bughunt_guided_metamorphic")
-    assert config.generator_profile == "bughunt"
+def test_cli_parses_discovery_guided_metamorphic_preset():
+    config = _preset_config("discovery_guided_metamorphic")
+    assert config.generator_profile == "discovery"
     assert config.enable_metamorphic_oracle is True
     assert config.guidance_strategy == "guided"
     assert config.metamorphic_variant_limit == 8
 
 
-def test_cli_parses_bughunt_no_groupby_guided_metamorphic_preset():
-    config = _preset_config("bughunt_no_groupby_guided_metamorphic")
-    assert config.generator_profile == "bughunt_no_groupby"
+def test_cli_parses_discovery_no_groupby_guided_metamorphic_preset():
+    config = _preset_config("discovery_no_groupby_guided_metamorphic")
+    assert config.generator_profile == "discovery_no_groupby"
     assert config.enable_metamorphic_oracle is True
     assert config.guidance_strategy == "guided"
     assert "groupby" not in config.guidance_targets
@@ -1469,8 +1943,8 @@ def test_catalog_backed_preset_overlays_preserve_base_semantics():
     assert workflow_metamorphic.enable_metamorphic_oracle is True
     assert workflow_metamorphic.oracle_mode == "both"
 
-    guided = _preset_config("bughunt_guided")
-    guided_metamorphic = _preset_config("bughunt_guided_metamorphic")
+    guided = _preset_config("discovery_guided")
+    guided_metamorphic = _preset_config("discovery_guided_metamorphic")
     assert guided_metamorphic.generator_profile == guided.generator_profile
     assert guided_metamorphic.guidance_strategy == guided.guidance_strategy
     assert guided_metamorphic.guidance_candidate_pool == guided.guidance_candidate_pool
@@ -1499,11 +1973,11 @@ def test_build_experiment_config_matches_final_harness_overlay_variants():
     )
     assert guided_join.to_dict() == _preset_config("guided_join").to_dict()
 
-    bughunt_guided = build_experiment_config(
-        "bughunt",
-        ("enable_guidance", "target_bughunt_guided"),
+    discovery_guided = build_experiment_config(
+        "discovery",
+        ("enable_guidance", "target_discovery_guided"),
     )
-    assert bughunt_guided.to_dict() == _preset_config("bughunt_guided").to_dict()
+    assert discovery_guided.to_dict() == _preset_config("discovery_guided").to_dict()
 
     deep_organic = build_experiment_config(
         "live_deep_organic",
@@ -1515,14 +1989,14 @@ def test_build_experiment_config_matches_final_harness_overlay_variants():
 def test_catalog_overlay_aliases_are_structured_in_preset_catalog():
     guided_join = PRESET_CATALOG["guided_join"]
     no_feedback = PRESET_CATALOG["no_feedback"]
-    bughunt_guided = PRESET_CATALOG["bughunt_guided"]
+    discovery_guided = PRESET_CATALOG["discovery_guided"]
 
     assert guided_join.base_preset == "baseline"
     assert guided_join.overlays == ("enable_guidance", "target_join")
     assert no_feedback.base_preset == "baseline"
     assert no_feedback.overlays == ("disable_feedback_corpus",)
-    assert bughunt_guided.base_preset == "bughunt"
-    assert bughunt_guided.overlays == ("enable_guidance", "target_bughunt_guided")
+    assert discovery_guided.base_preset == "discovery"
+    assert discovery_guided.overlays == ("enable_guidance", "target_discovery_guided")
 
 
 def test_catalog_backed_replay_overlay_preserves_live_base_targets():
@@ -1534,27 +2008,27 @@ def test_catalog_backed_replay_overlay_preserves_live_base_targets():
     assert replay.local_source_exploration_weight == live.local_source_exploration_weight
 
 
-def test_cli_parses_bughunt_experiment_presets():
-    assert _preset_config("bughunt").generator_profile == "bughunt"
-    assert _preset_config("bughunt_no_groupby").generator_profile == "bughunt_no_groupby"
-    guided = _preset_config("bughunt_guided")
-    assert guided.generator_profile == "bughunt"
+def test_cli_parses_discovery_experiment_presets():
+    assert _preset_config("discovery").generator_profile == "discovery"
+    assert _preset_config("discovery_no_groupby").generator_profile == "discovery_no_groupby"
+    guided = _preset_config("discovery_guided")
+    assert guided.generator_profile == "discovery"
     assert guided.guidance_strategy == "guided"
     assert guided.guidance_targets == ["join", "groupby", "mutate", "filter", "expressions"]
-    no_groupby_guided = _preset_config("bughunt_no_groupby_guided")
-    assert no_groupby_guided.generator_profile == "bughunt_no_groupby"
+    no_groupby_guided = _preset_config("discovery_no_groupby_guided")
+    assert no_groupby_guided.generator_profile == "discovery_no_groupby"
     assert no_groupby_guided.guidance_targets == ["join", "mutate", "filter", "expressions", "sort_limit"]
-    metamorphic = _preset_config("bughunt_metamorphic")
-    assert metamorphic.generator_profile == "bughunt"
+    metamorphic = _preset_config("discovery_metamorphic")
+    assert metamorphic.generator_profile == "discovery"
     assert metamorphic.enable_metamorphic_oracle is True
-    no_groupby_metamorphic = _preset_config("bughunt_no_groupby_metamorphic")
-    assert no_groupby_metamorphic.generator_profile == "bughunt_no_groupby"
+    no_groupby_metamorphic = _preset_config("discovery_no_groupby_metamorphic")
+    assert no_groupby_metamorphic.generator_profile == "discovery_no_groupby"
     assert no_groupby_metamorphic.enable_metamorphic_oracle is True
 
 
 def test_cli_parses_live_datafusion_presets():
     live = _preset_config("live_datafusion")
-    assert live.generator_profile == "bughunt"
+    assert live.generator_profile == "discovery"
     assert live.enable_replay_bug is False
     assert live.guidance_strategy == "guided"
     assert live.guidance_candidate_pool == 12
@@ -1595,7 +2069,7 @@ def test_cli_parses_live_datafusion_presets():
     assert metamorphic.metamorphic_variant_limit == 6
 
     fresh = _preset_config("live_datafusion_fresh")
-    assert fresh.generator_profile == "bughunt_no_groupby"
+    assert fresh.generator_profile == "discovery_no_groupby"
     assert fresh.enable_replay_bug is False
     assert fresh.guidance_strategy == "guided"
     assert fresh.enable_local_source_scheduler is True
@@ -1617,20 +2091,20 @@ def test_cli_parses_live_datafusion_presets():
     assert "distinct_null_topk@datafusion" in fresh.known_saturated_bug_families
 
     fresh_metamorphic = _preset_config("live_datafusion_fresh_metamorphic")
-    assert fresh_metamorphic.generator_profile == "bughunt_no_groupby"
+    assert fresh_metamorphic.generator_profile == "discovery_no_groupby"
     assert fresh_metamorphic.enable_metamorphic_oracle is True
     assert fresh_metamorphic.oracle_mode == "both"
     assert fresh_metamorphic.metamorphic_variant_limit == 6
 
     replay = _preset_config("live_datafusion_replay")
-    assert replay.generator_profile == "bughunt"
+    assert replay.generator_profile == "discovery"
     assert replay.enable_replay_bug is True
     assert replay.guidance_targets == live.guidance_targets
 
 
 def test_cli_parses_non_datafusion_live_presets():
     arrow = _preset_config("live_arrow")
-    assert arrow.generator_profile == "bughunt"
+    assert arrow.generator_profile == "discovery"
     assert arrow.guidance_strategy == "guided"
     assert {
         "join",
@@ -1682,7 +2156,7 @@ def test_cli_parses_non_datafusion_live_presets():
     assert arrow.issue_replay_global_saturation_penalty == 2.0
 
     polars_lazy = _preset_config("live_polars_lazy")
-    assert polars_lazy.generator_profile == "bughunt"
+    assert polars_lazy.generator_profile == "discovery"
     assert {
         "filter",
         "mutate",
@@ -1697,7 +2171,7 @@ def test_cli_parses_non_datafusion_live_presets():
     assert "reverse_division_operand_order@polars" in polars_lazy.known_saturated_bug_families
 
     polars_streaming = _preset_config("live_polars_streaming")
-    assert polars_streaming.generator_profile == "bughunt"
+    assert polars_streaming.generator_profile == "discovery"
     assert {
         "groupby",
         "aggregation",
@@ -1707,7 +2181,7 @@ def test_cli_parses_non_datafusion_live_presets():
     assert polars_streaming.local_source_exploration_weight == 0.45
 
     embedded_sql = _preset_config("live_embedded_sql")
-    assert embedded_sql.generator_profile == "bughunt"
+    assert embedded_sql.generator_profile == "discovery"
     assert {
         "join",
         "filter",
@@ -1723,7 +2197,7 @@ def test_cli_parses_non_datafusion_live_presets():
     assert embedded_sql.issue_replay_global_saturation_penalty == 2.0
 
     cross_family = _preset_config("live_cross_family")
-    assert cross_family.generator_profile == "bughunt"
+    assert cross_family.generator_profile == "discovery"
     assert {
         "common_workflow",
         "operation_combo",
@@ -1739,7 +2213,7 @@ def test_cli_parses_non_datafusion_live_presets():
     assert cross_family.issue_replay_global_saturation_penalty == 2.0
 
     deep_organic = _preset_config("live_deep_organic")
-    assert deep_organic.generator_profile == "bughunt_fresh"
+    assert deep_organic.generator_profile == "discovery_fresh"
     assert deep_organic.guidance_candidate_pool == 14
     assert deep_organic.enable_replay_bug is False
     assert deep_organic.enable_local_source_scheduler is True
@@ -1937,24 +2411,24 @@ def test_cli_parses_non_datafusion_live_presets():
     ]
 
     arrow_deep = _preset_config("live_arrow_deep_organic_metamorphic")
-    assert arrow_deep.generator_profile == "bughunt_fresh"
+    assert arrow_deep.generator_profile == "discovery_fresh"
     assert arrow_deep.enable_metamorphic_oracle is True
     assert "pyarrow_run_end_null_compute_semantics" in arrow_deep.guidance_targets
     assert "csv_long_numeric_roundtrip" not in arrow_deep.guidance_targets
 
     polars_deep = _preset_config("live_polars_deep_organic_metamorphic")
-    assert polars_deep.generator_profile == "bughunt_fresh"
+    assert polars_deep.generator_profile == "discovery_fresh"
     assert polars_deep.enable_metamorphic_oracle is True
     assert "polars_rolling_mean_by_null_count_semantics" in polars_deep.guidance_targets
     assert "polars_reverse_division_columns" not in polars_deep.guidance_targets
 
     streaming_deep = _preset_config("live_polars_streaming_deep_organic_metamorphic")
-    assert streaming_deep.generator_profile == "bughunt_fresh"
+    assert streaming_deep.generator_profile == "discovery_fresh"
     assert streaming_deep.enable_metamorphic_oracle is True
     assert "partitioned_running_sum" in streaming_deep.guidance_targets
 
     datafusion_deep = _preset_config("live_datafusion_deep_organic_metamorphic")
-    assert datafusion_deep.generator_profile == "bughunt_fresh"
+    assert datafusion_deep.generator_profile == "discovery_fresh"
     assert datafusion_deep.enable_metamorphic_oracle is True
     assert "datafusion_setop_all_duplicate_count" not in datafusion_deep.guidance_targets
     assert "row_value_absence_filter" in datafusion_deep.guidance_targets
@@ -1966,7 +2440,7 @@ def test_cli_parses_non_datafusion_live_presets():
     ]
 
     embedded_deep = _preset_config("live_embedded_sql_deep_organic_metamorphic")
-    assert embedded_deep.generator_profile == "bughunt_fresh"
+    assert embedded_deep.generator_profile == "discovery_fresh"
     assert embedded_deep.enable_metamorphic_oracle is True
     assert "duckdb_json_predicate_order_semantics" not in embedded_deep.guidance_targets
     assert "row_value_absence_filter" in embedded_deep.guidance_targets
@@ -2037,10 +2511,10 @@ def test_cli_parses_non_datafusion_live_presets():
     }.issubset(deep_probe.guidance_targets)
 
 
-def test_bug_sprint_config_can_merge_lane_discovery_biases():
+def test_discovery_campaign_config_can_merge_lane_discovery_biases():
     parser = build_parser()
-    args = parser.parse_args(["bug-sprint", "--lanes", "datafusion_optimizer"])
-    config = cli._bug_sprint_config_from_args(
+    args = parser.parse_args(["discovery-campaign", "--lanes", "datafusion_optimizer"])
+    config = cli._discovery_campaign_config_from_args(
         args,
         "live_datafusion_deep_organic_metamorphic",
         lane_discovery_biases=[
@@ -2064,9 +2538,9 @@ def test_bug_sprint_config_can_merge_lane_discovery_biases():
     assert any(bias.keep_in_pool for bias in config.discovery_biases)
 
 
-def test_bug_sprint_config_deduplicates_lane_discovery_biases():
+def test_discovery_campaign_config_deduplicates_lane_discovery_biases():
     parser = build_parser()
-    args = parser.parse_args(["bug-sprint", "--lanes", "datafusion_optimizer"])
+    args = parser.parse_args(["discovery-campaign", "--lanes", "datafusion_optimizer"])
     lane_bias = {
         "targets": ["row_value_absence_filter", "normalized_string_join", "negative_set_membership_filter"],
         "feature_prefixes": ["join:", "filter:", "pattern:"],
@@ -2077,7 +2551,7 @@ def test_bug_sprint_config_deduplicates_lane_discovery_biases():
         "keep_in_pool": True,
     }
 
-    config = cli._bug_sprint_config_from_args(
+    config = cli._discovery_campaign_config_from_args(
         args,
         "live_datafusion_deep_organic_metamorphic",
         lane_discovery_biases=[lane_bias],
@@ -2087,11 +2561,11 @@ def test_bug_sprint_config_deduplicates_lane_discovery_biases():
     assert config.discovery_biases[0].targets == lane_bias["targets"]
 
 
-def test_bug_sprint_config_merges_lane_semantic_focus():
+def test_discovery_campaign_config_merges_lane_semantic_focus():
     parser = build_parser()
-    args = parser.parse_args(["bug-sprint", "--lanes", "datafusion_optimizer"])
+    args = parser.parse_args(["discovery-campaign", "--lanes", "datafusion_optimizer"])
 
-    config = cli._bug_sprint_config_from_args(
+    config = cli._discovery_campaign_config_from_args(
         args,
         "live_datafusion_deep_organic_metamorphic",
         lane_semantic_focus_families=["join_membership", "string_semantics"],
@@ -2105,11 +2579,11 @@ def test_bug_sprint_config_merges_lane_semantic_focus():
     ]
 
 
-def test_bug_sprint_config_deduplicates_lane_semantic_focus():
+def test_discovery_campaign_config_deduplicates_lane_semantic_focus():
     parser = build_parser()
-    args = parser.parse_args(["bug-sprint", "--lanes", "datafusion_optimizer"])
+    args = parser.parse_args(["discovery-campaign", "--lanes", "datafusion_optimizer"])
 
-    config = cli._bug_sprint_config_from_args(
+    config = cli._discovery_campaign_config_from_args(
         args,
         "live_datafusion_deep_organic_metamorphic",
         lane_semantic_focus_families=["join_membership", "string_semantics", "topk_ordering"],
@@ -2159,7 +2633,7 @@ def test_cli_parses_non_datafusion_live_metamorphic_presets():
         assert config.enable_local_source_scheduler is True
 
     deep_organic = _preset_config("live_deep_organic_metamorphic")
-    assert deep_organic.generator_profile == "bughunt_fresh"
+    assert deep_organic.generator_profile == "discovery_fresh"
     assert deep_organic.guidance_candidate_pool == 10
     assert deep_organic.metamorphic_variant_limit == 8
 
@@ -2283,6 +2757,10 @@ def test_cli_parses_final_readiness_command():
             "runs/experiment-a.json",
             "--manifest",
             "runs/experiment-b.json",
+            "--extra-manifest",
+            "reports/experiment-final-version-ledger.json",
+            "--manifest-index",
+            "reports/final-experiment-manifest-index.json",
             "--latest-manifests",
             "12",
             "--all-manifests",
@@ -2308,12 +2786,40 @@ def test_cli_parses_final_readiness_command():
             "--no-require-seeded",
             "--no-require-ablation",
             "--no-require-comparison",
+            "--no-require-adaptive-component-ablation",
+            "--min-adaptive-component-ablations",
+            "3",
+            "--required-adaptive-component-ablations",
+            "scheduler-learning,quality-archive,online-reward-model",
+            "--no-require-transferability-scope",
+            "--min-transfer-target-families",
+            "3",
+            "--no-require-cross-version-ledger",
+            "--min-cross-version-ledger-versions",
+            "4",
+            "--min-cross-version-ledger-families",
+            "2",
+            "--no-require-cross-version-health-feedback",
+            "--no-require-runtime-efficiency",
+            "--min-throughput-cases-s",
+            "0.25",
+            "--max-scheduler-feedback-share",
+            "0.2",
+            "--min-scheduler-feedback-cases",
+            "25",
+            "--no-require-discovery-responsiveness",
+            "--max-first-candidate-elapsed-s",
+            "120",
+            "--no-require-closed-loop-state-persistence",
+            "--no-require-adaptive-live-component-evidence",
             "--json",
             "--fail-on-missing",
         ]
     )
     assert args.cmd == "final-readiness"
     assert args.manifest == ["runs/experiment-a.json", "runs/experiment-b.json"]
+    assert args.extra_manifest == ["reports/experiment-final-version-ledger.json"]
+    assert args.manifest_index == ["reports/final-experiment-manifest-index.json"]
     assert args.latest_manifests == 12
     assert args.all_manifests is True
     assert args.summary_only is True
@@ -2330,6 +2836,25 @@ def test_cli_parses_final_readiness_command():
     assert args.no_require_seeded is True
     assert args.no_require_ablation is True
     assert args.no_require_comparison is True
+    assert args.no_require_adaptive_component_ablation is True
+    assert args.min_adaptive_component_ablations == 3
+    assert args.required_adaptive_component_ablations == (
+        "scheduler-learning,quality-archive,online-reward-model"
+    )
+    assert args.no_require_transferability_scope is True
+    assert args.min_transfer_target_families == 3
+    assert args.no_require_cross_version_ledger is True
+    assert args.min_cross_version_ledger_versions == 4
+    assert args.min_cross_version_ledger_families == 2
+    assert args.no_require_cross_version_health_feedback is True
+    assert args.no_require_runtime_efficiency is True
+    assert args.min_throughput_cases_s == 0.25
+    assert args.max_scheduler_feedback_share == 0.2
+    assert args.min_scheduler_feedback_cases == 25
+    assert args.no_require_discovery_responsiveness is True
+    assert args.max_first_candidate_elapsed_s == 120.0
+    assert args.no_require_closed_loop_state_persistence is True
+    assert args.no_require_adaptive_live_component_evidence is True
     assert args.json is True
     assert args.fail_on_missing is True
 
@@ -2354,6 +2879,153 @@ def test_cli_final_readiness_prints_json_and_can_fail_on_missing(tmp_path, monke
     assert json.loads(capsys.readouterr().out)["schema_version"] == "final-readiness-v1"
     assert calls[0][1]["manifest_limit"] == 3
     assert calls[0][1]["scan_run_logs"] is False
+
+
+def test_cli_final_readiness_passes_extra_manifest_to_audit(tmp_path, monkeypatch):
+    audit = {"schema_version": "final-readiness-v1", "ready": True, "summary": {}}
+    md_path = tmp_path / "final-readiness.md"
+    json_path = tmp_path / "final-readiness.json"
+    md_path.write_text("# Final\n", encoding="utf-8")
+    json_path.write_text(json.dumps(audit), encoding="utf-8")
+    calls = []
+
+    def fake_analyze_final_readiness(*args, **kwargs):
+        calls.append((args, kwargs))
+        return md_path, json_path
+
+    monkeypatch.setattr(cli, "analyze_final_readiness", fake_analyze_final_readiness)
+
+    args = build_parser().parse_args(
+        [
+            "final-readiness",
+            "--latest-manifests",
+            "3",
+            "--extra-manifest",
+            "reports/experiment-final-version-ledger.json",
+        ]
+    )
+
+    assert args.func(args) == 0
+    assert calls[0][0][0] is None
+    assert calls[0][1]["manifest_limit"] == 3
+    assert calls[0][1]["extra_manifest_files"] == [Path("reports/experiment-final-version-ledger.json")]
+
+
+def test_cli_final_readiness_reads_manifest_index_for_targeted_audit(tmp_path, monkeypatch):
+    audit = {"schema_version": "final-readiness-v1", "ready": True, "summary": {}}
+    md_path = tmp_path / "final-readiness.md"
+    json_path = tmp_path / "final-readiness.json"
+    md_path.write_text("# Final\n", encoding="utf-8")
+    json_path.write_text(json.dumps(audit), encoding="utf-8")
+    index_path = tmp_path / "final-index.json"
+    index_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "final-experiment-manifest-index-v1",
+                "manifest_files": ["runs/experiment-validation.json"],
+                "extra_manifest_files": ["reports/experiment-ledger.json"],
+                "commands": [
+                    {
+                        "name": "live:datafusion_cross",
+                        "manifest_files": ["runs/experiment-live.json"],
+                        "extra_manifest_files": ["reports/experiment-ledger.json"],
+                        "paper_run_journal_files": ["reports/paper-run-journal.jsonl"],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    calls = []
+
+    def fake_analyze_final_readiness(*args, **kwargs):
+        calls.append((args, kwargs))
+        return md_path, json_path
+
+    monkeypatch.setattr(cli, "analyze_final_readiness", fake_analyze_final_readiness)
+
+    args = build_parser().parse_args(["final-readiness", "--manifest-index", str(index_path)])
+
+    assert args.func(args) == 0
+    assert calls[0][0][0] == [
+        Path("runs/experiment-validation.json"),
+        Path("runs/experiment-live.json"),
+    ]
+    assert calls[0][1]["extra_manifest_files"] == [Path("reports/experiment-ledger.json")]
+    assert calls[0][1]["paper_run_journal_files"] == [Path("reports/paper-run-journal.jsonl")]
+    assert calls[0][1]["manifest_limit"] is None
+    assert calls[0][1]["scan_run_logs"] is True
+
+
+def test_cli_final_readiness_passes_extended_thresholds_to_audit(tmp_path, monkeypatch):
+    audit = {"schema_version": "final-readiness-v1", "ready": True, "summary": {}}
+    md_path = tmp_path / "final-readiness.md"
+    json_path = tmp_path / "final-readiness.json"
+    md_path.write_text("# Final\n", encoding="utf-8")
+    json_path.write_text(json.dumps(audit), encoding="utf-8")
+    calls = []
+
+    def fake_analyze_final_readiness(*args, **kwargs):
+        calls.append((args, kwargs))
+        return md_path, json_path
+
+    monkeypatch.setattr(cli, "analyze_final_readiness", fake_analyze_final_readiness)
+
+    args = build_parser().parse_args(
+        [
+            "final-readiness",
+            "--no-require-adaptive-component-ablation",
+            "--min-adaptive-component-ablations",
+            "3",
+            "--required-adaptive-component-ablations",
+            "scheduler-learning,quality-archive,online-reward-model",
+            "--no-require-transferability-scope",
+            "--min-transfer-target-families",
+            "3",
+            "--no-require-cross-version-ledger",
+            "--min-cross-version-ledger-versions",
+            "4",
+            "--min-cross-version-ledger-families",
+            "2",
+            "--no-require-cross-version-health-feedback",
+            "--no-require-runtime-efficiency",
+            "--min-throughput-cases-s",
+            "0.25",
+            "--max-scheduler-feedback-share",
+            "0.2",
+            "--min-scheduler-feedback-cases",
+            "25",
+            "--no-require-discovery-responsiveness",
+            "--max-first-candidate-elapsed-s",
+            "120",
+            "--no-require-closed-loop-state-persistence",
+            "--no-require-adaptive-live-component-evidence",
+        ]
+    )
+
+    assert args.func(args) == 0
+    thresholds = calls[0][1]["thresholds"]
+    assert thresholds.require_adaptive_component_ablation is False
+    assert thresholds.min_adaptive_component_ablations == 3
+    assert thresholds.required_adaptive_component_ablations == (
+        "scheduler_learning",
+        "quality_archive",
+        "online_reward_model",
+    )
+    assert thresholds.require_transferability_scope is False
+    assert thresholds.min_transfer_target_families == 3
+    assert thresholds.require_cross_version_ledger is False
+    assert thresholds.min_cross_version_ledger_versions == 4
+    assert thresholds.min_cross_version_ledger_families == 2
+    assert thresholds.require_cross_version_health_feedback is False
+    assert thresholds.require_runtime_efficiency is False
+    assert thresholds.min_throughput_cases_s == 0.25
+    assert thresholds.max_scheduler_feedback_share == 0.2
+    assert thresholds.min_scheduler_feedback_cases == 25
+    assert thresholds.require_discovery_responsiveness is False
+    assert thresholds.max_first_candidate_elapsed_s == 120.0
+    assert thresholds.require_closed_loop_state_persistence is False
+    assert thresholds.require_adaptive_live_component_evidence is False
 
 
 def test_cli_final_readiness_all_manifests_removes_default_limit(tmp_path, monkeypatch):
@@ -2435,7 +3107,7 @@ def test_cli_parses_review_readiness_command():
             "20",
             "--min-audit-candidates",
             "1",
-            "--min-bug-workflows",
+            "--min-discovery-workflows",
             "1",
             "--min-generated-issue-drafts",
             "1",
@@ -2746,6 +3418,16 @@ def test_cli_experiment_parses_adaptive_schedule_flags():
             "0.3",
             "--max-group-pull-gap",
             "4",
+            "--adaptive-learning-weight",
+            "0.6",
+            "--scheduler-annealing-temperature",
+            "0.4",
+            "--scheduler-annealing-decay",
+            "0.97",
+            "--scheduler-annealing-min-temperature",
+            "0.03",
+            "--continual-learning-ledgers",
+            "reports/ledger-a.json,reports/ledger-b.json",
             "--local-source-exploration-weight",
             "0.2",
         ]
@@ -2758,7 +3440,41 @@ def test_cli_experiment_parses_adaptive_schedule_flags():
     assert args.exploration_weight == 0.5
     assert args.group_fairness_weight == 0.3
     assert args.max_group_pull_gap == 4
+    assert args.adaptive_learning_weight == 0.6
+    assert args.scheduler_annealing_temperature == 0.4
+    assert args.scheduler_annealing_decay == 0.97
+    assert args.scheduler_annealing_min_temperature == 0.03
+    assert args.continual_learning_ledgers == "reports/ledger-a.json,reports/ledger-b.json"
     assert args.local_source_exploration_weight == 0.2
+
+
+def test_cli_experiment_parses_adaptive_component_ablation_flags():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "experiment",
+            "--disable-adaptive-components",
+            (
+                "contextual-bandit,map-elites,profile-filter,runtime-cost,"
+                "uncertainty-sampling,online-reward,cross-version-learning,"
+                "simulated-annealing,semantic-objective,mr-learning,version-pair"
+            ),
+        ]
+    )
+
+    assert args.disable_adaptive_components == {
+        "scheduler_learning",
+        "semantic_objective_learning",
+        "metamorphic_relation_learning",
+        "version_pair_learning",
+        "quality_archive",
+        "profile_capability_filter",
+        "runtime_cost_learning",
+        "active_learning",
+        "online_reward_model",
+        "continual_learning",
+        "scheduler_annealing",
+    }
 
 
 def test_cli_experiment_parses_evidence_mode_flags():
@@ -2800,11 +3516,13 @@ def test_cli_parses_paper_run_journal_flags():
             "final-live:datafusion",
             "--paper-notes",
             "24h latest-version run",
+            "--persist-closed-loop-state",
             "--skip-paper-journal",
         ]
     )
     assert args.run_theme == "final-live:datafusion"
     assert args.paper_notes == "24h latest-version run"
+    assert args.persist_closed_loop_state is True
     assert args.skip_paper_journal is True
 
 
@@ -2845,6 +3563,90 @@ def test_run_experiment_job_propagates_local_source_scheduler(monkeypatch):
     assert captured["checkpoint_interval_s"] == 60.0
     assert captured["progress_interval_s"] == 60.0
     assert result["run"]["run_file"] == "runs/fake.jsonl"
+
+
+def test_run_experiment_job_can_persist_closed_loop_state(monkeypatch):
+    captured = {}
+
+    def fake_run_fuzz(*, cases, seed, backends, config, duration_s, **kwargs):
+        captured["persist_closed_loop_state"] = kwargs.get("persist_closed_loop_state", False)
+        return Path("runs/fake.jsonl")
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    cli._run_experiment_job(
+        {
+            "order": 0,
+            "target_suite": "core",
+            "backends": ["pandas"],
+            "preset": "baseline",
+            "seed": 1,
+            "cases": 1,
+            "duration_s": None,
+            "log_level": "compact",
+            "compress_run_log": True,
+            "artifact_limit": None,
+            "metamorphic_variant_limit": None,
+            "persist_closed_loop_state": True,
+            "skip_run_reports": True,
+        }
+    )
+
+    assert captured["persist_closed_loop_state"] is True
+
+
+def test_run_experiment_job_applies_adaptive_component_ablation(monkeypatch):
+    captured = {}
+
+    def fake_run_fuzz(*, cases, seed, backends, config, duration_s, **kwargs):
+        captured["enable_local_source_scheduler"] = config.enable_local_source_scheduler
+        captured["local_source_exploration_weight"] = config.local_source_exploration_weight
+        captured["enable_profile_capability_filter"] = config.enable_profile_capability_filter
+        captured["enable_mutation_operator_learning"] = config.enable_mutation_operator_learning
+        captured["enable_quality_archive"] = config.enable_quality_archive
+        return Path("runs/fake-ablation.jsonl")
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    result = cli._run_experiment_job(
+        {
+            "order": 0,
+            "target_suite": "core",
+            "backends": ["pandas"],
+            "preset": "baseline",
+            "seed": 1,
+            "cases": 1,
+            "duration_s": None,
+            "log_level": "compact",
+            "compress_run_log": True,
+            "artifact_limit": None,
+            "metamorphic_variant_limit": None,
+            "enable_local_source_scheduler": True,
+            "local_source_exploration_weight": 0.125,
+            "disable_adaptive_components": [
+                "local_source_scheduler",
+                "profile_capability_filter",
+                "mutation_operator_learning",
+                "quality_archive",
+            ],
+            "skip_run_reports": True,
+        }
+    )
+
+    assert captured["enable_local_source_scheduler"] is False
+    assert captured["local_source_exploration_weight"] == 0.0
+    assert captured["enable_profile_capability_filter"] is False
+    assert captured["enable_mutation_operator_learning"] is False
+    assert captured["enable_quality_archive"] is False
+    assert result["run"]["adaptive_components"]["local_source_scheduler"] is False
+    assert result["run"]["disabled_adaptive_components"] == [
+        "local_source_scheduler",
+        "mutation_operator_learning",
+        "profile_capability_filter",
+        "quality_archive",
+    ]
 
 
 def test_run_experiment_job_preserves_live_preset_source_scheduler(monkeypatch):
@@ -3221,7 +4023,7 @@ def test_cli_experiment_structured_variant_drives_run_config_from_base_and_overl
     assert args.func(args) == 0
     config = dict(captured["config"])
     assert config["guidance_strategy"] == "guided"
-    assert config["generator_profile"] == "bughunt_no_groupby"
+    assert config["generator_profile"] == "discovery_no_groupby"
     assert config["guidance_targets"] == ["join", "sort_limit"]
 
 
@@ -3462,6 +4264,7 @@ def test_cli_experiment_manifest_restores_registered_variant_catalog_for_compari
     reports_dir = tmp_path / "reports"
     monkeypatch.setattr(cli, "RUNS_DIR", runs_dir)
     monkeypatch.setattr(cli, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(cli, "ProcessPoolExecutor", cli.ThreadPoolExecutor)
 
     def fake_run_fuzz(*, cases, seed, backends, config, duration_s, **kwargs):
         run_file = runs_dir / f"run-{seed}.jsonl"
@@ -3667,19 +4470,34 @@ def test_cli_replay_fixture_records_single_case_run_and_journal(tmp_path, monkey
 
     assert args.func(args) == 0
     run_file = next(runs_dir.glob("run-fixture-*.jsonl"))
+    manifest_file = next(runs_dir.glob("experiment-*.json"))
     meta = json.loads(run_meta_path(run_file).read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
     journal = (reports_dir / "paper-run-journal.jsonl").read_text(encoding="utf-8")
+    journal_entry = json.loads(journal.strip().splitlines()[-1])
     output = capsys.readouterr().out
     assert "status=ok" in output
+    assert f"experiment manifest: {manifest_file}" in output
     assert meta["preset"] == "fixture_replay"
     assert meta["evidence_mode"] == "historical"
     assert meta["known_bug_id"] == "fixture-test"
+    assert meta["manifest_file"] == str(manifest_file)
     assert meta["fixture_sha256"] == fixture_sha256(fixture_path)
     assert meta["config"]["enable_replay_bug"] is True
     assert meta["experiment_meta"]["matrix_id"] == "historical_replay"
     assert meta["experiment_meta"]["historical"]["bug_id"] == "fixture-test"
     assert meta["experiment_meta"]["variant"]["variant_id"] == "fixture-test"
+    assert manifest["evidence_mode"] == "historical"
+    assert manifest["experiment_meta"]["matrix_id"] == "historical_replay"
+    assert manifest["fixture_sha256"] == fixture_sha256(fixture_path)
+    assert manifest["runs"][0]["run_file"] == str(run_file)
+    assert manifest["runs"][0]["preset"] == "fixture_replay"
+    assert manifest["runs"][0]["matrix_id"] == "historical_replay"
+    assert manifest["runs"][0]["variant_id"] == "fixture-test"
+    assert manifest["runs"][0]["fixture_sha256"] == fixture_sha256(fixture_path)
     assert '"known_bug_id": "fixture-test"' in journal
+    assert journal_entry["manifest_file"] == str(manifest_file)
+    assert journal_entry["matrix_id"] == "historical_replay"
 
 
 def test_cli_historical_status_marks_counted_and_pending(capsys):
@@ -3892,6 +4710,8 @@ def test_cli_experiment_adaptive_scheduler_reuses_budget_on_high_yield_arm(tmp_p
             "1",
             "--local-source-exploration-weight",
             "0.125",
+            "--adaptive-learning-weight",
+            "0.75",
             "--skip-run-reports",
         ]
     )
@@ -3909,8 +4729,268 @@ def test_cli_experiment_adaptive_scheduler_reuses_budget_on_high_yield_arm(tmp_p
     assert manifest["adaptive_config"]["group_fairness_weight"] == 0.4
     assert manifest["adaptive_config"]["max_group_pull_gap"] == 3
     assert manifest["adaptive_config"]["prefer_group_diversity_in_round"] is True
+    assert manifest["adaptive_config"]["learning_weight"] == 0.75
+    assert manifest["adaptive_learning"]["schema_version"] == "adaptive-learning-v1"
+    assert "batch_arm" in manifest["adaptive_learning"]["bandits"]
+    assert "generator_profile" in manifest["adaptive_learning"]["bandits"]
+    assert "guidance_strategy" in manifest["adaptive_learning"]["bandits"]
+    assert "oracle_mode" in manifest["adaptive_learning"]["bandits"]
+    assert "semantic_objective" in manifest["adaptive_learning"]["bandits"]
+    assert "discovery_fresh" in {
+        arm["action_id"]
+        for arm in manifest["adaptive_learning"]["bandits"]["generator_profile"]["arms"]
+    }
     suites = [run["target_suite"] for run in manifest["runs"]]
     assert suites.count("datafusion_cross") >= suites.count("core")
+
+
+def test_cli_experiment_adaptive_scheduler_imports_continual_learning_ledgers(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    bugs_dir = tmp_path / "bugs"
+    corpus_dir = tmp_path / "corpus"
+    monkeypatch.setattr(cli, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(cli, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(cli, "BUGS_DIR", bugs_dir)
+    monkeypatch.setattr(cli, "CORPUS_DIR", corpus_dir)
+
+    ledger_a = build_version_ledger(
+        [
+            VersionObservation(
+                version_id="engine-v1",
+                run_file="runs/engine-v1.jsonl",
+                case_count=1,
+                candidate_families={},
+            ),
+            VersionObservation(
+                version_id="engine-v2",
+                run_file="runs/engine-v2.jsonl",
+                case_count=1,
+                candidate_families={"null_semantics@engine": 1},
+            ),
+        ]
+    )
+    ledger_b = build_version_ledger(
+        [
+            VersionObservation(
+                version_id="engine-v2",
+                run_file="runs/engine-v2.jsonl",
+                case_count=1,
+                candidate_families={},
+            ),
+            VersionObservation(
+                version_id="engine-v3",
+                run_file="runs/engine-v3.jsonl",
+                case_count=1,
+                candidate_families={"cast_semantics@engine": 1},
+            ),
+        ]
+    )
+    ledger_a_path = tmp_path / "ledger-a.json"
+    ledger_b_path = tmp_path / "ledger-b.json"
+    dump_json(ledger_a, ledger_a_path)
+    dump_json(ledger_b, ledger_b_path)
+    old_ledger_path = tmp_path / "old-ledger.json"
+    old_ledger = dict(ledger_a)
+    old_ledger.pop("health_feedback_report", None)
+    dump_json(old_ledger, old_ledger_path)
+
+    counter = {"index": 0}
+
+    def fake_run_fuzz(
+        *,
+        cases,
+        seed,
+        backends,
+        config,
+        duration_s,
+        persist_closed_loop_state=False,
+        closed_loop_state=None,
+        **kwargs,
+    ):
+        idx = counter["index"]
+        counter["index"] += 1
+        assert persist_closed_loop_state is True
+        run_file = runs_dir / f"run-continual-{idx}.jsonl"
+        append_jsonl(
+            {
+                "case": {"case_id": f"case-{idx}", "seed": seed},
+                "is_new_behavior": False,
+                "findings": [],
+            },
+            run_file,
+        )
+        run_meta_path(run_file).write_text(
+            json.dumps(
+                {
+                    "elapsed_s": 0.1,
+                    "throughput_cases_s": 10.0,
+                    "next_seed": seed + cases,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return run_file
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "experiment",
+            "--target-suites",
+            "core",
+            "--presets",
+            "live_deep_organic",
+            "--seeds",
+            "1",
+            "--cases",
+            "1",
+            "--schedule",
+            "adaptive",
+            "--batch-cases",
+            "1",
+            "--jobs",
+            "1",
+            "--adaptive-learning-weight",
+            "0.75",
+            "--continual-learning-ledgers",
+            f"{ledger_a_path},{old_ledger_path},{ledger_b_path}",
+            "--skip-run-reports",
+        ]
+    )
+
+    assert args.func(args) == 0
+    assert "reward=" in capsys.readouterr().out
+    manifest = json.loads(next(runs_dir.glob("experiment-*.json")).read_text(encoding="utf-8"))
+    sources = manifest["adaptive_config"]["continual_learning_sources"]
+    memory = manifest["adaptive_learning"]["continual_priority_memory"]
+
+    assert [source["loaded"] for source in sources] == [True, False, True]
+    assert sources[0]["family_count"] == 1
+    assert sources[1]["reason"] == "missing_health_feedback_report"
+    assert sources[2]["family_count"] == 2
+    assert memory["imported_ledger_count"] == 2
+    assert memory["family_priorities"]["null_semantics@engine"] == 0.9
+    assert memory["family_priorities"]["cast_semantics@engine"] == 0.9
+    assert manifest["adaptive_learning"]["bandits"]["batch_arm"]["arms"]
+
+
+def test_cli_experiment_adaptive_component_ablation_manifest_and_runtime(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    bugs_dir = tmp_path / "bugs"
+    corpus_dir = tmp_path / "corpus"
+    monkeypatch.setattr(cli, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(cli, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(cli, "BUGS_DIR", bugs_dir)
+    monkeypatch.setattr(cli, "CORPUS_DIR", corpus_dir)
+
+    captured = {}
+
+    def fake_run_fuzz(
+        *,
+        cases,
+        seed,
+        backends,
+        config,
+        duration_s,
+        persist_closed_loop_state=False,
+        closed_loop_state=None,
+        **kwargs,
+    ):
+        captured["enable_local_source_scheduler"] = config.enable_local_source_scheduler
+        captured["enable_quality_archive"] = config.enable_quality_archive
+        run_file = runs_dir / "run-ablation.jsonl"
+        append_jsonl({"case": {"case_id": "case-1", "seed": seed}, "findings": []}, run_file)
+        meta_path = Path(str(run_file).replace(".jsonl", ".meta.json"))
+        meta_path.write_text(
+            json.dumps(
+                {
+                    "elapsed_s": 0.1,
+                    "throughput_cases_s": 10.0,
+                    "next_seed": seed + cases,
+                    "stage_profile": {
+                        "share_of_total": {"scheduler_feedback_ms": 0.9},
+                        "totals_ms": {
+                            "scheduler_feedback_ms": 9.0,
+                            "total_case_wall_ms": 10.0,
+                        },
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        return run_file
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "experiment",
+            "--target-suites",
+            "datafusion_cross",
+            "--presets",
+            "live_deep_organic",
+            "--seeds",
+            "1",
+            "--cases",
+            "1",
+            "--schedule",
+            "adaptive",
+            "--jobs",
+            "1",
+            "--adaptive-learning-weight",
+            "0.75",
+            "--scheduler-annealing-temperature",
+            "0.5",
+            "--disable-adaptive-components",
+            (
+                "local-source-scheduler,quality-archive,runtime-cost-learning,"
+                "active-learning,online-reward-model,continual-learning,"
+                "scheduler-annealing"
+            ),
+            "--skip-run-reports",
+        ]
+    )
+
+    assert args.func(args) == 0
+    manifest = json.loads(next(runs_dir.glob("experiment-*.json")).read_text(encoding="utf-8"))
+
+    assert captured["enable_local_source_scheduler"] is False
+    assert captured["enable_quality_archive"] is False
+    assert manifest["adaptive_config"]["learning_weight"] == 0.75
+    assert manifest["adaptive_config"]["record_learning_feedback"] is True
+    assert manifest["adaptive_config"]["runtime_cost_learning"] is False
+    assert manifest["adaptive_config"]["active_learning"] is False
+    assert manifest["adaptive_config"]["online_reward_model"] is False
+    assert manifest["adaptive_config"]["continual_learning"] is False
+    assert manifest["adaptive_config"]["scheduler_annealing"] is False
+    assert manifest["adaptive_config"]["annealing_initial_temperature"] == 0.0
+    assert manifest["adaptive_config"]["fine_grained_local_source_scheduler"] is False
+    assert "batch_arm" in manifest["adaptive_learning"]["bandits"]
+    assert manifest["adaptive_learning"]["bandits"]["batch_arm"]["reward_model"]["total_updates"] == 0
+    batch_arm = manifest["adaptive_learning"]["bandits"]["batch_arm"]["arms"][0]
+    assert batch_arm["runtime_cost_total"] == 0.0
+    assert manifest["adaptive_methodology"]["components"]["quality_archive"] is False
+    assert manifest["adaptive_methodology"]["components"]["runtime_cost_learning"] is False
+    assert manifest["adaptive_methodology"]["components"]["active_learning"] is False
+    assert manifest["adaptive_methodology"]["components"]["online_reward_model"] is False
+    assert manifest["adaptive_methodology"]["components"]["continual_learning"] is False
+    assert manifest["adaptive_methodology"]["components"]["scheduler_annealing"] is False
+    assert manifest["runs"][0]["adaptive_components"]["scheduler_learning"] is True
+    assert manifest["runs"][0]["adaptive_components"]["runtime_cost_learning"] is False
+    assert manifest["runs"][0]["adaptive_components"]["active_learning"] is False
+    assert manifest["runs"][0]["adaptive_components"]["online_reward_model"] is False
+    assert manifest["runs"][0]["adaptive_components"]["continual_learning"] is False
+    assert manifest["runs"][0]["adaptive_components"]["scheduler_annealing"] is False
 
 
 def test_cli_experiment_adaptive_scheduler_supports_parallel_rounds(tmp_path, monkeypatch, capsys):

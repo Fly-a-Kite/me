@@ -90,7 +90,7 @@ Optional follow-up for scheduler experiments outside the paper tables:
 .venv/bin/datadiff experiment \
   --cases 1000 \
   --seeds 1,1001,2001,3001,4001 \
-  --presets bughunt_no_groupby_guided_metamorphic,null_groupby_topk,null_agg_topk,float_group_key,float_group_key_metamorphic \
+  --presets discovery_no_groupby_guided_metamorphic,null_groupby_topk,null_agg_topk,float_group_key,float_group_key_metamorphic \
   --target-suites core_lazy,core_datafusion,datafusion_cross \
   --log-level minimal \
   --artifact-limit 2 \

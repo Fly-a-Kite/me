@@ -1,0 +1,292 @@
+{
+  "bug_audit": {
+    "skipped": true
+  },
+  "cases_per_lane_seed": 500,
+  "duration": null,
+  "generated_at": "2026-05-26T17:36:48Z",
+  "generated_by": "datadiff discovery-campaign",
+  "lane_ids": [
+    "common_api_workflow",
+    "arrow_layout",
+    "polars_lazy",
+    "embedded_sql"
+  ],
+  "lanes": [
+    {
+      "id": "common_api_workflow",
+      "preset": "live_common_api_workflow_metamorphic",
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, mutate, join, groupby, sort, and slice"
+    },
+    {
+      "id": "arrow_layout",
+      "preset": "live_arrow_deep_organic_metamorphic",
+      "target_suite": "arrow_cross",
+      "theme": "Organic Arrow table layout, nullable aggregation, string/cast, and compute equivalence"
+    },
+    {
+      "id": "polars_lazy",
+      "preset": "live_polars_deep_organic_metamorphic",
+      "target_suite": "polars_cross",
+      "theme": "Organic Polars eager/lazy state, sortedness, nullable dtype, and expression equivalence"
+    },
+    {
+      "id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    }
+  ],
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "pyarrow",
+        "polars",
+        "polars_lazy",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 500,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 16,
+        "refresh": false,
+        "run_file": "runs/run-20260526T172846-1779816526530938725.jsonl.gz",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260526T172846-1779816526530938725.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-distinct-organic-s7402-manifest-common_api_workflow-seed7402-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "common_api_workflow",
+      "preset": "live_common_api_workflow_metamorphic",
+      "report": "reports/report-run-20260526T172846-1779816526530938725.md",
+      "run_file": "runs/run-20260526T172846-1779816526530938725.jsonl.gz",
+      "seed": 7402,
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, mutate, join, groupby, sort, and slice"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "pyarrow"
+      ],
+      "cases": 500,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00007528-discovery-fresh",
+              "evidence": "Backends differ only in full-precision floating-point arithmetic or aggregate ordering; the relaxed numeric row multisets agree.",
+              "kind": "semantic_output_mismatch",
+              "root": "grouped_topk_null_sort_key",
+              "seed": 7528,
+              "signature": "cbcc800d689fe778",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00007895-discovery-fresh",
+              "evidence": "Backends differ only in full-precision floating-point arithmetic or aggregate ordering; the relaxed numeric row multisets agree.",
+              "kind": "semantic_output_mismatch",
+              "root": "grouped_topk_null_sort_key",
+              "seed": 7895,
+              "signature": "7f406aa4721631e4",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00009703-discovery-fresh",
+              "evidence": "Backends differ only in full-precision floating-point arithmetic or aggregate ordering; the relaxed numeric row multisets agree.",
+              "kind": "semantic_output_mismatch",
+              "root": "grouped_topk_null_sort_key",
+              "seed": 9703,
+              "signature": "35adfa7a4a02b57b",
+              "suspicious": [
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00010404-discovery-fresh",
+              "evidence": "Backends differ only in full-precision floating-point arithmetic or aggregate ordering; the relaxed numeric row multisets agree.",
+              "kind": "semantic_output_mismatch",
+              "root": "outer_join_truth_filter",
+              "seed": 10404,
+              "signature": "d0f2d219c817189f",
+              "suspicious": [
+                "duckdb"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 16,
+        "refresh": false,
+        "run_file": "runs/run-20260526T173102-1779816662147330403.jsonl.gz",
+        "triage_verdicts": {
+          "expected_semantic_divergence": 4
+        },
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260526T173102-1779816662147330403.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-distinct-organic-s7402-manifest-arrow_layout-seed7402-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "arrow_layout",
+      "preset": "live_arrow_deep_organic_metamorphic",
+      "report": "reports/report-run-20260526T173102-1779816662147330403.md",
+      "run_file": "runs/run-20260526T173102-1779816662147330403.jsonl.gz",
+      "seed": 7402,
+      "target_suite": "arrow_cross",
+      "theme": "Organic Arrow table layout, nullable aggregation, string/cast, and compute equivalence"
+    },
+    {
+      "backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "cases": 500,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 16,
+        "refresh": false,
+        "run_file": "runs/run-20260526T173312-1779816792066768028.jsonl.gz",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260526T173312-1779816792066768028.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-distinct-organic-s7402-manifest-polars_lazy-seed7402-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "polars_lazy",
+      "preset": "live_polars_deep_organic_metamorphic",
+      "report": "reports/report-run-20260526T173312-1779816792066768028.md",
+      "run_file": "runs/run-20260526T173312-1779816792066768028.jsonl.gz",
+      "seed": 7402,
+      "target_suite": "polars_cross",
+      "theme": "Organic Polars eager/lazy state, sortedness, nullable dtype, and expression equivalence"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 500,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00007528-discovery-fresh",
+              "evidence": "Backends differ only in full-precision floating-point arithmetic or aggregate ordering; the relaxed numeric row multisets agree.",
+              "kind": "semantic_output_mismatch",
+              "root": "grouped_topk_null_sort_key",
+              "seed": 7528,
+              "signature": "7aca991e33303bc7",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00007895-discovery-fresh",
+              "evidence": "Backends differ only in full-precision floating-point arithmetic or aggregate ordering; the relaxed numeric row multisets agree.",
+              "kind": "semantic_output_mismatch",
+              "root": "grouped_topk_null_sort_key",
+              "seed": 7895,
+              "signature": "fae3525c9178c04e",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00010404-discovery-fresh",
+              "evidence": "Backends differ only in full-precision floating-point arithmetic or aggregate ordering; the relaxed numeric row multisets agree.",
+              "kind": "semantic_output_mismatch",
+              "root": "outer_join_truth_filter",
+              "seed": 10404,
+              "signature": "d047f1ac4891ef7c",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00010404-discovery-fresh",
+              "evidence": "Backends differ only in full-precision floating-point arithmetic or aggregate ordering; the relaxed numeric row multisets agree.",
+              "kind": "metamorphic_filter_tautology_insertion_violation",
+              "root": "metamorphic_filter_tautology_insertion",
+              "seed": 10404,
+              "signature": "4783125a286f3287",
+              "suspicious": [
+                "duckdb"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 16,
+        "refresh": false,
+        "run_file": "runs/run-20260526T173409-1779816849097014140.jsonl.gz",
+        "triage_verdicts": {
+          "expected_semantic_divergence": 4
+        },
+        "unsaturated_candidate_bug_families": {}
+      },
+      "csv": "reports/findings-run-20260526T173409-1779816849097014140.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-distinct-organic-s7402-manifest-embedded_sql-seed7402-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "lane_id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "report": "reports/report-run-20260526T173409-1779816849097014140.md",
+      "run_file": "runs/run-20260526T173409-1779816849097014140.jsonl.gz",
+      "seed": 7402,
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    }
+  ],
+  "schema_version": "discovery-campaign-v1",
+  "seeds": [
+    7402
+  ],
+  "summary": {
+    "fresh_candidate_bug_families": {},
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {},
+    "run_count": 4,
+    "triage_verdicts": {
+      "expected_semantic_divergence": 8
+    }
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "targeted_short_sprints",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence"
+  ]
+}

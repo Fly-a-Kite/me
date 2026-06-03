@@ -3,10 +3,11 @@ from collections import Counter
 
 from datadiff import methodology_report, reporter
 from datadiff.methodology_report import write_methodology_report
-from datadiff.util import append_jsonl, dump_json, run_meta_path
+from datadiff.util import append_jsonl, closed_loop_state_path, dump_json, run_meta_path
 
 
-def _write_run(path, *, findings_by_index, artifact_dir=None, run_provenance=None):
+def _write_run(path, *, findings_by_index, artifact_dir=None, run_provenance=None, invalid_indexes=None):
+    invalid_indexes = set(invalid_indexes or [])
     for idx in range(2):
         findings = findings_by_index.get(idx, [])
         row = {
@@ -15,6 +16,7 @@ def _write_run(path, *, findings_by_index, artifact_dir=None, run_provenance=Non
             "elapsed_s": (idx + 1) * 0.1,
             "case": {"case_id": f"case-{path.stem}-{idx}", "seed": idx, "program": {"operations": []}},
             "findings": findings,
+            "preflight": {"valid": idx not in invalid_indexes, "fallback_used": idx in invalid_indexes},
             "behavior_signature": f"sig-{path.stem}-{idx}",
             "backend_status": {},
             "quality_oracles": [
@@ -63,6 +65,77 @@ def _write_run(path, *, findings_by_index, artifact_dir=None, run_provenance=Non
                 "guidance_oracle_verdict": "guided_productive" if idx == 0 else "guided_redundant",
             },
         }
+        if idx == 0:
+            row.update(
+                {
+                    "generator_profile_selection": {
+                        "strategy": "contextual_bandit",
+                        "profile": "discovery_fresh",
+                        "profile_pool": ["common", "discovery_fresh"],
+                        "learning_weight": 1.0,
+                        "reward": 2.0,
+                        "ranked": [
+                            {
+                                "action_id": "discovery_fresh",
+                                "score": 1.4,
+                                "model_prediction": 0.6,
+                                "uncertainty": 0.25,
+                                "exploration_bonus": 0.3,
+                                "version_signal": 0.2,
+                                "continual_priority_signal": 0.1,
+                                "health_penalty": 0.05,
+                            }
+                        ],
+                    },
+                    "semantic_objective_selection": {
+                        "strategy": "contextual_bandit_warmup",
+                        "action": "exploration_objective:boundary_depth",
+                        "action_pool": ["exploration_objective:boundary_depth"],
+                        "learning_weight": 1.0,
+                        "reward": 1.5,
+                        "ranked": [
+                            {
+                                "action_id": "exploration_objective:boundary_depth",
+                                "uncertainty": 0.75,
+                                "exploration_bonus": 0.5,
+                            }
+                        ],
+                    },
+                    "metamorphic_relation_selection": {
+                        "strategy": "contextual_bandit",
+                        "action": "input_partition_union_all",
+                        "action_pool": ["input_partition_union_all"],
+                        "learning_weight": 1.0,
+                        "reward": 1.0,
+                        "ranked": [
+                            {
+                                "action_id": "input_partition_union_all",
+                                "uncertainty": 0.5,
+                                "exploration_bonus": 0.7,
+                            }
+                        ],
+                    },
+                    "version_pair_selection": {
+                        "strategy": "contextual_bandit",
+                        "action": "latest->fixed",
+                        "action_pool": ["latest->fixed"],
+                        "learning_weight": 1.0,
+                        "reward": 0.5,
+                        "ranked": [
+                            {
+                                "action_id": "latest->fixed",
+                                "version_signal": 0.8,
+                                "continual_priority_signal": 0.4,
+                                "health_penalty": 0.2,
+                            }
+                        ],
+                    },
+                    "selected_generator_profile": "discovery_fresh",
+                    "selected_semantic_objective": "exploration_objective:boundary_depth",
+                    "selected_metamorphic_relation": "input_partition_union_all",
+                    "selected_version_pair": "latest->fixed",
+                }
+            )
         if artifact_dir and findings:
             row["bug_dir"] = str(artifact_dir)
         append_jsonl(row, path)
@@ -74,6 +147,11 @@ def _write_run(path, *, findings_by_index, artifact_dir=None, run_provenance=Non
             "targets": [],
             "common_capabilities": [],
             "run_provenance": run_provenance or {},
+            "preflight": {
+                "repaired_cases": 0,
+                "fallback_cases": len(invalid_indexes),
+                "invalid_cases": len(invalid_indexes),
+            },
             "config": {
                 "guidance_targets": ["groupby", "topk"],
                 "effective_guidance_targets": [
@@ -157,7 +235,7 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
     )
     dump_json(
         {
-            "schema_version": "bug-sprint-v1",
+            "schema_version": "discovery-campaign-v1",
             "generated_at": "2026-05-28T12:00:00Z",
             "scheduler": {
                 "lanes": [
@@ -189,7 +267,7 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
                 }
             ],
         },
-        tmp_path / "new_issue" / "generated" / "bug-sprint-report-manifest.json",
+        tmp_path / "new_issue" / "generated" / "discovery-campaign-report-manifest.json",
     )
     dump_json(
         {
@@ -340,6 +418,7 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
                 "strategy_learning": str(no_normalizer_strategy_learning),
             },
         },
+        invalid_indexes={1},
     )
     _write_run(
         reducer_run,
@@ -367,6 +446,16 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
             "evidence_mode": "live",
             "schedule": "adaptive",
             "local_source_scheduler": {"enabled": True, "exploration_weight": 0.2},
+            "adaptive_methodology": {
+                "components": {
+                    "scheduler_learning": True,
+                    "active_learning": True,
+                    "quality_archive": True,
+                    "local_source_scheduler": True,
+                    "runtime_cost_learning": True,
+                },
+                "disabled_components": [],
+            },
             "experiment_meta": {
                 "matrix_id": "module_ablation",
                 "comparison_group": "module_ablation",
@@ -408,6 +497,14 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
                     "analysis_tags": ["ablation", "baseline"],
                     "seed": 1,
                     "evidence_mode": "live",
+                    "adaptive_components": {
+                        "scheduler_learning": True,
+                        "active_learning": True,
+                        "quality_archive": True,
+                        "local_source_scheduler": True,
+                        "runtime_cost_learning": True,
+                    },
+                    "disabled_adaptive_components": [],
                     "run_file": str(baseline_run),
                     "report": "",
                 },
@@ -425,6 +522,19 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
                     "analysis_tags": ["ablation", "noise_control"],
                     "seed": 1,
                     "evidence_mode": "live",
+                    "adaptive_components": {
+                        "scheduler_learning": True,
+                        "active_learning": False,
+                        "quality_archive": False,
+                        "local_source_scheduler": False,
+                        "runtime_cost_learning": False,
+                    },
+                    "disabled_adaptive_components": [
+                        "active_learning",
+                        "quality_archive",
+                        "local_source_scheduler",
+                        "runtime_cost_learning",
+                    ],
                     "run_file": str(no_normalizer_run),
                     "report": "",
                 },
@@ -655,6 +765,90 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
         "enabled": True,
         "exploration_weight": 0.2,
     }
+    assert report["adaptive_methodology"]["enabled"] is True
+    assert report["adaptive_methodology"]["component_count"] == 5
+    assert report["adaptive_methodology"]["reference_run_count"] == 2
+    assert report["adaptive_methodology"]["contrast_run_count"] == 1
+    assert report["adaptive_methodology"]["disabled_components"] == [
+        "active_learning",
+        "local_source_scheduler",
+        "quality_archive",
+        "runtime_cost_learning",
+    ]
+    assert report["adaptive_methodology"]["reference_invalid_rate"] == 0.0
+    assert report["adaptive_methodology"]["contrast_invalid_rate"] == 0.5
+    assert report["adaptive_methodology"]["contrast_false_positive_rate"] == 0.5
+    quality_row = next(
+        row for row in report["adaptive_methodology"]["components"] if row["component"] == "quality_archive"
+    )
+    assert quality_row["enabled_run_count"] == 2
+    assert quality_row["disabled_run_count"] == 1
+    assert quality_row["ablation_covered"] is True
+    runtime_cost_row = next(
+        row for row in report["adaptive_methodology"]["components"] if row["component"] == "runtime_cost_learning"
+    )
+    assert runtime_cost_row["ablation_covered"] is True
+    active_learning_row = next(
+        row for row in report["adaptive_methodology"]["components"] if row["component"] == "active_learning"
+    )
+    assert active_learning_row["ablation_covered"] is True
+    effects = {
+        row["component"]: row
+        for row in report["adaptive_methodology"]["component_effects"]
+    }
+    quality_effect = effects["quality_archive"]
+    assert quality_effect["ablation_covered"] is True
+    assert quality_effect["reference_run_count"] == 2
+    assert quality_effect["disabled_run_count"] == 1
+    assert quality_effect["reference_candidate_bug_case_rate"] == 0.5
+    assert quality_effect["disabled_candidate_bug_case_rate"] == 0.0
+    assert quality_effect["candidate_bug_case_rate_delta"] == -0.5
+    assert quality_effect["signal_new_behavior_rate_delta"] == 0.25
+    assert quality_effect["throughput_cases_s_delta"] == 0.0
+    assert quality_effect["invalid_rate_delta"] == 0.5
+    assert quality_effect["false_positive_rate_delta"] == 0.5
+    assert quality_effect["candidate_bug_discovery_auc_delta"] == -0.75
+    assert quality_effect["first_candidate_bug_elapsed_s_delta"] is None
+    scheduler_effect = effects["scheduler_learning"]
+    assert scheduler_effect["ablation_covered"] is False
+    assert scheduler_effect["disabled_run_count"] == 0
+    assert scheduler_effect["candidate_bug_case_rate_delta"] is None
+    assert scheduler_effect["throughput_cases_s_delta"] is None
+    assert scheduler_effect["invalid_rate_delta"] is None
+    assert scheduler_effect["false_positive_rate_delta"] is None
+    assert report["adaptive_selection"]["enabled"] is True
+    assert report["adaptive_selection"]["total_count"] == 12
+    assert report["adaptive_selection"]["scope_count"] == 4
+    assert report["adaptive_selection"]["scopes"] == [
+        "generator_profile",
+        "metamorphic_relation",
+        "semantic_objective",
+        "version_pair",
+    ]
+    assert report["adaptive_selection"]["top_actions"]["generator_profile"] == {"discovery_fresh": 3}
+    assert report["adaptive_selection"]["top_actions"]["semantic_objective"] == {
+        "exploration_objective:boundary_depth": 3
+    }
+    assert report["adaptive_selection"]["top_actions"]["metamorphic_relation"] == {
+        "input_partition_union_all": 3
+    }
+    assert report["adaptive_selection"]["top_actions"]["version_pair"] == {"latest->fixed": 3}
+    assert report["adaptive_selection"]["avg_uncertainty"] > 0.0
+    assert report["adaptive_selection"]["avg_version_signal"] > 0.0
+    assert report["adaptive_selection"]["avg_health_penalty"] > 0.0
+    assert "### Adaptive Methodology Components" in md
+    assert "| active_learning | true | 2 | 1 | true |" in md
+    assert "| quality_archive | true | 2 | 1 | true |" in md
+    assert "| runtime_cost_learning | true | 2 | 1 | true |" in md
+    assert "### Adaptive Component Effects" in md
+    assert "| quality_archive | 1 | -50.0% | +25.0% | +0.00 | +50.0% | +50.0% |  | -0.75 |" in md
+    assert "| scheduler_learning | 0 |  |  |  |  |  |  |  |" in md
+    assert "- Ablation invalid rate: 50.0%" in md
+    assert "## Adaptive Selection" in md
+    assert "- Total selections: 12 (2.00/case)" in md
+    assert "discovery_fresh:3" in md
+    assert "exploration_objective:boundary_depth:3" in md
+    assert "latest->fixed:3" in md
     assert report["scheduler_effectiveness"]["lane_yield"][0]["lane_id"] == "arrow_layout"
     assert report["candidate_pipeline"]["manifest_count"] == 1
     assert report["candidate_pipeline"]["candidate_count"] == 2
@@ -1043,3 +1237,211 @@ def test_methodology_report_normalizes_manifest_experiment_meta_before_ablation_
     assert report["ablation"]["ablation_variant_ids"] == ["no_normalizer"]
     assert report["ablation"]["ablation_modules"] == ["semantic_normalizer"]
     assert "semantic_normalizer" not in report["ablation"]["missing_ablation_modules"]
+
+
+def test_methodology_report_exports_adaptive_learning_internal_evidence(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(reporter, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(methodology_report, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(methodology_report, "PROJECT_ROOT", tmp_path)
+
+    run_file = runs_dir / "run-adaptive-evidence.jsonl.gz"
+    _write_run(run_file, findings_by_index={})
+    state_file = closed_loop_state_path(run_file)
+    dump_json(
+        {
+            "seen_signatures": ["sig-a"],
+            "feedback": {
+                "adaptive_learning": {
+                    "schema_version": "adaptive-learning-v1",
+                    "bandits": {
+                        "mutation_operator": {
+                            "reward_model": {
+                                "total_updates": 2,
+                                "feature_counts": {
+                                    "scope:mutation_operator": 2,
+                                    "semantic_family:join": 1,
+                                },
+                            },
+                            "arms": [
+                                {
+                                    "action_id": "append_filter",
+                                    "pulls": 2,
+                                    "total_reward": 3.0,
+                                }
+                            ],
+                        }
+                    },
+                    "version_memory": {
+                        "reward_counts": {"mutation_operator|append_filter|v1": 2},
+                    },
+                    "exploration_memory": {
+                        "total_records": 2,
+                        "context_counts": {"semantic_family:join": 2},
+                        "action_counts": {"mutation_operator|append_filter|v1": 2},
+                    },
+                    "continual_priority_memory": {
+                        "imported_ledger_count": 1,
+                        "imported_family_count": 2,
+                        "family_priorities": {"join_order@engine": 1.0},
+                        "feature_counts": {"family:join_order": 1},
+                    },
+                },
+                "quality_archive": {
+                    "schema_version": "quality-diversity-archive-v1",
+                    "max_elites_per_cluster": 2,
+                    "cells": [
+                        {
+                            "cluster_key": "profile=common|targets=join|ops=filter",
+                            "max_elites": 2,
+                            "seeds": [
+                                {"index": 0, "utility": 1.0, "pulls": 1},
+                                {"index": 1, "utility": 0.5, "pulls": 0},
+                            ],
+                            "reward_count": 2,
+                            "outcome_count": 2,
+                            "invalid_count": 0,
+                            "false_positive_count": 0,
+                        }
+                    ],
+                },
+            },
+            "guidance": {},
+        },
+        state_file,
+        compact=True,
+    )
+    meta = json.loads(run_meta_path(run_file).read_text(encoding="utf-8"))
+    meta["closed_loop_state_file"] = str(state_file)
+    meta["closed_loop_state_summary"] = {
+        "seen_signature_count": 1,
+        "adaptive_learning_health": {
+            "schema_version": "adaptive-learning-health-v1",
+            "bandit_count": 1,
+            "arm_count": 1,
+            "total_pulls": 2,
+            "avg_health_penalty": 0.0,
+            "max_health_penalty": 0.0,
+            "avg_uncertainty": 0.25,
+            "exploration_memory": {
+                "total_records": 2,
+                "context_count": 1,
+                "action_count": 1,
+            },
+        },
+    }
+    dump_json(meta, run_meta_path(run_file), compact=True)
+
+    manifest = runs_dir / "experiment-adaptive-evidence.json"
+    dump_json(
+        {
+            "presets": ["baseline"],
+            "seeds": [1],
+            "target_suite": "core",
+            "target_suites": ["core"],
+            "evidence_mode": "live",
+            "schedule": "adaptive",
+            "adaptive_config": {
+                "continual_learning_sources": [
+                    {
+                        "path": "reports/version-ledger.json",
+                        "loaded": True,
+                        "family_count": 2,
+                        "feature_count": 4,
+                    }
+                ]
+            },
+            "adaptive_state": [
+                {
+                    "arm_id": "core:baseline:seed1",
+                    "target_suite": "core",
+                    "pulls": 3,
+                    "mean_reward": 1.5,
+                    "reward_signal": 1.2,
+                    "learning_signal": 0.7,
+                    "annealing_temperature": 0.2,
+                    "closed_loop_state_present": True,
+                }
+            ],
+            "adaptive_learning": {
+                "schema_version": "adaptive-learning-v1",
+                "bandits": {
+                    "generator_profile": {
+                        "reward_model": {
+                            "total_updates": 3,
+                            "feature_counts": {
+                                "scope:generator_profile": 3,
+                                "capability:op_join": 2,
+                            },
+                        },
+                        "arms": [
+                            {
+                                "action_id": "discovery",
+                                "pulls": 3,
+                                "total_reward": 4.5,
+                            }
+                        ],
+                    }
+                },
+                "version_memory": {
+                    "reward_counts": {"generator_profile|discovery|v1": 3},
+                },
+                "exploration_memory": {
+                    "total_records": 3,
+                    "context_counts": {"capability:op_join": 3},
+                    "action_counts": {"generator_profile|discovery|v1": 3},
+                },
+                "continual_priority_memory": {
+                    "imported_ledger_count": 1,
+                    "imported_family_count": 2,
+                    "family_priorities": {"join_order@engine": 1.0},
+                    "feature_counts": {"family:join_order": 1},
+                },
+            },
+            "runs": [
+                {
+                    "target_suite": "core",
+                    "preset": "baseline",
+                    "seed": 1,
+                    "evidence_mode": "live",
+                    "adaptive_components": {
+                        "scheduler_learning": True,
+                        "quality_archive": True,
+                    },
+                    "run_file": str(run_file),
+                    "report": "",
+                },
+            ],
+        },
+        manifest,
+    )
+
+    md_path, json_path = write_methodology_report(manifest, scan_run_logs=False)
+    report = json.loads(json_path.read_text(encoding="utf-8"))
+    md = md_path.read_text(encoding="utf-8")
+    evidence = report["adaptive_learning_evidence"]
+
+    assert evidence["schema_version"] == "adaptive-learning-evidence-v1"
+    assert evidence["scheduler"]["arm_count"] == 1
+    assert evidence["scheduler"]["pull_total"] == 3
+    assert evidence["scheduler"]["learning_signal_max"] == 0.7
+    assert evidence["scheduler"]["annealing_temperature_max"] == 0.2
+    assert evidence["manifest_learning"]["bandit_scope_count"] == 1
+    assert evidence["manifest_learning"]["bandit_total_pulls"] == 3
+    assert evidence["manifest_learning"]["reward_model_update_count"] == 3
+    assert evidence["manifest_learning"]["continual_imported_family_count"] == 2
+    assert evidence["closed_loop"]["state_file_count"] == 1
+    assert evidence["closed_loop"]["health_total_pulls"] == 2
+    assert evidence["closed_loop"]["learning_total_pulls"] == 2
+    assert evidence["closed_loop"]["learning_reward_model_updates"] == 2
+    assert evidence["quality_diversity"]["archive_cell_count"] == 1
+    assert evidence["quality_diversity"]["archive_seed_count"] == 2
+    assert evidence["quality_diversity"]["archive_elite_seed_count"] == 2
+    assert evidence["quality_diversity"]["archive_outcome_count"] == 2
+    assert evidence["continual_learning"]["loaded_source_count"] == 1
+    assert evidence["continual_learning"]["manifest_imported_ledger_count"] == 1
+    assert "## Adaptive Learning Evidence" in md
+    assert "- Manifest bandit scopes / arms / pulls: 1 / 1 / 3" in md
+    assert "- Quality-diversity archive cells / seeds / elites: 1 / 2 / 2" in md
+    assert "- Continual-learning sources loaded: 1/1" in md

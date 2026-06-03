@@ -1,0 +1,2472 @@
+{
+  "candidate_row_count": 4,
+  "candidate_rows": [
+    {
+      "case": {
+        "case_id": "case-00000407-common-api-workflow-mut-424",
+        "metadata": {
+          "candidate_source": "feedback_mutation",
+          "generator_profile": "common_api_workflow",
+          "mutation": {
+            "changed": true,
+            "detail": "append_boolean_predicate_filter:any_flag:bool_is_false",
+            "operator": "append_boolean_predicate_filter"
+          },
+          "seed_lineage": {
+            "depth": 1,
+            "mutation_seed": 424,
+            "parent_case_id": "case-00000407-common-api-workflow",
+            "parent_seed": 407,
+            "root_seed": 407
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "cmp": "<",
+              "column": "id",
+              "op": "filter",
+              "value": 0
+            },
+            {
+              "aggs": [
+                {
+                  "as": "row_count",
+                  "column": "id",
+                  "func": "count"
+                },
+                {
+                  "as": "sum_x",
+                  "column": "x",
+                  "func": "sum"
+                },
+                {
+                  "as": "mean_y",
+                  "column": "y",
+                  "func": "mean"
+                },
+                {
+                  "as": "any_flag",
+                  "column": "flag",
+                  "func": "any"
+                },
+                {
+                  "as": "all_flag",
+                  "column": "flag",
+                  "func": "all"
+                }
+              ],
+              "op": "aggregate"
+            },
+            {
+              "cmp": "bool_is_false",
+              "column": "any_flag",
+              "op": "filter",
+              "value": null
+            }
+          ],
+          "program_id": "prog-00000407-common-api-workflow-mut-424",
+          "seed": 424
+        },
+        "seed": 424,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "row_nr",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "g",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "x",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "y",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "flag",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "s",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "flag": null,
+                "g": "a",
+                "id": 0,
+                "row_nr": 0,
+                "s": "Beta",
+                "x": null,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": " padded ",
+                "id": 1,
+                "row_nr": 1,
+                "s": " alpha ",
+                "x": 1,
+                "y": 10.0
+              },
+              {
+                "flag": true,
+                "g": "c",
+                "id": 2,
+                "row_nr": 2,
+                "s": "space value",
+                "x": 5,
+                "y": 0.5
+              },
+              {
+                "flag": false,
+                "g": "space value",
+                "id": 3,
+                "row_nr": 3,
+                "s": "",
+                "x": -2,
+                "y": 0.0
+              },
+              {
+                "flag": true,
+                "g": "",
+                "id": 4,
+                "row_nr": 4,
+                "s": null,
+                "x": 10,
+                "y": 10.0
+              },
+              {
+                "flag": null,
+                "g": "",
+                "id": 5,
+                "row_nr": 5,
+                "s": "Alpha",
+                "x": 0,
+                "y": -1.5
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 6,
+                "row_nr": 6,
+                "s": "Alpha",
+                "x": 1,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 2,
+                "row_nr": 7,
+                "s": "Alpha",
+                "x": null,
+                "y": -0.5
+              },
+              {
+                "flag": true,
+                "g": " padded ",
+                "id": 8,
+                "row_nr": 8,
+                "s": " alpha ",
+                "x": 10,
+                "y": 1.5
+              },
+              {
+                "flag": true,
+                "g": "c",
+                "id": 4,
+                "row_nr": 9,
+                "s": "space value",
+                "x": 5,
+                "y": 1.5
+              },
+              {
+                "flag": null,
+                "g": "",
+                "id": 0,
+                "row_nr": 10,
+                "s": "  padded  ",
+                "x": 2,
+                "y": 0.5
+              },
+              {
+                "flag": true,
+                "g": "",
+                "id": 1,
+                "row_nr": 11,
+                "s": null,
+                "x": -1,
+                "y": 1.5
+              },
+              {
+                "flag": false,
+                "g": "",
+                "id": 5,
+                "row_nr": 12,
+                "s": null,
+                "x": 1,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 2,
+                "row_nr": 13,
+                "s": "Alpha",
+                "x": -1,
+                "y": 0.0
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 3,
+                "row_nr": 14,
+                "s": "Alpha",
+                "x": null,
+                "y": 1.5
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": 20,
+        "candidate_recheck_count": 2,
+        "compress_run_log": false,
+        "enable_artifact": true,
+        "enable_differential_oracle": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_normalizer": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_type_aware_generation": true,
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "generator_profile": "common_api_workflow",
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "common_api_workflow",
+          "daily_api",
+          "common_workflow",
+          "operation_combo",
+          "input_materialization",
+          "materialization_boundary",
+          "filter_input_materialization",
+          "cleanup_input_materialization",
+          "drop_nulls_input_materialization",
+          "fill_null_input_materialization",
+          "distinct_input_materialization",
+          "input_partition_union",
+          "join",
+          "multi_key_join",
+          "groupby",
+          "multi_key_groupby",
+          "mutate",
+          "filter",
+          "truth_filter",
+          "nulls",
+          "aggregation",
+          "boolean_aggregation",
+          "bool_any_all",
+          "sort_limit",
+          "union_all",
+          "concat",
+          "drop_nulls",
+          "dropna",
+          "semi_join",
+          "anti_join",
+          "membership_join",
+          "exclusion_join",
+          "distinct",
+          "duplicate_elimination",
+          "nunique",
+          "count_distinct",
+          "distinct_count_aggregation",
+          "unique_count_groupby",
+          "distinct_null_topk",
+          "fill_null",
+          "coalesce",
+          "case_when",
+          "conditional_expression",
+          "set_membership_filter",
+          "negative_set_membership_filter",
+          "null_predicate_filter",
+          "boolean_predicate_filter",
+          "range_filter",
+          "row_number_filter",
+          "top_n_per_group",
+          "dedup_latest_per_id",
+          "running_sum",
+          "partitioned_running_sum",
+          "global_aggregation",
+          "filtered_global_aggregation",
+          "empty_filter_aggregate",
+          "left_join_fill_null_aggregation",
+          "cleaned_join_key",
+          "having_filter_after_aggregation",
+          "strings",
+          "string_length",
+          "string_lower",
+          "string_upper",
+          "string_null_if_empty",
+          "string_starts_with",
+          "string_ends_with",
+          "string_split_part",
+          "date_part",
+          "date_extraction",
+          "numeric",
+          "casts",
+          "expressions"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.35,
+        "log_level": "compact",
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0
+      },
+      "findings": [
+        {
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'pyarrow': 'error', 'polars': 'ok', 'polars_lazy': 'ok', 'duckdb': 'ok', 'sqlite': 'ok'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-5ef1f5b4ad01f8a2",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "groupby_aggregation",
+          "severity": "high",
+          "signature": "5ef1f5b4ad01f8a2",
+          "source_issue": "",
+          "suspicious_backends": [
+            "pyarrow"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['duckdb', 'pandas', 'polars', 'polars_lazy', 'sqlite'] and disagrees with ['pyarrow'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "duckdb": {
+          "backend": "duckdb",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [],
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [],
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [],
+          "status": "ok"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [],
+          "status": "ok"
+        },
+        "pyarrow": {
+          "backend": "pyarrow",
+          "columns": [],
+          "error": "Invalid null value",
+          "error_type": "ArrowInvalid",
+          "rows": [],
+          "status": "error"
+        },
+        "sqlite": {
+          "backend": "sqlite",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [],
+          "status": "ok"
+        }
+      },
+      "raw_results": {
+        "duckdb": {
+          "backend": "duckdb",
+          "duration_ms": 15.390291053336114,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 2.157312002964318,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 1.1236920254305005,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 1.1172249796800315,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pyarrow": {
+          "backend": "pyarrow",
+          "duration_ms": 0.41514099575579166,
+          "error": "Invalid null value",
+          "error_type": "ArrowInvalid",
+          "status": "error"
+        },
+        "sqlite": {
+          "backend": "sqlite",
+          "duration_ms": 1.2439090060070157,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        }
+      }
+    },
+    {
+      "case": {
+        "case_id": "case-00000407-common-api-workflow-mut-1182",
+        "metadata": {
+          "candidate_source": "feedback_mutation",
+          "generator_profile": "common_api_workflow",
+          "mutation": {
+            "changed": true,
+            "detail": "append_boolean_predicate_filter:any_flag:bool_is_not_true",
+            "operator": "append_boolean_predicate_filter"
+          },
+          "seed_lineage": {
+            "depth": 1,
+            "mutation_seed": 1182,
+            "parent_case_id": "case-00000407-common-api-workflow",
+            "parent_seed": 407,
+            "root_seed": 407
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "cmp": "<",
+              "column": "id",
+              "op": "filter",
+              "value": 0
+            },
+            {
+              "aggs": [
+                {
+                  "as": "row_count",
+                  "column": "id",
+                  "func": "count"
+                },
+                {
+                  "as": "sum_x",
+                  "column": "x",
+                  "func": "sum"
+                },
+                {
+                  "as": "mean_y",
+                  "column": "y",
+                  "func": "mean"
+                },
+                {
+                  "as": "any_flag",
+                  "column": "flag",
+                  "func": "any"
+                },
+                {
+                  "as": "all_flag",
+                  "column": "flag",
+                  "func": "all"
+                }
+              ],
+              "op": "aggregate"
+            },
+            {
+              "cmp": "bool_is_not_true",
+              "column": "any_flag",
+              "op": "filter",
+              "value": null
+            }
+          ],
+          "program_id": "prog-00000407-common-api-workflow-mut-1182",
+          "seed": 1182
+        },
+        "seed": 1182,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "row_nr",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "g",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "x",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "y",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "flag",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "s",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "flag": null,
+                "g": "a",
+                "id": 0,
+                "row_nr": 0,
+                "s": "Beta",
+                "x": null,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": " padded ",
+                "id": 1,
+                "row_nr": 1,
+                "s": " alpha ",
+                "x": 1,
+                "y": 10.0
+              },
+              {
+                "flag": true,
+                "g": "c",
+                "id": 2,
+                "row_nr": 2,
+                "s": "space value",
+                "x": 5,
+                "y": 0.5
+              },
+              {
+                "flag": false,
+                "g": "space value",
+                "id": 3,
+                "row_nr": 3,
+                "s": "",
+                "x": -2,
+                "y": 0.0
+              },
+              {
+                "flag": true,
+                "g": "",
+                "id": 4,
+                "row_nr": 4,
+                "s": null,
+                "x": 10,
+                "y": 10.0
+              },
+              {
+                "flag": null,
+                "g": "",
+                "id": 5,
+                "row_nr": 5,
+                "s": "Alpha",
+                "x": 0,
+                "y": -1.5
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 6,
+                "row_nr": 6,
+                "s": "Alpha",
+                "x": 1,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 2,
+                "row_nr": 7,
+                "s": "Alpha",
+                "x": null,
+                "y": -0.5
+              },
+              {
+                "flag": true,
+                "g": " padded ",
+                "id": 8,
+                "row_nr": 8,
+                "s": " alpha ",
+                "x": 10,
+                "y": 1.5
+              },
+              {
+                "flag": true,
+                "g": "c",
+                "id": 4,
+                "row_nr": 9,
+                "s": "space value",
+                "x": 5,
+                "y": 1.5
+              },
+              {
+                "flag": null,
+                "g": "",
+                "id": 0,
+                "row_nr": 10,
+                "s": "  padded  ",
+                "x": 2,
+                "y": 0.5
+              },
+              {
+                "flag": true,
+                "g": "",
+                "id": 1,
+                "row_nr": 11,
+                "s": null,
+                "x": -1,
+                "y": 1.5
+              },
+              {
+                "flag": false,
+                "g": "",
+                "id": 5,
+                "row_nr": 12,
+                "s": null,
+                "x": 1,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 2,
+                "row_nr": 13,
+                "s": "Alpha",
+                "x": -1,
+                "y": 0.0
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 3,
+                "row_nr": 14,
+                "s": "Alpha",
+                "x": null,
+                "y": 1.5
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": 20,
+        "candidate_recheck_count": 2,
+        "compress_run_log": false,
+        "enable_artifact": true,
+        "enable_differential_oracle": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_normalizer": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_type_aware_generation": true,
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "generator_profile": "common_api_workflow",
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "common_api_workflow",
+          "daily_api",
+          "common_workflow",
+          "operation_combo",
+          "input_materialization",
+          "materialization_boundary",
+          "filter_input_materialization",
+          "cleanup_input_materialization",
+          "drop_nulls_input_materialization",
+          "fill_null_input_materialization",
+          "distinct_input_materialization",
+          "input_partition_union",
+          "join",
+          "multi_key_join",
+          "groupby",
+          "multi_key_groupby",
+          "mutate",
+          "filter",
+          "truth_filter",
+          "nulls",
+          "aggregation",
+          "boolean_aggregation",
+          "bool_any_all",
+          "sort_limit",
+          "union_all",
+          "concat",
+          "drop_nulls",
+          "dropna",
+          "semi_join",
+          "anti_join",
+          "membership_join",
+          "exclusion_join",
+          "distinct",
+          "duplicate_elimination",
+          "nunique",
+          "count_distinct",
+          "distinct_count_aggregation",
+          "unique_count_groupby",
+          "distinct_null_topk",
+          "fill_null",
+          "coalesce",
+          "case_when",
+          "conditional_expression",
+          "set_membership_filter",
+          "negative_set_membership_filter",
+          "null_predicate_filter",
+          "boolean_predicate_filter",
+          "range_filter",
+          "row_number_filter",
+          "top_n_per_group",
+          "dedup_latest_per_id",
+          "running_sum",
+          "partitioned_running_sum",
+          "global_aggregation",
+          "filtered_global_aggregation",
+          "empty_filter_aggregate",
+          "left_join_fill_null_aggregation",
+          "cleaned_join_key",
+          "having_filter_after_aggregation",
+          "strings",
+          "string_length",
+          "string_lower",
+          "string_upper",
+          "string_null_if_empty",
+          "string_starts_with",
+          "string_ends_with",
+          "string_split_part",
+          "date_part",
+          "date_extraction",
+          "numeric",
+          "casts",
+          "expressions"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.35,
+        "log_level": "compact",
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0
+      },
+      "findings": [
+        {
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'pyarrow': 'error', 'polars': 'ok', 'polars_lazy': 'ok', 'duckdb': 'ok', 'sqlite': 'ok'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-5a49fa9202175bea",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "groupby_aggregation",
+          "severity": "high",
+          "signature": "5a49fa9202175bea",
+          "source_issue": "",
+          "suspicious_backends": [
+            "pyarrow"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['duckdb', 'pandas', 'polars', 'polars_lazy', 'sqlite'] and disagrees with ['pyarrow'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "duckdb": {
+          "backend": "duckdb",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null,
+              null,
+              null,
+              0,
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null,
+              null,
+              null,
+              0,
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null,
+              null,
+              null,
+              0,
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null,
+              null,
+              null,
+              0,
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "pyarrow": {
+          "backend": "pyarrow",
+          "columns": [],
+          "error": "Invalid null value",
+          "error_type": "ArrowInvalid",
+          "rows": [],
+          "status": "error"
+        },
+        "sqlite": {
+          "backend": "sqlite",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null,
+              null,
+              null,
+              0,
+              null
+            ]
+          ],
+          "status": "ok"
+        }
+      },
+      "raw_results": {
+        "duckdb": {
+          "backend": "duckdb",
+          "duration_ms": 16.480322985444218,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 2.0477889920584857,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 0.9767330484464765,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 0.645491003524512,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pyarrow": {
+          "backend": "pyarrow",
+          "duration_ms": 0.3843509475700557,
+          "error": "Invalid null value",
+          "error_type": "ArrowInvalid",
+          "status": "error"
+        },
+        "sqlite": {
+          "backend": "sqlite",
+          "duration_ms": 1.2044269824400544,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        }
+      }
+    },
+    {
+      "case": {
+        "case_id": "case-00000407-common-api-workflow-mut-1194",
+        "metadata": {
+          "candidate_source": "feedback_mutation",
+          "generator_profile": "common_api_workflow",
+          "mutation": {
+            "changed": true,
+            "detail": "append:filter",
+            "operator": "append_op"
+          },
+          "seed_lineage": {
+            "depth": 1,
+            "mutation_seed": 1194,
+            "parent_case_id": "case-00000407-common-api-workflow",
+            "parent_seed": 407,
+            "root_seed": 407
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "cmp": "<",
+              "column": "id",
+              "op": "filter",
+              "value": 0
+            },
+            {
+              "aggs": [
+                {
+                  "as": "row_count",
+                  "column": "id",
+                  "func": "count"
+                },
+                {
+                  "as": "sum_x",
+                  "column": "x",
+                  "func": "sum"
+                },
+                {
+                  "as": "mean_y",
+                  "column": "y",
+                  "func": "mean"
+                },
+                {
+                  "as": "any_flag",
+                  "column": "flag",
+                  "func": "any"
+                },
+                {
+                  "as": "all_flag",
+                  "column": "flag",
+                  "func": "all"
+                }
+              ],
+              "op": "aggregate"
+            },
+            {
+              "cmp": "bool_is_not_true",
+              "column": "all_flag",
+              "op": "filter",
+              "value": null
+            }
+          ],
+          "program_id": "prog-00000407-common-api-workflow-mut-1194",
+          "seed": 1194
+        },
+        "seed": 1194,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "row_nr",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "g",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "x",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "y",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "flag",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "s",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "flag": null,
+                "g": "a",
+                "id": 0,
+                "row_nr": 0,
+                "s": "Beta",
+                "x": null,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": " padded ",
+                "id": 1,
+                "row_nr": 1,
+                "s": " alpha ",
+                "x": 1,
+                "y": 10.0
+              },
+              {
+                "flag": true,
+                "g": "c",
+                "id": 2,
+                "row_nr": 2,
+                "s": "space value",
+                "x": 5,
+                "y": 0.5
+              },
+              {
+                "flag": false,
+                "g": "space value",
+                "id": 3,
+                "row_nr": 3,
+                "s": "",
+                "x": -2,
+                "y": 0.0
+              },
+              {
+                "flag": true,
+                "g": "",
+                "id": 4,
+                "row_nr": 4,
+                "s": null,
+                "x": 10,
+                "y": 10.0
+              },
+              {
+                "flag": null,
+                "g": "",
+                "id": 5,
+                "row_nr": 5,
+                "s": "Alpha",
+                "x": 0,
+                "y": -1.5
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 6,
+                "row_nr": 6,
+                "s": "Alpha",
+                "x": 1,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 2,
+                "row_nr": 7,
+                "s": "Alpha",
+                "x": null,
+                "y": -0.5
+              },
+              {
+                "flag": true,
+                "g": " padded ",
+                "id": 8,
+                "row_nr": 8,
+                "s": " alpha ",
+                "x": 10,
+                "y": 1.5
+              },
+              {
+                "flag": true,
+                "g": "c",
+                "id": 4,
+                "row_nr": 9,
+                "s": "space value",
+                "x": 5,
+                "y": 1.5
+              },
+              {
+                "flag": null,
+                "g": "",
+                "id": 0,
+                "row_nr": 10,
+                "s": "  padded  ",
+                "x": 2,
+                "y": 0.5
+              },
+              {
+                "flag": true,
+                "g": "",
+                "id": 1,
+                "row_nr": 11,
+                "s": null,
+                "x": -1,
+                "y": 1.5
+              },
+              {
+                "flag": false,
+                "g": "",
+                "id": 5,
+                "row_nr": 12,
+                "s": null,
+                "x": 1,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 2,
+                "row_nr": 13,
+                "s": "Alpha",
+                "x": -1,
+                "y": 0.0
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 3,
+                "row_nr": 14,
+                "s": "Alpha",
+                "x": null,
+                "y": 1.5
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": 20,
+        "candidate_recheck_count": 2,
+        "compress_run_log": false,
+        "enable_artifact": true,
+        "enable_differential_oracle": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_normalizer": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_type_aware_generation": true,
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "generator_profile": "common_api_workflow",
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "common_api_workflow",
+          "daily_api",
+          "common_workflow",
+          "operation_combo",
+          "input_materialization",
+          "materialization_boundary",
+          "filter_input_materialization",
+          "cleanup_input_materialization",
+          "drop_nulls_input_materialization",
+          "fill_null_input_materialization",
+          "distinct_input_materialization",
+          "input_partition_union",
+          "join",
+          "multi_key_join",
+          "groupby",
+          "multi_key_groupby",
+          "mutate",
+          "filter",
+          "truth_filter",
+          "nulls",
+          "aggregation",
+          "boolean_aggregation",
+          "bool_any_all",
+          "sort_limit",
+          "union_all",
+          "concat",
+          "drop_nulls",
+          "dropna",
+          "semi_join",
+          "anti_join",
+          "membership_join",
+          "exclusion_join",
+          "distinct",
+          "duplicate_elimination",
+          "nunique",
+          "count_distinct",
+          "distinct_count_aggregation",
+          "unique_count_groupby",
+          "distinct_null_topk",
+          "fill_null",
+          "coalesce",
+          "case_when",
+          "conditional_expression",
+          "set_membership_filter",
+          "negative_set_membership_filter",
+          "null_predicate_filter",
+          "boolean_predicate_filter",
+          "range_filter",
+          "row_number_filter",
+          "top_n_per_group",
+          "dedup_latest_per_id",
+          "running_sum",
+          "partitioned_running_sum",
+          "global_aggregation",
+          "filtered_global_aggregation",
+          "empty_filter_aggregate",
+          "left_join_fill_null_aggregation",
+          "cleaned_join_key",
+          "having_filter_after_aggregation",
+          "strings",
+          "string_length",
+          "string_lower",
+          "string_upper",
+          "string_null_if_empty",
+          "string_starts_with",
+          "string_ends_with",
+          "string_split_part",
+          "date_part",
+          "date_extraction",
+          "numeric",
+          "casts",
+          "expressions"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.35,
+        "log_level": "compact",
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0
+      },
+      "findings": [
+        {
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'pyarrow': 'error', 'polars': 'ok', 'polars_lazy': 'ok', 'duckdb': 'ok', 'sqlite': 'ok'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-5a49fa9202175bea",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "groupby_aggregation",
+          "severity": "high",
+          "signature": "5a49fa9202175bea",
+          "source_issue": "",
+          "suspicious_backends": [
+            "pyarrow"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['duckdb', 'pandas', 'polars', 'polars_lazy', 'sqlite'] and disagrees with ['pyarrow'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "duckdb": {
+          "backend": "duckdb",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null,
+              null,
+              null,
+              0,
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null,
+              null,
+              null,
+              0,
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null,
+              null,
+              null,
+              0,
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null,
+              null,
+              null,
+              0,
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "pyarrow": {
+          "backend": "pyarrow",
+          "columns": [],
+          "error": "Invalid null value",
+          "error_type": "ArrowInvalid",
+          "rows": [],
+          "status": "error"
+        },
+        "sqlite": {
+          "backend": "sqlite",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null,
+              null,
+              null,
+              0,
+              null
+            ]
+          ],
+          "status": "ok"
+        }
+      },
+      "raw_results": {
+        "duckdb": {
+          "backend": "duckdb",
+          "duration_ms": 16.815795039292425,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 2.0994300139136612,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 0.9300039964728057,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 0.6476590060628951,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pyarrow": {
+          "backend": "pyarrow",
+          "duration_ms": 0.4121710080653429,
+          "error": "Invalid null value",
+          "error_type": "ArrowInvalid",
+          "status": "error"
+        },
+        "sqlite": {
+          "backend": "sqlite",
+          "duration_ms": 1.1811500298790634,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        }
+      }
+    },
+    {
+      "case": {
+        "case_id": "case-00000407-common-api-workflow-mut-1218",
+        "metadata": {
+          "candidate_source": "feedback_mutation",
+          "generator_profile": "common_api_workflow",
+          "mutation": {
+            "changed": true,
+            "detail": "append_boolean_predicate_filter:any_flag:bool_is_not_false",
+            "operator": "append_boolean_predicate_filter"
+          },
+          "seed_lineage": {
+            "depth": 1,
+            "mutation_seed": 1218,
+            "parent_case_id": "case-00000407-common-api-workflow",
+            "parent_seed": 407,
+            "root_seed": 407
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "cmp": "<",
+              "column": "id",
+              "op": "filter",
+              "value": 0
+            },
+            {
+              "aggs": [
+                {
+                  "as": "row_count",
+                  "column": "id",
+                  "func": "count"
+                },
+                {
+                  "as": "sum_x",
+                  "column": "x",
+                  "func": "sum"
+                },
+                {
+                  "as": "mean_y",
+                  "column": "y",
+                  "func": "mean"
+                },
+                {
+                  "as": "any_flag",
+                  "column": "flag",
+                  "func": "any"
+                },
+                {
+                  "as": "all_flag",
+                  "column": "flag",
+                  "func": "all"
+                }
+              ],
+              "op": "aggregate"
+            },
+            {
+              "cmp": "bool_is_not_false",
+              "column": "any_flag",
+              "op": "filter",
+              "value": null
+            }
+          ],
+          "program_id": "prog-00000407-common-api-workflow-mut-1218",
+          "seed": 1218
+        },
+        "seed": 1218,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "row_nr",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "g",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "x",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "y",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "flag",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "s",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "flag": null,
+                "g": "a",
+                "id": 0,
+                "row_nr": 0,
+                "s": "Beta",
+                "x": null,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": " padded ",
+                "id": 1,
+                "row_nr": 1,
+                "s": " alpha ",
+                "x": 1,
+                "y": 10.0
+              },
+              {
+                "flag": true,
+                "g": "c",
+                "id": 2,
+                "row_nr": 2,
+                "s": "space value",
+                "x": 5,
+                "y": 0.5
+              },
+              {
+                "flag": false,
+                "g": "space value",
+                "id": 3,
+                "row_nr": 3,
+                "s": "",
+                "x": -2,
+                "y": 0.0
+              },
+              {
+                "flag": true,
+                "g": "",
+                "id": 4,
+                "row_nr": 4,
+                "s": null,
+                "x": 10,
+                "y": 10.0
+              },
+              {
+                "flag": null,
+                "g": "",
+                "id": 5,
+                "row_nr": 5,
+                "s": "Alpha",
+                "x": 0,
+                "y": -1.5
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 6,
+                "row_nr": 6,
+                "s": "Alpha",
+                "x": 1,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 2,
+                "row_nr": 7,
+                "s": "Alpha",
+                "x": null,
+                "y": -0.5
+              },
+              {
+                "flag": true,
+                "g": " padded ",
+                "id": 8,
+                "row_nr": 8,
+                "s": " alpha ",
+                "x": 10,
+                "y": 1.5
+              },
+              {
+                "flag": true,
+                "g": "c",
+                "id": 4,
+                "row_nr": 9,
+                "s": "space value",
+                "x": 5,
+                "y": 1.5
+              },
+              {
+                "flag": null,
+                "g": "",
+                "id": 0,
+                "row_nr": 10,
+                "s": "  padded  ",
+                "x": 2,
+                "y": 0.5
+              },
+              {
+                "flag": true,
+                "g": "",
+                "id": 1,
+                "row_nr": 11,
+                "s": null,
+                "x": -1,
+                "y": 1.5
+              },
+              {
+                "flag": false,
+                "g": "",
+                "id": 5,
+                "row_nr": 12,
+                "s": null,
+                "x": 1,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 2,
+                "row_nr": 13,
+                "s": "Alpha",
+                "x": -1,
+                "y": 0.0
+              },
+              {
+                "flag": false,
+                "g": "b",
+                "id": 3,
+                "row_nr": 14,
+                "s": "Alpha",
+                "x": null,
+                "y": 1.5
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": 20,
+        "candidate_recheck_count": 2,
+        "compress_run_log": false,
+        "enable_artifact": true,
+        "enable_differential_oracle": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_normalizer": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_type_aware_generation": true,
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "generator_profile": "common_api_workflow",
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "common_api_workflow",
+          "daily_api",
+          "common_workflow",
+          "operation_combo",
+          "input_materialization",
+          "materialization_boundary",
+          "filter_input_materialization",
+          "cleanup_input_materialization",
+          "drop_nulls_input_materialization",
+          "fill_null_input_materialization",
+          "distinct_input_materialization",
+          "input_partition_union",
+          "join",
+          "multi_key_join",
+          "groupby",
+          "multi_key_groupby",
+          "mutate",
+          "filter",
+          "truth_filter",
+          "nulls",
+          "aggregation",
+          "boolean_aggregation",
+          "bool_any_all",
+          "sort_limit",
+          "union_all",
+          "concat",
+          "drop_nulls",
+          "dropna",
+          "semi_join",
+          "anti_join",
+          "membership_join",
+          "exclusion_join",
+          "distinct",
+          "duplicate_elimination",
+          "nunique",
+          "count_distinct",
+          "distinct_count_aggregation",
+          "unique_count_groupby",
+          "distinct_null_topk",
+          "fill_null",
+          "coalesce",
+          "case_when",
+          "conditional_expression",
+          "set_membership_filter",
+          "negative_set_membership_filter",
+          "null_predicate_filter",
+          "boolean_predicate_filter",
+          "range_filter",
+          "row_number_filter",
+          "top_n_per_group",
+          "dedup_latest_per_id",
+          "running_sum",
+          "partitioned_running_sum",
+          "global_aggregation",
+          "filtered_global_aggregation",
+          "empty_filter_aggregate",
+          "left_join_fill_null_aggregation",
+          "cleaned_join_key",
+          "having_filter_after_aggregation",
+          "strings",
+          "string_length",
+          "string_lower",
+          "string_upper",
+          "string_null_if_empty",
+          "string_starts_with",
+          "string_ends_with",
+          "string_split_part",
+          "date_part",
+          "date_extraction",
+          "numeric",
+          "casts",
+          "expressions"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.35,
+        "log_level": "compact",
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0
+      },
+      "findings": [
+        {
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'pyarrow': 'error', 'polars': 'ok', 'polars_lazy': 'ok', 'duckdb': 'ok', 'sqlite': 'ok'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-5a49fa9202175bea",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "groupby_aggregation",
+          "severity": "high",
+          "signature": "5a49fa9202175bea",
+          "source_issue": "",
+          "suspicious_backends": [
+            "pyarrow"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['duckdb', 'pandas', 'polars', 'polars_lazy', 'sqlite'] and disagrees with ['pyarrow'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "duckdb": {
+          "backend": "duckdb",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null,
+              null,
+              null,
+              0,
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null,
+              null,
+              null,
+              0,
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null,
+              null,
+              null,
+              0,
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null,
+              null,
+              null,
+              0,
+              null
+            ]
+          ],
+          "status": "ok"
+        },
+        "pyarrow": {
+          "backend": "pyarrow",
+          "columns": [],
+          "error": "Invalid null value",
+          "error_type": "ArrowInvalid",
+          "rows": [],
+          "status": "error"
+        },
+        "sqlite": {
+          "backend": "sqlite",
+          "columns": [
+            "all_flag",
+            "any_flag",
+            "mean_y",
+            "row_count",
+            "sum_x"
+          ],
+          "error": "",
+          "error_type": "",
+          "rows": [
+            [
+              null,
+              null,
+              null,
+              0,
+              null
+            ]
+          ],
+          "status": "ok"
+        }
+      },
+      "raw_results": {
+        "duckdb": {
+          "backend": "duckdb",
+          "duration_ms": 19.253636011853814,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 2.1247299737297,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 1.1515800142660737,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 0.9124880307354033,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pyarrow": {
+          "backend": "pyarrow",
+          "duration_ms": 0.3990819677710533,
+          "error": "Invalid null value",
+          "error_type": "ArrowInvalid",
+          "status": "error"
+        },
+        "sqlite": {
+          "backend": "sqlite",
+          "duration_ms": 1.5191659913398325,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        }
+      }
+    }
+  ],
+  "fresh_candidate_bug_families": {
+    "groupby_aggregation@pyarrow": 4
+  },
+  "generated_at": "2026-05-27T17:36:04Z",
+  "generated_by": "datadiff discovery-run",
+  "schema_version": "discovery-run-fresh-candidates-v1",
+  "source_run_file": "runs/run-20260527T173504-1779903304478611058.jsonl"
+}

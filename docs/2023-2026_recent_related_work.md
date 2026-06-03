@@ -19,7 +19,7 @@
 - 同时覆盖 `pandas / Polars / PyArrow / DuckDB / SQLite / DataFusion`
 - 统一处理 `Python DataFrame API + Arrow table compute + embedded SQL + query engine`
 - 同时使用 `differential + metamorphic + deterministic probes`
-- 附带 latest-version bug-hunting、triage、reduction、issue bundle、confirmation tracking
+- 附带 latest-version bug discovery、triage、reduction、issue bundle、confirmation tracking
 
 因此，**本项目的整体 novelty 仍然成立**。但是近几年有多篇论文会对你的叙事形成“局部威胁”，尤其是以下几条线：
 

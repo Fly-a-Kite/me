@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from datadiff.exploration_objectives import (
+    EXPLORATION_OBJECTIVE_PREFIX,
+    canonical_objective_key,
+)
 
 CANONICAL_SEMANTIC_SIGNAL_PREFIX = "semantic_signal:"
 LEGACY_COMBO_RISK_PREFIX = "combo_risk:"
@@ -36,6 +40,9 @@ def semantic_signal_feature_bundle(*signals: str, extra_features: set[str] | Non
 
 def canonical_semantic_feature(feature: str) -> str:
     text = str(feature).strip()
+    objective_key = canonical_objective_key(text)
+    if objective_key.startswith(EXPLORATION_OBJECTIVE_PREFIX):
+        return objective_key
     if text.startswith(LEGACY_COMBO_RISK_PREFIX):
         signal = text.removeprefix(LEGACY_COMBO_RISK_PREFIX).strip()
         if signal:
@@ -81,6 +88,9 @@ def feature_matches_prefix_alias(feature: str, prefix: str) -> bool:
 
 def canonical_target_key(value: Any) -> str:
     text = str(value).strip()
+    objective_key = canonical_objective_key(text)
+    if objective_key.startswith(EXPLORATION_OBJECTIVE_PREFIX):
+        return objective_key
     if text.startswith(LEGACY_RISK_PREFIX):
         signal = text.removeprefix(LEGACY_RISK_PREFIX).strip()
         if signal:
@@ -99,6 +109,8 @@ def legacy_target_key_alias(target_key: str) -> str:
 
 def target_key_weight(target_key: str) -> float:
     canonical = canonical_target_key(target_key)
+    if canonical.startswith(EXPLORATION_OBJECTIVE_PREFIX):
+        return 1.15
     if canonical.startswith("semantic_family:"):
         return 1.20
     if canonical.startswith(CANONICAL_SEMANTIC_SIGNAL_PREFIX):

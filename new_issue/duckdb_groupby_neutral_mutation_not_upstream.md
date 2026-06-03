@@ -71,4 +71,4 @@ contains_groupby_neutral_mutation = False
 
 - Original reduced artifact: `bugs/bug_6106a2d4ad837c90`
 - Auto draft that should not be submitted:
-  `new_issue/generated/candidate-pipelines/pipeline-bug-sprint-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-bughunt-fresh-mut-6155.md`
+  `new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-system-fresh-20260531T0010-manifest-20260531T061726/issue-drafts/metamorphic_groupby_neutral_mutation-duckdb-case-00054113-discovery-fresh-mut-6155.md`

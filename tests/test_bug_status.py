@@ -295,7 +295,7 @@ def test_build_bug_status_summarizes_lightweight_evidence(tmp_path):
         ),
         encoding="utf-8",
     )
-    (generated / "bug-hunt-manifest.json").write_text(
+    (generated / "discovery-run-manifest.json").write_text(
         json.dumps(
             {
                 "generated_at": "2026-05-26T00:00:00Z",
@@ -309,7 +309,7 @@ def test_build_bug_status_summarizes_lightweight_evidence(tmp_path):
         ),
         encoding="utf-8",
     )
-    (generated / "bug-sprint-manifest.json").write_text(
+    (generated / "discovery-campaign-manifest.json").write_text(
         json.dumps(
             {
                 "generated_at": "2026-05-26T01:00:00Z",
@@ -402,9 +402,8 @@ def test_build_bug_status_summarizes_lightweight_evidence(tmp_path):
         "datafusion_limit_idempotence@datafusion": 1,
         "distinct_null_topk@datafusion": 1,
     }
-    assert summary["bug_hunt_manifest_count"] == 1
-    assert summary["bug_sprint_manifest_count"] == 1
-    assert summary["bug_workflow_manifest_count"] == 2
+    assert summary["discovery_run_manifest_count"] == 1
+    assert summary["discovery_campaign_manifest_count"] == 1
     assert summary["discovery_run_manifest_count"] == 1
     assert summary["discovery_campaign_manifest_count"] == 1
     assert summary["discovery_workflow_manifest_count"] == 2
@@ -422,7 +421,7 @@ def test_build_bug_status_summarizes_lightweight_evidence(tmp_path):
     assert summary["issue_bundle_timeout_attempt_count"] == 0
     assert status["issue_bundle_manifest"]["families"] == ["bundle_family@polars", "bundle_family@pyarrow"]
     assert status["discovery_campaign_manifests"][0]["lane_ids"] == ["arrow_layout"]
-    assert status["bug_sprint_manifests"][0]["lane_ids"] == ["arrow_layout"]
+    assert status["discovery_campaign_manifests"][0]["lane_ids"] == ["arrow_layout"]
     assert summary["old_known_upstream_issue_count"] == 2
 
 

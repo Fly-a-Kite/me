@@ -83,9 +83,6 @@ def build_issue_status(
             "discovery_run_manifest_count": len(discovery_run_manifests),
             "discovery_campaign_manifest_count": len(discovery_campaign_manifests),
             "discovery_workflow_manifest_count": len(discovery_run_manifests) + len(discovery_campaign_manifests),
-            "bug_hunt_manifest_count": len(discovery_run_manifests),
-            "bug_sprint_manifest_count": len(discovery_campaign_manifests),
-            "bug_workflow_manifest_count": len(discovery_run_manifests) + len(discovery_campaign_manifests),
             "issue_bundle_present": bool(issue_bundle_manifest.get("present")),
             "issue_bundle_family_count": int(issue_bundle_manifest.get("family_count", 0) or 0),
             "issue_bundle_reproducer_count": int(issue_bundle_manifest.get("extracted_reproducer_count", 0) or 0),
@@ -118,8 +115,6 @@ def build_issue_status(
         "fresh_candidate_evidence": fresh_evidence,
         "discovery_run_manifests": discovery_run_manifests,
         "discovery_campaign_manifests": discovery_campaign_manifests,
-        "bug_hunt_manifests": discovery_run_manifests,
-        "bug_sprint_manifests": discovery_campaign_manifests,
         "issue_bundle_manifest": issue_bundle_manifest,
         "old_known": old_known,
     }
@@ -146,8 +141,7 @@ def render_issue_status_markdown(status: dict[str, Any]) -> str:
         f"- Audit candidate families: `{summary.get('audit_candidate_family_count', 0)}`",
         f"- Currently unsaturated fresh fuzz candidate families: `{summary.get('fresh_candidate_family_count', 0)}`",
         f"- Recorded fresh fuzz candidate families: `{summary.get('recorded_fresh_candidate_family_count', 0)}`",
-        f"- Discovery workflow manifests: `{summary.get('discovery_workflow_manifest_count', summary.get('bug_workflow_manifest_count', 0))}`",
-        f"- Bug workflow manifests: `{summary.get('bug_workflow_manifest_count', 0)}`",
+        f"- Discovery workflow manifests: `{summary.get('discovery_workflow_manifest_count', 0)}`",
         f"- Issue bundle families: `{summary.get('issue_bundle_family_count', 0)}`",
         f"- Issue bundle reproducers: `{summary.get('issue_bundle_reproducer_count', 0)}`",
         f"- Issue bundle flaky reproducers: `{summary.get('issue_bundle_flaky_reproducer_count', 0)}`",
@@ -386,7 +380,8 @@ def _collect_discovery_run_manifests(generated_issue_dir: Path) -> list[dict[str
     if not generated_issue_dir.is_dir():
         return []
     manifests = []
-    for path in sorted(generated_issue_dir.glob("bug-hunt*-manifest.json")):
+    paths = [*generated_issue_dir.glob("discovery-run*-manifest.json")]
+    for path in sorted(dict.fromkeys(paths)):
         data = _load_json_if_exists(path)
         if not isinstance(data, dict):
             continue
@@ -413,7 +408,8 @@ def _collect_discovery_campaign_manifests(generated_issue_dir: Path) -> list[dic
     if not generated_issue_dir.is_dir():
         return []
     manifests = []
-    for path in sorted(generated_issue_dir.glob("bug-sprint*-manifest.json")):
+    paths = [*generated_issue_dir.glob("discovery-campaign*-manifest.json")]
+    for path in sorted(dict.fromkeys(paths)):
         data = _load_json_if_exists(path)
         if not isinstance(data, dict):
             continue
@@ -434,10 +430,6 @@ def _collect_discovery_campaign_manifests(generated_issue_dir: Path) -> list[dic
             }
         )
     return manifests
-
-
-_collect_bug_sprint_manifests = _collect_discovery_campaign_manifests
-_collect_bug_hunt_manifests = _collect_discovery_run_manifests
 
 
 def _load_issue_bundle_manifest(generated_issue_dir: Path) -> dict[str, Any]:

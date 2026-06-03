@@ -285,7 +285,7 @@ DEFAULT_DISCOVERY_LANE_IDS: tuple[str, ...] = tuple(
 
 def discovery_lane_spec(lane_id: str) -> DiscoveryLaneSpec:
     if lane_id not in DISCOVERY_LANES_BY_ID:
-        raise ValueError(f"unknown bug-sprint lane id: {lane_id}")
+        raise ValueError(f"unknown discovery-campaign lane id: {lane_id}")
     return DISCOVERY_LANES_BY_ID[lane_id]
 
 
@@ -304,17 +304,3 @@ def discovery_biases_for_lanes(*lane_ids: str) -> list[DiscoveryBias]:
             if lane_id in DISCOVERY_LANES_BY_ID
         )
     )
-
-
-BugSprintLaneSpec = DiscoveryLaneSpec
-BUG_SPRINT_LANE_SPECS = DISCOVERY_LANE_SPECS
-BUG_SPRINT_LANES_BY_ID = DISCOVERY_LANES_BY_ID
-DEFAULT_BUG_SPRINT_LANE_IDS = DEFAULT_DISCOVERY_LANE_IDS
-
-
-def bug_sprint_lane_spec(lane_id: str) -> DiscoveryLaneSpec:
-    return discovery_lane_spec(lane_id)
-
-
-def bug_sprint_lane_catalog() -> dict[str, dict[str, Any]]:
-    return discovery_lane_catalog()

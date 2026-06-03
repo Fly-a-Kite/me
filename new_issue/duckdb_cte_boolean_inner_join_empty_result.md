@@ -5,7 +5,7 @@
 | Item | Value |
 | --- | --- |
 | Project family labels observed | `metamorphic_semi_anti_join_rewrite@duckdb` |
-| First automated signal | 2026-05-28 CST, `bug-sprint-operator-cooldown-s46010` |
+| First automated signal | 2026-05-28 CST, `discovery-campaign-operator-cooldown-s46010` |
 | Artifact | `bugs/bug_1d25bb8cd42bf069` |
 | How found | DataDiffFuzz generated a boolean membership workflow. The metamorphic oracle rewrote a `semi_join` as an equivalent distinct-key `INNER JOIN`; pandas and SQLite matched, while DuckDB returned an empty result for the rewritten query. |
 | Current status | Submitted upstream as [duckdb/duckdb#22924](https://github.com/duckdb/duckdb/issues/22924); upstream issue is open with `needs triage`. The local repeated reproducer was previously flaky on DuckDB 1.5.3, so keep it out of confirmed paper counts until upstream triage or stable local replay confirms it. |

@@ -122,6 +122,7 @@ def test_mutation_operator_profiles_expose_semantic_family_affinity_alias():
 
     assert "conditional_semantics" in profile.semantic_family_affinity
     assert profile.semantic_affinity == profile.semantic_family_affinity
+    assert "cross_model_consistency" in profile.exploration_objective_affinity
 
 
 def test_available_columns_are_deduplicated_after_overwrite_and_select():
@@ -315,7 +316,7 @@ def test_mutate_case_preserves_issue_profile_metadata_for_guidance():
         [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}, {"x": None}])],
         Program("prog-template", 10, [{"op": "limit", "n": 2}]),
         metadata={
-            "generator_profile": "bughunt",
+            "generator_profile": "discovery",
             "mixed_generator_profile": "post_topk_range_filter",
             "source_issue": "https://github.com/example/project/issues/1",
         },
@@ -324,7 +325,7 @@ def test_mutate_case_preserves_issue_profile_metadata_for_guidance():
     result = mutate_case_with_metadata(base, 99)
 
     assert result.metadata["candidate_source"] == "feedback_mutation"
-    assert result.metadata["generator_profile"] == "bughunt"
+    assert result.metadata["generator_profile"] == "discovery"
     assert result.metadata["mixed_generator_profile"] == "post_topk_range_filter"
     assert result.metadata["source_issue"] == "https://github.com/example/project/issues/1"
 

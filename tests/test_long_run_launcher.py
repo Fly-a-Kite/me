@@ -1,4 +1,5 @@
 import errno
+import json
 import os
 import shutil
 import subprocess
@@ -11,7 +12,7 @@ import pytest
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "start_closed_loop_12h_tmux.sh"
-LEGACY_LIVE_24H_SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "start_live_24h_tmux.sh"
+AUTHORITY_24H_SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "start_closed_loop_24h_tmux.sh"
 
 
 def _read_status(path: Path) -> dict[str, str]:
@@ -75,12 +76,76 @@ def _init_git_repo(root: Path) -> None:
     subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True)
 
 
-def test_legacy_live_24h_launcher_delegates_to_authority_closed_loop_launcher():
-    text = LEGACY_LIVE_24H_SCRIPT_PATH.read_text(encoding="utf-8")
+def test_only_authority_closed_loop_24h_launcher_is_exposed():
+    scripts_dir = Path(__file__).resolve().parents[1] / "scripts"
+    text = AUTHORITY_24H_SCRIPT_PATH.read_text(encoding="utf-8")
 
-    assert "start_closed_loop_24h_tmux.sh" in text
+    assert not (scripts_dir / "start_live_24h_tmux.sh").exists()
+    assert "start_closed_loop_12h_tmux.sh" in text
+    assert "datadiff-closed-loop-24h-authority" in text
+    assert "datadiff-live-24h" not in text
     assert "--skip-paper-journal" not in text
-    assert "datadiff-live-24h" in text
+
+
+def test_authority_closed_loop_launcher_uses_final_adaptive_learning_contract():
+    text = SCRIPT_PATH.read_text(encoding="utf-8")
+
+    for token in [
+        "DATADIFF_ADAPTIVE_LEARNING_WEIGHT",
+        "DATADIFF_SCHEDULER_ANNEALING_TEMPERATURE",
+        "DATADIFF_SCHEDULER_ANNEALING_DECAY",
+        "DATADIFF_SCHEDULER_ANNEALING_MIN_TEMPERATURE",
+        "DATADIFF_CONTINUAL_LEARNING_LEDGERS",
+        "--adaptive-learning-weight",
+        "--scheduler-annealing-temperature",
+        "--scheduler-annealing-decay",
+        "--scheduler-annealing-min-temperature",
+        "--persist-closed-loop-state",
+        "FREEZE_ADAPTIVE_LEARNING_WEIGHT",
+        "FREEZE_SCHEDULER_ANNEALING_TEMPERATURE",
+        "FREEZE_CONTINUAL_LEARNING_LEDGERS",
+        '"adaptive_config"',
+        '"persist_closed_loop_state"',
+        "adaptive_learning_weight=%s",
+        "scheduler_annealing_temperature=%s",
+        "continual_learning_ledgers=%s",
+        "persist_closed_loop_state=1",
+        "datadiff.cli final-readiness",
+        "FINAL_READINESS_COMMAND+=(--manifest",
+        "DATADIFF_FINAL_READINESS_MANIFEST_INDEX",
+        "DATADIFF_FINAL_READINESS_EXTRA_MANIFESTS",
+        "DATADIFF_FINAL_READINESS_FAIL_ON_MISSING",
+        "_final_readiness_command",
+        "--manifest-index",
+        "--extra-manifest",
+        "--fail-on-missing",
+        "final_readiness_markdown",
+        "final_readiness_json",
+        "final_readiness_manifest_index",
+        "final_readiness_extra_manifests",
+    ]:
+        assert token in text
+
+    assert "_build_experiment_command()" in text
+    assert 'if [[ -n "${CONTINUAL_LEARNING_LEDGERS}" ]]; then' in text
+    assert 'EXPERIMENT_COMMAND+=(--continual-learning-ledgers "${CONTINUAL_LEARNING_LEDGERS}")' in text
+
+
+def test_authority_24h_launcher_inherits_final_adaptive_defaults():
+    text = AUTHORITY_24H_SCRIPT_PATH.read_text(encoding="utf-8")
+
+    assert 'DATADIFF_ADAPTIVE_LEARNING_WEIGHT:-0.75' in text
+    assert 'DATADIFF_SCHEDULER_ANNEALING_TEMPERATURE:-0.35' in text
+    assert 'DATADIFF_SCHEDULER_ANNEALING_DECAY:-0.985' in text
+    assert 'DATADIFF_SCHEDULER_ANNEALING_MIN_TEMPERATURE:-0.02' in text
+    assert 'DATADIFF_CONTINUAL_LEARNING_LEDGERS:-' in text
+    assert (
+        'DATADIFF_FINAL_READINESS_MANIFEST_INDEX:-reports/final-experiment-manifest-index.json'
+        in text
+    )
+    assert 'DATADIFF_FINAL_READINESS_EXTRA_MANIFESTS:-' in text
+    assert 'DATADIFF_FINAL_READINESS_FAIL_ON_MISSING:-0' in text
+    assert 'start_closed_loop_12h_tmux.sh' in text
 
 
 @pytest.mark.skipif(shutil.which("tmux") is None, reason="tmux is not installed")
@@ -352,6 +417,52 @@ def test_closed_loop_launcher_writes_freeze_snapshot_for_clean_authority_run(tmp
         assert status["strategy_learning"].endswith(".strategy-learning.json")
         assert Path(status["strategy_snapshot"]).is_file()
         assert Path(status["strategy_learning"]).is_file()
+        assert "final_readiness_fail_on_missing" in status
+    finally:
+        subprocess.run(["tmux", "kill-session", "-t", session_name], check=False, capture_output=True)
+
+
+@pytest.mark.skipif(shutil.which("tmux") is None, reason="tmux is not installed")
+def test_closed_loop_launcher_records_final_readiness_index_config_in_freeze_snapshot(tmp_path: Path):
+    project_root = tmp_path / "project-root"
+    project_root.mkdir(parents=True)
+    _init_git_repo(project_root)
+    session_name = f"datadiff-test-readiness-freeze-{os.getpid()}-{int(time.time() * 1000)}"
+    env = os.environ.copy()
+    env.update(
+        {
+            "DATADIFF_ROOT_DIR": str(project_root),
+            "DATADIFF_TMUX_SESSION": session_name,
+            "DATADIFF_COMMAND": _long_running_command(),
+            "DATADIFF_FINAL_READINESS_MANIFEST_INDEX": "reports/final-index.json",
+            "DATADIFF_FINAL_READINESS_EXTRA_MANIFESTS": "reports/ledger-a.json,reports/ledger-b.json",
+            "DATADIFF_FINAL_READINESS_FAIL_ON_MISSING": "1",
+        }
+    )
+
+    try:
+        started = subprocess.run(
+            ["bash", str(SCRIPT_PATH)],
+            cwd=project_root,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        status_path = Path(_launcher_output_field(started.stdout, "status: "))
+        _wait_until(lambda: _read_status(status_path).get("status") == "running")
+        status = _read_status(status_path)
+        freeze_manifest = Path(status["freeze_manifest"])
+        payload = json.loads(freeze_manifest.read_text(encoding="utf-8"))
+
+        assert status["final_readiness_manifest_index"] == "reports/final-index.json"
+        assert status["final_readiness_extra_manifests"] == "reports/ledger-a.json,reports/ledger-b.json"
+        assert status["final_readiness_fail_on_missing"] == "1"
+        assert payload["post_run_readiness_config"] == {
+            "manifest_index": "reports/final-index.json",
+            "extra_manifests": "reports/ledger-a.json,reports/ledger-b.json",
+            "fail_on_missing": True,
+        }
     finally:
         subprocess.run(["tmux", "kill-session", "-t", session_name], check=False, capture_output=True)
 
@@ -395,6 +506,8 @@ def test_closed_loop_launcher_records_post_run_evidence_artifacts(tmp_path: Path
             analysis_csv="{project_root / 'reports' / 'experiment-analysis-experiment-finished.csv'}"
             methodology_md="{project_root / 'reports' / 'methodology-report-experiment-finished.md'}"
             methodology_json="{project_root / 'reports' / 'methodology-report-experiment-finished.json'}"
+            readiness_md="{project_root / 'reports' / 'final-readiness-finished.md'}"
+            readiness_json="{project_root / 'reports' / 'final-readiness-finished.json'}"
             classify_dir="{project_root / 'reports' / 'classify-run-experiment-finished'}"
             printf 'summary\\n' > "${{summary_md}}"
             printf 'summary\\n' > "${{summary_csv}}"
@@ -403,6 +516,8 @@ def test_closed_loop_launcher_records_post_run_evidence_artifacts(tmp_path: Path
             printf 'analysis\\n' > "${{analysis_csv}}"
             printf 'methodology\\n' > "${{methodology_md}}"
             printf '{{"ok": true}}\\n' > "${{methodology_json}}"
+            printf 'readiness\\n' > "${{readiness_md}}"
+            printf '{{"ready": true}}\\n' > "${{readiness_json}}"
             printf '{{"offline_buckets": {{}}}}\\n' > "${{classify_dir}}/run-a.json"
             echo "post_run_status=ok"
             echo "experiment_manifest=${{DATADIFF_POST_RUN_MANIFEST}}"
@@ -413,6 +528,8 @@ def test_closed_loop_launcher_records_post_run_evidence_artifacts(tmp_path: Path
             echo "experiment_analysis_csv=${{analysis_csv}}"
             echo "methodology_report_markdown=${{methodology_md}}"
             echo "methodology_report_json=${{methodology_json}}"
+            echo "final_readiness_markdown=${{readiness_md}}"
+            echo "final_readiness_json=${{readiness_json}}"
             echo "classify_run_dir=${{classify_dir}}"
             echo "classify_run_count=1"
             """
@@ -460,6 +577,8 @@ def test_closed_loop_launcher_records_post_run_evidence_artifacts(tmp_path: Path
     assert Path(final_status["experiment_analysis_csv"]).is_file()
     assert Path(final_status["methodology_report_markdown"]).is_file()
     assert Path(final_status["methodology_report_json"]).is_file()
+    assert Path(final_status["final_readiness_markdown"]).is_file()
+    assert Path(final_status["final_readiness_json"]).is_file()
     assert Path(final_status["classify_run_dir"]).is_dir()
     assert final_status["classify_run_count"] == "1"
     assert (Path(final_status["classify_run_dir"]) / "run-a.json").is_file()

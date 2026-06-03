@@ -20,6 +20,7 @@ from datadiff.classification_oracle import documented_semantic_rule_records  # n
 from datadiff.classification_oracle import semantic_boundary_rule_records  # noqa: E402
 from datadiff.dynamic_strategy import write_strategy_snapshot  # noqa: E402
 from datadiff.experiment_catalog import (  # noqa: E402
+    FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX,
     FINAL_COMPARISON_MATRIX,
     FINAL_LIVE_DISCOVERY_MATRIX,
     FINAL_MODULE_ABLATION_MATRIX,
@@ -29,12 +30,26 @@ from datadiff.experiment_catalog import (  # noqa: E402
     build_historical_experiment_meta,
 )
 from datadiff.historical import list_historical_bugs  # noqa: E402
+from datadiff.run_journal import append_run_journal_entries, build_run_journal_entry  # noqa: E402
 from datadiff.triage import standalone_reproducer_rule_records  # noqa: E402
-from datadiff.util import REPORTS_DIR, utc_now  # noqa: E402
+from datadiff.util import REPORTS_DIR, load_json, read_jsonl, utc_now  # noqa: E402
 
 DATADIFF = Path(sys.prefix) / "bin" / "datadiff"
 if not DATADIFF.exists():
     DATADIFF = PROJECT_ROOT / ".venv" / "bin" / "datadiff"
+
+FINAL_PLAN_TRACKS: tuple[str, ...] = (*FINAL_PROTOCOL_TRACKS, "postprocess")
+MANIFEST_INDEX_SCHEMA_VERSION = "final-experiment-manifest-index-v1"
+DEFAULT_FINAL_STRATEGY_SNAPSHOT = REPORTS_DIR / "strategy-snapshots" / "final-frozen-strategy-snapshot.json"
+FINAL_REQUIRED_MATRIX_IDS: tuple[str, ...] = (
+    FINAL_VALIDATION_MATRIX.id,
+    FINAL_LIVE_DISCOVERY_MATRIX.id,
+    "historical_replay",
+    FINAL_SEEDED_SENSITIVITY_MATRIX.id,
+    FINAL_MODULE_ABLATION_MATRIX.id,
+    FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.id,
+    FINAL_COMPARISON_MATRIX.id,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +83,10 @@ def run_with_args(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
+    index_path = Path(
+        str(getattr(args, "manifest_index", "") or REPORTS_DIR / "final-experiment-manifest-index.json")
+    )
+    imported = _import_existing_evidence_if_requested(args, index_path=index_path)
     commands = build_plan(args)
     plan_path = write_plan(commands, args)
     print(f"final experiment plan: {plan_path}")
@@ -80,15 +99,526 @@ def run_with_args(args: argparse.Namespace) -> int:
             print(f"notes: {item.notes}")
         print(shell_join(item.command))
     if args.execute:
+        if args.track == "postprocess" and _requires_postprocess_evidence_preflight(commands):
+            issues = _postprocess_evidence_preflight_issues(index_path, args=args)
+            if issues:
+                print(
+                    "refusing postprocess final-readiness: manifest index is incomplete",
+                    file=sys.stderr,
+                )
+                for issue in issues:
+                    print(f"- {issue}", file=sys.stderr)
+                return 2
+        if args.track != "postprocess" and (
+            bool(getattr(args, "reset_manifest_index", False)) or not index_path.exists()
+        ):
+            _write_initial_manifest_index(index_path, plan_path=plan_path, args=args, commands=commands)
+            if imported:
+                _append_manifest_index_import(
+                    index_path,
+                    manifest_files=imported["manifest_files"],
+                    extra_manifest_files=imported["extra_manifest_files"],
+                    paper_run_journal=imported["paper_run_journal"],
+                    imported_run_files=imported["imported_run_files"],
+                )
         for item in commands:
             print(f"\nexecuting [{item.track}] {item.name}", flush=True)
-            subprocess.run(item.command, cwd=PROJECT_ROOT, check=True)
+            result = _execute_command_with_manifest_capture(item)
+            _record_evidence_validation(item, result)
+            if args.track != "postprocess":
+                _append_manifest_index_command(index_path, item, result)
+            if result["returncode"] != 0:
+                raise subprocess.CalledProcessError(int(result["returncode"]), item.command)
     return 0
 
 
 def main_with_args_for_test(args: argparse.Namespace) -> int:
     # Compatibility alias for older tests and external wrappers.
     return run_with_args(args)
+
+
+def _execute_command_with_manifest_capture(item: FinalCommand) -> dict[str, object]:
+    observed: dict[str, object] = {
+        "returncode": 1,
+        "manifest_files": [],
+        "extra_manifest_files": [],
+        "final_readiness_files": [],
+    }
+    proc = subprocess.Popen(
+        item.command,
+        cwd=PROJECT_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        print(line, end="", flush=True)
+        _ingest_command_evidence_line(observed, line)
+    observed["returncode"] = proc.wait()
+    return observed
+
+
+def _ingest_command_evidence_line(observed: dict[str, object], line: str) -> None:
+    text = line.strip()
+    if text.startswith("experiment manifest:"):
+        _append_observed_path(observed, "manifest_files", text.split(":", 1)[1].strip())
+    elif text.startswith("evidence_manifest="):
+        _append_observed_path(observed, "extra_manifest_files", text.split("=", 1)[1].strip())
+    elif text.startswith("final readiness json:"):
+        _append_observed_path(observed, "final_readiness_files", text.split(":", 1)[1].strip())
+
+
+def _record_evidence_validation(item: FinalCommand, observed: dict[str, object]) -> None:
+    if int(observed.get("returncode", 1)) != 0:
+        return
+    issues = _missing_command_evidence(item, observed)
+    if not issues:
+        return
+    observed["evidence_issues"] = issues
+    observed["returncode"] = 2
+    print(
+        f"missing required evidence for [{item.track}] {item.name}: {', '.join(issues)}",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
+def _missing_command_evidence(item: FinalCommand, observed: dict[str, object]) -> list[str]:
+    subcommand = _datadiff_subcommand(item.command)
+    issues: list[str] = []
+    if subcommand in {"experiment", "replay-fixture"} and not _string_list(
+        observed.get("manifest_files", [])
+    ):
+        issues.append("missing_experiment_manifest")
+    if subcommand == "version-ledger" and "--evidence-manifest-output" in item.command and not _string_list(
+        observed.get("extra_manifest_files", [])
+    ):
+        issues.append("missing_version_ledger_evidence_manifest")
+    if subcommand == "final-readiness" and not _string_list(observed.get("final_readiness_files", [])):
+        issues.append("missing_final_readiness_json")
+    return issues
+
+
+def _datadiff_subcommand(command: list[str]) -> str:
+    known = {
+        "experiment",
+        "replay-fixture",
+        "version-ledger",
+        "final-readiness",
+    }
+    for part in command:
+        if part in known:
+            return part
+    return ""
+
+
+def _requires_postprocess_evidence_preflight(commands: list[FinalCommand]) -> bool:
+    return any(
+        _datadiff_subcommand(command.command) == "final-readiness"
+        and "--manifest-index" in command.command
+        for command in commands
+    )
+
+
+def _postprocess_evidence_preflight_issues(index_path: Path, *, args: argparse.Namespace) -> list[str]:
+    payload, load_error = _load_json_object(index_path)
+    if load_error:
+        return [f"manifest_index_{load_error}:{index_path}"]
+    assert payload is not None
+    issues: list[str] = []
+    if str(payload.get("schema_version", "") or "") != MANIFEST_INDEX_SCHEMA_VERSION:
+        issues.append("manifest_index_schema_mismatch")
+    failed_commands = _failed_manifest_index_commands(payload)
+    if failed_commands:
+        issues.append(f"failed_index_commands:{','.join(failed_commands[:10])}")
+    manifest_files = _string_list(payload.get("manifest_files", []))
+    if not manifest_files:
+        issues.append("manifest_index_has_no_manifest_files")
+    observed_matrix_ids, matrix_issues = _manifest_index_matrix_ids(manifest_files)
+    issues.extend(matrix_issues)
+    missing_matrix_ids = sorted(set(FINAL_REQUIRED_MATRIX_IDS) - observed_matrix_ids)
+    if missing_matrix_ids:
+        issues.append(f"missing_required_matrix_ids:{','.join(missing_matrix_ids)}")
+
+    ledger_manifest = str(
+        getattr(args, "ledger_evidence_manifest", "") or REPORTS_DIR / "experiment-final-version-ledger.json"
+    ).strip()
+    extra_manifest_files = _string_list(payload.get("extra_manifest_files", []))
+    if not ledger_manifest:
+        issues.append("missing_configured_version_ledger_evidence_manifest")
+    elif not _contains_recorded_path(extra_manifest_files, ledger_manifest):
+        issues.append(f"unrecorded_version_ledger_evidence_manifest:{ledger_manifest}")
+    if ledger_manifest:
+        issues.extend(_version_ledger_evidence_manifest_issues(ledger_manifest))
+    return issues
+
+
+def _failed_manifest_index_commands(payload: dict[str, object]) -> list[str]:
+    failed: list[str] = []
+    for row in payload.get("commands", []) or []:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("status", "") or "") == "completed":
+            continue
+        label = str(row.get("name", "") or row.get("track", "") or "unknown").strip()
+        failed.append(label)
+    return failed
+
+
+def _manifest_index_matrix_ids(manifest_files: list[str]) -> tuple[set[str], list[str]]:
+    matrix_ids: set[str] = set()
+    issues: list[str] = []
+    for path_text in manifest_files:
+        path = _project_path(path_text)
+        manifest, load_error = _load_json_object(path)
+        if load_error:
+            issues.append(f"manifest_{load_error}:{path_text}")
+            continue
+        assert manifest is not None
+        matrix_ids.update(_manifest_matrix_ids(manifest))
+    return matrix_ids, issues
+
+
+def _manifest_matrix_ids(manifest: dict[str, object]) -> set[str]:
+    matrix_ids: set[str] = set()
+
+    def add(value: object) -> None:
+        text = str(value or "").strip()
+        if text:
+            matrix_ids.add(text)
+
+    add(manifest.get("matrix_id", ""))
+    experiment_meta = manifest.get("experiment_meta", {})
+    if isinstance(experiment_meta, dict):
+        add(experiment_meta.get("matrix_id", ""))
+    for run in manifest.get("runs", []) or []:
+        if not isinstance(run, dict):
+            continue
+        add(run.get("matrix_id", ""))
+        run_meta = run.get("experiment_meta", {})
+        if isinstance(run_meta, dict):
+            add(run_meta.get("matrix_id", ""))
+    return matrix_ids
+
+
+def _version_ledger_evidence_manifest_issues(path_text: str) -> list[str]:
+    path = _project_path(path_text)
+    payload, load_error = _load_json_object(path)
+    if load_error:
+        return [f"version_ledger_evidence_manifest_{load_error}:{path_text}"]
+    assert payload is not None
+    issues: list[str] = []
+    if str(payload.get("schema_version", "") or "") != "version-ledger-evidence-manifest-v1":
+        issues.append(f"version_ledger_evidence_manifest_schema_mismatch:{path_text}")
+    ledger_file = str(payload.get("version_ledger_file", "") or "").strip()
+    if not ledger_file:
+        for run in payload.get("runs", []) or []:
+            if isinstance(run, dict):
+                ledger_file = str(run.get("version_ledger_file", "") or "").strip()
+                if ledger_file:
+                    break
+    if not ledger_file:
+        issues.append(f"version_ledger_evidence_manifest_missing_ledger_file:{path_text}")
+        return issues
+    ledger, ledger_load_error = _load_json_object(_project_path(ledger_file))
+    if ledger_load_error:
+        issues.append(f"version_ledger_{ledger_load_error}:{ledger_file}")
+        return issues
+    assert ledger is not None
+    issues.extend(_version_ledger_payload_issues(ledger, ledger_file=ledger_file))
+    return issues
+
+
+def _version_ledger_payload_issues(ledger: dict[str, object], *, ledger_file: str) -> list[str]:
+    issues: list[str] = []
+    if str(ledger.get("schema_version", "") or "") != "version-ledger-v1":
+        issues.append(f"version_ledger_schema_mismatch:{ledger_file}")
+    summary = ledger.get("summary", {}) if isinstance(ledger.get("summary", {}), dict) else {}
+    if int(summary.get("version_count", 0) or 0) < 2:
+        issues.append(f"version_ledger_requires_two_versions:{ledger_file}")
+    if int(summary.get("family_count", 0) or 0) < 1:
+        issues.append(f"version_ledger_requires_candidate_families:{ledger_file}")
+    health = ledger.get("health", {}) if isinstance(ledger.get("health", {}), dict) else {}
+    if str(health.get("schema_version", "") or "") != "version-ledger-health-v1":
+        issues.append(f"version_ledger_missing_health_feedback:{ledger_file}")
+    report = (
+        ledger.get("health_feedback_report", {})
+        if isinstance(ledger.get("health_feedback_report", {}), dict)
+        else {}
+    )
+    if str(report.get("schema_version", "") or "") != "version-ledger-health-feedback-report-v1":
+        issues.append(f"version_ledger_missing_health_feedback_report:{ledger_file}")
+    if int(report.get("health_observation_count", 0) or 0) <= 0:
+        issues.append(f"version_ledger_requires_health_observations:{ledger_file}")
+    return issues
+
+
+def _load_json_object(path: Path) -> tuple[dict[str, object] | None, str]:
+    if not path.is_file():
+        return None, "missing"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None, "invalid_json"
+    if not isinstance(data, dict):
+        return None, "not_object"
+    return data, ""
+
+
+def _project_path(path_text: str | Path) -> Path:
+    path = Path(str(path_text))
+    if path.is_absolute():
+        return path
+    return PROJECT_ROOT / path
+
+
+def _contains_recorded_path(values: list[str], expected: str) -> bool:
+    expected_text = str(expected).strip()
+    if expected_text in values:
+        return True
+    expected_path = _project_path(expected_text).resolve()
+    for value in values:
+        try:
+            if _project_path(value).resolve() == expected_path:
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def _append_observed_path(observed: dict[str, object], key: str, path: str) -> None:
+    if not path:
+        return
+    values = observed.setdefault(key, [])
+    if not isinstance(values, list):
+        return
+    if path not in values:
+        values.append(path)
+
+
+def _import_existing_evidence_if_requested(
+    args: argparse.Namespace,
+    *,
+    index_path: Path,
+) -> dict[str, list[str]] | None:
+    manifest_files = _string_list(getattr(args, "import_manifest", []))
+    extra_manifest_files = _string_list(getattr(args, "import_extra_manifest", []))
+    if not manifest_files and not extra_manifest_files:
+        return None
+    if bool(getattr(args, "reset_manifest_index", False)) or not index_path.exists():
+        _write_initial_manifest_index(index_path, plan_path=Path(""), args=args, commands=[])
+    imported_run_files = _import_manifest_journal_entries(
+        manifest_files=manifest_files,
+        paper_run_journal=Path(
+            str(getattr(args, "paper_run_journal", "") or REPORTS_DIR / "paper-run-journal.jsonl")
+        ),
+    )
+    _append_manifest_index_import(
+        index_path,
+        manifest_files=manifest_files,
+        extra_manifest_files=extra_manifest_files,
+        paper_run_journal=str(
+            getattr(args, "paper_run_journal", "") or REPORTS_DIR / "paper-run-journal.jsonl"
+        ),
+        imported_run_files=imported_run_files,
+    )
+    return {
+        "manifest_files": manifest_files,
+        "extra_manifest_files": extra_manifest_files,
+        "paper_run_journal": [str(getattr(args, "paper_run_journal", "") or REPORTS_DIR / "paper-run-journal.jsonl")],
+        "imported_run_files": imported_run_files,
+    }
+
+
+def _import_manifest_journal_entries(*, manifest_files: list[str], paper_run_journal: Path) -> list[str]:
+    existing_run_files = (
+        {
+            str(row.get("run_file", "")).strip()
+            for row in read_jsonl(paper_run_journal)
+            if isinstance(row, dict)
+        }
+        if paper_run_journal.exists()
+        else set()
+    )
+    entries = []
+    imported_run_files: list[str] = []
+    for manifest_text in manifest_files:
+        manifest_path = _project_path(manifest_text)
+        manifest = load_json(manifest_path)
+        if not isinstance(manifest, dict):
+            continue
+        experiment_meta = manifest.get("experiment_meta", {}) if isinstance(manifest.get("experiment_meta", {}), dict) else {}
+        paper_notes = str(manifest.get("paper_notes", "") or "")
+        evidence_mode = str(manifest.get("evidence_mode", "") or "")
+        known_bug_id = str(manifest.get("known_bug_id", "") or "")
+        target_version = str(manifest.get("target_version", "") or "")
+        for run in manifest.get("runs", []) or []:
+            if not isinstance(run, dict):
+                continue
+            run_file_text = str(run.get("run_file", "") or "").strip()
+            if not run_file_text or run_file_text in existing_run_files:
+                continue
+            run_file = Path(run_file_text)
+            imported_run_files.append(run_file_text)
+            existing_run_files.add(run_file_text)
+            entries.append(
+                build_run_journal_entry(
+                    run_file,
+                    {
+                        "command": "experiment-import",
+                        "theme": _manifest_run_theme(manifest, run),
+                        "notes": paper_notes,
+                        "evidence_mode": str(run.get("evidence_mode") or evidence_mode),
+                        "known_bug_id": str(run.get("known_bug_id") or known_bug_id),
+                        "target_version": str(run.get("target_version") or target_version),
+                        "target_suite": str(run.get("target_suite", "") or ""),
+                        "preset": str(run.get("preset", "") or ""),
+                        "seed": run.get("seed", ""),
+                        "backends": run.get("backends", []),
+                        "manifest_file": str(manifest_path),
+                        "experiment_meta": run.get("experiment_meta", {}) or experiment_meta,
+                    },
+                )
+            )
+    if entries:
+        append_run_journal_entries(entries, paper_run_journal)
+    return _unique_strings(imported_run_files)
+
+
+def _manifest_run_theme(manifest: dict[str, object], run: dict[str, object]) -> str:
+    base = str(manifest.get("run_theme", "") or "").strip()
+    suffix = f"{run.get('target_suite', '')}:{run.get('preset', '')}:seed{run.get('seed', '')}"
+    if base:
+        return f"{base} | {suffix}"
+    evidence_mode = str(run.get("evidence_mode") or manifest.get("evidence_mode", "live"))
+    known_bug_id = str(run.get("known_bug_id") or manifest.get("known_bug_id", "") or "")
+    if evidence_mode == "historical" and known_bug_id:
+        return f"historical:{known_bug_id}:{suffix}"
+    return f"{evidence_mode}:{suffix}"
+
+
+def _append_manifest_index_import(
+    index_path: Path,
+    *,
+    manifest_files: list[str],
+    extra_manifest_files: list[str],
+    paper_run_journal: list[str] | str,
+    imported_run_files: list[str],
+) -> None:
+    if not index_path.exists():
+        _write_initial_manifest_index(index_path, plan_path=Path(""), args=argparse.Namespace(), commands=[])
+    payload = json.loads(index_path.read_text(encoding="utf-8"))
+    commands = payload.setdefault("commands", [])
+    if not isinstance(commands, list):
+        commands = []
+        payload["commands"] = commands
+    commands.append(
+        {
+            "track": "import",
+            "name": "import_existing_evidence",
+            "status": "completed",
+            "returncode": 0,
+            "manifest_files": manifest_files,
+            "extra_manifest_files": extra_manifest_files,
+            "paper_run_journal_files": _string_list(paper_run_journal),
+            "imported_run_files": imported_run_files,
+            "final_readiness_files": [],
+            "evidence_issues": [],
+            "shell": "import-existing-evidence",
+        }
+    )
+    payload["manifest_files"] = _unique_strings(
+        [*_string_list(payload.get("manifest_files", [])), *manifest_files]
+    )
+    payload["extra_manifest_files"] = _unique_strings(
+        [*_string_list(payload.get("extra_manifest_files", [])), *extra_manifest_files]
+    )
+    payload["updated_at"] = utc_now()
+    index_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _write_initial_manifest_index(
+    index_path: Path,
+    *,
+    plan_path: Path,
+    args: argparse.Namespace,
+    commands: list[FinalCommand],
+) -> None:
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": MANIFEST_INDEX_SCHEMA_VERSION,
+        "created_at": utc_now(),
+        "updated_at": utc_now(),
+        "project_root": str(PROJECT_ROOT),
+        "plan_file": str(plan_path),
+        "args": vars(args),
+        "planned_command_count": len(commands),
+        "manifest_files": [],
+        "extra_manifest_files": [],
+        "commands": [],
+    }
+    index_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _append_manifest_index_command(
+    index_path: Path,
+    item: FinalCommand,
+    observed: dict[str, object],
+) -> None:
+    if not index_path.exists():
+        _write_initial_manifest_index(index_path, plan_path=Path(""), args=argparse.Namespace(), commands=[])
+    payload = json.loads(index_path.read_text(encoding="utf-8"))
+    commands = payload.setdefault("commands", [])
+    if not isinstance(commands, list):
+        commands = []
+        payload["commands"] = commands
+    manifest_files = _string_list(observed.get("manifest_files", []))
+    extra_manifest_files = _string_list(observed.get("extra_manifest_files", []))
+    returncode = int(observed.get("returncode", 1))
+    commands.append(
+        {
+            "track": item.track,
+            "name": item.name,
+            "status": "completed" if returncode == 0 else "failed",
+            "returncode": returncode,
+            "manifest_files": manifest_files,
+            "extra_manifest_files": extra_manifest_files,
+            "final_readiness_files": _string_list(observed.get("final_readiness_files", [])),
+            "evidence_issues": _string_list(observed.get("evidence_issues", [])),
+            "shell": shell_join(item.command),
+        }
+    )
+    payload["manifest_files"] = _unique_strings(
+        [*_string_list(payload.get("manifest_files", [])), *manifest_files]
+    )
+    payload["extra_manifest_files"] = _unique_strings(
+        [*_string_list(payload.get("extra_manifest_files", [])), *extra_manifest_files]
+    )
+    payload["updated_at"] = utc_now()
+    index_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _string_list(value: object) -> list[str]:
+    if isinstance(value, str):
+        items = [value]
+    elif isinstance(value, (list, tuple, set)):
+        items = [str(item) for item in value]
+    else:
+        items = []
+    return [item.strip() for item in items if item.strip()]
+
+
+def _unique_strings(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        out.append(value)
+    return out
 
 
 def jobs_arg(value: object) -> str:
@@ -107,11 +637,45 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--track",
-        choices=["all", *FINAL_PROTOCOL_TRACKS],
+        choices=["all", *FINAL_PLAN_TRACKS],
         default="all",
         help="experiment track to plan",
     )
     parser.add_argument("--duration", default="24h", help="per-run wall-clock budget for live discovery")
+    parser.add_argument(
+        "--live-batch-duration",
+        default="10m",
+        help="adaptive live-discovery batch wall-clock budget; longer batches reduce scheduler/IO overhead",
+    )
+    parser.add_argument(
+        "--adaptive-learning-weight",
+        type=float,
+        default=0.75,
+        help="adaptive scheduler contextual-learning weight for final live and adaptive-ablation runs",
+    )
+    parser.add_argument(
+        "--scheduler-annealing-temperature",
+        type=float,
+        default=0.35,
+        help="initial annealing temperature for final adaptive scheduling; 0 disables annealed selection",
+    )
+    parser.add_argument(
+        "--scheduler-annealing-decay",
+        type=float,
+        default=0.985,
+        help="per-completed-batch decay for final adaptive scheduler annealing",
+    )
+    parser.add_argument(
+        "--scheduler-annealing-min-temperature",
+        type=float,
+        default=0.02,
+        help="minimum nonzero final adaptive scheduler annealing temperature",
+    )
+    parser.add_argument(
+        "--continual-learning-ledgers",
+        default="",
+        help="comma-separated version ledgers used to cold-start final adaptive continual learning",
+    )
     parser.add_argument("--validation-cases", type=int, default=200, help="cases per short validation run")
     parser.add_argument("--validation-seeds", default="1,101", help="short validation seeds")
     parser.add_argument("--live-seeds", default="1,1001,2001", help="comma-separated live discovery seeds")
@@ -135,7 +699,72 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--strategy-snapshot",
         default="",
-        help="existing frozen strategy snapshot to reuse; default generates one for the plan",
+        help=(
+            "existing frozen strategy snapshot to reuse; default reuses "
+            "reports/strategy-snapshots/final-frozen-strategy-snapshot.json"
+        ),
+    )
+    parser.add_argument(
+        "--reset-strategy-snapshot",
+        action="store_true",
+        help="regenerate the default final frozen strategy snapshot before planning this track",
+    )
+    parser.add_argument(
+        "--ledger-run-files",
+        default="",
+        help="comma-separated cross-version run logs used to build the final regression ledger",
+    )
+    parser.add_argument(
+        "--ledger-versions",
+        default="",
+        help="comma-separated version ids matching --ledger-run-files",
+    )
+    parser.add_argument("--previous-ledger", default="", help="optional previous version ledger for regression detection")
+    parser.add_argument(
+        "--ledger-output",
+        default=str(REPORTS_DIR / "final-version-ledger.json"),
+        help="output path for the final cross-version ledger",
+    )
+    parser.add_argument(
+        "--ledger-evidence-manifest",
+        default=str(REPORTS_DIR / "experiment-final-version-ledger.json"),
+        help="manifest path that exposes the version ledger to final readiness",
+    )
+    parser.add_argument(
+        "--manifest-index",
+        default=str(REPORTS_DIR / "final-experiment-manifest-index.json"),
+        help=(
+            "JSON index populated during --execute with final experiment manifest paths; "
+            "postprocess audits this file instead of sweeping stale runs/experiment-*.json files"
+        ),
+    )
+    parser.add_argument(
+        "--import-manifest",
+        action="append",
+        default=[],
+        help=(
+            "existing experiment manifest to import into --manifest-index and paper-run-journal "
+            "without rerunning the experiment; may be repeated"
+        ),
+    )
+    parser.add_argument(
+        "--import-extra-manifest",
+        action="append",
+        default=[],
+        help=(
+            "existing support evidence manifest to import into --manifest-index, such as "
+            "reports/experiment-final-version-ledger.json; may be repeated"
+        ),
+    )
+    parser.add_argument(
+        "--paper-run-journal",
+        default=str(REPORTS_DIR / "paper-run-journal.jsonl"),
+        help="paper-run journal JSONL path used when importing existing experiment manifests",
+    )
+    parser.add_argument(
+        "--reset-manifest-index",
+        action="store_true",
+        help="when executing a non-postprocess track, start a fresh manifest index before appending evidence",
     )
     parser.add_argument("--execute", action="store_true", help="execute commands instead of only printing them")
     return parser.parse_args()
@@ -145,7 +774,7 @@ def build_plan(args: argparse.Namespace) -> list[FinalCommand]:
     commands: list[FinalCommand] = []
     strategy_snapshot = _resolve_strategy_snapshot(args)
     tracks = (
-        set(FINAL_PROTOCOL_TRACKS)
+        set(FINAL_PLAN_TRACKS)
         if args.track == "all"
         else {args.track}
     )
@@ -159,8 +788,14 @@ def build_plan(args: argparse.Namespace) -> list[FinalCommand]:
         commands.append(seeded_sensitivity_command(args, strategy_snapshot=strategy_snapshot))
     if "ablation" in tracks:
         commands.append(module_ablation_command(args, strategy_snapshot=strategy_snapshot))
+        commands.extend(adaptive_component_ablation_commands(args, strategy_snapshot=strategy_snapshot))
     if "comparison" in tracks:
         commands.append(method_comparison_command(args, strategy_snapshot=strategy_snapshot))
+        ledger_command = version_ledger_evidence_command(args)
+        if ledger_command is not None:
+            commands.append(ledger_command)
+    if "postprocess" in tracks:
+        commands.append(final_readiness_audit_command(args))
     return commands
 
 
@@ -172,11 +807,22 @@ def _resolve_strategy_snapshot(args: argparse.Namespace) -> str:
     configured = str(getattr(args, "strategy_snapshot", "") or "").strip()
     if configured:
         return configured
+    if DEFAULT_FINAL_STRATEGY_SNAPSHOT.is_file() and not bool(
+        getattr(args, "reset_strategy_snapshot", False)
+    ):
+        return str(DEFAULT_FINAL_STRATEGY_SNAPSHOT)
     snapshot = write_strategy_snapshot(
         classification_documented_rules=list(documented_semantic_rule_records()),
         classification_boundary_rules=list(semantic_boundary_rule_records()),
         reproducer_rules=list(standalone_reproducer_rule_records()),
-        metadata={"generated_by": "scripts/run_final_experiments.py", "track": str(args.track)},
+        metadata={
+            "generated_by": "scripts/run_final_experiments.py",
+            "track": str(args.track),
+            "freeze_role": "final_experiment_strategy",
+            "reuse_policy": "reuse_default_until_reset",
+        },
+        output_dir=DEFAULT_FINAL_STRATEGY_SNAPSHOT.parent,
+        snapshot_id=DEFAULT_FINAL_STRATEGY_SNAPSHOT.stem,
     )
     return str(snapshot)
 
@@ -269,6 +915,18 @@ def live_discovery_commands(args: argparse.Namespace, *, strategy_snapshot: str)
             suite,
             "--evidence-mode",
             "live",
+            "--schedule",
+            "adaptive",
+            "--batch-duration",
+            str(getattr(args, "live_batch_duration", "10m") or "10m"),
+            "--adaptive-learning-weight",
+            str(_adaptive_learning_weight(args)),
+            "--scheduler-annealing-temperature",
+            str(_scheduler_annealing_temperature(args)),
+            "--scheduler-annealing-decay",
+            str(_scheduler_annealing_decay(args)),
+            "--scheduler-annealing-min-temperature",
+            str(_scheduler_annealing_min_temperature(args)),
             "--run-theme",
             f"final-live:{suite}:{preset}",
             "--paper-notes",
@@ -281,7 +939,9 @@ def live_discovery_commands(args: argparse.Namespace, *, strategy_snapshot: str)
             str(args.log_level),
             "--jobs",
             jobs_arg(args.jobs),
+            "--persist-closed-loop-state",
         ]
+        _append_continual_learning_args(cmd, args)
         if args.skip_run_reports:
             cmd.append("--skip-run-reports")
         _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
@@ -545,6 +1205,127 @@ def module_ablation_command(args: argparse.Namespace, *, strategy_snapshot: str)
     )
 
 
+def adaptive_component_ablation_commands(args: argparse.Namespace, *, strategy_snapshot: str) -> list[FinalCommand]:
+    commands: list[FinalCommand] = []
+    for variant in FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.variants:
+        disabled_components = []
+        if variant.id == "no_scheduler_learning":
+            disabled_components.append("scheduler-learning")
+        if variant.id == "no_scheduler_annealing":
+            disabled_components.append("scheduler-annealing")
+        if variant.id == "no_online_reward_model":
+            disabled_components.append("online-reward-model")
+        if variant.id == "no_continual_learning":
+            disabled_components.append("continual-learning")
+        if variant.id == "no_runtime_cost_learning":
+            disabled_components.append("runtime-cost-learning")
+        if variant.id == "no_quality_archive":
+            disabled_components.append("quality-archive")
+        if variant.id == "no_active_learning":
+            disabled_components.append("active-learning")
+        cmd = [
+            str(DATADIFF),
+            "experiment",
+            "--cases",
+            str(max(1, int(args.ablation_cases))),
+            "--seeds",
+            str(args.ablation_seeds),
+            "--presets",
+            variant.preset,
+            "--target-suite",
+            FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.target_suites[0],
+            "--evidence-mode",
+            "ablation",
+            "--schedule",
+            "adaptive",
+            "--batch-cases",
+            str(min(100, max(1, int(args.ablation_cases)))),
+            "--adaptive-learning-weight",
+            str(_adaptive_learning_weight(args)),
+            "--scheduler-annealing-temperature",
+            str(_scheduler_annealing_temperature(args)),
+            "--scheduler-annealing-decay",
+            str(_scheduler_annealing_decay(args)),
+            "--scheduler-annealing-min-temperature",
+            str(_scheduler_annealing_min_temperature(args)),
+            "--run-theme",
+            f"final-adaptive-ablation:{variant.id}",
+            "--paper-notes",
+            variant.notes
+            or "Adaptive component ablation with fixed target, preset, seed budget, and oracle.",
+            "--replay-bug-source-issues",
+            ",".join(replay_source_issues()),
+            "--artifact-limit",
+            str(max(0, int(args.artifact_limit))),
+            "--log-level",
+            str(args.log_level),
+            "--jobs",
+            jobs_arg(args.jobs),
+            "--skip-run-reports",
+        ]
+        _append_continual_learning_args(cmd, args)
+        if disabled_components:
+            cmd.extend(["--disable-adaptive-components", ",".join(disabled_components)])
+        _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
+        experiment_meta = _adaptive_component_experiment_meta(variant)
+        _append_experiment_meta(cmd, experiment_meta)
+        commands.append(
+            FinalCommand(
+                track="ablation",
+                name=f"adaptive_component_ablation:{variant.id}",
+                command=cmd,
+                purpose=FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.purpose,
+                count_as_real_bugs=False,
+                expected_output=(
+                    "adaptive experiment manifest plus methodology-report adaptive component "
+                    "rows comparing throughput, invalid rate, false positive rate, and candidate yield"
+                ),
+                notes=(
+                    "Use together with module_ablation. This isolates closed-loop adaptive components "
+                    "without changing generator preset, target suite, oracle mode, or seed budget."
+                ),
+                replay_bug_policy={
+                    "enable_replay_bug": False,
+                    "source_issues": replay_source_issues(),
+                },
+                experiment_meta=experiment_meta,
+            )
+        )
+    return commands
+
+
+def _append_continual_learning_args(cmd: list[str], args: argparse.Namespace) -> None:
+    ledgers = str(getattr(args, "continual_learning_ledgers", "") or "").strip()
+    if ledgers:
+        cmd.extend(["--continual-learning-ledgers", ledgers])
+
+
+def _adaptive_learning_weight(args: argparse.Namespace) -> float:
+    return max(0.0, float(getattr(args, "adaptive_learning_weight", 0.75) or 0.0))
+
+
+def _scheduler_annealing_temperature(args: argparse.Namespace) -> float:
+    return max(0.0, float(getattr(args, "scheduler_annealing_temperature", 0.35) or 0.0))
+
+
+def _scheduler_annealing_decay(args: argparse.Namespace) -> float:
+    return min(1.0, max(0.0, float(getattr(args, "scheduler_annealing_decay", 0.985) or 0.0)))
+
+
+def _scheduler_annealing_min_temperature(args: argparse.Namespace) -> float:
+    return max(0.0, float(getattr(args, "scheduler_annealing_min_temperature", 0.02) or 0.0))
+
+
+def _adaptive_component_experiment_meta(variant: object) -> dict[str, object]:
+    meta = FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+        target_suites=FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.target_suites,
+    )
+    variant_meta = dict(variant.to_meta())
+    variant_meta.pop("preset", None)
+    meta["variant"] = variant_meta
+    return meta
+
+
 def method_comparison_command(args: argparse.Namespace, *, strategy_snapshot: str) -> FinalCommand:
     cmd = [
         str(DATADIFF),
@@ -604,6 +1385,110 @@ def method_comparison_command(args: argparse.Namespace, *, strategy_snapshot: st
     )
 
 
+def version_ledger_evidence_command(args: argparse.Namespace) -> FinalCommand | None:
+    run_files = str(getattr(args, "ledger_run_files", "") or "").strip()
+    manifest_index = str(
+        getattr(args, "manifest_index", "") or REPORTS_DIR / "final-experiment-manifest-index.json"
+    ).strip()
+    if not run_files and not manifest_index:
+        return None
+    ledger_output = str(getattr(args, "ledger_output", "") or REPORTS_DIR / "final-version-ledger.json")
+    evidence_manifest = str(
+        getattr(args, "ledger_evidence_manifest", "") or REPORTS_DIR / "experiment-final-version-ledger.json"
+    )
+    cmd = [
+        str(DATADIFF),
+        "version-ledger",
+        "--output",
+        ledger_output,
+        "--evidence-manifest-output",
+        evidence_manifest,
+    ]
+    if run_files:
+        cmd.extend(["--run-files", run_files])
+    else:
+        cmd.extend(["--manifest-index", manifest_index])
+    versions = str(getattr(args, "ledger_versions", "") or "").strip()
+    if versions:
+        cmd.extend(["--versions", versions])
+    previous_ledger = str(getattr(args, "previous_ledger", "") or "").strip()
+    if previous_ledger:
+        cmd.extend(["--previous-ledger", previous_ledger])
+    return FinalCommand(
+        track="comparison",
+        name="cross_version_regression_ledger",
+        command=cmd,
+        purpose=(
+            "Build the final cross-version regression ledger used by readiness to verify "
+            "continual-learning and multi-version stability claims."
+        ),
+        count_as_real_bugs=False,
+        expected_output=(
+            "version-ledger JSON plus experiment-final-version-ledger manifest referenced by final readiness"
+        ),
+        notes=(
+            "Run after collecting comparable run logs from at least two target versions. "
+            "This does not execute fuzzing; it converts existing cross-version outcomes into audited evidence."
+        ),
+        replay_bug_policy={"enable_replay_bug": False, "source_issues": replay_source_issues()},
+        experiment_meta={
+            "matrix_id": "baseline_scope_comparison",
+            "comparison_group": "cross_version_continual_learning",
+            "variant": {
+                "variant_id": "version_ledger",
+                "comparison_role": "support",
+                "component_focus": "cross_version_continual_learning",
+            },
+            "analysis_tags": ["cross_version", "continual_learning", "regression_ledger"],
+            "counts_as_real_bugs": False,
+        },
+    )
+
+
+def final_readiness_audit_command(args: argparse.Namespace) -> FinalCommand:
+    cmd = [
+        str(DATADIFF),
+        "final-readiness",
+        "--manifest-index",
+        str(getattr(args, "manifest_index", "") or REPORTS_DIR / "final-experiment-manifest-index.json"),
+        "--full-run-log-scan",
+        "--fail-on-missing",
+    ]
+    ledger_manifest = str(
+        getattr(args, "ledger_evidence_manifest", "") or REPORTS_DIR / "experiment-final-version-ledger.json"
+    ).strip()
+    if ledger_manifest:
+        cmd.extend(["--extra-manifest", ledger_manifest])
+    return FinalCommand(
+        track="postprocess",
+        name="final_readiness_audit",
+        command=cmd,
+        purpose=(
+            "Run the final ICSE evidence audit after all experiment tracks complete, including "
+            "24h live depth, validation, seeded sensitivity, ablations, comparisons, runtime "
+            "efficiency, discovery responsiveness, adaptive evidence, and cross-version ledgers."
+        ),
+        count_as_real_bugs=False,
+        expected_output="reports/final-readiness-*.json plus reports/final-readiness-*.md with all gates passing",
+        notes=(
+            "This is the authoritative final-paper gate. Do not claim final readiness unless this "
+            "command exits successfully after the frozen live and support tracks have completed."
+        ),
+        replay_bug_policy={"enable_replay_bug": False, "source_issues": replay_source_issues()},
+        experiment_meta={
+            "matrix_id": "final_readiness_audit",
+            "comparison_group": "postprocess_readiness",
+            "variant": {
+                "variant_id": "final_readiness_audit",
+                "comparison_role": "support",
+                "component_focus": "final_readiness",
+            },
+            "analysis_tags": ["final_readiness", "postprocess", "icse_audit"],
+            "counts_as_real_bugs": False,
+        },
+    )
+
+
 def write_plan(commands: Iterable[FinalCommand], args: argparse.Namespace) -> Path:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     path = REPORTS_DIR / f"final-experiment-plan-{utc_now().replace(':', '').replace('-', '').replace('Z', '')}-{time.time_ns()}.json"
@@ -623,6 +1508,11 @@ def write_plan(commands: Iterable[FinalCommand], args: argparse.Namespace) -> Pa
             "paper_run_journal": (
                 "Every final-plan command keeps paper-run-journal recording enabled so each counted or "
                 "paper-facing support run is appended to reports/paper-run-journal.jsonl and .md."
+            ),
+            "manifest_index": (
+                "When --execute is used, this script records each completed command's emitted experiment "
+                "manifest in --manifest-index. The postprocess readiness audit consumes that index so stale "
+                "pre-final runs do not contaminate the final ICSE evidence gate."
             ),
             "family_key": "root_cause + suspicious_backends",
             "replay_bug_gate": (
