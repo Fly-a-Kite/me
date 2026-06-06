@@ -115,8 +115,9 @@ current_load() {
 }
 
 active_discovery_campaigns() {
-  pgrep -af "python .* -m datadiff.cli discovery-campaign" 2>/dev/null \
-    | awk '!/start_discovery_longhaul_tmux/ { count += 1 } END { print count + 0 }'
+  local rows
+  rows="$(pgrep -af "datadiff.cli discovery-campaign" 2>/dev/null || true)"
+  printf '%s\n' "${rows}" | awk '!/start_discovery_longhaul_tmux/ { count += 1 } END { print count + 0 }'
 }
 
 load_below_limit() {
@@ -128,7 +129,11 @@ load_below_limit() {
 write_status() {
   local status="$1"
   local detail="${2:-}"
+  local status_dir
+  local status_tmp
+  status_dir="$(dirname "${STATUS_FILE}")"
   mkdir -p "$(dirname "${STATUS_FILE}")"
+  status_tmp="$(mktemp "${status_dir}/.$(basename "${STATUS_FILE}").tmp.XXXXXX")"
   {
     printf 'status=%s\n' "${status}"
     printf 'detail=%s\n' "${detail}"
@@ -141,8 +146,8 @@ write_status() {
     printf 'load_limit=%s\n' "$(effective_load_limit)"
     printf 'batch_cases=%s\n' "${BATCH_CASES}"
     printf 'aggregate_file=%s\n' "${AGGREGATE_FILE}"
-  } > "${STATUS_FILE}.tmp"
-  mv -f "${STATUS_FILE}.tmp" "${STATUS_FILE}"
+  } > "${status_tmp}"
+  mv -f "${status_tmp}" "${STATUS_FILE}"
 }
 
 print_config() {
