@@ -117,7 +117,15 @@ current_load() {
 active_discovery_campaigns() {
   local rows
   rows="$(pgrep -af "datadiff.cli discovery-campaign" 2>/dev/null || true)"
-  printf '%s\n' "${rows}" | awk '!/start_discovery_longhaul_tmux/ { count += 1 } END { print count + 0 }'
+  printf '%s\n' "${rows}" | awk '
+    {
+      sub(/^[0-9]+[[:space:]]+/, "")
+      if ($0 ~ /(^|\/)python[0-9.]*[[:space:]]+-m[[:space:]]+datadiff[.]cli[[:space:]]+discovery-campaign/) {
+        count += 1
+      }
+    }
+    END { print count + 0 }
+  '
 }
 
 load_below_limit() {
