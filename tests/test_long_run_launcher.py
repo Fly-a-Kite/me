@@ -13,6 +13,9 @@ import pytest
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "start_closed_loop_12h_tmux.sh"
 AUTHORITY_24H_SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "start_closed_loop_24h_tmux.sh"
+DISCOVERY_LONGHAUL_SCRIPT_PATH = (
+    Path(__file__).resolve().parents[1] / "scripts" / "start_discovery_longhaul_tmux.sh"
+)
 
 
 def _read_status(path: Path) -> dict[str, str]:
@@ -146,6 +149,36 @@ def test_authority_24h_launcher_inherits_final_adaptive_defaults():
     assert 'DATADIFF_FINAL_READINESS_EXTRA_MANIFESTS:-' in text
     assert 'DATADIFF_FINAL_READINESS_FAIL_ON_MISSING:-0' in text
     assert 'start_closed_loop_12h_tmux.sh' in text
+
+
+def test_discovery_longhaul_launcher_targets_high_yield_campaign_batches():
+    text = DISCOVERY_LONGHAUL_SCRIPT_PATH.read_text(encoding="utf-8")
+
+    for token in [
+        "DATADIFF_DISCOVERY_LONGHAUL_DURATION:-12h",
+        "DATADIFF_DISCOVERY_LONGHAUL_MAX_CONCURRENT",
+        "DATADIFF_DISCOVERY_LONGHAUL_LOAD_LIMIT",
+        "active_discovery_campaigns",
+        "discovery-campaign",
+        "--candidate-recheck-count",
+        "--candidate-pipeline-recheck-attempts",
+        "discovery-campaign-aggregate",
+        "polars_lazy,arrow_probe_stress",
+        "embedded_sql,duckdb_storage",
+        "datafusion_common_api,datafusion_optimizer",
+        "common_api_workflow,cross_family,deep_probe_rotation",
+    ]:
+        assert token in text
+
+    printed = subprocess.run(
+        ["bash", str(DISCOVERY_LONGHAUL_SCRIPT_PATH), "--print-config"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "duration=12h" in printed.stdout
+    assert "candidate_pipeline_recheck_attempts=3" in printed.stdout
+    assert "lane_groups=polars_lazy,arrow_probe_stress;" in printed.stdout
 
 
 @pytest.mark.skipif(shutil.which("tmux") is None, reason="tmux is not installed")

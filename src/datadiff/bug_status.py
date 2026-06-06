@@ -11,6 +11,8 @@ from datadiff.dsl import Case
 from datadiff.final_readiness import CONFIRMED_LATEST_UPSTREAM_STATUSES, DEFAULT_LATEST_CONFIRMATIONS_FILE
 from datadiff.normalizer import NormalizedResult
 from datadiff.oracle import classify_root_cause
+from datadiff.pathing import project_display_path as _project_display_path_impl
+from datadiff.pathing import resolve_project_path as _resolve_project_path_impl
 from datadiff.util import PROJECT_ROOT, REPORTS_DIR, dump_json, load_json, utc_now
 
 BUG_STATUS_SCHEMA_VERSION = "bug-status-v1"
@@ -206,9 +208,12 @@ def _default_latest_confirmation_files() -> list[Path]:
     return [DEFAULT_LATEST_CONFIRMATIONS_FILE] if DEFAULT_LATEST_CONFIRMATIONS_FILE.is_file() else []
 
 
-def _resolve_project_path(path: Path) -> Path:
-    path = Path(path)
-    return path if path.is_absolute() else PROJECT_ROOT / path
+def _resolve_project_path(path: str | Path | None) -> Path:
+    return _resolve_project_path_impl(path, project_root=PROJECT_ROOT)
+
+
+def _project_display_path(path: str | Path | None) -> str:
+    return _project_display_path_impl(path, project_root=PROJECT_ROOT)
 
 
 def _load_latest_confirmations(paths: list[Path]) -> list[dict[str, Any]]:
@@ -574,16 +579,6 @@ def _is_pending_issue_status(status: str) -> bool:
 
 def _extract_upstream_issue_urls(text: str) -> list[str]:
     return re.findall(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/\d+", text)
-
-
-def _project_display_path(path: str | Path) -> str:
-    resolved = Path(path)
-    if not resolved.is_absolute():
-        resolved = PROJECT_ROOT / resolved
-    try:
-        return str(resolved.resolve().relative_to(PROJECT_ROOT))
-    except ValueError:
-        return str(resolved)
 
 
 build_bug_status = build_issue_status

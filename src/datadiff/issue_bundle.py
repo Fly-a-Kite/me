@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from datadiff.issue_readiness import build_issue_readiness
+from datadiff.pathing import project_display_path as _project_display_path_impl
+from datadiff.pathing import resolve_project_path as _resolve_project_path_impl
 from datadiff.util import PROJECT_ROOT, dump_json, slugify, utc_now
 
 ISSUE_BUNDLE_SCHEMA_VERSION = "issue-bundle-v1"
@@ -698,16 +700,9 @@ def _truncate(value: str, *, limit: int = 4000) -> str:
     return value[:limit] + "\n...<truncated>..."
 
 
-def _resolve_project_path(path: Path) -> Path:
-    path = Path(path)
-    return path if path.is_absolute() else PROJECT_ROOT / path
+def _resolve_project_path(path: str | Path | None) -> Path:
+    return _resolve_project_path_impl(path, project_root=PROJECT_ROOT)
 
 
-def _project_display_path(path: str | Path) -> str:
-    resolved = Path(path)
-    if not resolved.is_absolute():
-        resolved = PROJECT_ROOT / resolved
-    try:
-        return str(resolved.resolve().relative_to(PROJECT_ROOT))
-    except ValueError:
-        return str(resolved)
+def _project_display_path(path: str | Path | None) -> str:
+    return _project_display_path_impl(path, project_root=PROJECT_ROOT)

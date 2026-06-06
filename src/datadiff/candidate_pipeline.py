@@ -15,8 +15,11 @@ from datadiff.dynamic_strategy import write_strategy_snapshot
 from datadiff.dsl import Case
 from datadiff.issue_readiness import build_issue_readiness
 from datadiff.oracle import Finding
-from datadiff.reducer import reduce_case
+from datadiff.pathing import project_display_path as _project_display_path_impl
+from datadiff.pathing import resolve_project_path as _resolve_project_path_impl
 from datadiff.finding_outcomes import candidate_issue_family_keys
+from datadiff.reducer import reduce_case
+from datadiff.reproducer_scripts import write_reduced_reproducer
 from datadiff.runner import run_loaded_case
 from datadiff.triage import (
     build_triage_report,
@@ -299,7 +302,7 @@ def _process_candidate(
                 ],
             )
             dump_json(reduced.to_dict(), artifact_dir / "reduced_case.json")
-            _write_reduced_reproducer(artifact_dir, triage_backends)
+            write_reduced_reproducer(artifact_dir, triage_backends)
             triage_case = reduced
             reduction = {
                 "requested": True,
@@ -602,27 +605,6 @@ def _artifact_backends(artifact_dir: Path) -> list[str]:
     return list(payload) if isinstance(payload, dict) else []
 
 
-def _write_reduced_reproducer(bug_dir: Path, backends: list[str]) -> None:
-    repro = f'''#!/usr/bin/env python3
-from datadiff.config import ExperimentConfig
-from datadiff.dsl import Case
-from datadiff.runner import run_loaded_case
-from datadiff.util import load_json
-
-here = __import__("pathlib").Path(__file__).parent
-case = Case.from_dict(load_json(here / "reduced_case.json"))
-config_data = load_json(here / "config.json")
-config = ExperimentConfig.from_payload(config_data)
-result = run_loaded_case(case, backends={backends!r}, config=config, save_artifact=False)
-print(result["status"])
-for finding in result["findings"]:
-    print(finding)
-'''
-    path = bug_dir / "reproduce_reduced.py"
-    path.write_text(repro, encoding="utf-8")
-    path.chmod(0o755)
-
-
 def _dedup_status(
     families: list[str],
     *,
@@ -761,19 +743,12 @@ def _pipeline_dir_name(manifest_file: Path | None, evidence_files: list[Path]) -
     return f"pipeline-{slugify(seed)}-{stamp}"
 
 
-def _resolve_project_path(path: Path | None) -> Path:
-    if path is None:
-        return PROJECT_ROOT
-    path = Path(path)
-    return path if path.is_absolute() else PROJECT_ROOT / path
+def _resolve_project_path(path: str | Path | None) -> Path:
+    return _resolve_project_path_impl(path, project_root=PROJECT_ROOT)
 
 
-def _project_display_path(path: Path | str) -> str:
-    resolved = _resolve_project_path(Path(path))
-    try:
-        return str(resolved.resolve().relative_to(PROJECT_ROOT))
-    except ValueError:
-        return str(resolved)
+def _project_display_path(path: str | Path | None) -> str:
+    return _project_display_path_impl(path, project_root=PROJECT_ROOT)
 
 
 _ensure_bug_dir = _ensure_candidate_artifact_dir

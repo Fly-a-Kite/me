@@ -11,6 +11,7 @@ from typing import Any
 
 from datadiff.canonicalization import sort_by_canonical_key
 from datadiff.env import collect_environment, package_version
+from datadiff.pathing import project_display_path as _project_display_path_impl
 from datadiff.util import PROJECT_ROOT, REPORTS_DIR, dump_json, ensure_dirs, slugify, utc_now
 
 
@@ -334,16 +335,8 @@ def _portable_manifest(run: BugAuditRun, *, manifest_path: Path) -> dict[str, An
     return data
 
 
-def _project_display_path(value: str) -> str:
-    if not value:
-        return ""
-    path = Path(value)
-    if not path.is_absolute():
-        path = PROJECT_ROOT / path
-    try:
-        return str(path.resolve().relative_to(PROJECT_ROOT))
-    except ValueError:
-        return str(path)
+def _project_display_path(value: str | Path | None) -> str:
+    return _project_display_path_impl(value, project_root=PROJECT_ROOT)
 
 
 available_bug_audit_probe_ids = list_audit_probe_ids

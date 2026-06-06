@@ -165,6 +165,7 @@ from datadiff.review_readiness import (
     build_review_readiness,
     write_review_readiness_outputs,
 )
+from datadiff.reproducer_scripts import write_reduced_reproducer
 from datadiff.run_journal import (
     append_run_journal_entries,
     build_run_journal_entry,
@@ -851,7 +852,7 @@ def cmd_triage_artifact(args: argparse.Namespace) -> int:
         write_triage_artifact_func=write_triage_artifact,
         supports_standalone_reproducer_func=supports_standalone_reproducer,
         write_standalone_reproducer_func=write_standalone_reproducer,
-        write_reduced_reproducer_func=_write_reduced_reproducer,
+        write_reduced_reproducer_func=write_reduced_reproducer,
     )
 
 
@@ -866,7 +867,7 @@ def cmd_reduce(args: argparse.Namespace) -> int:
         load_artifact_config_func=_load_artifact_config,
         reduce_case_func=reduce_case,
         run_loaded_case_func=run_loaded_case,
-        write_reduced_reproducer_func=_write_reduced_reproducer,
+        write_reduced_reproducer_func=write_reduced_reproducer,
     )
 
 
@@ -967,27 +968,6 @@ def _fixture_replay_run_id(label: str) -> str:
 def _load_artifact_config(bug_dir: Path) -> dict:
     config_path = bug_dir / "config.json"
     return load_json(config_path) if config_path.exists() else {}
-
-
-def _write_reduced_reproducer(bug_dir: Path, backends: list[str]) -> None:
-    repro = f'''#!/usr/bin/env python3
-from datadiff.config import ExperimentConfig
-from datadiff.dsl import Case
-from datadiff.runner import run_loaded_case
-from datadiff.util import load_json
-
-here = __import__("pathlib").Path(__file__).parent
-case = Case.from_dict(load_json(here / "reduced_case.json"))
-config_data = load_json(here / "config.json")
-config = ExperimentConfig.from_payload(config_data)
-result = run_loaded_case(case, backends={backends!r}, config=config, save_artifact=False)
-print(result["status"])
-for finding in result["findings"]:
-    print(finding)
-'''
-    path = bug_dir / "reproduce_reduced.py"
-    path.write_text(repro, encoding="utf-8")
-    path.chmod(0o755)
 
 
 def _parse_seeds(value: str) -> list[int]:
