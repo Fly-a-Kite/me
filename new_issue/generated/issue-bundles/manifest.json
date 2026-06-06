@@ -1,23 +1,239 @@
 {
   "bundle_selection": {
-    "available_issue_count": 0,
-    "available_issue_paths": [],
-    "available_submission_group_count": 0,
-    "groups": [],
-    "primary_issue_paths": [],
+    "available_issue_count": 11,
+    "available_issue_paths": [
+      "new_issue/datafusion_22190_grouped_null_topk.md",
+      "new_issue/datafusion_22489_grouped_limit_offset.md",
+      "new_issue/datafusion_22490_negative_zero.md",
+      "new_issue/datafusion_distinct_null_topk.md",
+      "new_issue/datafusion_limit_idempotence.md",
+      "new_issue/duckdb_cte_boolean_inner_join_empty_result.md",
+      "new_issue/polars_27672_grouped_max_sort.md",
+      "new_issue/polars_series_reflected_arithmetic_operand_order.md",
+      "new_issue/polars_series_rtruediv_operand_order.md",
+      "new_issue/polars_vector_division_rounding.md",
+      "new_issue/pyarrow_slice_groupby_any.md"
+    ],
+    "available_submission_group_count": 10,
+    "groups": [
+      {
+        "eligible_issue_paths": [
+          "new_issue/datafusion_22190_grouped_null_topk.md"
+        ],
+        "family": "grouped_topk_null_sort_key@datafusion",
+        "issue_paths": [
+          "new_issue/datafusion_22190_grouped_null_topk.md"
+        ],
+        "needs_dedup_check": false,
+        "primary_issue_path": "new_issue/datafusion_22190_grouped_null_topk.md",
+        "selected_issue_path": "new_issue/datafusion_22190_grouped_null_topk.md",
+        "skipped_supporting_issue_paths": [],
+        "status_counts": {
+          "already_submitted_or_confirmed": 1
+        },
+        "supporting_issue_paths": []
+      },
+      {
+        "eligible_issue_paths": [
+          "new_issue/datafusion_22489_grouped_limit_offset.md"
+        ],
+        "family": "groupby_aggregation@datafusion",
+        "issue_paths": [
+          "new_issue/datafusion_22489_grouped_limit_offset.md"
+        ],
+        "needs_dedup_check": false,
+        "primary_issue_path": "new_issue/datafusion_22489_grouped_limit_offset.md",
+        "selected_issue_path": "new_issue/datafusion_22489_grouped_limit_offset.md",
+        "skipped_supporting_issue_paths": [],
+        "status_counts": {
+          "already_submitted_or_confirmed": 1
+        },
+        "supporting_issue_paths": []
+      },
+      {
+        "eligible_issue_paths": [
+          "new_issue/datafusion_22490_negative_zero.md"
+        ],
+        "family": "negative_zero_comparison@datafusion",
+        "issue_paths": [
+          "new_issue/datafusion_22490_negative_zero.md"
+        ],
+        "needs_dedup_check": false,
+        "primary_issue_path": "new_issue/datafusion_22490_negative_zero.md",
+        "selected_issue_path": "new_issue/datafusion_22490_negative_zero.md",
+        "skipped_supporting_issue_paths": [],
+        "status_counts": {
+          "already_submitted_or_confirmed": 1
+        },
+        "supporting_issue_paths": []
+      },
+      {
+        "eligible_issue_paths": [
+          "new_issue/datafusion_distinct_null_topk.md"
+        ],
+        "family": "distinct_null_topk@datafusion",
+        "issue_paths": [
+          "new_issue/datafusion_distinct_null_topk.md"
+        ],
+        "needs_dedup_check": false,
+        "primary_issue_path": "new_issue/datafusion_distinct_null_topk.md",
+        "selected_issue_path": "new_issue/datafusion_distinct_null_topk.md",
+        "skipped_supporting_issue_paths": [],
+        "status_counts": {
+          "already_submitted_or_confirmed": 1
+        },
+        "supporting_issue_paths": []
+      },
+      {
+        "eligible_issue_paths": [
+          "new_issue/datafusion_limit_idempotence.md"
+        ],
+        "family": "datafusion_limit_idempotence@datafusion",
+        "issue_paths": [
+          "new_issue/datafusion_limit_idempotence.md"
+        ],
+        "needs_dedup_check": false,
+        "primary_issue_path": "new_issue/datafusion_limit_idempotence.md",
+        "selected_issue_path": "new_issue/datafusion_limit_idempotence.md",
+        "skipped_supporting_issue_paths": [],
+        "status_counts": {
+          "already_submitted_or_confirmed": 1
+        },
+        "supporting_issue_paths": []
+      },
+      {
+        "eligible_issue_paths": [
+          "new_issue/duckdb_cte_boolean_inner_join_empty_result.md"
+        ],
+        "family": "metamorphic_semi_anti_join_rewrite@duckdb",
+        "issue_paths": [
+          "new_issue/duckdb_cte_boolean_inner_join_empty_result.md"
+        ],
+        "needs_dedup_check": false,
+        "primary_issue_path": "new_issue/duckdb_cte_boolean_inner_join_empty_result.md",
+        "selected_issue_path": "new_issue/duckdb_cte_boolean_inner_join_empty_result.md",
+        "skipped_supporting_issue_paths": [],
+        "status_counts": {
+          "already_submitted_or_confirmed": 1
+        },
+        "supporting_issue_paths": []
+      },
+      {
+        "eligible_issue_paths": [
+          "new_issue/polars_27672_grouped_max_sort.md"
+        ],
+        "family": "groupby_aggregation@polars,polars_lazy",
+        "issue_paths": [
+          "new_issue/polars_27672_grouped_max_sort.md"
+        ],
+        "needs_dedup_check": false,
+        "primary_issue_path": "new_issue/polars_27672_grouped_max_sort.md",
+        "selected_issue_path": "new_issue/polars_27672_grouped_max_sort.md",
+        "skipped_supporting_issue_paths": [],
+        "status_counts": {
+          "already_submitted_or_confirmed": 1
+        },
+        "supporting_issue_paths": []
+      },
+      {
+        "eligible_issue_paths": [
+          "new_issue/polars_series_reflected_arithmetic_operand_order.md",
+          "new_issue/polars_series_rtruediv_operand_order.md"
+        ],
+        "family": "polars_reflected_arithmetic_operand_order@polars",
+        "issue_paths": [
+          "new_issue/polars_series_reflected_arithmetic_operand_order.md",
+          "new_issue/polars_series_rtruediv_operand_order.md"
+        ],
+        "needs_dedup_check": false,
+        "primary_issue_path": "new_issue/polars_series_reflected_arithmetic_operand_order.md",
+        "selected_issue_path": "new_issue/polars_series_reflected_arithmetic_operand_order.md",
+        "skipped_supporting_issue_paths": [
+          "new_issue/polars_series_rtruediv_operand_order.md"
+        ],
+        "status_counts": {
+          "already_submitted_or_confirmed": 2
+        },
+        "supporting_issue_paths": [
+          "new_issue/polars_series_rtruediv_operand_order.md"
+        ]
+      },
+      {
+        "eligible_issue_paths": [
+          "new_issue/polars_vector_division_rounding.md"
+        ],
+        "family": "polars_vector_division_rounding@polars",
+        "issue_paths": [
+          "new_issue/polars_vector_division_rounding.md"
+        ],
+        "needs_dedup_check": false,
+        "primary_issue_path": "new_issue/polars_vector_division_rounding.md",
+        "selected_issue_path": "new_issue/polars_vector_division_rounding.md",
+        "skipped_supporting_issue_paths": [],
+        "status_counts": {
+          "already_submitted_or_confirmed": 1
+        },
+        "supporting_issue_paths": []
+      },
+      {
+        "eligible_issue_paths": [
+          "new_issue/pyarrow_slice_groupby_any.md"
+        ],
+        "family": "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+        "issue_paths": [
+          "new_issue/pyarrow_slice_groupby_any.md"
+        ],
+        "needs_dedup_check": false,
+        "primary_issue_path": "new_issue/pyarrow_slice_groupby_any.md",
+        "selected_issue_path": "new_issue/pyarrow_slice_groupby_any.md",
+        "skipped_supporting_issue_paths": [],
+        "status_counts": {
+          "already_submitted_or_confirmed": 1
+        },
+        "supporting_issue_paths": []
+      }
+    ],
+    "primary_issue_paths": [
+      "new_issue/datafusion_22190_grouped_null_topk.md",
+      "new_issue/datafusion_22489_grouped_limit_offset.md",
+      "new_issue/datafusion_22490_negative_zero.md",
+      "new_issue/datafusion_distinct_null_topk.md",
+      "new_issue/datafusion_limit_idempotence.md",
+      "new_issue/duckdb_cte_boolean_inner_join_empty_result.md",
+      "new_issue/polars_27672_grouped_max_sort.md",
+      "new_issue/polars_series_reflected_arithmetic_operand_order.md",
+      "new_issue/polars_vector_division_rounding.md",
+      "new_issue/pyarrow_slice_groupby_any.md"
+    ],
     "primary_per_family": true,
-    "selected_issue_count": 0,
-    "selected_issue_paths": [],
+    "selected_issue_count": 10,
+    "selected_issue_paths": [
+      "new_issue/datafusion_22190_grouped_null_topk.md",
+      "new_issue/datafusion_22489_grouped_limit_offset.md",
+      "new_issue/datafusion_22490_negative_zero.md",
+      "new_issue/datafusion_distinct_null_topk.md",
+      "new_issue/datafusion_limit_idempotence.md",
+      "new_issue/duckdb_cte_boolean_inner_join_empty_result.md",
+      "new_issue/polars_27672_grouped_max_sort.md",
+      "new_issue/polars_series_reflected_arithmetic_operand_order.md",
+      "new_issue/polars_vector_division_rounding.md",
+      "new_issue/pyarrow_slice_groupby_any.md"
+    ],
     "selected_statuses": [
       "ready_to_submit",
-      "needs_dedup_check"
+      "needs_dedup_check",
+      "already_submitted_or_confirmed"
     ],
-    "selected_submission_group_count": 0,
-    "skipped_supporting_duplicate_count": 0,
-    "skipped_supporting_issue_paths": [],
-    "supporting_issue_paths": []
+    "selected_submission_group_count": 10,
+    "skipped_supporting_duplicate_count": 1,
+    "skipped_supporting_issue_paths": [
+      "new_issue/polars_series_rtruediv_operand_order.md"
+    ],
+    "supporting_issue_paths": [
+      "new_issue/polars_series_rtruediv_operand_order.md"
+    ]
   },
-  "generated_at": "2026-05-30T15:41:08Z",
+  "generated_at": "2026-06-06T18:44:09Z",
   "generated_by": "datadiff issue-bundle",
   "inputs": {
     "generated_issue_dir": "new_issue/generated",
@@ -27,13 +243,14 @@
     "new_issue_dir": "new_issue",
     "old_issue_dir": "old_issue",
     "primary_per_family": true,
-    "repeat_count": 3,
+    "repeat_count": 1,
     "run_reproducers": true,
     "statuses": [
       "ready_to_submit",
-      "needs_dedup_check"
+      "needs_dedup_check",
+      "already_submitted_or_confirmed"
     ],
-    "timeout_s": 20.0
+    "timeout_s": 30.0
   },
   "issue_readiness_summary": {
     "already_submitted_or_confirmed_count": 11,
@@ -52,17 +269,18 @@
     "confirmed_count_eligible_family_count": 8,
     "duplicate_family_draft_count": 0,
     "duplicate_family_draft_groups": {},
-    "issue_document_count": 14,
+    "issue_document_count": 15,
     "needs_dedup_check": [],
     "needs_dedup_check_count": 0,
     "needs_dedup_check_families": [],
     "needs_dedup_check_family_count": 0,
     "needs_reproducer_or_evidence": [
       "new_issue/datafusion_22554_followup_comment.md",
-      "new_issue/datafusion_null_group_key_candidate.md"
+      "new_issue/datafusion_null_group_key_candidate.md",
+      "new_issue/duckdb_groupby_neutral_mutation_not_upstream.md"
     ],
-    "needs_reproducer_or_evidence_count": 2,
-    "needs_reproducer_or_evidence_family_count": 2,
+    "needs_reproducer_or_evidence_count": 3,
+    "needs_reproducer_or_evidence_family_count": 3,
     "not_latest_reproducible_count": 1,
     "not_latest_reproducible_family_count": 1,
     "ready_to_submit": [],
@@ -75,41 +293,595 @@
     "submission_groups_ready_to_submit_count": 0,
     "top_priority": [
       "new_issue/datafusion_null_group_key_candidate.md",
+      "new_issue/duckdb_groupby_neutral_mutation_not_upstream.md",
       "new_issue/datafusion_22554_followup_comment.md",
-      "new_issue/datafusion_distinct_null_topk.md",
       "new_issue/datafusion_limit_idempotence.md",
       "new_issue/duckdb_cte_boolean_inner_join_empty_result.md"
     ]
   },
-  "issues": [],
+  "issues": [
+    {
+      "blocking_reasons": [
+        "already registered in latest confirmation evidence"
+      ],
+      "compile": {
+        "status": "ok"
+      },
+      "confirmed_latest_match": {
+        "family": "grouped_topk_null_sort_key@datafusion",
+        "issue_url": "https://github.com/apache/datafusion/issues/22190",
+        "matched_by": "issue_url",
+        "upstream_status": "upstream_labeled_bug"
+      },
+      "extracted": true,
+      "family_guess": "grouped_topk_null_sort_key@datafusion",
+      "issue_path": "new_issue/datafusion_22190_grouped_null_topk.md",
+      "priority": "low",
+      "readiness_status": "already_submitted_or_confirmed",
+      "reproducer_path": "new_issue/generated/issue-bundles/reproducers/datafusion_22190_grouped_null_topk.py",
+      "run": {
+        "attempt_count": 1,
+        "attempts": [
+          {
+            "returncode": 1,
+            "skipped": false,
+            "stderr": "Traceback (most recent call last):\n  File \"/root/datadiff_fuzz_lab/new_issue/generated/issue-bundles/reproducers/datafusion_22190_grouped_null_topk.py\", line 64, in <module>\n    main()\n  File \"/root/datadiff_fuzz_lab/new_issue/generated/issue-bundles/reproducers/datafusion_22190_grouped_null_topk.py\", line 60, in main\n    assert failing_rows == 1, \"DataFusion dropped the group whose aggregate sort key is NULL\"\n           ^^^^^^^^^^^^^^^^^\nAssertionError: DataFusion dropped the group whose aggregate sort key is NULL\n",
+            "stdout": "datafusion=53.0.0\npyarrow=24.0.0\ncontrol:\n   min_x\n0    NaN\ntop-k:\nEmpty DataFrame\nColumns: [min_x]\nIndex: []\ntop-k record-batch rows=0\n",
+            "timed_out": false
+          }
+        ],
+        "consistent_returncodes": true,
+        "consistent_stderr": true,
+        "consistent_stdout": true,
+        "expected_failure_reproduced": true,
+        "flaky": false,
+        "nonzero_attempt_count": 1,
+        "returncode": 1,
+        "skipped": false,
+        "stderr": "Traceback (most recent call last):\n  File \"/root/datadiff_fuzz_lab/new_issue/generated/issue-bundles/reproducers/datafusion_22190_grouped_null_topk.py\", line 64, in <module>\n    main()\n  File \"/root/datadiff_fuzz_lab/new_issue/generated/issue-bundles/reproducers/datafusion_22190_grouped_null_topk.py\", line 60, in main\n    assert failing_rows == 1, \"DataFusion dropped the group whose aggregate sort key is NULL\"\n           ^^^^^^^^^^^^^^^^^\nAssertionError: DataFusion dropped the group whose aggregate sort key is NULL\n",
+        "stdout": "datafusion=53.0.0\npyarrow=24.0.0\ncontrol:\n   min_x\n0    NaN\ntop-k:\nEmpty DataFrame\nColumns: [min_x]\nIndex: []\ntop-k record-batch rows=0\n",
+        "successful_attempt_count": 0,
+        "timed_out": false,
+        "timeout_attempt_count": 0
+      },
+      "source_block_heading": "Referenced Python reproducer: bugs/bug_9b4d1fa7aac3b391/standalone_datafusion_groupby_null_sortkey_limit.py",
+      "source_block_index": -1,
+      "source_path": "bugs/bug_9b4d1fa7aac3b391/standalone_datafusion_groupby_null_sortkey_limit.py",
+      "title": "DataFusion #22190: Grouped NULL Aggregate Sort Key Under Top-K",
+      "warnings": []
+    },
+    {
+      "blocking_reasons": [
+        "already registered in latest confirmation evidence"
+      ],
+      "compile": {
+        "status": "ok"
+      },
+      "confirmed_latest_match": {
+        "family": "groupby_aggregation@datafusion",
+        "issue_url": "https://github.com/apache/datafusion/issues/22489",
+        "matched_by": "issue_url",
+        "upstream_status": "upstream_labeled_bug"
+      },
+      "extracted": true,
+      "family_guess": "groupby_aggregation@datafusion",
+      "issue_path": "new_issue/datafusion_22489_grouped_limit_offset.md",
+      "priority": "low",
+      "readiness_status": "already_submitted_or_confirmed",
+      "reproducer_path": "new_issue/generated/issue-bundles/reproducers/datafusion_22489_grouped_limit_offset.py",
+      "run": {
+        "attempt_count": 1,
+        "attempts": [
+          {
+            "returncode": 1,
+            "skipped": false,
+            "stderr": "Traceback (most recent call last):\n  File \"/root/datadiff_fuzz_lab/new_issue/generated/issue-bundles/reproducers/datafusion_22489_grouped_limit_offset.py\", line 62, in <module>\n    main()\n  File \"/root/datadiff_fuzz_lab/new_issue/generated/issue-bundles/reproducers/datafusion_22489_grouped_limit_offset.py\", line 55, in main\n    assert len(failing) == 1 and failing.iloc[0][\"id\"] == 0, (\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: DataFusion dropped the second grouped row after inner ORDER BY/LIMIT and outer ORDER BY/OFFSET.\n",
+            "stdout": "datafusion=53.0.0\npyarrow=24.0.0\ncontrol:\n   id  count_id  nunique_j\n0   0         1          0\nwith inner limit:\nEmpty DataFrame\nColumns: [id, count_id, nunique_j]\nIndex: []\n",
+            "timed_out": false
+          }
+        ],
+        "consistent_returncodes": true,
+        "consistent_stderr": true,
+        "consistent_stdout": true,
+        "expected_failure_reproduced": true,
+        "flaky": false,
+        "nonzero_attempt_count": 1,
+        "returncode": 1,
+        "skipped": false,
+        "stderr": "Traceback (most recent call last):\n  File \"/root/datadiff_fuzz_lab/new_issue/generated/issue-bundles/reproducers/datafusion_22489_grouped_limit_offset.py\", line 62, in <module>\n    main()\n  File \"/root/datadiff_fuzz_lab/new_issue/generated/issue-bundles/reproducers/datafusion_22489_grouped_limit_offset.py\", line 55, in main\n    assert len(failing) == 1 and failing.iloc[0][\"id\"] == 0, (\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: DataFusion dropped the second grouped row after inner ORDER BY/LIMIT and outer ORDER BY/OFFSET.\n",
+        "stdout": "datafusion=53.0.0\npyarrow=24.0.0\ncontrol:\n   id  count_id  nunique_j\n0   0         1          0\nwith inner limit:\nEmpty DataFrame\nColumns: [id, count_id, nunique_j]\nIndex: []\n",
+        "successful_attempt_count": 0,
+        "timed_out": false,
+        "timeout_attempt_count": 0
+      },
+      "source_block_heading": "Referenced Python reproducer: bugs/bug_615197514c6c857f/standalone_datafusion_groupby_limit_offset.py",
+      "source_block_index": -1,
+      "source_path": "bugs/bug_615197514c6c857f/standalone_datafusion_groupby_limit_offset.py",
+      "title": "DataFusion #22489: Grouped Row Lost Across Ordered Limit And Offset",
+      "warnings": []
+    },
+    {
+      "blocking_reasons": [
+        "already registered in latest confirmation evidence"
+      ],
+      "compile": {
+        "status": "ok"
+      },
+      "confirmed_latest_match": {
+        "family": "negative_zero_comparison@datafusion",
+        "issue_url": "https://github.com/apache/datafusion/issues/22490",
+        "matched_by": "issue_url",
+        "upstream_status": "upstream_labeled_bug"
+      },
+      "extracted": true,
+      "family_guess": "negative_zero_comparison@datafusion",
+      "issue_path": "new_issue/datafusion_22490_negative_zero.md",
+      "priority": "low",
+      "readiness_status": "already_submitted_or_confirmed",
+      "reproducer_path": "new_issue/generated/issue-bundles/reproducers/datafusion_22490_negative_zero.py",
+      "run": {
+        "attempt_count": 1,
+        "attempts": [
+          {
+            "returncode": 1,
+            "skipped": false,
+            "stderr": "Traceback (most recent call last):\n  File \"/root/datadiff_fuzz_lab/new_issue/generated/issue-bundles/reproducers/datafusion_22490_negative_zero.py\", line 50, in <module>\n    main()\n  File \"/root/datadiff_fuzz_lab/new_issue/generated/issue-bundles/reproducers/datafusion_22490_negative_zero.py\", line 45, in main\n    assert bool(diagnostic.iloc[0][\"cmp\"]) is True, \"DataFusion evaluated -0.0 >= 0.0 as false\"\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: DataFusion evaluated -0.0 >= 0.0 as false\n",
+            "stdout": "datafusion=53.0.0\npyarrow=24.0.0\nduckdb=1.5.3\npython comparison: True\nduckdb comparison: True\ndatafusion diagnostic:\n   id  m_0    cmp\n0   1 -0.0  False\ndatafusion filtered rows:\n   id  m_0\n0   1 -0.0\n",
+            "timed_out": false
+          }
+        ],
+        "consistent_returncodes": true,
+        "consistent_stderr": true,
+        "consistent_stdout": true,
+        "expected_failure_reproduced": true,
+        "flaky": false,
+        "nonzero_attempt_count": 1,
+        "returncode": 1,
+        "skipped": false,
+        "stderr": "Traceback (most recent call last):\n  File \"/root/datadiff_fuzz_lab/new_issue/generated/issue-bundles/reproducers/datafusion_22490_negative_zero.py\", line 50, in <module>\n    main()\n  File \"/root/datadiff_fuzz_lab/new_issue/generated/issue-bundles/reproducers/datafusion_22490_negative_zero.py\", line 45, in main\n    assert bool(diagnostic.iloc[0][\"cmp\"]) is True, \"DataFusion evaluated -0.0 >= 0.0 as false\"\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: DataFusion evaluated -0.0 >= 0.0 as false\n",
+        "stdout": "datafusion=53.0.0\npyarrow=24.0.0\nduckdb=1.5.3\npython comparison: True\nduckdb comparison: True\ndatafusion diagnostic:\n   id  m_0    cmp\n0   1 -0.0  False\ndatafusion filtered rows:\n   id  m_0\n0   1 -0.0\n",
+        "successful_attempt_count": 0,
+        "timed_out": false,
+        "timeout_attempt_count": 0
+      },
+      "source_block_heading": "Referenced Python reproducer: bugs/bug_72710816fcc5d0d4/standalone_datafusion_negative_zero_truth_filter.py",
+      "source_block_index": -1,
+      "source_path": "bugs/bug_72710816fcc5d0d4/standalone_datafusion_negative_zero_truth_filter.py",
+      "title": "DataFusion #22490: Negative Zero Comparison",
+      "warnings": []
+    },
+    {
+      "blocking_reasons": [
+        "already registered in latest confirmation evidence"
+      ],
+      "compile": {
+        "status": "ok"
+      },
+      "confirmed_latest_match": {
+        "family": "distinct_null_topk@datafusion",
+        "issue_url": "https://github.com/apache/datafusion/issues/22554",
+        "matched_by": "issue_url",
+        "upstream_status": "upstream_labeled_bug"
+      },
+      "extracted": true,
+      "family_guess": "distinct_null_topk@datafusion",
+      "issue_path": "new_issue/datafusion_distinct_null_topk.md",
+      "priority": "low",
+      "readiness_status": "already_submitted_or_confirmed",
+      "reproducer_path": "new_issue/generated/issue-bundles/reproducers/datafusion_distinct_null_topk.py",
+      "run": {
+        "attempt_count": 1,
+        "attempts": [
+          {
+            "returncode": 1,
+            "skipped": false,
+            "stderr": "Traceback (most recent call last):\n  File \"/root/datadiff_fuzz_lab/new_issue/generated/issue-bundles/reproducers/datafusion_distinct_null_topk.py\", line 19, in <module>\n    assert top1 == full[:1]\n           ^^^^^^^^^^^^^^^^\nAssertionError\n",
+            "stdout": "full: [None, '', 'a']\ntop1: ['']\n",
+            "timed_out": false
+          }
+        ],
+        "consistent_returncodes": true,
+        "consistent_stderr": true,
+        "consistent_stdout": true,
+        "expected_failure_reproduced": true,
+        "flaky": false,
+        "nonzero_attempt_count": 1,
+        "returncode": 1,
+        "skipped": false,
+        "stderr": "Traceback (most recent call last):\n  File \"/root/datadiff_fuzz_lab/new_issue/generated/issue-bundles/reproducers/datafusion_distinct_null_topk.py\", line 19, in <module>\n    assert top1 == full[:1]\n           ^^^^^^^^^^^^^^^^\nAssertionError\n",
+        "stdout": "full: [None, '', 'a']\ntop1: ['']\n",
+        "successful_attempt_count": 0,
+        "timed_out": false,
+        "timeout_attempt_count": 0
+      },
+      "source_block_heading": "Reproducer",
+      "source_block_index": 0,
+      "source_path": "",
+      "title": "DataFusion DISTINCT ORDER BY NULLS FIRST LIMIT returns the wrong top row",
+      "warnings": [
+        "referenced local evidence paths are missing or ignored: reports/bug-audit-20260526T232117.md"
+      ]
+    },
+    {
+      "blocking_reasons": [
+        "already registered in latest confirmation evidence"
+      ],
+      "compile": {
+        "status": "ok"
+      },
+      "confirmed_latest_match": {
+        "family": "datafusion_limit_idempotence@datafusion",
+        "issue_url": "https://github.com/apache/datafusion/issues/22541",
+        "matched_by": "issue_url",
+        "upstream_status": "upstream_labeled_bug"
+      },
+      "extracted": true,
+      "family_guess": "datafusion_limit_idempotence@datafusion",
+      "issue_path": "new_issue/datafusion_limit_idempotence.md",
+      "priority": "low",
+      "readiness_status": "already_submitted_or_confirmed",
+      "reproducer_path": "new_issue/generated/issue-bundles/reproducers/datafusion_limit_idempotence.py",
+      "run": {
+        "attempt_count": 1,
+        "attempts": [
+          {
+            "returncode": 0,
+            "skipped": false,
+            "stderr": "",
+            "stdout": "base\n id g   x  z s\n  8 c   0  0 A\n 12 a  -2 -3  \n  2 c -10 -3  \nduplicate_limit\n id g  x  z s\n 12 a -2 -3  \n",
+            "timed_out": false
+          }
+        ],
+        "consistent_returncodes": true,
+        "consistent_stderr": true,
+        "consistent_stdout": true,
+        "expected_failure_reproduced": false,
+        "flaky": false,
+        "nonzero_attempt_count": 0,
+        "returncode": 0,
+        "skipped": false,
+        "stderr": "",
+        "stdout": "base\n id g   x  z s\n  8 c   0  0 A\n 12 a  -2 -3  \n  2 c -10 -3  \nduplicate_limit\n id g  x  z s\n 12 a -2 -3  \n",
+        "successful_attempt_count": 1,
+        "timed_out": false,
+        "timeout_attempt_count": 0
+      },
+      "source_block_heading": "Reproducer",
+      "source_block_index": 2,
+      "source_path": "",
+      "title": "Issue Draft: DataFusion Duplicate Ordered LIMIT Changes Query Result",
+      "warnings": []
+    },
+    {
+      "blocking_reasons": [
+        "document status says it has already been submitted or confirmed upstream"
+      ],
+      "compile": {
+        "status": "ok"
+      },
+      "confirmed_latest_match": {},
+      "extracted": true,
+      "family_guess": "metamorphic_semi_anti_join_rewrite@duckdb",
+      "issue_path": "new_issue/duckdb_cte_boolean_inner_join_empty_result.md",
+      "priority": "low",
+      "readiness_status": "already_submitted_or_confirmed",
+      "reproducer_path": "new_issue/generated/issue-bundles/reproducers/duckdb_cte_boolean_inner_join_empty_result.py",
+      "run": {
+        "attempt_count": 1,
+        "attempts": [
+          {
+            "returncode": 0,
+            "skipped": false,
+            "stderr": "",
+            "stdout": "duckdb 1.5.3\nstep_6 [(False, False)]\nexists [(False, False)]\ninner_join [(False, False)]\nmaterialized_inner_join [(False, False)]\n",
+            "timed_out": false
+          }
+        ],
+        "consistent_returncodes": true,
+        "consistent_stderr": true,
+        "consistent_stdout": true,
+        "expected_failure_reproduced": false,
+        "flaky": false,
+        "nonzero_attempt_count": 0,
+        "returncode": 0,
+        "skipped": false,
+        "stderr": "",
+        "stdout": "duckdb 1.5.3\nstep_6 [(False, False)]\nexists [(False, False)]\ninner_join [(False, False)]\nmaterialized_inner_join [(False, False)]\n",
+        "successful_attempt_count": 1,
+        "timed_out": false,
+        "timeout_attempt_count": 0
+      },
+      "source_block_heading": "Reproducer",
+      "source_block_index": 1,
+      "source_path": "",
+      "title": "Issue Draft: DuckDB CTE Boolean INNER JOIN Returns Empty Result While EXISTS and Materialized Join Match",
+      "warnings": []
+    },
+    {
+      "blocking_reasons": [
+        "already registered in latest confirmation evidence"
+      ],
+      "compile": {
+        "status": "ok"
+      },
+      "confirmed_latest_match": {
+        "family": "groupby_aggregation@polars,polars_lazy",
+        "issue_url": "https://github.com/pola-rs/polars/issues/27672",
+        "matched_by": "issue_url",
+        "upstream_status": "fixed_upstream"
+      },
+      "extracted": true,
+      "family_guess": "groupby_aggregation@polars,polars_lazy",
+      "issue_path": "new_issue/polars_27672_grouped_max_sort.md",
+      "priority": "low",
+      "readiness_status": "already_submitted_or_confirmed",
+      "reproducer_path": "new_issue/generated/issue-bundles/reproducers/polars_27672_grouped_max_sort.py",
+      "run": {
+        "attempt_count": 1,
+        "attempts": [
+          {
+            "returncode": 1,
+            "skipped": false,
+            "stderr": "",
+            "stdout": "polars=1.41.2\n\ninput\nshape: (4, 2)\n┌─────┬──────┐\n│ s   ┆ z    │\n│ --- ┆ ---  │\n│ str ┆ i64  │\n╞═════╪══════╡\n│ a   ┆ 1    │\n│ b   ┆ 2    │\n│ b   ┆ 0    │\n│ b   ┆ null │\n└─────┴──────┘\n\ngrouped\nshape: (2, 2)\n┌─────┬───────┐\n│ s   ┆ max_z │\n│ --- ┆ ---   │\n│ str ┆ i64   │\n╞═════╪═══════╡\n│ b   ┆ 2     │\n│ a   ┆ 1     │\n└─────┴───────┘\ngrouped['max_z'].flags={'SORTED_ASC': False, 'SORTED_DESC': False}\ngrouped['max_z'].arg_sort()=[1, 0]\ngrouped['max_z'].arg_sort(descending=True)=[0, 1]\n\nobserved eager sort descending\nshape: (2, 2)\n┌─────┬───────┐\n│ s   ┆ max_z │\n│ --- ┆ ---   │\n│ str ┆ i64   │\n╞═════╪═══════╡\n│ b   ┆ 2     │\n│ a   ┆ 1     │\n└─────┴───────┘\n\nexpected after materializing rows\nshape: (2, 2)\n┌─────┬───────┐\n│ s   ┆ max_z │\n│ --- ┆ ---   │\n│ str ┆ i64   │\n╞═════╪═══════╡\n│ b   ┆ 2     │\n│ a   ┆ 1     │\n└─────┴───────┘\n\nlazy reference\nshape: (2, 2)\n┌─────┬───────┐\n│ s   ┆ max_z │\n│ --- ┆ ---   │\n│ str ┆ i64   │\n╞═════╪═══════╡\n│ b   ┆ 2     │\n│ a   ┆ 1     │\n└─────┴───────┘\n\nNo mismatch reproduced.\n",
+            "timed_out": false
+          }
+        ],
+        "consistent_returncodes": true,
+        "consistent_stderr": true,
+        "consistent_stdout": true,
+        "expected_failure_reproduced": false,
+        "flaky": false,
+        "nonzero_attempt_count": 1,
+        "returncode": 1,
+        "skipped": false,
+        "stderr": "",
+        "stdout": "polars=1.41.2\n\ninput\nshape: (4, 2)\n┌─────┬──────┐\n│ s   ┆ z    │\n│ --- ┆ ---  │\n│ str ┆ i64  │\n╞═════╪══════╡\n│ a   ┆ 1    │\n│ b   ┆ 2    │\n│ b   ┆ 0    │\n│ b   ┆ null │\n└─────┴──────┘\n\ngrouped\nshape: (2, 2)\n┌─────┬───────┐\n│ s   ┆ max_z │\n│ --- ┆ ---   │\n│ str ┆ i64   │\n╞═════╪═══════╡\n│ b   ┆ 2     │\n│ a   ┆ 1     │\n└─────┴───────┘\ngrouped['max_z'].flags={'SORTED_ASC': False, 'SORTED_DESC': False}\ngrouped['max_z'].arg_sort()=[1, 0]\ngrouped['max_z'].arg_sort(descending=True)=[0, 1]\n\nobserved eager sort descending\nshape: (2, 2)\n┌─────┬───────┐\n│ s   ┆ max_z │\n│ --- ┆ ---   │\n│ str ┆ i64   │\n╞═════╪═══════╡\n│ b   ┆ 2     │\n│ a   ┆ 1     │\n└─────┴───────┘\n\nexpected after materializing rows\nshape: (2, 2)\n┌─────┬───────┐\n│ s   ┆ max_z │\n│ --- ┆ ---   │\n│ str ┆ i64   │\n╞═════╪═══════╡\n│ b   ┆ 2     │\n│ a   ┆ 1     │\n└─────┴───────┘\n\nlazy reference\nshape: (2, 2)\n┌─────┬───────┐\n│ s   ┆ max_z │\n│ --- ┆ ---   │\n│ str ┆ i64   │\n╞═════╪═══════╡\n│ b   ┆ 2     │\n│ a   ┆ 1     │\n└─────┴───────┘\n\nNo mismatch reproduced.\n",
+        "successful_attempt_count": 0,
+        "timed_out": false,
+        "timeout_attempt_count": 0
+      },
+      "source_block_heading": "Referenced Python reproducer: bugs/bug_546c99e96783cbaf/polars_minimal_reproduce.py",
+      "source_block_index": -1,
+      "source_path": "bugs/bug_546c99e96783cbaf/polars_minimal_reproduce.py",
+      "title": "Polars #27672: Grouped Max Result Carries Incorrect Sort State",
+      "warnings": []
+    },
+    {
+      "blocking_reasons": [
+        "already registered in latest confirmation evidence"
+      ],
+      "compile": {
+        "status": "ok"
+      },
+      "confirmed_latest_match": {
+        "family": "polars_reflected_arithmetic_operand_order@polars",
+        "issue_url": "https://github.com/pola-rs/polars/issues/27752",
+        "matched_by": "issue_url",
+        "upstream_status": "upstream_labeled_bug"
+      },
+      "extracted": true,
+      "family_guess": "polars_reflected_arithmetic_operand_order@polars",
+      "issue_path": "new_issue/polars_series_reflected_arithmetic_operand_order.md",
+      "priority": "low",
+      "readiness_status": "already_submitted_or_confirmed",
+      "reproducer_path": "new_issue/generated/issue-bundles/reproducers/polars_series_reflected_arithmetic_operand_order.py",
+      "run": {
+        "attempt_count": 1,
+        "attempts": [
+          {
+            "returncode": 0,
+            "skipped": false,
+            "stderr": "",
+            "stdout": "lhs.__rsub__(rhs): [-3, -4, -5]\nrhs - lhs: [3, 4, 5]\nlhs.__rtruediv__(rhs): [0.4, 0.42857142857142855, 0.4444444444444444]\nrhs / lhs: [2.5, 2.3333333333333335, 2.25]\nlhs.__rfloordiv__(rhs): [0, 0, 0]\nrhs // lhs: [2, 2, 2]\nlhs.__rmod__(rhs): [2, 3, 4]\nrhs % lhs: [1, 1, 1]\nlhs.__rpow__(rhs):\nColumnNotFoundError: unable to find column \"lhs\"; valid columns: [\"rhs\"]\nrhs ** lhs: [25, 343, 6561]\n",
+            "timed_out": false
+          }
+        ],
+        "consistent_returncodes": true,
+        "consistent_stderr": true,
+        "consistent_stdout": true,
+        "expected_failure_reproduced": false,
+        "flaky": false,
+        "nonzero_attempt_count": 0,
+        "returncode": 0,
+        "skipped": false,
+        "stderr": "",
+        "stdout": "lhs.__rsub__(rhs): [-3, -4, -5]\nrhs - lhs: [3, 4, 5]\nlhs.__rtruediv__(rhs): [0.4, 0.42857142857142855, 0.4444444444444444]\nrhs / lhs: [2.5, 2.3333333333333335, 2.25]\nlhs.__rfloordiv__(rhs): [0, 0, 0]\nrhs // lhs: [2, 2, 2]\nlhs.__rmod__(rhs): [2, 3, 4]\nrhs % lhs: [1, 1, 1]\nlhs.__rpow__(rhs):\nColumnNotFoundError: unable to find column \"lhs\"; valid columns: [\"rhs\"]\nrhs ** lhs: [25, 343, 6561]\n",
+        "successful_attempt_count": 1,
+        "timed_out": false,
+        "timeout_attempt_count": 0
+      },
+      "source_block_heading": "Reproducer",
+      "source_block_index": 1,
+      "source_path": "",
+      "title": "Issue Draft: Polars `Series` Reflected Arithmetic Uses Wrong Operand Order",
+      "warnings": []
+    },
+    {
+      "blocking_reasons": [
+        "document status says it has already been submitted or confirmed upstream"
+      ],
+      "compile": {
+        "status": "ok"
+      },
+      "confirmed_latest_match": {},
+      "extracted": true,
+      "family_guess": "polars_vector_division_rounding@polars",
+      "issue_path": "new_issue/polars_vector_division_rounding.md",
+      "priority": "low",
+      "readiness_status": "already_submitted_or_confirmed",
+      "reproducer_path": "new_issue/generated/issue-bundles/reproducers/polars_vector_division_rounding.py",
+      "run": {
+        "attempt_count": 1,
+        "attempts": [
+          {
+            "returncode": 0,
+            "skipped": false,
+            "stderr": "",
+            "stdout": "polars: 1.41.2\nsingle: ['1.4'] ['0x3ff6666666666666']\nvector: ['1.4000000000000001', '1.4000000000000001'] ['0x3ff6666666666667', '0x3ff6666666666667']\n",
+            "timed_out": false
+          }
+        ],
+        "consistent_returncodes": true,
+        "consistent_stderr": true,
+        "consistent_stdout": true,
+        "expected_failure_reproduced": false,
+        "flaky": false,
+        "nonzero_attempt_count": 0,
+        "returncode": 0,
+        "skipped": false,
+        "stderr": "",
+        "stdout": "polars: 1.41.2\nsingle: ['1.4'] ['0x3ff6666666666666']\nvector: ['1.4000000000000001', '1.4000000000000001'] ['0x3ff6666666666667', '0x3ff6666666666667']\n",
+        "successful_attempt_count": 1,
+        "timed_out": false,
+        "timeout_attempt_count": 0
+      },
+      "source_block_heading": "Reproducer",
+      "source_block_index": 1,
+      "source_path": "",
+      "title": "Issue Draft: Polars Vectorized Division Returns Next-Up Float For `7 / 5`",
+      "warnings": []
+    },
+    {
+      "blocking_reasons": [
+        "already registered in latest confirmation evidence"
+      ],
+      "compile": {
+        "status": "ok"
+      },
+      "confirmed_latest_match": {
+        "family": "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+        "issue_url": "https://github.com/apache/arrow/issues/50043",
+        "matched_by": "issue_url",
+        "upstream_status": "upstream_labeled_bug"
+      },
+      "extracted": true,
+      "family_guess": "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+      "issue_path": "new_issue/pyarrow_slice_groupby_any.md",
+      "priority": "low",
+      "readiness_status": "already_submitted_or_confirmed",
+      "reproducer_path": "new_issue/generated/issue-bundles/reproducers/pyarrow_slice_groupby_any.py",
+      "run": {
+        "attempt_count": 1,
+        "attempts": [
+          {
+            "returncode": 0,
+            "skipped": false,
+            "stderr": "",
+            "stdout": "offset: 1\nscalar any: False\nsliced: [True]\nrebuilt: [False]\n",
+            "timed_out": false
+          }
+        ],
+        "consistent_returncodes": true,
+        "consistent_stderr": true,
+        "consistent_stdout": true,
+        "expected_failure_reproduced": false,
+        "flaky": false,
+        "nonzero_attempt_count": 0,
+        "returncode": 0,
+        "skipped": false,
+        "stderr": "",
+        "stdout": "offset: 1\nscalar any: False\nsliced: [True]\nrebuilt: [False]\n",
+        "successful_attempt_count": 1,
+        "timed_out": false,
+        "timeout_attempt_count": 0
+      },
+      "source_block_heading": "Reproducer",
+      "source_block_index": 1,
+      "source_path": "",
+      "title": "Issue Draft: `Table.group_by(...).aggregate([(\"flag\", \"any\")])` Returns Wrong Result For Sliced Boolean Array",
+      "warnings": []
+    }
+  ],
   "manifest_path": "new_issue/generated/issue-bundles/manifest.json",
   "markdown_path": "new_issue/generated/issue-bundles/manifest.md",
   "schema_version": "issue-bundle-v1",
   "submission_groups": [],
   "summary": {
-    "available_issue_count": 0,
-    "available_submission_group_count": 0,
+    "available_issue_count": 11,
+    "available_submission_group_count": 10,
     "bundled_primary_per_family": true,
     "compile_failure_count": 0,
     "duplicate_family_draft_count": 0,
     "duplicate_family_draft_groups": {},
-    "executed_reproducer_attempt_count": 0,
-    "executed_reproducer_count": 0,
-    "extracted_reproducer_count": 0,
-    "families": [],
-    "family_count": 0,
-    "family_groups": {},
+    "executed_reproducer_attempt_count": 10,
+    "executed_reproducer_count": 10,
+    "expected_failure_reproducer_attempt_count": 4,
+    "expected_failure_reproducer_count": 4,
+    "extracted_reproducer_count": 10,
+    "families": [
+      "datafusion_limit_idempotence@datafusion",
+      "distinct_null_topk@datafusion",
+      "groupby_aggregation@datafusion",
+      "groupby_aggregation@polars,polars_lazy",
+      "grouped_topk_null_sort_key@datafusion",
+      "metamorphic_semi_anti_join_rewrite@duckdb",
+      "negative_zero_comparison@datafusion",
+      "polars_reflected_arithmetic_operand_order@polars",
+      "polars_vector_division_rounding@polars",
+      "pyarrow_sliced_bool_groupby_any_all@pyarrow"
+    ],
+    "family_count": 10,
+    "family_groups": {
+      "datafusion_limit_idempotence@datafusion": [
+        "new_issue/datafusion_limit_idempotence.md"
+      ],
+      "distinct_null_topk@datafusion": [
+        "new_issue/datafusion_distinct_null_topk.md"
+      ],
+      "groupby_aggregation@datafusion": [
+        "new_issue/datafusion_22489_grouped_limit_offset.md"
+      ],
+      "groupby_aggregation@polars,polars_lazy": [
+        "new_issue/polars_27672_grouped_max_sort.md"
+      ],
+      "grouped_topk_null_sort_key@datafusion": [
+        "new_issue/datafusion_22190_grouped_null_topk.md"
+      ],
+      "metamorphic_semi_anti_join_rewrite@duckdb": [
+        "new_issue/duckdb_cte_boolean_inner_join_empty_result.md"
+      ],
+      "negative_zero_comparison@datafusion": [
+        "new_issue/datafusion_22490_negative_zero.md"
+      ],
+      "polars_reflected_arithmetic_operand_order@polars": [
+        "new_issue/polars_series_reflected_arithmetic_operand_order.md"
+      ],
+      "polars_vector_division_rounding@polars": [
+        "new_issue/polars_vector_division_rounding.md"
+      ],
+      "pyarrow_sliced_bool_groupby_any_all@pyarrow": [
+        "new_issue/pyarrow_slice_groupby_any.md"
+      ]
+    },
+    "fixed_upstream_not_reproduced_attempt_count": 1,
+    "fixed_upstream_not_reproduced_count": 1,
     "flaky_reproducer_count": 0,
-    "issue_count": 0,
+    "issue_count": 10,
     "missing_reproducer_count": 0,
     "nonzero_exit_attempt_count": 0,
     "nonzero_exit_count": 0,
-    "primary_issue_paths": [],
-    "selected_issue_count": 0,
-    "selected_submission_group_count": 0,
-    "skipped_supporting_duplicate_count": 0,
-    "skipped_supporting_issue_paths": [],
-    "supporting_issue_paths": [],
+    "primary_issue_paths": [
+      "new_issue/datafusion_22190_grouped_null_topk.md",
+      "new_issue/datafusion_22489_grouped_limit_offset.md",
+      "new_issue/datafusion_22490_negative_zero.md",
+      "new_issue/datafusion_distinct_null_topk.md",
+      "new_issue/datafusion_limit_idempotence.md",
+      "new_issue/duckdb_cte_boolean_inner_join_empty_result.md",
+      "new_issue/polars_27672_grouped_max_sort.md",
+      "new_issue/polars_series_reflected_arithmetic_operand_order.md",
+      "new_issue/polars_vector_division_rounding.md",
+      "new_issue/pyarrow_slice_groupby_any.md"
+    ],
+    "selected_issue_count": 10,
+    "selected_submission_group_count": 10,
+    "skipped_supporting_duplicate_count": 1,
+    "skipped_supporting_issue_paths": [
+      "new_issue/polars_series_rtruediv_operand_order.md"
+    ],
+    "supporting_issue_paths": [
+      "new_issue/polars_series_rtruediv_operand_order.md"
+    ],
     "timeout_attempt_count": 0,
     "timeout_count": 0
   }

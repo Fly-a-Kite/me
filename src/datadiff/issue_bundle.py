@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -9,8 +10,15 @@ from datadiff.issue_readiness import build_issue_readiness
 from datadiff.util import PROJECT_ROOT, dump_json, slugify, utc_now
 
 ISSUE_BUNDLE_SCHEMA_VERSION = "issue-bundle-v1"
-DEFAULT_ISSUE_BUNDLE_STATUSES = ("ready_to_submit", "needs_dedup_check")
+DEFAULT_ISSUE_BUNDLE_STATUSES = (
+    "ready_to_submit",
+    "needs_dedup_check",
+    "already_submitted_or_confirmed",
+)
 DEFAULT_ISSUE_BUNDLE_DIR = PROJECT_ROOT / "new_issue" / "generated" / "issue-bundles"
+_PYTHON_PATH_REF_RE = re.compile(
+    r"(?<![\w/-])((?:bugs|new_issue|old_issue|experiments|scripts|src|tests)/[A-Za-z0-9_.:/-]+\.py)"
+)
 
 
 def build_issue_bundle(
@@ -50,7 +58,7 @@ def build_issue_bundle(
             bundled.append(_missing_issue_record(issue, issue_path))
             continue
         text = issue_path.read_text(encoding="utf-8")
-        code_block = _select_python_reproducer(text)
+        code_block = _select_python_reproducer(text, issue_path=issue_path)
         if code_block is None:
             bundled.append(_no_reproducer_record(issue, issue_path))
             continue
@@ -73,8 +81,10 @@ def build_issue_bundle(
                 "family_guess": str(issue.get("family_guess", "")),
                 "readiness_status": str(issue.get("readiness_status", "")),
                 "priority": str(issue.get("priority", "")),
+                "confirmed_latest_match": dict(issue.get("confirmed_latest_match", {}) or {}),
                 "source_block_index": code_block["index"],
                 "source_block_heading": code_block["heading"],
+                "source_path": code_block.get("source_path", ""),
                 "reproducer_path": _project_display_path(reproducer_path),
                 "compile": compile_result,
                 "run": run_result,
@@ -133,6 +143,8 @@ def render_issue_bundle_markdown(manifest: dict[str, Any]) -> str:
         f"- Compile failures: `{summary.get('compile_failure_count', 0)}`",
         f"- Executed reproducers: `{summary.get('executed_reproducer_count', 0)}`",
         f"- Executed attempts: `{summary.get('executed_reproducer_attempt_count', 0)}`",
+        f"- Expected assertion-failure reproducers: `{summary.get('expected_failure_reproducer_count', 0)}`",
+        f"- Fixed-upstream no-longer-reproduced scripts: `{summary.get('fixed_upstream_not_reproduced_count', 0)}`",
         f"- Flaky reproducers: `{summary.get('flaky_reproducer_count', 0)}`",
         f"- Non-zero reproducer exits: `{summary.get('nonzero_exit_count', 0)}`",
         "",
@@ -337,7 +349,7 @@ def _unique_sorted(values: Any) -> list[str]:
     return sorted({str(value) for value in values if str(value)})
 
 
-def _select_python_reproducer(text: str) -> dict[str, Any] | None:
+def _select_python_reproducer(text: str, *, issue_path: Path | None = None) -> dict[str, Any] | None:
     blocks = _markdown_code_blocks(text)
     python_blocks = [
         block
@@ -345,12 +357,45 @@ def _select_python_reproducer(text: str) -> dict[str, Any] | None:
         if block["language"] in {"python", "py"} or not block["language"] and _looks_like_python(block["source"])
     ]
     if not python_blocks:
-        return None
+        return _referenced_python_reproducer(text, issue_path=issue_path)
     for block in python_blocks:
         heading = block["heading"].lower()
         if "reproducer" in heading or "reproduction" in heading or "复现" in heading:
             return block
     return python_blocks[0]
+
+
+def _referenced_python_reproducer(text: str, *, issue_path: Path | None = None) -> dict[str, Any] | None:
+    for raw in _PYTHON_PATH_REF_RE.findall(text):
+        path = _resolve_referenced_path(raw, issue_path=issue_path)
+        if not path.is_file():
+            continue
+        source = path.read_text(encoding="utf-8")
+        if not _looks_like_python(source):
+            continue
+        display_path = _project_display_path(path)
+        return {
+            "index": -1,
+            "language": "python",
+            "heading": f"Referenced Python reproducer: {display_path}",
+            "source": source,
+            "source_path": display_path,
+        }
+    return None
+
+
+def _resolve_referenced_path(value: str, *, issue_path: Path | None = None) -> Path:
+    candidate = Path(value.rstrip(".,);:"))
+    if candidate.is_absolute():
+        return candidate
+    project_candidate = PROJECT_ROOT / candidate
+    if project_candidate.exists():
+        return project_candidate
+    if issue_path is not None:
+        issue_relative = issue_path.parent / candidate
+        if issue_relative.exists():
+            return issue_relative
+    return project_candidate
 
 
 def _markdown_code_blocks(text: str) -> list[dict[str, Any]]:
@@ -392,7 +437,19 @@ def _markdown_code_blocks(text: str) -> list[dict[str, Any]]:
 
 
 def _looks_like_python(source: str) -> bool:
-    markers = ("import ", "from ", "print(", "def ", "pl.", "pa.", "duckdb", "SessionContext")
+    markers = (
+        "#!/usr/bin/env python",
+        "import ",
+        "from ",
+        "print(",
+        "def ",
+        "assert ",
+        "__main__",
+        "pl.",
+        "pa.",
+        "duckdb",
+        "SessionContext",
+    )
     return any(marker in source for marker in markers)
 
 
@@ -467,6 +524,14 @@ def _summarize_reproducer_attempts(attempts: list[dict[str, Any]]) -> dict[str, 
     consistent_returncodes = len(set(returncodes)) <= 1 and timeout_count in {0, len(attempts)}
     consistent_stdout = len(set(stdout_values)) <= 1
     consistent_stderr = len(set(stderr_values)) <= 1
+    expected_failure_reproduced = (
+        nonzero_count == len(attempts)
+        and timeout_count == 0
+        and consistent_returncodes
+        and consistent_stdout
+        and consistent_stderr
+        and all(_is_expected_assertion_failure(attempt) for attempt in attempts)
+    )
     first.update(
         {
             "attempt_count": len(attempts),
@@ -483,10 +548,19 @@ def _summarize_reproducer_attempts(attempts: list[dict[str, Any]]) -> dict[str, 
             "consistent_returncodes": consistent_returncodes,
             "consistent_stdout": consistent_stdout,
             "consistent_stderr": consistent_stderr,
+            "expected_failure_reproduced": expected_failure_reproduced,
             "flaky": not (consistent_returncodes and consistent_stdout and consistent_stderr),
         }
     )
     return first
+
+
+def _is_expected_assertion_failure(attempt: dict[str, Any]) -> bool:
+    if attempt.get("skipped") or attempt.get("timed_out"):
+        return False
+    if int(attempt.get("returncode", 0) or 0) == 0:
+        return False
+    return "AssertionError" in f"{attempt.get('stdout', '')}\n{attempt.get('stderr', '')}"
 
 
 def _missing_issue_record(issue: dict[str, Any], issue_path: Path) -> dict[str, Any]:
@@ -534,13 +608,23 @@ def _bundle_summary(items: list[dict[str, Any]]) -> dict[str, Any]:
         if str(item.get("compile", {}).get("status", "")) not in {"", "ok"}
     ]
     executed = [item for item in items if not item.get("run", {}).get("skipped")]
+    expected_failures = [
+        item for item in executed if bool(item.get("run", {}).get("expected_failure_reproduced"))
+    ]
+    fixed_upstream_not_reproduced = [
+        item for item in executed if _is_fixed_upstream_not_reproduced(item)
+    ]
     nonzero = [
         item
         for item in executed
-        if int(item.get("run", {}).get("nonzero_attempt_count", 0) or 0)
-        or (
-            not item.get("run", {}).get("timed_out")
-            and int(item.get("run", {}).get("returncode", 0) or 0) != 0
+        if not bool(item.get("run", {}).get("expected_failure_reproduced"))
+        and not _is_fixed_upstream_not_reproduced(item)
+        and (
+            int(item.get("run", {}).get("nonzero_attempt_count", 0) or 0)
+            or (
+                not item.get("run", {}).get("timed_out")
+                and int(item.get("run", {}).get("returncode", 0) or 0) != 0
+            )
         )
     ]
     timed_out = [
@@ -550,7 +634,16 @@ def _bundle_summary(items: list[dict[str, Any]]) -> dict[str, Any]:
     ]
     flaky = [item for item in executed if item.get("run", {}).get("flaky")]
     attempt_count = sum(int(item.get("run", {}).get("attempt_count", 1) or 1) for item in executed)
-    nonzero_attempt_count = sum(int(item.get("run", {}).get("nonzero_attempt_count", 0) or 0) for item in executed)
+    nonzero_attempt_count = sum(
+        int(item.get("run", {}).get("nonzero_attempt_count", 0) or 0) for item in nonzero
+    )
+    expected_failure_attempt_count = sum(
+        int(item.get("run", {}).get("nonzero_attempt_count", 0) or 0) for item in expected_failures
+    )
+    fixed_upstream_not_reproduced_attempt_count = sum(
+        int(item.get("run", {}).get("nonzero_attempt_count", 0) or 0)
+        for item in fixed_upstream_not_reproduced
+    )
     timeout_attempt_count = sum(int(item.get("run", {}).get("timeout_attempt_count", 0) or 0) for item in executed)
     return {
         "issue_count": len(items),
@@ -564,12 +657,29 @@ def _bundle_summary(items: list[dict[str, Any]]) -> dict[str, Any]:
         "compile_failure_count": len(compile_failures),
         "executed_reproducer_count": len(executed),
         "executed_reproducer_attempt_count": attempt_count,
+        "expected_failure_reproducer_count": len(expected_failures),
+        "expected_failure_reproducer_attempt_count": expected_failure_attempt_count,
+        "fixed_upstream_not_reproduced_count": len(fixed_upstream_not_reproduced),
+        "fixed_upstream_not_reproduced_attempt_count": fixed_upstream_not_reproduced_attempt_count,
         "nonzero_exit_count": len(nonzero),
         "nonzero_exit_attempt_count": nonzero_attempt_count,
         "timeout_count": len(timed_out),
         "timeout_attempt_count": timeout_attempt_count,
         "flaky_reproducer_count": len(flaky),
     }
+
+
+def _is_fixed_upstream_not_reproduced(item: dict[str, Any]) -> bool:
+    run = item.get("run", {})
+    if run.get("skipped") or run.get("timed_out") or run.get("flaky"):
+        return False
+    if int(run.get("returncode", 0) or 0) == 0:
+        return False
+    confirmed = item.get("confirmed_latest_match", {})
+    if str(confirmed.get("upstream_status", "")) != "fixed_upstream":
+        return False
+    output = f"{run.get('stdout', '')}\n{run.get('stderr', '')}".lower()
+    return "no mismatch reproduced" in output or "not reproduc" in output or "no longer reproduc" in output
 
 
 def _family_groups(items: list[dict[str, Any]]) -> dict[str, list[str]]:

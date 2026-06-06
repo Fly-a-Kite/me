@@ -96,6 +96,18 @@ def build_issue_status(
             "issue_bundle_executed_reproducer_attempt_count": int(
                 issue_bundle_manifest.get("executed_reproducer_attempt_count", 0) or 0
             ),
+            "issue_bundle_expected_failure_reproducer_count": int(
+                issue_bundle_manifest.get("expected_failure_reproducer_count", 0) or 0
+            ),
+            "issue_bundle_expected_failure_reproducer_attempt_count": int(
+                issue_bundle_manifest.get("expected_failure_reproducer_attempt_count", 0) or 0
+            ),
+            "issue_bundle_fixed_upstream_not_reproduced_count": int(
+                issue_bundle_manifest.get("fixed_upstream_not_reproduced_count", 0) or 0
+            ),
+            "issue_bundle_fixed_upstream_not_reproduced_attempt_count": int(
+                issue_bundle_manifest.get("fixed_upstream_not_reproduced_attempt_count", 0) or 0
+            ),
             "issue_bundle_flaky_reproducer_count": int(
                 issue_bundle_manifest.get("flaky_reproducer_count", 0) or 0
             ),
@@ -144,6 +156,10 @@ def render_issue_status_markdown(status: dict[str, Any]) -> str:
         f"- Discovery workflow manifests: `{summary.get('discovery_workflow_manifest_count', 0)}`",
         f"- Issue bundle families: `{summary.get('issue_bundle_family_count', 0)}`",
         f"- Issue bundle reproducers: `{summary.get('issue_bundle_reproducer_count', 0)}`",
+        f"- Issue bundle expected assertion-failure reproducers: "
+        f"`{summary.get('issue_bundle_expected_failure_reproducer_count', 0)}`",
+        f"- Issue bundle fixed-upstream no-longer-reproduced scripts: "
+        f"`{summary.get('issue_bundle_fixed_upstream_not_reproduced_count', 0)}`",
         f"- Issue bundle flaky reproducers: `{summary.get('issue_bundle_flaky_reproducer_count', 0)}`",
         f"- Issue bundle nonzero exits: `{summary.get('issue_bundle_nonzero_exit_count', 0)}`",
         f"- Issue bundle timeouts: `{summary.get('issue_bundle_timeout_count', 0)}`",
@@ -453,6 +469,10 @@ def _load_issue_bundle_manifest(generated_issue_dir: Path) -> dict[str, Any]:
             "compile_failure_count": 0,
             "executed_reproducer_count": 0,
             "executed_reproducer_attempt_count": 0,
+            "expected_failure_reproducer_count": 0,
+            "expected_failure_reproducer_attempt_count": 0,
+            "fixed_upstream_not_reproduced_count": 0,
+            "fixed_upstream_not_reproduced_attempt_count": 0,
             "flaky_reproducer_count": 0,
             "nonzero_exit_count": 0,
             "nonzero_exit_attempt_count": 0,
@@ -475,6 +495,14 @@ def _load_issue_bundle_manifest(generated_issue_dir: Path) -> dict[str, Any]:
         "executed_reproducer_count": executed_reproducer_count,
         "executed_reproducer_attempt_count": int(
             summary.get("executed_reproducer_attempt_count", executed_reproducer_count) or 0
+        ),
+        "expected_failure_reproducer_count": int(summary.get("expected_failure_reproducer_count", 0) or 0),
+        "expected_failure_reproducer_attempt_count": int(
+            summary.get("expected_failure_reproducer_attempt_count", 0) or 0
+        ),
+        "fixed_upstream_not_reproduced_count": int(summary.get("fixed_upstream_not_reproduced_count", 0) or 0),
+        "fixed_upstream_not_reproduced_attempt_count": int(
+            summary.get("fixed_upstream_not_reproduced_attempt_count", 0) or 0
         ),
         "flaky_reproducer_count": int(summary.get("flaky_reproducer_count", 0) or 0),
         "nonzero_exit_count": int(summary.get("nonzero_exit_count", 0) or 0),

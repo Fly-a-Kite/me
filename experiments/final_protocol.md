@@ -200,15 +200,18 @@ semantic divergences from the final evidence chain. Its reproducibility block
 counts referenced bug artifact directories,
 `reproduce.py`, reduced reproducers, standalone reproducers, and triage reports
 so reproduction readiness is visible as a metric instead of an anecdote.
-The lighter pre-submission `issue-bundle --run-reproducers` manifest is also
-audited. Use `--repeat N` before submission when a candidate may depend on
-optimizer state or execution order. Use `--primary-per-family` when multiple
-drafts describe the same submission family, so only the primary draft's
-reproducer is executed while supporting draft paths remain in the manifest.
-Missing reproducer blocks, compile
-failures, flaky repeated outputs, nonzero exits, and timeouts are exposed
-through `bug-status` and fail `review-readiness` until the bundle evidence
-executes cleanly. `methodology-report` records the same issue-bundle manifest,
+The lighter `issue-bundle --run-reproducers` manifest is also audited for both
+pre-submission candidates and already-submitted/confirmed bug evidence. Use
+`--repeat N` before submission when a candidate may depend on optimizer state
+or execution order. Use `--primary-per-family` when multiple drafts describe
+the same submission family, so only the primary draft's reproducer is executed
+while supporting draft paths remain in the manifest. Missing reproducer blocks,
+compile failures, flaky repeated outputs, unexpected nonzero exits, and
+timeouts are exposed through `bug-status` and fail `review-readiness` until the
+bundle evidence executes cleanly. Stable assertion failures that demonstrate a
+current bug and fixed-upstream scripts that no longer reproduce on latest are
+recorded as separate non-blocking evidence classes. `methodology-report`
+records the same issue-bundle manifest,
 reproducer paths, execution coverage, and failure counts in the paper-facing
 reproducibility/evidence-chain artifact.
 The bug-discovery block records both the global first candidate and each

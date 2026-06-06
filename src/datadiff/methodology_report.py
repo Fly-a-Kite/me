@@ -1477,6 +1477,8 @@ def _render_markdown(
             f"- Issue bundle families: {issue_bundle.get('family_count', 0)}",
             f"- Issue bundle reproducers executed: {issue_bundle.get('executed_reproducer_count', 0)}/{issue_bundle.get('extracted_reproducer_count', 0)}",
             f"- Issue bundle reproducer attempts: {issue_bundle.get('executed_reproducer_attempt_count', 0)}",
+            f"- Issue bundle expected assertion-failure reproducers: {issue_bundle.get('expected_failure_reproducer_count', 0)}",
+            f"- Issue bundle fixed-upstream no-longer-reproduced scripts: {issue_bundle.get('fixed_upstream_not_reproduced_count', 0)}",
             f"- Issue bundle flaky reproducers: {issue_bundle.get('flaky_reproducer_count', 0)}",
             f"- Issue bundle clean execution: {str(issue_bundle.get('clean_execution', False)).lower()}",
             "- Issue bundle failures: missing={missing}, compile={compile}, flaky={flaky}, nonzero={nonzero}, timeout={timeout}".format(
@@ -1974,6 +1976,12 @@ def _issue_bundle_reproducibility(manifest_file: Path) -> dict[str, Any]:
     nonzero = _int(summary.get("nonzero_exit_count"))
     timeouts = _int(summary.get("timeout_count"))
     flaky = _int(summary.get("flaky_reproducer_count"))
+    expected_failures = _int(summary.get("expected_failure_reproducer_count"))
+    expected_failure_attempts = _int(summary.get("expected_failure_reproducer_attempt_count"))
+    fixed_upstream_not_reproduced = _int(summary.get("fixed_upstream_not_reproduced_count"))
+    fixed_upstream_not_reproduced_attempts = _int(
+        summary.get("fixed_upstream_not_reproduced_attempt_count")
+    )
     attempts = _int(summary.get("executed_reproducer_attempt_count")) or executed
     repeat_count = _int(inputs.get("repeat_count"))
     run_reproducers = bool(inputs.get("run_reproducers"))
@@ -2003,6 +2011,10 @@ def _issue_bundle_reproducibility(manifest_file: Path) -> dict[str, Any]:
         "compile_failure_count": compile_failures,
         "executed_reproducer_count": executed,
         "executed_reproducer_attempt_count": attempts,
+        "expected_failure_reproducer_count": expected_failures,
+        "expected_failure_reproducer_attempt_count": expected_failure_attempts,
+        "fixed_upstream_not_reproduced_count": fixed_upstream_not_reproduced,
+        "fixed_upstream_not_reproduced_attempt_count": fixed_upstream_not_reproduced_attempts,
         "flaky_reproducer_count": flaky,
         "nonzero_exit_count": nonzero,
         "nonzero_exit_attempt_count": _int(summary.get("nonzero_exit_attempt_count")),
@@ -2035,6 +2047,10 @@ def _empty_issue_bundle_reproducibility(path: Path) -> dict[str, Any]:
         "compile_failure_count": 0,
         "executed_reproducer_count": 0,
         "executed_reproducer_attempt_count": 0,
+        "expected_failure_reproducer_count": 0,
+        "expected_failure_reproducer_attempt_count": 0,
+        "fixed_upstream_not_reproduced_count": 0,
+        "fixed_upstream_not_reproduced_attempt_count": 0,
         "flaky_reproducer_count": 0,
         "nonzero_exit_count": 0,
         "nonzero_exit_attempt_count": 0,

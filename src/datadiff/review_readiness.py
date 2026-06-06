@@ -356,6 +356,8 @@ def _criterion_automated_bug_pipeline(status: dict[str, Any], thresholds: Review
             "generated_issue_drafts={generated_issue_draft_count}, "
             "issue_bundle_families={issue_bundle_family_count}, "
             "issue_bundle_reproducers={issue_bundle_reproducer_count}, "
+            "issue_bundle_expected_failures={issue_bundle_expected_failure_reproducer_count}, "
+            "issue_bundle_fixed_upstream_not_reproduced={issue_bundle_fixed_upstream_not_reproduced_count}, "
             "issue_bundle_missing={issue_bundle_missing_reproducer_count}, "
             "issue_bundle_compile_failures={issue_bundle_compile_failure_count}, "
             "issue_bundle_flaky={issue_bundle_flaky_reproducer_count}, "

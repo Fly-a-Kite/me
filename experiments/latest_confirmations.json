@@ -95,7 +95,7 @@
       ],
       "issue_url": "https://github.com/pola-rs/polars/issues/27672",
       "issue_title": "Incorrect descending sort after group_by max with maintain_order=True",
-      "upstream_status": "upstream_labeled_bug",
+      "upstream_status": "fixed_upstream",
       "state": "closed",
       "labels": [
         "bug",
@@ -104,8 +104,8 @@
         "P-high"
       ],
       "assignee": "orlp",
-      "checked_at": "2026-05-26T23:21:21+08:00",
-      "notes": "GitHub issue was submitted by Fly-a-Kite, labeled bug/accepted/P-high, assigned upstream, and is closed."
+      "checked_at": "2026-06-07T02:37:00+08:00",
+      "notes": "GitHub issue was submitted by Fly-a-Kite, labeled bug/accepted/P-high, assigned upstream, and is closed. Local issue-bundle replay on Polars 1.41.2 reports no mismatch, so the current artifact treats this as fixed upstream rather than latest-reproducible."
     },
     {
       "family": "polars_reflected_arithmetic_operand_order@polars",

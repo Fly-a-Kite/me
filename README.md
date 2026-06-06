@@ -59,6 +59,7 @@ python3 -m venv .venv
 .venv/bin/datadiff issue-bundle
 .venv/bin/datadiff issue-bundle --run-reproducers
 .venv/bin/datadiff issue-bundle --run-reproducers --repeat 3 --primary-per-family
+.venv/bin/datadiff issue-bundle --statuses already_submitted_or_confirmed --run-reproducers --repeat 3 --primary-per-family
 .venv/bin/datadiff methodology-report --manifest runs/experiment-YYYYMMDDTHHMMSS.json
 .venv/bin/datadiff methodology-report --summary-only --json
 .venv/bin/datadiff target-version-audit --output reports/target-version-audit-latest.json
@@ -419,11 +420,13 @@ standalone reproducer 和 `triage.json` 覆盖率，避免只用“有 artifact�
 默认报告仍可做完整 run-log scan；当 latest manifest 指向 24h 大型压缩日志时，可用
 `--summary-only` 复用已有 experiment-summary CSV 并跳过 offline bucket/artifact/first-seen 的
 run-log 派生区块，用于快速检查 coverage、效率汇总和 issue-bundle 复现状态。
-提交上游前的 `issue-bundle --run-reproducers` 也作为轻量复现门禁：manifest 中的
-missing/compile/nonzero/timeout 计数会进入 `bug-status` 和 `review-readiness`，防止不可执行的
-issue 草稿被误当作完整证据；有重复 family 辅助草稿时可加 `--primary-per-family` 只运行主草稿，
-同时保留 supporting draft 路径；同一份 issue-bundle manifest 和 reproducer 路径也会进入
-`methodology-report` 的 reproducibility/evidence-chain 区块。
+`issue-bundle --run-reproducers` 同时作为提交上游前和已确认 bug artifact 的轻量复现门禁：
+manifest 中的 missing/compile/unexpected-nonzero/timeout 计数会进入 `bug-status` 和
+`review-readiness`，防止不可执行的 issue 草稿被误当作完整证据；稳定 assertion failure
+会作为当前 bug 已复现记录，fixed-upstream 且当前 latest 不再复现的脚本会单独记录；有重复
+family 辅助草稿时可加 `--primary-per-family` 只运行主草稿，同时保留 supporting draft 路径；
+同一份 issue-bundle manifest 和 reproducer 路径也会进入 `methodology-report` 的
+reproducibility/evidence-chain 区块。
 同一份报告还会记录全局 first candidate，以及每个 rewardable candidate family 的首次出现
 case/time/run 上下文，用于论文中的 time-to-each-new-family 指标。
 

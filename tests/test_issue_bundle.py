@@ -1,5 +1,6 @@
 import json
 
+import datadiff.issue_bundle as issue_bundle
 from datadiff.issue_bundle import build_issue_bundle, render_issue_bundle_markdown
 
 
@@ -224,6 +225,94 @@ def test_issue_bundle_records_missing_and_syntax_error_reproducers(tmp_path):
     assert by_path["bad.md"]["compile"]["status"] == "syntax_error"
     assert manifest["summary"]["missing_reproducer_count"] == 1
     assert manifest["summary"]["compile_failure_count"] == 1
+
+
+def test_issue_bundle_uses_referenced_python_reproducer_and_accepts_expected_assertion_failure(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(issue_bundle, "PROJECT_ROOT", tmp_path)
+    latest, new_issue, old_issue, generated = _write_dirs(tmp_path)
+    repro = tmp_path / "bugs" / "bug_demo" / "standalone_reproducer.py"
+    repro.parent.mkdir(parents=True)
+    repro.write_text(
+        'print("observed wrong result")\nassert False, "bug reproduced"\n',
+        encoding="utf-8",
+    )
+    (new_issue / "submitted.md").write_text(
+        _issue_doc(
+            title="Submitted",
+            family="submitted_family@engine",
+            status="Submitted upstream as bug",
+            code="",
+        )
+        .replace("```python\n\n```", "")
+        + "\n- Upstream issue: https://github.com/example/project/issues/1\n"
+        + "\n- Standalone reproducer: `bugs/bug_demo/standalone_reproducer.py`\n",
+        encoding="utf-8",
+    )
+
+    manifest = build_issue_bundle(
+        latest_confirmation_files=[latest],
+        new_issue_dir=new_issue,
+        old_issue_dir=old_issue,
+        generated_issue_dir=generated,
+        output_dir=tmp_path / "bundle",
+        statuses=["already_submitted_or_confirmed"],
+        run_reproducers=True,
+    )
+
+    item = manifest["issues"][0]
+    assert item["source_path"] == "bugs/bug_demo/standalone_reproducer.py"
+    assert item["compile"]["status"] == "ok"
+    assert item["run"]["returncode"] != 0
+    assert item["run"]["expected_failure_reproduced"] is True
+    assert manifest["summary"]["extracted_reproducer_count"] == 1
+    assert manifest["summary"]["expected_failure_reproducer_count"] == 1
+    assert manifest["summary"]["nonzero_exit_count"] == 0
+    assert manifest["summary"]["nonzero_exit_attempt_count"] == 0
+
+
+def test_issue_bundle_treats_fixed_upstream_not_reproduced_as_nonblocking(tmp_path):
+    latest, new_issue, old_issue, generated = _write_dirs(tmp_path)
+    latest.write_text(
+        json.dumps(
+            {
+                "confirmations": [
+                    {
+                        "family": "fixed_family@engine",
+                        "issue_url": "https://github.com/example/project/issues/2",
+                        "upstream_status": "fixed_upstream",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (new_issue / "fixed.md").write_text(
+        _issue_doc(
+            title="Fixed",
+            family="fixed_family@engine",
+            status="Submitted upstream as https://github.com/example/project/issues/2",
+            code='print("No mismatch reproduced.")\nraise SystemExit(1)',
+        ),
+        encoding="utf-8",
+    )
+
+    manifest = build_issue_bundle(
+        latest_confirmation_files=[latest],
+        new_issue_dir=new_issue,
+        old_issue_dir=old_issue,
+        generated_issue_dir=generated,
+        output_dir=tmp_path / "bundle",
+        statuses=["already_submitted_or_confirmed"],
+        run_reproducers=True,
+    )
+
+    assert manifest["summary"]["fixed_upstream_not_reproduced_count"] == 1
+    assert manifest["summary"]["fixed_upstream_not_reproduced_attempt_count"] == 1
+    assert manifest["summary"]["nonzero_exit_count"] == 0
+    assert manifest["summary"]["nonzero_exit_attempt_count"] == 0
 
 
 def test_issue_bundle_does_not_run_syntax_error_reproducer(tmp_path):

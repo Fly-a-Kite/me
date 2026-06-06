@@ -243,6 +243,10 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
                 "compile_failure_count": 0,
                 "executed_reproducer_count": 2,
                 "executed_reproducer_attempt_count": 4,
+                "expected_failure_reproducer_count": 0,
+                "expected_failure_reproducer_attempt_count": 0,
+                "fixed_upstream_not_reproduced_count": 0,
+                "fixed_upstream_not_reproduced_attempt_count": 0,
                 "flaky_reproducer_count": 0,
                 "nonzero_exit_count": 0,
                 "nonzero_exit_attempt_count": 0,
@@ -721,6 +725,10 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
         "compile_failure_count": 0,
         "executed_reproducer_count": 2,
         "executed_reproducer_attempt_count": 4,
+        "expected_failure_reproducer_count": 0,
+        "expected_failure_reproducer_attempt_count": 0,
+        "fixed_upstream_not_reproduced_count": 0,
+        "fixed_upstream_not_reproduced_attempt_count": 0,
         "executed_reproducer_coverage": 1.0,
         "extracted_reproducer_count": 2,
         "families": ["ready_family@polars", "dedup_family@duckdb"],
@@ -948,6 +956,8 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
     assert "Run-provenance freeze manifests indexed: 2" in md
     assert "Issue bundle reproducers executed: 2/2" in md
     assert "Issue bundle reproducer attempts: 4" in md
+    assert "Issue bundle expected assertion-failure reproducers: 0" in md
+    assert "Issue bundle fixed-upstream no-longer-reproduced scripts: 0" in md
     assert "Issue bundle flaky reproducers: 0" in md
     assert "Issue bundle clean execution: true" in md
     assert "Ablated modules covered: reducer, semantic_normalizer" in md
