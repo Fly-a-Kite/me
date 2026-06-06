@@ -2,7 +2,7 @@ from pathlib import Path
 
 from datadiff.case_policy import case_discovery_origin, replay_bug_filter_reason
 from datadiff.cli import _preset_config
-from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES
+from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES, DiscoveryBias, ExperimentConfig
 from datadiff.datagen import generate_case
 from datadiff.targets import TARGETS, common_capabilities, resolve_target_backends
 
@@ -159,14 +159,75 @@ def test_methodology_fresh_and_replay_share_case_policy_gate():
     assert {"known_replay_source_issue", "issue_replay_probe"}.issubset(set(fresh_policy_rejections))
 
 
+def test_methodology_experiment_config_exposes_layered_views_without_breaking_flat_payloads():
+    config = ExperimentConfig(
+        enable_metamorphic_oracle=True,
+        oracle_mode="both",
+        metamorphic_variant_limit=7,
+        enable_feedback=True,
+        persist_feedback_corpus=True,
+        feedback_persist_limit=11,
+        enable_local_source_scheduler=True,
+        guidance_strategy="guided",
+        guidance_candidate_pool=5,
+        guidance_targets=["topk", "groupby"],
+        discovery_biases=[DiscoveryBias(targets=["topk"], feature_prefixes=["sort:"], score_bonus=0.5)],
+        generator_profile_pool=["common", "discovery"],
+        version_pair_pool=["old->new"],
+        generator_profile_learning_weight=0.7,
+        version_pair_learning_weight=0.8,
+        backend_pair_learning_weight=0.9,
+        target_version="new",
+        fixed_version="old",
+        log_level="minimal",
+        compress_run_log=False,
+        enable_parallel_backend_execution=False,
+    )
+
+    flat = config.to_dict()
+    nested = config.to_nested_dict()
+
+    assert "guidance_strategy" in flat
+    assert "guidance" not in flat
+    assert nested["flat"]["guidance_strategy"] == "guided"
+    assert nested["generation"]["generator_profile"] == "common"
+    assert nested["oracle"]["mode"] == "both"
+    assert nested["oracle"]["enable_metamorphic"] is True
+    assert nested["oracle"]["metamorphic_variant_limit"] == 7
+    assert nested["feedback"]["persist_corpus"] is True
+    assert nested["feedback"]["persist_limit"] == 11
+    assert nested["feedback"]["enable_local_source_scheduler"] is True
+    assert nested["guidance"]["strategy"] == "guided"
+    assert nested["guidance"]["candidate_pool"] == 5
+    assert nested["guidance"]["targets"] == ["topk", "groupby"]
+    assert nested["guidance"]["discovery_biases"][0]["score_bonus"] == 0.5
+    assert nested["learning"]["generator_profile_pool"] == ["common", "discovery"]
+    assert nested["learning"]["version_pair_pool"] == ["old->new"]
+    assert nested["learning"]["generator_profile_learning_weight"] == 0.7
+    assert nested["learning"]["version_pair_learning_weight"] == 0.8
+    assert nested["learning"]["backend_pair_learning_weight"] == 0.9
+    assert nested["learning"]["target_version"] == "new"
+    assert nested["learning"]["fixed_version"] == "old"
+    assert nested["logging"]["log_level"] == "minimal"
+    assert nested["logging"]["compress_run_log"] is False
+    assert nested["execution"]["enable_parallel_backend_execution"] is False
+
+
 def test_methodology_bottom_layer_does_not_import_middle_policy_modules():
     repo_root = Path(__file__).resolve().parents[1]
     bottom_layer_paths = [
         repo_root / "src/datadiff/datagen.py",
+        repo_root / "src/datadiff/common_api_workflow.py",
+        repo_root / "src/datadiff/discovery_profiles.py",
+        repo_root / "src/datadiff/profile_generators.py",
+        repo_root / "src/datadiff/program_generation.py",
+        repo_root / "src/datadiff/workflow_profiles.py",
         repo_root / "src/datadiff/csv_roundtrip.py",
         repo_root / "src/datadiff/dsl.py",
         repo_root / "src/datadiff/normalizer.py",
         repo_root / "src/datadiff/oracle.py",
+        repo_root / "src/datadiff/family_novelty.py",
+        repo_root / "src/datadiff/finding_outcomes.py",
         repo_root / "src/datadiff/pathing.py",
         repo_root / "src/datadiff/windowing.py",
         repo_root / "src/datadiff/running.py",
@@ -186,6 +247,556 @@ def test_methodology_bottom_layer_does_not_import_middle_policy_modules():
     for path in bottom_layer_paths:
         source = path.read_text(encoding="utf-8")
         assert not any(forbidden in source for forbidden in forbidden_imports), path
+
+
+def test_methodology_runner_delegates_decision_and_execution_boundaries():
+    repo_root = Path(__file__).resolve().parents[1]
+    decision_engine = repo_root / "src/datadiff/decision_engine.py"
+    execution = repo_root / "src/datadiff/execution.py"
+    fuzz_loop = repo_root / "src/datadiff/fuzz_loop.py"
+    oracle_complex = repo_root / "src/datadiff/oracle_complex.py"
+    source_scheduler = repo_root / "src/datadiff/source_scheduler.py"
+    candidate_scorer = repo_root / "src/datadiff/candidate_scorer.py"
+    seed_corpus = repo_root / "src/datadiff/seed_corpus.py"
+    bandit_selection = repo_root / "src/datadiff/bandit_selection.py"
+    synthesis_typed_case = repo_root / "src/datadiff/synthesis/typed_case.py"
+    synthesis_program = repo_root / "src/datadiff/synthesis/program_synthesizer.py"
+    common_api_workflow = repo_root / "src/datadiff/common_api_workflow.py"
+    discovery_profiles = repo_root / "src/datadiff/discovery_profiles.py"
+    profile_generators = repo_root / "src/datadiff/profile_generators.py"
+    program_generation = repo_root / "src/datadiff/program_generation.py"
+    workflow_profiles = repo_root / "src/datadiff/workflow_profiles.py"
+    mutator_ir = repo_root / "src/datadiff/mutator_ir/rewrite_swap.py"
+    mutator_swarm = repo_root / "src/datadiff/mutator_swarm.py"
+    run_config = repo_root / "src/datadiff/run_config.py"
+    run_artifacts = repo_root / "src/datadiff/run_artifacts.py"
+    run_candidates = repo_root / "src/datadiff/run_candidates.py"
+    run_metadata = repo_root / "src/datadiff/run_metadata.py"
+    run_findings = repo_root / "src/datadiff/run_findings.py"
+    run_state = repo_root / "src/datadiff/run_state.py"
+    run_signatures = repo_root / "src/datadiff/run_signatures.py"
+    run_feedback = repo_root / "src/datadiff/run_feedback.py"
+    feedback_policy = repo_root / "src/datadiff/feedback_policy.py"
+    feedback_signals = repo_root / "src/datadiff/feedback_signals.py"
+    family_novelty = repo_root / "src/datadiff/family_novelty.py"
+    finding_outcomes = repo_root / "src/datadiff/finding_outcomes.py"
+    run_selection = repo_root / "src/datadiff/run_selection.py"
+    run_row = repo_root / "src/datadiff/run_row.py"
+    run_logging = repo_root / "src/datadiff/run_logging.py"
+    run_loaded = repo_root / "src/datadiff/run_loaded.py"
+    run_recheck = repo_root / "src/datadiff/run_recheck.py"
+    config = repo_root / "src/datadiff/config.py"
+    guidance = repo_root / "src/datadiff/guidance.py"
+    datagen = repo_root / "src/datadiff/datagen.py"
+    runner = repo_root / "src/datadiff/runner.py"
+    feedback = repo_root / "src/datadiff/feedback.py"
+    reward = repo_root / "src/datadiff/reward.py"
+
+    assert decision_engine.exists()
+    assert execution.exists()
+    assert fuzz_loop.exists()
+    assert oracle_complex.exists()
+    assert source_scheduler.exists()
+    assert candidate_scorer.exists()
+    assert seed_corpus.exists()
+    assert bandit_selection.exists()
+    assert synthesis_typed_case.exists()
+    assert synthesis_program.exists()
+    assert common_api_workflow.exists()
+    assert discovery_profiles.exists()
+    assert profile_generators.exists()
+    assert program_generation.exists()
+    assert workflow_profiles.exists()
+    assert mutator_ir.exists()
+    assert mutator_swarm.exists()
+    assert run_config.exists()
+    assert run_artifacts.exists()
+    assert run_candidates.exists()
+    assert run_metadata.exists()
+    assert run_findings.exists()
+    assert run_state.exists()
+    assert run_signatures.exists()
+    assert run_feedback.exists()
+    assert feedback_policy.exists()
+    assert feedback_signals.exists()
+    assert family_novelty.exists()
+    assert finding_outcomes.exists()
+    assert run_selection.exists()
+    assert run_row.exists()
+    assert run_logging.exists()
+    assert run_loaded.exists()
+    assert run_recheck.exists()
+
+    runner_source = runner.read_text(encoding="utf-8")
+    guidance_source = guidance.read_text(encoding="utf-8")
+    scorer_source = candidate_scorer.read_text(encoding="utf-8")
+    seed_corpus_source = seed_corpus.read_text(encoding="utf-8")
+    bandit_selection_source = bandit_selection.read_text(encoding="utf-8")
+    synthesis_typed_case_source = synthesis_typed_case.read_text(encoding="utf-8")
+    synthesis_program_source = synthesis_program.read_text(encoding="utf-8")
+    common_api_workflow_source = common_api_workflow.read_text(encoding="utf-8")
+    discovery_profiles_source = discovery_profiles.read_text(encoding="utf-8")
+    profile_generators_source = profile_generators.read_text(encoding="utf-8")
+    program_generation_source = program_generation.read_text(encoding="utf-8")
+    workflow_profiles_source = workflow_profiles.read_text(encoding="utf-8")
+    mutator_ir_source = mutator_ir.read_text(encoding="utf-8")
+    mutator_swarm_source = mutator_swarm.read_text(encoding="utf-8")
+    run_config_source = run_config.read_text(encoding="utf-8")
+    run_artifacts_source = run_artifacts.read_text(encoding="utf-8")
+    run_candidates_source = run_candidates.read_text(encoding="utf-8")
+    run_metadata_source = run_metadata.read_text(encoding="utf-8")
+    run_findings_source = run_findings.read_text(encoding="utf-8")
+    run_state_source = run_state.read_text(encoding="utf-8")
+    run_signatures_source = run_signatures.read_text(encoding="utf-8")
+    run_feedback_source = run_feedback.read_text(encoding="utf-8")
+    feedback_policy_source = feedback_policy.read_text(encoding="utf-8")
+    feedback_signals_source = feedback_signals.read_text(encoding="utf-8")
+    family_novelty_source = family_novelty.read_text(encoding="utf-8")
+    finding_outcomes_source = finding_outcomes.read_text(encoding="utf-8")
+    run_selection_source = run_selection.read_text(encoding="utf-8")
+    run_row_source = run_row.read_text(encoding="utf-8")
+    run_logging_source = run_logging.read_text(encoding="utf-8")
+    run_loaded_source = run_loaded.read_text(encoding="utf-8")
+    run_recheck_source = run_recheck.read_text(encoding="utf-8")
+    feedback_source = feedback.read_text(encoding="utf-8")
+    reward_source = reward.read_text(encoding="utf-8")
+    config_source = config.read_text(encoding="utf-8")
+    datagen_source = datagen.read_text(encoding="utf-8")
+    assert "from datadiff.bandit_selection import (" in runner_source
+    assert "from datadiff.decision_engine import (" in bandit_selection_source
+    assert "choose_priority_actions as _choose_priority_actions" in bandit_selection_source
+    assert "record_priority_action_feedback as _record_priority_action_feedback" in bandit_selection_source
+    assert ".rank_top(" not in runner_source
+    assert ".record_outcome(" not in runner_source
+    assert "from datadiff.execution import execute_case as _execute_case_impl" in runner_source
+    assert "from datadiff.fuzz_loop import FuzzBudget, IntervalGate, RunCounters, RunPaths" in runner_source
+    assert "from datadiff.fuzz_loop import FuzzIteration" in runner_source
+    assert "from datadiff.oracle_complex import cross_validate_oracle_findings" in runner_source
+    assert "from datadiff.run_config import (" in runner_source
+    assert "from datadiff.run_artifacts import process_reducer_and_artifacts" in runner_source
+    assert "from datadiff.run_candidates import (" in runner_source
+    assert "from datadiff.run_metadata import (" in runner_source
+    assert "from datadiff.run_findings import (" in runner_source
+    assert "from datadiff.run_state import (" in runner_source
+    assert "from datadiff.run_signatures import (" in runner_source
+    assert "from datadiff.run_feedback import (" in runner_source
+    assert "from datadiff.run_selection import select_iteration_case" in runner_source
+    assert "from datadiff.run_row import apply_iteration_row_updates" in runner_source
+    assert "from datadiff.run_recheck import candidate_recheck_impl" in runner_source
+    assert "from datadiff.run_logging import (" in runner_source
+    assert "from datadiff.run_loaded import (" in runner_source
+    assert "getattr(guidance" not in runner_source
+
+    fuzz_loop_source = fuzz_loop.read_text(encoding="utf-8")
+    assert "class StageTimings" in fuzz_loop_source
+    assert "class FuzzIteration" in fuzz_loop_source
+    assert "cross_validate_oracle_findings" in oracle_complex.read_text(encoding="utf-8")
+    assert "class LocalSourceScheduler" in source_scheduler.read_text(encoding="utf-8")
+    assert "from datadiff.source_scheduler import LocalSourceScheduler" not in runner_source
+    assert "from datadiff.source_scheduler import LocalSourceScheduler" in run_state_source
+    assert "from datadiff.source_scheduler import LocalSourceScheduler" in feedback_source
+    assert "from datadiff.family_novelty import " in source_scheduler.read_text(encoding="utf-8")
+    assert "from datadiff.reward import candidate_family_novelty_reward" not in source_scheduler.read_text(encoding="utf-8")
+    assert "CandidateScorer" in guidance_source
+    assert "CandidateScoringContext" in guidance_source
+    assert "class CandidateScorer" in scorer_source
+    assert "class DenseCandidateScore" in scorer_source
+    assert "datadiff.guidance" not in scorer_source
+    assert "from datadiff.seed_corpus import SeedCorpus, SeedCorpusRecord" in feedback_source
+    assert "class SeedCorpus" in seed_corpus_source
+    assert "class SeedCorpusRecord" in seed_corpus_source
+    assert "datadiff.feedback" not in seed_corpus_source
+    assert "def _select_adaptive_action" in bandit_selection_source
+    assert "def _record_backend_pair_feedback" in bandit_selection_source
+    assert "def _version_pair_pool" in bandit_selection_source
+    assert "datadiff.runner" not in bandit_selection_source
+    assert "def build_typed_grammar_case" in synthesis_typed_case_source
+    assert "def synthesize_program" in synthesis_program_source
+    assert "class GrammarRegistry" in (repo_root / "src/datadiff/synthesis/grammar.py").read_text(encoding="utf-8")
+    assert "datadiff.runner" not in synthesis_typed_case_source
+    assert "from .common_api_workflow import COMMON_API_WORKFLOW_TEMPLATES, generate_common_api_workflow_case" in datagen_source
+    assert "def generate_common_api_workflow_case(" in common_api_workflow_source
+    assert "COMMON_API_WORKFLOW_TEMPLATES = (" in common_api_workflow_source
+    assert "def _common_api_base_table(" in common_api_workflow_source
+    assert "datadiff.runner" not in common_api_workflow_source
+    assert "def generate_common_api_workflow_case(" not in datagen_source
+    assert "COMMON_API_WORKFLOW_TEMPLATES = (" not in datagen_source
+    assert "from .discovery_profiles import (" in datagen_source
+    assert "DEEP_PROBE_ROTATION_PROFILES = (" in discovery_profiles_source
+    assert "ISSUE_FOCUS_MIXED_PROFILES = (" in discovery_profiles_source
+    assert "def as_discovery_mixed_case(" in discovery_profiles_source
+    assert "def discovery_issue_inspired_case(" in discovery_profiles_source
+    assert "def issue_focus_case(" in discovery_profiles_source
+    assert "datadiff.runner" not in discovery_profiles_source
+    assert "DEEP_PROBE_ROTATION_PROFILES = (" not in datagen_source
+    assert "ISSUE_FOCUS_MIXED_PROFILES = (" not in datagen_source
+    assert "def as_discovery_mixed_case(" not in datagen_source
+    assert "from .profile_generators import (" in datagen_source
+    assert "def generate_null_groupby_topk_case(" in profile_generators_source
+    assert "def generate_csv_long_numeric_roundtrip_case(" in profile_generators_source
+    assert "def generate_pyarrow_list_flatten_parent_indices_semantics_case(" in profile_generators_source
+    assert "def _stable_graph_edges(" in profile_generators_source
+    assert "datadiff.runner" not in profile_generators_source
+    assert "def generate_null_groupby_topk_case(" not in datagen_source
+    assert "def generate_csv_long_numeric_roundtrip_case(" not in datagen_source
+    assert "def generate_pyarrow_list_flatten_parent_indices_semantics_case(" not in datagen_source
+    assert "def _stable_graph_edges(" not in datagen_source
+    assert "from .program_generation import generate_program, repair_operations" in datagen_source
+    assert "def generate_program(" in program_generation_source
+    assert "def repair_operations(" in program_generation_source
+    assert "def _random_mutate_expr(" in program_generation_source
+    assert "datadiff.runner" not in program_generation_source
+    assert "def generate_program(" not in datagen_source
+    assert "def repair_operations(" not in datagen_source
+    assert len(datagen_source.splitlines()) <= 800
+    assert "from .workflow_profiles import generate_workflow_case" in datagen_source
+    assert "def generate_workflow_case(" in workflow_profiles_source
+    assert "def _etl_cleanup_workflow(" in workflow_profiles_source
+    assert "def _join_enrichment_workflow(" in workflow_profiles_source
+    assert "datadiff.runner" not in workflow_profiles_source
+    assert "def generate_workflow_case(" not in datagen_source
+    assert "def _etl_cleanup_workflow(" not in datagen_source
+    assert "def _join_enrichment_workflow(" not in datagen_source
+    assert "def legal_adjacent_swap_positions" in mutator_ir_source
+    assert "def apply_adjacent_independent_swap" in mutator_ir_source
+    assert "datadiff.runner" not in mutator_ir_source
+    assert "class OperatorParticle" in mutator_swarm_source
+    assert "class OperatorSwarm" in mutator_swarm_source
+    assert "def select_particle" in mutator_swarm_source
+    assert "def sample_operator" in mutator_swarm_source
+    assert "def update" in mutator_swarm_source
+    assert "datadiff.runner" not in mutator_swarm_source
+    assert "operator_swarm: OperatorSwarm" in feedback_source
+    assert '"mutation_operator_swarm"' in feedback_source
+    assert "def _configured_guidance_targets" in run_config_source
+    assert "def _config_layer_payload" in run_config_source
+    assert "datadiff.runner" not in run_config_source
+    assert "def process_reducer_and_artifacts" in run_artifacts_source
+    assert "class ArtifactProcessingResult" in run_artifacts_source
+    assert "datadiff.runner" not in run_artifacts_source
+    assert "def generate_candidate_batch" in run_candidates_source
+    assert "def _generate_case_with_optional_schema" in run_candidates_source
+    assert "def _known_replay_source_filter_reason" in run_candidates_source
+    assert "datadiff.runner" not in run_candidates_source
+    assert "def _selected_candidate_metadata" in run_metadata_source
+    assert "def _feedback_target_keys" in run_metadata_source
+    assert "def _fingerprint_anchor_result" in run_metadata_source
+    assert "datadiff.runner" not in run_metadata_source
+    assert "def _finding_recheck_key" in run_findings_source
+    assert "def _countable_row_findings" in run_findings_source
+    assert "def _artifact_budget_available" in run_findings_source
+    assert "datadiff.runner" not in run_findings_source
+    assert "def _restore_closed_loop_state" in run_state_source
+    assert "def _build_closed_loop_state" in run_state_source
+    assert "def _inject_champion_corpus" in run_state_source
+    assert "datadiff.runner" not in run_state_source
+    assert "def behavior_signature" in run_signatures_source
+    assert "def discovery_signature" in run_signatures_source
+    assert "def signal_signature" in run_signatures_source
+    assert "datadiff.runner" not in run_signatures_source
+    assert "def apply_feedback_updates" in run_feedback_source
+    assert "from datadiff.feedback_policy import (" in run_feedback_source
+    assert "from datadiff.feedback_signals import (" in run_feedback_source
+    assert "def _feedback_storage_decision" in run_feedback_source
+    assert "def _source_scheduler_snapshot" in run_feedback_source
+    assert "datadiff.runner" not in run_feedback_source
+    assert "class FeedbackStoragePolicy" in feedback_policy_source
+    assert "class FeedbackStorageContext" in feedback_policy_source
+    assert "def feedback_storage_decision" in feedback_policy_source
+    assert "def source_scheduler_snapshot" in feedback_policy_source
+    assert "datadiff.runner" not in feedback_policy_source
+    assert "class FeedbackDiscoverySignals" in feedback_signals_source
+    assert "def build_feedback_discovery_signals" in feedback_signals_source
+    assert "def feedback_source_new_behavior" in feedback_signals_source
+    assert "datadiff.runner" not in feedback_signals_source
+    assert "def candidate_family_novelty_reward" in family_novelty_source
+    assert "def family_key_matches_known_family" in family_novelty_source
+    assert "def split_family_key" in family_novelty_source
+    assert "datadiff.runner" not in family_novelty_source
+    assert "datadiff.reward" not in family_novelty_source
+    assert "from datadiff.family_novelty import candidate_family_novelty_reward" in reward_source
+    assert "from datadiff.finding_outcomes import (" in reward_source
+    assert "class FindingOutcomeAnalysis" in finding_outcomes_source
+    assert "def analyze_finding_outcomes" in finding_outcomes_source
+    assert "def row_reward_signals" in finding_outcomes_source
+    assert "def offline_finding_bucket" in finding_outcomes_source
+    assert "def source_reward_adjustment_from_summary" in reward_source
+    assert "def feedback_summary_for_case" in reward_source
+    assert "def candidate_family_novelty_reward" not in reward_source
+    assert "def analyze_finding_outcomes" not in reward_source
+    assert "def row_reward_signals" not in reward_source
+    assert "datadiff.runner" not in finding_outcomes_source
+    assert "def select_iteration_case" in run_selection_source
+    assert "def _select_guided_case" in run_selection_source
+    assert "datadiff.runner" not in run_selection_source
+    assert "def apply_iteration_row_updates" in run_row_source
+    assert "class IterationRowUpdate" in run_row_source
+    assert "datadiff.runner" not in run_row_source
+    assert "def _compact_log_row" in run_logging_source
+    assert "def _finalize_stage_profile_summary" in run_logging_source
+    assert "def _closed_loop_state_summary" in run_logging_source
+    assert "def _case_log_row" in run_logging_source
+    assert "datadiff.runner" not in run_logging_source
+    assert "def run_loaded_case_impl" in run_loaded_source
+    assert "def execute_case_for_run_loaded" in run_loaded_source
+    assert "def parallel_backend_execution_active" in run_loaded_source
+    assert "datadiff.runner" not in run_loaded_source
+    assert "def candidate_recheck_impl" in run_recheck_source
+    assert "datadiff.runner" not in run_recheck_source
+    for helper_name in (
+        "_case_log_row",
+        "_compact_log_row",
+        "_finalize_stage_profile_summary",
+        "_guidance_summary",
+        "_adaptive_learning_health_summary",
+        "_quality_archive_health_summary",
+        "_select_adaptive_action",
+        "_record_backend_pair_feedback",
+        "_version_pair_pool",
+        "_generator_profile_pool",
+        "_configured_guidance_targets",
+        "_config_layer_payload",
+        "process_reducer_and_artifacts",
+        "generate_candidate_batch",
+        "_generate_case_with_optional_schema",
+        "_known_replay_source_filter_reason",
+        "_selected_candidate_metadata",
+        "_generated_candidate_metadata",
+        "_feedback_target_keys",
+        "_fingerprint_anchor_result",
+        "_finding_recheck_key",
+        "_format_recheck_key",
+        "_mark_finding_non_reproducible",
+        "_countable_row_findings",
+        "_countable_finding_objects",
+        "_is_countable_finding_dict",
+        "_artifact_budget_available",
+        "_restore_closed_loop_state",
+        "_build_closed_loop_state",
+        "_inject_champion_corpus",
+        "apply_feedback_updates",
+        "_feedback_storage_decision",
+        "_source_scheduler_snapshot",
+        "select_iteration_case",
+        "_select_guided_case",
+        "apply_iteration_row_updates",
+        "run_loaded_case_impl",
+        "execute_case_for_run_loaded",
+        "parallel_backend_execution_active",
+        "candidate_recheck_impl",
+    ):
+        assert f"def {helper_name}" not in runner_source
+    assert "class OracleConfig" in config_source
+    assert "class FeedbackConfig" in config_source
+    assert "class GuidanceConfig" in config_source
+    assert "class LearningConfig" in config_source
+    assert "class ExecutionConfig" in config_source
+    assert "def to_nested_dict" in config_source
+
+
+def test_methodology_oracle_uses_data_driven_root_cause_rules():
+    repo_root = Path(__file__).resolve().parents[1]
+    oracle_rules = repo_root / "src/datadiff/oracle_rules.py"
+    semantic_boundaries = repo_root / "src/datadiff/semantic_boundaries.py"
+    classification_signals = repo_root / "src/datadiff/classification_signals.py"
+    case_validation = repo_root / "src/datadiff/case_validation.py"
+    classification_oracle = repo_root / "src/datadiff/classification_oracle.py"
+    oracle = repo_root / "src/datadiff/oracle.py"
+    preflight = repo_root / "src/datadiff/preflight.py"
+
+    assert oracle_rules.exists()
+    assert semantic_boundaries.exists()
+    assert classification_signals.exists()
+    assert case_validation.exists()
+
+    oracle_source = oracle.read_text(encoding="utf-8")
+    rules_source = oracle_rules.read_text(encoding="utf-8")
+    semantic_boundaries_source = semantic_boundaries.read_text(encoding="utf-8")
+    classification_signals_source = classification_signals.read_text(encoding="utf-8")
+    case_validation_source = case_validation.read_text(encoding="utf-8")
+    classification_oracle_source = classification_oracle.read_text(encoding="utf-8")
+    preflight_source = preflight.read_text(encoding="utf-8")
+    assert "from datadiff.oracle_rules import RootCauseContext, classify_root_cause_from_context" in oracle_source
+    assert "ROOT_CAUSE_RULES" in rules_source
+    assert "from datadiff.semantic_boundaries import (" in classification_oracle_source
+    assert "from datadiff.classification_signals import (" in classification_oracle_source
+    assert "from datadiff.case_validation import validate_case_program" in classification_oracle_source
+    assert "from datadiff.case_validation import validate_case_program" in preflight_source
+    assert "class SemanticBoundaryRule" in semantic_boundaries_source
+    assert "class SemanticBoundaryMatch" in semantic_boundaries_source
+    assert "def build_semantic_boundary_rules(" in semantic_boundaries_source
+    assert "def ordered_rules_from_snapshot(" in semantic_boundaries_source
+    assert "def matching_semantic_rules(" in semantic_boundaries_source
+    assert "def is_order_only_mismatch(" in classification_signals_source
+    assert "def is_float_precision_boundary_mismatch(" in classification_signals_source
+    assert "def is_pyarrow_empty_global_bool_aggregate_adapter_error(" in classification_signals_source
+    assert "def validate_case_program(" in case_validation_source
+    assert "def _validate_random_case_probe(" in case_validation_source
+    assert "class SemanticBoundaryRule" not in classification_oracle_source
+    assert "def _ordered_rules_from_snapshot(" not in classification_oracle_source
+    assert "def _matching_semantic_rules(" not in classification_oracle_source
+    assert "def _is_order_only_mismatch(" not in classification_oracle_source
+    assert "def _is_float_precision_boundary_mismatch(" not in classification_oracle_source
+    assert "def _is_pyarrow_empty_global_bool_aggregate_adapter_error(" not in classification_oracle_source
+    assert "def validate_case_program(" not in classification_oracle_source
+    assert "def _validate_random_case_probe(" not in classification_oracle_source
+    assert len(classification_oracle_source.splitlines()) <= 800
+    assert "datadiff.runner" not in semantic_boundaries_source
+    assert "datadiff.runner" not in classification_signals_source
+    assert "datadiff.runner" not in case_validation_source
+
+
+def test_methodology_cross_cutting_hot_paths_and_cli_commands_are_modularized():
+    repo_root = Path(__file__).resolve().parents[1]
+    rust_kernel = repo_root / "rust_kernel/src/lib.rs"
+    rust_wrapper = repo_root / "src/datadiff/rust_kernel.py"
+    guidance = repo_root / "src/datadiff/guidance.py"
+    candidate_scorer = repo_root / "src/datadiff/candidate_scorer.py"
+    cli = repo_root / "src/datadiff/cli.py"
+    run_summaries = repo_root / "src/datadiff/run_summaries.py"
+    discovery_campaign_summary = repo_root / "src/datadiff/discovery_campaign_summary.py"
+    commands_analysis = repo_root / "src/datadiff/commands/analysis.py"
+    commands_artifacts = repo_root / "src/datadiff/commands/artifacts.py"
+    commands_core = repo_root / "src/datadiff/commands/core.py"
+    commands_discovery = repo_root / "src/datadiff/commands/discovery.py"
+    commands_experiment = repo_root / "src/datadiff/commands/experiment.py"
+    commands_fuzzing = repo_root / "src/datadiff/commands/fuzzing.py"
+    commands_readiness = repo_root / "src/datadiff/commands/readiness.py"
+    commands_reporting = repo_root / "src/datadiff/commands/reporting.py"
+
+    for path in (
+        rust_kernel,
+        rust_wrapper,
+        guidance,
+        candidate_scorer,
+        cli,
+        run_summaries,
+        discovery_campaign_summary,
+        commands_analysis,
+        commands_artifacts,
+        commands_core,
+        commands_discovery,
+        commands_experiment,
+        commands_fuzzing,
+        commands_readiness,
+        commands_reporting,
+    ):
+        assert path.exists(), path
+
+    rust_source = rust_kernel.read_text(encoding="utf-8")
+    wrapper_source = rust_wrapper.read_text(encoding="utf-8")
+    guidance_source = guidance.read_text(encoding="utf-8")
+    scorer_source = candidate_scorer.read_text(encoding="utf-8")
+    cli_source = cli.read_text(encoding="utf-8")
+    run_summaries_source = run_summaries.read_text(encoding="utf-8")
+    discovery_campaign_summary_source = discovery_campaign_summary.read_text(encoding="utf-8")
+    commands_analysis_source = commands_analysis.read_text(encoding="utf-8")
+    commands_artifacts_source = commands_artifacts.read_text(encoding="utf-8")
+    commands_core_source = commands_core.read_text(encoding="utf-8")
+    commands_discovery_source = commands_discovery.read_text(encoding="utf-8")
+    commands_experiment_source = commands_experiment.read_text(encoding="utf-8")
+    commands_fuzzing_source = commands_fuzzing.read_text(encoding="utf-8")
+    commands_readiness_source = commands_readiness.read_text(encoding="utf-8")
+    commands_reporting_source = commands_reporting.read_text(encoding="utf-8")
+
+    assert "fn extract_case_features(" in rust_source
+    assert "fn score_candidate_feature_metrics_batch(" in rust_source
+    assert "wrap_pyfunction!(extract_case_features" in rust_source
+    assert "wrap_pyfunction!(score_candidate_feature_metrics_batch" in rust_source
+    assert "def extract_case_features(" in wrapper_source
+    assert "def score_candidate_feature_metrics_batch(" in wrapper_source
+    assert "from datadiff.rust_kernel import extract_case_features as _rust_extract_case_features" in guidance_source
+    assert "def _native_case_operation_features" in guidance_source
+    assert "from datadiff.rust_kernel import score_candidate_feature_metrics_batch" in scorer_source
+    assert "score_candidate_feature_metrics_batch(" in scorer_source
+
+    assert "from datadiff.commands.analysis import AnalysisCommandHandlers, register as register_analysis_commands" in cli_source
+    assert "from datadiff.commands.artifacts import ArtifactCommandHandlers, register as register_artifact_commands" in cli_source
+    assert "from datadiff.commands.core import CoreCommandHandlers, register as register_core_commands" in cli_source
+    assert "from datadiff.commands.discovery import DiscoveryCommandHandlers, register as register_discovery_commands" in cli_source
+    assert "from datadiff.commands.experiment import ExperimentCommandHandlers, register as register_experiment_commands" in cli_source
+    assert "from datadiff.commands.fuzzing import FuzzingCommandHandlers, register as register_fuzzing_commands" in cli_source
+    assert "from datadiff.commands.readiness import ReadinessCommandHandlers, register as register_readiness_commands" in cli_source
+    assert "from datadiff.commands.reporting import ReportingCommandHandlers, register as register_reporting_commands" in cli_source
+    assert "register_analysis_commands(" in cli_source
+    assert "register_artifact_commands(" in cli_source
+    assert "register_core_commands(" in cli_source
+    assert "register_discovery_commands(" in cli_source
+    assert "register_experiment_commands(" in cli_source
+    assert "register_fuzzing_commands(" in cli_source
+    assert "register_readiness_commands(" in cli_source
+    assert "register_reporting_commands(" in cli_source
+    assert "from datadiff.run_summaries import (" in cli_source
+    assert "from datadiff.discovery_campaign_summary import (" in cli_source
+    assert "def _summarize_run_health(" in run_summaries_source
+    assert "def _run_health_runtime_summary(" in run_summaries_source
+    assert "def _summarize_run_classification(" in run_summaries_source
+    assert "def _classify_run_row(" in run_summaries_source
+    assert "def _candidate_issue_family_keys(" in run_summaries_source
+    assert "def _refresh_differential_findings(" in run_summaries_source
+    assert "_candidate_bug_family_key = _candidate_issue_family_key" in run_summaries_source
+    assert "def _summarize_run_health(" not in cli_source
+    assert "def _run_health_runtime_summary(" not in cli_source
+    assert "def _summarize_run_classification(" not in cli_source
+    assert "def _classify_run_row(" not in cli_source
+    assert "def _candidate_issue_family_keys(" not in cli_source
+    assert "def _refresh_differential_findings(" not in cli_source
+    assert "def _discovery_campaign_scheduler_snapshot(" in discovery_campaign_summary_source
+    assert "def _discovery_campaign_lane_rows(" in discovery_campaign_summary_source
+    assert "def _summarize_discovery_campaign_status(" in discovery_campaign_summary_source
+    assert "def _latest_discovery_campaign_run_file(" in discovery_campaign_summary_source
+    assert "def _parse_manifest_utc_timestamp(" in discovery_campaign_summary_source
+    assert "def _discovery_campaign_scheduler_snapshot(" not in cli_source
+    assert "def _discovery_campaign_lane_rows(" not in cli_source
+    assert "def _summarize_discovery_campaign_status(" not in cli_source
+    assert "def _latest_discovery_campaign_run_file(" not in cli_source
+    assert "def _parse_manifest_utc_timestamp(" not in cli_source
+    assert "class AnalysisCommandHandlers" in commands_analysis_source
+    assert "def register(" in commands_analysis_source
+    assert "class ArtifactCommandHandlers" in commands_artifacts_source
+    assert "def register(" in commands_artifacts_source
+    assert "class CoreCommandHandlers" in commands_core_source
+    assert "def register(" in commands_core_source
+    assert "class DiscoveryCommandHandlers" in commands_discovery_source
+    assert "def register(" in commands_discovery_source
+    assert "class ExperimentCommandHandlers" in commands_experiment_source
+    assert "def register(" in commands_experiment_source
+    assert "class FuzzingCommandHandlers" in commands_fuzzing_source
+    assert "def register(" in commands_fuzzing_source
+    assert "class ReadinessCommandHandlers" in commands_readiness_source
+    assert "def register(" in commands_readiness_source
+    assert "class ReportingCommandHandlers" in commands_reporting_source
+    assert "def register(" in commands_reporting_source
+    assert "p_fuzz = sub.add_parser" not in cli_source
+    assert "p_long = sub.add_parser" not in cli_source
+    assert "p_report = sub.add_parser" not in cli_source
+    assert "p_bug_audit = sub.add_parser" not in cli_source
+    assert "p_bug_status = sub.add_parser" not in cli_source
+    assert "p_issue_readiness = sub.add_parser" not in cli_source
+    assert "p_issue_bundle = sub.add_parser" not in cli_source
+    assert "p_methodology_report = sub.add_parser" not in cli_source
+    assert 'p_show = sub.add_parser("show-bugs"' not in cli_source
+    assert 'p_classify = sub.add_parser("classify-run"' not in cli_source
+    assert 'p_health = sub.add_parser("run-health"' not in cli_source
+    assert "p_discovery_run = sub.add_parser" not in cli_source
+    assert "p_discovery_campaign = sub.add_parser" not in cli_source
+    assert "p_discovery_campaign_status = sub.add_parser" not in cli_source
+    assert "p_candidate_pipeline = sub.add_parser" not in cli_source
+    assert "p_exp_summary = sub.add_parser" not in cli_source
+    assert "p_exp_analysis = sub.add_parser" not in cli_source
+    assert "p_seeded_analysis = sub.add_parser" not in cli_source
+    assert "p_ablation_audit = sub.add_parser" not in cli_source
+    assert "p_adaptive_benchmark = sub.add_parser" not in cli_source
+    assert "p_pattern_variants = sub.add_parser" not in cli_source
+    assert "p_final_ready = sub.add_parser" not in cli_source
+    assert "p_review_ready = sub.add_parser" not in cli_source
+    assert "p_repro = sub.add_parser" not in cli_source
+    assert "p_validate = sub.add_parser" not in cli_source
+    assert "p_triage = sub.add_parser" not in cli_source
+    assert "p_reduce = sub.add_parser" not in cli_source
+    assert "p_hist = sub.add_parser" not in cli_source
+    assert "p_fixture = sub.add_parser" not in cli_source
+    assert "p_exp = sub.add_parser" not in cli_source
 
 
 def test_methodology_replay_source_gate_spans_historical_projects():

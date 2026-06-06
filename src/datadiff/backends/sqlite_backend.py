@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from datadiff.backends.base import Backend, BackendResult
+from datadiff.backends.base import Backend, BackendResult, PreparedTable, prepare_table
 from datadiff.backends.dataframe_semantics import running_sum_plan, tuple_absence_plan
 from datadiff.backends.probe_semantics import EXTENDED_FALSE_PROBE_KINDS
 from datadiff.backends.sql_lowering import (
@@ -235,25 +235,31 @@ def _scalar_subquery_probe_sql(op: dict[str, Any]) -> str:
 class SQLiteBackend(Backend):
     name = "sqlite"
 
-    def run(self, tables: list[TableData], program: Program, timeout_s: float = 5.0) -> BackendResult:
+    def run(
+        self,
+        tables: list[TableData | PreparedTable],
+        program: Program,
+        timeout_s: float = 5.0,
+    ) -> BackendResult:
         start = time.perf_counter()
         try:
             import pandas as pd
 
-            table_by_name = {table.name: table for table in tables}
-            column_types = {c.name: c.type for table in tables for c in table.columns}
-            current_cols = [c.name for c in tables[0].columns]
+            prepared_tables = [prepare_table(table) for table in tables]
+            table_by_name = {table.name: table for table in prepared_tables}
+            column_types = {c.name: c.type for table in prepared_tables for c in table.columns}
+            current_cols = [c.name for c in prepared_tables[0].columns]
             con = sqlite3.connect(":memory:")
             con.create_function("__datadiff_basename", 1, path_basename)
-            for table in tables:
+            for table in prepared_tables:
                 col_defs = ", ".join(f"{_quote(c.name)} {_sql_type(c.type)}" for c in table.columns)
                 con.execute(f"CREATE TABLE {_quote(table.name)} ({col_defs})")
-                if table.rows:
-                    cols = [c.name for c in table.columns]
+                if table.row_tuples:
+                    cols = list(table.column_names)
                     placeholders = ", ".join("?" for _ in cols)
                     con.executemany(
                         f"INSERT INTO {_quote(table.name)} ({', '.join(_quote(c) for c in cols)}) VALUES ({placeholders})",
-                        [[row.get(c) for c in cols] for row in table.rows],
+                        table.row_tuples,
                     )
             query = "SELECT * FROM t0"
             runtime = build_subquery_runtime(

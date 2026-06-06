@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import time
 
-from datadiff.backends.base import Backend, BackendResult
+from datadiff.backends.base import Backend, BackendResult, PreparedTable, prepare_table
 from datadiff.backends.dataframe_semantics import running_sum_plan, tuple_absence_plan
 from datadiff.backends.polars_lowering import (
     apply_polars_common_op,
@@ -65,14 +65,20 @@ def _polars_probe_handlers(
 class PolarsBackend(Backend):
     name = "polars"
 
-    def _to_df(self, table: TableData):
+    def _to_df(self, table: TableData | PreparedTable):
         import polars as pl
 
-        data = {c.name: [row.get(c.name) for row in table.rows] for c in table.columns}
-        schema = {c.name: _polars_dtype(pl, c.type) for c in table.columns}
+        prepared = prepare_table(table)
+        data = {column.name: prepared.columns_data[column.name] for column in prepared.columns}
+        schema = {column.name: _polars_dtype(pl, column.type) for column in prepared.columns}
         return pl.DataFrame(data, schema=schema)
 
-    def run(self, tables: list[TableData], program: Program, timeout_s: float = 5.0) -> BackendResult:
+    def run(
+        self,
+        tables: list[TableData | PreparedTable],
+        program: Program,
+        timeout_s: float = 5.0,
+    ) -> BackendResult:
         start = time.perf_counter()
         try:
             import polars as pl
@@ -170,7 +176,12 @@ class PolarsLazyBackend(PolarsBackend):
             return lazy_frame.collect()
         return lazy_frame.collect(engine=self.collect_engine)
 
-    def run(self, tables: list[TableData], program: Program, timeout_s: float = 5.0) -> BackendResult:
+    def run(
+        self,
+        tables: list[TableData | PreparedTable],
+        program: Program,
+        timeout_s: float = 5.0,
+    ) -> BackendResult:
         start = time.perf_counter()
         try:
             import polars as pl

@@ -21,8 +21,7 @@ from datadiff.experiment_metadata import (
     reference_row_for_group,
     row_tag_set,
 )
-from datadiff.reporter import latest_experiment_manifest_path, write_experiment_summary_report
-from datadiff.reward import (
+from datadiff.finding_outcomes import (
     OFFLINE_BUCKET_FALSE_POSITIVE,
     OFFLINE_BUCKET_KNOWN_BUG,
     OFFLINE_BUCKET_NEEDS_TRIAGE,
@@ -30,8 +29,12 @@ from datadiff.reward import (
     OFFLINE_BUCKET_SEMANTIC_DIVERGENCE,
     OFFLINE_BUCKET_UNCLASSIFIED,
     candidate_issue_family_keys,
+    is_rewardable_candidate_issue_finding,
     offline_finding_buckets,
+    row_has_rewardable_new_behavior,
 )
+from datadiff.icse_experiment_quality import score_methodology_report
+from datadiff.reporter import latest_experiment_manifest_path, write_experiment_summary_report
 from datadiff.util import (
     PROJECT_ROOT,
     REPORTS_DIR,
@@ -184,7 +187,6 @@ def _build_methodology_report(
         or (_int_or_path_size(row.get("run_log_bytes"), row.get("run_file", "")) + _int(row.get("artifact_bytes")))
         for row in run_rows
     )
-    candidate_cases = sum(_int(row.get("candidate_bug_cases")) for row in run_rows)
     findings = sum(_int(row.get("findings")) for row in run_rows)
     false_positive_count = sum(
         _int(row.get("generator_false_positive_count")) + _int(row.get("normalizer_false_positive_count"))
@@ -196,9 +198,6 @@ def _build_methodology_report(
         + _int(row.get("semantic_divergence_needs_confirmation_count"))
         for row in run_rows
     )
-    families = Counter()
-    for row in aggregate_rows:
-        families.update(_parse_counter_summary(row.get("top_candidate_bug_families", "")))
     target_suites = sorted({row.get("target_suite", "") for row in aggregate_rows if row.get("target_suite")})
     presets = sorted({row.get("preset", "") for row in aggregate_rows if row.get("preset")})
     matrix_ids = sorted({row.get("matrix_id", "") for row in aggregate_rows if row.get("matrix_id")})
@@ -215,10 +214,17 @@ def _build_methodology_report(
     ablation_rows = [row for row in aggregate_rows if _is_ablation_row(row)]
     reference_rows = [row for row in aggregate_rows if _is_reference_row(row)]
     expected_ablation_modules = _expected_ablation_modules(manifest, aggregate_rows)
-    run_log_evidence = _run_log_evidence(run_rows) if scan_run_logs else _empty_run_log_evidence(run_rows)
+    run_log_evidence = (
+        _run_log_evidence(run_rows, aggregate_rows)
+        if scan_run_logs
+        else _empty_run_log_evidence(run_rows, aggregate_rows)
+    )
     artifact_reproducibility = run_log_evidence["artifact_reproducibility"]
     offline_oracle = run_log_evidence["offline_oracle"]
-    candidate_family_first_seen = run_log_evidence["candidate_family_first_seen"]
+    candidate_discovery = run_log_evidence["candidate_discovery"]
+    candidate_cases = _int(candidate_discovery.get("candidate_bug_cases"))
+    candidate_families = dict(candidate_discovery.get("candidate_bug_families", {}) or {})
+    candidate_family_first_seen = candidate_discovery.get("candidate_family_first_seen", {}) or {}
     run_provenance_reproducibility = _run_provenance_reproducibility(run_rows)
     issue_bundle_reproducibility = _issue_bundle_reproducibility(manifest_file)
     workflow_generated_dir = _workflow_generated_dir(manifest_file)
@@ -228,9 +234,12 @@ def _build_methodology_report(
     adaptive_learning_evidence = _adaptive_learning_evidence(manifest, run_rows)
     adaptive_selection = _adaptive_selection_methodology_summary(run_rows, aggregate_rows)
     candidate_pipeline = _candidate_pipeline_metrics(workflow_generated_dir)
+    new_behavior_evidence = run_log_evidence["closed_loop_new_behavior"]
+    raw_new_behavior_cases = _int(new_behavior_evidence.get("raw_new_behavior_cases"))
+    signal_new_behavior_cases = _int(new_behavior_evidence.get("signal_new_behavior_cases"))
     closed_loop = {
-        "raw_new_behavior_cases": sum(_int(row.get("new_behavior_cases")) for row in run_rows),
-        "signal_new_behavior_cases": sum(_int(row.get("signal_new_behavior_cases")) for row in run_rows),
+        "raw_new_behavior_cases": raw_new_behavior_cases,
+        "signal_new_behavior_cases": signal_new_behavior_cases,
         "feedback_case_count": sum(_int(row.get("feedback_case_count")) for row in run_rows),
         "feedback_mutation_cases": sum(_int(row.get("feedback_mutation_cases")) for row in run_rows),
         "feedback_target_key_count": sum(_int(row.get("feedback_target_key_count")) for row in run_rows),
@@ -265,12 +274,9 @@ def _build_methodology_report(
         "feedback_redundant_behavior_cases": sum(_int(row.get("feedback_redundant_behavior_cases")) for row in run_rows),
         "guided_productive_cases": sum(_int(row.get("guided_productive_cases")) for row in run_rows),
         "guided_target_miss_cases": sum(_int(row.get("guided_target_miss_cases")) for row in run_rows),
-        "raw_new_behavior_rate": (
-            sum(_int(row.get("new_behavior_cases")) for row in run_rows) / total_cases if total_cases else 0.0
-        ),
-        "signal_new_behavior_rate": (
-            sum(_int(row.get("signal_new_behavior_cases")) for row in run_rows) / total_cases if total_cases else 0.0
-        ),
+        "raw_new_behavior_rate": raw_new_behavior_cases / total_cases if total_cases else 0.0,
+        "signal_new_behavior_rate": signal_new_behavior_cases / total_cases if total_cases else 0.0,
+        "new_behavior_signal_source": new_behavior_evidence.get("source", "summary"),
         "feedback_mutation_case_rate": _avg_float(aggregate_rows, "feedback_mutation_case_rate"),
         "feedback_operator_affinity_hit_rate": _avg_float(aggregate_rows, "feedback_operator_affinity_hit_rate"),
         "feedback_selected_operator_score_avg": _avg_float(aggregate_rows, "feedback_selected_operator_score_avg"),
@@ -332,7 +338,7 @@ def _build_methodology_report(
         "scheduler_feedback_share": _avg_float(aggregate_rows, "stage_scheduler_feedback_share"),
     }
 
-    return {
+    report = {
         "schema_version": "methodology-report-v1",
         "manifest_file": str(manifest_file),
         "created_from": {
@@ -382,12 +388,15 @@ def _build_methodology_report(
             "findings": findings,
             "candidate_bug_cases": candidate_cases,
             "candidate_bug_case_rate": candidate_cases / total_cases if total_cases else 0.0,
-            "candidate_bug_families": dict(families.most_common()),
-            "candidate_bug_family_count": len(families),
-            "first_candidate": _global_first_candidate(run_rows),
+            "candidate_bug_families": candidate_families,
+            "candidate_bug_family_count": len(candidate_families),
+            "first_candidate": candidate_discovery.get("first_candidate"),
             "candidate_family_first_seen": candidate_family_first_seen,
             "candidate_family_first_seen_count": len(candidate_family_first_seen),
-            "avg_candidate_bug_discovery_auc": _avg_float(aggregate_rows, "avg_candidate_bug_discovery_auc"),
+            "avg_candidate_bug_discovery_auc": _float(
+                candidate_discovery.get("avg_candidate_bug_discovery_auc")
+            ),
+            "candidate_bug_signal_source": candidate_discovery.get("source", "summary"),
         },
         "soundness": {
             "semantic_divergence_count": semantic_divergence_count,
@@ -444,6 +453,8 @@ def _build_methodology_report(
         },
         "comparisons": _reference_variant_comparisons(aggregate_rows),
     }
+    report["icse_experiment_quality"] = score_methodology_report(report)
+    return report
 
 
 def _reference_variant_comparisons(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
@@ -1071,6 +1082,7 @@ def _render_markdown(
     ablation = report["ablation"]
     offline_oracle = report["offline_oracle"]
     closed_loop = report.get("closed_loop_feedback", {})
+    icse_quality = report.get("icse_experiment_quality", {})
     adaptive_evidence = report.get("adaptive_learning_evidence", {})
     adaptive_evidence_scheduler = adaptive_evidence.get("scheduler", {})
     adaptive_evidence_manifest = adaptive_evidence.get("manifest_learning", {})
@@ -1094,6 +1106,40 @@ def _render_markdown(
         "2. Run short validation to catch adapter and oracle noise, then run longer discovery with health gates.",
             "3. Compare modules by ablation, reference/contrast variants, seeded replay sensitivity, and efficiency metrics.",
         "",
+        "## ICSE Experiment Quality",
+        "",
+        f"- Overall score: {_fmt_float(icse_quality.get('overall_score', 0.0))}",
+        f"- Grade: {icse_quality.get('grade', 'F')}",
+        f"- Ready for ICSE claim: {str(icse_quality.get('ready_for_icse_claim', False)).lower()}",
+        f"- Methodology claim: {icse_quality.get('methodology_claim', '')}",
+        "",
+        "| dimension | status | score | observed | target |",
+        "|---|---|---:|---:|---:|",
+    ]
+    for dimension, row in (icse_quality.get("dimensions", {}) or {}).items():
+        lines.append(
+            "| {dimension} | {status} | {score} | {observed} | {target} |".format(
+                dimension=dimension,
+                status="pass" if row.get("passed") else "fail",
+                score=_fmt_float(row.get("score", 0.0)),
+                observed=_fmt_optional_number(row.get("observed")),
+                target=_fmt_optional_number(row.get("target")),
+            )
+        )
+    if not icse_quality.get("dimensions"):
+        lines.append("| none | fail | 0.00 |  |  |")
+    lines.extend(
+        [
+            "",
+            "### ICSE Optimization Priorities",
+            "",
+            ", ".join(
+                item.get("dimension", "")
+                for item in (icse_quality.get("optimization_priorities", []) or [])[:3]
+                if item.get("dimension")
+            )
+            or "none",
+            "",
         "## Coverage",
         "",
         f"- Target suites: {report['coverage']['target_suite_count']} ({', '.join(report['coverage']['target_suites'])})",
@@ -1138,6 +1184,7 @@ def _render_markdown(
         "### Candidate Family First Seen",
         "",
     ]
+    )
     if discovery["candidate_family_first_seen"]:
         lines.extend(
             [
@@ -1519,25 +1566,50 @@ def _global_first_candidate(rows: list[dict[str, str]]) -> dict[str, Any] | None
     return best[1] if best else None
 
 
-def _run_log_evidence(run_rows: list[dict[str, str]]) -> dict[str, Any]:
+def _run_log_evidence(
+    run_rows: list[dict[str, str]],
+    aggregate_rows: list[dict[str, str]],
+) -> dict[str, Any]:
     buckets: Counter[str] = Counter()
     total_findings = 0
     artifact_case_count = 0
     artifact_dirs: dict[str, Path] = {}
     first_seen: dict[str, dict[str, Any]] = {}
+    candidate_families: Counter[str] = Counter()
+    first_candidate: tuple[tuple[float, float, str], dict[str, Any]] | None = None
+    candidate_auc_values: list[float] = []
     scanned = 0
     missing = 0
+    raw_new_behavior_cases = 0
+    signal_new_behavior_cases = 0
+    candidate_bug_cases = 0
     for run_row in run_rows:
         run_path = _resolve_existing_path(run_row.get("run_file", ""))
         if run_path is None:
             missing += 1
+            raw_new_behavior_cases += _int(run_row.get("new_behavior_cases"))
+            signal_new_behavior_cases += _int(run_row.get("signal_new_behavior_cases"))
+            candidate_bug_cases += _int(run_row.get("candidate_bug_cases"))
+            candidate_families.update(_parse_counter_summary(str(run_row.get("top_candidate_bug_families", "") or "")))
+            fallback_first = _global_first_candidate([run_row])
+            if fallback_first is not None:
+                first_key = _first_seen_key(fallback_first)
+                if first_candidate is None or first_key < first_candidate[0]:
+                    first_candidate = (first_key, fallback_first)
+            if run_row.get("candidate_bug_discovery_auc") not in (None, ""):
+                candidate_auc_values.append(_float(run_row.get("candidate_bug_discovery_auc")))
             continue
         scanned += 1
         known_saturated = _known_saturated_families_for_run(run_path)
+        run_hits: list[int] = []
         for fallback_idx, item in enumerate(_iter_jsonl(run_path)):
             findings = item.get("findings", []) or []
             total_findings += len(findings)
             buckets.update(offline_finding_buckets(findings, known_saturated))
+            raw_new_behavior_cases += int(bool(item.get("is_new_behavior")))
+            signal_new_behavior_cases += int(
+                row_has_rewardable_new_behavior(item, known_saturated)
+            )
 
             bug_dir_text = str(item.get("bug_dir", "") or "").strip()
             if bug_dir_text:
@@ -1547,7 +1619,27 @@ def _run_log_evidence(run_rows: list[dict[str, str]]) -> dict[str, Any]:
             case = item.get("case", {}) if isinstance(item.get("case", {}), dict) else {}
             case_index = item.get("case_index", fallback_idx)
             elapsed_s = item.get("elapsed_s")
-            for family in candidate_issue_family_keys(findings, known_saturated):
+            row_candidate_families = candidate_issue_family_keys(findings, known_saturated)
+            rewardable_candidate_case = any(
+                is_rewardable_candidate_issue_finding(finding, known_saturated)
+                for finding in findings
+            )
+            run_hits.append(int(rewardable_candidate_case))
+            if rewardable_candidate_case:
+                candidate_bug_cases += 1
+                candidate_payload = {
+                    "target_suite": run_row.get("target_suite", ""),
+                    "variant_label": run_row.get("variant_label", ""),
+                    "preset": run_row.get("preset", ""),
+                    "seed": run_row.get("seed", ""),
+                    "case_index": case_index,
+                    "elapsed_s": elapsed_s,
+                }
+                first_key = _first_seen_key(candidate_payload)
+                if first_candidate is None or first_key < first_candidate[0]:
+                    first_candidate = (first_key, candidate_payload)
+            candidate_families.update(row_candidate_families)
+            for family in row_candidate_families:
                 payload = {
                     "target_suite": run_row.get("target_suite", ""),
                     "variant_label": run_row.get("variant_label", ""),
@@ -1562,15 +1654,37 @@ def _run_log_evidence(run_rows: list[dict[str, str]]) -> dict[str, Any]:
                 previous = first_seen.get(family)
                 if previous is None or _first_seen_key(payload) < _first_seen_key(previous):
                     first_seen[family] = payload
+        candidate_auc_values.append(_candidate_discovery_auc_from_hits(run_hits))
+    candidate_family_first_seen = dict(
+        sorted(first_seen.items(), key=lambda item: _first_seen_key(item[1]))
+    )
+    candidate_discovery = {
+        "candidate_bug_cases": candidate_bug_cases,
+        "candidate_bug_families": dict(candidate_families.most_common()),
+        "candidate_bug_family_count": len(candidate_families),
+        "first_candidate": first_candidate[1] if first_candidate else None,
+        "candidate_family_first_seen": candidate_family_first_seen,
+        "candidate_family_first_seen_count": len(candidate_family_first_seen),
+        "avg_candidate_bug_discovery_auc": (
+            sum(candidate_auc_values) / len(candidate_auc_values)
+            if candidate_auc_values
+            else _avg_float(aggregate_rows, "avg_candidate_bug_discovery_auc")
+        ),
+        "source": _scan_source(scanned, missing),
+    }
     return {
         "artifact_reproducibility": _artifact_reproducibility_from_dirs(
             artifact_case_count,
             artifact_dirs,
         ),
         "offline_oracle": _offline_oracle_summary_from_buckets(buckets, total_findings),
-        "candidate_family_first_seen": dict(
-            sorted(first_seen.items(), key=lambda item: _first_seen_key(item[1]))
-        ),
+        "candidate_discovery": candidate_discovery,
+        "candidate_family_first_seen": candidate_family_first_seen,
+        "closed_loop_new_behavior": {
+            "raw_new_behavior_cases": raw_new_behavior_cases,
+            "signal_new_behavior_cases": signal_new_behavior_cases,
+            "source": _scan_source(scanned, missing),
+        },
         "run_log_scan": {
             "run_logs_total": len(run_rows),
             "run_logs_scanned": scanned,
@@ -1580,11 +1694,17 @@ def _run_log_evidence(run_rows: list[dict[str, str]]) -> dict[str, Any]:
     }
 
 
-def _empty_run_log_evidence(run_rows: list[dict[str, str]]) -> dict[str, Any]:
+def _empty_run_log_evidence(
+    run_rows: list[dict[str, str]],
+    aggregate_rows: list[dict[str, str]],
+) -> dict[str, Any]:
+    candidate_discovery = _summary_candidate_discovery(run_rows, aggregate_rows)
     return {
         "artifact_reproducibility": _artifact_reproducibility_from_dirs(0, {}),
         "offline_oracle": _offline_oracle_summary_from_buckets(Counter(), 0),
+        "candidate_discovery": candidate_discovery,
         "candidate_family_first_seen": {},
+        "closed_loop_new_behavior": _summary_new_behavior_counts(run_rows),
         "run_log_scan": {
             "run_logs_total": len(run_rows),
             "run_logs_scanned": 0,
@@ -1592,6 +1712,58 @@ def _empty_run_log_evidence(run_rows: list[dict[str, str]]) -> dict[str, Any]:
             "run_logs_scan_skipped": True,
         },
     }
+
+
+def _summary_candidate_discovery(
+    run_rows: list[dict[str, str]],
+    aggregate_rows: list[dict[str, str]],
+) -> dict[str, Any]:
+    families: Counter[str] = Counter()
+    family_rows = aggregate_rows if aggregate_rows else run_rows
+    for row in family_rows:
+        families.update(_parse_counter_summary(str(row.get("top_candidate_bug_families", "") or "")))
+    return {
+        "candidate_bug_cases": sum(_int(row.get("candidate_bug_cases")) for row in run_rows),
+        "candidate_bug_families": dict(families.most_common()),
+        "candidate_bug_family_count": len(families),
+        "first_candidate": _global_first_candidate(run_rows),
+        "candidate_family_first_seen": {},
+        "candidate_family_first_seen_count": 0,
+        "avg_candidate_bug_discovery_auc": _avg_float(aggregate_rows, "avg_candidate_bug_discovery_auc"),
+        "source": "summary",
+    }
+
+
+def _summary_new_behavior_counts(run_rows: list[dict[str, str]]) -> dict[str, Any]:
+    return {
+        "raw_new_behavior_cases": sum(_int(row.get("new_behavior_cases")) for row in run_rows),
+        "signal_new_behavior_cases": sum(
+            _int(row.get("signal_new_behavior_cases")) for row in run_rows
+        ),
+        "source": "summary",
+    }
+
+
+def _scan_source(scanned: int, missing: int) -> str:
+    if scanned and not missing:
+        return "run_logs"
+    if scanned:
+        return "run_logs+summary"
+    return "summary"
+
+
+def _candidate_discovery_auc_from_hits(hits: list[int]) -> float:
+    if not hits:
+        return 0.0
+    total = sum(hits)
+    if total == 0:
+        return 0.0
+    cumulative = 0
+    area = 0
+    for hit in hits:
+        cumulative += hit
+        area += cumulative
+    return area / (len(hits) * total)
 
 
 def _iter_jsonl(path: Path):

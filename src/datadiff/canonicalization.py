@@ -610,6 +610,9 @@ def compare_result_batch(results: Iterable[Mapping[str, Any] | Any]) -> BatchRes
     items = list(results)
     if not items:
         return BatchResultComparison(group_ids=[], mismatch_class="none")
+    fast = _compare_result_batch_fast(items)
+    if fast is not None:
+        return fast
     group_ids, mismatch_class, suspicious_indices, has_clear_majority, majority_group = kernel_compare_result_batch_summary(items)
     return BatchResultComparison(
         group_ids=group_ids,
@@ -628,6 +631,16 @@ def compare_result_against_anchor(
     items = list(results)
     if not items:
         raise IndexError("anchor_index out of range")
+    fast = _compare_result_batch_fast(items)
+    if fast is not None:
+        if anchor_index < 0 or anchor_index >= len(items):
+            raise IndexError("anchor_index out of range")
+        return AnchorResultComparison(
+            anchor_index=anchor_index,
+            matching_indices=fast.matching_indices(anchor_index),
+            mismatching_indices=fast.mismatching_indices(anchor_index),
+            confidence=fast.anchor_confidence(anchor_index),
+        )
     matching_indices, mismatching_indices, confidence = kernel_compare_result_batch_anchor_summary(
         items,
         anchor_index,
@@ -639,4 +652,89 @@ def compare_result_against_anchor(
         matching_indices=matching_indices,
         mismatching_indices=mismatching_indices,
         confidence=confidence,
+    )
+
+
+def _result_field(result: Mapping[str, Any] | Any, key: str, default: Any = None) -> Any:
+    if isinstance(result, Mapping):
+        return result.get(key, default)
+    return getattr(result, key, default)
+
+
+def _compare_result_batch_fast(
+    results: Sequence[Mapping[str, Any] | Any],
+) -> BatchResultComparison | None:
+    profiles: list[ResultProfile] = []
+    row_counts: list[int] = []
+    for result in results:
+        if isinstance(result, ResultProfile):
+            profiles.append(result)
+            row_counts.append(0)
+            continue
+        status = str(_result_field(result, "status", "") or "")
+        columns = tuple(str(column) for column in list(_result_field(result, "columns", []) or []))
+        error_type = str(_result_field(result, "error_type", "") or "")
+        ordered_signature = str(_result_field(result, "ordered_row_signature", "") or "")
+        unordered_signature = str(_result_field(result, "unordered_row_signature", "") or "")
+        has_duplicate_rows = _result_field(result, "has_duplicate_rows", None)
+        comparison_key = str(_result_field(result, "comparison_key", "") or "")
+        if (
+            not ordered_signature
+            or not unordered_signature
+            or not isinstance(has_duplicate_rows, bool)
+            or not comparison_key
+        ):
+            return None
+        profiles.append(
+            ResultProfile(
+                status=status,
+                columns=columns,
+                error_type=error_type,
+                row_profile=RowSetProfile(
+                    ordered_signature=ordered_signature,
+                    unordered_signature=unordered_signature,
+                    has_duplicates=has_duplicate_rows,
+                ),
+                comparison_key=comparison_key,
+            )
+        )
+        row_count = _result_field(result, "row_count", None)
+        if row_count is None:
+            rows = _result_field(result, "rows", []) or []
+            row_count = len(rows)
+        row_counts.append(int(row_count))
+
+    group_ids = _group_ids_from_keys([profile.comparison_key for profile in profiles])
+    statuses = {profile.status for profile in profiles}
+    if len(statuses) > 1:
+        mismatch_class = "status"
+    else:
+        first_status = profiles[0].status
+        if first_status != "ok":
+            error_types = {profile.error_type for profile in profiles}
+            if len(error_types) > 1:
+                mismatch_class = "error_type"
+            else:
+                mismatch_class = "none" if len(set(group_ids)) == 1 else "status"
+        else:
+            if len({profile.columns for profile in profiles}) > 1:
+                mismatch_class = "schema"
+            elif len(set(row_counts)) > 1:
+                mismatch_class = "row_count"
+            elif len({profile.ordered_row_signature for profile in profiles}) == 1:
+                mismatch_class = "none"
+            elif len({profile.unordered_row_signature for profile in profiles}) == 1:
+                mismatch_class = "row_order"
+            else:
+                mismatch_class = "value"
+
+    suspicious_indices = _suspicious_indices_from_group_ids(group_ids)
+    has_clear_majority = _has_clear_majority_group(group_ids)
+    majority_group = _majority_group_from_group_ids(group_ids) or []
+    return BatchResultComparison(
+        group_ids=group_ids,
+        mismatch_class=mismatch_class,
+        suspicious_indices_value=suspicious_indices,
+        has_clear_majority_value=has_clear_majority,
+        majority_group_value=majority_group,
     )

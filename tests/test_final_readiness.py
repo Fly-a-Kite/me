@@ -24,12 +24,32 @@ from datadiff.version_ledger import VersionObservation, build_version_ledger
 
 REQUIRED_ADAPTIVE_COMPONENTS = (
     "active_learning",
+    "backend_pair_learning",
+    "bd_axis_bandit",
+    "bayesian_exploration",
+    "champion_graft_donor",
     "continual_learning",
+    "cost_normalized_reward",
+    "disagreement_bd_axis",
+    "divergence_conditioned",
+    "hierarchical_archive",
+    "ir_rewrite_mutations",
+    "lineage_rarity",
+    "minhash_dedup",
     "online_reward_model",
+    "operator_swarm",
+    "value_catalog",
     "quality_archive",
+    "seed_quota",
+    "seed_energy_batch",
+    "seed_energy_tier",
+    "per_operator_energy",
+    "lhs_seeding",
+    "champion_corpus",
     "runtime_cost_learning",
     "scheduler_annealing",
     "scheduler_learning",
+    "shrink_mutations",
 )
 
 
@@ -39,9 +59,46 @@ def _adaptive_component_flags(**overrides: bool) -> dict[str, bool]:
     return flags
 
 
+def _adaptive_component_ablation_manifest(
+    root: Path,
+    *,
+    component: str,
+    seed: int,
+) -> Path:
+    return _write_manifest(
+        root,
+        name=f"ablation-adaptive-{component.replace('_', '-')}",
+        evidence_mode="ablation",
+        target_suite="datafusion_cross",
+        preset="live_deep_organic",
+        seed=seed,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        run_updates={
+            "adaptive_components": _adaptive_component_flags(
+                **{component: False, "local_source_scheduler": True},
+            ),
+            "disabled_adaptive_components": [component],
+        },
+        experiment_meta={
+            **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                target_suites=("datafusion_cross",)
+            ),
+            "variant": {
+                "variant_id": f"no_{component}",
+                "comparison_role": "contrast",
+                "component_focus": component,
+                "factors": {component: False},
+            },
+        },
+    )
+
+
 def test_final_readiness_passes_when_all_evidence_tracks_are_present(tmp_path):
     manifests = []
     version_ledger_path = _write_version_ledger(tmp_path)
+    target_version_audit_path = _write_target_version_audit(tmp_path, outdated=False)
+    manifests.append(target_version_audit_path)
     manifests.append(
         _write_manifest(
             tmp_path,
@@ -237,7 +294,15 @@ def test_final_readiness_passes_when_all_evidence_tracks_are_present(tmp_path):
                         "online_reward_model": True,
                         "continual_learning": True,
                         "active_learning": True,
+                        "bayesian_exploration": True,
+                        "bd_axis_bandit": True,
+                        "value_catalog": True,
                         "quality_archive": True,
+                        "seed_quota": True,
+                        "seed_energy_batch": True,
+                        "per_operator_energy": True,
+                        "lhs_seeding": True,
+                        "champion_corpus": True,
                         "runtime_cost_learning": True,
                         "scheduler_annealing": True,
                     },
@@ -398,6 +463,276 @@ def test_final_readiness_passes_when_all_evidence_tracks_are_present(tmp_path):
     manifests.append(
         _write_manifest(
             tmp_path,
+            name="ablation-adaptive-bd-axis-bandit",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=18,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    bd_axis_bandit=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["bd_axis_bandit"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_bd_axis_bandit",
+                    "comparison_role": "contrast",
+                    "component_focus": "bd_axis_bandit",
+                    "factors": {"bd_axis_bandit": False},
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-bayesian-exploration",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=19,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    bayesian_exploration=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["bayesian_exploration"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_bayesian_exploration",
+                    "comparison_role": "contrast",
+                    "component_focus": "bayesian_exploration",
+                    "factors": {"bayesian_exploration": False},
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-value-catalog",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=14,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    value_catalog=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["value_catalog"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_value_catalog",
+                    "comparison_role": "contrast",
+                    "component_focus": "value_catalog",
+                    "factors": {"value_catalog": False},
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-seed-quota",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=11,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    seed_quota=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["seed_quota"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_seed_quota",
+                    "comparison_role": "contrast",
+                    "component_focus": "seed_quota",
+                    "factors": {"seed_quota": False},
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-seed-energy-batch",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=15,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    seed_energy_batch=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["seed_energy_batch"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_seed_energy_batch",
+                    "comparison_role": "contrast",
+                    "component_focus": "seed_energy_batch",
+                    "factors": {"seed_energy_batch": False},
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-per-operator-energy",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=16,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    per_operator_energy=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["per_operator_energy"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_per_operator_energy",
+                    "comparison_role": "contrast",
+                    "component_focus": "per_operator_energy",
+                    "factors": {"per_operator_energy": False},
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-ir-rewrite-mutations",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=17,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    ir_rewrite_mutations=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["ir_rewrite_mutations"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_ir_rewrite_mutations",
+                    "comparison_role": "contrast",
+                    "component_focus": "ir_rewrite_mutations",
+                    "factors": {"ir_rewrite_mutations": False},
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-lhs-seeding",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=12,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    lhs_seeding=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["lhs_seeding"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_lhs_seeding",
+                    "comparison_role": "contrast",
+                    "component_focus": "lhs_seeding",
+                    "factors": {"lhs_seeding": False},
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
+            name="ablation-adaptive-champion-corpus",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=13,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    champion_corpus=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["champion_corpus"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_champion_corpus",
+                    "comparison_role": "contrast",
+                    "component_focus": "champion_corpus",
+                    "factors": {"champion_corpus": False},
+                },
+            },
+        )
+    )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
             name="ablation-adaptive-active-learning",
             evidence_mode="ablation",
             target_suite="datafusion_cross",
@@ -445,6 +780,58 @@ def test_final_readiness_passes_when_all_evidence_tracks_are_present(tmp_path):
     manifests.append(
         _write_manifest(
             tmp_path,
+            name="ablation-adaptive-backend-pair-learning",
+            evidence_mode="ablation",
+            target_suite="datafusion_cross",
+            preset="live_deep_organic",
+            seed=10,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "adaptive_components": _adaptive_component_flags(
+                    backend_pair_learning=False,
+                    local_source_scheduler=True,
+                ),
+                "disabled_adaptive_components": ["backend_pair_learning"],
+            },
+            experiment_meta={
+                **FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.to_experiment_meta(
+                    target_suites=("datafusion_cross",)
+                ),
+                "variant": {
+                    "variant_id": "no_backend_pair_learning",
+                    "comparison_role": "contrast",
+                    "component_focus": "backend_pair_learning",
+                    "factors": {"backend_pair_learning": False},
+                },
+            },
+        )
+    )
+    for offset, component in enumerate(
+        (
+            "operator_swarm",
+            "divergence_conditioned",
+            "shrink_mutations",
+            "hierarchical_archive",
+            "lineage_rarity",
+            "minhash_dedup",
+            "disagreement_bd_axis",
+            "cost_normalized_reward",
+            "seed_energy_tier",
+            "champion_graft_donor",
+        ),
+        start=20,
+    ):
+        manifests.append(
+            _adaptive_component_ablation_manifest(
+                tmp_path,
+                component=component,
+                seed=offset,
+            )
+        )
+    manifests.append(
+        _write_manifest(
+            tmp_path,
             name="comparison-guided",
             evidence_mode="comparison",
             target_suite="embedded_sql",
@@ -467,6 +854,18 @@ def test_final_readiness_passes_when_all_evidence_tracks_are_present(tmp_path):
 
     assert audit["schema_version"] == "final-readiness-v1"
     assert audit["ready"] is True
+    assert audit["icse_experiment_quality"]["schema_version"] == "icse-experiment-quality-v1"
+    assert audit["summary"]["icse_experiment_quality"] == audit["icse_experiment_quality"]
+    target_version_gate = {gate["name"]: gate for gate in audit["gates"]}["target_version_audit"]
+    assert target_version_gate["passed"] is True
+    assert audit["summary"]["target_version_audit"]["valid_audit_files"] == [str(target_version_audit_path)]
+    assert set(audit["icse_experiment_quality"]["dimensions"]) == {
+        "real_bug_yield",
+        "throughput",
+        "coverage",
+        "speed",
+        "reproducibility",
+    }
     assert tuple(audit["policy"]["required_live_suites"]) == DEFAULT_A_LEVEL_READINESS_POLICY.required_live_suites
     assert {gate["name"]: gate["passed"] for gate in audit["gates"]}["short_validation"] is True
     assert {gate["name"]: gate["passed"] for gate in audit["gates"]}["live_suite_breadth"] is True
@@ -477,12 +876,16 @@ def test_final_readiness_passes_when_all_evidence_tracks_are_present(tmp_path):
     assert audit["summary"]["module_ablation_comparison"]["reference_run_count"] == 1
     assert audit["summary"]["module_ablation_comparison"]["contrast_run_count"] == 1
     assert audit["summary"]["adaptive_component_ablation"]["reference_run_count"] == 1
-    assert audit["summary"]["adaptive_component_ablation"]["contrast_run_count"] == 7
-    assert audit["summary"]["adaptive_component_ablation"]["disabled_components"] == list(
+    assert audit["summary"]["adaptive_component_ablation"]["contrast_run_count"] == len(
+        REQUIRED_ADAPTIVE_COMPONENTS
+    )
+    assert audit["summary"]["adaptive_component_ablation"]["disabled_components"] == sorted(
         REQUIRED_ADAPTIVE_COMPONENTS
     )
     assert audit["summary"]["adaptive_component_ablation"]["reference_metrics"]["cases"] == 1
-    assert audit["summary"]["adaptive_component_ablation"]["contrast_metrics"]["cases"] == 7
+    assert audit["summary"]["adaptive_component_ablation"]["contrast_metrics"]["cases"] == len(
+        REQUIRED_ADAPTIVE_COMPONENTS
+    )
     assert audit["summary"]["final_matrix_coverage"]["missing_matrix_ids"] == []
     assert audit["summary"]["cross_version_ledger"]["ledger_count"] == 1
     assert audit["summary"]["cross_version_ledger"]["max_version_count"] == 2
@@ -526,7 +929,7 @@ def test_final_readiness_requires_adaptive_component_ablation_for_final_claim(tm
     gates = {gate["name"]: gate for gate in audit["gates"]}
     assert gates["adaptive_component_ablation"]["passed"] is False
     assert gates["adaptive_component_ablation"]["disabled_components"] == []
-    assert gates["adaptive_component_ablation"]["missing_required_components"] == list(
+    assert sorted(gates["adaptive_component_ablation"]["missing_required_components"]) == sorted(
         REQUIRED_ADAPTIVE_COMPONENTS
     )
 
@@ -602,14 +1005,9 @@ def test_final_readiness_requires_key_adaptive_component_ablations(tmp_path):
     gates = {gate["name"]: gate for gate in audit["gates"]}
     assert gates["adaptive_component_ablation"]["passed"] is False
     assert gates["adaptive_component_ablation"]["disabled_components"] == ["quality_archive"]
-    assert gates["adaptive_component_ablation"]["missing_required_components"] == [
-        "active_learning",
-        "continual_learning",
-        "online_reward_model",
-        "runtime_cost_learning",
-        "scheduler_annealing",
-        "scheduler_learning",
-    ]
+    assert gates["adaptive_component_ablation"]["missing_required_components"] == sorted(
+        set(REQUIRED_ADAPTIVE_COMPONENTS) - {"quality_archive"}
+    )
     assert gates["adaptive_component_ablation"]["reference_run_count"] == 1
     assert gates["adaptive_component_ablation"]["contrast_run_count"] == 1
 
@@ -627,12 +1025,22 @@ def test_final_readiness_requires_adaptive_component_reference_run(tmp_path):
         run_updates={
             "adaptive_components": _adaptive_component_flags(
                 active_learning=False,
+                bayesian_exploration=False,
+                backend_pair_learning=False,
+                bd_axis_bandit=False,
+                champion_corpus=False,
                 continual_learning=False,
+                ir_rewrite_mutations=False,
+                lhs_seeding=False,
                 online_reward_model=False,
+                per_operator_energy=False,
                 quality_archive=False,
                 runtime_cost_learning=False,
                 scheduler_annealing=False,
                 scheduler_learning=False,
+                seed_energy_batch=False,
+                seed_quota=False,
+                value_catalog=False,
             ),
             "disabled_adaptive_components": list(REQUIRED_ADAPTIVE_COMPONENTS),
         },
@@ -646,12 +1054,21 @@ def test_final_readiness_requires_adaptive_component_reference_run(tmp_path):
                 "component_focus": "adaptive_closed_loop",
                 "factors": {
                     "active_learning": False,
+                    "backend_pair_learning": False,
+                    "bd_axis_bandit": False,
+                    "champion_corpus": False,
                     "continual_learning": False,
+                    "ir_rewrite_mutations": False,
+                    "lhs_seeding": False,
                     "online_reward_model": False,
+                    "per_operator_energy": False,
                     "quality_archive": False,
                     "runtime_cost_learning": False,
                     "scheduler_annealing": False,
                     "scheduler_learning": False,
+                    "seed_energy_batch": False,
+                    "seed_quota": False,
+                    "value_catalog": False,
                 },
             },
         },
@@ -794,6 +1211,124 @@ def test_final_readiness_rejects_invalid_cross_version_ledger(tmp_path):
     gate = {gate["name"]: gate for gate in audit["gates"]}["cross_version_continual_learning"]
     assert gate["passed"] is False
     assert gate["invalid_reasons"][str(invalid_ledger)] == "schema_mismatch"
+
+
+def test_final_readiness_requires_target_version_audit_for_live_claim(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="live-without-target-version-audit",
+        evidence_mode="live",
+        target_suite="datafusion_cross",
+        preset="live_datafusion",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+            require_adaptive_component_ablation=False,
+            require_runtime_efficiency=False,
+            require_cross_version_ledger=False,
+            require_closed_loop_state_persistence=False,
+            require_adaptive_live_component_evidence=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=("datafusion_cross",), required_live_families=("query_engine",)),
+    )
+
+    gate = {gate["name"]: gate for gate in audit["gates"]}["target_version_audit"]
+    assert gate["passed"] is False
+    assert gate["valid_audit_files"] == []
+    assert audit["summary"]["target_version_audit"]["valid_audit_count"] == 0
+
+
+def test_final_readiness_accepts_up_to_date_target_version_audit(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="live-with-target-version-audit",
+        evidence_mode="live",
+        target_suite="datafusion_cross",
+        preset="live_datafusion",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+    version_audit = _write_target_version_audit(tmp_path, outdated=False)
+
+    audit = build_final_readiness(
+        [manifest, version_audit],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+            require_adaptive_component_ablation=False,
+            require_runtime_efficiency=False,
+            require_cross_version_ledger=False,
+            require_closed_loop_state_persistence=False,
+            require_adaptive_live_component_evidence=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=("datafusion_cross",), required_live_families=("query_engine",)),
+    )
+
+    gate = {gate["name"]: gate for gate in audit["gates"]}["target_version_audit"]
+    assert gate["passed"] is True
+    assert gate["valid_audit_files"] == [str(version_audit)]
+    assert audit["summary"]["target_version_audit"]["all_target_packages_up_to_date"] is True
+
+
+def test_final_readiness_rejects_outdated_target_version_audit(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="live-with-outdated-target-version-audit",
+        evidence_mode="live",
+        target_suite="datafusion_cross",
+        preset="live_datafusion",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+    version_audit = _write_target_version_audit(tmp_path, outdated=True)
+
+    audit = build_final_readiness(
+        [manifest, version_audit],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+            require_adaptive_component_ablation=False,
+            require_runtime_efficiency=False,
+            require_cross_version_ledger=False,
+            require_closed_loop_state_persistence=False,
+            require_adaptive_live_component_evidence=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=("datafusion_cross",), required_live_families=("query_engine",)),
+    )
+
+    gate = {gate["name"]: gate for gate in audit["gates"]}["target_version_audit"]
+    assert gate["passed"] is False
+    assert gate["outdated_target_packages"][0]["package"] == "pandas"
 
 
 def test_final_readiness_rejects_old_cross_version_ledger_without_health_feedback(tmp_path):
@@ -1100,6 +1635,7 @@ def test_final_readiness_requires_transferability_beyond_primary_dataframe_famil
             require_adaptive_component_ablation=False,
             require_cross_version_ledger=False,
             require_discovery_responsiveness=False,
+            require_target_version_audit=False,
         ),
         policy=ReadinessPolicy(
             required_live_suites=("dataframe",),
@@ -1848,6 +2384,10 @@ def test_final_readiness_requires_component_level_adaptive_live_evidence(tmp_pat
         },
     }
     meta["closed_loop_state_summary"].pop("quality_archive_health", None)
+    meta["closed_loop_state_summary"].pop("seed_quota_health", None)
+    meta["closed_loop_state_summary"].pop("champion_corpus_health", None)
+    meta.pop("lhs_seeding", None)
+    meta.pop("champion_corpus", None)
     dump_json(meta, meta_path)
     manifest_payload = final_readiness.load_json(manifest)
     manifest_payload["adaptive_state"] = [
@@ -1858,6 +2398,7 @@ def test_final_readiness_requires_component_level_adaptive_live_evidence(tmp_pat
             "pulls": 1,
             "learning_signal": 0.1,
             "annealing_temperature": 0.0,
+            "bayesian_exploration_observation_count": 0,
         }
     ]
     final_readiness.dump_json(manifest_payload, manifest)
@@ -1886,14 +2427,23 @@ def test_final_readiness_requires_component_level_adaptive_live_evidence(tmp_pat
     gate = {gate["name"]: gate for gate in audit["gates"]}["adaptive_live_component_evidence"]
 
     assert gate["passed"] is False
-    assert gate["proven_components"] == ["scheduler_learning"]
+    assert gate["proven_components"] == ["backend_pair_learning", "scheduler_learning"]
     assert gate["missing"] == [
         "live:datafusion_cross:live_datafusion:active_learning",
+        "live:datafusion_cross:live_datafusion:bayesian_exploration",
+        "live:datafusion_cross:live_datafusion:bd_axis_bandit",
+        "live:datafusion_cross:live_datafusion:champion_corpus",
+        "live:datafusion_cross:live_datafusion:champion_graft_donor",
         "live:datafusion_cross:live_datafusion:continual_learning",
+        "live:datafusion_cross:live_datafusion:hierarchical_archive",
+        "live:datafusion_cross:live_datafusion:lhs_seeding",
         "live:datafusion_cross:live_datafusion:online_reward_model",
         "live:datafusion_cross:live_datafusion:quality_archive",
         "live:datafusion_cross:live_datafusion:runtime_cost_learning",
         "live:datafusion_cross:live_datafusion:scheduler_annealing",
+        "live:datafusion_cross:live_datafusion:seed_energy_tier",
+        "live:datafusion_cross:live_datafusion:seed_quota",
+        "live:datafusion_cross:live_datafusion:value_catalog",
     ]
 
     meta["closed_loop_state_summary"]["adaptive_learning_health"].update(
@@ -1903,6 +2453,14 @@ def test_final_readiness_requires_component_level_adaptive_live_evidence(tmp_pat
             "version_memory_key_count": 1,
             "runtime_cost_observation_count": 1,
             "runtime_cost_total": 0.1,
+            "value_catalog_entry_pulls": 1,
+            "value_catalog_entry_arm_count": 1,
+            "bd_axis_weight_pulls": 1,
+            "bd_axis_weight_arm_count": 1,
+            "seed_energy_tier_pulls": 1,
+            "seed_energy_tier_arm_count": 1,
+            "champion_graft_donor_pulls": 1,
+            "champion_graft_donor_arm_count": 1,
             "continual_priority_memory": {
                 "imported_ledger_count": 1,
                 "imported_family_count": 1,
@@ -1919,6 +2477,9 @@ def test_final_readiness_requires_component_level_adaptive_live_evidence(tmp_pat
     meta["closed_loop_state_summary"]["quality_archive_health"] = {
         "schema_version": "quality-archive-health-v1",
         "cell_count": 1,
+        "hierarchical_enabled": True,
+        "child_cell_count": 1,
+        "split_cell_count": 1,
         "seed_count": 1,
         "elite_seed_count": 1,
         "reward_count": 1,
@@ -1927,8 +2488,28 @@ def test_final_readiness_requires_component_level_adaptive_live_evidence(tmp_pat
         "fallback_count": 0,
         "false_positive_count": 0,
     }
+    meta["closed_loop_state_summary"]["seed_quota_health"] = {
+        "enabled": True,
+        "active": True,
+        "cluster_count": 1,
+        "seed_count": 1,
+    }
+    meta["closed_loop_state_summary"]["champion_corpus_health"] = {
+        "enabled": True,
+        "family_hit_count": 1,
+        "promoted_family_count": 1,
+        "version_id": "test-version",
+    }
+    meta["lhs_seeding"] = {"enabled": True, "sample_count": 256}
+    meta["champion_corpus"] = {
+        "enabled": True,
+        "path": str(tmp_path / "runs" / "champion_corpus.jsonl"),
+        "version_id": "test-version",
+        "injected_count": 1,
+    }
     dump_json(meta, meta_path)
     manifest_payload["adaptive_state"][0]["annealing_temperature"] = 0.2
+    manifest_payload["adaptive_state"][0]["bayesian_exploration_observation_count"] = 1
     final_readiness.dump_json(manifest_payload, manifest)
 
     audit = build_final_readiness([manifest], thresholds=thresholds, policy=policy)
@@ -1936,8 +2517,9 @@ def test_final_readiness_requires_component_level_adaptive_live_evidence(tmp_pat
 
     assert gate["passed"] is True
     assert gate["missing"] == []
-    assert gate["adaptive_selection_total_count"] == 4
+    assert gate["adaptive_selection_total_count"] == 5
     assert gate["adaptive_selection_scopes"] == [
+        "backend_pair",
         "generator_profile",
         "metamorphic_relation",
         "semantic_objective",
@@ -1945,12 +2527,22 @@ def test_final_readiness_requires_component_level_adaptive_live_evidence(tmp_pat
     ]
     assert gate["proven_components"] == [
         "active_learning",
+        "backend_pair_learning",
+        "bayesian_exploration",
+        "bd_axis_bandit",
+        "champion_corpus",
+        "champion_graft_donor",
         "continual_learning",
+        "hierarchical_archive",
+        "lhs_seeding",
         "online_reward_model",
         "quality_archive",
         "runtime_cost_learning",
         "scheduler_annealing",
         "scheduler_learning",
+        "seed_energy_tier",
+        "seed_quota",
+        "value_catalog",
     ]
 
 
@@ -2007,9 +2599,11 @@ def test_final_readiness_infers_adaptive_selection_requirement_from_run_config(t
         "semantic_objective_learning_weight": 1.0,
         "metamorphic_relation_learning_weight": 1.0,
         "version_pair_learning_weight": 1.0,
+        "backend_pair_learning_weight": 1.0,
         "enable_generator_profile_learning": True,
         "enable_semantic_objective_learning": True,
         "enable_metamorphic_relation_learning": True,
+        "enable_backend_pair_learning": True,
         "enable_metamorphic_oracle": True,
         "enable_quality_archive": False,
     }
@@ -2049,9 +2643,10 @@ def test_final_readiness_infers_adaptive_selection_requirement_from_run_config(t
     gate = {gate["name"]: gate for gate in audit["gates"]}["adaptive_live_component_evidence"]
 
     assert gate["passed"] is True
-    assert gate["declared_components"] == ["scheduler_learning"]
-    assert gate["adaptive_selection_total_count"] == 4
+    assert gate["declared_components"] == ["backend_pair_learning", "scheduler_learning"]
+    assert gate["adaptive_selection_total_count"] == 5
     assert gate["adaptive_selection_scopes"] == [
+        "backend_pair",
         "generator_profile",
         "metamorphic_relation",
         "semantic_objective",
@@ -2068,7 +2663,10 @@ def test_final_readiness_infers_adaptive_selection_requirement_from_run_config(t
     gate = {gate["name"]: gate for gate in audit["gates"]}["adaptive_live_component_evidence"]
 
     assert gate["passed"] is False
-    assert gate["missing"] == ["live:datafusion_cross:live_datafusion:adaptive_selection_telemetry"]
+    assert gate["missing"] == [
+        "live:datafusion_cross:live_datafusion:adaptive_selection_telemetry",
+        "live:datafusion_cross:live_datafusion:backend_pair_learning",
+    ]
 
 
 def test_final_readiness_requires_paper_run_journal_coverage(tmp_path):
@@ -2857,6 +3455,7 @@ def test_final_readiness_policy_keeps_top_level_requirements_out_of_engine(tmp_p
             require_adaptive_component_ablation=False,
             require_cross_version_ledger=False,
             require_discovery_responsiveness=False,
+            require_target_version_audit=False,
         ),
         policy=ReadinessPolicy(
             required_live_suites=("datafusion_cross",),
@@ -3023,6 +3622,7 @@ def _write_manifest(
             "semantic_objective_learning_weight",
             "metamorphic_relation_learning_weight",
             "version_pair_learning_weight",
+            "backend_pair_learning_weight",
         )
     )
     if (
@@ -3096,6 +3696,21 @@ def _write_manifest(
                         }
                     ],
                 },
+                "backend_pair_selection": {
+                    "strategy": "contextual_bandit",
+                    "scope": "backend_pair",
+                    "priority": ["pandas|duckdb"],
+                    "action_pool": ["pandas|duckdb"],
+                    "learning_weight": 1.0,
+                    "ranked": [
+                        {
+                            "action_id": "pandas|duckdb",
+                            "score": 0.5,
+                            "uncertainty": 0.25,
+                        }
+                    ],
+                },
+                "backend_pair_priority": ["pandas|duckdb"],
                 "selected_generator_profile": "common",
                 "selected_semantic_objective": "exploration_objective:boundary_depth",
                 "selected_metamorphic_relation": "input_partition_union_all",
@@ -3150,6 +3765,47 @@ def _write_manifest(
         run_meta["first_candidate_bug_elapsed_s"] = first_candidate_elapsed_s
     if candidate_bug_discovery_auc is not None:
         run_meta["candidate_bug_discovery_auc"] = candidate_bug_discovery_auc
+    value_catalog_enabled = bool(
+        not isinstance(adaptive_components, dict)
+        or adaptive_components.get("value_catalog", True)
+    )
+    bd_axis_bandit_enabled = bool(
+        not isinstance(adaptive_components, dict)
+        or adaptive_components.get("bd_axis_bandit", True)
+    )
+    seed_energy_tier_enabled = bool(
+        not isinstance(adaptive_components, dict)
+        or adaptive_components.get("seed_energy_tier", True)
+    )
+    champion_graft_donor_enabled = bool(
+        not isinstance(adaptive_components, dict)
+        or adaptive_components.get("champion_graft_donor", True)
+    )
+    hierarchical_archive_enabled = bool(
+        not isinstance(adaptive_components, dict)
+        or adaptive_components.get("hierarchical_archive", True)
+    )
+    run_meta["lhs_seeding"] = {
+        "enabled": bool(
+            not isinstance(adaptive_components, dict)
+            or adaptive_components.get("lhs_seeding", True)
+        ),
+        "sample_count": 256,
+    }
+    run_meta["champion_corpus"] = {
+        "enabled": bool(
+            not isinstance(adaptive_components, dict)
+            or adaptive_components.get("champion_corpus", True)
+        ),
+        "path": str(runs_dir / "champion_corpus.jsonl"),
+        "version_id": "test-version",
+        "injected_count": 1
+        if bool(
+            not isinstance(adaptive_components, dict)
+            or adaptive_components.get("champion_corpus", True)
+        )
+        else 0,
+    }
     should_write_closed_loop_state = evidence_mode == "live" if include_closed_loop_state is None else include_closed_loop_state
     if should_write_closed_loop_state:
         state_path = runs_dir / f"run-{name}.state.json"
@@ -3167,6 +3823,26 @@ def _write_manifest(
                 "version_memory_key_count": 1,
                 "runtime_cost_observation_count": 1,
                 "runtime_cost_total": 0.1,
+                "scope_pull_counts": {
+                    "bd_axis_weights": 1 if bd_axis_bandit_enabled else 0,
+                    "seed_energy_tier": 1 if seed_energy_tier_enabled else 0,
+                    "champion_graft_donor": 1 if champion_graft_donor_enabled else 0,
+                    "value_catalog_entry": 1 if value_catalog_enabled else 0,
+                },
+                "scope_arm_counts": {
+                    "bd_axis_weights": 1 if bd_axis_bandit_enabled else 0,
+                    "seed_energy_tier": 1 if seed_energy_tier_enabled else 0,
+                    "champion_graft_donor": 1 if champion_graft_donor_enabled else 0,
+                    "value_catalog_entry": 1 if value_catalog_enabled else 0,
+                },
+                "value_catalog_entry_pulls": 1 if value_catalog_enabled else 0,
+                "value_catalog_entry_arm_count": 1 if value_catalog_enabled else 0,
+                "bd_axis_weight_pulls": 1 if bd_axis_bandit_enabled else 0,
+                "bd_axis_weight_arm_count": 1 if bd_axis_bandit_enabled else 0,
+                "seed_energy_tier_pulls": 1 if seed_energy_tier_enabled else 0,
+                "seed_energy_tier_arm_count": 1 if seed_energy_tier_enabled else 0,
+                "champion_graft_donor_pulls": 1 if champion_graft_donor_enabled else 0,
+                "champion_graft_donor_arm_count": 1 if champion_graft_donor_enabled else 0,
                 "continual_priority_memory": {
                     "imported_ledger_count": 1,
                     "imported_family_count": 1,
@@ -3185,6 +3861,9 @@ def _write_manifest(
             "quality_archive_health": {
                 "schema_version": "quality-archive-health-v1",
                 "cell_count": 1,
+                "hierarchical_enabled": hierarchical_archive_enabled,
+                "child_cell_count": 1 if hierarchical_archive_enabled else 0,
+                "split_cell_count": 1 if hierarchical_archive_enabled else 0,
                 "seed_count": 1,
                 "elite_seed_count": 1,
                 "reward_count": 1,
@@ -3192,6 +3871,37 @@ def _write_manifest(
                 "invalid_count": 0,
                 "fallback_count": 0,
                 "false_positive_count": 0,
+            },
+            "seed_quota_health": {
+                "enabled": bool(
+                    not isinstance(adaptive_components, dict)
+                    or adaptive_components.get("seed_quota", True)
+                ),
+                "active": bool(
+                    not isinstance(adaptive_components, dict)
+                    or adaptive_components.get("seed_quota", True)
+                ),
+                "cluster_count": 1,
+                "seed_count": 1,
+            },
+            "champion_corpus_health": {
+                "enabled": bool(
+                    not isinstance(adaptive_components, dict)
+                    or adaptive_components.get("champion_corpus", True)
+                ),
+                "family_hit_count": 1
+                if bool(
+                    not isinstance(adaptive_components, dict)
+                    or adaptive_components.get("champion_corpus", True)
+                )
+                else 0,
+                "promoted_family_count": 1
+                if bool(
+                    not isinstance(adaptive_components, dict)
+                    or adaptive_components.get("champion_corpus", True)
+                )
+                else 0,
+                "version_id": "test-version",
             },
         }
     reports_dir = root / "reports"
@@ -3260,6 +3970,9 @@ def _write_manifest(
                 "preset": preset,
                 "pulls": 1,
                 "learning_signal": 0.5,
+                "bayesian_exploration_observation_count": 1
+                if bool(adaptive_components.get("bayesian_exploration", False))
+                else 0,
                 "annealing_temperature": 0.25
                 if bool(adaptive_components.get("scheduler_annealing", False))
                 else 0.0,
@@ -3302,6 +4015,54 @@ def _write_version_ledger(root: Path) -> Path:
                 ),
             ]
         ),
+        path,
+    )
+    return path
+
+
+def _write_target_version_audit(root: Path, *, outdated: bool = False) -> Path:
+    path = root / "reports" / ("target-version-audit-outdated.json" if outdated else "target-version-audit.json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    installed = "3.0.3"
+    latest = "3.0.4" if outdated else installed
+    outdated_rows = (
+        [
+            {
+                "package": "pandas",
+                "target": "pandas",
+                "installed_version": installed,
+                "latest_version": latest,
+                "up_to_date": False,
+            }
+        ]
+        if outdated
+        else []
+    )
+    dump_json(
+        {
+            "schema_version": "target-version-audit-v1",
+            "generated_at": "2026-06-07T00:00:00Z",
+            "target_packages": [
+                {
+                    "package": "pandas",
+                    "target": "pandas",
+                    "role": "implemented target",
+                    "installed_version": installed,
+                    "latest_version": latest,
+                    "up_to_date": not outdated,
+                    "latest_source": "override",
+                }
+            ],
+            "summary": {
+                "target_package_count": 1,
+                "up_to_date_target_package_count": 0 if outdated else 1,
+                "outdated_target_package_count": 1 if outdated else 0,
+                "unknown_latest_target_package_count": 0,
+                "all_target_packages_up_to_date": not outdated,
+                "outdated_target_packages": outdated_rows,
+                "unknown_latest_target_packages": [],
+            },
+        },
         path,
     )
     return path

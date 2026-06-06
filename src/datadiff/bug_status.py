@@ -347,7 +347,15 @@ def _canonical_fresh_candidate_families(data: dict[str, Any]) -> dict[str, int] 
                 finding.get("triage_verdict") == "candidate_implementation_bug"
                 and not bool(finding.get("false_positive"))
             )
-            if classification.verdict != "candidate_implementation_bug" and not was_recorded_candidate:
+            root = str(finding.get("root_cause", "unknown"))
+            is_metamorphic_candidate = (
+                str(finding.get("oracle", "")) == "metamorphic" or root.startswith("metamorphic_")
+            )
+            if (
+                classification.verdict != "candidate_implementation_bug"
+                and not was_recorded_candidate
+                and not is_metamorphic_candidate
+            ):
                 continue
             suspicious = classification.implicated_backends or [
                 str(backend)
@@ -356,8 +364,7 @@ def _canonical_fresh_candidate_families(data: dict[str, Any]) -> dict[str, int] 
             ]
             if not suspicious:
                 continue
-            root = str(finding.get("root_cause", "unknown"))
-            if str(finding.get("oracle", "")) == "metamorphic" or root.startswith("metamorphic_"):
+            if is_metamorphic_candidate:
                 family = _canonical_fresh_family(f"{root}@{','.join(sorted(suspicious))}")
             else:
                 root = classify_root_cause(case, normalized, str(finding.get("kind", "")))

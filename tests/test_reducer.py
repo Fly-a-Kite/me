@@ -81,6 +81,37 @@ def test_reducer_rejects_same_kind_with_different_root_cause(monkeypatch):
     assert reduced.to_dict() == case.to_dict()
 
 
+def test_reducer_rejects_same_kind_and_root_with_different_suspicious_backend(monkeypatch):
+    def fake_run_loaded_case(candidate, backends, config=None, save_artifact=False):
+        return {
+            "findings": [
+                {
+                    "kind": "semantic_output_mismatch",
+                    "root_cause": "conditional_expression",
+                    "suspicious_backends": ["duckdb"],
+                }
+            ]
+        }
+
+    monkeypatch.setattr(reducer, "run_loaded_case", fake_run_loaded_case)
+    case = Case(
+        "case-backend-attribution",
+        8,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}, {"x": 2}])],
+        Program("prog-backend-attribution", 8, [{"op": "filter", "column": "x", "cmp": ">", "value": 1}]),
+    )
+
+    reduced = reducer.reduce_case(
+        case,
+        backends=["pandas", "duckdb", "polars_lazy"],
+        target_kinds=["semantic_output_mismatch"],
+        target_roots=["conditional_expression"],
+        target_suspicious_backends=[["polars_lazy"]],
+    )
+
+    assert reduced.to_dict() == case.to_dict()
+
+
 def test_reducer_rejects_false_positive_reduction(monkeypatch):
     def fake_run_loaded_case(candidate, backends, config=None, save_artifact=False):
         return {

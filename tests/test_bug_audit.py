@@ -16,6 +16,11 @@ def test_bug_audit_registry_contains_latest_fresh_probes():
     assert set(available_bug_audit_probe_ids()) == {
         "datafusion_distinct_null_topk",
         "datafusion_limit_idempotence",
+        "duckdb_cte_inline_equivalence",
+        "duckdb_left_anti_join_equivalence",
+        "pandas_arrow_groupby_size_count",
+        "polars_concat_select_pushdown",
+        "polars_lazy_eager_equivalence",
         "polars_reflected_arithmetic",
         "polars_slice_chunk_lazy_equivalence",
         "polars_vector_division_rounding",

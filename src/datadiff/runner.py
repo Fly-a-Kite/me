@@ -1,53 +1,146 @@
 from __future__ import annotations
 
-from collections import Counter
 import hashlib
 import json
+import signal
 import time
+import traceback
 from pathlib import Path
 from typing import Any, Callable
 
 from datadiff.artifact import save_issue_artifact as save_bug_artifact
-from datadiff.adjudication import build_adjudication, counts_as_bug_evidence
+from datadiff.bandit_selection import (
+    _adaptive_exploration_reward,
+    _backend_pair_context_features,
+    _backend_pair_pool,
+    _backend_pair_reward,
+    _bucket_feature,
+    _case_learning_context_features,
+    _config_for_version_pair,
+    _config_payload_for_version_pair,
+    _effective_generator_profile,
+    _generator_profile_context_features,
+    _generator_profile_pool,
+    _generator_profile_reward,
+    _metamorphic_relation_order_from_selection,
+    _normalize_backend_pair_id,
+    _pair_disagrees_from_descriptor,
+    _parse_version_pair,
+    _rank_backend_pairs,
+    _record_backend_pair_feedback,
+    _runtime_cost_signal,
+    _select_adaptive_action,
+    _select_generator_profile,
+    _semantic_objective_pool,
+    _unique_nonempty_strings,
+    _version_pair_context_features,
+    _version_pair_id,
+    _version_pair_pool,
+)
 from datadiff.backends import make_backend
 from datadiff.backends.base import Backend
-from datadiff.case_features import PROBE_ROOTS
-from datadiff.case_policy import known_replay_source_filter_reason
-from datadiff.canonicalization import short_canonical_hash
+from datadiff.champion_corpus import ChampionRegistry, DEFAULT_CHAMPION_CORPUS_PATH
 from datadiff.classification_oracle import annotate_findings
 from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES, ExperimentConfig
 from datadiff.datagen import generate_case
+from datadiff.disagreement import compute_descriptor
 from datadiff.dsl import Case
 from datadiff.env import collect_environment
-from datadiff.exploration_objectives import (
-    EXPLORATION_OBJECTIVE_PREFIX,
-    derive_exploration_objective_features,
-    objective_features_for_rules,
-)
+from datadiff.execution import execute_case as _execute_case_impl
+from datadiff.fingerprint import compute_fingerprint
 from datadiff.feedback import FeedbackState
-from datadiff.guidance import GuidanceState, derive_case_features
+from datadiff.fuzz_loop import FuzzBudget, IntervalGate, RunCounters, RunPaths
+from datadiff.fuzz_loop import FuzzIteration
+from datadiff.guidance import GuidanceState
 from datadiff.metamorphic import (
     all_metamorphic_variants,
     evaluate_metamorphic_variants,
     select_metamorphic_variants,
 )
-from datadiff.normalizer import normalize_result
 from datadiff.oracle import Finding, evaluate_case
-from datadiff.operation_combo import combo_semantic_signals, describe_operation_combo
-from datadiff.operation_semantics import op_kind, operation_names
-from datadiff.preflight import preflight_case
-from datadiff.quality_oracles import evaluate_quality_oracles
-from datadiff.reward import (
-    analyze_finding_outcomes,
-    source_reward_adjustment_from_summary,
-    offline_finding_bucket,
-    row_reward_signals,
-    feedback_summary_for_case,
+from datadiff.oracle_complex import cross_validate_oracle_findings
+from datadiff.run_config import (
+    _config_layer_payload,
+    _config_payload_with_effective_guidance_targets,
+    _configured_guidance_targets,
+)
+from datadiff.run_artifacts import process_reducer_and_artifacts
+from datadiff.run_candidates import (
+    REPLAY_FILTER_EXTRA_ATTEMPTS_PER_CANDIDATE,
+    SATURATED_FAMILY_FILTER_EXTRA_ATTEMPTS_PER_CANDIDATE,
+    _generate_case_with_optional_schema,
+    _known_replay_source_filter_reason,
+    _replay_bug_filter_reason,
+    generate_candidate_batch,
+)
+from datadiff.run_findings import (
+    _artifact_budget_available,
+    _countable_finding_objects,
+    _countable_row_findings,
+    _finding_recheck_key,
+    _format_recheck_key,
+    _is_countable_finding_dict,
+    _mark_finding_non_reproducible,
+)
+from datadiff.run_logging import (
+    CASE_LOG_BUFFER_LINES,
+    RUN_LOG_BUFFER_LINES,
+    STAGE_PROFILE_KEYS,
+    _adaptive_learning_health_summary,
+    _case_log_row,
+    _case_summary,
+    _champion_corpus_health_summary,
+    _closed_loop_state_summary,
+    _compact_log_row,
+    _empty_stage_profile,
+    _finalize_stage_profile_summary,
+    _guidance_summary,
+    _merge_stage_profile,
+    _normalized_summary,
+    _quality_archive_health_summary,
+    _quality_oracle_summary,
+    _raw_results_summary,
+    _seed_quota_health_summary,
+    _stage_profile_with_total,
+)
+from datadiff.run_loaded import (
+    execute_case_for_run_loaded,
+    parallel_backend_execution_active,
+    run_loaded_case_impl,
+)
+from datadiff.run_metadata import (
+    _attach_case_fingerprint_to_row_case,
+    _attach_disagreement_descriptor_to_row_case,
+    _attach_metadata_to_row_case,
+    _candidate_quality_context,
+    _candidate_target_keys_from_metadata,
+    _capability_target_keys,
+    _feedback_target_keys,
+    _fingerprint_anchor_result,
+    _generated_candidate_metadata,
+    _selected_candidate_metadata,
+)
+from datadiff.run_feedback import (
+    _feedback_storage_decision,
+    _source_scheduler_snapshot,
+    apply_feedback_updates,
+)
+from datadiff.run_row import apply_iteration_row_updates
+from datadiff.run_recheck import candidate_recheck_impl
+from datadiff.run_selection import select_iteration_case
+from datadiff.run_signatures import (
+    behavior_signature,
+    discovery_signature,
+    row_count_bucket as _row_count_bucket,
+    signal_signature,
 )
 from datadiff.run_provenance import collect_run_provenance
-from datadiff.scheduler import LocalSourceScheduler
-from datadiff.semantic_registry import filter_generator_profiles_by_capability
-from datadiff.semantic_signal import canonical_target_key, legacy_target_key_alias, semantic_signal_feature
+from datadiff.run_state import (
+    _build_closed_loop_state,
+    _inject_champion_corpus,
+    _restore_closed_loop_state,
+)
+from datadiff.synthesis.lhs_sampler import schema_spec_for_seed
 from datadiff.targets import describe_targets, target_context
 from datadiff.util import (
     CORPUS_DIR,
@@ -62,1405 +155,10 @@ from datadiff.util import (
 )
 
 ProgressCallback = Callable[[dict[str, Any]], None]
-STAGE_PROFILE_KEYS = (
-    "generate_mutate_ms",
-    "backend_execution_ms",
-    "normalize_ms",
-    "oracle_classification_ms",
-    "scheduler_feedback_ms",
-    "logging_artifact_ms",
-    "total_case_wall_ms",
-)
-RUN_LOG_BUFFER_LINES = 32
-CASE_LOG_BUFFER_LINES = 16
 
 
-def _effective_guidance_targets(config: ExperimentConfig) -> list[str]:
-    out: list[str] = []
-    seen: set[str] = set()
-    for text in _configured_guidance_targets(config):
-        if text in seen:
-            continue
-        seen.add(text)
-        out.append(text)
-    return out
-
-
-def _configured_guidance_targets(config: ExperimentConfig) -> list[str]:
-    configured: list[str] = []
-    seen: set[str] = set()
-
-    def _append(value: Any) -> None:
-        text = str(value).strip()
-        if not text or text in seen:
-            return
-        seen.add(text)
-        configured.append(text)
-
-    for value in config.guidance_targets or []:
-        _append(value)
-    for value in config.semantic_focus_families or []:
-        family = str(value).strip()
-        if not family:
-            continue
-        _append(f"semantic_family:{family}")
-    for value in config.semantic_focus_signals or []:
-        signal = str(value).strip()
-        if not signal:
-            continue
-        semantic_target = str(canonical_target_key(semantic_signal_feature(signal))).strip()
-        if semantic_target:
-            _append(semantic_target)
-    for objective in objective_features_for_rules(config.exploration_objective_rules):
-        _append(objective)
-    return configured
-
-
-def _config_payload_with_effective_guidance_targets(config: ExperimentConfig) -> dict[str, Any]:
-    payload = config.to_dict()
-    payload["effective_guidance_targets"] = _configured_guidance_targets(config)
-    return payload
-
-
-def _selected_candidate_metadata(
-    case: Case,
-    config: ExperimentConfig,
-    guidance_enabled: bool,
-) -> dict[str, Any]:
-    generated_metadata = _generated_candidate_metadata(case)
-    return {
-        "source": "generated",
-        "generated_seed": case.seed,
-        "seed_lineage": generated_metadata["seed_lineage"],
-        "mutation": generated_metadata["mutation"],
-        "feedback_selection": {},
-        "feedback_decision": {},
-        "quality_archive_context": {},
-        "operation_combo": describe_operation_combo(case.program.operations),
-        "preflight": {
-            "valid": True,
-            "repaired": False,
-            "fallback_used": False,
-            "errors_before": [],
-            "errors_after": [],
-        },
-        "replay_filter": {
-            "enabled": not config.enable_replay_bug,
-            "filtered_before_candidate": 0,
-            "fallback_used": False,
-            "last_skip_reason": "",
-        },
-        "family_saturation_filter": {
-            "enabled": guidance_enabled,
-            "filtered_before_candidate": 0,
-            "fallback_used": False,
-            "last_skip_reason": "",
-        },
-    }
-
-
-def _case_summary(case_data: dict[str, Any]) -> dict[str, Any]:
-    program = case_data.get("program", {})
-    return {
-        "case_id": case_data.get("case_id", ""),
-        "seed": case_data.get("seed", 0),
-        "table_count": len(case_data.get("tables", [])),
-        "row_count": sum(len(table.get("rows", [])) for table in case_data.get("tables", [])),
-        "program": {
-            "program_id": program.get("program_id", ""),
-            "seed": program.get("seed", 0),
-            "operations": program.get("operations", []),
-        },
-    }
-
-
-def _normalized_summary(normalized: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    return {
-        backend: {
-            "backend": data.get("backend", backend),
-            "status": data.get("status", "unknown"),
-            "columns": data.get("columns", []),
-            "row_count": len(data.get("rows", [])),
-            "error_type": data.get("error_type", ""),
-            "error": data.get("error", ""),
-        }
-        for backend, data in normalized.items()
-    }
-
-
-def _raw_results_summary(raw_results: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    return {
-        backend: {
-            "backend": data.get("backend", backend),
-            "status": data.get("status", "unknown"),
-            "error_type": data.get("error_type", ""),
-            "duration_ms": data.get("duration_ms", 0.0),
-        }
-        for backend, data in raw_results.items()
-    }
-
-
-def _empty_stage_profile() -> dict[str, float]:
-    return {key: 0.0 for key in STAGE_PROFILE_KEYS}
-
-
-def _stage_profile_with_total(stage_profile: dict[str, float]) -> dict[str, float]:
-    profile = _empty_stage_profile()
-    for key in STAGE_PROFILE_KEYS:
-        if key == "total_case_wall_ms":
-            continue
-        profile[key] = float(stage_profile.get(key, 0.0) or 0.0)
-    profile["total_case_wall_ms"] = sum(
-        profile[key]
-        for key in STAGE_PROFILE_KEYS
-        if key != "total_case_wall_ms"
-    )
-    return profile
-
-
-def _merge_stage_profile(totals: dict[str, float], stage_profile: dict[str, float]) -> dict[str, float]:
-    merged = _empty_stage_profile()
-    for key in STAGE_PROFILE_KEYS:
-        merged[key] = float(totals.get(key, 0.0) or 0.0) + float(stage_profile.get(key, 0.0) or 0.0)
-    return merged
-
-
-def _finalize_stage_profile_summary(totals: dict[str, float], *, cases: int) -> dict[str, Any]:
-    summary = {
-        "totals_ms": _stage_profile_with_total(totals),
-        "avg_ms_per_case": _empty_stage_profile(),
-        "share_of_total": _empty_stage_profile(),
-        "case_count": max(0, int(cases)),
-    }
-    case_count = max(0, int(cases))
-    total_wall_ms = float(summary["totals_ms"].get("total_case_wall_ms", 0.0) or 0.0)
-    for key in STAGE_PROFILE_KEYS:
-        total_ms = float(summary["totals_ms"].get(key, 0.0) or 0.0)
-        summary["avg_ms_per_case"][key] = total_ms / case_count if case_count else 0.0
-        summary["share_of_total"][key] = total_ms / total_wall_ms if total_wall_ms else 0.0
-    return summary
-
-
-def _guidance_summary(guidance: dict[str, Any]) -> dict[str, Any]:
-    family_saturation_penalty = guidance.get("score_breakdown", {}).get("family_saturation_penalty", 0.0)
-    family_saturation_active = guidance.get("score_breakdown", {}).get("family_saturation_active", 0.0)
-    return {
-        "strategy": guidance.get("strategy", ""),
-        "score": guidance.get("score", 0.0),
-        "matched_targets": guidance.get("matched_targets", []),
-        "matched_semantic_targets": guidance.get("matched_targets", []),
-        "candidate_count": guidance.get("candidate_count", 1),
-        "contributing_candidate_count": guidance.get("contributing_candidate_count", guidance.get("candidate_count", 1)),
-        "pruned_candidate_count": guidance.get("pruned_candidate_count", 0),
-        "feature_count": len(guidance.get("features", [])),
-        "frontier_bucket_count": len(guidance.get("frontier_buckets", [])),
-        "discovery_bucket_count": len(guidance.get("discovery_buckets", [])),
-        "path_coverage_proxy": guidance.get("score_breakdown", {}).get("path_coverage_proxy", 0.0),
-        "data_sensitivity": guidance.get("score_breakdown", {}).get("data_sensitivity", 0.0),
-        "frontier_conformance": guidance.get("score_breakdown", {}).get("frontier_conformance", 0.0),
-        "discovery_diversity_bonus": guidance.get("score_breakdown", {}).get("discovery_diversity_bonus", 0.0),
-        "candidate_pool_diversity_bonus": guidance.get("score_breakdown", {}).get(
-            "candidate_pool_diversity_bonus", 0.0
-        ),
-        "discovery_stale_penalty": guidance.get("score_breakdown", {}).get("discovery_stale_penalty", 0.0),
-        "discovery_stale_active": guidance.get("score_breakdown", {}).get("discovery_stale_active", 0.0),
-        "recent_discovery_loop_penalty": guidance.get("score_breakdown", {}).get(
-            "recent_discovery_loop_penalty", 0.0
-        ),
-        "recent_discovery_loop_active": guidance.get("score_breakdown", {}).get(
-            "recent_discovery_loop_active", 0.0
-        ),
-        "recent_discovery_window_count": guidance.get("score_breakdown", {}).get(
-            "recent_discovery_window_count", 0.0
-        ),
-        "contribution_potential": guidance.get("score_breakdown", {}).get("contribution_potential", 0.0),
-        "combo_priority": guidance.get("score_breakdown", {}).get("combo_priority", 0.0),
-        "online_weight_mean": guidance.get("score_breakdown", {}).get("online_weight_mean", 1.0),
-        "online_weight_max": guidance.get("score_breakdown", {}).get("online_weight_max", 1.0),
-        "online_weight_updates": guidance.get("score_breakdown", {}).get("online_weight_updates", 0.0),
-        "resolved_semantic_boundary_penalty": guidance.get("score_breakdown", {}).get(
-            "resolved_semantic_boundary_penalty", 0.0
-        ),
-        "profile_saturation_penalty": guidance.get("score_breakdown", {}).get("profile_saturation_penalty", 0.0),
-        "profile_saturation_active": guidance.get("score_breakdown", {}).get("profile_saturation_active", 0.0),
-        "family_saturation_penalty": family_saturation_penalty,
-        "family_saturation_active": family_saturation_active,
-        "family_diversity_guard_penalty": family_saturation_penalty,
-        "family_diversity_guard_active": family_saturation_active,
-        "issue_replay_saturation_penalty": guidance.get("score_breakdown", {}).get(
-            "issue_replay_saturation_penalty", 0.0
-        ),
-        "issue_replay_saturation_active": guidance.get("score_breakdown", {}).get(
-            "issue_replay_saturation_active", 0.0
-        ),
-        "issue_replay_global_saturation_penalty": guidance.get("score_breakdown", {}).get(
-            "issue_replay_global_saturation_penalty", 0.0
-        ),
-        "issue_replay_global_saturation_active": guidance.get("score_breakdown", {}).get(
-            "issue_replay_global_saturation_active", 0.0
-        ),
-        "issue_inspired_source_saturation_penalty": guidance.get("score_breakdown", {}).get(
-            "issue_inspired_source_saturation_penalty", 0.0
-        ),
-        "issue_inspired_source_saturation_active": guidance.get("score_breakdown", {}).get(
-            "issue_inspired_source_saturation_active", 0.0
-        ),
-    }
-
-
-def _closed_loop_state_summary(state: dict[str, Any]) -> dict[str, Any]:
-    feedback_state = state.get("feedback") if isinstance(state.get("feedback"), dict) else {}
-    guidance_state = state.get("guidance") if isinstance(state.get("guidance"), dict) else {}
-    adaptive_learning = feedback_state.get("adaptive_learning", {}) if isinstance(feedback_state, dict) else {}
-    quality_archive = feedback_state.get("quality_archive", {}) if isinstance(feedback_state, dict) else {}
-    return {
-        "seen_signature_count": len(state.get("seen_signatures", []) or []),
-        "signal_seen_signature_count": len(state.get("signal_seen_signatures", []) or []),
-        "feedback_interesting_case_count": len(feedback_state.get("interesting_cases", []) or []),
-        "feedback_stored_candidate_family_count": len(feedback_state.get("stored_candidate_bug_families", {}) or {}),
-        "feedback_stored_target_key_count": len(feedback_state.get("stored_target_keys", {}) or {}),
-        "adaptive_learning_health": _adaptive_learning_health_summary(adaptive_learning),
-        "quality_archive_health": _quality_archive_health_summary(quality_archive),
-        "guidance_feature_count": len(guidance_state.get("feature_counts", {}) or {}),
-        "guidance_frontier_bucket_count": len(guidance_state.get("frontier_bucket_counts", {}) or {}),
-        "guidance_candidate_bug_family_count": len(guidance_state.get("candidate_bug_family_counts", {}) or {}),
-    }
-
-
-def _adaptive_learning_health_summary(state: dict[str, Any]) -> dict[str, Any]:
-    if not isinstance(state, dict) or str(state.get("schema_version", "") or "") != "adaptive-learning-v1":
-        return {}
-    bandits = state.get("bandits", {}) if isinstance(state.get("bandits", {}), dict) else {}
-    arm_count = 0
-    total_pulls = 0
-    reward_model_update_count = 0
-    reward_model_feature_count = 0
-    runtime_cost_observation_count = 0
-    runtime_cost_total = 0.0
-    health_penalties: list[float] = []
-    uncertainties: list[float] = []
-    for bandit in bandits.values():
-        if not isinstance(bandit, dict):
-            continue
-        for arm in bandit.get("arms", []) or []:
-            if not isinstance(arm, dict):
-                continue
-            arm_count += 1
-            arm_pulls = int(arm.get("pulls", 0) or 0)
-            total_pulls += arm_pulls
-            pulls = max(1, arm_pulls)
-            arm_runtime_cost = float(arm.get("runtime_cost_total", 0.0) or 0.0)
-            runtime_cost_total += arm_runtime_cost
-            if arm_pulls > 0:
-                runtime_cost_observation_count += arm_pulls
-            runtime_cost = arm_runtime_cost / pulls
-            false_positive = float(arm.get("false_positive_count", 0) or 0) / pulls
-            invalid = float(arm.get("invalid_count", 0) or 0) / pulls
-            health_penalties.append(min(1.5, 0.35 * runtime_cost + 0.60 * false_positive + 0.25 * invalid))
-        reward_model = bandit.get("reward_model", {}) if isinstance(bandit.get("reward_model", {}), dict) else {}
-        reward_model_update_count += int(reward_model.get("total_updates", 0) or 0)
-        feature_counts = reward_model.get("feature_counts", {})
-        if isinstance(feature_counts, dict):
-            reward_model_feature_count += len(feature_counts)
-            uncertainties.extend(1.0 / ((1.0 + float(count or 0.0)) ** 0.5) for count in feature_counts.values())
-    version_memory = state.get("version_memory", {})
-    version_memory_key_count = 0
-    if isinstance(version_memory, dict):
-        reward_counts = version_memory.get("reward_counts", {})
-        version_memory_key_count = len(reward_counts) if isinstance(reward_counts, dict) else 0
-    continual_memory = state.get("continual_priority_memory", {})
-    continual_summary = {}
-    if isinstance(continual_memory, dict):
-        family_priorities = continual_memory.get("family_priorities", {})
-        feature_counts = continual_memory.get("feature_counts", {})
-        continual_summary = {
-            "imported_ledger_count": int(continual_memory.get("imported_ledger_count", 0) or 0),
-            "imported_family_count": int(continual_memory.get("imported_family_count", 0) or 0),
-            "imported_health_feedback_count": int(
-                continual_memory.get("imported_health_feedback_count", 0) or 0
-            ),
-            "family_count": len(family_priorities) if isinstance(family_priorities, dict) else 0,
-            "feature_count": len(feature_counts) if isinstance(feature_counts, dict) else 0,
-            "health_feedback_feature_count": len(
-                continual_memory.get("feature_health_counts", {})
-                if isinstance(continual_memory.get("feature_health_counts", {}), dict)
-                else {}
-            ),
-        }
-    exploration_memory = state.get("exploration_memory", {})
-    exploration_summary = {}
-    if isinstance(exploration_memory, dict):
-        context_counts = exploration_memory.get("context_counts", {})
-        action_counts = exploration_memory.get("action_counts", {})
-        exploration_summary = {
-            "total_records": int(exploration_memory.get("total_records", 0) or 0),
-            "context_count": len(context_counts) if isinstance(context_counts, dict) else 0,
-            "action_count": len(action_counts) if isinstance(action_counts, dict) else 0,
-        }
-    return {
-        "schema_version": "adaptive-learning-health-v1",
-        "bandit_count": len(bandits),
-        "arm_count": arm_count,
-        "total_pulls": total_pulls,
-        "reward_model_update_count": reward_model_update_count,
-        "reward_model_feature_count": reward_model_feature_count,
-        "version_memory_key_count": version_memory_key_count,
-        "runtime_cost_observation_count": runtime_cost_observation_count,
-        "runtime_cost_total": runtime_cost_total,
-        "continual_priority_memory": continual_summary,
-        "avg_health_penalty": sum(health_penalties) / len(health_penalties) if health_penalties else 0.0,
-        "max_health_penalty": max(health_penalties) if health_penalties else 0.0,
-        "avg_uncertainty": sum(uncertainties) / len(uncertainties) if uncertainties else 0.0,
-        "exploration_memory": exploration_summary,
-    }
-
-
-def _quality_archive_health_summary(state: dict[str, Any]) -> dict[str, Any]:
-    if not isinstance(state, dict) or str(state.get("schema_version", "") or "") != "quality-diversity-archive-v1":
-        return {}
-    cells = [cell for cell in state.get("cells", []) or [] if isinstance(cell, dict)]
-    seed_count = 0
-    elite_seed_count = 0
-    reward_count = 0
-    outcome_count = 0
-    invalid_count = 0
-    fallback_count = 0
-    false_positive_count = 0
-    for cell in cells:
-        seeds = [seed for seed in cell.get("seeds", []) or [] if isinstance(seed, dict)]
-        max_elites = max(0, int(cell.get("max_elites", state.get("max_elites_per_cluster", 4)) or 0))
-        seed_count += len(seeds)
-        elite_seed_count += min(len(seeds), max_elites)
-        reward_count += int(cell.get("reward_count", 0) or 0)
-        outcome_count += int(cell.get("outcome_count", 0) or 0)
-        invalid_count += int(cell.get("invalid_count", 0) or 0)
-        fallback_count += int(cell.get("fallback_count", 0) or 0)
-        false_positive_count += int(cell.get("false_positive_count", 0) or 0)
-    return {
-        "schema_version": "quality-archive-health-v1",
-        "cell_count": len(cells),
-        "seed_count": seed_count,
-        "elite_seed_count": elite_seed_count,
-        "reward_count": reward_count,
-        "outcome_count": outcome_count,
-        "invalid_count": invalid_count,
-        "fallback_count": fallback_count,
-        "false_positive_count": false_positive_count,
-    }
-
-
-def _quality_oracle_summary(oracles: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [
-        {
-            "name": oracle.get("name", "unknown"),
-            "verdict": oracle.get("verdict", "unknown"),
-            "passed": bool(oracle.get("passed", False)),
-            "score": oracle.get("score", 0.0),
-        }
-        for oracle in oracles
-    ]
-
-
-def _generated_candidate_metadata(case: Case) -> dict[str, Any]:
-    return {
-        "seed_lineage": {
-            "root_seed": case.seed,
-            "parent_seed": None,
-            "parent_case_id": "",
-            "mutation_seed": None,
-            "depth": 0,
-        },
-        "mutation": {
-            "operator": "generated",
-            "detail": "generated",
-            "changed": False,
-        },
-        "feedback_selection": {},
-        "feedback_decision": {},
-    }
-
-
-def _source_scheduler_snapshot(feedback: FeedbackState | None) -> list[dict[str, Any]]:
-    scheduler = getattr(feedback, "source_scheduler", None) if feedback is not None else None
-    if scheduler is None or not hasattr(scheduler, "snapshot"):
-        return []
-    return scheduler.snapshot()
-
-
-def _version_pair_id(config: ExperimentConfig) -> str:
-    target_version = str(getattr(config, "target_version", "") or "").strip()
-    fixed_version = str(getattr(config, "fixed_version", "") or "").strip()
-    if target_version and fixed_version:
-        return f"{target_version}->{fixed_version}"
-    return target_version or fixed_version
-
-
-def _parse_version_pair(value: str) -> tuple[str, str]:
-    text = str(value or "").strip()
-    if not text:
-        return "", ""
-    if "->" in text:
-        target, fixed = text.split("->", 1)
-        return str(target).strip(), str(fixed).strip()
-    return text, ""
-
-
-def _version_pair_pool(config: ExperimentConfig) -> tuple[tuple[str, ...], dict[str, Any]]:
-    configured = [str(item).strip() for item in getattr(config, "version_pair_pool", []) if str(item).strip()]
-    default_pair = _version_pair_id(config)
-    if default_pair and default_pair not in configured:
-        configured.insert(0, default_pair)
-    selected = tuple(_unique_nonempty_strings(configured))
-    if not selected and default_pair:
-        selected = (default_pair,)
-    metadata = {
-        "requested": list(configured),
-        "selected": list(selected),
-        "default_pair": default_pair,
-    }
-    return selected, metadata
-
-
-def _config_for_version_pair(config: ExperimentConfig, version_pair: str) -> ExperimentConfig:
-    if not version_pair:
-        return config
-    target_version, fixed_version = _parse_version_pair(version_pair)
-    if target_version == str(getattr(config, "target_version", "") or "").strip() and fixed_version == str(
-        getattr(config, "fixed_version", "") or ""
-    ).strip():
-        return config
-    config_data = config.to_dict()
-    config_data["target_version"] = target_version
-    config_data["fixed_version"] = fixed_version
-    return ExperimentConfig(**config_data)
-
-
-def _config_payload_for_version_pair(config_payload: dict[str, Any], version_pair: str) -> dict[str, Any]:
-    payload = dict(config_payload)
-    if not version_pair:
-        return payload
-    target_version, fixed_version = _parse_version_pair(version_pair)
-    payload["target_version"] = target_version
-    payload["fixed_version"] = fixed_version
-    payload["selected_version_pair"] = version_pair
-    return payload
-
-
-def _case_learning_context_features(
-    case: Case,
-    config: ExperimentConfig,
-    *,
-    backends: list[str],
-    target_capabilities: list[str] | tuple[str, ...] = (),
-    operation_combo: dict[str, Any] | None = None,
-    guidance_row: dict[str, Any] | None = None,
-) -> tuple[str, ...]:
-    features: list[str] = [
-        f"oracle_mode:{config.oracle_mode}",
-        f"guidance_strategy:{config.guidance_strategy}",
-        _bucket_feature("backend_count", len(backends), [(0, "none"), (1, "single"), (3, "few")], "many"),
-    ]
-    if config.enable_metamorphic_oracle:
-        features.append("metamorphic:enabled")
-    if config.enable_feedback:
-        features.append("feedback:enabled")
-    version_pair = _version_pair_id(config)
-    if version_pair:
-        features.append("version_pair:present")
-    for backend in backends[:8]:
-        features.append(f"backend:{backend}")
-    for capability in target_capabilities[:24]:
-        features.append(f"capability:{capability}")
-    if isinstance(guidance_row, dict):
-        for target in guidance_row.get("matched_targets", []) or []:
-            text = str(target).strip()
-            if text:
-                features.append(f"matched_target:{text}")
-        for feature in guidance_row.get("features", []) or []:
-            text = str(feature).strip()
-            if text:
-                features.append(text)
-    case_features = derive_case_features(
-        case,
-        operation_combo=operation_combo,
-        exploration_objective_rules=config.exploration_objective_rules,
-    )
-    features.extend(sorted(case_features))
-    return tuple(_unique_nonempty_strings(features))
-
-
-def _version_pair_context_features(
-    *,
-    config: ExperimentConfig,
-    backends: list[str],
-    target_capabilities: list[str] | tuple[str, ...] = (),
-) -> tuple[str, ...]:
-    features = [
-        f"oracle_mode:{config.oracle_mode}",
-        f"guidance_strategy:{config.guidance_strategy}",
-        _bucket_feature("backend_count", len(backends), [(0, "none"), (1, "single"), (3, "few")], "many"),
-    ]
-    if config.enable_feedback:
-        features.append("feedback:enabled")
-    if config.enable_metamorphic_oracle:
-        features.append("metamorphic:enabled")
-    for backend in backends[:8]:
-        features.append(f"backend:{backend}")
-    for capability in target_capabilities[:24]:
-        features.append(f"capability:{capability}")
-    for family in config.semantic_focus_families[:8]:
-        features.append(f"semantic_family:{family}")
-    for signal in config.semantic_focus_signals[:8]:
-        features.append(f"semantic_signal:{signal}")
-    return tuple(_unique_nonempty_strings(features))
-
-
-def _semantic_objective_pool(
-    case_features: tuple[str, ...],
-    config: ExperimentConfig,
-    guidance_row: dict[str, Any],
-) -> tuple[str, ...]:
-    candidates: list[str] = []
-    for feature in case_features:
-        text = str(feature).strip()
-        if text.startswith(EXPLORATION_OBJECTIVE_PREFIX):
-            candidates.append(text)
-    for target in guidance_row.get("matched_targets", []) or []:
-        text = str(target).strip()
-        if text.startswith(EXPLORATION_OBJECTIVE_PREFIX):
-            candidates.append(text)
-    candidates.extend(objective_features_for_rules(config.exploration_objective_rules))
-    candidates.extend(derive_exploration_objective_features(case_features, rules=config.exploration_objective_rules))
-    return tuple(_unique_nonempty_strings(candidates))
-
-
-def _select_adaptive_action(
-    feedback: FeedbackState | None,
-    *,
-    scope: str,
-    action_pool: tuple[str, ...],
-    context_features: tuple[str, ...],
-    version_id: str,
-    learning_weight: float,
-    enabled: bool,
-    fixed_strategy: str = "fixed",
-) -> tuple[str, dict[str, Any]]:
-    if not action_pool:
-        return "", {
-            "strategy": "none",
-            "scope": scope,
-            "action": "",
-            "action_pool": [],
-            "learning_weight": 0.0,
-            "ranked": [],
-        }
-    if not enabled or feedback is None or learning_weight <= 0.0:
-        action = action_pool[0]
-        return action, {
-            "strategy": fixed_strategy,
-            "scope": scope,
-            "action": action,
-            "action_pool": list(action_pool),
-            "learning_weight": 0.0,
-            "ranked": [],
-        }
-    learning = getattr(feedback, "adaptive_learning", None)
-    if learning is None:
-        action = action_pool[0]
-        return action, {
-            "strategy": "fixed_no_learning_state",
-            "scope": scope,
-            "action": action,
-            "action_pool": list(action_pool),
-            "learning_weight": 0.0,
-            "ranked": [],
-        }
-    bandit = learning.bandits.get(scope)
-    if bandit is not None:
-        for action in action_pool:
-            arm = bandit.arms.get(action)
-            if arm is None or arm.pulls <= 0:
-                return action, {
-                    "strategy": "contextual_bandit_warmup",
-                    "scope": scope,
-                    "action": action,
-                    "action_pool": list(action_pool),
-                    "learning_weight": float(learning_weight),
-                    "ranked": learning.rank(
-                        scope,
-                        action_pool,
-                        context_features=context_features,
-                        version_id=version_id,
-                    )[:8],
-                }
-    else:
-        action = action_pool[0]
-        return action, {
-            "strategy": "contextual_bandit_warmup",
-            "scope": scope,
-            "action": action,
-            "action_pool": list(action_pool),
-            "learning_weight": float(learning_weight),
-            "ranked": [],
-        }
-    ranked = learning.rank(
-        scope,
-        action_pool,
-        context_features=context_features,
-        version_id=version_id,
-    )
-    action = str(ranked[0]["action_id"]) if ranked else action_pool[0]
-    return action, {
-        "strategy": "contextual_bandit",
-        "scope": scope,
-        "action": action,
-        "action_pool": list(action_pool),
-        "learning_weight": float(learning_weight),
-        "ranked": ranked[:8],
-    }
-
-
-def _record_adaptive_action_feedback(
-    feedback: FeedbackState | None,
-    selection: dict[str, Any],
-    row: dict[str, Any],
-    *,
-    context_features: tuple[str, ...],
-    version_id: str,
-    reward_signals: dict[str, Any],
-) -> float | None:
-    learning = getattr(feedback, "adaptive_learning", None) if feedback is not None else None
-    if learning is None or not isinstance(selection, dict):
-        return None
-    if str(selection.get("strategy", "") or "") not in {"contextual_bandit", "contextual_bandit_warmup"}:
-        return None
-    scope = str(selection.get("scope", "") or "").strip()
-    action = str(selection.get("action", "") or "").strip()
-    if not scope or not action:
-        return None
-    reward = _adaptive_exploration_reward(row, reward_signals=reward_signals)
-    preflight = row.get("preflight", {}) if isinstance(row.get("preflight", {}), dict) else {}
-    learning.record_outcome(
-        scope,
-        action,
-        context_features=context_features,
-        version_id=version_id,
-        reward=reward,
-        runtime_cost=_runtime_cost_signal(row),
-        preflight_valid=bool(preflight.get("valid", True)),
-        fallback_used=bool(preflight.get("fallback_used", False)),
-        false_positive=bool(reward_signals.get("false_positive", False)),
-    )
-    return reward
-
-
-def _adaptive_exploration_reward(row: dict[str, Any], *, reward_signals: dict[str, Any]) -> float:
-    return _generator_profile_reward(row, reward_signals=reward_signals)
-
-
-def _runtime_cost_signal(row: dict[str, Any]) -> float:
-    duration_ms = float(row.get("duration_ms", 0.0) or 0.0)
-    return min(2.0, max(0.0, duration_ms / 1000.0))
-
-
-def _metamorphic_relation_order_from_selection(
-    selected_relation: str,
-    *,
-    configured_order: list[str] | tuple[str, ...],
-) -> list[str]:
-    ordered = []
-    if selected_relation:
-        ordered.append(selected_relation)
-    ordered.extend(str(item).strip() for item in configured_order if str(item).strip())
-    return _unique_nonempty_strings(ordered)
-
-
-def _candidate_target_keys_from_metadata(metadata: dict[str, Any]) -> list[str]:
-    out: list[str] = []
-    seen: set[str] = set()
-    if not isinstance(metadata, dict):
-        return out
-    for section_name in ("feedback_decision", "feedback_selection"):
-        section = metadata.get(section_name)
-        if not isinstance(section, dict):
-            continue
-        values = section.get("target_keys")
-        if not isinstance(values, list):
-            continue
-        for value in values:
-            text = str(value).strip()
-            if not text or text in seen:
-                continue
-            out.append(text)
-            seen.add(text)
-    return out
-
-
-def _candidate_quality_context(
-    feedback: FeedbackState | None,
-    case: Case,
-    metadata: dict[str, Any],
-    *,
-    target_capabilities: list[str] | tuple[str, ...] = (),
-) -> dict[str, Any]:
-    if feedback is None:
-        return {}
-    context_getter = getattr(feedback, "candidate_quality_context", None)
-    if context_getter is None:
-        return {}
-    target_keys = _candidate_target_keys_from_metadata(metadata)
-    target_keys.extend(_capability_target_keys(target_capabilities))
-    return dict(context_getter(case, target_keys=target_keys or None) or {})
-
-
-def _compact_log_row(row: dict[str, Any], log_level: str) -> dict[str, Any]:
-    if log_level == "full":
-        return row
-    has_findings = bool(row.get("findings"))
-    if has_findings and log_level in {"compact", "minimal"}:
-        # Finding rows keep reproduction detail; run-level duplicated metadata
-        # stays in meta.json and artifacts.
-        return {
-            key: value
-            for key, value in row.items()
-            if key not in {"environment", "targets"}
-        }
-
-    out = {
-        "run_at": row.get("run_at", ""),
-        "status": row.get("status", "unknown"),
-        "case": _case_summary(row.get("case", {})),
-        "behavior_signature": row.get("behavior_signature", ""),
-        "discovery_signature": row.get("discovery_signature", ""),
-        "signal_signature": row.get("signal_signature", ""),
-        "duration_ms": row.get("duration_ms", 0.0),
-        "stage_profile": _stage_profile_with_total(row.get("stage_profile", {})),
-        "findings": row.get("findings", []),
-        "bug_dir": row.get("bug_dir", ""),
-        "candidate_source": row.get("candidate_source", "generated"),
-        "seed_lineage": row.get("seed_lineage", {}),
-        "mutation": row.get("mutation", {}),
-        "feedback_selection": row.get("feedback_selection", row.get("feedback_decision", {})),
-        "feedback_decision": row.get("feedback_decision", {}),
-        "quality_archive_context": row.get("quality_archive_context", {}),
-        "generator_profile_selection": row.get("generator_profile_selection", {}),
-        "selected_generator_profile": row.get("selected_generator_profile", ""),
-        "semantic_objective_selection": row.get("semantic_objective_selection", {}),
-        "selected_semantic_objective": row.get("selected_semantic_objective", ""),
-        "metamorphic_relation_selection": row.get("metamorphic_relation_selection", {}),
-        "selected_metamorphic_relation": row.get("selected_metamorphic_relation", ""),
-        "version_pair_selection": row.get("version_pair_selection", {}),
-        "selected_version_pair": row.get("selected_version_pair", ""),
-        "case_learning_context": row.get("case_learning_context", []),
-        "metamorphic_selection": row.get("metamorphic_selection", {}),
-        "operation_combo": row.get("operation_combo", {}),
-        "source_reward": row.get("source_reward"),
-        "source_scheduler": row.get("source_scheduler", []),
-        "preflight": row.get("preflight", {}),
-        "quality_oracles": _quality_oracle_summary(row.get("quality_oracles", [])),
-        "guidance": _guidance_summary(row.get("guidance", {})),
-        "candidate_seed_start": row.get("candidate_seed_start", 0),
-        "candidate_pool_size": row.get("candidate_pool_size", 1),
-        "case_index": row.get("case_index", 0),
-        "elapsed_s": row.get("elapsed_s", 0.0),
-        "is_new_behavior": row.get("is_new_behavior", False),
-        "signal_new_behavior": row.get("signal_new_behavior", row.get("is_new_behavior", False)),
-        "stored_in_feedback_corpus": row.get("stored_in_feedback_corpus", False),
-        "feedback_corpus_persisted": row.get("feedback_corpus_persisted", False),
-        "feedback_eligible": row.get("feedback_eligible", True),
-        "feedback_skip_reason": row.get("feedback_skip_reason", ""),
-        "feedback_record_skip_reason": row.get("feedback_record_skip_reason", ""),
-        "replay_filter": row.get("replay_filter", {}),
-        "family_saturation_filter": row.get("family_saturation_filter", {}),
-        "feedback_summary": row.get("feedback_summary", {}),
-    }
-    if log_level == "compact":
-        out["normalized"] = _normalized_summary(row.get("normalized", {}))
-        out["raw_results"] = _raw_results_summary(row.get("raw_results", {}))
-    else:
-        out["backend_status"] = {
-            backend: data.get("status", "unknown")
-            for backend, data in row.get("normalized", {}).items()
-        }
-    return out
-
-
-def behavior_signature(row: dict[str, Any]) -> str:
-    payload = {
-        "case_ops": row["case"]["program"]["operations"],
-        "backend_status": {
-            b: r["status"] for b, r in sorted(row["normalized"].items())
-        },
-        "normalized_shape": {
-            b: {
-                "columns": r.get("columns", []),
-                "rows": len(r.get("rows", [])),
-                "sample": r.get("rows", [])[:3],
-                "error_type": r.get("error_type", ""),
-            }
-            for b, r in sorted(row["normalized"].items())
-        },
-        "finding_kinds": sorted(f["kind"] for f in row.get("findings", [])),
-        "finding_roots": sorted(f.get("root_cause", "unknown") for f in row.get("findings", [])),
-    }
-    return short_canonical_hash(payload, 16)
-
-
-def _row_count_bucket(row_count: int) -> str:
-    if row_count <= 0:
-        return "0"
-    if row_count == 1:
-        return "1"
-    if row_count <= 3:
-        return "2-3"
-    if row_count <= 7:
-        return "4-7"
-    if row_count <= 15:
-        return "8-15"
-    if row_count <= 31:
-        return "16-31"
-    return "32+"
-
-
-def discovery_signature(row: dict[str, Any]) -> str:
-    operations = operation_names(row["case"]["program"]["operations"], default="unknown")
-    op_histogram = sorted(Counter(operations).items())
-    combo = describe_operation_combo(row["case"]["program"]["operations"])
-    findings = row.get("findings") or []
-    payload = {
-        "combo_template": combo.get("template", ""),
-        "operation_histogram": op_histogram,
-        "backend_outcomes": {
-            backend: {
-                "status": result.get("status", "unknown"),
-                "error_type": result.get("error_type", ""),
-                "column_count": len(result.get("columns", [])),
-                "row_count_bucket": _row_count_bucket(len(result.get("rows", []))),
-            }
-            for backend, result in sorted((row.get("normalized") or {}).items())
-        },
-        "finding_kinds": sorted(str(finding.get("kind", "")) for finding in findings),
-        "finding_roots": sorted(
-            str(finding.get("root_cause", "unknown"))
-            for finding in findings
-            if not bool(finding.get("false_positive"))
-        ),
-    }
-    return short_canonical_hash(payload, 16)
-
-
-def signal_signature(row: dict[str, Any]) -> str:
-    operations = sorted(set(operation_names(row["case"]["program"]["operations"], default="unknown")))
-    combo = describe_operation_combo(row["case"]["program"]["operations"])
-    findings = row.get("findings") or []
-    payload = {
-        "combo_template": combo.get("template", ""),
-        "operation_set": operations,
-        "backend_outcomes": {
-            backend: {
-                "status": result.get("status", "unknown"),
-                "error_type": result.get("error_type", ""),
-            }
-            for backend, result in sorted((row.get("normalized") or {}).items())
-        },
-        "finding_buckets": sorted(
-            {
-                offline_finding_bucket(finding)
-                for finding in findings
-                if not bool(finding.get("false_positive"))
-            }
-        ),
-        "suspicious_backends": sorted(
-            {
-                str(backend)
-                for finding in findings
-                if not bool(finding.get("false_positive"))
-                for backend in finding.get("suspicious_backends", []) or []
-            }
-        ),
-    }
-    return short_canonical_hash(payload, 16)
-
-
-CALIBRATION_PROBE_OPS = frozenset(PROBE_ROOTS) | {
-    "running_sum",
-    "tuple_absence_filter",
-}
-REPLAY_FILTER_EXTRA_ATTEMPTS_PER_CANDIDATE = 20
-SATURATED_FAMILY_FILTER_EXTRA_ATTEMPTS_PER_CANDIDATE = 20
-
-
-def _feedback_storage_decision(
-    case: Case,
-    *,
-    candidate_source: str = "generated",
-    seed_lineage: dict[str, Any] | None = None,
-) -> tuple[bool, str]:
-    lineage_depth = 0
-    if isinstance(seed_lineage, dict):
-        lineage_depth = int(seed_lineage.get("depth", 0) or 0)
-    if candidate_source == "feedback_mutation" or lineage_depth > 0:
-        return False, "feedback_mutation_child"
-    if any(op_kind(op) in CALIBRATION_PROBE_OPS for op in case.program.operations):
-        return False, "calibration_probe_case"
-    return True, ""
-
-
-def _feedback_target_keys(
-    guidance_row: dict[str, Any],
-    operation_combo: dict[str, Any],
-    *,
-    target_capabilities: list[str] | tuple[str, ...] = (),
-) -> list[str]:
-    broad_targets = {
-        "strings",
-        "numeric",
-        "nulls",
-        "mutate",
-        "aggregation",
-        "expressions",
-        "groupby",
-        "filter",
-        "sort_limit",
-        "topk",
-        "join",
-    }
-    keys: list[str] = []
-    for target in guidance_row.get("matched_targets", []) or []:
-        value = str(target).strip()
-        if value and value not in broad_targets:
-            keys.append(f"target:{value}")
-    for feature in guidance_row.get("features", []) or []:
-        value = str(feature).strip()
-        if value and (
-            value.startswith("pattern:")
-            or value.startswith("semantic_family:")
-            or value.startswith(EXPLORATION_OBJECTIVE_PREFIX)
-            or value.startswith("source:")
-            or value.startswith("profile:")
-        ):
-            keys.append(f"feature:{value}")
-    template = str(operation_combo.get("template", "")).strip()
-    if template:
-        keys.append(f"combo:{template}")
-    for family in guidance_row.get("features", []) or []:
-        value = str(family).strip()
-        if value.startswith("semantic_family:"):
-            keys.append(value)
-        elif value.startswith(EXPLORATION_OBJECTIVE_PREFIX):
-            keys.append(value)
-    for signal in combo_semantic_signals(operation_combo):
-        value = str(signal).strip()
-        if value:
-            semantic_key = semantic_signal_feature(value)
-            keys.append(semantic_key)
-            legacy_key = legacy_target_key_alias(semantic_key)
-            if legacy_key:
-                keys.append(legacy_key)
-    config_payload = guidance_row.get("config", {}) if isinstance(guidance_row.get("config", {}), dict) else {}
-    for family in config_payload.get("semantic_focus_families", []) or []:
-        value = str(family).strip()
-        if value:
-            keys.append(f"semantic_family:{value}")
-    for signal in config_payload.get("semantic_focus_signals", []) or []:
-        value = str(signal).strip()
-        if value:
-            semantic_key = semantic_signal_feature(value)
-            keys.append(semantic_key)
-            legacy_key = legacy_target_key_alias(semantic_key)
-            if legacy_key:
-                keys.append(legacy_key)
-    keys.extend(_capability_target_keys(target_capabilities))
-    out: list[str] = []
-    seen: set[str] = set()
-    for key in keys:
-        if key in seen:
-            continue
-        out.append(key)
-        seen.add(key)
-    return out
-
-
-def _capability_target_keys(target_capabilities: list[str] | tuple[str, ...]) -> list[str]:
-    keys: list[str] = []
-    seen: set[str] = set()
-    for capability in target_capabilities:
-        value = str(capability).strip()
-        if not value:
-            continue
-        key = f"capability:{value}"
-        if key in seen:
-            continue
-        keys.append(key)
-        seen.add(key)
-    return keys[:24]
-
-
-def _known_replay_source_filter_reason(case_item: Case, config: ExperimentConfig) -> str:
-    return known_replay_source_filter_reason(
-        case_item,
-        enable_replay_bug=config.enable_replay_bug,
-        replay_bug_source_issues=config.replay_bug_source_issues,
-    )
-
-
-_replay_bug_filter_reason = _known_replay_source_filter_reason
-
-
-def _effective_generator_profile(config: ExperimentConfig) -> str:
-    return config.generator_profile
-
-
-def _generator_profile_pool(
-    config: ExperimentConfig,
-    *,
-    target_capabilities: list[str] | tuple[str, ...] = (),
-) -> tuple[tuple[str, ...], dict[str, Any]]:
-    configured = [str(item).strip() for item in config.generator_profile_pool if str(item).strip()]
-    if not configured:
-        configured = [str(config.generator_profile or "common").strip()]
-    elif str(config.generator_profile or "").strip() not in configured:
-        configured.insert(0, str(config.generator_profile or "common").strip())
-    out: list[str] = []
-    seen: set[str] = set()
-    for profile in configured:
-        if not profile or profile in seen:
-            continue
-        out.append(profile)
-        seen.add(profile)
-    original = out or ["common"]
-    filter_result = filter_generator_profiles_by_capability(original, target_capabilities)
-    if not config.enable_profile_capability_filter:
-        filter_result = {
-            "selected": list(original),
-            "dropped": [],
-            "target_capability_count": len(tuple(target_capabilities)),
-        }
-    selected = list(filter_result.get("selected", []) or [])
-    if not selected:
-        selected = [str(config.generator_profile or "common").strip() or "common"]
-    metadata = {
-        "requested": list(original),
-        "selected": selected,
-        "dropped": list(filter_result.get("dropped", []) or []),
-        "target_capability_count": int(filter_result.get("target_capability_count", 0) or 0),
-        "capability_aware": bool(target_capabilities) and config.enable_profile_capability_filter,
-        "capability_filter_enabled": config.enable_profile_capability_filter,
-    }
-    return tuple(selected), metadata
-
-
-def _generator_profile_context_features(
-    *,
-    config: ExperimentConfig,
-    backends: list[str],
-    target_specs: list[dict[str, Any]],
-    target_capabilities: list[str],
-    candidate_pool: int,
-) -> tuple[str, ...]:
-    features = [
-        f"oracle_mode:{config.oracle_mode}",
-        f"guidance_strategy:{config.guidance_strategy}",
-        _bucket_feature("candidate_pool", candidate_pool, [(1, "single"), (4, "small"), (8, "medium")], "large"),
-        _bucket_feature("backend_count", len(backends), [(0, "none"), (1, "single"), (3, "few")], "many"),
-    ]
-    if config.enable_metamorphic_oracle:
-        features.append("metamorphic:enabled")
-    if config.enable_feedback:
-        features.append("feedback:enabled")
-    for backend in backends[:8]:
-        features.append(f"backend:{backend}")
-    for target in target_specs[:8]:
-        if isinstance(target, dict):
-            family = str(target.get("family", "") or "").strip()
-            layer = str(target.get("layer", "") or "").strip()
-            if family:
-                features.append(f"target_family:{family}")
-            if layer:
-                features.append(f"target_layer:{layer}")
-    for capability in target_capabilities[:24]:
-        features.append(f"capability:{capability}")
-    for family in config.semantic_focus_families[:8]:
-        features.append(f"semantic_family:{family}")
-    for signal in config.semantic_focus_signals[:8]:
-        features.append(f"semantic_signal:{signal}")
-    for target in config.guidance_targets[:8]:
-        features.append(f"guidance_target:{target}")
-    return tuple(_unique_nonempty_strings(features))
-
-
-def _select_generator_profile(
-    feedback: FeedbackState | None,
-    profile_pool: tuple[str, ...],
-    *,
-    context_features: tuple[str, ...],
-    learning_weight: float,
-    pool_metadata: dict[str, Any] | None = None,
-) -> tuple[str, dict[str, Any]]:
-    metadata = dict(pool_metadata or {})
-    if len(profile_pool) <= 1 or feedback is None or learning_weight <= 0.0:
-        profile = profile_pool[0] if profile_pool else "common"
-        return profile, {
-            "strategy": "fixed",
-            "profile": profile,
-            "profile_pool": list(profile_pool),
-            "profile_pool_metadata": metadata,
-            "learning_weight": 0.0,
-            "ranked": [],
-        }
-    learning = getattr(feedback, "adaptive_learning", None)
-    if learning is None:
-        profile = profile_pool[0]
-        return profile, {
-            "strategy": "fixed_no_learning_state",
-            "profile": profile,
-            "profile_pool": list(profile_pool),
-            "profile_pool_metadata": metadata,
-            "learning_weight": 0.0,
-            "ranked": [],
-        }
-    bandit = learning.bandits.get("generator_profile")
-    if bandit is not None:
-        for profile in profile_pool:
-            arm = bandit.arms.get(profile)
-            if arm is None or arm.pulls <= 0:
-                return profile, {
-                    "strategy": "contextual_bandit_warmup",
-                    "profile": profile,
-                    "profile_pool": list(profile_pool),
-                    "profile_pool_metadata": metadata,
-                    "learning_weight": float(learning_weight),
-                    "ranked": learning.rank(
-                        "generator_profile",
-                        profile_pool,
-                        context_features=context_features,
-                    )[:8],
-                }
-    else:
-        profile = profile_pool[0]
-        return profile, {
-            "strategy": "contextual_bandit_warmup",
-            "profile": profile,
-            "profile_pool": list(profile_pool),
-            "profile_pool_metadata": metadata,
-            "learning_weight": float(learning_weight),
-            "ranked": [],
-        }
-    ranked = learning.rank(
-        "generator_profile",
-        profile_pool,
-        context_features=context_features,
-    )
-    profile = ranked[0]["action_id"] if ranked else profile_pool[0]
-    return profile, {
-        "strategy": "contextual_bandit",
-        "profile": profile,
-        "profile_pool": list(profile_pool),
-        "profile_pool_metadata": metadata,
-        "learning_weight": float(learning_weight),
-        "ranked": ranked[:8],
-    }
-
-
-def _record_generator_profile_feedback(
-    feedback: FeedbackState | None,
-    selected_meta: dict[str, Any],
-    row: dict[str, Any],
-    *,
-    context_features: tuple[str, ...],
-    reward_signals: dict[str, Any],
-) -> float | None:
-    learning = getattr(feedback, "adaptive_learning", None) if feedback is not None else None
-    if learning is None:
-        return None
-    profile_selection = selected_meta.get("generator_profile_selection", {})
-    if not isinstance(profile_selection, dict):
-        return None
-    if str(profile_selection.get("strategy", "") or "") not in {
-        "contextual_bandit",
-        "contextual_bandit_warmup",
-    }:
-        return None
-    profile = str(profile_selection.get("profile", "") or "").strip()
-    if not profile:
-        return None
-    reward = _generator_profile_reward(row, reward_signals=reward_signals)
-    learning.record_outcome(
-        "generator_profile",
-        profile,
-        context_features=context_features,
-        reward=reward,
-        preflight_valid=bool(row.get("preflight", {}).get("valid", True)),
-        fallback_used=bool(row.get("preflight", {}).get("fallback_used", False)),
-        false_positive=bool(reward_signals.get("false_positive", False)),
-    )
-    return reward
-
-
-def _generator_profile_reward(row: dict[str, Any], *, reward_signals: dict[str, Any]) -> float:
-    findings = row.get("findings", []) or []
-    finding_count = len(findings)
-    candidate_bug = bool(reward_signals.get("candidate_bug", False))
-    rewardable_semantic = bool(reward_signals.get("rewardable_semantic_divergence", False))
-    false_positive = bool(reward_signals.get("false_positive", False))
-    new_behavior = bool(row.get("signal_new_behavior", row.get("is_new_behavior", False)))
-    preflight = row.get("preflight", {}) if isinstance(row.get("preflight", {}), dict) else {}
-    throughput_hint = 0.0
-    duration_ms = float(row.get("duration_ms", 0.0) or 0.0)
-    if duration_ms > 0.0:
-        throughput_hint = min(0.25, 1.0 / duration_ms)
-    return (
-        (3.0 if candidate_bug else 0.0)
-        + (0.7 if rewardable_semantic else 0.0)
-        + (0.45 if new_behavior else 0.0)
-        + min(0.4, 0.05 * finding_count)
-        + throughput_hint
-        - (2.5 if false_positive else 0.0)
-        - (0.5 if not bool(preflight.get("valid", True)) else 0.0)
-        - (0.25 if bool(preflight.get("fallback_used", False)) else 0.0)
-    )
-
-
-def _bucket_feature(prefix: str, value: int, limits: list[tuple[int, str]], fallback: str) -> str:
-    for limit, name in limits:
-        if value <= limit:
-            return f"{prefix}:{name}"
-    return f"{prefix}:{fallback}"
-
-
-def _unique_nonempty_strings(values: list[str]) -> list[str]:
-    out: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        item = str(value).strip()
-        if not item or item in seen:
-            continue
-        out.append(item)
-        seen.add(item)
-    return out
-
-
-def _restore_closed_loop_state(
-    closed_loop_state: dict[str, Any] | None,
-    *,
-    config: ExperimentConfig,
-    backends: list[str],
-    guidance_enabled: bool,
-    feedback_enabled: bool,
-) -> tuple[set[str], set[str], FeedbackState | None, GuidanceState | None]:
-    state = closed_loop_state if isinstance(closed_loop_state, dict) else {}
-    seen = {str(item) for item in state.get("seen_signatures", []) or []}
-    signal_seen = {str(item) for item in state.get("signal_seen_signatures", []) or []}
-    if not signal_seen:
-        signal_seen = set(seen)
-    feedback: FeedbackState | None = None
-    guidance: GuidanceState | None = None
-    if feedback_enabled:
-        scheduler_state = None
-        if config.enable_local_source_scheduler:
-            raw_scheduler_state = state.get("source_scheduler")
-            if not isinstance(raw_scheduler_state, dict):
-                raw_feedback_state = state.get("feedback")
-                if isinstance(raw_feedback_state, dict):
-                    raw_scheduler_state = raw_feedback_state.get("source_scheduler")
-            if isinstance(raw_scheduler_state, dict):
-                scheduler_state = LocalSourceScheduler.from_state_dict(
-                    raw_scheduler_state,
-                    exploration_weight=config.local_source_exploration_weight,
-                    enable_family_saturation=config.enable_family_saturation,
-                    family_saturation_threshold=config.family_saturation_threshold,
-                    saturated_family_reward=config.saturated_family_reward,
-                    known_saturated_bug_families=config.known_saturated_bug_families,
-                )
-            else:
-                scheduler_state = LocalSourceScheduler(
-                    exploration_weight=config.local_source_exploration_weight,
-                    enable_family_saturation=config.enable_family_saturation,
-                    family_saturation_threshold=config.family_saturation_threshold,
-                    saturated_family_reward=config.saturated_family_reward,
-                    known_saturated_bug_families=config.known_saturated_bug_families,
-                )
-        raw_feedback_state = state.get("feedback")
-        if isinstance(raw_feedback_state, dict):
-            feedback = FeedbackState.from_state_dict(
-                raw_feedback_state,
-                persist_to_disk=config.persist_feedback_corpus,
-                max_persisted=config.feedback_persist_limit,
-                max_cases_per_profile=config.feedback_max_cases_per_profile,
-                source_scheduler=scheduler_state,
-                enable_mutation_operator_learning=config.enable_mutation_operator_learning,
-                enable_quality_archive=config.enable_quality_archive,
-            )
-        else:
-            feedback = FeedbackState(
-                persist_to_disk=config.persist_feedback_corpus,
-                max_persisted=config.feedback_persist_limit,
-                max_cases_per_profile=config.feedback_max_cases_per_profile,
-                source_scheduler=scheduler_state,
-                enable_mutation_operator_learning=config.enable_mutation_operator_learning,
-                enable_quality_archive=config.enable_quality_archive,
-            )
-    if guidance_enabled:
-        effective_guidance_targets = _effective_guidance_targets(config)
-        raw_guidance_state = state.get("guidance")
-        if isinstance(raw_guidance_state, dict):
-            guidance = GuidanceState.from_state_dict(
-                raw_guidance_state,
-                targets=effective_guidance_targets,
-                discovery_biases=list(config.discovery_biases),
-                exploration_objective_rules=list(config.exploration_objective_rules),
-                enable_family_saturation=config.enable_family_saturation,
-                family_saturation_threshold=config.family_saturation_threshold,
-                family_saturation_penalty=config.family_saturation_penalty,
-                saturated_family_reward=config.saturated_family_reward,
-                known_saturated_bug_families=config.known_saturated_bug_families,
-                issue_replay_saturation_threshold=config.issue_replay_saturation_threshold,
-                issue_replay_saturation_penalty=config.issue_replay_saturation_penalty,
-                issue_replay_global_saturation_threshold=config.issue_replay_global_saturation_threshold,
-                issue_replay_global_saturation_penalty=config.issue_replay_global_saturation_penalty,
-                issue_inspired_source_saturation_threshold=config.issue_inspired_source_saturation_threshold,
-                issue_inspired_source_saturation_penalty=config.issue_inspired_source_saturation_penalty,
-                active_backends=list(backends),
-            )
-        else:
-            guidance = GuidanceState(
-                targets=effective_guidance_targets,
-                discovery_biases=list(config.discovery_biases),
-                exploration_objective_rules=list(config.exploration_objective_rules),
-                enable_family_saturation=config.enable_family_saturation,
-                family_saturation_threshold=config.family_saturation_threshold,
-                family_saturation_penalty=config.family_saturation_penalty,
-                saturated_family_reward=config.saturated_family_reward,
-                known_saturated_bug_families=config.known_saturated_bug_families,
-                issue_replay_saturation_threshold=config.issue_replay_saturation_threshold,
-                issue_replay_saturation_penalty=config.issue_replay_saturation_penalty,
-                issue_replay_global_saturation_threshold=config.issue_replay_global_saturation_threshold,
-                issue_replay_global_saturation_penalty=config.issue_replay_global_saturation_penalty,
-                issue_inspired_source_saturation_threshold=config.issue_inspired_source_saturation_threshold,
-                issue_inspired_source_saturation_penalty=config.issue_inspired_source_saturation_penalty,
-                active_backends=list(backends),
-            )
-    return seen, signal_seen, feedback, guidance
-
-
-def _build_closed_loop_state(
-    *,
-    seen: set[str],
-    signal_seen: set[str],
-    feedback: FeedbackState | None,
-    guidance: GuidanceState | None,
-) -> dict[str, Any]:
-    return {
-        "seen_signatures": sorted(seen),
-        "signal_seen_signatures": sorted(signal_seen),
-        "feedback": feedback.to_state_dict() if feedback is not None else None,
-        "source_scheduler": (
-            feedback.source_scheduler.to_state_dict()
-            if feedback is not None and feedback.source_scheduler is not None
-            else None
-        ),
-        "guidance": guidance.to_state_dict() if guidance is not None else None,
-    }
+def _parallel_backend_execution_active(config: ExperimentConfig, backends: list[str]) -> bool:
+    return parallel_backend_execution_active(config, backends)
 
 
 def _execute_case(
@@ -1469,22 +167,13 @@ def _execute_case(
     config: ExperimentConfig,
     backend_instances: dict[str, Backend] | None = None,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
-    raw_results = {}
-    normalized = {}
-    for backend_name in backends:
-        backend = backend_instances[backend_name] if backend_instances is not None else make_backend(backend_name)
-        result = backend.run(case.tables, case.program)
-        raw_results[backend_name] = {
-            k: v
-            for k, v in result.to_dict().items()
-            if k != "data"
-        }
-        normalized[backend_name] = normalize_result(
-            result,
-            case.program,
-            enable_normalizer=config.enable_normalizer,
-        )
-    return raw_results, normalized
+    return _execute_case_impl(
+        case,
+        backends,
+        config,
+        backend_instances=backend_instances,
+        parallel=config.enable_parallel_backend_execution,
+    )
 
 
 def _invoke_run_loaded_case(
@@ -1523,7 +212,7 @@ def _invoke_run_loaded_case(
             environment=environment,
             target_specs=target_specs,
             config_payload=config_payload,
-        )
+    )
 
 
 def run_loaded_case(
@@ -1537,116 +226,28 @@ def run_loaded_case(
     config_payload: dict[str, Any] | None = None,
     metamorphic_relation_order: list[str] | tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
-    config = config or ExperimentConfig()
-    resolved_config_payload = dict(config_payload) if isinstance(config_payload, dict) else _config_payload_with_effective_guidance_targets(config)
-    started = time.perf_counter()
-    stage_profile = _empty_stage_profile()
-    execute_started = time.perf_counter()
-    raw_results, normalized = _execute_case(case, backends, config, backend_instances=backend_instances)
-    execute_elapsed = (time.perf_counter() - execute_started) * 1000
-    stage_profile["backend_execution_ms"] += sum(
-        float(result.get("duration_ms", 0.0) or 0.0)
-        for result in raw_results.values()
+    return run_loaded_case_impl(
+        case,
+        backends,
+        config=config,
+        save_artifact=save_artifact,
+        backend_instances=backend_instances,
+        environment=environment,
+        target_specs=target_specs,
+        config_payload=config_payload,
+        metamorphic_relation_order=metamorphic_relation_order,
+        execute_case_fn=_execute_case,
+        parallel_backend_execution_active_fn=_parallel_backend_execution_active,
+        evaluate_case_fn=evaluate_case,
+        all_metamorphic_variants_fn=all_metamorphic_variants,
+        select_metamorphic_variants_fn=select_metamorphic_variants,
+        evaluate_metamorphic_variants_fn=evaluate_metamorphic_variants,
+        annotate_findings_fn=annotate_findings,
+        candidate_recheck_fn=_candidate_recheck,
+        save_bug_artifact_fn=save_bug_artifact,
+        collect_environment_fn=collect_environment,
+        describe_targets_fn=describe_targets,
     )
-    stage_profile["normalize_ms"] += max(0.0, execute_elapsed - stage_profile["backend_execution_ms"])
-
-    findings = []
-    classification_started = time.perf_counter()
-    if config.enable_differential_oracle:
-        findings = evaluate_case(case, normalized)
-    metamorphic_rows: dict[str, Any] = {}
-    metamorphic_selection: dict[str, Any] = {}
-    if config.enable_metamorphic_oracle:
-        variant_results = {}
-        variants = select_metamorphic_variants(
-            all_metamorphic_variants(case),
-            limit=max(0, config.metamorphic_variant_limit),
-            relation_order=metamorphic_relation_order or config.metamorphic_relation_order,
-        )
-        for variant in variants:
-            variant_raw, variant_norm = _execute_case(
-                variant.case,
-                backends,
-                config,
-                backend_instances=backend_instances,
-            )
-            variant_results[variant.name] = variant_norm
-            metamorphic_rows[variant.name] = {
-                "relation": variant.relation,
-                "case": variant.case.to_dict(),
-                "raw_results": variant_raw,
-                "normalized": {k: v.to_dict() for k, v in variant_norm.items()},
-            }
-        findings.extend(evaluate_metamorphic_variants(case, normalized, variant_results))
-        if metamorphic_rows:
-            metamorphic_selection = {
-                "relation_order": list(metamorphic_relation_order or config.metamorphic_relation_order),
-                "executed_relations": [row["relation"] for row in metamorphic_rows.values() if isinstance(row, dict)],
-                "variant_limit": max(0, int(config.metamorphic_variant_limit)),
-            }
-    if findings:
-        annotate_findings(
-            case,
-            findings,
-            normalized=normalized,
-            raw_results=raw_results,
-            config=resolved_config_payload,
-            backends=backends,
-        )
-        countable_findings = _countable_finding_objects(findings)
-        if countable_findings:
-            recheck = _candidate_recheck(case, backends, config, countable_findings)
-            countable_findings = _countable_finding_objects(findings)
-        else:
-            recheck = {
-                "enabled": False,
-                "attempts": 0,
-                "reproduced_keys": [],
-                "non_reproduced_keys": [],
-                "skip_reason": "no_countable_candidate_findings",
-            }
-    else:
-        countable_findings = []
-        recheck = {"enabled": False, "attempts": 0, "reproduced_keys": [], "non_reproduced_keys": []}
-    stage_profile["oracle_classification_ms"] = (time.perf_counter() - classification_started) * 1000
-    stage_profile["total_case_wall_ms"] = (time.perf_counter() - started) * 1000
-
-    row = {
-        "run_at": utc_now(),
-        "case": case.to_dict(),
-        "targets": target_specs if target_specs is not None else describe_targets(backends),
-        "raw_results": raw_results,
-        "normalized": {k: v.to_dict() for k, v in normalized.items()},
-        "metamorphic": metamorphic_rows,
-        "metamorphic_selection": metamorphic_selection,
-        "findings": [f.to_dict() for f in findings],
-        "candidate_recheck": recheck,
-        "config": resolved_config_payload,
-        "environment": environment if environment is not None else collect_environment(),
-        "status": "bug" if countable_findings else "ok",
-        "duration_ms": stage_profile["total_case_wall_ms"],
-        "stage_profile": stage_profile,
-    }
-    row["behavior_signature"] = behavior_signature(row)
-    row["discovery_signature"] = discovery_signature(row)
-    if countable_findings and save_artifact and config.enable_artifact:
-        artifact_started = time.perf_counter()
-        bug_dir = save_bug_artifact(
-            case,
-            raw_results=raw_results,
-            normalized={k: v.to_dict() for k, v in normalized.items()},
-            findings=countable_findings,
-            config=resolved_config_payload,
-        )
-        stage_profile["logging_artifact_ms"] += (time.perf_counter() - artifact_started) * 1000
-        stage_profile["total_case_wall_ms"] = sum(
-            stage_profile[key]
-            for key in STAGE_PROFILE_KEYS
-            if key != "total_case_wall_ms"
-        )
-        row["duration_ms"] = stage_profile["total_case_wall_ms"]
-        row["bug_dir"] = str(bug_dir)
-    return row
 
 
 def _candidate_recheck(
@@ -1655,87 +256,13 @@ def _candidate_recheck(
     config: ExperimentConfig,
     findings: list[Finding],
 ) -> dict[str, Any]:
-    attempts = max(0, int(getattr(config, "candidate_recheck_count", 0)))
-    if attempts <= 0 or not findings:
-        return {"enabled": False, "attempts": 0, "reproduced_keys": [], "non_reproduced_keys": []}
-
-    recheck_config_data = config.to_dict()
-    recheck_config_data["candidate_recheck_count"] = 0
-    recheck_config_data["enable_artifact"] = False
-    recheck_config = ExperimentConfig(**recheck_config_data)
-    original_keys = {_finding_recheck_key(finding.to_dict()) for finding in findings}
-    reproduced_keys: set[tuple[str, str, tuple[str, ...], str]] | None = None
-    attempt_summaries: list[dict[str, Any]] = []
-    for attempt in range(attempts):
-        row = run_loaded_case(
-            case,
-            backends=backends,
-            config=recheck_config,
-            save_artifact=False,
-            backend_instances=None,
-            target_specs=[],
-        )
-        keys = {_finding_recheck_key(finding) for finding in row.get("findings", [])}
-        current_reproduced = original_keys & keys
-        reproduced_keys = current_reproduced if reproduced_keys is None else reproduced_keys & current_reproduced
-        attempt_summaries.append(
-            {
-                "attempt": attempt + 1,
-                "finding_count": len(row.get("findings", []) or []),
-                "reproduced_keys": [_format_recheck_key(key) for key in sorted(current_reproduced)],
-            }
-        )
-    reproduced_keys = reproduced_keys or set()
-    non_reproduced_keys = original_keys - reproduced_keys
-    for finding in findings:
-        key = _finding_recheck_key(finding.to_dict())
-        if key in non_reproduced_keys:
-            _mark_finding_non_reproducible(finding, attempts)
-    return {
-        "enabled": True,
-        "attempts": attempts,
-        "attempt_summaries": attempt_summaries,
-        "reproduced_keys": [_format_recheck_key(key) for key in sorted(reproduced_keys)],
-        "non_reproduced_keys": [_format_recheck_key(key) for key in sorted(non_reproduced_keys)],
-    }
-
-
-def _finding_recheck_key(finding: dict[str, Any]) -> tuple[str, str, tuple[str, ...], str]:
-    return (
-        str(finding.get("kind", "")),
-        str(finding.get("root_cause", "unknown")),
-        tuple(sorted(str(backend) for backend in finding.get("suspicious_backends", []) or [])),
-        str(finding.get("mismatch_class", "")),
+    return candidate_recheck_impl(
+        case,
+        backends,
+        config,
+        findings,
+        run_loaded_case_fn=run_loaded_case,
     )
-
-
-def _format_recheck_key(key: tuple[str, str, tuple[str, ...], str]) -> str:
-    kind, root, backends, mismatch = key
-    backend_part = ",".join(backends) or "unknown"
-    suffix = f":{mismatch}" if mismatch else ""
-    return f"{kind}:{root}@{backend_part}{suffix}"
-
-
-def _mark_finding_non_reproducible(finding: Finding, attempts: int) -> None:
-    finding.triage_verdict = "non_reproducible_candidate"
-    finding.paper_status = "exclude_unreproducible_candidate"
-    finding.triage_confidence = "high"
-    finding.false_positive = True
-    finding.false_positive_reason = "candidate_not_reproduced_on_immediate_recheck"
-    finding.triage_evidence = (
-        f"Initial finding did not reproduce in {attempts} immediate fresh recheck run(s); "
-        "exclude it from latest-version bug evidence until a stable reproducer exists."
-    )
-    finding.adjudication = build_adjudication(
-        "non_reproducible_candidate",
-        validity_gate="recheck_failed",
-        semantic_gate="unknown",
-        attribution_gate="reproduction_failed",
-        recheck_status="failed",
-        exclusion_reason="candidate_not_reproduced_on_immediate_recheck",
-        needs_manual_review=False,
-    )
-
 
 def run_fuzz(
     cases: int | None,
@@ -1753,57 +280,65 @@ def run_fuzz(
 ) -> Path:
     ensure_dirs()
     config = config or ExperimentConfig()
-    if cases is None and duration_s is None:
-        cases = 100
+    budget = FuzzBudget.start(
+        cases=cases,
+        duration_s=duration_s,
+        now=time.perf_counter(),
+    )
+    cases = budget.cases
     run_id = f"run-{utc_now().replace(':', '').replace('-', '').replace('Z', '')}-{time.time_ns()}"
-    run_suffix = ".jsonl.gz" if config.compress_run_log else ".jsonl"
-    run_file = RUNS_DIR / f"{run_id}{run_suffix}"
-    if case_log_file is not None:
-        save_cases = True
-    resolved_case_log_file = case_log_file
-    if save_cases and resolved_case_log_file is None:
-        resolved_case_log_file = CORPUS_DIR / "generated" / f"{run_id}.cases.jsonl"
-    checkpoint_file = RUNS_DIR / f"{run_id}.checkpoint.json" if checkpoint_interval_s is not None else None
+    run_paths = RunPaths.build(
+        run_id=run_id,
+        runs_dir=RUNS_DIR,
+        corpus_dir=CORPUS_DIR,
+        compress_run_log=config.compress_run_log,
+        save_cases=save_cases,
+        case_log_file=case_log_file,
+        checkpoint_interval_s=checkpoint_interval_s,
+    )
+    run_file = run_paths.run_file
+    resolved_case_log_file = run_paths.case_log_file
+    checkpoint_file = run_paths.checkpoint_file
     backend_instances = {backend_name: make_backend(backend_name) for backend_name in backends}
     environment = collect_environment()
     run_provenance = collect_run_provenance()
     targets = target_context(backends)
     target_specs = targets.target_dicts()
     config_payload = _config_payload_with_effective_guidance_targets(config)
+    config_layers_payload = _config_layer_payload(config)
     guidance_targets = _configured_guidance_targets(config)
     guided = config.guidance_strategy == "guided"
     candidate_pool = max(1, config.guidance_candidate_pool if guided else 1)
+    champion_registry = (
+        ChampionRegistry(DEFAULT_CHAMPION_CORPUS_PATH)
+        if config.enable_champion_corpus
+        else None
+    )
+    champion_version_id = _version_pair_id(config)
     seen, signal_seen, feedback, guidance = _restore_closed_loop_state(
         closed_loop_state,
         config=config,
         backends=backends,
         guidance_enabled=guided,
         feedback_enabled=config.enable_feedback,
+        champion_registry=champion_registry,
+        champion_version_id=champion_version_id,
+        feedback_state_cls=FeedbackState,
+        guidance_state_cls=GuidanceState,
     )
-    started = time.perf_counter()
-    last_checkpoint = started
-    last_progress = started
-    executed = 0
+    started = budget.started
+    checkpoint_gate = IntervalGate(checkpoint_interval_s, started)
+    progress_gate = IntervalGate(progress_interval_s, started)
+    counters = RunCounters(known_saturated_bug_families=tuple(config.known_saturated_bug_families))
     next_seed = seed
-    findings_count = 0
-    new_behavior_count = 0
-    signal_new_behavior_count = 0
-    artifact_saved_count = 0
     stage_profile_totals = _empty_stage_profile()
-    preflight_repaired_count = 0
-    preflight_fallback_count = 0
-    preflight_invalid_count = 0
-    replay_filtered_candidate_count = 0
-    replay_filter_fallback_count = 0
-    saturated_family_filtered_candidate_count = 0
-    saturated_family_filter_fallback_count = 0
-    quality_oracle_counts: dict[str, int] = {}
     effective_generator_profile = _effective_generator_profile(config)
     generator_profile_pool, generator_profile_pool_metadata = _generator_profile_pool(
         config,
         target_capabilities=targets.common_capabilities,
     )
     version_pair_pool, version_pair_pool_metadata = _version_pair_pool(config)
+    backend_pair_pool = _backend_pair_pool(backends)
     generator_profile_context_features = _generator_profile_context_features(
         config=config,
         backends=backends,
@@ -1817,9 +352,19 @@ def run_fuzz(
         target_capabilities=list(targets.common_capabilities),
     )
     persisted_closed_loop_state_path = closed_loop_state_path(run_file) if persist_closed_loop_state else None
+    champion_injected_count = _inject_champion_corpus(
+        feedback,
+        version_id=champion_version_id,
+        limit=max(0, min(16, max(1, candidate_pool) * 4)),
+    )
+
+    def lhs_schema_spec(case_seed: int):
+        if not config.enable_lhs_seeding or (case_seed - seed) >= 256:
+            return None
+        return schema_spec_for_seed(case_seed, sample_count=256)
 
     def snapshot(status: str) -> dict[str, Any]:
-        elapsed_s = time.perf_counter() - started
+        elapsed_s = budget.elapsed_s(time.perf_counter())
         out = {
             "run_id": run_id,
             "status": status,
@@ -1827,31 +372,21 @@ def run_fuzz(
             "case_log_file": str(resolved_case_log_file) if resolved_case_log_file is not None else "",
             "checkpoint_file": str(checkpoint_file) if checkpoint_file is not None else "",
             "requested_cases": cases,
-            "executed_cases": executed,
+            "executed_cases": counters.executed,
             "duration_s": duration_s,
             "elapsed_s": elapsed_s,
-            "throughput_cases_s": executed / elapsed_s if elapsed_s else 0.0,
-            "findings": findings_count,
-            "new_behavior_cases": new_behavior_count,
-            "signal_new_behavior_cases": signal_new_behavior_count,
-            "saved_artifacts": artifact_saved_count,
-            "preflight": {
-                "repaired_cases": preflight_repaired_count,
-                "fallback_cases": preflight_fallback_count,
-                "invalid_cases": preflight_invalid_count,
-            },
-            "replay_bug_filter": {
-                "enabled": not config.enable_replay_bug,
-                "filtered_candidates": replay_filtered_candidate_count,
-                "fallback_candidates": replay_filter_fallback_count,
-            },
-            "family_saturation_filter": {
-                "enabled": bool(guidance is not None and config.enable_family_saturation),
-                "filtered_candidates": saturated_family_filtered_candidate_count,
-                "fallback_candidates": saturated_family_filter_fallback_count,
-            },
-            "quality_oracles": quality_oracle_counts,
-            "stage_profile": _finalize_stage_profile_summary(stage_profile_totals, cases=executed),
+            "throughput_cases_s": counters.executed / elapsed_s if elapsed_s else 0.0,
+            "findings": counters.findings,
+            "new_behavior_cases": counters.new_behavior_cases,
+            "signal_new_behavior_cases": counters.signal_new_behavior_cases,
+            "saved_artifacts": counters.saved_artifacts,
+            "preflight": counters.preflight_summary(),
+            "replay_bug_filter": counters.replay_filter_summary(enabled=not config.enable_replay_bug),
+            "family_saturation_filter": counters.family_saturation_filter_summary(
+                enabled=bool(guidance is not None and config.enable_family_saturation),
+            ),
+            "quality_oracles": counters.quality_oracles,
+            "stage_profile": _finalize_stage_profile_summary(stage_profile_totals, cases=counters.executed),
             "seed": seed,
             "next_seed": next_seed,
             "guidance": {
@@ -1864,6 +399,12 @@ def run_fuzz(
             "generator_profile_pool_metadata": dict(generator_profile_pool_metadata),
             "version_pair_pool": list(version_pair_pool),
             "version_pair_pool_metadata": dict(version_pair_pool_metadata),
+            "backend_pair_pool": list(backend_pair_pool),
+            "backend_pair_learning_weight": config.backend_pair_learning_weight,
+            "backend_pair_priority_limit": config.backend_pair_priority_limit,
+            "execution": {
+                "parallel_backend_execution": _parallel_backend_execution_active(config, backends),
+            },
             "generator_profile_learning_weight": config.generator_profile_learning_weight,
             "semantic_objective_learning_weight": config.semantic_objective_learning_weight,
             "metamorphic_relation_learning_weight": config.metamorphic_relation_learning_weight,
@@ -1871,11 +412,23 @@ def run_fuzz(
             "version_pair": _version_pair_id(config),
             "target_version": config.target_version,
             "fixed_version": config.fixed_version,
+            "champion_corpus": {
+                "enabled": config.enable_champion_corpus,
+                "donor_bandit_enabled": config.enable_champion_graft_donor_bandit,
+                "path": str(DEFAULT_CHAMPION_CORPUS_PATH),
+                "version_id": champion_version_id,
+                "injected_count": champion_injected_count,
+            },
+            "lhs_seeding": {
+                "enabled": config.enable_lhs_seeding,
+                "sample_count": 256,
+            },
             "backends": backends,
             "targets": target_specs,
             "common_capabilities": list(targets.common_capabilities),
             "target_context": targets.to_dict(),
             "config": config_payload,
+            "config_layers": config_layers_payload,
             "environment": environment,
             "run_provenance": run_provenance,
             "log_level": config.log_level,
@@ -1895,22 +448,25 @@ def run_fuzz(
         return out
 
     def write_checkpoint(status: str) -> None:
-        run_writer.flush()
-        if case_writer is not None:
-            case_writer.flush()
-        if checkpoint_file is not None:
-            if persist_closed_loop_state and persisted_closed_loop_state_path is not None:
-                dump_json(
-                    _build_closed_loop_state(
-                        seen=seen,
-                        signal_seen=signal_seen,
-                        feedback=feedback,
-                        guidance=guidance,
-                    ),
-                    persisted_closed_loop_state_path,
-                    compact=True,
-                )
-            dump_json(snapshot(status), checkpoint_file, compact=True)
+        try:
+            run_writer.flush()
+            if case_writer is not None:
+                case_writer.flush()
+            if checkpoint_file is not None:
+                if persist_closed_loop_state and persisted_closed_loop_state_path is not None:
+                    dump_json(
+                        _build_closed_loop_state(
+                            seen=seen,
+                            signal_seen=signal_seen,
+                            feedback=feedback,
+                            guidance=guidance,
+                        ),
+                        persisted_closed_loop_state_path,
+                        compact=True,
+                    )
+                dump_json(snapshot(status), checkpoint_file, compact=True)
+        except Exception:  # noqa: BLE001 — never let checkpoint IO crash a 24h run
+            counters.checkpoint_write_failures += 1
 
     run_writer_context = JsonlWriter(run_file, compresslevel=1, buffer_lines=RUN_LOG_BUFFER_LINES)
     run_writer = run_writer_context.__enter__()
@@ -1926,325 +482,89 @@ def run_fuzz(
     case_writer = case_writer_context.__enter__() if case_writer_context is not None else None
     include_online_weight_snapshot = config.log_level == "full" or case_writer is not None
 
-    while True:
-        if cases is not None and executed >= cases:
-            break
-        if duration_s is not None and executed > 0 and (time.perf_counter() - started) >= duration_s:
-            break
+    # 24h-stability: a SIGTERM (e.g. tmux/systemd shutdown) must flush state, not lose it.
+    graceful_stop = {"requested": False}
+
+    def _on_graceful_signal(_signo: int, _frame: Any) -> None:
+        graceful_stop["requested"] = True
+
+    previous_sigterm = signal.getsignal(signal.SIGTERM)
+    previous_sigusr1 = signal.getsignal(signal.SIGUSR1) if hasattr(signal, "SIGUSR1") else None
+    try:
+        signal.signal(signal.SIGTERM, _on_graceful_signal)
+        if hasattr(signal, "SIGUSR1"):
+            signal.signal(signal.SIGUSR1, _on_graceful_signal)
+    except (ValueError, OSError):
+        # Non-main thread / restricted environment: signals optional, do not abort.
+        pass
+
+    def _run_one_iteration() -> dict[str, Any]:
+        """Single fuzz iteration body wrapped so a 24h run never dies on one bad case."""
+        nonlocal next_seed, stage_profile_totals
         candidate_seed_start = next_seed
-        candidate_seed_cursor = candidate_seed_start
         generate_mutate_started = time.perf_counter()
-        candidates: list[Case] = []
-        candidate_meta: dict[int, dict[str, Any]] = {}
-        for offset in range(candidate_pool):
-            skipped_replay_candidates = 0
-            replay_skip_reason = ""
-            last_replay_skip_reason = ""
-            replay_fallback_used = False
-            skipped_saturated_family_candidates = 0
-            last_saturated_family_skip_reason = ""
-            saturated_family_fallback_used = False
-            while True:
-                case_seed = candidate_seed_cursor
-                candidate_seed_cursor += 1
-                selected_profile, profile_selection = _select_generator_profile(
-                    feedback,
-                    generator_profile_pool,
-                    context_features=generator_profile_context_features,
-                    learning_weight=(
-                        config.generator_profile_learning_weight
-                        if config.enable_generator_profile_learning
-                        else 0.0
-                    ),
-                    pool_metadata=generator_profile_pool_metadata,
-                )
-                generated = generate_case(
-                    case_seed,
-                    type_aware=config.enable_type_aware_generation,
-                    profile=selected_profile,
-                )
-                if feedback is not None:
-                    feedback_selector = getattr(feedback, "select_case", None) or getattr(feedback, "choose_case")
-                    selected = feedback_selector(case_seed, generated)
-                else:
-                    selected = generated
-                source = getattr(feedback, "last_candidate_source", "generated") if feedback is not None else "generated"
-                metadata = (
-                    getattr(feedback, "last_candidate_metadata", None)
-                    if feedback is not None
-                    else None
-                ) or selected.metadata or _generated_candidate_metadata(generated)
-                preflight = preflight_case(
-                    selected,
-                    enable_validation=config.enable_preflight_validation,
-                    enable_repair=config.enable_preflight_repair,
-                )
-                candidate = preflight.case
-                replay_skip_reason = _known_replay_source_filter_reason(candidate, config)
-                if not replay_skip_reason:
-                    saturated_roots = (
-                        guidance.predicted_saturated_family_roots_for_candidate(
-                            candidate,
-                            include_known_families=False,
-                        )
-                        if guidance is not None
-                        else []
-                    )
-                    if not saturated_roots:
-                        break
-                    last_saturated_family_skip_reason = ",".join(saturated_roots)
-                    saturated_family_filtered_candidate_count += 1
-                    skipped_saturated_family_candidates += 1
-                    if skipped_saturated_family_candidates <= SATURATED_FAMILY_FILTER_EXTRA_ATTEMPTS_PER_CANDIDATE:
-                        continue
-                    saturated_family_fallback_used = True
-                    saturated_family_filter_fallback_count += 1
-                    case_seed = candidate_seed_cursor
-                    candidate_seed_cursor += 1
-                    generated = generate_case(
-                        case_seed,
-                        type_aware=config.enable_type_aware_generation,
-                        profile="common",
-                    )
-                    profile_selection = {
-                        "strategy": "saturation_fallback",
-                        "profile": "common",
-                        "profile_pool": list(generator_profile_pool),
-                        "profile_pool_metadata": dict(generator_profile_pool_metadata),
-                        "learning_weight": 0.0,
-                        "ranked": [],
-                    }
-                    selected = generated
-                    source = "generated_saturation_fallback"
-                    metadata = _generated_candidate_metadata(generated)
-                    preflight = preflight_case(
-                        selected,
-                        enable_validation=config.enable_preflight_validation,
-                        enable_repair=config.enable_preflight_repair,
-                    )
-                    candidate = preflight.case
-                    replay_skip_reason = _known_replay_source_filter_reason(candidate, config)
-                    if replay_skip_reason:
-                        replay_filtered_candidate_count += 1
-                        raise RuntimeError(f"saturation fallback generated replay candidate: {replay_skip_reason}")
-                    fallback_roots = (
-                        guidance.predicted_saturated_family_roots_for_candidate(
-                            candidate,
-                            include_known_families=False,
-                        )
-                        if guidance is not None
-                        else []
-                    )
-                    if fallback_roots:
-                        last_saturated_family_skip_reason = ",".join(fallback_roots)
-                    break
-                last_replay_skip_reason = replay_skip_reason
-                replay_filtered_candidate_count += 1
-                skipped_replay_candidates += 1
-                if skipped_replay_candidates <= REPLAY_FILTER_EXTRA_ATTEMPTS_PER_CANDIDATE:
-                    continue
-                replay_fallback_used = True
-                replay_filter_fallback_count += 1
-                case_seed = candidate_seed_cursor
-                candidate_seed_cursor += 1
-                generated = generate_case(
-                    case_seed,
-                    type_aware=config.enable_type_aware_generation,
-                    profile="common",
-                )
-                profile_selection = {
-                    "strategy": "fresh_fallback",
-                    "profile": "common",
-                    "profile_pool": list(generator_profile_pool),
-                    "profile_pool_metadata": dict(generator_profile_pool_metadata),
-                    "learning_weight": 0.0,
-                    "ranked": [],
-                }
-                selected = generated
-                source = "generated_fresh_fallback"
-                metadata = _generated_candidate_metadata(generated)
-                preflight = preflight_case(
-                    selected,
-                    enable_validation=config.enable_preflight_validation,
-                    enable_repair=config.enable_preflight_repair,
-                )
-                candidate = preflight.case
-                replay_skip_reason = _known_replay_source_filter_reason(candidate, config)
-                if replay_skip_reason:
-                    replay_filtered_candidate_count += 1
-                    raise RuntimeError(f"fresh fallback generated replay candidate: {replay_skip_reason}")
-                break
-            quality_archive_context = _candidate_quality_context(
-                feedback,
-                candidate,
-                metadata,
-                target_capabilities=targets.common_capabilities,
-            )
-            if quality_archive_context:
-                candidate.metadata["quality_archive_context"] = quality_archive_context
-            candidate_meta[id(candidate)] = {
-                "source": source,
-                "generated_seed": case_seed,
-                "seed_lineage": metadata.get("seed_lineage", {}),
-                "mutation": metadata.get("mutation", {}),
-                "feedback_selection": metadata.get("feedback_selection", metadata.get("feedback_decision", {})),
-                "feedback_decision": metadata.get("feedback_decision", metadata.get("feedback_selection", {})),
-                "quality_archive_context": quality_archive_context,
-                "generator_profile_selection": profile_selection,
-                "preflight": preflight.to_dict(),
-                "replay_filter": {
-                    "enabled": not config.enable_replay_bug,
-                    "filtered_before_candidate": skipped_replay_candidates,
-                    "fallback_used": replay_fallback_used,
-                    "last_skip_reason": last_replay_skip_reason,
-                },
-                "family_saturation_filter": {
-                    "enabled": bool(guidance is not None and config.enable_family_saturation),
-                    "filtered_before_candidate": skipped_saturated_family_candidates,
-                    "fallback_used": saturated_family_fallback_used,
-                    "last_skip_reason": last_saturated_family_skip_reason,
-                },
-            }
-            candidates.append(candidate)
-        generate_mutate_elapsed_ms = (time.perf_counter() - generate_mutate_started) * 1000
-        next_seed = candidate_seed_cursor
-        scheduler_feedback_elapsed_ms = 0.0
-        if guidance is not None:
-            guidance_started = time.perf_counter()
-            guidance_selector = getattr(guidance, "select_case", None) or getattr(guidance, "choose_case")
-            decision = guidance_selector(
-                candidates,
-                include_online_weight_snapshot=include_online_weight_snapshot,
-            )
-            case = decision.case
-            guidance_row = decision.to_dict()
-            guidance_row["strategy"] = config.guidance_strategy
-            selected_operation_combo = (
-                decision.analysis.operation_combo
-                if getattr(decision, "analysis", None) is not None
-                else None
-            )
-            scheduler_feedback_elapsed_ms += (time.perf_counter() - guidance_started) * 1000
-        else:
-            case = candidates[0]
-            guidance_row = {
-                "strategy": config.guidance_strategy,
-                "score": 0.0,
-                "features": [],
-                "matched_targets": [],
-                "candidate_count": 1,
-            }
-            selected_operation_combo = None
-        selected_meta = candidate_meta.get(id(case))
-        if selected_meta is None:
-            selected_meta = _selected_candidate_metadata(
-                case,
-                config,
-                bool(guidance is not None and config.enable_family_saturation),
-            )
-        if not selected_meta.get("quality_archive_context"):
-            selected_meta["quality_archive_context"] = _candidate_quality_context(
-                feedback,
-                case,
-                selected_meta,
-                target_capabilities=targets.common_capabilities,
-            )
-            if selected_meta["quality_archive_context"]:
-                case.metadata["quality_archive_context"] = selected_meta["quality_archive_context"]
-        selected_meta["operation_combo"] = selected_operation_combo or describe_operation_combo(case.program.operations)
-        preflight_row = selected_meta["preflight"]
-        case_seed = case.seed
-        selected_version_pair, version_pair_selection = _select_adaptive_action(
-            feedback,
-            scope="version_pair",
-            action_pool=version_pair_pool,
-            context_features=version_pair_context_features,
-            version_id=_version_pair_id(config),
-            learning_weight=config.version_pair_learning_weight,
-            enabled=bool(version_pair_pool),
-        )
-        effective_config = _config_for_version_pair(config, selected_version_pair)
-        effective_config_payload = _config_payload_for_version_pair(config_payload, selected_version_pair)
-        version_pair_id = _version_pair_id(effective_config)
-        case_learning_context = _case_learning_context_features(
-            case,
-            effective_config,
-            backends=backends,
+        candidate_batch = generate_candidate_batch(
+            seed_start=candidate_seed_start,
+            candidate_pool=candidate_pool,
+            config=config,
+            feedback=feedback,
+            guidance=guidance,
+            generator_profile_pool=generator_profile_pool,
+            generator_profile_pool_metadata=generator_profile_pool_metadata,
+            generator_profile_context_features=generator_profile_context_features,
             target_capabilities=targets.common_capabilities,
-            operation_combo=selected_meta["operation_combo"],
-            guidance_row=guidance_row,
+            schema_spec_for_seed=lhs_schema_spec,
+            generate_case_fn=generate_case,
+            replay_filter_fn=_known_replay_source_filter_reason,
         )
-        semantic_objective_pool = _semantic_objective_pool(case_learning_context, config, guidance_row)
-        selected_semantic_objective, semantic_objective_selection = _select_adaptive_action(
-            feedback,
-            scope="semantic_objective",
-            action_pool=semantic_objective_pool,
-            context_features=case_learning_context,
-            version_id=version_pair_id,
-            learning_weight=config.semantic_objective_learning_weight,
-            enabled=config.enable_semantic_objective_learning,
+        candidates = candidate_batch.candidates
+        candidate_meta = candidate_batch.candidate_meta
+        counters.replay_filtered_candidates += candidate_batch.replay_filtered_candidates
+        counters.replay_fallback_candidates += candidate_batch.replay_fallback_candidates
+        counters.saturated_family_filtered_candidates += candidate_batch.saturated_family_filtered_candidates
+        counters.saturated_family_fallback_candidates += candidate_batch.saturated_family_fallback_candidates
+        generate_mutate_elapsed_ms = (time.perf_counter() - generate_mutate_started) * 1000
+        next_seed = candidate_batch.next_seed
+        selected_iteration = select_iteration_case(
+            candidates=candidates,
+            candidate_meta=candidate_meta,
+            config=config,
+            config_payload=config_payload,
+            feedback=feedback,
+            guidance=guidance,
+            include_online_weight_snapshot=include_online_weight_snapshot,
+            version_pair_pool=version_pair_pool,
+            version_pair_pool_metadata=version_pair_pool_metadata,
+            version_pair_context_features=version_pair_context_features,
+            target_capabilities=targets.common_capabilities,
+            backends=backends,
         )
-        all_mr_variants = all_metamorphic_variants(case) if config.enable_metamorphic_oracle else []
-        metamorphic_relation_pool = tuple(
-            _unique_nonempty_strings([variant.relation for variant in all_mr_variants])
-        )
-        selected_metamorphic_relation, metamorphic_relation_selection = _select_adaptive_action(
-            feedback,
-            scope="metamorphic_relation",
-            action_pool=metamorphic_relation_pool,
-            context_features=case_learning_context,
-            version_id=version_pair_id,
-            learning_weight=config.metamorphic_relation_learning_weight,
-            enabled=config.enable_metamorphic_relation_learning and config.enable_metamorphic_oracle,
-        )
-        selected_meta["semantic_objective_selection"] = semantic_objective_selection
-        selected_meta["selected_semantic_objective"] = selected_semantic_objective
-        selected_meta["metamorphic_relation_selection"] = metamorphic_relation_selection
-        selected_meta["selected_metamorphic_relation"] = selected_metamorphic_relation
-        selected_meta["version_pair_selection"] = version_pair_selection
-        selected_meta["selected_version_pair"] = selected_version_pair
-        selected_meta["version_pair_pool_metadata"] = dict(version_pair_pool_metadata)
-        selected_meta["case_learning_context"] = list(case_learning_context)
-        selected_meta["metamorphic_relation_order"] = _metamorphic_relation_order_from_selection(
-            selected_metamorphic_relation,
-            configured_order=config.metamorphic_relation_order,
-        )
+        case = selected_iteration.case
+        selected_meta = selected_iteration.selected_meta
+        guidance_row = selected_iteration.guidance_row
+        preflight_row = selected_iteration.preflight_row
+        case_seed = selected_iteration.case_seed
+        effective_config = selected_iteration.effective_config
+        effective_config_payload = selected_iteration.effective_config_payload
+        version_pair_id = selected_iteration.version_pair_id
+        scheduler_feedback_elapsed_ms = selected_iteration.scheduler_elapsed_ms
         if case_writer is not None:
             case_writer.write(
-                {
-                    "run_id": run_id,
-                    "case_index": executed,
-                    "seed": case_seed,
-                    "candidate_seed_start": candidate_seed_start,
-                    "candidate_pool_size": candidate_pool,
-                    "guidance": guidance_row,
-                    "candidate_source": selected_meta["source"],
-                    "seed_lineage": selected_meta["seed_lineage"],
-                    "mutation": selected_meta["mutation"],
-                    "feedback_selection": selected_meta.get(
-                        "feedback_selection",
-                        selected_meta.get("feedback_decision", {}),
-                    ),
-                    "feedback_decision": selected_meta.get(
-                        "feedback_decision",
-                        selected_meta.get("feedback_selection", {}),
-                    ),
-                    "quality_archive_context": selected_meta.get("quality_archive_context", {}),
-                    "generator_profile_selection": selected_meta.get("generator_profile_selection", {}),
-                    "semantic_objective_selection": selected_meta.get("semantic_objective_selection", {}),
-                    "metamorphic_relation_selection": selected_meta.get("metamorphic_relation_selection", {}),
-                    "version_pair_selection": selected_meta.get("version_pair_selection", {}),
-                    "selected_version_pair": selected_meta.get("selected_version_pair", ""),
-                    "case_learning_context": selected_meta.get("case_learning_context", []),
-                    "operation_combo": selected_meta["operation_combo"],
-                    "preflight": preflight_row,
-                    "replay_filter": selected_meta["replay_filter"],
-                    "family_saturation_filter": selected_meta["family_saturation_filter"],
-                    "generated_at": utc_now(),
-                    "case": case.to_dict(),
-                }
+                _case_log_row(
+                    run_id=run_id,
+                    case_index=counters.executed,
+                    case_seed=case_seed,
+                    candidate_seed_start=candidate_seed_start,
+                    candidate_pool=candidate_pool,
+                    guidance_row=guidance_row,
+                    selected_meta=selected_meta,
+                    backend_pair_pool=backend_pair_pool,
+                    preflight_row=preflight_row,
+                    generated_at=utc_now(),
+                    case=case,
+                )
             )
-        save_artifact_for_case = _artifact_budget_available(config, artifact_saved_count)
+        save_artifact_for_case = _artifact_budget_available(config, counters.saved_artifacts)
         row = _invoke_run_loaded_case(
             case,
             backends=backends,
@@ -2256,235 +576,63 @@ def run_fuzz(
             config_payload=effective_config_payload,
             metamorphic_relation_order=selected_meta.get("metamorphic_relation_order", []),
         )
-        row_stage_profile = _stage_profile_with_total(row.get("stage_profile", {}))
-        row_stage_profile["generate_mutate_ms"] += generate_mutate_elapsed_ms
-        countable_row_findings = _countable_row_findings(row)
-        if countable_row_findings and config.enable_reducer:
-            from datadiff.reducer import reduce_case
+        artifact_result = process_reducer_and_artifacts(
+            row=row,
+            case=case,
+            backends=backends,
+            config=config,
+            effective_config=effective_config,
+            backend_instances=backend_instances,
+            environment=environment,
+            target_specs=target_specs,
+            effective_config_payload=effective_config_payload,
+            saved_artifacts_count=counters.saved_artifacts,
+            generate_mutate_elapsed_ms=generate_mutate_elapsed_ms,
+            run_loaded_case_fn=run_loaded_case,
+        )
+        row = artifact_result.row
+        row_stage_profile = artifact_result.row_stage_profile
+        scheduler_feedback_elapsed_ms += artifact_result.scheduler_elapsed_ms
+        counters.saved_artifacts += artifact_result.saved_artifact_delta
 
-            reducer_started = time.perf_counter()
-            reduced = reduce_case(
-                case,
-                backends=backends,
-                config=ExperimentConfig(
-                    enable_type_aware_generation=effective_config.enable_type_aware_generation,
-                    enable_normalizer=effective_config.enable_normalizer,
-                    enable_differential_oracle=effective_config.enable_differential_oracle,
-                    enable_metamorphic_oracle=effective_config.enable_metamorphic_oracle,
-                    enable_feedback=False,
-                    enable_reducer=False,
-                    enable_artifact=False,
-                    oracle_mode=effective_config.oracle_mode,
-                    generator_profile=effective_config.generator_profile,
-                    metamorphic_variant_limit=effective_config.metamorphic_variant_limit,
-                    target_version=effective_config.target_version,
-                    fixed_version=effective_config.fixed_version,
-                ),
-                target_kinds=[finding["kind"] for finding in countable_row_findings],
-                target_roots=[finding.get("root_cause", "unknown") for finding in countable_row_findings],
-            )
-            scheduler_feedback_elapsed_ms += (time.perf_counter() - reducer_started) * 1000
-            reduced_row = run_loaded_case(
-                reduced,
-                backends=backends,
-                config=effective_config,
-                save_artifact=_artifact_budget_available(config, artifact_saved_count),
-                backend_instances=backend_instances,
-                environment=environment,
-                target_specs=target_specs,
-                config_payload=effective_config_payload,
-            )
-            reduced_row["original_case"] = case.to_dict()
-            reduced_row["reduction"] = {
-                "original_rows": len(case.tables[0].rows),
-                "reduced_rows": len(reduced.tables[0].rows),
-                "original_ops": len(case.program.operations),
-                "reduced_ops": len(reduced.program.operations),
-            }
-            row = reduced_row
-            countable_row_findings = _countable_row_findings(row)
-            row_stage_profile = _stage_profile_with_total(row.get("stage_profile", {}))
-            row_stage_profile["generate_mutate_ms"] += generate_mutate_elapsed_ms
-        if countable_row_findings and row.get("bug_dir"):
-            artifact_saved_count += 1
-            row["artifact_saved"] = True
-        elif countable_row_findings and config.enable_artifact:
-            row["artifact_saved"] = False
-            row["artifact_skipped_reason"] = "artifact_limit_reached"
-
-        sig = row["behavior_signature"]
-        discovery_sig = str(row.get("discovery_signature", sig))
-        row["is_new_behavior"] = discovery_sig not in seen
-        seen.add(discovery_sig)
-        signal_sig = signal_signature(row)
-        row["signal_signature"] = signal_sig
-        row["signal_new_behavior"] = bool(row["is_new_behavior"]) and signal_sig not in signal_seen
-        if row["is_new_behavior"]:
-            signal_seen.add(signal_sig)
-        row["candidate_source"] = selected_meta["source"]
-        row["seed_lineage"] = selected_meta["seed_lineage"]
-        row["mutation"] = selected_meta["mutation"]
-        row["feedback_selection"] = selected_meta.get("feedback_selection", selected_meta.get("feedback_decision", {}))
-        row["feedback_decision"] = selected_meta.get("feedback_decision", selected_meta.get("feedback_selection", {}))
-        row["quality_archive_context"] = selected_meta.get("quality_archive_context", {})
-        row["generator_profile_selection"] = selected_meta.get("generator_profile_selection", {})
-        row["selected_generator_profile"] = str(row["generator_profile_selection"].get("profile", "") or "")
-        row["semantic_objective_selection"] = selected_meta.get("semantic_objective_selection", {})
-        row["selected_semantic_objective"] = str(selected_meta.get("selected_semantic_objective", "") or "")
-        row["metamorphic_relation_selection"] = selected_meta.get("metamorphic_relation_selection", {})
-        row["selected_metamorphic_relation"] = str(selected_meta.get("selected_metamorphic_relation", "") or "")
-        row["version_pair_selection"] = selected_meta.get("version_pair_selection", {})
-        row["selected_version_pair"] = str(selected_meta.get("selected_version_pair", "") or "")
-        row["case_learning_context"] = selected_meta.get("case_learning_context", [])
-        row["operation_combo"] = selected_meta["operation_combo"]
-        row["preflight"] = preflight_row
-        row["replay_filter"] = selected_meta["replay_filter"]
-        row["family_saturation_filter"] = selected_meta["family_saturation_filter"]
-        row["candidate_seed_start"] = candidate_seed_start
-        row["candidate_pool_size"] = candidate_pool
-        row["case_index"] = executed
-        row["elapsed_s"] = round(time.perf_counter() - started, 6)
-        quality_oracles = evaluate_quality_oracles(
-            case,
-            row,
-            candidate_source=selected_meta["source"],
-            preflight=preflight_row,
-            guidance_decision=guidance_row,
-            guidance_strategy=config.guidance_strategy,
+        row_update = apply_iteration_row_updates(
+            row=row,
+            case=case,
+            selected_meta=selected_meta,
+            preflight_row=preflight_row,
+            feedback=feedback,
+            config=config,
+            guidance_row=guidance_row,
             guidance_targets=guidance_targets,
+            backend_pair_pool=backend_pair_pool,
+            version_pair_id=version_pair_id,
+            target_capabilities=targets.common_capabilities,
+            seen=seen,
+            signal_seen=signal_seen,
+            candidate_seed_start=candidate_seed_start,
+            candidate_pool=candidate_pool,
+            case_index=counters.executed,
+            elapsed_s=round(time.perf_counter() - started, 6),
         )
-        row["quality_oracles"] = [oracle.to_dict() for oracle in quality_oracles]
-        for oracle in row["quality_oracles"]:
-            quality_oracle_counts[f"{oracle['name']}:{oracle['verdict']}"] = (
-                quality_oracle_counts.get(f"{oracle['name']}:{oracle['verdict']}", 0) + 1
-            )
-        row_findings = row.get("findings") or []
-        finding_outcomes = (
-            analyze_finding_outcomes(
-                row_findings,
-                known_saturated_bug_families=config.known_saturated_bug_families,
-            )
-            if row_findings
-            else None
+        for oracle in row_update.quality_oracles:
+            counters.record_quality_oracle(oracle)
+        feedback_update = apply_feedback_updates(
+            row=row,
+            case=case,
+            feedback=feedback,
+            config=config,
+            selected_meta=selected_meta,
+            guidance_row=guidance_row,
+            preflight_row=preflight_row,
+            behavior_signature=row_update.behavior_signature,
+            signal_signature=row_update.signal_signature,
+            discovery_signature=row_update.discovery_signature,
+            version_id=version_pair_id,
+            generator_profile_context_features=generator_profile_context_features,
+            target_capabilities=targets.common_capabilities,
         )
-        if feedback is not None:
-            known_families = config.known_saturated_bug_families
-            reward_signals = row_reward_signals(
-                row,
-                known_saturated_bug_families=known_families,
-                finding_outcomes=finding_outcomes,
-            )
-            row_candidate_families = list(finding_outcomes.candidate_bug_families) if finding_outcomes else []
-            row_candidate_signatures = list(finding_outcomes.candidate_bug_signatures) if finding_outcomes else []
-            rewardable_semantic_divergence = bool(reward_signals["rewardable_semantic_divergence"])
-            resolved_semantic_only = (
-                bool(reward_signals["resolved_semantic_divergence_count"])
-                and not bool(reward_signals["candidate_bug"])
-                and not rewardable_semantic_divergence
-            )
-            feedback_finding = bool(row_candidate_families) or rewardable_semantic_divergence
-            feedback_eligible, feedback_skip_reason = _feedback_storage_decision(
-                case,
-                candidate_source=selected_meta["source"],
-                seed_lineage=selected_meta["seed_lineage"],
-            )
-            if feedback_eligible and resolved_semantic_only:
-                feedback_eligible = False
-                feedback_skip_reason = "resolved_semantic_divergence"
-            row["feedback_eligible"] = feedback_eligible
-            row["feedback_skip_reason"] = feedback_skip_reason
-            feedback_summary = feedback_summary_for_case(
-                row,
-                known_saturated_bug_families=known_families,
-                finding_outcomes=finding_outcomes,
-            )
-            if feedback_eligible:
-                feedback_started = time.perf_counter()
-                row_target_keys = _feedback_target_keys(
-                    guidance_row,
-                    selected_meta["operation_combo"],
-                    target_capabilities=targets.common_capabilities,
-                )
-                row["stored_in_feedback_corpus"] = feedback.record(
-                    case,
-                    sig,
-                    feedback_finding,
-                    novelty_signature=signal_sig,
-                    discovery_signature=discovery_sig,
-                    candidate_bug_families=row_candidate_families,
-                    target_keys=row_target_keys,
-                    schedule_delta=float(feedback_summary.get("seed_schedule_delta", 0.0) or 0.0),
-                )
-                scheduler_feedback_elapsed_ms += (time.perf_counter() - feedback_started) * 1000
-                row["feedback_corpus_persisted"] = feedback.last_persisted_to_disk
-                row["feedback_record_skip_reason"] = feedback.last_record_skip_reason
-            else:
-                feedback.last_persisted_to_disk = False
-                row["stored_in_feedback_corpus"] = False
-                row["feedback_corpus_persisted"] = False
-                row["feedback_record_skip_reason"] = ""
-            feedback_summary["stored_in_feedback_corpus"] = bool(row["stored_in_feedback_corpus"])
-            feedback_summary["source_reward_adjustment"] = source_reward_adjustment_from_summary(
-                feedback_summary,
-                candidate_source=selected_meta["source"],
-            )
-            row["feedback_summary"] = feedback_summary
-            source_reward_started = time.perf_counter()
-            feedback_outcome_recorder = getattr(feedback, "record_candidate_outcome", None) or getattr(
-                feedback,
-                "record_candidate_result",
-            )
-            row["source_reward"] = feedback_outcome_recorder(
-                selected_meta["source"],
-                has_finding=feedback_finding,
-                is_new_behavior=bool(row["signal_new_behavior"]) and not resolved_semantic_only,
-                preflight=preflight_row,
-                candidate_bug=bool(reward_signals["candidate_bug"]),
-                semantic_divergence=rewardable_semantic_divergence,
-                false_positive=bool(reward_signals["false_positive"]),
-                candidate_bug_families=row_candidate_families,
-                candidate_bug_signatures=row_candidate_signatures,
-                reward_adjustment=float(feedback_summary.get("source_reward_adjustment", 0.0) or 0.0),
-            )
-            profile_reward = _record_generator_profile_feedback(
-                feedback,
-                selected_meta,
-                row,
-                context_features=generator_profile_context_features,
-                reward_signals=reward_signals,
-            )
-            if profile_reward is not None:
-                row["generator_profile_selection"]["reward"] = profile_reward
-            for selection_key in (
-                "semantic_objective_selection",
-                "metamorphic_relation_selection",
-                "version_pair_selection",
-            ):
-                learning_reward = _record_adaptive_action_feedback(
-                    feedback,
-                    row.get(selection_key, {}),
-                    row,
-                    context_features=tuple(row.get("case_learning_context", []) or ()),
-                    version_id=version_pair_id,
-                    reward_signals=reward_signals,
-                )
-                if learning_reward is not None and isinstance(row.get(selection_key), dict):
-                    row[selection_key]["reward"] = learning_reward
-            scheduler_feedback_elapsed_ms += (time.perf_counter() - source_reward_started) * 1000
-            row["source_scheduler"] = _source_scheduler_snapshot(feedback)
-        else:
-            row["stored_in_feedback_corpus"] = False
-            row["feedback_corpus_persisted"] = False
-            row["feedback_eligible"] = False
-            row["feedback_skip_reason"] = "feedback_disabled"
-            row["feedback_record_skip_reason"] = ""
-            row["source_reward"] = None
-            row["source_scheduler"] = []
-            row["feedback_summary"] = feedback_summary_for_case(
-                row,
-                known_saturated_bug_families=config.known_saturated_bug_families,
-                finding_outcomes=finding_outcomes,
-            )
+        finding_outcomes = feedback_update.finding_outcomes
+        scheduler_feedback_elapsed_ms += feedback_update.elapsed_ms
         if guidance is not None:
             guidance_record_started = time.perf_counter()
             guidance.record_result(case, row, finding_outcomes=finding_outcomes)
@@ -2492,12 +640,7 @@ def run_fuzz(
         row["guidance"] = guidance_row
         row_stage_profile["scheduler_feedback_ms"] += scheduler_feedback_elapsed_ms
         logging_started = time.perf_counter()
-        preflight_repaired_count += int(bool(preflight_row.get("repaired", False)))
-        preflight_fallback_count += int(bool(preflight_row.get("fallback_used", False)))
-        preflight_invalid_count += int(not bool(preflight_row.get("valid", True)))
-        findings_count += len(row["findings"])
-        new_behavior_count += int(row["is_new_behavior"])
-        signal_new_behavior_count += int(row["signal_new_behavior"])
+        counters.record_completed_case(row=row, preflight=preflight_row)
         row_stage_profile["logging_artifact_ms"] += (time.perf_counter() - logging_started) * 1000
         row_stage_profile["total_case_wall_ms"] = sum(
             row_stage_profile[key]
@@ -2506,36 +649,77 @@ def run_fuzz(
         )
         row["stage_profile"] = row_stage_profile
         row["duration_ms"] = row_stage_profile["total_case_wall_ms"]
+        row["fuzz_iteration"] = FuzzIteration.from_row(row, run_id=run_id).to_dict()
         run_writer.write(_compact_log_row(row, config.log_level))
         stage_profile_totals = _merge_stage_profile(stage_profile_totals, row_stage_profile)
-        executed += 1
 
         now = time.perf_counter()
-        if checkpoint_interval_s is not None and (now - last_checkpoint) >= checkpoint_interval_s:
+        if checkpoint_gate.due(now):
             write_checkpoint("running")
-            last_checkpoint = now
+            checkpoint_gate.mark(now)
         if (
             progress_callback is not None
-            and progress_interval_s is not None
-            and (now - last_progress) >= progress_interval_s
+            and progress_gate.due(now)
         ):
             run_writer.flush()
             if case_writer is not None:
                 case_writer.flush()
             progress_callback(snapshot("running"))
-            last_progress = now
+            progress_gate.mark(now)
 
-        if duration_s is not None and (time.perf_counter() - started) >= duration_s:
+        return {"stop": bool(budget.should_stop_after_iteration(now=time.perf_counter()))}
+
+    while budget.should_start_iteration(executed=counters.executed, now=time.perf_counter()):
+        if graceful_stop["requested"]:
             break
+        try:
+            iteration_result = _run_one_iteration()
+        except KeyboardInterrupt:
+            graceful_stop["requested"] = True
+            break
+        except Exception as exc:  # noqa: BLE001 — protect 24h long run from single bad case
+            counters.case_iteration_failures += 1
+            counters.last_case_iteration_error = f"{type(exc).__name__}: {exc}"
+            try:
+                run_writer.write(
+                    {
+                        "kind": "case_iteration_error",
+                        "case_seed": next_seed,
+                        "case_index": counters.executed,
+                        "error_type": type(exc).__name__,
+                        "error": str(exc),
+                        "traceback": traceback.format_exc()[-2048:],
+                        "logged_at": utc_now(),
+                    }
+                )
+            except Exception:  # noqa: BLE001
+                pass
+            next_seed += 1
+            now_after_failure = time.perf_counter()
+            if checkpoint_gate.due(now_after_failure):
+                write_checkpoint("running")
+                checkpoint_gate.mark(now_after_failure)
+            if budget.should_stop_after_iteration(now=now_after_failure):
+                break
+            continue
+        if iteration_result.get("stop"):
+            break
+
+    try:
+        signal.signal(signal.SIGTERM, previous_sigterm)
+        if hasattr(signal, "SIGUSR1") and previous_sigusr1 is not None:
+            signal.signal(signal.SIGUSR1, previous_sigusr1)
+    except (ValueError, OSError):
+        pass
 
     if case_writer_context is not None:
         case_writer_context.__exit__(None, None, None)
     run_writer_context.__exit__(None, None, None)
 
-    elapsed_s = time.perf_counter() - started
+    elapsed_s = budget.elapsed_s(time.perf_counter())
     meta = snapshot("completed")
     meta["elapsed_s"] = elapsed_s
-    meta["throughput_cases_s"] = executed / elapsed_s if elapsed_s else 0.0
+    meta["throughput_cases_s"] = counters.executed / elapsed_s if elapsed_s else 0.0
     if persist_closed_loop_state and persisted_closed_loop_state_path is not None:
         dump_json(
             _build_closed_loop_state(
@@ -2552,27 +736,3 @@ def run_fuzz(
     if progress_callback is not None:
         progress_callback(meta)
     return run_file
-
-
-def _countable_row_findings(row: dict[str, Any]) -> list[dict[str, Any]]:
-    return [
-        finding
-        for finding in row.get("findings", []) or []
-        if _is_countable_finding_dict(finding)
-    ]
-
-
-def _countable_finding_objects(findings: list[Finding]) -> list[Finding]:
-    return [finding for finding in findings if _is_countable_finding_dict(finding.to_dict())]
-
-
-def _is_countable_finding_dict(finding: dict[str, Any]) -> bool:
-    return counts_as_bug_evidence(finding)
-
-
-def _artifact_budget_available(config: ExperimentConfig, saved_count: int) -> bool:
-    if not config.enable_artifact:
-        return False
-    if config.artifact_limit is None:
-        return True
-    return saved_count < max(0, int(config.artifact_limit))

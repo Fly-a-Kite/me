@@ -6,8 +6,19 @@ from datadiff.methodology_report import write_methodology_report
 from datadiff.util import append_jsonl, closed_loop_state_path, dump_json, run_meta_path
 
 
-def _write_run(path, *, findings_by_index, artifact_dir=None, run_provenance=None, invalid_indexes=None):
+def _write_run(
+    path,
+    *,
+    findings_by_index,
+    artifact_dir=None,
+    run_provenance=None,
+    invalid_indexes=None,
+    new_behavior_indexes=None,
+    signal_indexes=None,
+):
     invalid_indexes = set(invalid_indexes or [])
+    explicit_new_behavior_indexes = set(new_behavior_indexes) if new_behavior_indexes is not None else None
+    explicit_signal_indexes = set(signal_indexes) if signal_indexes is not None else None
     for idx in range(2):
         findings = findings_by_index.get(idx, [])
         row = {
@@ -46,8 +57,16 @@ def _write_run(path, *, findings_by_index, artifact_dir=None, run_provenance=Non
                 "discovery_stale_penalty": -0.2,
                 "contribution_potential": 1.0,
             },
-            "is_new_behavior": idx == 0,
-            "signal_new_behavior": idx == 0 and bool(findings),
+            "is_new_behavior": (
+                idx in explicit_new_behavior_indexes
+                if explicit_new_behavior_indexes is not None
+                else idx == 0
+            ),
+            "signal_new_behavior": (
+                idx in explicit_signal_indexes
+                if explicit_signal_indexes is not None
+                else idx == 0 and bool(findings)
+            ),
             "candidate_source": "feedback_mutation" if idx == 0 else "generated",
             "stored_in_feedback_corpus": idx == 0,
             "feedback_summary": {
@@ -345,6 +364,8 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
             ]
         },
         artifact_dir=artifact_dir,
+        new_behavior_indexes={1},
+        signal_indexes={1},
         run_provenance={
             "vcs": {
                 "git_commit": "a" * 40,
@@ -388,7 +409,7 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
                 {
                     "kind": "semantic_output_mismatch",
                     "root_cause": "nan_inf_semantics",
-                    "triage_verdict": "expected_semantic_divergence",
+                    "triage_verdict": "semantic_divergence_needs_confirmation",
                     "signature": "sig-semantic",
                 }
             ]
@@ -419,6 +440,8 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
             },
         },
         invalid_indexes={1},
+        new_behavior_indexes={1},
+        signal_indexes={1},
     )
     _write_run(
         reducer_run,
@@ -435,6 +458,8 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
             ]
         },
         artifact_dir=None,
+        new_behavior_indexes={0},
+        signal_indexes={0},
     )
     manifest = runs_dir / "experiment-methodology.json"
     dump_json(
@@ -573,6 +598,15 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
     report = json.loads(json_path.read_text(encoding="utf-8"))
     md = md_path.read_text(encoding="utf-8")
     assert report["schema_version"] == "methodology-report-v1"
+    assert report["icse_experiment_quality"]["schema_version"] == "icse-experiment-quality-v1"
+    assert set(report["icse_experiment_quality"]["dimensions"]) == {
+        "real_bug_yield",
+        "throughput",
+        "coverage",
+        "speed",
+        "reproducibility",
+    }
+    assert "## ICSE Experiment Quality" in md
     assert report["evidence_chain"]["manifest"] == str(manifest)
     assert report["evidence_chain"]["aggregate_json"].endswith(
         "experiment-summary-experiment-methodology-aggregates.json"
@@ -800,14 +834,14 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
     assert quality_effect["ablation_covered"] is True
     assert quality_effect["reference_run_count"] == 2
     assert quality_effect["disabled_run_count"] == 1
-    assert quality_effect["reference_candidate_bug_case_rate"] == 0.5
+    assert quality_effect["reference_candidate_bug_case_rate"] == 0.25
     assert quality_effect["disabled_candidate_bug_case_rate"] == 0.0
-    assert quality_effect["candidate_bug_case_rate_delta"] == -0.5
+    assert quality_effect["candidate_bug_case_rate_delta"] == -0.25
     assert quality_effect["signal_new_behavior_rate_delta"] == 0.25
     assert quality_effect["throughput_cases_s_delta"] == 0.0
     assert quality_effect["invalid_rate_delta"] == 0.5
     assert quality_effect["false_positive_rate_delta"] == 0.5
-    assert quality_effect["candidate_bug_discovery_auc_delta"] == -0.75
+    assert quality_effect["candidate_bug_discovery_auc_delta"] == -0.25
     assert quality_effect["first_candidate_bug_elapsed_s_delta"] is None
     scheduler_effect = effects["scheduler_learning"]
     assert scheduler_effect["ablation_covered"] is False
@@ -841,7 +875,7 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
     assert "| quality_archive | true | 2 | 1 | true |" in md
     assert "| runtime_cost_learning | true | 2 | 1 | true |" in md
     assert "### Adaptive Component Effects" in md
-    assert "| quality_archive | 1 | -50.0% | +25.0% | +0.00 | +50.0% | +50.0% |  | -0.75 |" in md
+    assert "| quality_archive | 1 | -25.0% | +25.0% | +0.00 | +50.0% | +50.0% |  | -0.25 |" in md
     assert "| scheduler_learning | 0 |  |  |  |  |  |  |  |" in md
     assert "- Ablation invalid rate: 50.0%" in md
     assert "## Adaptive Selection" in md
@@ -1445,3 +1479,132 @@ def test_methodology_report_exports_adaptive_learning_internal_evidence(tmp_path
     assert "- Manifest bandit scopes / arms / pulls: 1 / 1 / 3" in md
     assert "- Quality-diversity archive cells / seeds / elites: 1 / 2 / 2" in md
     assert "- Continual-learning sources loaded: 1/1" in md
+
+
+def test_methodology_report_recomputes_signal_new_behavior_from_run_logs(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(methodology_report, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(methodology_report, "PROJECT_ROOT", tmp_path)
+    run_file = runs_dir / "run-stale-summary.jsonl"
+    findings = [
+        {
+            "triage_verdict": "candidate_implementation_bug",
+            "false_positive": True,
+            "root_cause": "false_positive_root",
+            "suspicious_backends": ["duckdb"],
+        },
+        {
+            "triage_verdict": "candidate_implementation_bug",
+            "root_cause": "known_root",
+            "suspicious_backends": ["duckdb"],
+        },
+        {
+            "triage_verdict": "candidate_implementation_bug",
+            "root_cause": "fresh_root",
+            "suspicious_backends": ["duckdb"],
+        },
+    ]
+    for idx, finding in enumerate(findings):
+        append_jsonl(
+            {
+                "case_index": idx,
+                "elapsed_s": idx + 1,
+                "case": {"case_id": f"case-stale-{idx}", "seed": idx},
+                "is_new_behavior": True,
+                "signal_new_behavior": True,
+                "findings": [finding],
+            },
+            run_file,
+        )
+    dump_json(
+        {"config": {"known_saturated_bug_families": ["known_root@duckdb"]}},
+        run_meta_path(run_file),
+    )
+    manifest = runs_dir / "experiment-stale-summary.json"
+    dump_json(
+        {
+            "presets": ["baseline"],
+            "seeds": [1],
+            "target_suite": "core",
+            "target_suites": ["core"],
+            "evidence_mode": "live",
+            "runs": [
+                {
+                    "target_suite": "core",
+                    "preset": "baseline",
+                    "seed": 1,
+                    "evidence_mode": "live",
+                    "run_file": str(run_file),
+                }
+            ],
+        },
+        manifest,
+    )
+    reports_dir.mkdir(parents=True)
+    summary_md = reports_dir / f"experiment-summary-{manifest.stem}.md"
+    run_csv = reports_dir / f"experiment-summary-{manifest.stem}.csv"
+    aggregate_csv = reports_dir / f"{summary_md.stem}-aggregates.csv"
+    aggregate_json = reports_dir / f"{summary_md.stem}-aggregates.json"
+    summary_md.write_text("# stale summary\n", encoding="utf-8")
+    run_csv.write_text(
+        "target_suite,preset,seed,evidence_mode,cases,elapsed_s,findings,"
+        "candidate_bug_cases,new_behavior_cases,signal_new_behavior_cases,run_file\n"
+        f"core,baseline,1,live,3,3,3,3,99,99,{run_file}\n",
+        encoding="utf-8",
+    )
+    aggregate_csv.write_text(
+        "target_suite,preset,seed,cases,candidate_bug_cases,signal_new_behavior_cases\n"
+        "core,baseline,1,3,3,99\n",
+        encoding="utf-8",
+    )
+    dump_json(
+        {
+            "variant_rows": [
+                {
+                    "target_suite": "core",
+                    "preset": "baseline",
+                    "seed": 1,
+                    "cases": 3,
+                    "candidate_bug_cases": 3,
+                    "signal_new_behavior_cases": 99,
+                }
+            ]
+        },
+        aggregate_json,
+    )
+
+    _, json_path = write_methodology_report(manifest, scan_run_logs=True)
+    report = json.loads(json_path.read_text(encoding="utf-8"))
+
+    assert report["closed_loop_feedback"]["raw_new_behavior_cases"] == 3
+    assert report["closed_loop_feedback"]["signal_new_behavior_cases"] == 1
+    assert report["closed_loop_feedback"]["signal_new_behavior_rate"] == 1 / 3
+    assert report["closed_loop_feedback"]["new_behavior_signal_source"] == "run_logs"
+    assert report["bug_discovery"]["candidate_bug_cases"] == 1
+    assert report["bug_discovery"]["candidate_bug_case_rate"] == 1 / 3
+    assert report["bug_discovery"]["candidate_bug_families"] == {"fresh_root@duckdb": 1}
+    assert report["bug_discovery"]["candidate_bug_family_count"] == 1
+    assert report["bug_discovery"]["first_candidate"] == {
+        "target_suite": "core",
+        "variant_label": "",
+        "preset": "baseline",
+        "seed": "1",
+        "case_index": 2,
+        "elapsed_s": 3,
+    }
+    assert report["bug_discovery"]["candidate_family_first_seen"] == {
+        "fresh_root@duckdb": {
+            "target_suite": "core",
+            "variant_label": "",
+            "preset": "baseline",
+            "seed": "1",
+            "run_file": str(run_file),
+            "case_index": 2,
+            "elapsed_s": 3,
+            "case_id": "case-stale-2",
+            "case_seed": 2,
+        }
+    }
+    assert report["bug_discovery"]["avg_candidate_bug_discovery_auc"] == 1 / 3
+    assert report["bug_discovery"]["candidate_bug_signal_source"] == "run_logs"

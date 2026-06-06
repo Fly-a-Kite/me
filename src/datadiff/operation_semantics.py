@@ -34,6 +34,8 @@ DEFAULT_FALSE_PROBE_KINDS: frozenset[str] = frozenset(
 def op_kind(op: OperationLike, default: str = "") -> str:
     value = op.get("op", default)
     if value in {None, ""}:
+        value = op.get("kind", default)
+    if value in {None, ""}:
         return default
     return str(value)
 
@@ -54,6 +56,25 @@ def has_operation(operations: Iterable[OperationLike], kind: str) -> bool:
 def has_any_operation(operations: Iterable[OperationLike], kinds: Collection[str]) -> bool:
     wanted = {str(kind) for kind in kinds}
     return any(op_kind(operation) in wanted for operation in operations)
+
+
+ORDER_OBSERVING_OPS: frozenset[str] = frozenset(
+    {
+        "row_number_filter",
+        "running_sum",
+        "sort",
+        "limit",
+        "offset",
+        "sortedness_check",
+    }
+)
+
+
+def has_order_observer(program_or_operations: Any) -> bool:
+    operations = getattr(program_or_operations, "operations", program_or_operations)
+    if operations is None:
+        return False
+    return has_any_operation(operations, ORDER_OBSERVING_OPS)
 
 
 def is_default_false_probe_kind(kind: str) -> bool:

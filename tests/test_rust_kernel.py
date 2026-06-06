@@ -8,7 +8,9 @@ from datadiff.rust_kernel import (
     compare_row_set_batch_summary,
     compare_row_sets,
     compare_row_sets_summary,
+    compute_minhash,
     dedupe_canonical_rows,
+    extract_case_features as rust_extract_case_features,
     has_duplicate_rows,
     json_canonical_dumps,
     native_available,
@@ -18,12 +20,14 @@ from datadiff.rust_kernel import (
     row_profiles,
     row_set_profiles,
     short_sha256_hex,
+    score_candidate_feature_metrics_batch,
     sorted_canonical_rows,
     stable_rows,
     unordered_row_signatures,
     unordered_row_signature,
 )
 import datadiff.rust_kernel as rust_kernel_module
+import pytest
 from datadiff.normalizer import NormalizedResult
 
 
@@ -46,6 +50,108 @@ def test_rust_kernel_short_sha256_hex_is_stable():
 
 def test_rust_kernel_fallback_or_native_is_available():
     assert native_available() in {True, False}
+
+
+def test_rust_kernel_compute_minhash_is_deterministic_and_order_insensitive():
+    left = compute_minhash(["ops:select", "row:[1]", "row:[2]", "row:[1]"], 16)
+    right = compute_minhash(["row:[2]", "ops:select", "row:[1]"], 16)
+    changed = compute_minhash(["ops:select", "row:[1]", "row:[3]"], 16)
+
+    assert left == right
+    assert len(left) == 16
+    assert all(isinstance(item, int) for item in left)
+    assert left != changed
+
+
+def test_rust_kernel_native_minhash_matches_python_fallback_when_available():
+    tokens = ["ops:select", "row:[1]", "row:[2]", "row:[1]", ""]
+    fallback = rust_kernel_module._compute_minhash_fallback(tokens, 32)
+    native = rust_kernel_module._load_native()
+
+    assert compute_minhash(tokens, 32) == fallback
+    if native is not None and getattr(native, "compute_minhash", None) is not None:
+        assert [int(item) for item in native.compute_minhash(tokens, 32)] == fallback
+
+
+def test_rust_kernel_candidate_feature_metric_batch_matches_python_fallback():
+    candidate_specs = [
+        [
+            ("op:filter", 1.0, 0.5, 0.7, 0.2, None, False),
+            ("mixed_generator_profile:common_workflow", 0.3, 1.2, 0.0, 0.4, 1.5, True),
+        ],
+        [
+            ("op:sort", 0.8, 0.2, 0.6, 0.0, 0.75, False),
+            ("data:null", 1.4, 0.9, 0.0, 0.8, None, False),
+        ],
+    ]
+    feature_counts = {
+        "op:filter": 0,
+        "mixed_generator_profile:common_workflow": 5,
+        "op:sort": 2,
+        "data:null": 0,
+    }
+    finding_feature_counts = {
+        "op:filter": 3,
+        "mixed_generator_profile:common_workflow": 27,
+        "op:sort": 0,
+        "data:null": 51,
+    }
+
+    fallback = rust_kernel_module._score_candidate_feature_metrics_batch_fallback(
+        candidate_specs,
+        feature_counts,
+        finding_feature_counts,
+    )
+    actual = score_candidate_feature_metrics_batch(
+        candidate_specs,
+        feature_counts,
+        finding_feature_counts,
+    )
+
+    assert len(actual) == len(fallback)
+    for actual_metrics, fallback_metrics in zip(actual, fallback, strict=True):
+        assert actual_metrics == pytest.approx(fallback_metrics)
+
+    native = rust_kernel_module._load_native()
+    if native is not None and getattr(native, "score_candidate_feature_metrics_batch", None) is not None:
+        native_metrics = native.score_candidate_feature_metrics_batch(
+            candidate_specs,
+            feature_counts,
+            finding_feature_counts,
+        )
+        for actual_metrics, fallback_metrics in zip(native_metrics, fallback, strict=True):
+            assert actual_metrics == pytest.approx(fallback_metrics)
+
+
+def test_rust_kernel_extract_case_features_matches_python_fallback_for_core_ops():
+    operations = [
+        {"op": "filter", "column": "x", "cmp": "range_closed", "value": [0, 10]},
+        {"op": "mutate", "column": "xf", "expr": {"kind": "cast", "source": "x", "to": "float"}},
+        {"op": "groupby", "keys": ["g"], "aggs": [{"column": "x", "func": "count", "as": "count_x"}]},
+        {"op": "sort", "columns": ["count_x"], "ascending": False},
+        {"op": "limit", "n": 0},
+    ]
+    column_types = {"id": "int", "g": "str", "x": "int", "flag": "bool"}
+
+    fallback = rust_kernel_module._extract_case_features_fallback(operations, column_types)
+    actual = rust_extract_case_features(operations, column_types)
+
+    assert actual == fallback
+    assert {
+        "op:filter",
+        "filter:range-closed",
+        "mutate:cast",
+        "cast:int_to_float",
+        "groupby_keys:one",
+        "agg:count",
+        "sort:desc",
+        "op:limit_zero",
+        "opseq:filter>mutate>groupby>sort>limit",
+    }.issubset(actual)
+
+    native = rust_kernel_module._load_native()
+    if native is not None and getattr(native, "extract_case_features", None) is not None:
+        assert sorted(str(item) for item in native.extract_case_features(operations, column_types)) == fallback
 
 
 def test_rust_kernel_canonical_sort_key_is_stable():

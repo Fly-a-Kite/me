@@ -4,6 +4,11 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from datadiff.dsl import Case
+from datadiff.finding_outcomes import (
+    row_has_rewardable_finding,
+    row_has_rewardable_new_behavior,
+    row_reward_signals,
+)
 from datadiff.guidance import derive_case_features
 
 
@@ -29,16 +34,24 @@ def evaluate_quality_oracles(
     guidance_decision: dict[str, Any],
     guidance_strategy: str,
     guidance_targets: list[str],
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
 ) -> list[QualityOracleResult]:
     return [
-        mutation_oracle(case, row, candidate_source=candidate_source, preflight=preflight),
-        feedback_oracle(row),
+        mutation_oracle(
+            case,
+            row,
+            candidate_source=candidate_source,
+            preflight=preflight,
+            known_saturated_bug_families=known_saturated_bug_families,
+        ),
+        feedback_oracle(row, known_saturated_bug_families=known_saturated_bug_families),
         guidance_oracle(
             case,
             row,
             guidance_decision=guidance_decision,
             guidance_strategy=guidance_strategy,
             guidance_targets=guidance_targets,
+            known_saturated_bug_families=known_saturated_bug_families,
         ),
     ]
 
@@ -49,6 +62,7 @@ def mutation_oracle(
     *,
     candidate_source: str,
     preflight: dict[str, Any],
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
 ) -> QualityOracleResult:
     if candidate_source != "feedback_mutation":
         return QualityOracleResult(
@@ -60,9 +74,21 @@ def mutation_oracle(
             metrics={"candidate_source": candidate_source},
         )
 
-    signal_new_behavior = bool(row.get("signal_new_behavior", row.get("is_new_behavior")))
+    raw_signal_new_behavior = bool(row.get("signal_new_behavior", row.get("is_new_behavior")))
+    signal_new_behavior = row_has_rewardable_new_behavior(
+        row,
+        known_saturated_bug_families=known_saturated_bug_families,
+    )
+    rewardable_finding = row_has_rewardable_finding(
+        row,
+        known_saturated_bug_families=known_saturated_bug_families,
+    )
+    reward_signals = row_reward_signals(
+        row,
+        known_saturated_bug_families=known_saturated_bug_families,
+    )
     valid = bool(preflight.get("valid", True))
-    productive = bool(row.get("findings") or signal_new_behavior)
+    productive = bool(rewardable_finding or signal_new_behavior)
     fallback_used = bool(preflight.get("fallback_used", False))
     passed = valid and productive and not fallback_used
     if passed:
@@ -74,7 +100,7 @@ def mutation_oracle(
     else:
         verdict = "redundant_mutation"
         evidence = "Feedback mutation executed but did not add new behavior or findings."
-    score = (1.0 if row.get("findings") else 0.0) + (0.5 if signal_new_behavior else 0.0)
+    score = (1.0 if rewardable_finding else 0.0) + (0.5 if signal_new_behavior else 0.0)
     if not valid or fallback_used:
         score -= 0.5
     return QualityOracleResult(
@@ -90,14 +116,47 @@ def mutation_oracle(
             "preflight_repaired": bool(preflight.get("repaired", False)),
             "preflight_fallback_used": fallback_used,
             "new_behavior": signal_new_behavior,
+            "raw_new_behavior": raw_signal_new_behavior,
             "findings": len(row.get("findings", [])),
+            "rewardable_finding": rewardable_finding,
+            "rewardable_finding_count": int(reward_signals.get("candidate_bug_count", 0) or 0)
+            + int(reward_signals.get("semantic_divergence_needs_confirmation_count", 0) or 0),
+            "false_positive_count": int(reward_signals.get("false_positive_count", 0) or 0),
+            "resolved_semantic_divergence_count": int(
+                reward_signals.get("resolved_semantic_divergence_count", 0) or 0
+            ),
+            "known_saturated_candidate_bug_count": int(
+                reward_signals.get("known_saturated_candidate_bug_count", 0) or 0
+            ),
+            "source_issue_candidate_bug_count": int(
+                reward_signals.get("source_issue_candidate_bug_count", 0) or 0
+            ),
+            "issue_replay_candidate_bug_count": int(
+                reward_signals.get("issue_replay_candidate_bug_count", 0) or 0
+            ),
         },
     )
 
 
-def feedback_oracle(row: dict[str, Any]) -> QualityOracleResult:
-    has_finding = bool(row.get("findings"))
-    new_behavior = bool(row.get("signal_new_behavior", row.get("is_new_behavior")))
+def feedback_oracle(
+    row: dict[str, Any],
+    *,
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
+) -> QualityOracleResult:
+    raw_has_finding = bool(row.get("findings"))
+    raw_new_behavior = bool(row.get("signal_new_behavior", row.get("is_new_behavior")))
+    has_finding = row_has_rewardable_finding(
+        row,
+        known_saturated_bug_families=known_saturated_bug_families,
+    )
+    new_behavior = row_has_rewardable_new_behavior(
+        row,
+        known_saturated_bug_families=known_saturated_bug_families,
+    )
+    reward_signals = row_reward_signals(
+        row,
+        known_saturated_bug_families=known_saturated_bug_families,
+    )
     stored = bool(row.get("stored_in_feedback_corpus"))
     passed = has_finding or new_behavior
     if has_finding:
@@ -117,7 +176,25 @@ def feedback_oracle(row: dict[str, Any]) -> QualityOracleResult:
         evidence=evidence,
         metrics={
             "new_behavior": new_behavior,
+            "raw_new_behavior": raw_new_behavior,
             "findings": len(row.get("findings", [])),
+            "raw_finding": raw_has_finding,
+            "rewardable_finding": has_finding,
+            "rewardable_finding_count": int(reward_signals.get("candidate_bug_count", 0) or 0)
+            + int(reward_signals.get("semantic_divergence_needs_confirmation_count", 0) or 0),
+            "false_positive_count": int(reward_signals.get("false_positive_count", 0) or 0),
+            "resolved_semantic_divergence_count": int(
+                reward_signals.get("resolved_semantic_divergence_count", 0) or 0
+            ),
+            "known_saturated_candidate_bug_count": int(
+                reward_signals.get("known_saturated_candidate_bug_count", 0) or 0
+            ),
+            "source_issue_candidate_bug_count": int(
+                reward_signals.get("source_issue_candidate_bug_count", 0) or 0
+            ),
+            "issue_replay_candidate_bug_count": int(
+                reward_signals.get("issue_replay_candidate_bug_count", 0) or 0
+            ),
             "stored_in_feedback_corpus": stored,
             "behavior_signature": row.get("behavior_signature", ""),
         },
@@ -131,6 +208,7 @@ def guidance_oracle(
     guidance_decision: dict[str, Any],
     guidance_strategy: str,
     guidance_targets: list[str],
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
 ) -> QualityOracleResult:
     if guidance_strategy != "guided":
         return QualityOracleResult(
@@ -142,11 +220,23 @@ def guidance_oracle(
             metrics={"strategy": guidance_strategy},
         )
 
-    signal_new_behavior = bool(row.get("signal_new_behavior", row.get("is_new_behavior")))
+    raw_signal_new_behavior = bool(row.get("signal_new_behavior", row.get("is_new_behavior")))
+    signal_new_behavior = row_has_rewardable_new_behavior(
+        row,
+        known_saturated_bug_families=known_saturated_bug_families,
+    )
+    rewardable_finding = row_has_rewardable_finding(
+        row,
+        known_saturated_bug_families=known_saturated_bug_families,
+    )
+    reward_signals = row_reward_signals(
+        row,
+        known_saturated_bug_families=known_saturated_bug_families,
+    )
     matched_targets = list(guidance_decision.get("matched_targets", []))
     features = derive_case_features(case)
     target_hit = bool(matched_targets) if guidance_targets else True
-    productive = bool(row.get("findings") or signal_new_behavior)
+    productive = bool(rewardable_finding or signal_new_behavior)
     passed = target_hit and productive
     if passed:
         verdict = "guided_productive"
@@ -189,6 +279,23 @@ def guidance_oracle(
             ),
             "feature_count": len(features),
             "new_behavior": signal_new_behavior,
+            "raw_new_behavior": raw_signal_new_behavior,
             "findings": len(row.get("findings", [])),
+            "rewardable_finding": rewardable_finding,
+            "rewardable_finding_count": int(reward_signals.get("candidate_bug_count", 0) or 0)
+            + int(reward_signals.get("semantic_divergence_needs_confirmation_count", 0) or 0),
+            "false_positive_count": int(reward_signals.get("false_positive_count", 0) or 0),
+            "resolved_semantic_divergence_count": int(
+                reward_signals.get("resolved_semantic_divergence_count", 0) or 0
+            ),
+            "known_saturated_candidate_bug_count": int(
+                reward_signals.get("known_saturated_candidate_bug_count", 0) or 0
+            ),
+            "source_issue_candidate_bug_count": int(
+                reward_signals.get("source_issue_candidate_bug_count", 0) or 0
+            ),
+            "issue_replay_candidate_bug_count": int(
+                reward_signals.get("issue_replay_candidate_bug_count", 0) or 0
+            ),
         },
     )

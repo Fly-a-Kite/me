@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import time
+import warnings
 from typing import Any
 
-from datadiff.backends.base import Backend, BackendResult
+from datadiff.backends.base import Backend, BackendResult, PreparedTable, prepare_table
 from datadiff.backends.probe_semantics import EXTENDED_FALSE_PROBE_KINDS, resolve_bool_probe
 from datadiff.csv_roundtrip import (
     csv_long_numeric_roundtrip_mismatch,
@@ -69,6 +70,16 @@ from datadiff.tuple_logic import evaluate_tuple_absence
 from datadiff.windowing import row_number_filter_rows
 
 
+def _records_without_duplicate_column_warning(df: Any) -> list[dict[str, Any]]:
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r"DataFrame columns are not unique, some columns will be omitted\.",
+            category=UserWarning,
+        )
+        return df.to_dict("records")
+
+
 def _bool_reduction(values: Any, func: str) -> bool | None:
     import pandas as pd
 
@@ -103,11 +114,12 @@ def _pandas_bool_probe_handlers(pd: Any, op: dict[str, Any]) -> dict[str, Any]:
 class PandasBackend(Backend):
     name = "pandas"
 
-    def _to_df(self, table: TableData):
+    def _to_df(self, table: TableData | PreparedTable):
         import pandas as pd
+        prepared = prepare_table(table)
         data = {}
-        for column in table.columns:
-            values = [row.get(column.name) for row in table.rows]
+        for column in prepared.columns:
+            values = prepared.columns_data[column.name]
             if column.type == "int":
                 data[column.name] = pd.array(values, dtype="Int64")
             elif column.type == "bool":
@@ -116,9 +128,14 @@ class PandasBackend(Backend):
                 data[column.name] = pd.array(values, dtype="string")
             else:
                 data[column.name] = values
-        return pd.DataFrame(data, columns=[c.name for c in table.columns])
+        return pd.DataFrame(data, columns=[c.name for c in prepared.columns])
 
-    def run(self, tables: list[TableData], program: Program, timeout_s: float = 5.0) -> BackendResult:
+    def run(
+        self,
+        tables: list[TableData | PreparedTable],
+        program: Program,
+        timeout_s: float = 5.0,
+    ) -> BackendResult:
         start = time.perf_counter()
         try:
             import pandas as pd  # noqa: F401
@@ -181,25 +198,28 @@ class PandasBackend(Backend):
                     df = df.loc[keep_mask]
                 elif kind == "tuple_absence_filter":
                     right = frames[op_table(op)]
-                    right_rows = right[list(op.right_columns)].to_dict("records")
+                    right_rows = _records_without_duplicate_column_warning(right[list(op.right_columns)])
                     left_columns = list(op.columns)
                     right_columns = list(op.right_columns)
                     keep_mask = pd.Series(
                         [
                             evaluate_tuple_absence(row, left_columns, right_rows, right_columns)
-                            for row in df.to_dict("records")
+                            for row in _records_without_duplicate_column_warning(df)
                         ],
                         index=df.index,
                         dtype=bool,
                     )
                     df = df.loc[keep_mask]
                 elif kind == "row_number_filter":
-                    rows = row_number_filter_rows(df.to_dict("records"), op)
+                    rows = row_number_filter_rows(_records_without_duplicate_column_warning(df), op)
                     df = pd.DataFrame(rows, columns=list(df.columns))
                 elif kind == "running_sum":
                     out_column = op_column(op)
                     columns = [column for column in df.columns if column != out_column] + [out_column]
-                    rows = sort_rows_for_running(df.to_dict("records"), running_sum_sort_keys(op))
+                    rows = sort_rows_for_running(
+                        _records_without_duplicate_column_warning(df),
+                        running_sum_sort_keys(op),
+                    )
                     values = stable_running_sum_values(rows, op_source(op), running_sum_partition_columns(op))
                     rows = [{**row, out_column: value} for row, value in zip(rows, values)]
                     df = pd.DataFrame(rows, columns=columns)

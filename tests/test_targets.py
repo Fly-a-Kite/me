@@ -264,6 +264,14 @@ def test_sqlite_target_records_runtime_version():
     assert env["sqlite_runtime"] == SQLITE_RUNTIME
 
 
+def test_environment_records_latest_target_backend_packages():
+    env = collect_environment()
+
+    for package in ("pandas", "polars", "duckdb", "pyarrow", "datafusion", "chdb"):
+        assert package in env
+        assert env[package]
+
+
 def test_seeded_fault_targets_are_described():
     specs = describe_targets(["buggy_filter", "buggy_join"])
     assert [spec["family"] for spec in specs] == ["seeded_fault", "seeded_fault"]

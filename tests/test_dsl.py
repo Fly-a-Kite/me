@@ -16,6 +16,7 @@ from datadiff.dsl import (
     SortOp,
     StringLowerExpr,
 )
+from datadiff.operation_semantics import op_kind
 
 
 def test_program_coerces_operations_into_typed_ir_nodes():
@@ -94,6 +95,23 @@ def test_program_coerces_filter_and_aggregate_into_specific_operation_nodes():
 
     assert isinstance(program.operations[0], FilterOp)
     assert isinstance(program.operations[1], AggregateOp)
+
+
+def test_program_accepts_legacy_kind_operation_field():
+    program = Program(
+        "prog-kind-compat",
+        17,
+        [
+            {"kind": "filter", "column": "x", "cmp": ">", "value": 1},
+            {"kind": "sort", "keys": [{"column": "x", "ascending": True, "nulls": "last"}]},
+        ],
+    )
+
+    assert isinstance(program.operations[0], FilterOp)
+    assert isinstance(program.operations[1], SortOp)
+    assert op_kind(program.operations[0]) == "filter"
+    assert program.operations[0]["op"] == "filter"
+    assert program.operations[0]["kind"] == "filter"
 
 
 def test_typed_ir_exposes_stable_properties_for_common_nodes():

@@ -16,10 +16,12 @@ dependencies = [
 [project.optional-dependencies]
 arrow = ["pyarrow>=14"]
 datafusion = ["datafusion>=40", "pyarrow>=14"]
+chdb = ["chdb>=4.1.8"]
 test = ["pytest>=8"]
 all = [
   "datafusion>=40",
   "pyarrow>=14",
+  "chdb>=4.1.8",
   "pysqlite3-binary>=0.5.4.post2",
   "pytest>=8",
 ]

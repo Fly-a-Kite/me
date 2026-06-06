@@ -4,7 +4,7 @@ import time
 from contextlib import contextmanager
 from typing import Any
 
-from datadiff.backends.base import Backend, BackendResult
+from datadiff.backends.base import Backend, BackendResult, PreparedTable, prepare_table
 from datadiff.backends.dataframe_semantics import (
     aggregate_triplets,
     case_when_plan,
@@ -67,15 +67,21 @@ def _pyarrow_probe_handlers(pa: Any, op: dict[str, Any]) -> dict[str, Any]:
 class PyArrowBackend(Backend):
     name = "pyarrow"
 
-    def _to_table(self, table: TableData):
+    def _to_table(self, table: TableData | PreparedTable):
         import pyarrow as pa
 
+        prepared = prepare_table(table)
         schema = pa.schema(
-            [pa.field(column.name, _arrow_type(pa, column.type), nullable=column.nullable) for column in table.columns]
+            [pa.field(column.name, _arrow_type(pa, column.type), nullable=column.nullable) for column in prepared.columns]
         )
-        return pa.Table.from_pylist(table.rows, schema=schema)
+        return pa.Table.from_pydict(prepared.columns_data, schema=schema)
 
-    def run(self, tables: list[TableData], program: Program, timeout_s: float = 5.0) -> BackendResult:
+    def run(
+        self,
+        tables: list[TableData | PreparedTable],
+        program: Program,
+        timeout_s: float = 5.0,
+    ) -> BackendResult:
         start = time.perf_counter()
         try:
             with _suppress_native_stderr():

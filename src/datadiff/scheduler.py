@@ -5,22 +5,24 @@ import math
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
-from datadiff.reward import (
+from datadiff.finding_outcomes import (
     FALSE_POSITIVE_VERDICTS,
     NEEDS_CONFIRMATION_VERDICTS,
+    RESOLVED_SEMANTIC_DIVERGENCE_VERDICTS,
     SEMANTIC_DIVERGENCE_VERDICTS,
-    aggregate_feedback_summaries,
     backend_group_key,
-    candidate_family_novelty_reward,
     candidate_issue_family_keys,
     is_rewardable_candidate_issue_finding,
+    row_has_rewardable_new_behavior,
 )
+from datadiff.reward import aggregate_feedback_summaries
 from datadiff.adaptive_learning import AdaptiveLearningState, context_features_from_mapping
-from datadiff.util import load_json, read_jsonl, run_meta_path
-
-CandidateSource = Literal["generated", "feedback_mutation"]
+from datadiff.discovery_rate import DiscoveryRateEstimator
+from datadiff.energy import cost_normalized_reward
+from datadiff.source_scheduler import LocalSourceScheduler
+from datadiff.util import iter_jsonl, load_json, read_jsonl, run_meta_path
 
 @dataclass(slots=True)
 class BatchObservation:
@@ -31,6 +33,8 @@ class BatchObservation:
     candidate_bug_cases: int
     candidate_bug_families: set[str] = field(default_factory=set)
     semantic_divergence_count: int = 0
+    rewardable_semantic_divergence_count: int = 0
+    resolved_semantic_divergence_count: int = 0
     false_positive_count: int = 0
     needs_confirmation_count: int = 0
     new_behavior_cases: int = 0
@@ -74,9 +78,11 @@ class AdaptiveScheduleConfig:
     learning_weight: float = 0.0
     record_learning_feedback: bool = True
     enable_runtime_cost_learning: bool = True
+    enable_cost_normalized_reward: bool = True
     enable_active_learning: bool = True
     enable_online_reward_model: bool = True
     enable_continual_learning: bool = True
+    enable_bayesian_exploration: bool = True
     annealing_initial_temperature: float = 0.0
     annealing_decay: float = 0.985
     annealing_min_temperature: float = 0.02
@@ -112,202 +118,6 @@ class AdaptiveArmState:
         return self.total_reward / self.pulls if self.pulls else 0.0
 
 
-@dataclass(slots=True)
-class SourceArmState:
-    name: CandidateSource
-    pulls: int = 0
-    total_reward: float = 0.0
-    candidate_bug_families: Counter[str] = field(default_factory=Counter)
-    candidate_bug_signatures: Counter[str] = field(default_factory=Counter)
-
-    @property
-    def mean_reward(self) -> float:
-        return self.total_reward / self.pulls if self.pulls else 0.0
-
-
-class LocalSourceScheduler:
-    def __init__(
-        self,
-        *,
-        exploration_weight: float = 0.5,
-        min_feedback_share: float = 0.12,
-        enable_family_saturation: bool = True,
-        family_saturation_threshold: int = 8,
-        saturated_family_reward: float = 0.02,
-        known_saturated_bug_families: list[str] | None = None,
-    ) -> None:
-        self.exploration_weight = max(0.0, float(exploration_weight))
-        self.min_feedback_share = min(0.5, max(0.0, float(min_feedback_share)))
-        self.enable_family_saturation = bool(enable_family_saturation)
-        self.family_saturation_threshold = max(0, int(family_saturation_threshold))
-        self.saturated_family_reward = max(0.0, float(saturated_family_reward))
-        self.known_saturated_bug_families = _unique_nonempty(known_saturated_bug_families or [])
-        self.total_pulls = 0
-        self.candidate_bug_families: Counter[str] = Counter()
-        self.candidate_bug_signatures: Counter[str] = Counter()
-        self.arms: dict[CandidateSource, SourceArmState] = {
-            "generated": SourceArmState(name="generated"),
-            "feedback_mutation": SourceArmState(name="feedback_mutation"),
-        }
-
-    def choose_source(self, *, feedback_available: bool) -> CandidateSource:
-        if not feedback_available:
-            return "generated"
-        for source in ("generated", "feedback_mutation"):
-            if self.arms[source].pulls == 0:
-                return source
-        feedback_pulls = self.arms["feedback_mutation"].pulls
-        if self.total_pulls >= 4 and feedback_pulls / max(1, self.total_pulls) < self.min_feedback_share:
-            return "feedback_mutation"
-        return max(self.arms.values(), key=self._score_arm).name
-
-    def record_result(
-        self,
-        source: CandidateSource,
-        *,
-        has_finding: bool,
-        is_new_behavior: bool,
-        preflight_valid: bool,
-        fallback_used: bool,
-        candidate_bug: bool = False,
-        semantic_divergence: bool = False,
-        false_positive: bool = False,
-        candidate_bug_families: list[str] | None = None,
-        candidate_bug_signatures: list[str] | None = None,
-        reward_adjustment: float = 0.0,
-    ) -> float:
-        family_keys = _unique_nonempty(candidate_bug_families or [])
-        signature_keys = _unique_nonempty(candidate_bug_signatures or [])
-        rewardable_semantic_divergence = semantic_divergence and not false_positive
-        candidate_bug_reward = 0.0
-        if candidate_bug:
-            if family_keys:
-                candidate_bug_reward = sum(
-                    _candidate_family_reward(
-                        self._previous_family_hits(family),
-                        enable_family_saturation=self.enable_family_saturation,
-                        family_saturation_threshold=self.family_saturation_threshold,
-                        saturated_family_reward=self.saturated_family_reward,
-                    )
-                    for family in family_keys
-                )
-                if signature_keys and all(self.candidate_bug_signatures[signature] > 0 for signature in signature_keys):
-                    candidate_bug_reward *= 0.5
-            else:
-                candidate_bug_reward = 4.0
-        reward = (
-            candidate_bug_reward
-            + (0.20 if rewardable_semantic_divergence else 0.0)
-            + (0.05 if has_finding and not candidate_bug and not semantic_divergence and not false_positive else 0.0)
-            + (0.5 if is_new_behavior else 0.0)
-            - (2.5 if false_positive else 0.0)
-        )
-        if not preflight_valid or fallback_used:
-            reward -= 0.75
-        reward += float(reward_adjustment)
-        if reward == 0.0:
-            reward -= 0.1
-        arm = self.arms[source]
-        arm.pulls += 1
-        arm.total_reward += reward
-        arm.candidate_bug_families.update(family_keys)
-        arm.candidate_bug_signatures.update(signature_keys)
-        self.candidate_bug_families.update(family_keys)
-        self.candidate_bug_signatures.update(signature_keys)
-        self.total_pulls += 1
-        return reward
-
-    def _previous_family_hits(self, family: str) -> int:
-        previous_hits = self.candidate_bug_families[family]
-        if self.enable_family_saturation and _family_key_matches_known_family(
-            family,
-            self.known_saturated_bug_families,
-        ):
-            previous_hits = max(previous_hits, self.family_saturation_threshold)
-        return previous_hits
-
-    def snapshot(self) -> list[dict[str, Any]]:
-        return [
-            {
-                "source": arm.name,
-                "pulls": arm.pulls,
-                "mean_reward": arm.mean_reward,
-                "reward_signal": self._arm_reward_signal(arm),
-                "total_reward": arm.total_reward,
-                "candidate_bug_family_count": len(arm.candidate_bug_families),
-                "candidate_bug_signature_count": len(arm.candidate_bug_signatures),
-                "min_feedback_share": self.min_feedback_share,
-            }
-            for arm in sorted(self.arms.values(), key=lambda item: item.name)
-        ]
-
-    def to_state_dict(self) -> dict[str, Any]:
-        return {
-            "exploration_weight": self.exploration_weight,
-            "min_feedback_share": self.min_feedback_share,
-            "enable_family_saturation": self.enable_family_saturation,
-            "family_saturation_threshold": self.family_saturation_threshold,
-            "saturated_family_reward": self.saturated_family_reward,
-            "known_saturated_bug_families": list(self.known_saturated_bug_families),
-            "total_pulls": self.total_pulls,
-            "candidate_bug_families": dict(self.candidate_bug_families),
-            "candidate_bug_signatures": dict(self.candidate_bug_signatures),
-            "arms": {
-                name: {
-                    "pulls": arm.pulls,
-                    "total_reward": arm.total_reward,
-                    "candidate_bug_families": dict(arm.candidate_bug_families),
-                    "candidate_bug_signatures": dict(arm.candidate_bug_signatures),
-                }
-                for name, arm in self.arms.items()
-            },
-        }
-
-    @classmethod
-    def from_state_dict(
-        cls,
-        data: dict[str, Any],
-        *,
-        exploration_weight: float,
-        enable_family_saturation: bool,
-        family_saturation_threshold: int,
-        saturated_family_reward: float,
-        known_saturated_bug_families: list[str] | None,
-    ) -> "LocalSourceScheduler":
-        scheduler = cls(
-            exploration_weight=exploration_weight,
-            min_feedback_share=float(data.get("min_feedback_share", 0.12) or 0.12),
-            enable_family_saturation=enable_family_saturation,
-            family_saturation_threshold=family_saturation_threshold,
-            saturated_family_reward=saturated_family_reward,
-            known_saturated_bug_families=known_saturated_bug_families,
-        )
-        scheduler.total_pulls = int(data.get("total_pulls", 0) or 0)
-        scheduler.candidate_bug_families = Counter(data.get("candidate_bug_families", {}) or {})
-        scheduler.candidate_bug_signatures = Counter(data.get("candidate_bug_signatures", {}) or {})
-        for name, arm in scheduler.arms.items():
-            arm_data = (data.get("arms", {}) or {}).get(name, {})
-            arm.pulls = int(arm_data.get("pulls", 0) or 0)
-            arm.total_reward = float(arm_data.get("total_reward", 0.0) or 0.0)
-            arm.candidate_bug_families = Counter(arm_data.get("candidate_bug_families", {}) or {})
-            arm.candidate_bug_signatures = Counter(arm_data.get("candidate_bug_signatures", {}) or {})
-        return scheduler
-
-    def _score_arm(self, arm: SourceArmState) -> float:
-        explore = self.exploration_weight * math.sqrt(
-            math.log(self.total_pulls + 1.0) / max(1, arm.pulls)
-        )
-        return self._arm_reward_signal(arm) + explore
-
-    @staticmethod
-    def _arm_reward_signal(arm: SourceArmState) -> float:
-        return _bounded_confident_mean_reward(
-            arm.total_reward,
-            arm.pulls,
-            max_abs=2.5,
-        )
-
-
 class AdaptiveBudgetScheduler:
     def __init__(
         self,
@@ -331,6 +141,11 @@ class AdaptiveBudgetScheduler:
         self.total_batches_scheduled = 0
         self.global_candidate_bug_families: set[str] = set()
         self.learning_state = learning_state or AdaptiveLearningState()
+        self.base_exploration_weight = max(0.0, float(config.exploration_weight or 0.0))
+        self.current_exploration_weight = self.base_exploration_weight
+        self.bayesian_exploration_observation_count = 0
+        self.bayesian_unseen_probability = 0.0
+        self.bayesian_exploration_bucket = ""
         self.arms = {
             str(job["arm_id"]): AdaptiveArmState(
                 arm_id=str(job["arm_id"]),
@@ -421,25 +236,21 @@ class AdaptiveBudgetScheduler:
             new_global_family_count=len(new_global_families),
             new_local_family_count=len(new_local_families),
             enable_runtime_cost=bool(self.config.enable_runtime_cost_learning),
+            enable_cost_normalized_reward=bool(self.config.enable_cost_normalized_reward),
         )
         arm.pulls += 1
         arm.total_reward += reward
         arm.last_reward = reward
         arm.next_seed = int(next_seed)
         arm.closed_loop_state = dict(closed_loop_state) if isinstance(closed_loop_state, dict) else None
+        self._update_bayesian_exploration_from_closed_loop_state(arm.closed_loop_state)
         arm.candidate_bug_families.update(observation.candidate_bug_families)
         self.global_candidate_bug_families.update(observation.candidate_bug_families)
         self._record_learning_feedback(arm, observation, reward)
-        signal = bool(
-            observation.candidate_bug_cases
-            or observation.signal_new_behavior_cases
-            or new_global_families
-            or new_local_families
-            or observation.productive_mutation_cases
-            or observation.feedback_finding_yield_cases
-            or observation.guided_productive_cases
-            or observation.source_reward_adjustment_total > 0.0
-            or observation.seed_schedule_delta_total > 0.0
+        signal = _observation_has_rewardable_signal(
+            observation,
+            new_global_family_count=len(new_global_families),
+            new_local_family_count=len(new_local_families),
         )
         arm.stale_batches = 0 if signal else arm.stale_batches + 1
         if self.remaining_cases_budget is not None:
@@ -469,6 +280,12 @@ class AdaptiveBudgetScheduler:
                     "mean_reward": arm.mean_reward,
                     "reward_signal": self._arm_reward_signal(arm),
                     "learning_signal": self._learning_signal(arm),
+                    "base_exploration_weight": self.base_exploration_weight,
+                    "current_exploration_weight": self._exploration_weight(),
+                    "bayesian_exploration_enabled": bool(self.config.enable_bayesian_exploration),
+                    "bayesian_exploration_observation_count": self.bayesian_exploration_observation_count,
+                    "bayesian_unseen_probability": self.bayesian_unseen_probability,
+                    "bayesian_exploration_bucket": self.bayesian_exploration_bucket,
                     "annealing_temperature": self._annealing_temperature(),
                     "last_reward": arm.last_reward,
                     "stale_batches": arm.stale_batches,
@@ -551,7 +368,7 @@ class AdaptiveBudgetScheduler:
         return max(minimum, cooled)
 
     def _score_arm(self, arm: AdaptiveArmState) -> float:
-        explore = self.config.exploration_weight * math.sqrt(
+        explore = self._exploration_weight() * math.sqrt(
             math.log(self.total_batches_completed + 2.0) / max(1, arm.pulls)
         )
         freshness = self.config.freshness_weight * min(
@@ -568,6 +385,31 @@ class AdaptiveBudgetScheduler:
             )
         learning = self.config.learning_weight * self._learning_signal(arm)
         return self._arm_reward_signal(arm) + explore + freshness + fairness_bonus + learning - stale
+
+    def _exploration_weight(self) -> float:
+        if not self.config.enable_bayesian_exploration:
+            return self.base_exploration_weight
+        return max(0.0, float(self.current_exploration_weight or 0.0))
+
+    def _update_bayesian_exploration_from_closed_loop_state(
+        self,
+        closed_loop_state: dict[str, Any] | None,
+    ) -> None:
+        if not self.config.enable_bayesian_exploration:
+            self.current_exploration_weight = self.base_exploration_weight
+            return
+        raw_estimator = _discovery_rate_state_from_closed_loop_state(closed_loop_state)
+        if not raw_estimator:
+            return
+        estimator = DiscoveryRateEstimator.from_state_dict(raw_estimator)
+        if estimator.total_observations <= 0:
+            return
+        self.current_exploration_weight = estimator.adaptive_exploration_weight(
+            self.base_exploration_weight
+        )
+        self.bayesian_unseen_probability = estimator.unseen_probability()
+        self.bayesian_exploration_bucket = estimator.bucket()
+        self.bayesian_exploration_observation_count += 1
 
     def _learning_signal(self, arm: AdaptiveArmState) -> float:
         if self.config.learning_weight <= 0.0:
@@ -706,24 +548,29 @@ class AdaptiveBudgetScheduler:
 
 
 def summarize_batch_run(run_file: Path) -> BatchObservation:
-    rows = read_jsonl(run_file)
     meta_path = run_meta_path(run_file)
     meta = load_json(meta_path) if meta_path.exists() else {}
     config = meta.get("config", {}) if isinstance(meta.get("config", {}), dict) else {}
     known_families = list(config.get("known_saturated_bug_families", []) or [])
     findings = 0
+    case_count = 0
     candidate_bug_cases = 0
     candidate_bug_families: Counter[str] = Counter()
     semantic_divergence_count = 0
+    rewardable_semantic_divergence_count = 0
+    resolved_semantic_divergence_count = 0
     false_positive_count = 0
     needs_confirmation_count = 0
     new_behavior_cases = 0
     signal_new_behavior_cases = 0
-    for row in rows:
+    rows: list[dict[str, Any]] = []
+    for row in iter_jsonl(run_file):
+        rows.append(row)
+        case_count += 1
         row_findings = row.get("findings", [])
         findings += len(row_findings)
         new_behavior_cases += int(bool(row.get("is_new_behavior")))
-        signal_new_behavior_cases += int(bool(row.get("signal_new_behavior", row.get("is_new_behavior"))))
+        signal_new_behavior_cases += int(row_has_rewardable_new_behavior(row, known_families))
         if any(is_rewardable_candidate_issue_finding(finding, known_families) for finding in row_findings):
             candidate_bug_cases += 1
         candidate_bug_families.update(
@@ -733,6 +580,10 @@ def summarize_batch_run(run_file: Path) -> BatchObservation:
             verdict = str(finding.get("triage_verdict", "unclassified"))
             if verdict in SEMANTIC_DIVERGENCE_VERDICTS:
                 semantic_divergence_count += 1
+            if verdict == "semantic_divergence_needs_confirmation":
+                rewardable_semantic_divergence_count += 1
+            if verdict in RESOLVED_SEMANTIC_DIVERGENCE_VERDICTS:
+                resolved_semantic_divergence_count += 1
             if verdict in FALSE_POSITIVE_VERDICTS:
                 false_positive_count += 1
             if verdict in NEEDS_CONFIRMATION_VERDICTS:
@@ -740,13 +591,15 @@ def summarize_batch_run(run_file: Path) -> BatchObservation:
     feedback = aggregate_feedback_summaries(rows, known_saturated_bug_families=known_families)
     first_candidate_idx, first_candidate_elapsed_s = _first_candidate_bug_position(rows, known_families)
     return BatchObservation(
-        cases=len(rows),
+        cases=case_count,
         elapsed_s=float(meta.get("elapsed_s", 0.0) or 0.0),
         throughput_cases_s=float(meta.get("throughput_cases_s", 0.0) or 0.0),
         findings=findings,
         candidate_bug_cases=candidate_bug_cases,
         candidate_bug_families=set(candidate_bug_families),
         semantic_divergence_count=semantic_divergence_count,
+        rewardable_semantic_divergence_count=rewardable_semantic_divergence_count,
+        resolved_semantic_divergence_count=resolved_semantic_divergence_count,
         false_positive_count=false_positive_count,
         needs_confirmation_count=needs_confirmation_count,
         new_behavior_cases=new_behavior_cases,
@@ -783,23 +636,46 @@ def _batch_reward(
     new_global_family_count: int,
     new_local_family_count: int,
     enable_runtime_cost: bool = True,
+    enable_cost_normalized_reward: bool = True,
 ) -> float:
     cases = max(1, int(observation.cases))
     findings = max(1, int(observation.findings))
     candidate_rate = observation.candidate_bug_cases / cases
     new_behavior_rate = observation.signal_new_behavior_cases / cases
-    semantic_rate = observation.semantic_divergence_count / findings
+    rewardable_semantic_rate = observation.rewardable_semantic_divergence_count / findings
+    resolved_semantic_rate = observation.resolved_semantic_divergence_count / findings
     false_positive_rate = observation.false_positive_count / findings
-    needs_confirmation_rate = observation.needs_confirmation_count / findings
+    manual_confirmation_count = max(
+        0,
+        int(observation.needs_confirmation_count) - int(observation.rewardable_semantic_divergence_count),
+    )
+    manual_confirmation_rate = manual_confirmation_count / findings
     throughput_signal = math.log1p(max(0.0, float(observation.throughput_cases_s))) / 6.0
+    has_rewardable_signal = _observation_has_rewardable_signal(
+        observation,
+        new_global_family_count=new_global_family_count,
+        new_local_family_count=new_local_family_count,
+    )
     quality_balance = (
         (float(observation.quality_pass_count) - float(observation.quality_fail_count))
         / max(1.0, float(observation.quality_oracle_count))
     )
     quality_score_rate = float(observation.quality_score_total) / cases
-    source_adjustment_rate = float(observation.source_reward_adjustment_total) / cases
-    guidance_adjustment_rate = float(observation.guidance_reward_adjustment_total) / cases
-    seed_schedule_rate = float(observation.seed_schedule_delta_total) / cases
+    source_adjustment_rate = _gated_positive_rate(
+        float(observation.source_reward_adjustment_total),
+        cases,
+        allow_positive=has_rewardable_signal,
+    )
+    guidance_adjustment_rate = _gated_positive_rate(
+        float(observation.guidance_reward_adjustment_total),
+        cases,
+        allow_positive=has_rewardable_signal,
+    )
+    seed_schedule_rate = _gated_positive_rate(
+        float(observation.seed_schedule_delta_total),
+        cases,
+        allow_positive=has_rewardable_signal,
+    )
     feedback_mutation_productive_rate = (
         float(observation.productive_mutation_cases) / max(1.0, float(observation.feedback_mutation_cases))
         if observation.feedback_mutation_cases
@@ -821,21 +697,22 @@ def _batch_reward(
     reward = (
         10.0 * candidate_rate
         + 2.0 * new_behavior_rate
-        + 0.10 * semantic_rate
+        + 0.35 * rewardable_semantic_rate
+        - 0.25 * resolved_semantic_rate
         + 1.5 * new_local_family_count
         + 3.0 * new_global_family_count
         + 2.0 * early_case_bonus
         + 1.0 * early_time_bonus
         + 3.0 * observation.candidate_bug_discovery_auc
         + 0.2 * throughput_signal
-        + 0.5 * quality_balance
-        + 0.05 * quality_score_rate
-        + 1.0 * feedback_mutation_productive_rate
-        + 0.75 * guidance_productive_rate
+        + 0.5 * _gated_positive_value(quality_balance, allow_positive=has_rewardable_signal)
+        + 0.05 * _gated_positive_value(quality_score_rate, allow_positive=has_rewardable_signal)
+        + 1.0 * _gated_positive_value(feedback_mutation_productive_rate, allow_positive=has_rewardable_signal)
+        + 0.75 * _gated_positive_value(guidance_productive_rate, allow_positive=has_rewardable_signal)
         + 0.35 * source_adjustment_rate
         + 0.25 * guidance_adjustment_rate
         + 0.40 * seed_schedule_rate
-        - 1.0 * needs_confirmation_rate
+        - 1.0 * manual_confirmation_rate
         - 6.0 * false_positive_rate
         - (_runtime_cost_penalty(observation) if enable_runtime_cost else 0.0)
         - 0.5 * guidance_target_miss_rate
@@ -843,7 +720,35 @@ def _batch_reward(
     )
     if observation.findings == 0 and observation.signal_new_behavior_cases == 0:
         reward -= 0.25
+    if enable_cost_normalized_reward:
+        return cost_normalized_reward(reward, observation.elapsed_s)
     return reward
+
+
+def _observation_has_rewardable_signal(
+    observation: BatchObservation,
+    *,
+    new_global_family_count: int,
+    new_local_family_count: int,
+) -> bool:
+    return bool(
+        observation.candidate_bug_cases
+        or observation.signal_new_behavior_cases
+        or observation.rewardable_semantic_divergence_count
+        or new_global_family_count
+        or new_local_family_count
+    )
+
+
+def _gated_positive_rate(total: float, cases: float, *, allow_positive: bool) -> float:
+    return _gated_positive_value(float(total) / max(1.0, float(cases)), allow_positive=allow_positive)
+
+
+def _gated_positive_value(value: float, *, allow_positive: bool) -> float:
+    value = float(value)
+    if allow_positive:
+        return value
+    return min(0.0, value)
 
 
 def _runtime_cost_penalty(observation: BatchObservation) -> float:
@@ -899,6 +804,22 @@ def _safe_float(value: Any) -> float:
 
 def _candidate_issue_family_keys(findings: list[dict[str, Any]]) -> Counter[str]:
     return candidate_issue_family_keys(findings)
+
+
+def _discovery_rate_state_from_closed_loop_state(
+    closed_loop_state: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not isinstance(closed_loop_state, dict):
+        return None
+    feedback = closed_loop_state.get("feedback")
+    if isinstance(feedback, dict):
+        estimator = feedback.get("discovery_rate_estimator")
+        if isinstance(estimator, dict):
+            return estimator
+    estimator = closed_loop_state.get("discovery_rate_estimator")
+    if isinstance(estimator, dict):
+        return estimator
+    return None
 
 
 def _adaptive_group_key(job: dict[str, Any]) -> str:
@@ -998,38 +919,6 @@ def _iter_string_values(value: Any) -> list[str]:
     else:
         raw = [value]
     return _unique_nonempty([str(item).strip() for item in raw])
-
-
-def _candidate_family_reward(
-    previous_hits: int,
-    *,
-    enable_family_saturation: bool = True,
-    family_saturation_threshold: int = 8,
-    saturated_family_reward: float = 0.02,
-) -> float:
-    return candidate_family_novelty_reward(
-        previous_hits,
-        enable_family_saturation=enable_family_saturation,
-        family_saturation_threshold=family_saturation_threshold,
-        saturated_family_reward=saturated_family_reward,
-    )
-
-
-def _family_key_matches_known_family(candidate_family: str, known_saturated_bug_families: list[str]) -> bool:
-    candidate_root, candidate_backends = _split_family_key(candidate_family)
-    for known_family in known_saturated_bug_families:
-        known_root, known_backends = _split_family_key(known_family)
-        if known_root != candidate_root:
-            continue
-        if not known_backends or not candidate_backends or known_backends & candidate_backends:
-            return True
-    return False
-
-
-def _split_family_key(family_key: str) -> tuple[str, set[str]]:
-    root, _, backend_part = str(family_key).partition("@")
-    backends = {backend.strip() for backend in backend_part.split(",") if backend.strip()}
-    return root.strip(), backends
 
 
 def _bounded_confident_mean_reward(total_reward: float, pulls: float, *, max_abs: float) -> float:

@@ -44,6 +44,22 @@ def test_metamorphic_ignores_float_precision_only_differences():
     assert findings == []
 
 
+def test_metamorphic_finding_records_status_mismatch_class():
+    case = generate_case(10)
+    base = {"duckdb": NormalizedResult("duckdb", "ok", ["x"], [[1]])}
+    variants = {
+        "filter_idempotence:duplicate-0": {
+            "duckdb": NormalizedResult("duckdb", "error", [], [], "BinderException", "missing column")
+        }
+    }
+
+    findings = evaluate_metamorphic_variants(case, base, variants)
+
+    assert len(findings) == 1
+    assert findings[0].mismatch_class == "status"
+    assert "mismatch_class=status" in findings[0].evidence
+
+
 def test_metamorphic_skips_row_permutation_with_limit():
     case = generate_case(8)
     case.program = Program(case.program.program_id, case.program.seed, [{"op": "limit", "n": 1}])
@@ -899,7 +915,7 @@ def test_metamorphic_skips_groupby_sorted_input_before_order_observing_tail():
     assert not any(v.relation == "groupby_sorted_input" for v in variants)
 
 
-def test_metamorphic_allows_groupby_sorted_input_when_tail_sorts_before_limit():
+def test_metamorphic_skips_groupby_sorted_input_when_tail_sorts_before_limit():
     case = Case(
         "case-groupby-sorted-input-sort-limit-tail",
         163,
@@ -923,7 +939,7 @@ def test_metamorphic_allows_groupby_sorted_input_when_tail_sorts_before_limit():
 
     variants = build_metamorphic_variants(case, limit=20)
 
-    assert any(v.relation == "groupby_sorted_input" for v in variants)
+    assert not any(v.relation == "groupby_sorted_input" for v in variants)
 
 
 def test_metamorphic_groupby_sorted_input_tracks_columns_after_global_aggregate():
@@ -1201,6 +1217,118 @@ def test_metamorphic_skips_filter_tautology_insertion_for_mean_sort_boundary():
     variants = build_metamorphic_variants(case, limit=20)
 
     assert not any(v.relation == "filter_tautology_insertion" for v in variants)
+
+
+def test_program_order_sensitive_when_row_number_precedes_groupby():
+    case = Case(
+        "case-row-number-groupby",
+        24,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("g", "str"),
+                    ColumnSpec("x", "int"),
+                ],
+                [{"id": 1, "g": "a", "x": 10}, {"id": 2, "g": "a", "x": 20}],
+            )
+        ],
+        Program(
+            "prog-row-number-groupby",
+            24,
+            [
+                {
+                    "op": "row_number_filter",
+                    "partition_by": ["g"],
+                    "order_by": [{"column": "x", "ascending": True, "nulls": "last"}],
+                    "cmp": "==",
+                    "value": 1,
+                },
+                {"op": "groupby", "keys": ["g"], "aggs": [{"column": "x", "func": "sum", "as": "sum_x"}]},
+            ],
+        ),
+    )
+
+    assert case.program.order_sensitive
+
+
+def test_metamorphic_skips_overtrigger_relations_with_row_number_observer():
+    case = Case(
+        "case-row-number-overtrigger",
+        25,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("g", "str"),
+                    ColumnSpec("x", "int"),
+                ],
+                [
+                    {"id": 1, "g": "a", "x": 10},
+                    {"id": 2, "g": "a", "x": 20},
+                    {"id": 3, "g": "b", "x": 30},
+                    {"id": 4, "g": "b", "x": 40},
+                ],
+            )
+        ],
+        Program(
+            "prog-row-number-overtrigger",
+            25,
+            [
+                {
+                    "op": "row_number_filter",
+                    "partition_by": ["g"],
+                    "order_by": [{"column": "x", "ascending": True, "nulls": "last"}],
+                    "cmp": "==",
+                    "value": 1,
+                },
+                {"op": "groupby", "keys": ["g"], "aggs": [{"column": "x", "func": "sum", "as": "sum_x"}]},
+            ],
+        ),
+    )
+
+    relations = {variant.relation for variant in build_metamorphic_variants(case, limit=100)}
+
+    assert "input_partition_union_all" not in relations
+    assert "filter_tautology_insertion" not in relations
+    assert "groupby_neutral_mutation" not in relations
+    assert "groupby_sorted_input" not in relations
+    assert "groupby_aggregation_permutation" not in relations
+    assert "mutate_add_zero_insertion" not in relations
+    assert "row_permutation" not in relations
+
+
+def test_metamorphic_skips_join_inner_left_equivalence_for_groupby_mean_tail():
+    case = Case(
+        "case-join-mean-tail",
+        26,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("x", "float")],
+                [{"id": 1, "x": 0.1}, {"id": 2, "x": 0.2}],
+            ),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("j", "float")],
+                [{"id": 1, "j": 1.0}, {"id": 2, "j": 2.0}],
+            ),
+        ],
+        Program(
+            "prog-join-mean-tail",
+            26,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+                {"op": "groupby", "keys": ["id"], "aggs": [{"column": "j", "func": "mean", "as": "mean_j"}]},
+            ],
+        ),
+    )
+
+    variants = build_metamorphic_variants(case, limit=100)
+
+    assert not any(variant.relation == "join_inner_left_equivalence" for variant in variants)
 
 
 def test_metamorphic_builds_sort_select_commutation():

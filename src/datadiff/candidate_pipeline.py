@@ -5,6 +5,10 @@ from pathlib import Path
 from typing import Any
 
 from datadiff.artifact import save_issue_artifact
+from datadiff.bug_discovery_system import (
+    bug_discovery_system_descriptor,
+    rank_candidate_pipeline_rows,
+)
 from datadiff.config import ExperimentConfig
 from datadiff.dynamic_strategy import append_learning_event
 from datadiff.dynamic_strategy import write_strategy_snapshot
@@ -12,7 +16,7 @@ from datadiff.dsl import Case
 from datadiff.issue_readiness import build_issue_readiness
 from datadiff.oracle import Finding
 from datadiff.reducer import reduce_case
-from datadiff.reward import candidate_issue_family_keys
+from datadiff.finding_outcomes import candidate_issue_family_keys
 from datadiff.runner import run_loaded_case
 from datadiff.triage import (
     build_triage_report,
@@ -95,7 +99,14 @@ def build_candidate_pipeline(
         for row_index, row in enumerate(evidence.get("candidate_rows", [])):
             if not isinstance(row, dict):
                 continue
-            row_families = sorted(candidate_issue_family_keys(row.get("findings", [])).keys())
+            row_config = row.get("config", {}) if isinstance(row.get("config", {}), dict) else {}
+            known_families = tuple(row_config.get("known_saturated_bug_families", []) or ())
+            row_families = sorted(
+                candidate_issue_family_keys(
+                    row.get("findings", []),
+                    known_saturated_bug_families=known_families,
+                ).keys()
+            )
             if not row_families:
                 continue
             primary_family = row_families[0]
@@ -109,7 +120,7 @@ def build_candidate_pipeline(
                 "normalized": row.get("normalized", {}),
                 "raw_results": row.get("raw_results", {}),
                 "config": {
-                    **(row.get("config", {}) if isinstance(row.get("config", {}), dict) else {}),
+                    **row_config,
                     "strategy_snapshot_path": str(strategy_snapshot_path),
                     "freeze_strategy_snapshot": True,
                     "strategy_learning_path": str(pipeline_dir / "strategy-learning" / "candidate-pipeline-learning.json"),
@@ -119,20 +130,27 @@ def build_candidate_pipeline(
                 "families": row_families,
             }
             frozen_rows.append(frozen_row)
-            candidates.append(
-                _process_candidate(
-                    candidate_id=candidate_id,
-                    row=frozen_row,
-                    pipeline_dir=pipeline_dir,
-                    issue_drafts_dir=issue_drafts_dir,
-                    recheck_attempts=max(0, int(recheck_attempts)),
-                    reduce_artifacts=reduce_artifacts,
-                    standalone_reproducer=standalone_reproducer,
-                    confirmed_latest_families=confirmed_latest_families,
-                    existing_by_family=existing_by_family,
-                    family_seen_in_pipeline=family_seen_in_pipeline,
-                )
+
+    frozen_rows = rank_candidate_pipeline_rows(
+        frozen_rows,
+        confirmed_latest_families=confirmed_latest_families,
+        existing_by_family=existing_by_family,
+    )
+    for frozen_row in frozen_rows:
+        candidates.append(
+            _process_candidate(
+                candidate_id=str(frozen_row.get("candidate_id", "")),
+                row=frozen_row,
+                pipeline_dir=pipeline_dir,
+                issue_drafts_dir=issue_drafts_dir,
+                recheck_attempts=max(0, int(recheck_attempts)),
+                reduce_artifacts=reduce_artifacts,
+                standalone_reproducer=standalone_reproducer,
+                confirmed_latest_families=confirmed_latest_families,
+                existing_by_family=existing_by_family,
+                family_seen_in_pipeline=family_seen_in_pipeline,
             )
+        )
 
     frozen_manifest = {
         "schema_version": "candidate-freeze-v1",
@@ -142,6 +160,7 @@ def build_candidate_pipeline(
         "evidence_files": [_project_display_path(path) for path in resolved_evidence_files],
         "strategy_snapshot_path": _project_display_path(strategy_snapshot_path),
         "candidate_count": len(frozen_rows),
+        "bug_discovery_system": bug_discovery_system_descriptor(),
         "candidates": frozen_rows,
     }
     dump_json(frozen_manifest, frozen_path)
@@ -182,6 +201,7 @@ def build_candidate_pipeline(
         },
         "frozen_candidates_path": _project_display_path(frozen_path),
         "strategy_snapshot_path": _project_display_path(strategy_snapshot_path),
+        "bug_discovery_system": bug_discovery_system_descriptor(),
         "summary": _candidate_pipeline_summary(candidates, queue),
         "existing_issue_readiness_summary": existing_queue.get("summary", {}),
         "pipeline_issue_readiness_summary": queue.get("summary", {}),
@@ -210,21 +230,24 @@ def render_candidate_pipeline_markdown(manifest: dict[str, Any]) -> str:
         "",
         "## Candidates",
         "",
-        "| Candidate | Family | Reproduced | Triage | Dedup | Issue readiness |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| Candidate | Family | Score | True bug probability | Reproduced | Triage | Dedup | Issue readiness |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for candidate in manifest.get("candidates", []):
         issue_readiness = candidate.get("issue_readiness", {})
+        acquisition = candidate.get("candidate_acquisition", {}) if isinstance(candidate.get("candidate_acquisition"), dict) else {}
         lines.append(
             f"| `{candidate.get('candidate_id', '')}` | "
             f"`{candidate.get('primary_family', '')}` | "
+            f"`{float(acquisition.get('acquisition_score', 0.0) or 0.0):.2f}` | "
+            f"`{float(acquisition.get('true_bug_probability', 0.0) or 0.0):.2f}` | "
             f"`{str(candidate.get('recheck', {}).get('reproduced', False)).lower()}` | "
             f"`{candidate.get('triage', {}).get('verdict', '')}` | "
             f"`{candidate.get('dedup', {}).get('status', '')}` | "
             f"`{issue_readiness.get('readiness_status', '')}` |"
         )
     if not manifest.get("candidates"):
-        lines.append("| none |  | false |  |  |  |")
+        lines.append("| none |  | 0.00 | 0.00 | false |  |  |  |")
     lines.append("")
     return "\n".join(lines)
 
@@ -247,7 +270,7 @@ def _process_candidate(
     case = Case.from_dict(row.get("case", {}))
     backends = _candidate_backends(row)
     config_data = row.get("config", {}) if isinstance(row.get("config", {}), dict) else {}
-    config = ExperimentConfig(**config_data) if config_data else ExperimentConfig()
+    config = ExperimentConfig.from_payload(config_data)
     artifact_dir, artifact_created = _ensure_candidate_artifact_dir(row)
     recheck = _recheck_candidate(case, backends, config, families, attempts=recheck_attempts)
 
@@ -271,6 +294,9 @@ def _process_candidate(
                 config=triage_config,
                 target_kinds=[finding.get("kind", "") for finding in original_findings],
                 target_roots=target_roots,
+                target_suspicious_backends=[
+                    finding.get("suspicious_backends", []) for finding in original_findings
+                ],
             )
             dump_json(reduced.to_dict(), artifact_dir / "reduced_case.json")
             _write_reduced_reproducer(artifact_dir, triage_backends)
@@ -375,6 +401,7 @@ def _process_candidate(
         "candidate_id": candidate_id,
         "primary_family": primary_family,
         "families": families,
+        "candidate_acquisition": dict(row.get("candidate_acquisition", {}) or {}),
         "source_evidence_file": str(row.get("source_evidence_file", "")),
         "source_run_file": str(row.get("source_run_file", "")),
         "case_id": row.get("case", {}).get("case_id", ""),
@@ -519,7 +546,7 @@ def _recheck_candidate(
     recheck_config_data["candidate_recheck_count"] = 0
     recheck_config_data["enable_artifact"] = False
     recheck_config_data["enable_reducer"] = False
-    recheck_config = ExperimentConfig(**recheck_config_data)
+    recheck_config = ExperimentConfig.from_payload(recheck_config_data)
     original_families = set(families)
     reproduced_families: set[str] | None = None
     attempt_summaries: list[dict[str, Any]] = []
@@ -563,8 +590,8 @@ def _artifact_config_or_default(artifact_dir: Path, fallback: dict[str, Any]) ->
     if config_path.is_file():
         payload = load_json(config_path)
         if isinstance(payload, dict) and payload:
-            return ExperimentConfig(**payload)
-    return ExperimentConfig(**fallback) if fallback else ExperimentConfig()
+            return ExperimentConfig.from_payload(payload)
+    return ExperimentConfig.from_payload(fallback)
 
 
 def _artifact_backends(artifact_dir: Path) -> list[str]:
@@ -585,7 +612,7 @@ from datadiff.util import load_json
 here = __import__("pathlib").Path(__file__).parent
 case = Case.from_dict(load_json(here / "reduced_case.json"))
 config_data = load_json(here / "config.json")
-config = ExperimentConfig(**config_data) if config_data else ExperimentConfig()
+config = ExperimentConfig.from_payload(config_data)
 result = run_loaded_case(case, backends={backends!r}, config=config, save_artifact=False)
 print(result["status"])
 for finding in result["findings"]:

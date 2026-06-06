@@ -26,17 +26,19 @@ from datadiff.experiment_metadata import (
     manifest_experiment_meta,
     resolved_run_semantics,
 )
-from datadiff.historical import list_historical_bugs
-from datadiff.reward import (
+from datadiff.finding_outcomes import (
     candidate_issue_family_key,
     is_issue_replay_finding,
     is_known_saturated_candidate_issue_finding,
     is_rewardable_candidate_issue_finding,
 )
+from datadiff.historical import list_historical_bugs
+from datadiff.icse_experiment_quality import score_final_readiness_summary
 from datadiff.run_provenance import current_workspace_git_commit
 from datadiff.runner import _configured_guidance_targets
+from datadiff.target_version_audit import TARGET_VERSION_AUDIT_SCHEMA_VERSION
 from datadiff.targets import TARGETS, TARGET_SUITES, target_context
-from datadiff.util import REPORTS_DIR, RUNS_DIR, dump_json, ensure_dirs, load_json, read_jsonl, run_meta_path, utc_now
+from datadiff.util import REPORTS_DIR, RUNS_DIR, dump_json, ensure_dirs, iter_jsonl, load_json, read_jsonl, run_meta_path, utc_now
 
 DEFAULT_LATEST_CONFIRMATIONS_FILE = Path("experiments/latest_confirmations.json")
 DEFAULT_FINAL_READINESS_MANIFEST_LIMIT = 25
@@ -48,7 +50,17 @@ ADAPTIVE_LIVE_EVIDENCE_COMPONENTS = frozenset(
         "online_reward_model",
         "active_learning",
         "continual_learning",
+        "backend_pair_learning",
+        "value_catalog",
         "quality_archive",
+        "hierarchical_archive",
+        "bd_axis_bandit",
+        "bayesian_exploration",
+        "seed_quota",
+        "seed_energy_tier",
+        "lhs_seeding",
+        "champion_corpus",
+        "champion_graft_donor",
         "runtime_cost_learning",
         "scheduler_annealing",
     }
@@ -124,10 +136,30 @@ class ReadinessThresholds:
     required_adaptive_component_ablations: tuple[str, ...] = (
         "scheduler_learning",
         "online_reward_model",
+        "backend_pair_learning",
         "continual_learning",
         "active_learning",
+        "ir_rewrite_mutations",
+        "operator_swarm",
+        "divergence_conditioned",
+        "shrink_mutations",
+        "value_catalog",
         "quality_archive",
+        "hierarchical_archive",
+        "bd_axis_bandit",
+        "bayesian_exploration",
+        "seed_quota",
+        "seed_energy_batch",
+        "seed_energy_tier",
+        "per_operator_energy",
+        "lineage_rarity",
+        "minhash_dedup",
+        "disagreement_bd_axis",
+        "lhs_seeding",
+        "champion_corpus",
+        "champion_graft_donor",
         "runtime_cost_learning",
+        "cost_normalized_reward",
         "scheduler_annealing",
     )
     require_transferability_scope: bool = True
@@ -144,6 +176,7 @@ class ReadinessThresholds:
     max_first_candidate_elapsed_s: float = 6 * 3600.0
     require_closed_loop_state_persistence: bool = True
     require_adaptive_live_component_evidence: bool = True
+    require_target_version_audit: bool = True
 
 
 STAGE_PROFILE_FIELDS: tuple[str, ...] = (
@@ -246,6 +279,7 @@ def build_final_readiness(
     closed_loop_state_persistence = _closed_loop_state_persistence_summary(live_runs)
     adaptive_live_component_evidence = _adaptive_live_component_evidence_summary(live_runs)
     continual_learning_absorption = _continual_learning_absorption_summary(audited_runs)
+    target_version_audit = _target_version_audit_summary(manifests)
     rewardable_live_families = Counter()
     confirmed_live_families = Counter()
     external_confirmed_live_families = _confirmed_latest_family_counter(latest_confirmations)
@@ -291,8 +325,9 @@ def build_final_readiness(
         closed_loop_state_persistence=closed_loop_state_persistence,
         adaptive_live_component_evidence=adaptive_live_component_evidence,
         continual_learning_absorption=continual_learning_absorption,
+        target_version_audit=target_version_audit,
     )
-    return {
+    audit = {
         "schema_version": FINAL_READINESS_SCHEMA_VERSION,
         "created_at": utc_now(),
         "ready": all(gate["passed"] for gate in gates),
@@ -345,6 +380,7 @@ def build_final_readiness(
             "transferability_scope": transferability_scope,
             "cross_version_ledger": cross_version_ledger,
             "continual_learning_absorption": continual_learning_absorption,
+            "target_version_audit": target_version_audit,
             "runtime_efficiency": runtime_efficiency,
             "discovery_responsiveness": discovery_responsiveness,
             "closed_loop_state_persistence": closed_loop_state_persistence,
@@ -382,6 +418,10 @@ def build_final_readiness(
         "ignored_runs": ignored_runs,
         "replay_policy_rejected_live_runs": replay_policy_rejected_live_runs,
     }
+    icse_quality = score_final_readiness_summary(audit["summary"])
+    audit["summary"]["icse_experiment_quality"] = icse_quality
+    audit["icse_experiment_quality"] = icse_quality
+    return audit
 
 
 def _resolve_manifest_files(
@@ -451,7 +491,7 @@ def _load_paper_run_journal_entries(paths: list[Path]) -> list[dict[str, Any]]:
     for path in paths:
         if not path.is_file():
             continue
-        for row in read_jsonl(path):
+        for row in iter_jsonl(path):
             if isinstance(row, dict):
                 entries.append(dict(row))
     return entries
@@ -599,6 +639,7 @@ def _manifest_runs(
                 "run_log_scanned": run_log_scanned,
                 "run_log_scan_skipped": bool(not run_log_scanned and run_file.is_file()),
                 "adaptive_selection_telemetry": adaptive_selection_telemetry,
+                "run_meta": dict(meta),
                 "stage_profile_present": _stage_profile_present(meta),
                 "stage_profile_totals": _stage_profile_totals(meta),
                 "version_ledger_files": _version_ledger_files(run, manifest, meta),
@@ -725,6 +766,7 @@ def _adaptive_selection_telemetry_from_rows(rows: list[dict[str, Any]]) -> dict[
         ("semantic_objective", "semantic_objective_selection", ("action",), "selected_semantic_objective"),
         ("metamorphic_relation", "metamorphic_relation_selection", ("action",), "selected_metamorphic_relation"),
         ("version_pair", "version_pair_selection", ("action",), "selected_version_pair"),
+        ("backend_pair", "backend_pair_selection", ("action", "priority"), "backend_pair_priority"),
     )
     scope_counts: Counter[str] = Counter()
     strategy_counts: Counter[str] = Counter()
@@ -792,9 +834,14 @@ def _adaptive_selection_telemetry_from_rows(rows: list[dict[str, Any]]) -> dict[
 
 def _adaptive_selection_action(selection: dict[str, Any], keys: tuple[str, ...], fallback: Any = "") -> str:
     for key in keys:
-        text = str(selection.get(key, "") or "").strip()
+        value = selection.get(key, "")
+        if isinstance(value, list):
+            value = next((item for item in value if str(item).strip()), "")
+        text = str(value or "").strip()
         if text:
             return text
+    if isinstance(fallback, list):
+        fallback = next((item for item in fallback if str(item).strip()), "")
     return str(fallback or "").strip()
 
 
@@ -1288,6 +1335,62 @@ def _load_version_ledger(path_value: str) -> dict[str, Any]:
     }
 
 
+def _target_version_audit_summary(manifests: list[dict[str, Any]]) -> dict[str, Any]:
+    audits = [
+        manifest
+        for manifest in manifests
+        if str(manifest.get("schema_version", "") or "") == TARGET_VERSION_AUDIT_SCHEMA_VERSION
+    ]
+    valid: list[dict[str, Any]] = []
+    invalid_reasons: dict[str, str] = {}
+    for audit in audits:
+        path = str(audit.get("_manifest_file", "") or "")
+        summary = audit.get("summary", {}) if isinstance(audit.get("summary", {}), dict) else {}
+        packages = audit.get("target_packages", []) if isinstance(audit.get("target_packages", []), list) else []
+        if not summary:
+            invalid_reasons[path] = "missing_summary"
+            continue
+        if not packages:
+            invalid_reasons[path] = "missing_target_packages"
+            continue
+        valid.append(audit)
+    outdated: list[dict[str, Any]] = []
+    unknown: list[dict[str, Any]] = []
+    package_count = 0
+    up_to_date_count = 0
+    for audit in valid:
+        summary = audit.get("summary", {}) if isinstance(audit.get("summary", {}), dict) else {}
+        package_count = max(package_count, int(summary.get("target_package_count", 0) or 0))
+        up_to_date_count = max(up_to_date_count, int(summary.get("up_to_date_target_package_count", 0) or 0))
+        outdated.extend(
+            item
+            for item in summary.get("outdated_target_packages", []) or []
+            if isinstance(item, dict)
+        )
+        unknown.extend(
+            item
+            for item in summary.get("unknown_latest_target_packages", []) or []
+            if isinstance(item, dict)
+        )
+    all_up_to_date = bool(valid) and not outdated and not unknown and not invalid_reasons
+    return {
+        "schema_version": "final-readiness-target-version-audit-summary-v1",
+        "audit_files": [str(audit.get("_manifest_file", "") or "") for audit in audits],
+        "valid_audit_files": [str(audit.get("_manifest_file", "") or "") for audit in valid],
+        "invalid_files": sorted(invalid_reasons),
+        "invalid_reasons": invalid_reasons,
+        "audit_count": len(audits),
+        "valid_audit_count": len(valid),
+        "target_package_count": package_count,
+        "up_to_date_target_package_count": up_to_date_count,
+        "outdated_target_package_count": len(outdated),
+        "unknown_latest_target_package_count": len(unknown),
+        "all_target_packages_up_to_date": all_up_to_date,
+        "outdated_target_packages": outdated,
+        "unknown_latest_target_packages": unknown,
+    }
+
+
 def _runtime_efficiency_summary(
     runs: list[dict[str, Any]],
     *,
@@ -1444,8 +1547,37 @@ def _adaptive_live_component_evidence_summary(runs: list[dict[str, Any]]) -> dic
         "version_memory_key_count": sum(int(row.get("version_memory_key_count", 0) or 0) for row in rows),
         "continual_imported_family_count": sum(int(row.get("continual_imported_family_count", 0) or 0) for row in rows),
         "quality_archive_cell_count": sum(int(row.get("quality_archive_cell_count", 0) or 0) for row in rows),
+        "quality_archive_child_cell_count": sum(
+            int(row.get("quality_archive_child_cell_count", 0) or 0) for row in rows
+        ),
+        "quality_archive_split_cell_count": sum(
+            int(row.get("quality_archive_split_cell_count", 0) or 0) for row in rows
+        ),
         "quality_archive_seed_count": sum(int(row.get("quality_archive_seed_count", 0) or 0) for row in rows),
         "quality_archive_outcome_count": sum(int(row.get("quality_archive_outcome_count", 0) or 0) for row in rows),
+        "value_catalog_entry_pulls": sum(int(row.get("value_catalog_entry_pulls", 0) or 0) for row in rows),
+        "value_catalog_entry_arm_count": sum(int(row.get("value_catalog_entry_arm_count", 0) or 0) for row in rows),
+        "bd_axis_weight_pulls": sum(int(row.get("bd_axis_weight_pulls", 0) or 0) for row in rows),
+        "bd_axis_weight_arm_count": sum(int(row.get("bd_axis_weight_arm_count", 0) or 0) for row in rows),
+        "seed_energy_tier_pulls": sum(int(row.get("seed_energy_tier_pulls", 0) or 0) for row in rows),
+        "seed_energy_tier_arm_count": sum(int(row.get("seed_energy_tier_arm_count", 0) or 0) for row in rows),
+        "champion_graft_donor_pulls": sum(int(row.get("champion_graft_donor_pulls", 0) or 0) for row in rows),
+        "champion_graft_donor_arm_count": sum(
+            int(row.get("champion_graft_donor_arm_count", 0) or 0) for row in rows
+        ),
+        "seed_quota_active_run_count": sum(1 for row in rows if bool(row.get("seed_quota_active", False))),
+        "seed_quota_cluster_count": sum(int(row.get("seed_quota_cluster_count", 0) or 0) for row in rows),
+        "seed_quota_seed_count": sum(int(row.get("seed_quota_seed_count", 0) or 0) for row in rows),
+        "lhs_seeding_enabled_run_count": sum(1 for row in rows if bool(row.get("lhs_seeding_enabled", False))),
+        "champion_corpus_enabled_run_count": sum(
+            1 for row in rows if bool(row.get("champion_corpus_enabled", False))
+        ),
+        "champion_corpus_injected_count": sum(
+            int(row.get("champion_corpus_injected_count", 0) or 0) for row in rows
+        ),
+        "champion_corpus_promoted_family_count": sum(
+            int(row.get("champion_corpus_promoted_family_count", 0) or 0) for row in rows
+        ),
         "runtime_cost_observation_count": sum(int(row.get("runtime_cost_observation_count", 0) or 0) for row in rows),
         "annealing_observation_count": sum(int(row.get("annealing_observation_count", 0) or 0) for row in rows),
         "adaptive_selection_run_count": sum(
@@ -1478,6 +1610,11 @@ def _declared_adaptive_live_components(run: dict[str, Any]) -> set[str]:
         case_selection_learning = _run_config_enables_case_selection_learning(run_config)
         if case_selection_learning:
             declared.add("scheduler_learning")
+        if (
+            float(run_config.get("backend_pair_learning_weight", 0.0) or 0.0) > 0.0
+            and bool(run_config.get("enable_backend_pair_learning", True))
+        ):
+            declared.add("backend_pair_learning")
         if case_selection_learning and bool(run_config.get("enable_quality_archive", False)):
             declared.add("quality_archive")
     config = run.get("adaptive_config", {})
@@ -1501,6 +1638,7 @@ def _run_config_enables_case_selection_learning(config: dict[str, Any]) -> bool:
         ("semantic_objective_learning_weight", "enable_semantic_objective_learning"),
         ("metamorphic_relation_learning_weight", "enable_metamorphic_relation_learning"),
         ("version_pair_learning_weight", ""),
+        ("backend_pair_learning_weight", "enable_backend_pair_learning"),
     )
     return any(
         float(config.get(weight_key, 0.0) or 0.0) > 0.0
@@ -1516,13 +1654,39 @@ def _adaptive_component_config_key(component: str) -> str:
         "online_reward_model": "online_reward_model",
         "runtime_cost_learning": "runtime_cost_learning",
         "scheduler_annealing": "scheduler_annealing",
+        "value_catalog": "value_catalog",
+        "bd_axis_bandit": "bd_axis_bandit",
+        "bayesian_exploration": "bayesian_exploration",
+        "seed_quota": "seed_quota",
+        "seed_energy_tier": "seed_energy_tier",
+        "lhs_seeding": "lhs_seeding",
+        "champion_corpus": "champion_corpus",
+        "champion_graft_donor": "champion_graft_donor",
     }.get(component, "")
+
+
+def _backend_pair_learning_observed(run: dict[str, Any], health: dict[str, Any]) -> bool:
+    selection = run.get("adaptive_selection_telemetry", {})
+    if isinstance(selection, dict):
+        scope_counts = selection.get("scope_counts", {})
+        if isinstance(scope_counts, dict) and int(scope_counts.get("backend_pair", 0) or 0) > 0:
+            return True
+    state = run.get("adaptive_learning_state", {})
+    if isinstance(state, dict):
+        bandits = state.get("bandits", {})
+        if isinstance(bandits, dict):
+            backend_pair = bandits.get("backend_pair", {})
+            if isinstance(backend_pair, dict) and int(backend_pair.get("total_pulls", 0) or 0) > 0:
+                return True
+    return int(health.get("backend_pair_pulls", 0) or 0) > 0
 
 
 def _adaptive_live_component_evidence_row(run: dict[str, Any], components: set[str]) -> dict[str, Any]:
     summary = run.get("closed_loop_state_summary", {})
     health = _adaptive_learning_health_from_summary(summary)
     quality = _quality_archive_health_from_summary(summary)
+    seed_quota = _seed_quota_health_from_summary(summary)
+    champion_corpus = _champion_corpus_health_from_run(run)
     selection = run.get("adaptive_selection_telemetry", {})
     selection = selection if isinstance(selection, dict) else {}
     scheduler_rows = [
@@ -1535,6 +1699,10 @@ def _adaptive_live_component_evidence_row(run: dict[str, Any], components: set[s
         1
         for item in scheduler_rows
         if float(item.get("annealing_temperature", 0.0) or 0.0) > 0.0
+    )
+    bayesian_exploration_observation_count = sum(
+        int(item.get("bayesian_exploration_observation_count", 0) or 0)
+        for item in scheduler_rows
     )
     continual_imported_family_count = int(health.get("continual_imported_family_count", 0) or 0)
     continual_family_count = int(health.get("continual_family_count", 0) or 0)
@@ -1554,10 +1722,23 @@ def _adaptive_live_component_evidence_row(run: dict[str, Any], components: set[s
             or continual_imported_family_count > 0
             or continual_family_count > 0
         ),
+        "backend_pair_learning": _backend_pair_learning_observed(run, health),
+        "value_catalog": int(health.get("value_catalog_entry_pulls", 0) or 0) > 0,
+        "bd_axis_bandit": int(health.get("bd_axis_weight_pulls", 0) or 0) > 0,
+        "seed_energy_tier": int(health.get("seed_energy_tier_pulls", 0) or 0) > 0,
+        "champion_graft_donor": int(health.get("champion_graft_donor_pulls", 0) or 0) > 0,
+        "bayesian_exploration": bayesian_exploration_observation_count > 0,
         "quality_archive": (
             int(quality.get("cell_count", 0) or 0) > 0
             and int(quality.get("seed_count", 0) or 0) > 0
         ),
+        "hierarchical_archive": (
+            bool(quality.get("hierarchical_enabled", False))
+            and int(quality.get("child_cell_count", 0) or 0) > 0
+        ),
+        "seed_quota": bool(seed_quota.get("active", False)),
+        "lhs_seeding": _lhs_seeding_observed(run),
+        "champion_corpus": bool(champion_corpus.get("active", False)),
         "runtime_cost_learning": (
             int(health.get("runtime_cost_observation_count", 0) or 0) > 0
             or float(health.get("runtime_cost_total", 0.0) or 0.0) > 0.0
@@ -1579,11 +1760,29 @@ def _adaptive_live_component_evidence_row(run: dict[str, Any], components: set[s
         "continual_imported_family_count": continual_imported_family_count,
         "continual_family_count": continual_family_count,
         "quality_archive_cell_count": int(quality.get("cell_count", 0) or 0),
+        "quality_archive_child_cell_count": int(quality.get("child_cell_count", 0) or 0),
+        "quality_archive_split_cell_count": int(quality.get("split_cell_count", 0) or 0),
         "quality_archive_seed_count": int(quality.get("seed_count", 0) or 0),
         "quality_archive_outcome_count": int(quality.get("outcome_count", 0) or 0),
+        "value_catalog_entry_pulls": int(health.get("value_catalog_entry_pulls", 0) or 0),
+        "value_catalog_entry_arm_count": int(health.get("value_catalog_entry_arm_count", 0) or 0),
+        "bd_axis_weight_pulls": int(health.get("bd_axis_weight_pulls", 0) or 0),
+        "bd_axis_weight_arm_count": int(health.get("bd_axis_weight_arm_count", 0) or 0),
+        "seed_energy_tier_pulls": int(health.get("seed_energy_tier_pulls", 0) or 0),
+        "seed_energy_tier_arm_count": int(health.get("seed_energy_tier_arm_count", 0) or 0),
+        "champion_graft_donor_pulls": int(health.get("champion_graft_donor_pulls", 0) or 0),
+        "champion_graft_donor_arm_count": int(health.get("champion_graft_donor_arm_count", 0) or 0),
+        "seed_quota_active": bool(seed_quota.get("active", False)),
+        "seed_quota_cluster_count": int(seed_quota.get("cluster_count", 0) or 0),
+        "seed_quota_seed_count": int(seed_quota.get("seed_count", 0) or 0),
+        "lhs_seeding_enabled": _lhs_seeding_observed(run),
+        "champion_corpus_enabled": bool(champion_corpus.get("enabled", False)),
+        "champion_corpus_injected_count": int(champion_corpus.get("injected_count", 0) or 0),
+        "champion_corpus_promoted_family_count": int(champion_corpus.get("promoted_family_count", 0) or 0),
         "runtime_cost_observation_count": int(health.get("runtime_cost_observation_count", 0) or 0),
         "runtime_cost_total": float(health.get("runtime_cost_total", 0.0) or 0.0),
         "annealing_observation_count": annealing_observation_count,
+        "bayesian_exploration_observation_count": bayesian_exploration_observation_count,
         "adaptive_selection_total_count": int(selection.get("total_count", 0) or 0),
         "adaptive_selection_scope_counts": dict(selection.get("scope_counts", {}) or {}),
         "adaptive_selection_top_actions": dict(selection.get("top_actions", {}) or {}),
@@ -1719,6 +1918,14 @@ def _adaptive_learning_health_from_summary(summary: Any) -> dict[str, Any]:
         "version_memory_key_count": int(health.get("version_memory_key_count", 0) or 0),
         "runtime_cost_observation_count": int(health.get("runtime_cost_observation_count", 0) or 0),
         "runtime_cost_total": float(health.get("runtime_cost_total", 0.0) or 0.0),
+        "value_catalog_entry_pulls": int(health.get("value_catalog_entry_pulls", 0) or 0),
+        "value_catalog_entry_arm_count": int(health.get("value_catalog_entry_arm_count", 0) or 0),
+        "bd_axis_weight_pulls": int(health.get("bd_axis_weight_pulls", 0) or 0),
+        "bd_axis_weight_arm_count": int(health.get("bd_axis_weight_arm_count", 0) or 0),
+        "seed_energy_tier_pulls": int(health.get("seed_energy_tier_pulls", 0) or 0),
+        "seed_energy_tier_arm_count": int(health.get("seed_energy_tier_arm_count", 0) or 0),
+        "champion_graft_donor_pulls": int(health.get("champion_graft_donor_pulls", 0) or 0),
+        "champion_graft_donor_arm_count": int(health.get("champion_graft_donor_arm_count", 0) or 0),
         "continual_imported_family_count": continual_imported_family_count,
         "continual_family_count": continual_family_count,
         "avg_health_penalty": float(health.get("avg_health_penalty", 0.0) or 0.0),
@@ -1735,6 +1942,9 @@ def _quality_archive_health_from_summary(summary: Any) -> dict[str, Any]:
     if isinstance(health, dict) and str(health.get("schema_version", "") or "") == "quality-archive-health-v1":
         return {
             "cell_count": int(health.get("cell_count", 0) or 0),
+            "hierarchical_enabled": bool(health.get("hierarchical_enabled", False)),
+            "child_cell_count": int(health.get("child_cell_count", 0) or 0),
+            "split_cell_count": int(health.get("split_cell_count", 0) or 0),
             "seed_count": int(health.get("seed_count", 0) or 0),
             "elite_seed_count": int(health.get("elite_seed_count", 0) or 0),
             "reward_count": int(health.get("reward_count", 0) or 0),
@@ -1744,10 +1954,19 @@ def _quality_archive_health_from_summary(summary: Any) -> dict[str, Any]:
             "false_positive_count": int(health.get("false_positive_count", 0) or 0),
         }
     archive = summary.get("quality_archive", {})
-    if isinstance(archive, dict) and str(archive.get("schema_version", "") or "") == "quality-diversity-archive-v1":
+    if isinstance(archive, dict) and str(archive.get("schema_version", "") or "") in {
+        "quality-diversity-archive-v1",
+        "quality-diversity-archive-v2",
+    }:
         cells = [cell for cell in archive.get("cells", []) or [] if isinstance(cell, dict)]
         return {
             "cell_count": len(cells),
+            "hierarchical_enabled": bool(archive.get("enable_hierarchical", False)),
+            "child_cell_count": sum(
+                len([child for child in cell.get("children", []) or [] if isinstance(child, dict)])
+                for cell in cells
+            ),
+            "split_cell_count": sum(1 for cell in cells if str(cell.get("split_axis", "") or "")),
             "seed_count": sum(
                 len([seed for seed in cell.get("seeds", []) or [] if isinstance(seed, dict)])
                 for cell in cells
@@ -1762,6 +1981,60 @@ def _quality_archive_health_from_summary(summary: Any) -> dict[str, Any]:
     return {}
 
 
+def _seed_quota_health_from_summary(summary: Any) -> dict[str, Any]:
+    if not isinstance(summary, dict):
+        return {}
+    health = summary.get("seed_quota_health", {})
+    if not isinstance(health, dict):
+        return {}
+    return {
+        "enabled": bool(health.get("enabled", False)),
+        "active": bool(health.get("active", False)),
+        "cluster_count": int(health.get("cluster_count", 0) or 0),
+        "seed_count": int(health.get("seed_count", 0) or 0),
+    }
+
+
+def _lhs_seeding_observed(run: dict[str, Any]) -> bool:
+    meta = run.get("run_meta", {})
+    if isinstance(meta, dict):
+        lhs = meta.get("lhs_seeding", {})
+        if isinstance(lhs, dict) and bool(lhs.get("enabled", False)):
+            return True
+    config = run.get("config", {})
+    return isinstance(config, dict) and bool(config.get("enable_lhs_seeding", False))
+
+
+def _champion_corpus_health_from_run(run: dict[str, Any]) -> dict[str, Any]:
+    health: dict[str, Any] = {}
+    meta = run.get("run_meta", {})
+    if isinstance(meta, dict):
+        corpus = meta.get("champion_corpus", {})
+        if isinstance(corpus, dict):
+            health.update(
+                {
+                    "enabled": bool(corpus.get("enabled", False)),
+                    "injected_count": int(corpus.get("injected_count", 0) or 0),
+                }
+            )
+    summary = run.get("closed_loop_state_summary", {})
+    if isinstance(summary, dict):
+        corpus_summary = summary.get("champion_corpus_health", {})
+        if isinstance(corpus_summary, dict):
+            health.setdefault("enabled", bool(corpus_summary.get("enabled", False)))
+            health["promoted_family_count"] = int(corpus_summary.get("promoted_family_count", 0) or 0)
+            health["family_hit_count"] = int(corpus_summary.get("family_hit_count", 0) or 0)
+    health["active"] = bool(
+        health.get("enabled", False)
+        and (
+            int(health.get("injected_count", 0) or 0) > 0
+            or int(health.get("promoted_family_count", 0) or 0) > 0
+            or int(health.get("family_hit_count", 0) or 0) > 0
+        )
+    )
+    return health
+
+
 def _adaptive_learning_health_rollup(rows: list[dict[str, Any]]) -> dict[str, Any]:
     if not rows:
         return {
@@ -1772,6 +2045,12 @@ def _adaptive_learning_health_rollup(rows: list[dict[str, Any]]) -> dict[str, An
             "version_memory_key_count": 0,
             "runtime_cost_observation_count": 0,
             "runtime_cost_total": 0.0,
+            "bd_axis_weight_pulls": 0,
+            "bd_axis_weight_arm_count": 0,
+            "seed_energy_tier_pulls": 0,
+            "seed_energy_tier_arm_count": 0,
+            "champion_graft_donor_pulls": 0,
+            "champion_graft_donor_arm_count": 0,
             "continual_imported_family_count": 0,
             "continual_family_count": 0,
             "max_health_penalty": 0.0,
@@ -1787,6 +2066,14 @@ def _adaptive_learning_health_rollup(rows: list[dict[str, Any]]) -> dict[str, An
         "version_memory_key_count": sum(int(row.get("version_memory_key_count", 0) or 0) for row in rows),
         "runtime_cost_observation_count": sum(int(row.get("runtime_cost_observation_count", 0) or 0) for row in rows),
         "runtime_cost_total": sum(float(row.get("runtime_cost_total", 0.0) or 0.0) for row in rows),
+        "bd_axis_weight_pulls": sum(int(row.get("bd_axis_weight_pulls", 0) or 0) for row in rows),
+        "bd_axis_weight_arm_count": sum(int(row.get("bd_axis_weight_arm_count", 0) or 0) for row in rows),
+        "seed_energy_tier_pulls": sum(int(row.get("seed_energy_tier_pulls", 0) or 0) for row in rows),
+        "seed_energy_tier_arm_count": sum(int(row.get("seed_energy_tier_arm_count", 0) or 0) for row in rows),
+        "champion_graft_donor_pulls": sum(int(row.get("champion_graft_donor_pulls", 0) or 0) for row in rows),
+        "champion_graft_donor_arm_count": sum(
+            int(row.get("champion_graft_donor_arm_count", 0) or 0) for row in rows
+        ),
         "continual_imported_family_count": sum(int(row.get("continual_imported_family_count", 0) or 0) for row in rows),
         "continual_family_count": sum(int(row.get("continual_family_count", 0) or 0) for row in rows),
         "max_health_penalty": max(float(row.get("max_health_penalty", 0.0) or 0.0) for row in rows),
@@ -1956,6 +2243,7 @@ def _readiness_gates(
     closed_loop_state_persistence: dict[str, Any],
     adaptive_live_component_evidence: dict[str, Any],
     continual_learning_absorption: dict[str, Any],
+    target_version_audit: dict[str, Any],
 ) -> list[dict[str, Any]]:
     required_suites = set(policy.required_live_suites)
     missing_suites = sorted(required_suites - set(live_by_suite))
@@ -1988,6 +2276,33 @@ def _readiness_gates(
             ),
             issues=paper_run_journal_issues,
             missing=paper_run_journal_issues,
+        ),
+        _gate(
+            "target_version_audit",
+            (
+                not live_runs
+                or not thresholds.require_target_version_audit
+                or (
+                    target_version_audit.get("valid_audit_count", 0) > 0
+                    and target_version_audit.get("all_target_packages_up_to_date", False)
+                    and not target_version_audit.get("invalid_files", [])
+                )
+            ),
+            (
+                f"required={thresholds.require_target_version_audit} "
+                f"live_runs={len(live_runs)} "
+                f"valid_audits={target_version_audit.get('valid_audit_count', 0)} "
+                f"target_packages={target_version_audit.get('target_package_count', 0)} "
+                f"outdated={target_version_audit.get('outdated_target_package_count', 0)} "
+                f"unknown_latest={target_version_audit.get('unknown_latest_target_package_count', 0)}"
+            ),
+            audit_files=target_version_audit.get("audit_files", []),
+            valid_audit_files=target_version_audit.get("valid_audit_files", []),
+            invalid_files=target_version_audit.get("invalid_files", []),
+            invalid_reasons=target_version_audit.get("invalid_reasons", {}),
+            outdated_target_packages=target_version_audit.get("outdated_target_packages", []),
+            unknown_latest_target_packages=target_version_audit.get("unknown_latest_target_packages", []),
+            all_target_packages_up_to_date=target_version_audit.get("all_target_packages_up_to_date", False),
         ),
         _gate(
             "short_validation",
@@ -2198,7 +2513,31 @@ def _readiness_gates(
             version_memory_key_count=adaptive_live_component_evidence.get("version_memory_key_count", 0),
             continual_imported_family_count=adaptive_live_component_evidence.get("continual_imported_family_count", 0),
             quality_archive_cell_count=adaptive_live_component_evidence.get("quality_archive_cell_count", 0),
+            quality_archive_child_cell_count=adaptive_live_component_evidence.get(
+                "quality_archive_child_cell_count",
+                0,
+            ),
+            quality_archive_split_cell_count=adaptive_live_component_evidence.get(
+                "quality_archive_split_cell_count",
+                0,
+            ),
             quality_archive_seed_count=adaptive_live_component_evidence.get("quality_archive_seed_count", 0),
+            value_catalog_entry_pulls=adaptive_live_component_evidence.get("value_catalog_entry_pulls", 0),
+            value_catalog_entry_arm_count=adaptive_live_component_evidence.get("value_catalog_entry_arm_count", 0),
+            seed_energy_tier_pulls=adaptive_live_component_evidence.get("seed_energy_tier_pulls", 0),
+            seed_energy_tier_arm_count=adaptive_live_component_evidence.get("seed_energy_tier_arm_count", 0),
+            champion_graft_donor_pulls=adaptive_live_component_evidence.get("champion_graft_donor_pulls", 0),
+            champion_graft_donor_arm_count=adaptive_live_component_evidence.get("champion_graft_donor_arm_count", 0),
+            seed_quota_active_run_count=adaptive_live_component_evidence.get("seed_quota_active_run_count", 0),
+            seed_quota_cluster_count=adaptive_live_component_evidence.get("seed_quota_cluster_count", 0),
+            seed_quota_seed_count=adaptive_live_component_evidence.get("seed_quota_seed_count", 0),
+            lhs_seeding_enabled_run_count=adaptive_live_component_evidence.get("lhs_seeding_enabled_run_count", 0),
+            champion_corpus_enabled_run_count=adaptive_live_component_evidence.get("champion_corpus_enabled_run_count", 0),
+            champion_corpus_injected_count=adaptive_live_component_evidence.get("champion_corpus_injected_count", 0),
+            champion_corpus_promoted_family_count=adaptive_live_component_evidence.get(
+                "champion_corpus_promoted_family_count",
+                0,
+            ),
             runtime_cost_observation_count=adaptive_live_component_evidence.get("runtime_cost_observation_count", 0),
             annealing_observation_count=adaptive_live_component_evidence.get("annealing_observation_count", 0),
             adaptive_selection_run_count=adaptive_live_component_evidence.get("adaptive_selection_run_count", 0),
@@ -2644,11 +2983,24 @@ def _render_markdown(audit: dict[str, Any]) -> str:
     for gate in audit["gates"]:
         lines.append(f"| {gate['name']} | {'pass' if gate['passed'] else 'fail'} | {gate['detail']} |")
     summary = audit["summary"]
+    icse_quality = summary.get("icse_experiment_quality", {})
+    icse_priorities = ", ".join(
+        item.get("dimension", "")
+        for item in (icse_quality.get("optimization_priorities", []) or [])[:3]
+        if item.get("dimension")
+    ) or "none"
     lines.extend(
         [
             "",
             "## Summary",
             "",
+            (
+                "- ICSE experiment quality: "
+                f"score `{icse_quality.get('overall_score', 0.0):.6g}`; "
+                f"grade `{icse_quality.get('grade', 'F')}`; "
+                f"claim-ready `{str(icse_quality.get('ready_for_icse_claim', False)).lower()}`; "
+                f"priorities `{icse_priorities}`"
+            ),
             f"- Validation runs: `{summary['validation_runs']}`; validation cases: `{summary['validation_cases']}`",
             (
                 f"- Ablation runs: `{summary['ablation_runs']}`; ablation cases: `{summary['ablation_cases']}`; "

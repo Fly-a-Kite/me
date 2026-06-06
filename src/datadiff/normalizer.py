@@ -36,7 +36,7 @@ class NormalizedResult:
     def from_dict(cls, payload: Mapping[str, Any], *, backend: str | None = None) -> NormalizedResult:
         columns = [str(column) for column in list(payload.get("columns", []) or [])]
         rows = [list(row) for row in list(payload.get("rows", []) or [])]
-        return cls(
+        result = cls(
             backend=str(payload.get("backend", backend or "")),
             status=str(payload.get("status", "")),
             columns=columns,
@@ -44,6 +44,23 @@ class NormalizedResult:
             error_type=str(payload.get("error_type", "")),
             error=str(payload.get("error", "")),
         )
+        ordered_row_signature = str(payload.get("ordered_row_signature", "") or "")
+        unordered_row_signature = str(payload.get("unordered_row_signature", "") or "")
+        has_duplicate_rows = payload.get("has_duplicate_rows")
+        if (
+            ordered_row_signature
+            and unordered_row_signature
+            and isinstance(has_duplicate_rows, bool)
+        ):
+            result._row_profile_cache = RowSetProfile(
+                ordered_signature=ordered_row_signature,
+                unordered_signature=unordered_row_signature,
+                has_duplicates=has_duplicate_rows,
+            )
+        comparison_key = str(payload.get("comparison_key", "") or "")
+        if comparison_key:
+            result._comparison_key_cache = comparison_key
+        return result
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -51,8 +68,13 @@ class NormalizedResult:
             "status": self.status,
             "columns": self.columns,
             "rows": self.rows,
+            "row_count": self.row_count,
             "error_type": self.error_type,
             "error": self.error,
+            "ordered_row_signature": self.ordered_row_signature,
+            "unordered_row_signature": self.unordered_row_signature,
+            "has_duplicate_rows": self.has_duplicate_rows,
+            "comparison_key": self.comparison_key,
         }
 
     def comparison_payload(self) -> dict[str, Any]:
@@ -85,6 +107,10 @@ class NormalizedResult:
         if self._stable_row_keys_cache is None:
             self._stable_row_keys_cache = canonical_keys(self.rows)
         return self._stable_row_keys_cache
+
+    @property
+    def row_count(self) -> int:
+        return len(self.rows)
 
     def adopt_canonicalized_rows(self, canonicalized: CanonicalizedRows) -> None:
         self.rows = canonicalized.rows
@@ -190,14 +216,15 @@ def normalize_result(result: BackendResult, program: Program, enable_normalizer:
         if native_table is None:
             df = _to_pandas(result.data)
             original_columns = [str(c) for c in list(df.columns)]
-            raw_rows = [[row.iloc[idx] for idx in range(len(original_columns))] for _, row in df.iterrows()]
+            raw_rows_iter = df.itertuples(index=False, name=None)
         else:
             original_columns, raw_rows = native_table
+            raw_rows_iter = raw_rows
         column_positions = sorted(enumerate(original_columns), key=lambda item: (item[1], item[0]))
         columns = [name for _, name in column_positions]
         rows: list[list[Any]] = []
         preserve_float_precision = program.order_sensitive
-        for raw_row in raw_rows:
+        for raw_row in raw_rows_iter:
             rows.append(
                 [
                     _norm_value(raw_row[idx], preserve_float_precision=preserve_float_precision)

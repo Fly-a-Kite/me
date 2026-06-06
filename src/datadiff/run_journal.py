@@ -11,13 +11,15 @@ from datadiff.experiment_metadata import (
     manifest_experiment_meta,
     resolved_run_semantics,
 )
-from datadiff.reward import (
+from datadiff.finding_outcomes import (
     candidate_issue_family_keys,
     is_rewardable_candidate_issue_finding,
+    row_has_rewardable_new_behavior,
 )
 from datadiff.util import (
     JsonlWriter,
     REPORTS_DIR,
+    iter_jsonl,
     jsonl_log_stem,
     load_json,
     read_jsonl,
@@ -35,7 +37,6 @@ def default_journal_path() -> Path:
 
 def build_run_journal_entry(run_file: Path, context: dict[str, Any] | None = None) -> dict[str, Any]:
     context = dict(context or {})
-    rows = read_jsonl(run_file) if run_file.exists() else []
     meta_path = run_meta_path(run_file)
     meta = load_json(meta_path) if meta_path.exists() else {}
     meta_with_context = dict(meta)
@@ -45,10 +46,6 @@ def build_run_journal_entry(run_file: Path, context: dict[str, Any] | None = Non
     run_semantics = resolved_run_semantics(context, experiment_meta)
     config = meta.get("config", {}) if isinstance(meta.get("config", {}), dict) else {}
     known_bug_families = list(config.get("known_saturated_bug_families", []) or [])
-    findings = [finding for row in rows for finding in row.get("findings", [])]
-    candidate_families = _candidate_bug_family_keys(findings, known_bug_families)
-    semantic_divergences = sum(_is_semantic_divergence(finding) for finding in findings)
-    false_positives = sum(_is_false_positive(finding) for finding in findings)
     target_specs = meta.get("targets", [])
     target_families = Counter(target.get("family", "unknown") for target in target_specs)
     target_layers = Counter(target.get("layer", "unknown") for target in target_specs)
@@ -57,13 +54,22 @@ def build_run_journal_entry(run_file: Path, context: dict[str, Any] | None = Non
     )
     evidence_mode = str(context.get("evidence_mode") or meta.get("evidence_mode") or "live")
     theme = str(context.get("theme") or meta.get("run_theme") or _default_theme(context, meta, run_file))
-    executed_cases = int(meta.get("executed_cases", len(rows)))
-    raw_new_behavior_cases = int(meta.get("new_behavior_cases", sum(1 for row in rows if row.get("is_new_behavior"))))
-    signal_new_behavior_cases = int(
-        meta.get(
-            "signal_new_behavior_cases",
-            sum(1 for row in rows if row.get("signal_new_behavior", row.get("is_new_behavior"))),
-        )
+    has_run_log = run_file.exists()
+    summary = _summarize_run_rows(run_file, known_bug_families) if has_run_log else _empty_run_row_summary()
+    executed_cases = (
+        int(summary["executed_cases"])
+        if has_run_log
+        else int(meta.get("executed_cases", summary["executed_cases"]) or 0)
+    )
+    raw_new_behavior_cases = (
+        int(summary["raw_new_behavior_cases"])
+        if has_run_log
+        else int(meta.get("new_behavior_cases", summary["raw_new_behavior_cases"]) or 0)
+    )
+    signal_new_behavior_cases = (
+        int(summary["signal_new_behavior_cases"])
+        if has_run_log
+        else int(meta.get("signal_new_behavior_cases", summary["signal_new_behavior_cases"]) or 0)
     )
 
     return {
@@ -104,7 +110,7 @@ def build_run_journal_entry(run_file: Path, context: dict[str, Any] | None = Non
         "requested_cases": meta.get("requested_cases"),
         "executed_cases": executed_cases,
         "duration_s": meta.get("duration_s"),
-        "elapsed_s": meta.get("elapsed_s", _last_elapsed_s(rows)),
+        "elapsed_s": meta.get("elapsed_s", summary["last_elapsed_s"]),
         "throughput_cases_s": meta.get("throughput_cases_s", 0.0),
         "backends": list(meta.get("backends", context.get("backends", [])) or []),
         "target_families": dict(sorted(target_families.items())),
@@ -136,35 +142,22 @@ def build_run_journal_entry(run_file: Path, context: dict[str, Any] | None = Non
             "fallback_candidates": int(replay_filter.get("fallback_candidates", 0) or 0),
         },
         "result_summary": {
-            "raw_findings": len(findings),
-            "bug_triggering_cases": sum(1 for row in rows if row.get("findings")),
-            "candidate_bug_cases": sum(
-                1
-                for row in rows
-                if any(
-                    is_rewardable_candidate_issue_finding(finding, known_bug_families)
-                    for finding in row.get("findings", [])
-                )
-            ),
-            "candidate_bug_families": dict(candidate_families),
-            "candidate_bug_family_count": len(candidate_families),
-            "semantic_divergence_findings": semantic_divergences,
-            "false_positive_findings": false_positives,
+            "raw_findings": summary["raw_findings"],
+            "bug_triggering_cases": summary["bug_triggering_cases"],
+            "candidate_bug_cases": summary["candidate_bug_cases"],
+            "candidate_bug_families": summary["candidate_bug_families"],
+            "candidate_bug_family_count": len(summary["candidate_bug_families"]),
+            "semantic_divergence_findings": summary["semantic_divergence_findings"],
+            "false_positive_findings": summary["false_positive_findings"],
             "new_behavior_cases": raw_new_behavior_cases,
             "new_behavior_rate": raw_new_behavior_cases / executed_cases if executed_cases else 0.0,
             "signal_new_behavior_cases": signal_new_behavior_cases,
             "signal_new_behavior_rate": signal_new_behavior_cases / executed_cases if executed_cases else 0.0,
-            "saved_artifacts": int(meta.get("saved_artifacts", sum(1 for row in rows if row.get("bug_dir")))),
-            "first_finding_case_index": _first_case_index(rows, lambda finding: True),
-            "first_candidate_bug_case_index": _first_case_index(
-                rows,
-                lambda finding: is_rewardable_candidate_issue_finding(finding, known_bug_families),
-            ),
-            "first_candidate_bug_elapsed_s": _first_case_elapsed_s(
-                rows,
-                lambda finding: is_rewardable_candidate_issue_finding(finding, known_bug_families),
-            ),
-            "candidate_family_first_seen": _candidate_family_first_seen(rows, known_bug_families),
+            "saved_artifacts": int(meta.get("saved_artifacts", summary["saved_artifacts"])),
+            "first_finding_case_index": summary["first_finding_case_index"],
+            "first_candidate_bug_case_index": summary["first_candidate_bug_case_index"],
+            "first_candidate_bug_elapsed_s": summary["first_candidate_bug_elapsed_s"],
+            "candidate_family_first_seen": summary["candidate_family_first_seen"],
             "preflight": meta.get("preflight", {}),
             "quality_oracles": meta.get("quality_oracles", {}),
         },
@@ -306,14 +299,66 @@ def _candidate_issue_family_keys(
     )
 
 
-def _candidate_family_first_seen(
-    rows: list[dict[str, Any]],
-    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
-) -> dict[str, dict[str, Any]]:
+_candidate_bug_family_keys = _candidate_issue_family_keys
+
+
+def _empty_run_row_summary() -> dict[str, Any]:
+    return {
+        "executed_cases": 0,
+        "raw_findings": 0,
+        "bug_triggering_cases": 0,
+        "candidate_bug_cases": 0,
+        "candidate_bug_families": {},
+        "semantic_divergence_findings": 0,
+        "false_positive_findings": 0,
+        "raw_new_behavior_cases": 0,
+        "signal_new_behavior_cases": 0,
+        "saved_artifacts": 0,
+        "first_finding_case_index": None,
+        "first_candidate_bug_case_index": None,
+        "first_candidate_bug_elapsed_s": None,
+        "last_elapsed_s": 0.0,
+        "candidate_family_first_seen": {},
+    }
+
+
+def _summarize_run_rows(
+    run_file: Path,
+    known_bug_families: list[str] | tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    summary = _empty_run_row_summary()
+    candidate_bug_families: Counter[str] = Counter()
     first_seen: dict[str, dict[str, Any]] = {}
-    for fallback_idx, row in enumerate(rows):
-        case = row.get("case", {})
-        for family in _candidate_issue_family_keys(row.get("findings", []), known_saturated_bug_families):
+    for fallback_idx, row in enumerate(iter_jsonl(run_file)):
+        summary["executed_cases"] += 1
+        elapsed = row.get("elapsed_s")
+        if elapsed is not None:
+            summary["last_elapsed_s"] = float(elapsed)
+        findings = row.get("findings", []) or []
+        if findings:
+            summary["bug_triggering_cases"] += 1
+            if summary["first_finding_case_index"] is None:
+                summary["first_finding_case_index"] = int(row.get("case_index", fallback_idx))
+        summary["raw_findings"] += len(findings)
+        summary["raw_new_behavior_cases"] += int(bool(row.get("is_new_behavior")))
+        summary["signal_new_behavior_cases"] += int(
+            row_has_rewardable_new_behavior(row, known_bug_families)
+        )
+        summary["saved_artifacts"] += int(bool(str(row.get("bug_dir", "") or "").strip()))
+        if any(
+            is_rewardable_candidate_issue_finding(finding, known_bug_families)
+            for finding in findings
+        ):
+            summary["candidate_bug_cases"] += 1
+            if summary["first_candidate_bug_case_index"] is None:
+                summary["first_candidate_bug_case_index"] = int(row.get("case_index", fallback_idx))
+                summary["first_candidate_bug_elapsed_s"] = float(elapsed) if elapsed is not None else None
+        for finding in findings:
+            summary["semantic_divergence_findings"] += int(_is_semantic_divergence(finding))
+            summary["false_positive_findings"] += int(_is_false_positive(finding))
+        case = row.get("case", {}) if isinstance(row.get("case", {}), dict) else {}
+        for family in _candidate_issue_family_keys(findings, known_bug_families):
+            candidate_bug_families[family] += 1
             first_seen.setdefault(
                 family,
                 {
@@ -323,32 +368,9 @@ def _candidate_family_first_seen(
                     "seed": case.get("seed", ""),
                 },
             )
-    return first_seen
-
-
-_candidate_bug_family_keys = _candidate_issue_family_keys
-
-
-def _first_case_index(rows: list[dict[str, Any]], predicate: Any) -> int | None:
-    for fallback_idx, row in enumerate(rows):
-        if any(predicate(finding) for finding in row.get("findings", [])):
-            return int(row.get("case_index", fallback_idx))
-    return None
-
-
-def _first_case_elapsed_s(rows: list[dict[str, Any]], predicate: Any) -> float | None:
-    for row in rows:
-        if any(predicate(finding) for finding in row.get("findings", [])):
-            elapsed = row.get("elapsed_s")
-            return float(elapsed) if elapsed is not None else None
-    return None
-
-
-def _last_elapsed_s(rows: list[dict[str, Any]]) -> float:
-    if not rows:
-        return 0.0
-    elapsed = rows[-1].get("elapsed_s", 0.0)
-    return float(elapsed) if elapsed is not None else 0.0
+    summary["candidate_bug_families"] = dict(candidate_bug_families)
+    summary["candidate_family_first_seen"] = first_seen
+    return summary
 
 
 def _is_false_positive(finding: dict[str, Any]) -> bool:

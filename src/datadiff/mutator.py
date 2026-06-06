@@ -1,19 +1,40 @@
 from __future__ import annotations
 
 import copy
+from contextlib import contextmanager
+from contextvars import ContextVar
 import math
 import random
+from itertools import combinations
 from dataclasses import dataclass, field
+from datadiff.champion_corpus import ChampionSeed, ChampionRegistry
 from types import MappingProxyType
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Sequence
 
 from datadiff.datagen import repair_operations
+from datadiff.disagreement import DisagreementDescriptor
 from datadiff.dsl import Case, ColumnSpec, IRNode, Program, TableData, normalize_sort_keys
+from datadiff.energy import operator_energy
 from datadiff.identifiers import make_safe_output_name
-from datadiff.join_keys import join_key_pairs
+from datadiff.join_keys import join_key_arg, join_key_pairs
+from datadiff.mutator_ir import (
+    apply_adjacent_independent_swap,
+    apply_filter_pushdown,
+    apply_filter_above_groupby,
+    apply_redundant_op_fold,
+    apply_subtree_splice,
+    apply_wrap_with_window,
+)
 from datadiff.operation_semantics import aggregate_alias, aggregate_column, aggregate_func, aggregate_specs, op_ascending, op_column, op_kind, op_n, operation_count
 from datadiff.program_state import ProgramState, state_after_operations
+from datadiff.mutator_shrink import (
+    shrink_drop_tail_op,
+    shrink_fold_redundant_op,
+    shrink_inline_single_use_mutate,
+    shrink_merge_adjacent_filters,
+)
 from datadiff.util import unique_preserve_order
+from datadiff.value_catalog import CatalogEntry, sample as sample_catalog_entry
 
 INHERITED_METADATA_KEYS = (
     "generator_profile",
@@ -59,12 +80,116 @@ BOOLEAN_ALIAS_PREFIXES = ("any_", "all_")
 MUTATION_OPERATOR_ANNEALING_BASE_TEMPERATURE = 0.12
 MUTATION_OPERATOR_ANNEALING_MIN_TEMPERATURE = 0.02
 MUTATION_OPERATOR_ANNEALING_DECAY = 0.85
+MUTATION_PLAN_MAX_STEPS = 4
+MUTATION_PLAN_CANDIDATE_WIDTH = 6
+MUTATION_PLAN_MAX_ENERGY_CANDIDATES = 12
+VALUE_CATALOG_SAMPLE_PROBABILITY = 0.50
+IR_REWRITE_MUTATION_OPERATOR_NAMES = frozenset(
+    {
+        "ir_swap_adjacent",
+        "ir_pushdown_filter",
+        "ir_pull_filter_above_groupby",
+        "ir_wrap_with_window",
+        "ir_splice_subtree",
+        "ir_fold_redundant_op",
+    }
+)
+SHRINK_MUTATION_OPERATOR_NAMES = frozenset(
+    {
+        "shrink_drop_tail_op",
+        "shrink_fold_redundant_op",
+        "shrink_merge_adjacent_filters",
+        "shrink_inline_single_use_mutate",
+    }
+)
+
+
+@dataclass(slots=True)
+class _MutationStateCache:
+    schema_by_key: dict[tuple[Any, ...], "MutationSchema"] = field(default_factory=dict)
+    context_by_key: dict[tuple[Any, ...], "MutationOperationContext | None"] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class _ValueCatalogMutationContext:
+    descriptor: DisagreementDescriptor | None = None
+    entry_scores: Mapping[str, float] | None = None
+    collect_usage: bool = False
+    used_entries: list[dict[str, Any]] = field(default_factory=list)
+
+
+_ACTIVE_MUTATION_STATE_CACHE: ContextVar[_MutationStateCache | None] = ContextVar(
+    "active_mutation_state_cache",
+    default=None,
+)
+_ACTIVE_VALUE_CATALOG_CONTEXT: ContextVar[_ValueCatalogMutationContext | None] = ContextVar(
+    "active_value_catalog_context",
+    default=None,
+)
 
 
 @dataclass(slots=True)
 class MutationResult:
     case: Case
     metadata: dict[str, Any]
+
+
+@dataclass(slots=True)
+class MutationPlanStep:
+    operator: str
+    detail: str
+    changed: bool
+    productive: bool
+    heuristic_score: float
+    operator_score: float
+    target_affinity: float
+    divergence_affinity: float
+    novelty_bonus: float
+    candidate_width: int
+    resulting_operation_count: int
+    replay_seed: int
+    repair_changed: bool = False
+    fallback_used: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "operator": self.operator,
+            "detail": self.detail,
+            "changed": self.changed,
+            "productive": self.productive,
+            "repair_changed": self.repair_changed,
+            "fallback_used": self.fallback_used,
+            "heuristic_score": self.heuristic_score,
+            "operator_score": self.operator_score,
+            "target_affinity": self.target_affinity,
+            "divergence_affinity": self.divergence_affinity,
+            "novelty_bonus": self.novelty_bonus,
+            "candidate_width": self.candidate_width,
+            "resulting_operation_count": self.resulting_operation_count,
+            "replay_seed": self.replay_seed,
+        }
+
+
+@dataclass(slots=True)
+class MutationPlan:
+    strategy: str
+    planned_depth: int
+    executed_depth: int
+    steps: list[MutationPlanStep] = field(default_factory=list)
+    top_operators: list[dict[str, Any]] = field(default_factory=list)
+    annealing_temperature: float = 0.0
+    changed: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "strategy": self.strategy,
+            "planned_depth": self.planned_depth,
+            "executed_depth": self.executed_depth,
+            "changed": self.changed,
+            "annealing_temperature": self.annealing_temperature,
+            "top_operators": [dict(row) for row in self.top_operators],
+            "steps": [step.to_dict() for step in self.steps],
+        }
 
 
 @dataclass(frozen=True, slots=True, init=False)
@@ -74,6 +199,7 @@ class MutationOperator:
     semantic_family_affinity: tuple[str, ...]
     semantic_signal_affinity: tuple[str, ...]
     exploration_objective_affinity: tuple[str, ...]
+    divergence_affinity: tuple[str, ...]
 
     def __init__(
         self,
@@ -82,6 +208,7 @@ class MutationOperator:
         semantic_family_affinity: tuple[str, ...] = (),
         semantic_signal_affinity: tuple[str, ...] = (),
         exploration_objective_affinity: tuple[str, ...] = (),
+        divergence_affinity: tuple[str, ...] = (),
         *,
         semantic_affinity: tuple[str, ...] | None = None,
     ) -> None:
@@ -95,6 +222,7 @@ class MutationOperator:
             "exploration_objective_affinity",
             tuple(exploration_objective_affinity),
         )
+        object.__setattr__(self, "divergence_affinity", tuple(divergence_affinity))
 
     @property
     def semantic_affinity(self) -> tuple[str, ...]:
@@ -130,12 +258,37 @@ class MutationOperationContext:
     strings: tuple[str, ...]
     date_strings: tuple[str, ...]
     numeric_strings: tuple[str, ...]
+    extra_tables: tuple[TableData, ...] = ()
 
     def column_type(self, name: str) -> str:
         return self.schema.column_type(name)
 
     def column_has_null(self, name: str) -> bool:
         return self.schema.column_has_null(name)
+
+
+@contextmanager
+def _activate_mutation_state_cache(cache: _MutationStateCache | None):
+    if cache is None:
+        yield
+        return
+    token = _ACTIVE_MUTATION_STATE_CACHE.set(cache)
+    try:
+        yield
+    finally:
+        _ACTIVE_MUTATION_STATE_CACHE.reset(token)
+
+
+@contextmanager
+def _activate_value_catalog_context(context: _ValueCatalogMutationContext | None):
+    if context is None:
+        yield
+        return
+    token = _ACTIVE_VALUE_CATALOG_CONTEXT.set(context)
+    try:
+        yield
+    finally:
+        _ACTIVE_VALUE_CATALOG_CONTEXT.reset(token)
 
 
 def mutate_case(case: Case, seed: int) -> Case:
@@ -148,35 +301,104 @@ def mutate_case_with_metadata(
     *,
     allow_probe_operators: bool = True,
     operator_scores: Mapping[str, float] | None = None,
+    target_keys: Sequence[str] | None = None,
+    plan_depth: int | None = None,
+    disagreement: DisagreementDescriptor | Mapping[str, Any] | None = None,
+    operator_pulls: Mapping[str, int] | None = None,
+    recent_operator_pulls: Mapping[str, int] | None = None,
+    champion_donors: Sequence[ChampionSeed] | None = None,
+    enable_ir_rewrite_mutations: bool = True,
+    enable_divergence_conditioned_mutations: bool = True,
+    enable_shrink_mutations: bool = True,
+    enable_per_operator_energy: bool = True,
+    enable_value_catalog: bool = True,
+    value_catalog_scores: Mapping[str, float] | None = None,
 ) -> MutationResult:
-    rnd = random.Random(seed * 104729 + case.seed)
-    operator_pool = MUTATION_OPERATORS if allow_probe_operators else DISCOVERY_MUTATION_OPERATORS
-    attempt_order = _mutation_attempt_order(operator_pool, rnd, operator_scores=operator_scores)
-    fallback: tuple[list[TableData], list[dict[str, Any]], MutationOperator, str, bool] | None = None
-    selected: tuple[list[TableData], list[dict[str, Any]], MutationOperator, str, bool] | None = None
-    original_tables = case.tables
-    original_ops = case.program.operations
-    for operator in attempt_order:
-        tables = _clone_tables(case.tables)
-        table = tables[0]
-        operations = _clone_operations(case.program.operations)
-        detail = operator.apply(tables, operations, rnd)
-        operations = repair_operations(table, operations, extra_tables=tables[1:])
-        if not operations:
-            operations = [{"op": "limit", "n": len(table.rows)}]
-        changed = tables != original_tables or operations != original_ops
-        attempt = (tables, operations, operator, detail, changed)
-        fallback = attempt
-        if changed and not _mutation_detail_is_unproductive(detail):
-            selected = attempt
-            break
-    if selected is None:
-        if fallback is None:
-            raise RuntimeError("mutation operator pool is empty")
-        selected = fallback
-    tables, operations, operator, detail, changed = selected
+    if champion_donors:
+        graft_rnd = random.Random(seed ^ 0xC0FFEE)
+        if graft_rnd.random() < 0.20:
+            donor = champion_donors[0]
+            grafted = ChampionRegistry().graft_subtree(case, donor, graft_rnd)
+            metadata = _inherited_metadata(case.metadata)
+            metadata.update(dict(grafted.metadata or {}))
+            metadata.update(
+                {
+                    "candidate_source": "feedback_mutation",
+                    "seed_lineage": {
+                        "root_seed": case.seed,
+                        "parent_seed": case.seed,
+                        "parent_case_id": case.case_id,
+                        "mutation_seed": seed,
+                        "depth": int((case.metadata or {}).get("seed_lineage", {}).get("depth", 0) or 0) + 1
+                        if isinstance(case.metadata, dict)
+                        else 1,
+                    },
+                    "mutation": {
+                        "operator": "champion_graft",
+                        "detail": f"donor={donor.case_id}",
+                        "changed": grafted.program.operations != case.program.operations,
+                        "operator_sequence": ["champion_graft"],
+                        "detail_sequence": [f"donor={donor.case_id}"],
+                        "plan_depth": 1,
+                        "executed_steps": 1,
+                        "multi_step": False,
+                    },
+                    "mutation_selection": {
+                        "operator": "champion_graft",
+                        "strategy": "champion_seed_grafting",
+                    },
+                    "mutation_plan": {
+                        "strategy": "champion_seed_grafting",
+                        "planned_depth": 1,
+                        "executed_depth": 1,
+                        "changed": grafted.program.operations != case.program.operations,
+                        "steps": [],
+                    },
+                }
+            )
+            grafted.case_id = f"{case.case_id}-champion-mut-{seed}"
+            grafted.seed = seed
+            grafted.metadata = metadata
+            return MutationResult(grafted, metadata)
+    operator_pool = _mutation_operator_pool(
+        allow_probe_operators=allow_probe_operators,
+        enable_ir_rewrite_mutations=enable_ir_rewrite_mutations,
+        enable_shrink_mutations=enable_shrink_mutations,
+    )
+    plan = _build_mutation_plan(
+        case,
+        seed,
+        operator_pool=operator_pool,
+        operator_scores=operator_scores,
+        target_keys=target_keys,
+        plan_depth=plan_depth,
+        disagreement=disagreement,
+        operator_pulls=operator_pulls,
+        recent_operator_pulls=recent_operator_pulls,
+        enable_divergence_conditioned_mutations=enable_divergence_conditioned_mutations,
+        enable_per_operator_energy=enable_per_operator_energy,
+        enable_value_catalog=enable_value_catalog,
+        value_catalog_scores=value_catalog_scores,
+    )
+    if not plan.steps:
+        raise RuntimeError("mutation operator pool is empty")
+    disagreement_descriptor = _coerce_disagreement_descriptor(disagreement)
+    value_catalog_context = (
+        _ValueCatalogMutationContext(
+            descriptor=disagreement_descriptor,
+            entry_scores=value_catalog_scores,
+            collect_usage=True,
+        )
+        if enable_value_catalog
+        else None
+    )
+    with _activate_value_catalog_context(value_catalog_context):
+        tables, operations = _apply_mutation_plan(case, seed, operator_pool=operator_pool, plan=plan)
+    primary_step = plan.steps[0]
+    choice = primary_step.operator
+    detail = primary_step.detail
+    changed = bool(plan.changed)
     table = tables[0]
-    choice = operator.name
     parent_lineage = case.metadata.get("seed_lineage", {}) if isinstance(case.metadata, dict) else {}
     root_seed = parent_lineage.get("root_seed", case.seed)
     depth = int(parent_lineage.get("depth", 0) or 0) + 1
@@ -195,12 +417,23 @@ def mutate_case_with_metadata(
                 "operator": choice,
                 "detail": detail,
                 "changed": changed,
+                "operator_sequence": [step.operator for step in plan.steps],
+                "detail_sequence": [step.detail for step in plan.steps],
+                "plan_depth": plan.planned_depth,
+                "executed_steps": plan.executed_depth,
+                "multi_step": plan.executed_depth > 1,
+                "value_catalog_entries": list(value_catalog_context.used_entries)
+                if value_catalog_context is not None
+                else [],
             },
             "mutation_selection": _mutation_selection_metadata(
                 choice,
-                attempt_order,
+                [operator for operator in operator_pool if operator.name in {step.operator for step in plan.steps}]
+                or list(operator_pool),
                 operator_scores=operator_scores,
+                plan=plan,
             ),
+            "mutation_plan": plan.to_dict(),
         }
     )
     program = Program(
@@ -216,6 +449,448 @@ def mutate_case_with_metadata(
         metadata=metadata,
     )
     return MutationResult(mutated, metadata)
+
+
+def _build_mutation_plan(
+    case: Case,
+    seed: int,
+    *,
+    operator_pool: tuple[MutationOperator, ...],
+    operator_scores: Mapping[str, float] | None,
+    target_keys: Sequence[str] | None,
+    plan_depth: int | None,
+    disagreement: DisagreementDescriptor | Mapping[str, Any] | None = None,
+    operator_pulls: Mapping[str, int] | None = None,
+    recent_operator_pulls: Mapping[str, int] | None = None,
+    enable_divergence_conditioned_mutations: bool = True,
+    enable_per_operator_energy: bool = True,
+    enable_value_catalog: bool = True,
+    value_catalog_scores: Mapping[str, float] | None = None,
+) -> MutationPlan:
+    if not operator_pool:
+        return MutationPlan(strategy="empty_pool", planned_depth=0, executed_depth=0)
+    planned_depth = _resolve_mutation_plan_depth(
+        case,
+        operator_scores=operator_scores,
+        target_keys=target_keys,
+        plan_depth=plan_depth,
+    )
+    operator_score_map = dict(operator_scores or {})
+    target_context = _mutation_target_context(target_keys)
+    disagreement_descriptor = _coerce_disagreement_descriptor(disagreement)
+    original_tables = case.tables
+    original_ops = case.program.operations
+    current_tables = _clone_tables(case.tables)
+    current_operations = _clone_operations(case.program.operations)
+    state_cache = _MutationStateCache()
+    executed_steps: list[MutationPlanStep] = []
+    top_operators: list[dict[str, Any]] = []
+    annealing_temperature = 0.0
+    for step_index in range(planned_depth):
+        step_seed = _mutation_step_seed(seed, case.seed, step_index)
+        step_rnd = random.Random(step_seed)
+        attempt_order = _mutation_attempt_order(
+            operator_pool,
+            step_rnd,
+            operator_scores=operator_score_map,
+        )
+        if step_index == 0:
+            top_operators = _ranked_operator_snapshot(attempt_order, operator_score_map)
+            annealing_temperature = _mutation_selection_temperature(
+                attempt_order,
+                operator_score_map,
+            )
+        candidates: list[tuple[list[TableData], list[dict[str, Any]], MutationPlanStep]] = []
+        candidate_rank = 1
+        candidate_budget = _mutation_plan_candidate_budget(
+            operator_pulls=operator_pulls,
+            recent_operator_pulls=recent_operator_pulls,
+            enable_per_operator_energy=enable_per_operator_energy,
+        )
+        for operator in attempt_order[: min(len(attempt_order), MUTATION_PLAN_CANDIDATE_WIDTH)]:
+            width = _mutation_operator_candidate_width(
+                operator,
+                operator_scores=operator_score_map,
+                operator_pulls=operator_pulls,
+                recent_operator_pulls=recent_operator_pulls,
+                enable_per_operator_energy=enable_per_operator_energy,
+            )
+            for _ in range(width):
+                if len(candidates) >= candidate_budget:
+                    break
+                trial_tables, trial_operations, step = _simulate_mutation_step(
+                    current_tables,
+                    current_operations,
+                    operator,
+                    seed=seed,
+                    case_seed=case.seed,
+                    step_index=step_index,
+                    candidate_rank=candidate_rank,
+                    candidate_width=width,
+                    operator_scores=operator_score_map,
+                    target_context=target_context,
+                    disagreement=disagreement_descriptor,
+                    enable_divergence_conditioned_mutations=enable_divergence_conditioned_mutations,
+                    enable_value_catalog=enable_value_catalog,
+                    value_catalog_scores=value_catalog_scores,
+                    prior_steps=executed_steps,
+                    state_cache=state_cache,
+                )
+                candidates.append((trial_tables, trial_operations, step))
+                candidate_rank += 1
+            if len(candidates) >= candidate_budget:
+                break
+        if not candidates:
+            break
+        selected_tables, selected_operations, selected_step = max(
+            candidates,
+            key=lambda item: (
+                item[2].productive,
+                item[2].changed,
+                item[2].heuristic_score,
+                -len(item[1]),
+                item[2].operator,
+            ),
+        )
+        if not selected_step.changed:
+            if not executed_steps:
+                executed_steps.append(selected_step)
+            break
+        current_tables = selected_tables
+        current_operations = selected_operations
+        executed_steps.append(selected_step)
+        if not selected_step.productive:
+            break
+        operator_score_map = _advance_plan_operator_scores(
+            operator_score_map,
+            selected_step.operator,
+            executed_steps,
+        )
+    changed = current_tables != original_tables or current_operations != original_ops
+    return MutationPlan(
+        strategy="adaptive_multi_step_planning" if planned_depth > 1 else "single_step_ranking",
+        planned_depth=planned_depth,
+        executed_depth=sum(1 for step in executed_steps if step.changed),
+        steps=executed_steps,
+        top_operators=top_operators[:8],
+        annealing_temperature=annealing_temperature,
+        changed=changed,
+    )
+
+
+def _apply_mutation_plan(
+    case: Case,
+    seed: int,
+    *,
+    operator_pool: tuple[MutationOperator, ...],
+    plan: MutationPlan,
+) -> tuple[list[TableData], list[dict[str, Any]]]:
+    operator_index = {operator.name: operator for operator in operator_pool}
+    tables = _clone_tables(case.tables)
+    operations = _clone_operations(case.program.operations)
+    state_cache = _MutationStateCache()
+    for step_index, step in enumerate(plan.steps):
+        operator = operator_index.get(step.operator)
+        if operator is None:
+            continue
+        step_rnd = random.Random(step.replay_seed)
+        with _activate_mutation_state_cache(state_cache):
+            detail = operator.apply(tables, operations, step_rnd)
+        operations = repair_operations(tables[0], operations, extra_tables=tables[1:])
+        if not operations:
+            operations = [{"op": "limit", "n": len(tables[0].rows)}]
+        if step.detail != detail:
+            step.detail = detail
+    return tables, operations
+
+
+def _simulate_mutation_step(
+    current_tables: list[TableData],
+    current_operations: list[dict[str, Any]],
+    operator: MutationOperator,
+    *,
+    seed: int,
+    case_seed: int,
+    step_index: int,
+    candidate_rank: int,
+    candidate_width: int,
+    operator_scores: Mapping[str, float] | None,
+    target_context: dict[str, set[str]],
+    disagreement: DisagreementDescriptor | None,
+    enable_divergence_conditioned_mutations: bool,
+    enable_value_catalog: bool,
+    value_catalog_scores: Mapping[str, float] | None,
+    prior_steps: Sequence[MutationPlanStep],
+    state_cache: _MutationStateCache | None = None,
+) -> tuple[list[TableData], list[dict[str, Any]], MutationPlanStep]:
+    trial_tables = _clone_tables(current_tables)
+    trial_operations = _clone_operations(current_operations)
+    replay_seed = _mutation_candidate_seed(seed, case_seed, step_index, candidate_rank, operator.name)
+    trial_rnd = random.Random(replay_seed)
+    value_context = (
+        _ValueCatalogMutationContext(
+            descriptor=disagreement,
+            entry_scores=value_catalog_scores,
+            collect_usage=False,
+        )
+        if enable_value_catalog
+        else None
+    )
+    with _activate_value_catalog_context(value_context), _activate_mutation_state_cache(state_cache):
+        detail = operator.apply(trial_tables, trial_operations, trial_rnd)
+    trial_operations = repair_operations(trial_tables[0], trial_operations, extra_tables=trial_tables[1:])
+    if not trial_operations:
+        trial_operations = [{"op": "limit", "n": len(trial_tables[0].rows)}]
+    changed = trial_tables != current_tables or trial_operations != current_operations
+    productive = changed and not _mutation_detail_is_unproductive(detail)
+    operator_score = _mutation_operator_score(operator.name, operator_scores)
+    target_affinity = _mutation_target_affinity(operator, target_context)
+    divergence_affinity = (
+        _mutation_divergence_affinity(operator, disagreement)
+        if enable_divergence_conditioned_mutations
+        else 0.0
+    )
+    novelty_bonus = 0.18 if all(step.operator != operator.name for step in prior_steps) else -0.08
+    heuristic_score = _mutation_plan_step_score(
+        operator=operator,
+        detail=detail,
+        changed=changed,
+        productive=productive,
+        operator_score=operator_score,
+        target_affinity=target_affinity,
+        divergence_affinity=divergence_affinity,
+        novelty_bonus=novelty_bonus,
+        resulting_operation_count=len(trial_operations),
+        prior_steps=prior_steps,
+    )
+    return trial_tables, trial_operations, MutationPlanStep(
+        operator=operator.name,
+        detail=detail,
+        changed=changed,
+        productive=productive,
+        heuristic_score=heuristic_score,
+        operator_score=operator_score,
+        target_affinity=target_affinity,
+        divergence_affinity=divergence_affinity,
+        novelty_bonus=novelty_bonus + divergence_affinity,
+        candidate_width=max(1, int(candidate_width)),
+        resulting_operation_count=len(trial_operations),
+        replay_seed=replay_seed,
+    )
+
+
+def _resolve_mutation_plan_depth(
+    case: Case,
+    *,
+    operator_scores: Mapping[str, float] | None,
+    target_keys: Sequence[str] | None,
+    plan_depth: int | None,
+) -> int:
+    if plan_depth is not None:
+        return max(1, min(MUTATION_PLAN_MAX_STEPS, int(plan_depth)))
+    normalized_targets = [str(target).strip() for target in (target_keys or ()) if str(target).strip()]
+    if not normalized_targets:
+        return 1
+    depth = 1
+    lineage = case.metadata.get("seed_lineage", {}) if isinstance(case.metadata, dict) else {}
+    current_depth = int(lineage.get("depth", 0) or 0)
+    if current_depth <= 1:
+        depth += 1
+    if len(normalized_targets) >= 2:
+        depth += 1
+    if any(
+        target.startswith("semantic_signal:") or target.startswith("exploration_objective:")
+        for target in normalized_targets
+    ):
+        depth += 1
+    if operator_scores:
+        positive = [float(score) for key, score in operator_scores.items() if key != "__untried__" and float(score) > 0.0]
+        if len(positive) >= 2:
+            depth += 1
+    return max(1, min(MUTATION_PLAN_MAX_STEPS, depth))
+
+
+def _mutation_target_context(target_keys: Sequence[str] | None) -> dict[str, set[str]]:
+    context = {
+        "semantic_family": set(),
+        "semantic_signal": set(),
+        "exploration_objective": set(),
+    }
+    for target in target_keys or ():
+        text = str(target).strip()
+        if not text:
+            continue
+        if text.startswith("semantic_family:"):
+            context["semantic_family"].add(text.removeprefix("semantic_family:").strip())
+        elif text.startswith("semantic_signal:"):
+            context["semantic_signal"].add(text.removeprefix("semantic_signal:").strip())
+        elif text.startswith("exploration_objective:"):
+            context["exploration_objective"].add(text.removeprefix("exploration_objective:").strip())
+    return context
+
+
+def _mutation_target_affinity(
+    operator: MutationOperator,
+    target_context: Mapping[str, set[str]],
+) -> float:
+    bonus = 0.0
+    family_targets = target_context.get("semantic_family", set())
+    signal_targets = target_context.get("semantic_signal", set())
+    objective_targets = target_context.get("exploration_objective", set())
+    if family_targets:
+        family_hits = family_targets & set(operator.semantic_family_affinity)
+        bonus += 0.18 * len(family_hits)
+    if signal_targets:
+        signal_hits = signal_targets & set(operator.semantic_signal_affinity)
+        bonus += 0.22 * len(signal_hits)
+    if objective_targets:
+        objective_hits = objective_targets & set(operator.exploration_objective_affinity)
+        bonus += 0.16 * len(objective_hits)
+    return min(0.75, bonus)
+
+
+def _coerce_disagreement_descriptor(
+    disagreement: DisagreementDescriptor | Mapping[str, Any] | None,
+) -> DisagreementDescriptor | None:
+    if disagreement is None:
+        return None
+    if isinstance(disagreement, DisagreementDescriptor):
+        return disagreement
+    if isinstance(disagreement, Mapping):
+        descriptor = DisagreementDescriptor.from_dict(disagreement)
+        return descriptor if descriptor.feature_tokens() else None
+    return None
+
+
+def _mutation_divergence_affinity(
+    operator: MutationOperator,
+    descriptor: DisagreementDescriptor | None,
+) -> float:
+    if descriptor is None or not operator.divergence_affinity:
+        return 0.0
+    tokens = set(descriptor.feature_tokens())
+    if not tokens:
+        return 0.0
+    hits = sum(1 for token in operator.divergence_affinity if token in tokens)
+    if hits <= 0:
+        return 0.0
+    return 0.30 * min(1.0, hits / max(1, len(operator.divergence_affinity)))
+
+
+def _mutation_plan_candidate_budget(
+    *,
+    operator_pulls: Mapping[str, int] | None,
+    recent_operator_pulls: Mapping[str, int] | None,
+    enable_per_operator_energy: bool = True,
+) -> int:
+    if not enable_per_operator_energy or (operator_pulls is None and recent_operator_pulls is None):
+        return MUTATION_PLAN_CANDIDATE_WIDTH
+    return MUTATION_PLAN_MAX_ENERGY_CANDIDATES
+
+
+def _mutation_operator_candidate_width(
+    operator: MutationOperator,
+    *,
+    operator_scores: Mapping[str, float],
+    operator_pulls: Mapping[str, int] | None,
+    recent_operator_pulls: Mapping[str, int] | None,
+    enable_per_operator_energy: bool = True,
+) -> int:
+    if not enable_per_operator_energy or (operator_pulls is None and recent_operator_pulls is None):
+        return 1
+    return operator_energy(
+        pulls=int((operator_pulls or {}).get(operator.name, 0) or 0),
+        mean_reward=float(operator_scores.get(operator.name, operator_scores.get("__untried__", 0.0)) or 0.0),
+        recent_unproductive_streak=int((recent_operator_pulls or {}).get(operator.name, 0) or 0),
+        catalog_width=MUTATION_PLAN_CANDIDATE_WIDTH,
+    )
+
+
+def _mutation_plan_step_score(
+    *,
+    operator: MutationOperator,
+    detail: str,
+    changed: bool,
+    productive: bool,
+    operator_score: float,
+    target_affinity: float,
+    divergence_affinity: float,
+    novelty_bonus: float,
+    resulting_operation_count: int,
+    prior_steps: Sequence[MutationPlanStep],
+) -> float:
+    score = operator_score + target_affinity + divergence_affinity + novelty_bonus
+    if changed:
+        score += 0.85
+    else:
+        score -= 1.25
+    if productive:
+        score += 0.65
+    else:
+        score -= 0.25
+    if detail.startswith("append_") or detail.startswith("join:") or detail.startswith("groupby:"):
+        score += 0.10
+    repeated_penalty = 0.0
+    if prior_steps and any(step.operator == operator.name for step in prior_steps):
+        repeated_penalty += 0.20
+    complexity_penalty = max(0.0, resulting_operation_count - 8) * 0.06
+    return score - repeated_penalty - complexity_penalty
+
+
+def _mutation_step_seed(seed: int, case_seed: int, step_index: int) -> int:
+    return (seed * 104729) + (case_seed * 13007) + (step_index * 4099)
+
+
+def _mutation_candidate_seed(seed: int, case_seed: int, step_index: int, candidate_rank: int, operator_name: str) -> int:
+    operator_hash = sum((index + 1) * ord(char) for index, char in enumerate(operator_name))
+    return _mutation_step_seed(seed, case_seed, step_index) + (candidate_rank * 811) + operator_hash
+
+
+def _mutation_operator_score(operator_name: str, operator_scores: Mapping[str, float] | None) -> float:
+    if not operator_scores:
+        return 0.0
+    untried = float(operator_scores.get("__untried__", 0.0))
+    return float(operator_scores.get(operator_name, untried))
+
+
+def _advance_plan_operator_scores(
+    operator_scores: Mapping[str, float],
+    selected_operator: str,
+    prior_steps: Sequence[MutationPlanStep],
+) -> dict[str, float]:
+    updated = dict(operator_scores)
+    if selected_operator:
+        updated[selected_operator] = float(updated.get(selected_operator, updated.get("__untried__", 0.0))) - 0.20
+    if len(prior_steps) >= 2:
+        updated["__untried__"] = float(updated.get("__untried__", 0.0)) + 0.05
+    return updated
+
+
+def _ranked_operator_snapshot(
+    attempt_order: Sequence[MutationOperator],
+    operator_scores: Mapping[str, float] | None,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "operator": operator.name,
+            "score": _mutation_operator_score(operator.name, operator_scores),
+        }
+        for operator in attempt_order[:8]
+    ]
+
+
+def _mutation_selection_temperature(
+    attempt_order: Sequence[MutationOperator],
+    operator_scores: Mapping[str, float] | None,
+) -> float:
+    if not operator_scores:
+        return 0.0
+    untried_score = float(operator_scores.get("__untried__", 0.0))
+    return _mutation_annealing_temperature(
+        list(attempt_order[1:]),
+        operator_scores=operator_scores,
+        untried_score=untried_score,
+    )
 
 
 def _mutation_attempt_order(
@@ -306,13 +981,20 @@ def _mutation_selection_metadata(
     attempt_order: list[MutationOperator],
     *,
     operator_scores: Mapping[str, float] | None,
+    plan: MutationPlan | None = None,
 ) -> dict[str, Any]:
     if not operator_scores:
-        return {
+        payload = {
             "strategy": "random_operator_shuffle",
             "candidate_count": len(attempt_order),
             "selected_operator": selected_operator,
         }
+        if plan is not None:
+            payload["planned_depth"] = plan.planned_depth
+            payload["executed_depth"] = plan.executed_depth
+            payload["multi_step"] = plan.executed_depth > 1
+            payload["plan"] = plan.to_dict()
+        return payload
     untried_score = float(operator_scores.get("__untried__", 0.0))
     scored = [
         {
@@ -328,7 +1010,7 @@ def _mutation_selection_metadata(
         0,
     )
     tail = [operator for operator in attempt_order if operator.name != ranked[0]["operator"]]
-    return {
+    payload = {
         "strategy": "feedback_score_with_annealed_tail",
         "candidate_count": len(attempt_order),
         "selected_operator": selected_operator,
@@ -340,17 +1022,56 @@ def _mutation_selection_metadata(
             untried_score=untried_score,
         ),
         "annealing_decay": MUTATION_OPERATOR_ANNEALING_DECAY,
-        "top_operators": ranked[:8],
+        "top_operators": plan.top_operators[:8] if plan is not None and plan.top_operators else ranked[:8],
     }
+    if plan is not None:
+        payload["planned_depth"] = plan.planned_depth
+        payload["executed_depth"] = plan.executed_depth
+        payload["multi_step"] = plan.executed_depth > 1
+        payload["plan"] = plan.to_dict()
+        if plan.annealing_temperature > 0.0:
+            payload["annealing_temperature"] = plan.annealing_temperature
+    return payload
 
 
 def mutation_operator_profiles(
     *,
     allow_probe_operators: bool = True,
+    enable_ir_rewrite_mutations: bool = True,
+    enable_shrink_mutations: bool = True,
 ) -> Mapping[str, MutationOperator]:
-    if allow_probe_operators:
-        return ALL_MUTATION_OPERATOR_PROFILES
-    return DISCOVERY_MUTATION_OPERATOR_PROFILES
+    profiles = ALL_MUTATION_OPERATOR_PROFILES if allow_probe_operators else DISCOVERY_MUTATION_OPERATOR_PROFILES
+    disabled_names: set[str] = set()
+    if not enable_ir_rewrite_mutations:
+        disabled_names.update(IR_REWRITE_MUTATION_OPERATOR_NAMES)
+    if not enable_shrink_mutations:
+        disabled_names.update(SHRINK_MUTATION_OPERATOR_NAMES)
+    if not disabled_names:
+        return profiles
+    return MappingProxyType(
+        {
+            name: operator
+            for name, operator in profiles.items()
+            if name not in disabled_names
+        }
+    )
+
+
+def _mutation_operator_pool(
+    *,
+    allow_probe_operators: bool,
+    enable_ir_rewrite_mutations: bool = True,
+    enable_shrink_mutations: bool = True,
+) -> tuple[MutationOperator, ...]:
+    pool = MUTATION_OPERATORS if allow_probe_operators else DISCOVERY_MUTATION_OPERATORS
+    disabled_names: set[str] = set()
+    if not enable_ir_rewrite_mutations:
+        disabled_names.update(IR_REWRITE_MUTATION_OPERATOR_NAMES)
+    if not enable_shrink_mutations:
+        disabled_names.update(SHRINK_MUTATION_OPERATOR_NAMES)
+    if not disabled_names:
+        return pool
+    return tuple(operator for operator in pool if operator.name not in disabled_names)
 
 
 def _mutation_detail_is_unproductive(detail: str) -> bool:
@@ -367,8 +1088,17 @@ def _mutation_detail_is_unproductive(detail: str) -> bool:
 
 
 def _mutation_schema(tables: list[TableData], operations: list[dict[str, Any]]) -> MutationSchema:
+    cache = _ACTIVE_MUTATION_STATE_CACHE.get()
+    cache_key = _mutation_state_cache_key(tables, operations) if cache is not None else None
+    if cache is not None and cache_key is not None:
+        cached = cache.schema_by_key.get(cache_key)
+        if cached is not None:
+            return cached
     if not tables:
-        return MutationSchema([], {}, set())
+        schema = MutationSchema([], {}, set())
+        if cache is not None and cache_key is not None:
+            cache.schema_by_key[cache_key] = schema
+        return schema
     state = state_after_operations(
         tables[0],
         operations,
@@ -378,7 +1108,10 @@ def _mutation_schema(tables: list[TableData], operations: list[dict[str, Any]]) 
     for name in state.columns:
         if _base_table_column_has_null(tables, name):
             nullable_columns.add(name)
-    return MutationSchema(list(state.columns), dict(state.column_types), nullable_columns)
+    schema = MutationSchema(list(state.columns), dict(state.column_types), nullable_columns)
+    if cache is not None and cache_key is not None:
+        cache.schema_by_key[cache_key] = schema
+    return schema
 
 
 def _base_table_column_has_null(tables: list[TableData], name: str) -> bool:
@@ -459,12 +1192,21 @@ def _mutate_value(table: TableData, rnd: random.Random) -> str:
     col = rnd.choice(table.columns)
     row = rnd.choice(table.rows)
     current = row.get(col.name)
+    catalog = _sample_catalog_literal(col.type, rnd, column=col.name)
     if current is None:
+        if catalog is not None:
+            row[col.name] = catalog.value
+            _record_value_catalog_usage(catalog, column=col.name, column_type=col.type, purpose="fill-null")
+            return f"value_catalog:{catalog.entry_id}:{col.name}:fill-null"
         if col.type == "str" and _looks_like_date_column(col.name):
             row[col.name] = rnd.choice(["2024-01-03", "2024-02-14T08:30:00", "2025-12-31", "2026-01-01"])
         else:
             row[col.name] = _literal_for_type(col.type, rnd)
         return f"value:{col.type}:fill-null"
+    if catalog is not None and rnd.random() < 0.70:
+        row[col.name] = catalog.value
+        _record_value_catalog_usage(catalog, column=col.name, column_type=col.type, purpose="replace")
+        return f"value_catalog:{catalog.entry_id}:{col.name}"
     if col.type == "int":
         row[col.name] = int(current) + rnd.choice([-10, -1, 0, 1, 10])
     elif col.type == "float":
@@ -2202,15 +2944,80 @@ def _append_multi_key_membership_case_aggregate(
     return f"append_multi_key_membership_case_aggregate:{join_kind}:{','.join(left_keys)}"
 
 
+def _case_when_literals_for_type(typ: str, rnd: random.Random) -> tuple[Any, Any]:
+    if typ == "int":
+        return rnd.choice([1, 10]), rnd.choice([0, -1])
+    if typ == "float":
+        return rnd.choice([1.0, 0.5]), rnd.choice([0.0, -1.0])
+    if typ == "bool":
+        return True, False
+    return rnd.choice(["matched", "high", "yes"]), rnd.choice(["other", "low", "no"])
+
+
+def _coalesce_column_groups(context: MutationOperationContext) -> list[tuple[str, list[str]]]:
+    groups: dict[str, list[str]] = {}
+    for column in context.available:
+        typ = context.column_type(column)
+        if typ in {"int", "float", "str", "bool"}:
+            groups.setdefault(typ, []).append(column)
+    return [(typ, columns) for typ, columns in groups.items() if len(columns) >= 2]
+
+
+def _compatible_membership_key_pairs_for_context(
+    context: MutationOperationContext,
+) -> list[tuple[TableData, list[str], list[str]]]:
+    pairs: list[tuple[TableData, list[str], list[str]]] = []
+    seen: set[tuple[str, tuple[str, ...], tuple[str, ...]]] = set()
+    available = list(context.available)
+    for extra in context.extra_tables:
+        right_types = {column.name: column.type for column in extra.columns}
+        matching = [
+            column
+            for column in available
+            if right_types.get(column) is not None and right_types.get(column) == context.column_type(column)
+        ]
+        for width in range(1, min(2, len(matching)) + 1):
+            for key_columns in combinations(matching, width):
+                left_columns = list(key_columns)
+                right_columns = list(key_columns)
+                key = (extra.name, tuple(left_columns), tuple(right_columns))
+                if key in seen:
+                    continue
+                seen.add(key)
+                pairs.append((extra, left_columns, right_columns))
+    return pairs
+
+
+def _choose_membership_key_pair(
+    pairs: list[tuple[TableData, list[str], list[str]]],
+    rnd: random.Random,
+    *,
+    prefer_multi_key: bool = True,
+) -> tuple[TableData, list[str], list[str]]:
+    if prefer_multi_key:
+        multi_key_pairs = [pair for pair in pairs if len(pair[1]) > 1]
+        if multi_key_pairs and rnd.random() < 0.65:
+            return rnd.choice(multi_key_pairs)
+    return rnd.choice(pairs)
+
+
 def _mutation_operation_context(
     tables: list[TableData],
     operations: list[dict[str, Any]],
 ) -> MutationOperationContext | None:
+    cache = _ACTIVE_MUTATION_STATE_CACHE.get()
+    cache_key = _mutation_state_cache_key(tables, operations) if cache is not None else None
+    if cache is not None and cache_key is not None and cache_key in cache.context_by_key:
+        return cache.context_by_key[cache_key]
     if not tables:
+        if cache is not None and cache_key is not None:
+            cache.context_by_key[cache_key] = None
         return None
     schema = _mutation_schema(tables, operations)
     available = tuple(schema.available)
     if not available:
+        if cache is not None and cache_key is not None:
+            cache.context_by_key[cache_key] = None
         return None
     numeric = tuple(
         column
@@ -2223,7 +3030,7 @@ def _mutation_operation_context(
         if schema.column_type(column) == "bool" or column.startswith(BOOLEAN_ALIAS_PREFIXES)
     )
     strings = tuple(column for column in available if schema.column_type(column) == "str")
-    return MutationOperationContext(
+    context = MutationOperationContext(
         table=tables[0],
         schema=schema,
         available=available,
@@ -2232,7 +3039,56 @@ def _mutation_operation_context(
         strings=strings,
         date_strings=tuple(column for column in strings if _looks_like_date_column(column)),
         numeric_strings=tuple(column for column in strings if _looks_like_numeric_string_column(column)),
+        extra_tables=tuple(tables[1:]),
     )
+    if cache is not None and cache_key is not None:
+        cache.context_by_key[cache_key] = context
+    return context
+
+
+def _mutation_state_cache_key(
+    tables: list[TableData],
+    operations: list[dict[str, Any]],
+) -> tuple[Any, ...]:
+    return (
+        tuple(_mutation_table_cache_key(table) for table in tables),
+        tuple(_mutation_operation_cache_key(operation) for operation in operations),
+    )
+
+
+def _mutation_table_cache_key(table: TableData) -> tuple[Any, ...]:
+    column_specs = tuple((column.name, column.type, bool(column.nullable)) for column in table.columns)
+    null_flags = tuple(
+        (
+            column.name,
+            any(column.name in row and row.get(column.name) is None for row in table.rows),
+        )
+        for column in table.columns
+    )
+    return (table.name, column_specs, null_flags)
+
+
+def _mutation_operation_cache_key(value: Any) -> Any:
+    if isinstance(value, IRNode):
+        value = value.to_dict()
+    if isinstance(value, Mapping):
+        return tuple(
+            (str(key), _mutation_operation_cache_key(item))
+            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+        )
+    if isinstance(value, list):
+        return tuple(_mutation_operation_cache_key(item) for item in value)
+    if isinstance(value, tuple):
+        return tuple(_mutation_operation_cache_key(item) for item in value)
+    if isinstance(value, set):
+        normalized = [_mutation_operation_cache_key(item) for item in value]
+        return tuple(sorted(normalized, key=repr))
+    if isinstance(value, float):
+        if math.isnan(value):
+            return ("float", "nan")
+        if math.isinf(value):
+            return ("float", "inf", 1 if value > 0 else -1)
+    return value
 
 
 def _random_operation(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> dict[str, Any] | None:
@@ -2246,22 +3102,50 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
     strings = context.strings
     date_strings = context.date_strings
     numeric_strings = context.numeric_strings
-    choices = ["filter", "select", "sort", "limit"]
-    if numeric or strings:
+    membership_pairs = _compatible_membership_key_pairs_for_context(context)
+    base_columns = {column.name for column in table.columns}
+    nullable_columns = {
+        column
+        for column in available
+        if context.column_has_null(column) or column not in base_columns
+    }
+    comparable = tuple(
+        column
+        for column in available
+        if context.column_type(column) in {"int", "float", "str", "bool"}
+    )
+    derived_comparable = tuple(column for column in comparable if column not in base_columns)
+    coalesce_groups = _coalesce_column_groups(context)
+    choices = ["filter", "select", "sort", "limit", "offset", "distinct"]
+    if available:
+        choices.append("fill_null")
+    if comparable:
+        choices.extend(["case_when", "row_number_filter"])
+    if membership_pairs:
+        choices.extend(["semi_join", "anti_join", "tuple_absence_filter"])
+    if coalesce_groups:
+        choices.append("coalesce")
+    if numeric or bools or strings:
         choices.append("mutate")
+    if numeric:
+        choices.append("running_sum")
     if numeric or bools:
         choices.append("groupby")
         choices.append("aggregate")
     kind = rnd.choice(choices)
     if kind == "filter":
-        col = rnd.choice(available)
+        if derived_comparable and rnd.random() < 0.55:
+            col = rnd.choice(derived_comparable)
+        else:
+            nullable_candidates = [column for column in comparable if column in nullable_columns]
+            col = rnd.choice(nullable_candidates) if nullable_candidates and rnd.random() < 0.30 else rnd.choice(available)
         typ = context.column_type(col)
         cmp = rnd.choice(["==", "!="] if typ in {"str", "bool"} else [">", ">=", "<", "<=", "==", "!="])
         if typ in {"int", "float"} and rnd.random() < 0.20:
             cmp = rnd.choice(["gt_is_not_true", "ge_is_not_true", "lt_is_not_false", "le_is_not_false"])
         if rnd.random() < 0.15:
             cmp = rnd.choice(["in_set", "not_in_set"])
-        if rnd.random() < 0.12:
+        if col in nullable_columns and rnd.random() < 0.25:
             cmp = rnd.choice(["is_null", "is_not_null"])
         if typ == "bool" and rnd.random() < 0.25:
             cmp = rnd.choice(["bool_is_true", "bool_is_not_true", "bool_is_false", "bool_is_not_false"])
@@ -2297,7 +3181,156 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
         return {"op": "sort", "columns": cols, "ascending": rnd.choice([True, False])}
     if kind == "limit":
         return {"op": "limit", "n": rnd.randint(0, max(1, len(table.rows) + 3))}
-    if kind == "mutate" and (numeric or strings):
+    if kind == "offset":
+        return {"op": "offset", "n": rnd.randint(0, max(1, len(table.rows) + 3))}
+    if kind == "distinct":
+        count = rnd.randint(1, min(3, len(available)))
+        return {"op": "distinct", "columns": sorted(rnd.sample(available, count))}
+    if kind in {"semi_join", "anti_join"} and membership_pairs:
+        right, left_columns, right_columns = _choose_membership_key_pair(membership_pairs, rnd)
+        return {
+            "op": kind,
+            "table": right.name,
+            "left_on": join_key_arg(left_columns),
+            "right_on": join_key_arg(right_columns),
+        }
+    if kind == "tuple_absence_filter" and membership_pairs:
+        right, left_columns, right_columns = _choose_membership_key_pair(membership_pairs, rnd)
+        return {
+            "op": "tuple_absence_filter",
+            "columns": left_columns,
+            "table": right.name,
+            "right_columns": right_columns,
+        }
+    if kind == "fill_null":
+        column = rnd.choice(available)
+        return {"op": "fill_null", "column": column, "value": _literal_for_type(context.column_type(column), rnd)}
+    if kind == "coalesce" and coalesce_groups:
+        output_type, candidates = rnd.choice(coalesce_groups)
+        width = rnd.randint(2, min(3, len(candidates)))
+        columns = rnd.sample(candidates, width)
+        alias = make_safe_output_name(
+            f"co_{columns[0]}",
+            used=set(available) | {op.get("as", "") for op in operations if isinstance(op, dict)},
+        )
+        op: dict[str, Any] = {"op": "coalesce", "columns": columns, "as": alias}
+        if rnd.random() < 0.75:
+            op["fallback"] = _literal_for_type(output_type, rnd)
+        return op
+    if kind == "case_when" and comparable:
+        if derived_comparable and rnd.random() < 0.60:
+            predicate_col = rnd.choice(derived_comparable)
+        else:
+            nullable_candidates = [column for column in comparable if column in nullable_columns]
+            predicate_col = (
+                rnd.choice(nullable_candidates)
+                if nullable_candidates and rnd.random() < 0.30
+                else rnd.choice(comparable)
+            )
+        predicate_type = context.column_type(predicate_col)
+        cmp_ops = ["==", "!="] if predicate_type in {"str", "bool"} else [">", ">=", "<", "<=", "==", "!="]
+        if predicate_type in {"int", "float"} and rnd.random() < 0.25:
+            cmp_ops = [rnd.choice(["gt_is_not_true", "ge_is_not_true", "lt_is_not_false", "le_is_not_false"]), *cmp_ops]
+        if predicate_type == "bool" and rnd.random() < 0.35:
+            cmp_ops = [rnd.choice(["bool_is_true", "bool_is_not_true", "bool_is_false", "bool_is_not_false"]), *cmp_ops]
+        if predicate_type in {"int", "float"} and rnd.random() < 0.20:
+            cmp_ops = ["range_closed", *cmp_ops]
+        if predicate_col in nullable_columns and rnd.random() < 0.25:
+            cmp_ops = [rnd.choice(["is_null", "is_not_null"]), *cmp_ops]
+        cmp = rnd.choice(cmp_ops)
+        if cmp == "range_closed":
+            predicate_value = sorted(rnd.sample(_literal_list_for_type(predicate_type, rnd), 2))
+        elif cmp in {"is_null", "is_not_null", "bool_is_true", "bool_is_not_true", "bool_is_false", "bool_is_not_false"}:
+            predicate_value = None
+        else:
+            predicate_value = _literal_for_type(predicate_type, rnd)
+        output_type = rnd.choice(["str", "int", "bool"])
+        then_value, else_value = _case_when_literals_for_type(output_type, rnd)
+        alias = make_safe_output_name(f"cw_{operation_count(operations, 'case_when')}", used=set(available))
+        return {
+            "op": "case_when",
+            "as": alias,
+            "condition": {"column": predicate_col, "cmp": cmp, "value": predicate_value},
+            "then": then_value,
+            "else": else_value,
+        }
+    if kind == "row_number_filter" and comparable:
+        order_width = 1 if len(comparable) == 1 else rnd.randint(2, min(3, len(comparable)))
+        if derived_comparable and rnd.random() < 0.55:
+            first_order = rnd.choice(derived_comparable)
+            remaining_order = [column for column in comparable if column != first_order]
+            order_by_columns = [first_order, *rnd.sample(remaining_order, k=max(0, order_width - 1))]
+        else:
+            order_by_columns = rnd.sample(list(comparable), k=order_width)
+        partition_candidates = [column for column in available if context.column_type(column) in {"int", "str", "bool"}]
+        partition_by: list[str] = []
+        if partition_candidates and rnd.random() < 0.8:
+            partition_width = rnd.randint(1, min(2, len(partition_candidates)))
+            partition_by = unique_preserve_order(rnd.sample(partition_candidates, k=partition_width))
+        comparator = "==" if rnd.random() < 0.45 else rnd.choice(["<", "<="])
+        value = 1 if comparator == "==" else rnd.choice([1, 2, 3])
+        return {
+            "op": "row_number_filter",
+            "partition_by": partition_by,
+            "order_by": [
+                {
+                    "column": column,
+                    "ascending": rnd.choice([True, False]),
+                    "nulls": (
+                        "first"
+                        if column in nullable_columns and rnd.random() < 0.60
+                        else rnd.choice(["first", "last"])
+                    ),
+                }
+                for column in order_by_columns
+            ],
+            "cmp": comparator,
+            "value": value,
+        }
+    if kind == "running_sum" and numeric:
+        derived_numeric = [column for column in numeric if column not in base_columns]
+        if derived_numeric and rnd.random() < 0.45:
+            source = rnd.choice(derived_numeric)
+        else:
+            source = rnd.choice(numeric)
+        order_width = 1 if len(comparable) == 1 else rnd.randint(2, min(3, len(comparable)))
+        if derived_comparable and rnd.random() < 0.55:
+            first_order = rnd.choice(derived_comparable)
+            remaining_order = [column for column in comparable if column != first_order]
+            order_by_columns = [first_order, *rnd.sample(remaining_order, k=max(0, order_width - 1))]
+        else:
+            order_by_columns = rnd.sample(list(comparable), k=order_width)
+        partition_candidates = [
+            column
+            for column in available
+            if column != source and context.column_type(column) in {"int", "str", "bool"}
+        ]
+        partition_by: list[str] = []
+        if partition_candidates and rnd.random() < 0.75:
+            partition_width = rnd.randint(1, min(2, len(partition_candidates)))
+            partition_by = unique_preserve_order(rnd.sample(partition_candidates, k=partition_width))
+        op: dict[str, Any] = {
+            "op": "running_sum",
+            "source": source,
+            "column": make_safe_output_name(f"run_{source}", used=set(available)),
+            "order_by": [
+                {
+                    "column": column,
+                    "ascending": rnd.choice([True, False]),
+                    "nulls": (
+                        "first"
+                        if column in nullable_columns and rnd.random() < 0.60
+                        else rnd.choice(["first", "last"])
+                    ),
+                }
+                for column in order_by_columns
+            ],
+            "input_dtype": "float32" if context.column_type(source) == "float" or rnd.random() < 0.5 else "float64",
+        }
+        if partition_by:
+            op["partition_by"] = partition_by
+        return op
+    if kind == "mutate" and (numeric or bools or strings):
         if numeric_strings and rnd.random() < 0.20:
             src = rnd.choice(numeric_strings)
             expr = {
@@ -2309,6 +3342,8 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
         elif date_strings and rnd.random() < 0.25:
             src = rnd.choice(date_strings)
             expr = {"kind": "date_part", "source": src, "part": rnd.choice(["year", "month", "day"])}
+        elif bools and (not numeric and not strings or rnd.random() < 0.20):
+            expr = {"kind": "bool_not", "source": rnd.choice(bools)}
         elif strings and (not numeric or rnd.random() < 0.3):
             src = rnd.choice(strings)
             string_exprs = [
@@ -2334,6 +3369,14 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
             if len(numeric) > 1 and rnd.random() < 0.20:
                 numerator = rnd.choice([column for column in numeric if column != src])
                 expr = {"kind": "reverse_division_columns", "source": src, "numerator": numerator}
+            elif rnd.random() < 0.20:
+                expr = {"kind": "abs", "source": src}
+            elif rnd.random() < 0.20:
+                if context.column_type(src) == "int":
+                    lower, upper = sorted(rnd.sample([-10, -5, -2, 0, 2, 5, 10], 2))
+                else:
+                    lower, upper = sorted(rnd.sample([-10.0, -2.5, -1.0, 0.0, 1.0, 2.5, 10.0], 2))
+                expr = {"kind": "clip", "source": src, "lower": lower, "upper": upper}
             elif rnd.random() < 0.25:
                 if context.column_type(src) == "int":
                     expr = {"kind": "cast", "source": src, "to": rnd.choice(["float", "str"])}
@@ -2347,12 +3390,16 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
             "expr": expr,
         }
     if kind == "groupby" and (numeric or bools):
+        key_candidates = [column for column in available if context.column_type(column) in {"int", "str", "bool"}]
         keys = [rnd.choice(available)]
+        if key_candidates:
+            key_count = 1 if len(key_candidates) == 1 or rnd.random() < 0.8 else 2
+            keys = sorted(rnd.sample(key_candidates, key_count))
         val = rnd.choice(numeric + bools)
         if val in bools:
             func = rnd.choice(["any", "all", "min", "max", "count", "nunique"])
         else:
-            func = rnd.choice(["sum", "min", "max", "count", "nunique"])
+            func = rnd.choice(["sum", "mean", "min", "max", "count", "nunique"])
         alias = make_safe_output_name(f"{func}_{val}", used=set(keys))
         return {"op": "groupby", "keys": keys, "aggs": [{"column": val, "func": func, "as": alias}]}
     if kind == "aggregate" and (numeric or bools):
@@ -2360,7 +3407,7 @@ def _random_operation(tables: list[TableData], operations: list[dict[str, Any]],
         if val in bools:
             func = rnd.choice(["any", "all", "min", "max", "count", "nunique"])
         else:
-            func = rnd.choice(["sum", "min", "max", "count", "nunique"])
+            func = rnd.choice(["sum", "mean", "min", "max", "count", "nunique"])
         alias = make_safe_output_name(f"{func}_{val}_all")
         return {"op": "aggregate", "aggs": [{"column": val, "func": func, "as": alias}]}
     return None
@@ -2473,6 +3520,10 @@ def _column_has_null(tables: list[TableData], name: str) -> bool:
 
 
 def _literal_for_type(typ: str, rnd: random.Random) -> Any:
+    catalog = _sample_catalog_literal(typ, rnd)
+    if catalog is not None:
+        _record_value_catalog_usage(catalog, column="", column_type=typ, purpose="literal")
+        return catalog.value
     if typ == "int":
         return rnd.choice([-10, -1, 0, 1, 2, 10])
     if typ == "float":
@@ -2480,6 +3531,48 @@ def _literal_for_type(typ: str, rnd: random.Random) -> Any:
     if typ == "bool":
         return rnd.choice([True, False])
     return rnd.choice(["", "alpha", "beta", "中文", "missing"])
+
+
+def _sample_catalog_literal(
+    typ: str,
+    rnd: random.Random,
+    *,
+    column: str = "",
+) -> CatalogEntry | None:
+    context = _ACTIVE_VALUE_CATALOG_CONTEXT.get()
+    if context is None:
+        return None
+    if rnd.random() >= VALUE_CATALOG_SAMPLE_PROBABILITY:
+        return None
+    column_type = "datetime" if typ == "str" and column and _looks_like_date_column(column) else typ
+    return sample_catalog_entry(
+        rnd,
+        column_type,
+        descriptor=context.descriptor,
+        entry_scores=context.entry_scores,
+    )
+
+
+def _record_value_catalog_usage(
+    entry: CatalogEntry,
+    *,
+    column: str,
+    column_type: str,
+    purpose: str,
+) -> None:
+    context = _ACTIVE_VALUE_CATALOG_CONTEXT.get()
+    if context is None or not context.collect_usage:
+        return
+    payload = {
+        "entry_id": entry.entry_id,
+        "column": str(column),
+        "column_type": str(column_type),
+        "catalog_type": entry.column_type,
+        "source_root_cause": entry.source_root_cause,
+        "purpose": str(purpose),
+    }
+    if payload not in context.used_entries:
+        context.used_entries.append(payload)
 
 
 def _literal_list_for_type(typ: str, rnd: random.Random) -> list[Any]:
@@ -2518,24 +3611,80 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_window_avg_probe", _append_window_avg_probe),
     MutationOperator("append_struct_distinct_probe", _append_struct_distinct_probe),
     MutationOperator("append_bit_compare_probe", _append_bit_compare_probe),
-    MutationOperator("append_round_even_probe", _append_round_even_probe),
-    MutationOperator("append_series_rtruediv_probe", _append_series_rtruediv_probe),
-    MutationOperator("append_uint64_isin_probe", _append_uint64_isin_probe),
-    MutationOperator("append_tuple_anti_null_probe", _append_tuple_anti_null_probe),
-    MutationOperator("append_setop_all_duplicate_probe", _append_setop_all_duplicate_probe),
-    MutationOperator("append_json_predicate_order_probe", _append_json_predicate_order_probe),
-    MutationOperator("append_sparse_mask_probe", _append_sparse_mask_probe),
-    MutationOperator("append_float_wrap_probe", _append_float_wrap_probe),
+    MutationOperator(
+        "append_round_even_probe",
+        _append_round_even_probe,
+        divergence_affinity=("disagree_class:numeric", "mismatch:value"),
+    ),
+    MutationOperator(
+        "append_series_rtruediv_probe",
+        _append_series_rtruediv_probe,
+        divergence_affinity=("disagree_class:numeric", "mismatch:value"),
+    ),
+    MutationOperator(
+        "append_uint64_isin_probe",
+        _append_uint64_isin_probe,
+        divergence_affinity=("disagree_class:numeric", "mismatch:value"),
+    ),
+    MutationOperator(
+        "append_tuple_anti_null_probe",
+        _append_tuple_anti_null_probe,
+        divergence_affinity=("disagree_class:null", "mismatch:value"),
+    ),
+    MutationOperator(
+        "append_setop_all_duplicate_probe",
+        _append_setop_all_duplicate_probe,
+        divergence_affinity=("mismatch:row_count", "mismatch:value"),
+    ),
+    MutationOperator(
+        "append_json_predicate_order_probe",
+        _append_json_predicate_order_probe,
+        divergence_affinity=("disagree_class:string", "mismatch:value"),
+    ),
+    MutationOperator(
+        "append_sparse_mask_probe",
+        _append_sparse_mask_probe,
+        divergence_affinity=("disagree_class:bool", "mismatch:value"),
+    ),
+    MutationOperator(
+        "append_float_wrap_probe",
+        _append_float_wrap_probe,
+        divergence_affinity=("disagree_class:numeric", "mismatch:value"),
+    ),
     MutationOperator("append_index_bool_probe", _append_index_bool_probe),
     MutationOperator("append_empty_literal_groupby_probe", _append_empty_literal_groupby_probe),
-    MutationOperator("append_arrow_string_eq_sum_probe", _append_arrow_string_eq_sum_probe),
-    MutationOperator("append_arrow_timestamp_loc_slice_probe", _append_arrow_timestamp_loc_slice_probe),
-    MutationOperator("append_arrow_timestamp_index_attr_probe", _append_arrow_timestamp_index_attr_probe),
+    MutationOperator(
+        "append_arrow_string_eq_sum_probe",
+        _append_arrow_string_eq_sum_probe,
+        divergence_affinity=("disagree_class:string", "mismatch:value"),
+    ),
+    MutationOperator(
+        "append_arrow_timestamp_loc_slice_probe",
+        _append_arrow_timestamp_loc_slice_probe,
+        divergence_affinity=("disagree_class:string", "mismatch:value"),
+    ),
+    MutationOperator(
+        "append_arrow_timestamp_index_attr_probe",
+        _append_arrow_timestamp_index_attr_probe,
+        divergence_affinity=("disagree_class:string", "mismatch:value"),
+    ),
     MutationOperator("append_eval_inplace_alias_probe", _append_eval_inplace_alias_probe),
-    MutationOperator("append_bool_reduction_skipna_probe", _append_bool_reduction_skipna_probe),
+    MutationOperator(
+        "append_bool_reduction_skipna_probe",
+        _append_bool_reduction_skipna_probe,
+        divergence_affinity=("disagree_class:bool", "mismatch:value"),
+    ),
     MutationOperator("append_dataset_isin_all_match_probe", _append_dataset_isin_all_match_probe),
-    MutationOperator("append_run_end_null_compute_probe", _append_run_end_null_compute_probe),
-    MutationOperator("append_large_string_partition_probe", _append_large_string_partition_probe),
+    MutationOperator(
+        "append_run_end_null_compute_probe",
+        _append_run_end_null_compute_probe,
+        divergence_affinity=("disagree_class:null", "mismatch:value"),
+    ),
+    MutationOperator(
+        "append_large_string_partition_probe",
+        _append_large_string_partition_probe,
+        divergence_affinity=("disagree_class:string", "mismatch:value"),
+    ),
     MutationOperator("append_hash_pivot_wider_probe", _append_hash_pivot_wider_probe),
     MutationOperator("append_list_flatten_parent_indices_probe", _append_list_flatten_parent_indices_probe),
     MutationOperator("append_rolling_mean_by_null_count_probe", _append_rolling_mean_by_null_count_probe),
@@ -2639,8 +3788,54 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
         semantic_family_affinity=("join_membership", "conditional_semantics", "aggregation_cardinality"),
         semantic_signal_affinity=("multi_key_membership_aggregation", "multi_key_semi_anti_join"),
     ),
+    MutationOperator(
+        "ir_swap_adjacent",
+        apply_adjacent_independent_swap,
+        semantic_family_affinity=("operation_rewrite", "ordering_semantics"),
+        semantic_signal_affinity=("ir_adjacent_swap",),
+        exploration_objective_affinity=("boundary_depth", "coverage_breadth"),
+    ),
+    MutationOperator(
+        "ir_pushdown_filter",
+        apply_filter_pushdown,
+        semantic_family_affinity=("operation_rewrite", "predicate_logic", "join_membership"),
+        semantic_signal_affinity=("ir_filter_pushdown",),
+        exploration_objective_affinity=("boundary_depth", "cross_model_consistency"),
+    ),
+    MutationOperator(
+        "ir_pull_filter_above_groupby",
+        apply_filter_above_groupby,
+        semantic_family_affinity=("operation_rewrite", "predicate_logic", "aggregation_cardinality"),
+        semantic_signal_affinity=("ir_filter_above_groupby", "groupby_having_where_rewrite"),
+        exploration_objective_affinity=("boundary_depth", "semantic_boundary"),
+    ),
+    MutationOperator(
+        "ir_wrap_with_window",
+        apply_wrap_with_window,
+        semantic_family_affinity=("operation_rewrite", "ordering_semantics"),
+        semantic_signal_affinity=("ir_window_wrap", "window_boundary"),
+        exploration_objective_affinity=("coverage_breadth", "boundary_depth"),
+    ),
+    MutationOperator(
+        "ir_splice_subtree",
+        apply_subtree_splice,
+        semantic_family_affinity=("operation_rewrite", "ordering_semantics"),
+        semantic_signal_affinity=("ir_subtree_splice",),
+        exploration_objective_affinity=("coverage_breadth", "boundary_depth"),
+    ),
+    MutationOperator(
+        "ir_fold_redundant_op",
+        apply_redundant_op_fold,
+        semantic_family_affinity=("operation_rewrite", "ordering_semantics"),
+        semantic_signal_affinity=("ir_redundant_fold",),
+        exploration_objective_affinity=("state_space_minimization", "boundary_depth"),
+    ),
     MutationOperator("drop_op", _drop_operation),
     MutationOperator("tweak_op", _tweak_random_operation),
+    MutationOperator("shrink_drop_tail_op", shrink_drop_tail_op),
+    MutationOperator("shrink_fold_redundant_op", shrink_fold_redundant_op),
+    MutationOperator("shrink_merge_adjacent_filters", shrink_merge_adjacent_filters),
+    MutationOperator("shrink_inline_single_use_mutate", shrink_inline_single_use_mutate),
 )
 
 
@@ -2662,6 +3857,7 @@ def _operator_with_inferred_objective_affinity(operator: MutationOperator) -> Mu
         semantic_family_affinity=operator.semantic_family_affinity,
         semantic_signal_affinity=operator.semantic_signal_affinity,
         exploration_objective_affinity=inferred,
+        divergence_affinity=operator.divergence_affinity,
     )
 
 

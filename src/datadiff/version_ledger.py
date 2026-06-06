@@ -6,7 +6,11 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from datadiff.adaptive_learning import continual_learning_summary
-from datadiff.reward import candidate_issue_family_key, is_candidate_issue_finding, is_false_positive_finding
+from datadiff.finding_outcomes import (
+    candidate_issue_family_key,
+    is_candidate_issue_finding,
+    is_false_positive_finding,
+)
 from datadiff.util import dump_json, read_jsonl, run_meta_path, utc_now
 
 VERSION_LEDGER_SCHEMA_VERSION = "version-ledger-v1"

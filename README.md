@@ -47,6 +47,7 @@ python3 -m venv .venv
 .venv/bin/datadiff discovery-campaign --cases 100 --seeds 1
 .venv/bin/datadiff discovery-campaign --cases 100 --seeds 1 --watch-health
 .venv/bin/datadiff discovery-campaign-status --manifest new_issue/generated/discovery-campaign-manifest.json
+.venv/bin/datadiff discovery-campaign-aggregate --manifests 'new_issue/generated/discovery-campaign*.json' --output new_issue/generated/discovery-campaign-aggregate.json
 .venv/bin/datadiff candidate-pipeline --manifest new_issue/generated/discovery-campaign-manifest.json
 .venv/bin/datadiff run-health
 .venv/bin/datadiff run-health --fail-on-fresh-candidate --fail-on-bug
@@ -60,7 +61,8 @@ python3 -m venv .venv
 .venv/bin/datadiff issue-bundle --run-reproducers --repeat 3 --primary-per-family
 .venv/bin/datadiff methodology-report --manifest runs/experiment-YYYYMMDDTHHMMSS.json
 .venv/bin/datadiff methodology-report --summary-only --json
-.venv/bin/datadiff final-readiness --latest-confirmation-file experiments/latest_confirmations.json --min-live-duration-hours 0 --no-require-validation --no-require-seeded --no-require-ablation --no-require-comparison --summary-only --json
+.venv/bin/datadiff target-version-audit --output reports/target-version-audit-latest.json
+.venv/bin/datadiff final-readiness --extra-manifest reports/target-version-audit-latest.json --latest-confirmation-file experiments/latest_confirmations.json --min-live-duration-hours 0 --no-require-validation --no-require-seeded --no-require-ablation --no-require-comparison --summary-only --json
 .venv/bin/datadiff review-readiness --json --write-report
 ```
 
@@ -108,6 +110,13 @@ organic fresh candidate 后停止剩余 lane。`run-health` 是长时间探索�
 `discovery-campaign-status` 读取 discovery-campaign manifest，并补充当前/最近 run 的 `run-health` 摘要与最近 lane yield
 摘要，适合监控端到端系统级 fresh 探索是否仍在同一 lane、已经完成多少 lane/seed、下一轮该增减哪些
 lane 预算，以及是否已出现需要马上 triage 的候选。
+多 shard 长跑时用 `discovery-campaign-aggregate` 汇总所有 discovery-campaign manifest；它只接受
+`schema_version=discovery-campaign-v1` 的文件，避免把 `*-fresh-candidates.json` 误算成 campaign。
+聚合输出包含 fresh family 数、fresh evidence rows、candidate pipeline 的 reproduced/reduced/issue draft
+数量、首个 fresh candidate 的 elapsed time、discovery AUC、串行/并行容量吞吐和 ICSE experiment quality
+评分。12h/24h 长期实验建议固定一组 tmux shard 分别覆盖 Polars、Arrow/DataFusion、embedded SQL 和
+common API lane，并周期性写出 aggregate JSON，作为论文中真实 bug 数量、速度、覆盖率、吞吐量和复现率的
+统一证据表。
 
 当 fresh candidate 出现时，`discovery-run` / `discovery-campaign` 会自动串起
 freeze -> recheck -> reduce -> dedup -> issue-readiness 流水线，并把结果写到
@@ -167,6 +176,7 @@ needs-reproducer/stabilization 草稿分成不同建议，避免把多个 issue 
 
 - `dataframe`: pandas, polars
 - `polars_cross`: pandas, Polars eager/lazy，用于 Polars 目标族的 cross-reference latest 探索
+- `polars_streaming_cross`: Polars lazy/streaming，用于 Polars streaming executor 路径探索
 - `embedded_sql`: DuckDB, SQLite
 - `embedded_sql_cross`: pandas, DuckDB, SQLite，用于 DuckDB/SQL 目标族的 cross-reference latest 探索
 - `duckdb_storage_cross`: pandas, DuckDB persistent-storage target for storage-aware historical replay
@@ -174,6 +184,8 @@ needs-reproducer/stabilization 草稿分成不同建议，避免把多个 issue 
 - `datafusion_cross`: pandas, DuckDB, DataFusion
 - `latest_all_engines`: pandas, PyArrow, Polars eager/lazy, DuckDB, SQLite, DataFusion
 - `latest_no_datafusion`: pandas, PyArrow, Polars eager/lazy, DuckDB, SQLite，用于避开已知 DataFusion 饱和家族后的广谱探索
+- `chdb_cross` / `chdb_olap_cross`: pandas, DuckDB/SQLite, chDB，用于 ClickHouse-family embedded OLAP 探索
+- `latest_with_chdb`: pandas, PyArrow, Polars eager/lazy, DuckDB, SQLite, chDB
 - `core` / `all`: pandas, polars, DuckDB, SQLite
 
 显式 `--backends` 会覆盖 `--target-suite`。这让实验方法论可以按目标族横向展开：
@@ -450,10 +462,13 @@ candidate bug cases/s。它们是方法学敏感度实验，不能作为真实�
 - `reports/bug-status-*.md` / `.json`: 当前 confirmed/candidate/known issue 状态快照
 - `reports/issue-readiness-*.md` / `.json`: 上游提交前的本地 issue 草稿自审队列
 - `new_issue/generated/issue-bundles/`: 从待提交 issue 草稿自动提取的复现脚本和证据 manifest
+- `reports/target-version-audit-*.json`: latest-version live claim 的目标库版本审计，记录已安装目标包、
+  public latest version、过期/未知 latest 状态，并作为 final-readiness 的支持性 manifest
 - `reports/final-readiness-*.md` / `.json`: A 会最终实验 readiness 审计，检查 validation smoke、
-  live 广度、24h 深度、fresh/replay 隔离、latest confirmed bug、historical replay、seeded sensitivity、
-  module ablation 和 baseline/comparison 证据；未显式传 `--manifest` 时只扫描最新一组 experiment manifest，
-  并默认使用 metadata-only status mode，论文最终声明应传入冻结计划对应的 manifest 列表以触发完整 run-log scan
+  live 广度、24h 深度、fresh/replay 隔离、target-version audit、latest confirmed bug、historical replay、
+  seeded sensitivity、module ablation 和 baseline/comparison 证据；未显式传 `--manifest` 时只扫描最新一组
+  experiment manifest，并默认使用 metadata-only status mode，论文最终声明应传入冻结计划对应的 manifest
+  列表和 `reports/target-version-audit-latest.json` 以触发完整 run-log scan 与 latest 目标库审计
 - `experiments/latest_confirmations.json`: 上层 latest bug 上游确认证据登记，只影响 final-readiness
   的 confirmed gate，不会改变 fresh rewardable candidate 统计，也不会改变底层执行语义
   （这些是上层实验 policy；审计逻辑只读取 manifest/run log 和 confirmation evidence，不改变底层执行语义）

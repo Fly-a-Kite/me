@@ -24,14 +24,17 @@ from datadiff.experiment_metadata import (
 )
 from datadiff.normalizer import NormalizedResult, normalized_results_from_mapping
 from datadiff.oracle import evaluate_case
-from datadiff.reward import (
-    aggregate_feedback_summary,
-    aggregate_feedback_summaries,
+from datadiff.finding_outcomes import (
     candidate_bug_family_keys as reward_candidate_bug_family_keys,
     is_candidate_bug_finding as reward_is_candidate_bug_finding,
     is_issue_replay_finding as reward_is_issue_replay_finding,
     is_known_saturated_candidate_bug_finding as reward_is_known_saturated_candidate_bug_finding,
     is_rewardable_candidate_bug_finding as reward_is_rewardable_candidate_bug_finding,
+    row_has_rewardable_new_behavior as reward_row_has_rewardable_new_behavior,
+)
+from datadiff.reward import (
+    aggregate_feedback_summary,
+    aggregate_feedback_summaries,
 )
 from datadiff.targets import target_context
 from datadiff.util import REPORTS_DIR, RUNS_DIR, ensure_dirs, jsonl_log_stem, load_json, read_jsonl, run_meta_path
@@ -320,12 +323,15 @@ def write_run_report(run_file: Path | None = None, csv_limit: int | None = None)
         or meta.get("common_capabilities")
         or _common_capabilities_from_specs(target_specs)
     )
-    raw_new_behavior_cases = int(meta.get("new_behavior_cases", sum(1 for row in rows if row.get("is_new_behavior"))))
-    signal_new_behavior_cases = int(
-        meta.get(
-            "signal_new_behavior_cases",
-            sum(1 for row in rows if row.get("signal_new_behavior", row.get("is_new_behavior"))),
-        )
+    raw_new_behavior_cases = (
+        sum(1 for row in rows if row.get("is_new_behavior"))
+        if rows
+        else int(meta.get("new_behavior_cases", 0) or 0)
+    )
+    signal_new_behavior_cases = (
+        sum(1 for row in rows if reward_row_has_rewardable_new_behavior(row, known_bug_families))
+        if rows
+        else int(meta.get("signal_new_behavior_cases", 0) or 0)
     )
 
     for row in rows:
@@ -661,26 +667,32 @@ def write_experiment_summary_report(
             1
             for row in run_rows
             if any(
-                _is_candidate_bug_finding(finding)
+                _is_rewardable_candidate_bug_finding(finding, known_bug_families)
                 for finding in row.get("findings", [])
             )
         )
         first_finding_case_index = _first_case_index(run_rows, lambda finding: True)
         first_candidate_bug_case_index = _first_case_index(
             run_rows,
-            _is_candidate_bug_finding,
+            _rewardable_candidate_predicate(known_bug_families),
         )
-        first_candidate_bug_elapsed_s = _first_case_elapsed_s(run_rows, _is_candidate_bug_finding)
-        candidate_bug_discovery_auc = _candidate_bug_discovery_auc(run_rows)
+        first_candidate_bug_elapsed_s = _first_case_elapsed_s(
+            run_rows,
+            _rewardable_candidate_predicate(known_bug_families),
+        )
+        candidate_bug_discovery_auc = _candidate_bug_discovery_auc(run_rows, known_bug_families)
         guidance_metrics = _guidance_metrics(run_rows)
         feedback_metrics = _feedback_metrics(run_rows, known_bug_families)
         adaptive_selection_metrics = _adaptive_selection_summary_fields(run_rows)
-        new_behavior_cases = int(meta.get("new_behavior_cases", sum(1 for row in run_rows if row.get("is_new_behavior"))))
-        signal_new_behavior_cases = int(
-            meta.get(
-                "signal_new_behavior_cases",
-                sum(1 for row in run_rows if row.get("signal_new_behavior", row.get("is_new_behavior"))),
-            )
+        new_behavior_cases = (
+            sum(1 for row in run_rows if row.get("is_new_behavior"))
+            if run_rows
+            else int(meta.get("new_behavior_cases", 0) or 0)
+        )
+        signal_new_behavior_cases = (
+            sum(1 for row in run_rows if reward_row_has_rewardable_new_behavior(row, known_bug_families))
+            if run_rows
+            else int(meta.get("signal_new_behavior_cases", 0) or 0)
         )
         arm_state = adaptive_state_by_arm.get(str(run.get("schedule_arm_id", "")), {})
         run_semantics = resolved_run_semantics(run, experiment_meta)
@@ -1813,11 +1825,28 @@ def _first_case_elapsed_s(rows: list[dict], predicate) -> float | None:
     return None
 
 
-def _candidate_issue_discovery_auc(rows: list[dict]) -> float:
+def _rewardable_candidate_predicate(
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
+):
+    return lambda finding: _is_rewardable_candidate_issue_finding(
+        finding,
+        known_saturated_bug_families,
+    )
+
+
+def _candidate_issue_discovery_auc(
+    rows: list[dict],
+    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
+) -> float:
     if not rows:
         return 0.0
     hits = [
-        int(any(_is_candidate_issue_finding(finding) for finding in row.get("findings", [])))
+        int(
+            any(
+                _is_rewardable_candidate_issue_finding(finding, known_saturated_bug_families)
+                for finding in row.get("findings", [])
+            )
+        )
         for row in rows
     ]
     total = sum(hits)

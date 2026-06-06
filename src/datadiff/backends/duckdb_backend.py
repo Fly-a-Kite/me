@@ -4,7 +4,7 @@ import os
 import tempfile
 import time
 
-from datadiff.backends.base import Backend, BackendResult
+from datadiff.backends.base import Backend, BackendResult, PreparedTable, prepare_table
 from datadiff.backends.sql_lowering import (
     SqlDialect,
     render_aggregate_sql,
@@ -343,10 +343,11 @@ def _duckdb_csv_long_numeric_roundtrip_mismatch(con, op: dict) -> bool:
     return csv_long_numeric_roundtrip_mismatch(observed_values, expected_values)
 
 
-def _table_to_dataframe(pd, table: TableData):
+def _table_to_dataframe(pd, table: TableData | PreparedTable):
+    prepared = prepare_table(table)
     data = {}
-    for column in table.columns:
-        values = [row.get(column.name) for row in table.rows]
+    for column in prepared.columns:
+        values = prepared.columns_data[column.name]
         if column.type == "int":
             data[column.name] = pd.array(values, dtype="Int64")
         elif column.type == "bool":
@@ -355,14 +356,19 @@ def _table_to_dataframe(pd, table: TableData):
             data[column.name] = pd.array(values, dtype="string")
         else:
             data[column.name] = values
-    return pd.DataFrame(data, columns=[c.name for c in table.columns])
+    return pd.DataFrame(data, columns=[c.name for c in prepared.columns])
 
 
 class DuckDBBackend(Backend):
     name = "duckdb"
     persistent_storage = False
 
-    def run(self, tables: list[TableData], program: Program, timeout_s: float = 5.0) -> BackendResult:
+    def run(
+        self,
+        tables: list[TableData | PreparedTable],
+        program: Program,
+        timeout_s: float = 5.0,
+    ) -> BackendResult:
         start = time.perf_counter()
         tempdir = tempfile.TemporaryDirectory() if self.persistent_storage else None
         con = None

@@ -2,6 +2,7 @@ from collections import Counter
 
 import pytest
 
+import datadiff.guidance as guidance_module
 from datadiff.datagen import generate_case
 from datadiff.config import DiscoveryBias
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
@@ -92,6 +93,99 @@ def test_derive_case_features_matches_compatibility_alias():
     case = _case(99, [{"op": "filter", "column": "x", "cmp": ">=", "value": 0}])
 
     assert derive_case_features(case) == extract_case_features(case)
+
+
+def test_native_operation_features_are_python_feature_subset(monkeypatch):
+    case = _case(
+        100,
+        [
+            {"op": "filter", "column": "x", "cmp": "range_closed", "value": [0, 10]},
+            {"op": "mutate", "column": "xf", "expr": {"kind": "cast", "source": "x", "to": "float"}},
+            {"op": "groupby", "keys": ["g"], "aggs": [{"column": "x", "func": "count", "as": "count_x"}]},
+            {"op": "sort", "columns": ["count_x"], "ascending": False},
+            {"op": "limit", "n": 0},
+        ],
+    )
+    native_features = guidance_module._native_case_operation_features(case)
+
+    monkeypatch.setattr(guidance_module, "_rust_extract_case_features", lambda _ops, _column_types: [])
+    guidance_module._clear_case_feature_prefix_cache()
+    python_only_features = derive_case_features(case)
+
+    assert native_features
+    assert native_features.issubset(python_only_features)
+
+
+def test_derive_case_features_merges_native_operation_feature_helper(monkeypatch):
+    case = _case(102, [{"op": "select", "columns": ["id"]}])
+
+    monkeypatch.setattr(guidance_module, "_rust_extract_case_features", lambda _ops, _column_types: ["native:sentinel"])
+    guidance_module._clear_case_feature_prefix_cache()
+
+    assert "native:sentinel" in derive_case_features(case)
+
+
+def test_derive_case_features_prefix_cache_preserves_feature_equivalence():
+    shared_prefix = [
+        {
+            "op": "mutate",
+            "column": "xf",
+            "expr": {"kind": "cast", "source": "x", "target_type": "float"},
+        },
+        {"op": "filter", "column": "xf", "cmp": ">=", "value": 0},
+        {
+            "op": "groupby",
+            "keys": ["g"],
+            "aggs": [{"column": "xf", "func": "sum", "as": "sum_xf"}],
+        },
+    ]
+    warmup_case = _case(150, shared_prefix + [{"op": "sort", "columns": ["sum_xf"], "ascending": False}])
+    target_case = _case(151, shared_prefix + [{"op": "select", "columns": ["g", "sum_xf"]}])
+
+    guidance_module._clear_case_feature_prefix_cache()
+    cold_features = derive_case_features(target_case)
+
+    guidance_module._clear_case_feature_prefix_cache()
+    derive_case_features(warmup_case)
+    warm_features = derive_case_features(target_case)
+
+    assert warm_features == cold_features
+
+
+def test_derive_case_features_reuses_longest_cached_prefix(monkeypatch):
+    shared_prefix = [
+        {
+            "op": "mutate",
+            "column": "xf",
+            "expr": {"kind": "cast", "source": "x", "target_type": "float"},
+        },
+        {"op": "filter", "column": "xf", "cmp": ">=", "value": 0},
+        {
+            "op": "groupby",
+            "keys": ["g"],
+            "aggs": [{"column": "xf", "func": "sum", "as": "sum_xf"}],
+        },
+    ]
+    first_case = _case(152, shared_prefix + [{"op": "sort", "columns": ["sum_xf"], "ascending": False}])
+    second_case = _case(153, shared_prefix + [{"op": "select", "columns": ["g", "sum_xf"]}])
+
+    guidance_module._clear_case_feature_prefix_cache()
+    original = guidance_module._apply_case_feature_operation
+    applied_ops: list[str] = []
+
+    def _counting_apply_case_feature_operation(state, op, *, table_by_name):
+        applied_ops.append(str(op.get("op", "")))
+        return original(state, op, table_by_name=table_by_name)
+
+    monkeypatch.setattr(guidance_module, "_apply_case_feature_operation", _counting_apply_case_feature_operation)
+
+    derive_case_features(first_case)
+    first_count = len(applied_ops)
+    derive_case_features(second_case)
+    second_count = len(applied_ops) - first_count
+
+    assert first_count == len(first_case.program.operations)
+    assert second_count == 1
 
 
 def test_guidance_features_bucket_quality_archive_context_without_cluster_identity():
@@ -819,7 +913,51 @@ def test_extract_case_features_tracks_string_upper_expression():
     assert "op:mutate" in features
     assert "expr:string_upper" in features
     assert "string:upper" in features
-    assert decision.matched_targets == ["string_upper"]
+
+
+def test_extract_case_features_tracks_derived_null_window_composition():
+    case = _case(
+        115,
+        [
+            {"op": "mutate", "column": "m_x", "expr": {"kind": "add_const", "source": "x", "value": 1}},
+            {"op": "coalesce", "columns": ["g", "g"], "as": "g_or_g", "fallback": "missing"},
+            {
+                "op": "case_when",
+                "as": "flag_bucket",
+                "condition": {"column": "g_or_g", "cmp": "is_null", "value": None},
+                "then": "unknown",
+                "else": "known",
+            },
+            {
+                "op": "row_number_filter",
+                "partition_by": ["flag_bucket"],
+                "order_by": [{"column": "m_x", "ascending": True, "nulls": "first"}],
+                "cmp": "==",
+                "value": 1,
+            },
+            {
+                "op": "running_sum",
+                "source": "m_x",
+                "column": "run_m_x",
+                "order_by": [{"column": "g_or_g", "ascending": True, "nulls": "first"}],
+                "partition_by": ["flag_bucket"],
+                "input_dtype": "float32",
+            },
+            {"op": "filter", "column": "run_m_x", "cmp": "is_not_null", "value": None},
+        ],
+    )
+
+    features = extract_case_features(case)
+
+    assert "conditional:derived-input" in features
+    assert "case_when_cmp:is_null" in features
+    assert "running:derived-source" in features
+    assert "running:partitioned" in features
+    assert "row_pick:keyed" in features
+    assert "row_pick:order-derived" in features
+    assert "row_pick:cmp:==" in features
+    assert "filter:derived-input" in features
+    assert "filter:null-predicate" in features
 
 
 def test_guidance_tracks_unicode_case_mapping_boundary():

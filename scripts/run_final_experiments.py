@@ -39,6 +39,16 @@ if not DATADIFF.exists():
     DATADIFF = PROJECT_ROOT / ".venv" / "bin" / "datadiff"
 
 FINAL_PLAN_TRACKS: tuple[str, ...] = (*FINAL_PROTOCOL_TRACKS, "postprocess")
+FINAL_MATRIX_TRACK_ALIASES: tuple[str, ...] = (
+    FINAL_VALIDATION_MATRIX.id,
+    FINAL_LIVE_DISCOVERY_MATRIX.id,
+    "historical_replay",
+    FINAL_SEEDED_SENSITIVITY_MATRIX.id,
+    FINAL_MODULE_ABLATION_MATRIX.id,
+    FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.id,
+    FINAL_COMPARISON_MATRIX.id,
+    "version_ledger",
+)
 MANIFEST_INDEX_SCHEMA_VERSION = "final-experiment-manifest-index-v1"
 DEFAULT_FINAL_STRATEGY_SNAPSHOT = REPORTS_DIR / "strategy-snapshots" / "final-frozen-strategy-snapshot.json"
 FINAL_REQUIRED_MATRIX_IDS: tuple[str, ...] = (
@@ -637,9 +647,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--track",
-        choices=["all", *FINAL_PLAN_TRACKS],
+        choices=["all", *FINAL_PLAN_TRACKS, *FINAL_MATRIX_TRACK_ALIASES],
         default="all",
-        help="experiment track to plan",
+        help="experiment track or final matrix id to plan",
     )
     parser.add_argument("--duration", default="24h", help="per-run wall-clock budget for live discovery")
     parser.add_argument(
@@ -773,30 +783,38 @@ def parse_args() -> argparse.Namespace:
 def build_plan(args: argparse.Namespace) -> list[FinalCommand]:
     commands: list[FinalCommand] = []
     strategy_snapshot = _resolve_strategy_snapshot(args)
-    tracks = (
-        set(FINAL_PLAN_TRACKS)
-        if args.track == "all"
-        else {args.track}
-    )
-    if "validation" in tracks:
+    selected = _selected_tracks(args.track)
+    if _track_selected(selected, "validation", FINAL_VALIDATION_MATRIX.id):
         commands.append(short_validation_command(args, strategy_snapshot=strategy_snapshot))
-    if "live" in tracks:
+    if _track_selected(selected, "live", FINAL_LIVE_DISCOVERY_MATRIX.id):
         commands.extend(live_discovery_commands(args, strategy_snapshot=strategy_snapshot))
-    if "historical" in tracks:
+    if _track_selected(selected, "historical", "historical_replay"):
         commands.extend(historical_replay_commands(args, strategy_snapshot=strategy_snapshot))
-    if "seeded" in tracks:
+    if _track_selected(selected, "seeded", FINAL_SEEDED_SENSITIVITY_MATRIX.id):
         commands.append(seeded_sensitivity_command(args, strategy_snapshot=strategy_snapshot))
-    if "ablation" in tracks:
+    if _track_selected(selected, "ablation", FINAL_MODULE_ABLATION_MATRIX.id):
         commands.append(module_ablation_command(args, strategy_snapshot=strategy_snapshot))
+    if _track_selected(selected, "ablation", FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX.id):
         commands.extend(adaptive_component_ablation_commands(args, strategy_snapshot=strategy_snapshot))
-    if "comparison" in tracks:
+    if _track_selected(selected, "comparison", FINAL_COMPARISON_MATRIX.id):
         commands.append(method_comparison_command(args, strategy_snapshot=strategy_snapshot))
+    if _track_selected(selected, "comparison", "version_ledger"):
         ledger_command = version_ledger_evidence_command(args)
         if ledger_command is not None:
             commands.append(ledger_command)
-    if "postprocess" in tracks:
+    if _track_selected(selected, "postprocess"):
         commands.append(final_readiness_audit_command(args))
     return commands
+
+
+def _selected_tracks(track: str) -> set[str]:
+    if track == "all":
+        return set(FINAL_PLAN_TRACKS)
+    return {track}
+
+
+def _track_selected(selected: set[str], *aliases: str) -> bool:
+    return any(alias in selected for alias in aliases)
 
 
 def _append_experiment_meta(cmd: list[str], meta: dict[str, object]) -> None:
@@ -1221,6 +1239,42 @@ def adaptive_component_ablation_commands(args: argparse.Namespace, *, strategy_s
             disabled_components.append("runtime-cost-learning")
         if variant.id == "no_quality_archive":
             disabled_components.append("quality-archive")
+        if variant.id == "no_bd_axis_bandit":
+            disabled_components.append("bd-axis-bandit")
+        if variant.id == "no_bayesian_exploration":
+            disabled_components.append("bayesian-exploration")
+        if variant.id == "no_value_catalog":
+            disabled_components.append("value-catalog")
+        if variant.id == "no_hierarchical_archive":
+            disabled_components.append("hierarchical-archive")
+        if variant.id == "no_seed_quota":
+            disabled_components.append("seed-quota")
+        if variant.id == "no_seed_energy_batch":
+            disabled_components.append("seed-energy-batch")
+        if variant.id == "no_per_operator_energy":
+            disabled_components.append("per-operator-energy")
+        if variant.id == "no_ir_rewrite_mutations":
+            disabled_components.append("ir-rewrite-mutations")
+        if variant.id == "no_operator_swarm":
+            disabled_components.append("operator-swarm")
+        if variant.id == "no_divergence_conditioned":
+            disabled_components.append("divergence-conditioned")
+        if variant.id == "no_shrink_mutations":
+            disabled_components.append("shrink-mutations")
+        if variant.id == "no_lineage_rarity":
+            disabled_components.append("lineage-rarity")
+        if variant.id == "no_minhash_dedup":
+            disabled_components.append("minhash-dedup")
+        if variant.id == "no_disagreement_bd_axis":
+            disabled_components.append("disagreement-bd-axis")
+        if variant.id == "no_lhs_seeding":
+            disabled_components.append("lhs-seeding")
+        if variant.id == "no_champion_corpus":
+            disabled_components.append("champion-corpus")
+        if variant.id == "no_backend_pair_learning":
+            disabled_components.append("backend-pair-learning")
+        if variant.id == "no_cost_normalized_reward":
+            disabled_components.append("cost-normalized-reward")
         if variant.id == "no_active_learning":
             disabled_components.append("active-learning")
         cmd = [

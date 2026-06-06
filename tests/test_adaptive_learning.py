@@ -23,6 +23,28 @@ def test_contextual_bandit_prefers_rewarded_action_after_feedback():
     assert ranked[0]["reward_signal"] > ranked[1]["reward_signal"]
 
 
+def test_contextual_bandit_self_calibrates_top_level_component_scales():
+    bandit = ContextualBandit(
+        exploration_weight=0.0,
+        model_weight=0.0,
+        uncertainty_weight=0.0,
+        version_weight=0.0,
+        continual_priority_weight=0.0,
+        active_learning_weight=0.0,
+    )
+
+    bandit.record("profile_a", scope="generator_profile", context_features=["target:core"], reward=3.0)
+    bandit.record("profile_a", scope="generator_profile", context_features=["target:core"], reward=3.0)
+
+    row = bandit.score_action("profile_a", scope="generator_profile", context_features=["target:core"])
+    restored = ContextualBandit.from_state_dict(bandit.to_state_dict())
+
+    assert bandit.weight_calibrator.total_updates == 2
+    assert bandit.weight_calibrator.scale("reward_signal") > 1.0
+    assert row["calibrated_component_scales"]["reward_signal"] > 1.0
+    assert restored.weight_calibrator.scale("reward_signal") == bandit.weight_calibrator.scale("reward_signal")
+
+
 def test_contextual_bandit_downranks_high_runtime_cost_action():
     bandit = ContextualBandit(exploration_weight=0.0, uncertainty_weight=0.0, model_weight=0.0)
 
@@ -391,6 +413,38 @@ def test_adaptive_learning_state_persists_scoped_actions_and_version_memory():
     assert ranked[0]["version_signal"] > 0.0
     assert ranked[0]["exploration_bonus"] >= 0.0
     assert restored.exploration_memory.total_records == 1
+
+
+def test_backend_pair_scope_learns_rewarded_pair_priority():
+    state = AdaptiveLearningState()
+    context = ["fp_type_mix:num1", "mismatch:value"]
+    for _ in range(4):
+        state.record_outcome(
+            "backend_pair",
+            "left|right",
+            context_features=context,
+            version_id="latest->fixed",
+            reward=2.0,
+        )
+        state.record_outcome(
+            "backend_pair",
+            "left|third",
+            context_features=context,
+            version_id="latest->fixed",
+            reward=-0.1,
+        )
+
+    ranked = state.rank_top(
+        "backend_pair",
+        ["left|third", "left|right"],
+        limit=2,
+        context_features=context,
+        version_id="latest->fixed",
+    )
+
+    assert ranked[0]["action_id"] == "left|right"
+    assert ranked[0]["mean_reward"] > ranked[1]["mean_reward"]
+    assert "backend_pair" in state.to_state_dict()["bandits"]
 
 
 def test_adaptive_learning_state_imports_and_persists_continual_priority_seed():

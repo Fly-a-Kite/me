@@ -6,6 +6,7 @@ from datadiff.scheduler import (
     AdaptiveScheduleConfig,
     BatchObservation,
     LocalSourceScheduler,
+    _batch_reward,
     summarize_batch_run,
 )
 from datadiff.adaptive_learning import AdaptiveLearningState
@@ -193,6 +194,93 @@ def test_adaptive_budget_scheduler_warmup_then_exploits_high_reward_arm():
     assert snapshot["b"]["mean_reward"] > snapshot["a"]["mean_reward"]
 
 
+def test_adaptive_budget_scheduler_applies_good_turing_exploration_from_closed_loop_state():
+    scheduler = AdaptiveBudgetScheduler(
+        [
+            {"arm_id": "a", "target_suite": "core", "preset": "baseline", "seed": 1},
+            {"arm_id": "b", "target_suite": "core_datafusion", "preset": "guided", "seed": 1001},
+        ],
+        total_cases_budget=8,
+        total_duration_budget_s=None,
+        config=AdaptiveScheduleConfig(batch_cases=4, warmup_batches=1, exploration_weight=0.5),
+    )
+
+    batch = scheduler.next_batch()
+    scheduler.record_result(
+        batch,
+        BatchObservation(
+            cases=4,
+            elapsed_s=1.0,
+            throughput_cases_s=4.0,
+            findings=0,
+            candidate_bug_cases=0,
+        ),
+        next_seed=5,
+        closed_loop_state={
+            "feedback": {
+                "discovery_rate_estimator": {
+                    "family_counts": {
+                        "family:a": 1,
+                        "family:b": 1,
+                        "family:c": 1,
+                        "family:d": 1,
+                    },
+                    "total_observations": 4,
+                }
+            }
+        },
+    )
+
+    snapshot = {row["arm_id"]: row for row in scheduler.snapshot()}
+    row = snapshot[batch.arm_id]
+    assert row["base_exploration_weight"] == 0.5
+    assert row["current_exploration_weight"] > row["base_exploration_weight"]
+    assert row["bayesian_exploration_observation_count"] == 1
+    assert row["bayesian_unseen_probability"] == 1.0
+    assert row["bayesian_exploration_bucket"] == "very_high"
+
+
+def test_adaptive_budget_scheduler_can_disable_good_turing_exploration():
+    scheduler = AdaptiveBudgetScheduler(
+        [{"arm_id": "a", "target_suite": "core", "preset": "baseline", "seed": 1}],
+        total_cases_budget=4,
+        total_duration_budget_s=None,
+        config=AdaptiveScheduleConfig(
+            batch_cases=4,
+            warmup_batches=1,
+            exploration_weight=0.5,
+            enable_bayesian_exploration=False,
+        ),
+    )
+
+    batch = scheduler.next_batch()
+    scheduler.record_result(
+        batch,
+        BatchObservation(
+            cases=4,
+            elapsed_s=1.0,
+            throughput_cases_s=4.0,
+            findings=0,
+            candidate_bug_cases=0,
+        ),
+        next_seed=5,
+        closed_loop_state={
+            "feedback": {
+                "discovery_rate_estimator": {
+                    "family_counts": {"family:a": 1, "family:b": 1},
+                    "total_observations": 2,
+                }
+            }
+        },
+    )
+
+    row = scheduler.snapshot()[0]
+    assert row["base_exploration_weight"] == 0.5
+    assert row["current_exploration_weight"] == 0.5
+    assert row["bayesian_exploration_enabled"] is False
+    assert row["bayesian_exploration_observation_count"] == 0
+
+
 def test_adaptive_budget_scheduler_reward_signal_prefers_repeated_stable_arm_over_single_spike():
     scheduler = AdaptiveBudgetScheduler(
         [
@@ -283,9 +371,67 @@ def test_adaptive_budget_scheduler_reward_signal_prefers_repeated_stable_arm_ove
 
     snapshot = {row["arm_id"]: row for row in scheduler.snapshot()}
 
-    assert snapshot["spiky"]["mean_reward"] > snapshot["stable"]["mean_reward"]
+    assert snapshot["spiky"]["mean_reward"] < snapshot["stable"]["mean_reward"]
     assert snapshot["stable"]["reward_signal"] > snapshot["spiky"]["reward_signal"]
     assert scheduler.next_batch().arm_id == "stable"
+
+
+def test_batch_reward_suppresses_auxiliary_positive_terms_without_rewardable_signal():
+    auxiliary_only = BatchObservation(
+        cases=4,
+        elapsed_s=1.0,
+        throughput_cases_s=8.0,
+        findings=1,
+        candidate_bug_cases=0,
+        signal_new_behavior_cases=0,
+        semantic_divergence_count=1,
+        resolved_semantic_divergence_count=1,
+        quality_oracle_count=3,
+        quality_pass_count=3,
+        quality_fail_count=0,
+        quality_score_total=500.0,
+        feedback_mutation_cases=1,
+        productive_mutation_cases=1,
+        guided_productive_cases=1,
+        source_reward_adjustment_total=3.0,
+        guidance_reward_adjustment_total=3.0,
+        seed_schedule_delta_total=5.0,
+    )
+    rewardable = BatchObservation(
+        cases=4,
+        elapsed_s=1.0,
+        throughput_cases_s=8.0,
+        findings=1,
+        candidate_bug_cases=0,
+        signal_new_behavior_cases=0,
+        semantic_divergence_count=1,
+        rewardable_semantic_divergence_count=1,
+        needs_confirmation_count=1,
+        quality_oracle_count=3,
+        quality_pass_count=3,
+        quality_fail_count=0,
+        quality_score_total=3.0,
+        feedback_mutation_cases=1,
+        productive_mutation_cases=1,
+        guided_productive_cases=1,
+        source_reward_adjustment_total=0.5,
+        guidance_reward_adjustment_total=0.5,
+        seed_schedule_delta_total=0.5,
+    )
+
+    auxiliary_only_reward = scheduler_module._batch_reward(
+        auxiliary_only,
+        new_global_family_count=0,
+        new_local_family_count=0,
+    )
+    rewardable_reward = scheduler_module._batch_reward(
+        rewardable,
+        new_global_family_count=0,
+        new_local_family_count=0,
+    )
+
+    assert auxiliary_only_reward < 0.0
+    assert rewardable_reward > auxiliary_only_reward
 
 
 def test_batch_reward_penalizes_runtime_cost_without_losing_signal_terms():
@@ -330,6 +476,35 @@ def test_batch_reward_penalizes_runtime_cost_without_losing_signal_terms():
 
     assert lean_reward > costly_reward
     assert scheduler_module._runtime_cost_penalty(costly) > scheduler_module._runtime_cost_penalty(lean)
+
+
+def test_batch_reward_cost_normalizes_same_signal_by_elapsed_time():
+    fast = BatchObservation(
+        cases=4,
+        elapsed_s=0.5,
+        throughput_cases_s=8.0,
+        findings=0,
+        candidate_bug_cases=0,
+        signal_new_behavior_cases=2,
+    )
+    slow = BatchObservation(
+        cases=4,
+        elapsed_s=2.0,
+        throughput_cases_s=2.0,
+        findings=0,
+        candidate_bug_cases=0,
+        signal_new_behavior_cases=2,
+    )
+
+    assert scheduler_module._batch_reward(
+        fast,
+        new_global_family_count=0,
+        new_local_family_count=0,
+    ) > scheduler_module._batch_reward(
+        slow,
+        new_global_family_count=0,
+        new_local_family_count=0,
+    )
 
 
 def test_adaptive_budget_scheduler_carries_closed_loop_state_between_batches():
@@ -499,6 +674,45 @@ def test_adaptive_budget_scheduler_can_ablate_runtime_cost_learning():
     )
 
     assert learning.bandits["batch_arm"].arms["guided-a"].runtime_cost_total == 0.0
+
+
+def test_batch_reward_can_disable_elapsed_cost_normalization_only():
+    observation = BatchObservation(
+        cases=1,
+        elapsed_s=0.1,
+        throughput_cases_s=10.0,
+        findings=0,
+        candidate_bug_cases=0,
+        signal_new_behavior_cases=1,
+        feedback_mutation_cases=1,
+        invalid_mutation_cases=1,
+        scheduler_feedback_share=0.90,
+    )
+
+    normalized = _batch_reward(
+        observation,
+        new_global_family_count=0,
+        new_local_family_count=0,
+        enable_runtime_cost=True,
+        enable_cost_normalized_reward=True,
+    )
+    unnormalized_with_penalty = _batch_reward(
+        observation,
+        new_global_family_count=0,
+        new_local_family_count=0,
+        enable_runtime_cost=True,
+        enable_cost_normalized_reward=False,
+    )
+    unnormalized_without_penalty = _batch_reward(
+        observation,
+        new_global_family_count=0,
+        new_local_family_count=0,
+        enable_runtime_cost=False,
+        enable_cost_normalized_reward=False,
+    )
+
+    assert normalized != unnormalized_with_penalty
+    assert unnormalized_with_penalty < unnormalized_without_penalty
 
 
 def test_adaptive_budget_scheduler_can_ablate_online_reward_model_updates():
@@ -1098,9 +1312,109 @@ def test_summarize_batch_run_counts_scheduler_signals(tmp_path: Path):
     assert observation.stored_in_feedback_corpus_cases == 1
     assert observation.quality_oracle_count == 3
     assert observation.quality_pass_count == 3
-    assert observation.source_reward_adjustment_total == 0.4
+    assert observation.source_reward_adjustment_total == 0.5
     assert observation.guidance_reward_adjustment_total == 0.25
-    assert observation.seed_schedule_delta_total == 2.85
+    assert observation.seed_schedule_delta_total == 2.0
     assert observation.productive_mutation_cases == 1
     assert observation.feedback_finding_yield_cases == 1
     assert observation.guided_productive_cases == 1
+
+
+def test_summarize_batch_run_filters_non_rewardable_signal_new_behavior(tmp_path: Path):
+    run_file = tmp_path / "run-scheduler-filtered-signal.jsonl"
+    rows = [
+        {
+            "case": {"case_id": "resolved", "seed": 1},
+            "case_index": 0,
+            "elapsed_s": 0.1,
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [
+                {
+                    "root_cause": "nan_inf_semantics",
+                    "triage_verdict": "expected_semantic_divergence",
+                    "suspicious_backends": ["duckdb"],
+                }
+            ],
+        },
+        {
+            "case": {"case_id": "false-positive", "seed": 2},
+            "case_index": 1,
+            "elapsed_s": 0.2,
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [
+                {
+                    "root_cause": "order_only_normalization_mismatch",
+                    "triage_verdict": "normalizer_false_positive",
+                    "false_positive": True,
+                    "suspicious_backends": ["sqlite"],
+                }
+            ],
+        },
+        {
+            "case": {"case_id": "source-issue", "seed": 3},
+            "case_index": 2,
+            "elapsed_s": 0.3,
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [
+                {
+                    "root_cause": "csv_long_numeric_roundtrip",
+                    "triage_verdict": "candidate_implementation_bug",
+                    "source_issue": "duckdb/duckdb#12345",
+                    "suspicious_backends": ["duckdb"],
+                }
+            ],
+        },
+        {
+            "case": {"case_id": "pure-behavior", "seed": 4},
+            "case_index": 3,
+            "elapsed_s": 0.4,
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [],
+        },
+        {
+            "case": {"case_id": "candidate", "seed": 5},
+            "case_index": 4,
+            "elapsed_s": 0.5,
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [
+                {
+                    "root_cause": "topk_filter_pushdown",
+                    "triage_verdict": "candidate_implementation_bug",
+                    "suspicious_backends": ["datafusion"],
+                }
+            ],
+        },
+        {
+            "case": {"case_id": "semantic-needs-confirmation", "seed": 6},
+            "case_index": 5,
+            "elapsed_s": 0.6,
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [
+                {
+                    "root_cause": "string_expression",
+                    "triage_verdict": "semantic_divergence_needs_confirmation",
+                    "suspicious_backends": ["sqlite"],
+                }
+            ],
+        },
+    ]
+    for row in rows:
+        append_jsonl(row, run_file)
+    dump_json({"elapsed_s": 1.0, "throughput_cases_s": 6.0}, run_meta_path(run_file))
+
+    observation = summarize_batch_run(run_file)
+
+    assert observation.new_behavior_cases == 6
+    assert observation.signal_new_behavior_cases == 3
+    assert observation.candidate_bug_cases == 1
+    assert observation.candidate_bug_families == {"topk_filter_pushdown@datafusion"}
+    assert observation.semantic_divergence_count == 2
+    assert observation.rewardable_semantic_divergence_count == 1
+    assert observation.resolved_semantic_divergence_count == 1
+    assert observation.false_positive_count == 1

@@ -4,7 +4,7 @@ import math
 import time
 from typing import Any
 
-from datadiff.backends.base import Backend, BackendResult
+from datadiff.backends.base import Backend, BackendResult, PreparedTable, prepare_table
 from datadiff.backends.dataframe_semantics import running_sum_plan, tuple_absence_plan
 from datadiff.backends.probe_semantics import EXTENDED_FALSE_PROBE_KINDS
 from datadiff.backends.sql_lowering import (
@@ -184,16 +184,22 @@ def _setop_all_duplicate_probe_sql(op: dict[str, Any]) -> str:
 class DataFusionBackend(Backend):
     name = "datafusion"
 
-    def _to_record_batch(self, table: TableData, pa):
+    def _to_record_batch(self, table: TableData | PreparedTable, pa):
+        prepared = prepare_table(table)
         arrays = []
         fields = []
-        for column in table.columns:
+        for column in prepared.columns:
             typ = _arrow_type(pa, column.type)
-            arrays.append(pa.array([row.get(column.name) for row in table.rows], type=typ))
+            arrays.append(pa.array(prepared.columns_data[column.name], type=typ))
             fields.append(pa.field(column.name, typ, nullable=column.nullable))
         return pa.RecordBatch.from_arrays(arrays, schema=pa.schema(fields))
 
-    def run(self, tables: list[TableData], program: Program, timeout_s: float = 5.0) -> BackendResult:
+    def run(
+        self,
+        tables: list[TableData | PreparedTable],
+        program: Program,
+        timeout_s: float = 5.0,
+    ) -> BackendResult:
         start = time.perf_counter()
         try:
             from datafusion import SessionContext

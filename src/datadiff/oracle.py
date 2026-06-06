@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from datadiff.canonicalization import (
-    compare_row_set_batch,
+    compare_result_batch,
     short_canonical_hash,
 )
 from datadiff.case_features import (
@@ -26,6 +26,7 @@ from datadiff.expression_semantics import cast_output_type, eval_expr_on_row, ex
 from datadiff.filtering import evaluate_filter_predicate, parse_filter_comparator
 from datadiff.join_keys import join_key_pairs, join_key_value
 from datadiff.normalizer import NormalizedResult
+from datadiff.oracle_rules import RootCauseContext, classify_root_cause_from_context
 from datadiff.operation_semantics import (
     aggregate_alias,
     aggregate_column,
@@ -110,96 +111,43 @@ def _signature(case: Case, normalized: dict[str, NormalizedResult], kind: str) -
 
 def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kind: str) -> str:
     ops = case.program.op_sequence()
-    if kind == "exception_mismatch":
-        return "exception_taxonomy"
-    probe_root = _last_probe_root(case)
-    if probe_root is not None:
-        return probe_root
-    if _case_has_path_projection_keyed_pick(case):
-        return "path_projection_keyed_pick"
-    if _case_has_running_sum(case):
-        return "running_sum_precision"
-    if _case_contains_special_float(case):
-        return "nan_inf_semantics"
-    if _case_uses_modulo(case):
-        return "arithmetic_expression"
-    if _case_has_reverse_division_columns(case):
-        return "reverse_division_operand_order"
-    if _case_has_grouped_topk_null_sort_key(case):
-        return "grouped_topk_null_sort_key"
-    if _case_has_distinct_null_topk(case):
-        return "distinct_null_topk"
-    if _case_has_float_group_key_instability(case, normalized):
-        return "float_group_key_instability"
-    if _case_has_negative_zero_comparison(case):
-        return "negative_zero_comparison"
-    if _case_has_tuple_absence_filter(case):
-        return "tuple_absence_null_filter"
-    if _case_uses_unicode_case_mapping(case) and _case_contains_non_ascii_string(case):
-        return "unicode_case_mapping"
-    if _case_has_outer_join_truth_filter(case):
-        return "outer_join_truth_filter"
-    if _case_has_post_topk_filter(case):
-        return "topk_filter_pushdown"
-    if _case_has_joined_order_offset_projection(case):
-        return "joined_order_offset_projection"
-    if _case_has_ordered_topk_projection(case):
-        return "ordered_topk_projection"
-    if any(op == "case_when" for op in ops):
-        return "conditional_expression"
-    if any(op == "union_all" for op in ops):
-        return "union_all_row_append"
-    if any(op == "drop_nulls" for op in ops):
-        return "drop_nulls_null_filter"
-    if any(op == "semi_join" for op in ops):
-        return "semi_join_membership"
-    if any(op == "anti_join" for op in ops):
-        return "anti_join_exclusion"
-    if any(op == "coalesce" for op in ops):
-        return "coalesce_null_semantics"
-    if any(op in {"groupby", "aggregate"} for op in ops):
-        return "groupby_aggregation"
-    if any(op == "join" for op in ops):
-        return "join_semantics"
-    if any(op == "fill_null" for op in ops):
-        return "fill_null_null_semantics"
-    if any(op == "distinct" for op in ops):
-        return "distinct_duplicate_elimination"
-    if any(op == "filter" for op in ops):
-        return "filter_predicate"
-    if any(op == "mutate" for op in ops):
-        kinds = expr_kinds(case.program.operations)
-        if kinds & {
-            "string_length",
-            "string_lower",
-            "string_upper",
-            "string_strip",
-            "string_null_if_empty",
-            "string_replace",
-            "string_slice",
-            "string_split_part",
-            "string_basename",
-            "string_concat",
-            "string_contains",
-            "string_starts_with",
-            "string_ends_with",
-        }:
-            return "string_expression"
-        if "date_part" in kinds:
-            return "datetime_expression"
-        if "bool_not" in kinds:
-            return "nullable_boolean_expression"
-        if "cast" in kinds:
-            return "type_cast"
-        return "arithmetic_expression"
-    if any(op in {"sort", "limit", "offset"} for op in ops):
-        return "ordering_or_limit"
-    ok_results = [r for r in normalized.values() if r.status == "ok"]
-    if ok_results and len({tuple(r.columns) for r in ok_results}) > 1:
-        return "schema_projection"
-    if _case_contains_null(case):
-        return "null_semantics"
-    return "unknown"
+    op_set = frozenset(ops)
+    expr_kind_set = expr_kinds(case.program.operations) if "mutate" in op_set else set()
+    return classify_root_cause_from_context(
+        RootCauseContext(
+            kind=kind,
+            op_set=op_set,
+            expr_kind_set=frozenset(expr_kind_set),
+            probe_root=_last_probe_root(case),
+            signals={
+                "path_projection_keyed_pick": lambda: _case_has_path_projection_keyed_pick(case),
+                "running_sum": lambda: _case_has_running_sum(case),
+                "contains_special_float": lambda: _case_contains_special_float(case),
+                "uses_modulo": lambda: _case_uses_modulo(case),
+                "reverse_division_columns": lambda: _case_has_reverse_division_columns(case),
+                "grouped_topk_null_sort_key": lambda: _case_has_grouped_topk_null_sort_key(case),
+                "distinct_null_topk": lambda: _case_has_distinct_null_topk(case),
+                "float_group_key_instability": lambda: _case_has_float_group_key_instability(case, normalized),
+                "negative_zero_comparison": lambda: _case_has_negative_zero_comparison(case),
+                "tuple_absence_filter": lambda: _case_has_tuple_absence_filter(case),
+                "unicode_case_mapping": lambda: (
+                    _case_uses_unicode_case_mapping(case)
+                    and _case_contains_non_ascii_string(case)
+                ),
+                "outer_join_truth_filter": lambda: _case_has_outer_join_truth_filter(case),
+                "post_topk_filter": lambda: _case_has_post_topk_filter(case),
+                "joined_order_offset_projection": lambda: _case_has_joined_order_offset_projection(case),
+                "ordered_topk_projection": lambda: _case_has_ordered_topk_projection(case),
+                "ok_result_columns_differ": lambda: _ok_result_columns_differ(normalized),
+                "contains_null": lambda: _case_contains_null(case),
+            },
+        )
+    )
+
+
+def _ok_result_columns_differ(normalized: dict[str, NormalizedResult]) -> bool:
+    ok_results = [result for result in normalized.values() if result.status == "ok"]
+    return bool(ok_results and len({tuple(result.columns) for result in ok_results}) > 1)
 
 
 def _case_has_sortedness_check(case: Case) -> bool:
@@ -598,10 +546,7 @@ def evaluate_case(case: Case, normalized: dict[str, NormalizedResult]) -> list[F
     if len(ok) >= 2:
         ok_items = list(ok.items())
         ok_backends = [backend for backend, _ in ok_items]
-        comparison = compare_row_set_batch(
-            [result.rows for _, result in ok_items],
-            column_sets=[result.columns for _, result in ok_items],
-        )
+        comparison = compare_result_batch([result for _, result in ok_items])
         if comparison.has_mismatch:
             suspicious = sorted(comparison.suspicious_labels(ok_backends))
             sig = _signature(case, normalized, "semantic_output_mismatch")
@@ -627,8 +572,5 @@ def _semantic_mismatch_class(ok_results: dict[str, NormalizedResult]) -> str:
     result_rows = list(ok_results.values())
     if len(result_rows) < 2:
         return "none"
-    comparison = compare_row_set_batch(
-        [result.rows for result in result_rows],
-        column_sets=[result.columns for result in result_rows],
-    )
+    comparison = compare_result_batch(result_rows)
     return comparison.mismatch_class

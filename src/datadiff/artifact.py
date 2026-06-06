@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from datadiff.config import ExperimentConfig
 from datadiff.dsl import Case
 from datadiff.env import collect_environment
 from datadiff.oracle import Finding
@@ -46,7 +47,7 @@ from datadiff.util import load_json
 here = __import__("pathlib").Path(__file__).parent
 case = Case.from_dict(load_json(here / "case.json"))
 config_data = load_json(here / "config.json")
-config = ExperimentConfig(**config_data) if config_data else ExperimentConfig()
+config = ExperimentConfig.from_payload(config_data)
 result = run_loaded_case(case, backends={list(raw_results)!r}, config=config, save_artifact=False)
 print(result["status"])
 for f in result["findings"]:

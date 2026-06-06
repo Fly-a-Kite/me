@@ -83,6 +83,8 @@ class Program:
     def order_sensitive(self) -> bool:
         from datadiff.operation_semantics import op_kind
 
+        if any(op_kind(op) in {"running_sum", "row_number_filter", "sortedness_check"} for op in self.operations):
+            return True
         row_order_preserving = {
             "filter",
             "tuple_absence_filter",
@@ -90,8 +92,6 @@ class Program:
             "semi_join",
             "anti_join",
             "coalesce",
-            "running_sum",
-            "row_number_filter",
             "select",
             "fill_null",
             "case_when",
@@ -811,9 +811,12 @@ def coerce_operation(operation: Mapping[str, Any] | Operation) -> Operation:
         return operation
     if not isinstance(operation, Mapping):
         raise TypeError(f"operation must be a mapping, got {type(operation).__name__}")
-    kind = str(operation.get("op", ""))
+    payload = dict(operation)
+    if not payload.get("op") and payload.get("kind"):
+        payload["op"] = payload["kind"]
+    kind = str(payload.get("op", ""))
     op_type = OPERATION_NODE_TYPES.get(kind, Operation)
-    return op_type(operation)
+    return op_type(payload)
 
 
 def normalize_sort_keys(op: Mapping[str, Any]) -> list[SortKey]:

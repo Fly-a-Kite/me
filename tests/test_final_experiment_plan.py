@@ -8,6 +8,35 @@ from pathlib import Path
 import json
 
 
+ADAPTIVE_COMPONENT_DISABLE_FLAGS = {
+    "active_learning": "active-learning",
+    "backend_pair_learning": "backend-pair-learning",
+    "bd_axis_bandit": "bd-axis-bandit",
+    "bayesian_exploration": "bayesian-exploration",
+    "champion_corpus": "champion-corpus",
+    "continual_learning": "continual-learning",
+    "cost_normalized_reward": "cost-normalized-reward",
+    "disagreement_bd_axis": "disagreement-bd-axis",
+    "divergence_conditioned": "divergence-conditioned",
+    "hierarchical_archive": "hierarchical-archive",
+    "ir_rewrite_mutations": "ir-rewrite-mutations",
+    "lhs_seeding": "lhs-seeding",
+    "lineage_rarity": "lineage-rarity",
+    "minhash_dedup": "minhash-dedup",
+    "online_reward_model": "online-reward-model",
+    "operator_swarm": "operator-swarm",
+    "per_operator_energy": "per-operator-energy",
+    "quality_archive": "quality-archive",
+    "runtime_cost_learning": "runtime-cost-learning",
+    "scheduler_annealing": "scheduler-annealing",
+    "scheduler_learning": "scheduler-learning",
+    "seed_energy_batch": "seed-energy-batch",
+    "seed_quota": "seed-quota",
+    "shrink_mutations": "shrink-mutations",
+    "value_catalog": "value-catalog",
+}
+
+
 def _module():
     path = Path(__file__).resolve().parents[1] / "scripts" / "run_final_experiments.py"
     spec = importlib.util.spec_from_file_location("run_final_experiments", path)
@@ -81,7 +110,7 @@ def test_default_final_plan_includes_only_confirmed_historical_specs():
     assert sum(1 for command in commands if command.track == "live") == 11
     assert sum(1 for command in commands if command.track == "validation") == 1
     assert sum(1 for command in commands if command.track == "seeded") == 1
-    assert sum(1 for command in commands if command.track == "ablation") == 9
+    assert sum(1 for command in commands if command.track == "ablation") == 27
     assert sum(1 for command in commands if command.track == "comparison") == 2
     assert sum(1 for command in commands if command.track == "postprocess") == 1
 
@@ -177,6 +206,32 @@ def test_validation_command_gates_short_before_long_runs():
     assert "run-health/classify-run" in validation.expected_output
 
 
+def test_final_plan_accepts_matrix_alias_tracks():
+    module = _module()
+
+    module_only = module.build_plan(_args(track="module_ablation"))
+    assert [command.name for command in module_only] == ["module_ablation"]
+
+    adaptive_only = module.build_plan(_args(track="adaptive_component_ablation"))
+    assert adaptive_only
+    assert all(command.name.startswith("adaptive_component_ablation:") for command in adaptive_only)
+
+    comparison_only = module.build_plan(_args(track="baseline_scope_comparison"))
+    assert [command.name for command in comparison_only] == ["baseline_and_related_scope"]
+
+    ledger_only = module.build_plan(_args(track="version_ledger"))
+    assert [command.name for command in ledger_only] == ["cross_version_regression_ledger"]
+
+
+def test_final_plan_parse_args_accepts_matrix_alias_track(monkeypatch):
+    module = _module()
+
+    monkeypatch.setattr(sys, "argv", ["run_final_experiments.py", "--track", "module_ablation"])
+    args = module.parse_args()
+
+    assert args.track == "module_ablation"
+
+
 def test_ablation_and_comparison_commands_cover_method_rqs():
     module = _module()
 
@@ -184,24 +239,15 @@ def test_ablation_and_comparison_commands_cover_method_rqs():
     by_name = {command.name: command for command in commands}
     ablation = by_name["module_ablation"]
     adaptive_reference = by_name["adaptive_component_ablation:adaptive_reference"]
-    no_scheduler = by_name["adaptive_component_ablation:no_scheduler_learning"]
-    no_scheduler_annealing = by_name["adaptive_component_ablation:no_scheduler_annealing"]
-    no_online_reward = by_name["adaptive_component_ablation:no_online_reward_model"]
-    no_continual = by_name["adaptive_component_ablation:no_continual_learning"]
-    no_runtime_cost = by_name["adaptive_component_ablation:no_runtime_cost_learning"]
-    no_quality_archive = by_name["adaptive_component_ablation:no_quality_archive"]
-    no_active_learning = by_name["adaptive_component_ablation:no_active_learning"]
+    adaptive_contrasts = {
+        component: by_name[f"adaptive_component_ablation:no_{component}"]
+        for component in ADAPTIVE_COMPONENT_DISABLE_FLAGS
+    }
     comparison = by_name["baseline_and_related_scope"]
 
     assert ablation.count_as_real_bugs is False
     assert adaptive_reference.count_as_real_bugs is False
-    assert no_scheduler.count_as_real_bugs is False
-    assert no_scheduler_annealing.count_as_real_bugs is False
-    assert no_online_reward.count_as_real_bugs is False
-    assert no_continual.count_as_real_bugs is False
-    assert no_runtime_cost.count_as_real_bugs is False
-    assert no_quality_archive.count_as_real_bugs is False
-    assert no_active_learning.count_as_real_bugs is False
+    assert all(command.count_as_real_bugs is False for command in adaptive_contrasts.values())
     assert comparison.count_as_real_bugs is False
     assert "no_type_aware" in _flag_value(ablation.command, "--presets")
     assert "no_normalizer" in _flag_value(ablation.command, "--presets")
@@ -215,31 +261,20 @@ def test_ablation_and_comparison_commands_cover_method_rqs():
     assert "live_cross_family" in _flag_value(comparison.command, "--presets")
     assert _flag_value(ablation.command, "--evidence-mode") == "ablation"
     assert _flag_value(adaptive_reference.command, "--schedule") == "adaptive"
-    assert _flag_value(no_scheduler.command, "--schedule") == "adaptive"
-    assert _flag_value(no_scheduler_annealing.command, "--schedule") == "adaptive"
-    assert _flag_value(no_online_reward.command, "--schedule") == "adaptive"
-    assert _flag_value(no_continual.command, "--schedule") == "adaptive"
-    assert _flag_value(no_runtime_cost.command, "--schedule") == "adaptive"
-    assert _flag_value(no_quality_archive.command, "--schedule") == "adaptive"
-    assert _flag_value(no_active_learning.command, "--schedule") == "adaptive"
-    assert _flag_value(no_scheduler.command, "--disable-adaptive-components") == "scheduler-learning"
-    assert _flag_value(no_scheduler_annealing.command, "--disable-adaptive-components") == "scheduler-annealing"
-    assert _flag_value(no_online_reward.command, "--disable-adaptive-components") == "online-reward-model"
-    assert _flag_value(no_continual.command, "--disable-adaptive-components") == "continual-learning"
-    assert _flag_value(no_runtime_cost.command, "--disable-adaptive-components") == "runtime-cost-learning"
-    assert _flag_value(no_quality_archive.command, "--disable-adaptive-components") == "quality-archive"
-    assert _flag_value(no_active_learning.command, "--disable-adaptive-components") == "active-learning"
+    for component, command in adaptive_contrasts.items():
+        assert _flag_value(command.command, "--schedule") == "adaptive"
+        assert (
+            _flag_value(command.command, "--disable-adaptive-components")
+            == ADAPTIVE_COMPONENT_DISABLE_FLAGS[component]
+        )
     assert "--disable-adaptive-components" not in adaptive_reference.command
     assert _flag_value(comparison.command, "--evidence-mode") == "comparison"
     assert ablation.replay_bug_policy["enable_replay_bug"] is False
     assert adaptive_reference.replay_bug_policy["enable_replay_bug"] is False
-    assert no_scheduler.replay_bug_policy["enable_replay_bug"] is False
-    assert no_scheduler_annealing.replay_bug_policy["enable_replay_bug"] is False
-    assert no_online_reward.replay_bug_policy["enable_replay_bug"] is False
-    assert no_continual.replay_bug_policy["enable_replay_bug"] is False
-    assert no_runtime_cost.replay_bug_policy["enable_replay_bug"] is False
-    assert no_quality_archive.replay_bug_policy["enable_replay_bug"] is False
-    assert no_active_learning.replay_bug_policy["enable_replay_bug"] is False
+    assert all(
+        command.replay_bug_policy["enable_replay_bug"] is False
+        for command in adaptive_contrasts.values()
+    )
     assert comparison.replay_bug_policy["enable_replay_bug"] is False
 
 
@@ -288,19 +323,14 @@ def test_final_plan_commands_include_structured_experiment_meta():
     assert ablation_meta["comparison_group"] == "module_ablation"
     assert "RQ2" in ablation_meta["rq_tags"]
 
-    adaptive = by_name["adaptive_component_ablation:no_runtime_cost_learning"]
-    adaptive_meta = json.loads(_flag_value(adaptive.command, "--experiment-meta"))
-    assert adaptive_meta["matrix_id"] == "adaptive_component_ablation"
-    assert adaptive_meta["comparison_group"] == "adaptive_component_ablation"
-    assert adaptive_meta["variant"]["variant_id"] == "no_runtime_cost_learning"
-    assert adaptive_meta["variant"]["component_focus"] == "runtime_cost_learning"
-    assert adaptive_meta["variant"]["factors"] == {"runtime_cost_learning": False}
-
-    annealing = by_name["adaptive_component_ablation:no_scheduler_annealing"]
-    annealing_meta = json.loads(_flag_value(annealing.command, "--experiment-meta"))
-    assert annealing_meta["variant"]["variant_id"] == "no_scheduler_annealing"
-    assert annealing_meta["variant"]["component_focus"] == "scheduler_annealing"
-    assert annealing_meta["variant"]["factors"] == {"scheduler_annealing": False}
+    for component in ADAPTIVE_COMPONENT_DISABLE_FLAGS:
+        command = by_name[f"adaptive_component_ablation:no_{component}"]
+        adaptive_meta = json.loads(_flag_value(command.command, "--experiment-meta"))
+        assert adaptive_meta["matrix_id"] == "adaptive_component_ablation"
+        assert adaptive_meta["comparison_group"] == "adaptive_component_ablation"
+        assert adaptive_meta["variant"]["variant_id"] == f"no_{component}"
+        assert adaptive_meta["variant"]["component_focus"] == component
+        assert adaptive_meta["variant"]["factors"] == {component: False}
 
     comparison = by_name["baseline_and_related_scope"]
     comparison_meta = json.loads(_flag_value(comparison.command, "--experiment-meta"))

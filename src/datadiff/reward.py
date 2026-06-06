@@ -1,297 +1,49 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass, field
 from typing import Any
 
 from datadiff.exploration_objectives import EXPLORATION_OBJECTIVE_PREFIX
+from datadiff.family_novelty import candidate_family_novelty_reward
+from datadiff.finding_outcomes import (
+    CANDIDATE_BUG_VERDICT,
+    EMPTY_FINDING_REWARD_SIGNALS,
+    FALSE_POSITIVE_VERDICTS,
+    ISSUE_REPLAY_ORIGIN,
+    NEEDS_CONFIRMATION_VERDICTS,
+    OFFLINE_BUCKET_FALSE_POSITIVE,
+    OFFLINE_BUCKET_KNOWN_BUG,
+    OFFLINE_BUCKET_NEEDS_TRIAGE,
+    OFFLINE_BUCKET_NEW_BUG,
+    OFFLINE_BUCKET_SEMANTIC_DIVERGENCE,
+    OFFLINE_BUCKET_UNCLASSIFIED,
+    RESOLVED_SEMANTIC_DIVERGENCE_VERDICTS,
+    SEMANTIC_DIVERGENCE_VERDICTS,
+    FindingOutcomeAnalysis,
+    analyze_finding_outcomes,
+    backend_group_key,
+    candidate_issue_family_key,
+    candidate_issue_family_keys,
+    candidate_issue_signatures,
+    family_key_matches_known_family,
+    is_candidate_issue_finding,
+    is_false_positive_finding,
+    is_issue_replay_finding,
+    is_known_saturated_candidate_issue_finding,
+    is_resolved_semantic_divergence_finding,
+    is_rewardable_candidate_issue_finding,
+    is_semantic_divergence_finding,
+    is_source_issue_candidate_issue_finding,
+    issue_replay_candidate_issue_family_keys,
+    offline_finding_bucket,
+    offline_finding_buckets,
+    row_has_rewardable_new_behavior,
+    row_reward_signals,
+    split_family_key,
+    suspicious_key,
+)
 from datadiff.mutator import mutation_operator_profiles
 from datadiff.semantic_signal import CANONICAL_SEMANTIC_SIGNAL_PREFIX, canonical_target_key
-
-CANDIDATE_BUG_VERDICT = "candidate_implementation_bug"
-ISSUE_REPLAY_ORIGIN = "issue_replay"
-SEMANTIC_DIVERGENCE_VERDICTS = {
-    "documented_semantic_divergence",
-    "expected_semantic_divergence",
-    "semantic_divergence_needs_confirmation",
-}
-RESOLVED_SEMANTIC_DIVERGENCE_VERDICTS = {
-    "documented_semantic_divergence",
-    "expected_semantic_divergence",
-}
-FALSE_POSITIVE_VERDICTS = {
-    "generator_false_positive",
-    "normalizer_false_positive",
-}
-NEEDS_CONFIRMATION_VERDICTS = {
-    "needs_manual_confirmation",
-    "semantic_divergence_needs_confirmation",
-}
-OFFLINE_BUCKET_NEW_BUG = "new_bug"
-OFFLINE_BUCKET_KNOWN_BUG = "known_bug"
-OFFLINE_BUCKET_FALSE_POSITIVE = "false_positive"
-OFFLINE_BUCKET_SEMANTIC_DIVERGENCE = "semantic_divergence"
-OFFLINE_BUCKET_NEEDS_TRIAGE = "needs_triage"
-OFFLINE_BUCKET_UNCLASSIFIED = "unclassified"
-EMPTY_FINDING_REWARD_SIGNALS = {
-    "candidate_bug": False,
-    "candidate_bug_count": 0,
-    "issue_replay_candidate_bug_count": 0,
-    "known_saturated_candidate_bug_count": 0,
-    "semantic_divergence": False,
-    "semantic_divergence_count": 0,
-    "resolved_semantic_divergence_count": 0,
-    "rewardable_semantic_divergence": False,
-    "false_positive": False,
-    "false_positive_count": 0,
-    "needs_confirmation": False,
-    "needs_confirmation_count": 0,
-}
-
-
-@dataclass(slots=True)
-class FindingOutcomeAnalysis:
-    candidate_bug_count: int = 0
-    issue_replay_candidate_bug_count: int = 0
-    known_saturated_candidate_bug_count: int = 0
-    semantic_divergence_count: int = 0
-    resolved_semantic_divergence_count: int = 0
-    false_positive_count: int = 0
-    needs_confirmation_count: int = 0
-    root_cause_counts: Counter[str] = field(default_factory=Counter)
-    candidate_bug_families: Counter[str] = field(default_factory=Counter)
-    issue_replay_candidate_bug_families: Counter[str] = field(default_factory=Counter)
-    candidate_bug_signatures: Counter[str] = field(default_factory=Counter)
-
-    def reward_signals(self) -> dict[str, Any]:
-        if (
-            self.candidate_bug_count == 0
-            and self.issue_replay_candidate_bug_count == 0
-            and self.known_saturated_candidate_bug_count == 0
-            and self.semantic_divergence_count == 0
-            and self.resolved_semantic_divergence_count == 0
-            and self.false_positive_count == 0
-            and self.needs_confirmation_count == 0
-        ):
-            return dict(EMPTY_FINDING_REWARD_SIGNALS)
-        return {
-            "candidate_bug": self.candidate_bug_count > 0,
-            "candidate_bug_count": self.candidate_bug_count,
-            "issue_replay_candidate_bug_count": self.issue_replay_candidate_bug_count,
-            "known_saturated_candidate_bug_count": self.known_saturated_candidate_bug_count,
-            "semantic_divergence": self.semantic_divergence_count > 0,
-            "semantic_divergence_count": self.semantic_divergence_count,
-            "resolved_semantic_divergence_count": self.resolved_semantic_divergence_count,
-            "rewardable_semantic_divergence": self.needs_confirmation_count > 0,
-            "false_positive": self.false_positive_count > 0,
-            "false_positive_count": self.false_positive_count,
-            "needs_confirmation": self.needs_confirmation_count > 0,
-            "needs_confirmation_count": self.needs_confirmation_count,
-        }
-
-
-def analyze_finding_outcomes(
-    findings: list[dict[str, Any]],
-    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
-) -> FindingOutcomeAnalysis:
-    known_families = known_saturated_bug_families or ()
-    analysis = FindingOutcomeAnalysis()
-    root_by_backend_group: dict[str, str] = {}
-    rewardable_findings: list[tuple[str, str, str]] = []
-    for finding in findings:
-        root = str(finding.get("root_cause", "unknown"))
-        verdict = str(finding.get("triage_verdict", "unclassified"))
-        analysis.root_cause_counts[root] += 1
-        if verdict in SEMANTIC_DIVERGENCE_VERDICTS:
-            analysis.semantic_divergence_count += 1
-        if verdict in RESOLVED_SEMANTIC_DIVERGENCE_VERDICTS:
-            analysis.resolved_semantic_divergence_count += 1
-        if verdict in NEEDS_CONFIRMATION_VERDICTS:
-            analysis.needs_confirmation_count += 1
-        if is_false_positive_finding(finding):
-            analysis.false_positive_count += 1
-
-        if not is_candidate_issue_finding(finding):
-            continue
-        backend_group = backend_group_key(finding)
-        family_key = f"{root}@{backend_group}"
-        is_issue_replay = is_issue_replay_finding(finding)
-        is_known_saturated = family_key_matches_known_family(family_key, known_families)
-        if is_issue_replay:
-            analysis.issue_replay_candidate_bug_count += 1
-            if not root.startswith("metamorphic_"):
-                analysis.issue_replay_candidate_bug_families[family_key] += 1
-        if is_known_saturated:
-            analysis.known_saturated_candidate_bug_count += 1
-        if is_issue_replay or is_known_saturated:
-            continue
-        analysis.candidate_bug_count += 1
-        if not root.startswith("metamorphic_"):
-            root_by_backend_group.setdefault(backend_group, root)
-        rewardable_findings.append((root, backend_group, str(finding.get("signature", "")).strip()))
-    for root, backend_group, signature in rewardable_findings:
-        normalized_root = root
-        if normalized_root.startswith("metamorphic_") and backend_group in root_by_backend_group:
-            normalized_root = root_by_backend_group[backend_group]
-        analysis.candidate_bug_families[f"{normalized_root}@{backend_group}"] += 1
-        if signature:
-            analysis.candidate_bug_signatures[signature] += 1
-    return analysis
-
-
-def candidate_family_novelty_reward(
-    previous_hits: int,
-    *,
-    enable_family_saturation: bool = True,
-    family_saturation_threshold: int = 8,
-    saturated_family_reward: float = 0.02,
-) -> float:
-    if enable_family_saturation and family_saturation_threshold > 0 and previous_hits >= family_saturation_threshold:
-        return max(0.0, saturated_family_reward)
-    if previous_hits <= 0:
-        return 4.0
-    if previous_hits <= 2:
-        return 1.5
-    if previous_hits <= 8:
-        return 0.75 / max(1.0, previous_hits**0.5)
-    return 0.10
-
-
-def is_candidate_issue_finding(finding: dict[str, Any]) -> bool:
-    return finding.get("triage_verdict") == CANDIDATE_BUG_VERDICT and not finding.get("false_positive")
-
-
-def is_issue_replay_finding(finding: dict[str, Any]) -> bool:
-    return str(finding.get("discovery_origin", "")).strip() == ISSUE_REPLAY_ORIGIN
-
-
-def backend_group_key(finding: dict[str, Any]) -> str:
-    return ",".join(sorted(finding.get("suspicious_backends", []) or [])) or "unknown"
-
-
-def candidate_issue_family_key(finding: dict[str, Any]) -> str:
-    root = str(finding.get("root_cause", "unknown"))
-    backend_group = backend_group_key(finding)
-    return f"{root}@{backend_group}"
-
-
-def family_key_matches_known_family(candidate_family: str, known_bug_families: list[str] | tuple[str, ...]) -> bool:
-    candidate_root, candidate_backends = _split_family_key(candidate_family)
-    for known_family in known_bug_families:
-        known_root, known_backends = _split_family_key(known_family)
-        if known_root != candidate_root:
-            continue
-        if not known_backends or not candidate_backends or known_backends & candidate_backends:
-            return True
-    return False
-
-
-def is_known_saturated_candidate_issue_finding(
-    finding: dict[str, Any],
-    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
-) -> bool:
-    if not is_candidate_issue_finding(finding):
-        return False
-    known_families = known_saturated_bug_families or ()
-    return family_key_matches_known_family(candidate_issue_family_key(finding), known_families)
-
-
-def is_rewardable_candidate_issue_finding(
-    finding: dict[str, Any],
-    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
-) -> bool:
-    return (
-        is_candidate_issue_finding(finding)
-        and not is_issue_replay_finding(finding)
-        and not is_known_saturated_candidate_issue_finding(finding, known_saturated_bug_families)
-    )
-
-
-def is_semantic_divergence_finding(finding: dict[str, Any]) -> bool:
-    return str(finding.get("triage_verdict", "unclassified")) in SEMANTIC_DIVERGENCE_VERDICTS
-
-
-def is_resolved_semantic_divergence_finding(finding: dict[str, Any]) -> bool:
-    return str(finding.get("triage_verdict", "unclassified")) in RESOLVED_SEMANTIC_DIVERGENCE_VERDICTS
-
-
-def is_false_positive_finding(finding: dict[str, Any]) -> bool:
-    return bool(finding.get("false_positive")) or str(finding.get("triage_verdict", "unclassified")) in FALSE_POSITIVE_VERDICTS
-
-
-def offline_finding_bucket(
-    finding: dict[str, Any],
-    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
-) -> str:
-    if is_false_positive_finding(finding):
-        return OFFLINE_BUCKET_FALSE_POSITIVE
-    if is_semantic_divergence_finding(finding):
-        return OFFLINE_BUCKET_SEMANTIC_DIVERGENCE
-    if is_candidate_issue_finding(finding):
-        if (
-            is_known_saturated_candidate_issue_finding(finding, known_saturated_bug_families)
-            or is_issue_replay_finding(finding)
-            or str(finding.get("source_issue", "")).strip()
-        ):
-            return OFFLINE_BUCKET_KNOWN_BUG
-        return OFFLINE_BUCKET_NEW_BUG
-    if str(finding.get("triage_verdict", "unclassified")) in NEEDS_CONFIRMATION_VERDICTS:
-        return OFFLINE_BUCKET_NEEDS_TRIAGE
-    return OFFLINE_BUCKET_UNCLASSIFIED
-
-
-def offline_finding_buckets(
-    findings: list[dict[str, Any]],
-    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
-) -> Counter[str]:
-    return Counter(
-        offline_finding_bucket(finding, known_saturated_bug_families)
-        for finding in findings
-    )
-
-
-def suspicious_key(finding: dict[str, Any]) -> str:
-    return backend_group_key(finding)
-
-
-def candidate_issue_family_keys(
-    findings: list[dict[str, Any]],
-    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
-) -> Counter[str]:
-    return analyze_finding_outcomes(
-        findings,
-        known_saturated_bug_families=known_saturated_bug_families,
-    ).candidate_bug_families
-
-
-def issue_replay_candidate_issue_family_keys(findings: list[dict[str, Any]]) -> Counter[str]:
-    return analyze_finding_outcomes(findings).issue_replay_candidate_bug_families
-
-
-def candidate_issue_signatures(
-    findings: list[dict[str, Any]],
-    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
-) -> Counter[str]:
-    return analyze_finding_outcomes(
-        findings,
-        known_saturated_bug_families=known_saturated_bug_families,
-    ).candidate_bug_signatures
-
-
-def row_reward_signals(
-    row: dict[str, Any],
-    known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
-    *,
-    finding_outcomes: FindingOutcomeAnalysis | None = None,
-) -> dict[str, Any]:
-    findings = row.get("findings") or []
-    if finding_outcomes is None and not findings:
-        return dict(EMPTY_FINDING_REWARD_SIGNALS)
-    analysis = finding_outcomes or analyze_finding_outcomes(
-        findings,
-        known_saturated_bug_families=known_saturated_bug_families,
-    )
-    return analysis.reward_signals()
 
 
 def online_case_reward(
@@ -306,10 +58,14 @@ def online_case_reward(
         finding_outcomes=finding_outcomes,
     )
     preflight = row.get("preflight") or {}
-    signal_new_behavior = bool(row.get("signal_new_behavior", row.get("is_new_behavior")))
+    signal_new_behavior = row_has_rewardable_new_behavior(
+        row,
+        known_saturated_bug_families=known_saturated_bug_families,
+        finding_outcomes=finding_outcomes,
+    )
     reward = (
         4.0 * signals["candidate_bug_count"]
-        + 0.20 * signals["needs_confirmation_count"]
+        + 0.20 * signals["semantic_divergence_needs_confirmation_count"]
         + (0.5 if signal_new_behavior else 0.0)
         - 0.15 * signals["resolved_semantic_divergence_count"]
         - 2.5 * signals["false_positive_count"]
@@ -347,7 +103,12 @@ def feedback_summary_for_case(
         "candidate_source": str(row.get("candidate_source", "generated")),
         "has_finding": bool(findings),
         "is_new_behavior": bool(row.get("is_new_behavior")),
-        "signal_new_behavior": bool(row.get("signal_new_behavior", row.get("is_new_behavior"))),
+        "raw_signal_new_behavior": bool(row.get("signal_new_behavior", row.get("is_new_behavior"))),
+        "signal_new_behavior": row_has_rewardable_new_behavior(
+            row,
+            known_saturated_bug_families=known_families,
+            finding_outcomes=analysis,
+        ),
         "candidate_bug_families": list(analysis.candidate_bug_families) if analysis is not None else [],
         "candidate_bug_signatures": list(analysis.candidate_bug_signatures) if analysis is not None else [],
         "stored_in_feedback_corpus": bool(row.get("stored_in_feedback_corpus")),
@@ -376,16 +137,40 @@ def resolved_case_feedback_summary(
     existing = row.get("feedback_summary")
     if not isinstance(existing, dict):
         return base
-    merged = dict(base)
-    merged.update(existing)
+    merged = dict(existing)
+    merged.update(base)
     merged["candidate_source"] = str(
-        existing.get("candidate_source", row.get("candidate_source", merged["candidate_source"]))
+        row.get("candidate_source", existing.get("candidate_source", merged["candidate_source"]))
     )
-    merged["candidate_bug_families"] = list(existing.get("candidate_bug_families", merged["candidate_bug_families"]))
-    merged["candidate_bug_signatures"] = list(
-        existing.get("candidate_bug_signatures", merged["candidate_bug_signatures"])
-    )
+    if not row.get("quality_oracles"):
+        _inherit_historical_quality_summary(merged, existing)
+        merged["source_reward_adjustment"] = source_reward_adjustment_from_summary(
+            merged,
+            candidate_source=str(merged.get("candidate_source", "generated")),
+        )
+        merged["guidance_reward_adjustment"] = guidance_reward_adjustment_from_summary(merged)
+        merged["seed_schedule_delta"] = seed_schedule_delta_from_summary(merged)
     return merged
+
+
+def _inherit_historical_quality_summary(summary: dict[str, Any], existing: dict[str, Any]) -> None:
+    for key in (
+        "quality_oracle_count",
+        "quality_pass_count",
+        "quality_fail_count",
+        "quality_score_total",
+        "mutation_oracle_verdict",
+        "mutation_oracle_score",
+        "mutation_oracle_passed",
+        "feedback_oracle_verdict",
+        "feedback_oracle_score",
+        "feedback_oracle_passed",
+        "guidance_oracle_verdict",
+        "guidance_oracle_score",
+        "guidance_oracle_passed",
+    ):
+        if key in existing:
+            summary[key] = existing[key]
 
 
 def aggregate_feedback_summary(
@@ -488,11 +273,7 @@ def source_reward_adjustment_from_summary(summary: dict[str, Any], *, candidate_
     mutation_verdict = str(summary.get("mutation_oracle_verdict", ""))
     feedback_verdict = str(summary.get("feedback_oracle_verdict", ""))
     guidance_verdict = str(summary.get("guidance_oracle_verdict", ""))
-    suppress_positive_signal = bool(summary.get("false_positive_count", 0)) or (
-        bool(summary.get("resolved_semantic_divergence_count", 0))
-        and not bool(summary.get("candidate_bug_count", 0))
-        and not bool(summary.get("needs_confirmation_count", 0))
-    )
+    suppress_positive_signal = _suppress_auxiliary_positive_feedback(summary)
     if candidate_source == "feedback_mutation":
         if mutation_verdict == "productive_mutation" and not suppress_positive_signal:
             adjustment += 0.35
@@ -515,7 +296,8 @@ def source_reward_adjustment_from_summary(summary: dict[str, Any], *, candidate_
 
 def guidance_reward_adjustment_from_summary(summary: dict[str, Any]) -> float:
     verdict = str(summary.get("guidance_oracle_verdict", ""))
-    if verdict == "guided_productive":
+    suppress_positive_signal = _suppress_auxiliary_positive_feedback(summary)
+    if verdict == "guided_productive" and not suppress_positive_signal:
         return 0.25
     if verdict == "guided_target_miss":
         return -0.15
@@ -526,18 +308,47 @@ def guidance_reward_adjustment_from_summary(summary: dict[str, Any]) -> float:
 
 def seed_schedule_delta_from_summary(summary: dict[str, Any]) -> float:
     signal_new_behavior = bool(summary.get("signal_new_behavior", summary.get("is_new_behavior")))
+    suppress_positive_signal = _suppress_auxiliary_positive_feedback(summary)
+    auxiliary_positive_delta = 0.0
+    if not suppress_positive_signal:
+        auxiliary_positive_delta = (
+            (0.5 if signal_new_behavior else 0.0)
+            + 0.25 * float(summary.get("quality_pass_count", 0))
+        )
     delta = (
         2.5 * float(summary.get("candidate_bug_count", 0))
-        + 0.5 * float(summary.get("needs_confirmation_count", 0))
-        + (0.5 if signal_new_behavior else 0.0)
+        + 0.5 * float(summary.get("semantic_divergence_needs_confirmation_count", 0))
+        + auxiliary_positive_delta
         - 1.0 * float(summary.get("false_positive_count", 0))
         - 0.25 * float(summary.get("resolved_semantic_divergence_count", 0))
-        + 0.25 * float(summary.get("quality_pass_count", 0))
         - 0.10 * float(summary.get("quality_fail_count", 0))
     )
     if not bool(summary.get("preflight_valid", True)) or bool(summary.get("preflight_fallback_used", False)):
         delta -= 0.25
     return max(-2.0, min(6.0, delta))
+
+
+def _suppress_auxiliary_positive_feedback(summary: dict[str, Any]) -> bool:
+    has_rewardable_candidate = bool(summary.get("candidate_bug_count", 0))
+    has_rewardable_semantic = bool(summary.get("rewardable_semantic_divergence", False))
+    if bool(summary.get("false_positive_count", 0)):
+        return True
+    if (
+        bool(summary.get("resolved_semantic_divergence_count", 0))
+        and not has_rewardable_candidate
+        and not has_rewardable_semantic
+    ):
+        return True
+    known_candidate_only = (
+        (
+            bool(summary.get("issue_replay_candidate_bug_count", 0))
+            or bool(summary.get("known_saturated_candidate_bug_count", 0))
+            or bool(summary.get("source_issue_candidate_bug_count", 0))
+        )
+        and not has_rewardable_candidate
+        and not has_rewardable_semantic
+    )
+    return known_candidate_only
 
 
 def _quality_oracle_signals(oracles: list[dict[str, Any]]) -> dict[str, Any]:
@@ -681,12 +492,6 @@ def _string_items(values: list[Any] | tuple[Any, ...] | set[Any] | None) -> list
         seen.add(text)
         out.append(text)
     return out
-
-
-def _split_family_key(family_key: str) -> tuple[str, set[str]]:
-    root, _, backend_part = str(family_key).partition("@")
-    backends = {backend.strip() for backend in backend_part.split(",") if backend.strip()}
-    return root.strip(), backends
 
 
 is_candidate_bug_finding = is_candidate_issue_finding

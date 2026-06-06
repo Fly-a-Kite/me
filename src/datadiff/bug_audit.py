@@ -940,6 +940,472 @@ def _sorted_pyarrow_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sort_by_canonical_key(rows)
 
 
+def _duckdb_cte_inline_equivalence_sweep(duckdb: Any) -> dict[str, Any]:
+    """Deterministically compare WITH (inline) CTE vs equivalent inline subquery results.
+
+    DuckDB's optimizer is allowed to inline non-recursive CTEs by default. The
+    invariant under test is that the inline subquery form and the explicit CTE
+    form must return identical rows for read-only, deterministic SELECT queries.
+    """
+
+    queries: tuple[tuple[str, str, str], ...] = (
+        (
+            "filter_group_sum",
+            (
+                "SELECT g, sum(x) AS s FROM (SELECT * FROM t WHERE x IS NOT NULL) "
+                "GROUP BY g ORDER BY g NULLS FIRST"
+            ),
+            (
+                "WITH cte AS (SELECT * FROM t WHERE x IS NOT NULL) "
+                "SELECT g, sum(x) AS s FROM cte GROUP BY g ORDER BY g NULLS FIRST"
+            ),
+        ),
+        (
+            "distinct_limit_offset",
+            (
+                "SELECT * FROM (SELECT DISTINCT g, s FROM t ORDER BY g NULLS FIRST, s NULLS FIRST) "
+                "LIMIT 3 OFFSET 1"
+            ),
+            (
+                "WITH cte AS (SELECT DISTINCT g, s FROM t ORDER BY g NULLS FIRST, s NULLS FIRST) "
+                "SELECT * FROM cte LIMIT 3 OFFSET 1"
+            ),
+        ),
+        (
+            "left_join_then_count",
+            (
+                "SELECT a.g, count(*) AS c FROM t a LEFT JOIN "
+                "(SELECT g, max(x) AS mx FROM t GROUP BY g) b ON a.g = b.g "
+                "GROUP BY a.g ORDER BY a.g NULLS FIRST"
+            ),
+            (
+                "WITH agg AS (SELECT g, max(x) AS mx FROM t GROUP BY g) "
+                "SELECT a.g, count(*) AS c FROM t a LEFT JOIN agg b ON a.g = b.g "
+                "GROUP BY a.g ORDER BY a.g NULLS FIRST"
+            ),
+        ),
+    )
+
+    con = duckdb.connect(database=":memory:")
+    con.execute(
+        "CREATE TABLE t AS SELECT * FROM (VALUES "
+        "(1, 'a', 10), (1, 'a', 10), (1, 'b', NULL), "
+        "(2, 'a', -3), (2, NULL, 7), (NULL, 'c', 0), (3, 'b', 4)"
+        ") AS v(g, s, x)"
+    )
+
+    mismatches: list[dict[str, Any]] = []
+    for label, inline_sql, cte_sql in queries:
+        try:
+            inline_rows = _sorted_pyarrow_rows(con.execute(inline_sql).fetchdf().to_dict(orient="records"))
+            cte_rows = _sorted_pyarrow_rows(con.execute(cte_sql).fetchdf().to_dict(orient="records"))
+        except Exception as exc:  # noqa: BLE001 — record probe-side error, not a candidate
+            mismatches.append(
+                {"query": label, "error_type": type(exc).__name__, "error": str(exc)}
+            )
+            continue
+        if inline_rows != cte_rows:
+            mismatches.append(
+                {
+                    "query": label,
+                    "inline_rows": inline_rows,
+                    "cte_rows": cte_rows,
+                }
+            )
+
+    return {
+        "sweep": "duckdb_cte_inline_equivalence",
+        "checked_queries": len(queries),
+        "mismatch_count": len(mismatches),
+        "first_mismatch": mismatches[0] if mismatches else None,
+        "sample_mismatches": mismatches[:5],
+    }
+
+
+def _duckdb_cte_inline_equivalence_probe() -> dict[str, Any]:
+    import duckdb
+
+    sweep = _duckdb_cte_inline_equivalence_sweep(duckdb)
+    return {
+        "candidate_bug": bool(sweep["mismatch_count"]),
+        "version": getattr(duckdb, "__version__", "") or package_version("duckdb"),
+        "expected": {"mismatch_count": 0, "relation": "inline subquery ≡ named CTE"},
+        "observed": {
+            "mismatch_count": sweep["mismatch_count"],
+            "first_mismatch": sweep["first_mismatch"],
+        },
+        "evidence": (
+            "Reading a non-recursive, deterministic query through an inline subquery and through "
+            "an explicit WITH CTE must yield identical result rows; "
+            f"checked queries={sweep['checked_queries']}, mismatches={sweep['mismatch_count']}."
+        ),
+        "details": sweep,
+    }
+
+
+def _polars_concat_select_pushdown_sweep(pl: Any) -> dict[str, Any]:
+    """Concat-then-select must equal per-frame-select-then-concat for shared columns.
+
+    Polars' optimizer routinely pushes column projection through concat. If the
+    pushdown reorders columns, mishandles nulls, or drops rows, the lazy plan
+    diverges from the per-frame-then-concat form. The invariant must hold for
+    column subsets shared across both frames.
+    """
+
+    frame_pairs = (
+        (
+            "numeric_strs",
+            pl.DataFrame(
+                {
+                    "g": [1, 2, 3, None],
+                    "x": [10, None, -5, 7],
+                    "s": ["a", "b", None, "d"],
+                }
+            ),
+            pl.DataFrame(
+                {
+                    "g": [3, 4, None],
+                    "x": [9, -1, 4],
+                    "s": ["e", None, "g"],
+                }
+            ),
+            ["g", "s"],
+        ),
+        (
+            "bool_floats",
+            pl.DataFrame(
+                {
+                    "k": [True, False, None, True],
+                    "v": [1.5, -2.25, float("nan"), 0.0],
+                    "label": ["a", "b", "c", "d"],
+                }
+            ),
+            pl.DataFrame(
+                {
+                    "k": [False, None, True],
+                    "v": [3.0, float("inf"), -0.0],
+                    "label": ["e", "f", "g"],
+                }
+            ),
+            ["label", "v"],
+        ),
+    )
+
+    mismatches: list[dict[str, Any]] = []
+    for label, left, right, projection in frame_pairs:
+        try:
+            via_concat_then_select = (
+                pl.concat([left, right], how="vertical")
+                .select(projection)
+                .to_dicts()
+            )
+            via_select_then_concat = (
+                pl.concat(
+                    [left.select(projection), right.select(projection)],
+                    how="vertical",
+                ).to_dicts()
+            )
+        except Exception as exc:  # noqa: BLE001
+            mismatches.append(
+                {"frames": label, "error_type": type(exc).__name__, "error": str(exc)}
+            )
+            continue
+        normalized_a = json.loads(json.dumps(via_concat_then_select, default=str))
+        normalized_b = json.loads(json.dumps(via_select_then_concat, default=str))
+        if normalized_a != normalized_b:
+            mismatches.append(
+                {
+                    "frames": label,
+                    "projection": projection,
+                    "concat_then_select": normalized_a,
+                    "select_then_concat": normalized_b,
+                }
+            )
+
+    return {
+        "sweep": "polars_concat_select_pushdown",
+        "checked_frames": len(frame_pairs),
+        "mismatch_count": len(mismatches),
+        "first_mismatch": mismatches[0] if mismatches else None,
+        "sample_mismatches": mismatches[:5],
+    }
+
+
+def _polars_concat_select_pushdown_probe() -> dict[str, Any]:
+    import polars as pl
+
+    sweep = _polars_concat_select_pushdown_sweep(pl)
+    return {
+        "candidate_bug": bool(sweep["mismatch_count"]),
+        "version": pl.__version__,
+        "expected": {"mismatch_count": 0, "relation": "concat∘select ≡ select-each∘concat for shared columns"},
+        "observed": {
+            "mismatch_count": sweep["mismatch_count"],
+            "first_mismatch": sweep["first_mismatch"],
+        },
+        "evidence": (
+            "Selecting columns after concat must equal selecting the same columns from each frame "
+            "and concatenating; this catches projection-pushdown ordering and null-handling bugs. "
+            f"Checked frames={sweep['checked_frames']}, mismatches={sweep['mismatch_count']}."
+        ),
+        "details": sweep,
+    }
+
+
+def _pandas_arrow_groupby_size_count_sweep(pd: Any) -> dict[str, Any]:
+    """For Arrow-backed pandas, groupby.size() must equal groupby.count() + per-group nulls.
+
+    Invariant: ``size = count(non_null) + count(null)`` per group; both forms must
+    agree with the input frame's row count summed across groups. This catches
+    the family of pandas-Arrow bugs where group size is computed on the dense
+    Arrow buffer but count() is computed on the validity bitmap, yielding
+    inconsistent results across the two APIs.
+    """
+
+    frames = (
+        (
+            "single_key_int",
+            pd.DataFrame(
+                {
+                    "g": pd.array([1, 1, 2, 2, None, 3, 3, None], dtype="int64[pyarrow]"),
+                    "x": pd.array([10, None, 5, 5, 7, None, 1, 2], dtype="int64[pyarrow]"),
+                }
+            ),
+            ["g"],
+        ),
+        (
+            "single_key_str",
+            pd.DataFrame(
+                {
+                    "g": pd.array(["a", "a", "b", None, "b", None, "c"], dtype="string[pyarrow]"),
+                    "v": pd.array([1.0, None, 2.0, 3.0, None, 4.0, 5.0], dtype="float64[pyarrow]"),
+                }
+            ),
+            ["g"],
+        ),
+    )
+
+    mismatches: list[dict[str, Any]] = []
+    for label, df, keys in frames:
+        try:
+            agg_size = df.groupby(keys, dropna=False).size().to_dict()
+            agg_count = df.groupby(keys, dropna=False).count().to_dict()
+            total_rows = int(df.shape[0])
+            sum_of_sizes = sum(int(v) for v in agg_size.values())
+        except Exception as exc:  # noqa: BLE001
+            mismatches.append({"frame": label, "error_type": type(exc).__name__, "error": str(exc)})
+            continue
+        if sum_of_sizes != total_rows:
+            mismatches.append(
+                {
+                    "frame": label,
+                    "sum_of_sizes": sum_of_sizes,
+                    "total_rows": total_rows,
+                    "size_per_group": {str(k): int(v) for k, v in agg_size.items()},
+                    "count_per_group": {col: {str(k): int(v) for k, v in counts.items()} for col, counts in agg_count.items()},
+                }
+            )
+
+    return {
+        "sweep": "pandas_arrow_groupby_size_count",
+        "checked_frames": len(frames),
+        "mismatch_count": len(mismatches),
+        "first_mismatch": mismatches[0] if mismatches else None,
+        "sample_mismatches": mismatches[:5],
+    }
+
+
+def _pandas_arrow_groupby_size_count_probe() -> dict[str, Any]:
+    import pandas as pd
+
+    sweep = _pandas_arrow_groupby_size_count_sweep(pd)
+    return {
+        "candidate_bug": bool(sweep["mismatch_count"]),
+        "version": pd.__version__,
+        "expected": {"mismatch_count": 0, "relation": "sum(groupby.size()) == n_rows"},
+        "observed": {
+            "mismatch_count": sweep["mismatch_count"],
+            "first_mismatch": sweep["first_mismatch"],
+        },
+        "evidence": (
+            "For Arrow-backed pandas extension dtypes, the sum of groupby.size() values "
+            "must equal the input row count regardless of null handling on the grouping key; "
+            f"checked frames={sweep['checked_frames']}, mismatches={sweep['mismatch_count']}."
+        ),
+        "details": sweep,
+    }
+
+
+def _duckdb_left_anti_join_equivalence_sweep(duckdb: Any) -> dict[str, Any]:
+    """LEFT ANTI JOIN must equal `LEFT JOIN ... WHERE right.key IS NULL`.
+
+    This is a textbook SQL identity; if DuckDB's anti-join planner deviates
+    (e.g. mishandles NULL on either side, drops rows after probe), the two
+    forms diverge. The invariant must hold across mixed NULLs on both sides.
+    """
+
+    con = duckdb.connect(database=":memory:")
+    con.execute(
+        "CREATE TABLE l AS SELECT * FROM (VALUES "
+        "(1, 'a'), (2, 'b'), (NULL, 'c'), (3, NULL), (4, 'a'), (5, NULL)"
+        ") AS v(k, lbl)"
+    )
+    con.execute(
+        "CREATE TABLE r AS SELECT * FROM (VALUES "
+        "(1, 'p'), (3, 'q'), (NULL, 'r')"
+        ") AS v(k, tag)"
+    )
+
+    queries = (
+        (
+            "anti_join_via_left",
+            "SELECT l.* FROM l ANTI JOIN r ON l.k = r.k ORDER BY l.k NULLS LAST, l.lbl NULLS LAST",
+            (
+                "SELECT l.k, l.lbl FROM l LEFT JOIN r ON l.k = r.k "
+                "WHERE r.k IS NULL ORDER BY l.k NULLS LAST, l.lbl NULLS LAST"
+            ),
+        ),
+        (
+            "anti_join_with_filter",
+            (
+                "SELECT l.* FROM l ANTI JOIN (SELECT k FROM r WHERE tag IS NOT NULL) r ON l.k = r.k "
+                "ORDER BY l.k NULLS LAST, l.lbl NULLS LAST"
+            ),
+            (
+                "SELECT l.k, l.lbl FROM l LEFT JOIN (SELECT k FROM r WHERE tag IS NOT NULL) r ON l.k = r.k "
+                "WHERE r.k IS NULL ORDER BY l.k NULLS LAST, l.lbl NULLS LAST"
+            ),
+        ),
+    )
+
+    mismatches: list[dict[str, Any]] = []
+    for label, anti_sql, left_sql in queries:
+        try:
+            anti_rows = con.execute(anti_sql).fetchdf().to_dict(orient="records")
+            left_rows = con.execute(left_sql).fetchdf().to_dict(orient="records")
+        except Exception as exc:  # noqa: BLE001
+            mismatches.append({"query": label, "error_type": type(exc).__name__, "error": str(exc)})
+            continue
+        if anti_rows != left_rows:
+            mismatches.append(
+                {"query": label, "anti_rows": anti_rows, "left_join_with_filter_rows": left_rows}
+            )
+
+    return {
+        "sweep": "duckdb_left_anti_join_equivalence",
+        "checked_queries": len(queries),
+        "mismatch_count": len(mismatches),
+        "first_mismatch": mismatches[0] if mismatches else None,
+        "sample_mismatches": mismatches[:5],
+    }
+
+
+def _duckdb_left_anti_join_equivalence_probe() -> dict[str, Any]:
+    import duckdb
+
+    sweep = _duckdb_left_anti_join_equivalence_sweep(duckdb)
+    return {
+        "candidate_bug": bool(sweep["mismatch_count"]),
+        "version": getattr(duckdb, "__version__", "") or package_version("duckdb"),
+        "expected": {
+            "mismatch_count": 0,
+            "relation": "ANTI JOIN ≡ LEFT JOIN ... WHERE right.key IS NULL (mixed NULLs on both sides)",
+        },
+        "observed": {
+            "mismatch_count": sweep["mismatch_count"],
+            "first_mismatch": sweep["first_mismatch"],
+        },
+        "evidence": (
+            "ANTI JOIN and LEFT JOIN + IS NULL filter are standard SQL equivalents; any divergence "
+            "indicates a planner or null-handling bug. "
+            f"Checked queries={sweep['checked_queries']}, mismatches={sweep['mismatch_count']}."
+        ),
+        "details": sweep,
+    }
+
+
+def _polars_lazy_eager_equivalence_sweep(pl: Any) -> dict[str, Any]:
+    """For pure (no-IO) transformations Polars eager and lazy.collect() must agree.
+
+    The lazy plan goes through projection pushdown, predicate pushdown, simplify
+    expressions, and the streaming/parallel collector; the eager path goes
+    through the in-memory operator. They must compute the same result on the
+    same input frame. The sweep includes mixed-null filter+groupby+agg pipelines
+    that have historically exposed lazy-vs-eager planner bugs.
+    """
+
+    queries = (
+        (
+            "filter_groupby_agg",
+            lambda df: df.filter(pl.col("x").is_not_null())
+            .group_by("g")
+            .agg([pl.col("x").sum().alias("sx"), pl.col("x").count().alias("cx")])
+            .sort(["g", "sx", "cx"], nulls_last=True),
+        ),
+        (
+            "with_columns_then_filter",
+            lambda df: df.with_columns([(pl.col("x") * 2).alias("x2")])
+            .filter(pl.col("x2") >= 0)
+            .sort(["g", "x2"], nulls_last=True),
+        ),
+        (
+            "unique_then_sort",
+            lambda df: df.select(["g"]).unique().sort(["g"], nulls_last=True),
+        ),
+    )
+
+    base = pl.DataFrame(
+        {
+            "g": [1, 1, 2, 2, None, 3, 3, None, 4, 4],
+            "x": [10, None, -5, 5, 7, None, 1, 2, 0, -3],
+        }
+    )
+
+    mismatches: list[dict[str, Any]] = []
+    for label, build_query in queries:
+        try:
+            eager_result = build_query(base).to_dicts()
+            lazy_result = build_query(base.lazy()).collect().to_dicts()
+        except Exception as exc:  # noqa: BLE001
+            mismatches.append({"query": label, "error_type": type(exc).__name__, "error": str(exc)})
+            continue
+        normalized_eager = json.loads(json.dumps(eager_result, default=str))
+        normalized_lazy = json.loads(json.dumps(lazy_result, default=str))
+        if normalized_eager != normalized_lazy:
+            mismatches.append(
+                {"query": label, "eager": normalized_eager, "lazy": normalized_lazy}
+            )
+
+    return {
+        "sweep": "polars_lazy_eager_equivalence",
+        "checked_queries": len(queries),
+        "mismatch_count": len(mismatches),
+        "first_mismatch": mismatches[0] if mismatches else None,
+        "sample_mismatches": mismatches[:5],
+    }
+
+
+def _polars_lazy_eager_equivalence_probe() -> dict[str, Any]:
+    import polars as pl
+
+    sweep = _polars_lazy_eager_equivalence_sweep(pl)
+    return {
+        "candidate_bug": bool(sweep["mismatch_count"]),
+        "version": pl.__version__,
+        "expected": {"mismatch_count": 0, "relation": "eager(query) ≡ lazy(query).collect() for pure pipelines"},
+        "observed": {
+            "mismatch_count": sweep["mismatch_count"],
+            "first_mismatch": sweep["first_mismatch"],
+        },
+        "evidence": (
+            "Polars eager and lazy execution paths share the same logical plan; any divergence on "
+            "pure (no-IO) pipelines indicates a planner-vs-evaluator bug. "
+            f"Checked queries={sweep['checked_queries']}, mismatches={sweep['mismatch_count']}."
+        ),
+        "details": sweep,
+    }
+
+
 PROBES: dict[str, BugAuditProbe] = {
     "datafusion_distinct_null_topk": BugAuditProbe(
         probe_id="datafusion_distinct_null_topk",
@@ -996,5 +1462,60 @@ PROBES: dict[str, BugAuditProbe] = {
         title="PyArrow sliced Boolean transform equivalence",
         invariant="A sliced Arrow table must filter, sort, and take like an equivalent zero-offset rebuilt table.",
         runner=_pyarrow_sliced_transform_equivalence_probe,
+    ),
+    "duckdb_cte_inline_equivalence": BugAuditProbe(
+        probe_id="duckdb_cte_inline_equivalence",
+        target_backend="duckdb",
+        family="duckdb_cte_inline_equivalence",
+        title="DuckDB inline subquery vs explicit CTE equivalence",
+        invariant=(
+            "Reading a deterministic, non-recursive query through an inline subquery and through "
+            "an explicit WITH CTE must yield identical result rows."
+        ),
+        runner=_duckdb_cte_inline_equivalence_probe,
+    ),
+    "polars_concat_select_pushdown": BugAuditProbe(
+        probe_id="polars_concat_select_pushdown",
+        target_backend="polars",
+        family="polars_concat_select_pushdown",
+        title="Polars concat-select projection pushdown equivalence",
+        invariant=(
+            "concat(frames).select(cols) must equal concat(frame.select(cols) for frame in frames) "
+            "for any column subset shared across frames."
+        ),
+        runner=_polars_concat_select_pushdown_probe,
+    ),
+    "pandas_arrow_groupby_size_count": BugAuditProbe(
+        probe_id="pandas_arrow_groupby_size_count",
+        target_backend="pandas",
+        family="pandas_arrow_groupby_size_count",
+        title="pandas Arrow-backed groupby.size() row-count consistency",
+        invariant=(
+            "For Arrow-backed extension dtypes, sum(groupby.size()) must equal the input row count "
+            "regardless of null handling on the grouping key."
+        ),
+        runner=_pandas_arrow_groupby_size_count_probe,
+    ),
+    "duckdb_left_anti_join_equivalence": BugAuditProbe(
+        probe_id="duckdb_left_anti_join_equivalence",
+        target_backend="duckdb",
+        family="duckdb_left_anti_join_equivalence",
+        title="DuckDB ANTI JOIN vs LEFT JOIN IS NULL equivalence",
+        invariant=(
+            "ANTI JOIN must produce the same rows as LEFT JOIN ... WHERE right.key IS NULL "
+            "for any predicate combination over NULLable join keys."
+        ),
+        runner=_duckdb_left_anti_join_equivalence_probe,
+    ),
+    "polars_lazy_eager_equivalence": BugAuditProbe(
+        probe_id="polars_lazy_eager_equivalence",
+        target_backend="polars",
+        family="polars_lazy_eager_equivalence",
+        title="Polars lazy.collect() vs eager pipeline equivalence",
+        invariant=(
+            "For pure (no-IO) Polars pipelines, df.lazy().pipeline().collect() must equal "
+            "df.pipeline() exactly."
+        ),
+        runner=_polars_lazy_eager_equivalence_probe,
     ),
 }

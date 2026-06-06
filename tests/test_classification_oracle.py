@@ -1080,6 +1080,66 @@ def test_classification_excludes_limit_before_any_defined_order():
     assert classification.false_positive_reason == "limit_offset_order_underconstrained"
 
 
+def test_classification_allows_unordered_limit_that_does_not_truncate_rows():
+    case = Case(
+        "case-limit-no-op",
+        45,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("x", "int")],
+                [{"x": 1}, {"x": 2}],
+            )
+        ],
+        Program("prog-limit-no-op", 45, [{"op": "limit", "n": 2}]),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "arithmetic_expression",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["x"], [[1], [2]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["x"], [[1], [3]]),
+    }
+
+    classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "common"}, ["pandas", "duckdb"])
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.false_positive is False
+
+
+def test_classification_allows_unordered_offset_that_discards_all_rows():
+    case = Case(
+        "case-offset-empty-no-op",
+        46,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("x", "int")],
+                [{"x": 1}, {"x": 2}],
+            )
+        ],
+        Program("prog-offset-empty-no-op", 46, [{"op": "offset", "n": 2}]),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "schema_projection",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["x"], []),
+        "duckdb": NormalizedResult("duckdb", "ok", ["x"], [[99]]),
+    }
+
+    classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "common"}, ["pandas", "duckdb"])
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.false_positive is False
+
+
 def test_classification_marks_float_precision_order_boundary_not_candidate_bug():
     case = Case(
         "case-float-precision-order-boundary",
@@ -1562,6 +1622,73 @@ def test_classification_marks_single_backend_metamorphic_violation_as_candidate_
 
     assert classification.verdict == "candidate_implementation_bug"
     assert classification.confidence == "high"
+
+
+def test_classification_downgrades_metamorphic_accept_reject_violation():
+    case = _case([{"op": "filter", "column": "x", "cmp": ">", "value": 0}])
+    finding = {
+        "kind": "metamorphic_filter_idempotence_violation",
+        "root_cause": "metamorphic_filter_idempotence",
+        "oracle": "metamorphic",
+        "confidence": "medium",
+        "suspicious_backends": ["duckdb"],
+        "mismatch_class": "status",
+    }
+
+    classification = classify_finding(case, finding, {}, {}, {"generator_profile": "common"}, ["pandas", "duckdb"])
+
+    assert classification.verdict == "semantic_divergence_needs_confirmation"
+    assert classification.paper_status == "valid_finding_not_confirmed_bug"
+    assert classification.adjudication["countable_as_bug_evidence"] is False
+    assert classification.adjudication["metamorphic_support"] == "accept_reject_needs_confirmation"
+
+
+def test_classification_downgrades_metamorphic_row_order_violation():
+    case = _case([{"op": "filter", "column": "x", "cmp": ">", "value": 0}])
+    finding = {
+        "kind": "metamorphic_union_all_empty_append_violation",
+        "root_cause": "metamorphic_union_all_empty_append",
+        "oracle": "metamorphic",
+        "confidence": "medium",
+        "suspicious_backends": ["duckdb"],
+        "mismatch_class": "row_order",
+    }
+
+    classification = classify_finding(case, finding, {}, {}, {"generator_profile": "common"}, ["pandas", "duckdb"])
+
+    assert classification.verdict == "semantic_divergence_needs_confirmation"
+    assert classification.paper_status == "valid_finding_not_confirmed_bug"
+    assert classification.adjudication["countable_as_bug_evidence"] is False
+    assert classification.adjudication["metamorphic_support"] == "row_order_needs_confirmation"
+
+
+def test_classification_downgrades_metamorphic_violation_with_order_observer():
+    case = _case(
+        [
+            {
+                "op": "row_number_filter",
+                "partition_by": [],
+                "order_by": [{"column": "x", "ascending": True, "nulls": "last"}],
+                "cmp": "==",
+                "value": 1,
+            },
+            {"op": "groupby", "keys": ["flag"], "aggs": [{"column": "x", "func": "sum", "as": "sum_x"}]},
+        ]
+    )
+    finding = {
+        "kind": "metamorphic_input_partition_union_all_violation",
+        "root_cause": "metamorphic_input_partition_union_all",
+        "oracle": "metamorphic",
+        "confidence": "medium",
+        "suspicious_backends": ["duckdb"],
+    }
+
+    classification = classify_finding(case, finding, {}, {}, {"generator_profile": "common"}, ["pandas", "duckdb"])
+
+    assert classification.verdict == "semantic_divergence_needs_confirmation"
+    assert classification.paper_status == "valid_finding_not_confirmed_bug"
+    assert classification.confidence == "medium"
+    assert classification.adjudication["countable_as_bug_evidence"] is False
 
 
 def test_validate_case_rejects_cross_type_filter_literal():

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import math
 from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
@@ -63,6 +64,450 @@ def stable_rows(rows: Any) -> list[str]:
         except Exception:
             pass
     return [json_canonical_dumps(row) for row in rows]
+
+
+def compute_minhash(tokens: Any, signature_size: int = 64) -> list[int]:
+    native = _load_native()
+    if native is not None:
+        native_minhash = getattr(native, "compute_minhash", None)
+        if native_minhash is not None:
+            try:
+                return [int(item) for item in native_minhash(tokens, int(signature_size))]
+            except Exception:
+                pass
+    return _compute_minhash_fallback(tokens, int(signature_size))
+
+
+def _compute_minhash_fallback(tokens: Any, signature_size: int = 64) -> list[int]:
+    size = max(1, int(signature_size or 64))
+    values = [str(token) for token in tokens if str(token)]
+    if not values:
+        return [0 for _ in range(size)]
+    signature = [(1 << 64) - 1 for _ in range(size)]
+    for token in sorted(set(values)):
+        encoded = token.encode("utf-8", "surrogatepass")
+        for index in range(size):
+            digest = hashlib.sha256(index.to_bytes(2, "big") + b"\0" + encoded).digest()
+            value = int.from_bytes(digest[:8], "big", signed=False)
+            if value < signature[index]:
+                signature[index] = value
+    return signature
+
+
+def extract_case_features(operations: Any, column_types: Mapping[str, str]) -> list[str]:
+    operation_payloads = [_plain_payload(operation) for operation in operations]
+    resolved_column_types = {
+        str(name): str(column_type)
+        for name, column_type in dict(column_types).items()
+        if str(name)
+    }
+    native = _load_native()
+    if native is not None:
+        native_extract = getattr(native, "extract_case_features", None)
+        if native_extract is not None:
+            try:
+                return sorted({str(item) for item in native_extract(operation_payloads, resolved_column_types)})
+            except Exception:
+                pass
+    return _extract_case_features_fallback(operation_payloads, resolved_column_types)
+
+
+def _plain_payload(value: Any) -> Any:
+    if hasattr(value, "to_dict") and callable(value.to_dict):
+        return _plain_payload(value.to_dict())
+    if isinstance(value, Mapping):
+        return {str(key): _plain_payload(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_plain_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return [_plain_payload(item) for item in value]
+    return value
+
+
+def _extract_case_features_fallback(operations: Any, column_types: Mapping[str, str]) -> list[str]:
+    features: set[str] = set()
+    op_names: list[str] = []
+    for raw_op in operations:
+        if not isinstance(raw_op, Mapping):
+            continue
+        op = dict(raw_op)
+        kind = str(op.get("op") or "unknown")
+        op_names.append(kind)
+        features.add(f"op:{kind}")
+        if kind == "filter":
+            column = str(op.get("column") or "unknown")
+            cmp = str(op.get("cmp") or "unknown")
+            features.add(f"cmp:{cmp}")
+            if column in column_types:
+                features.add(f"filter_type:{column_types[column]}")
+            _add_filter_comparator_feature_subset(features, cmp)
+        elif kind == "select":
+            features.add(_feature_bucket("select_width", len(_string_list(op.get("columns"))), [(1, "one"), (3, "few")], "many"))
+        elif kind == "sort":
+            features.add(_sort_direction_feature(op))
+        elif kind == "limit":
+            limit = _int_value(op.get("n"), 0)
+            if limit == 0:
+                features.add("op:limit_zero")
+            features.add(_feature_bucket("limit", limit, [(0, "zero"), (3, "tiny"), (10, "small")], "large"))
+        elif kind == "offset":
+            offset = _int_value(op.get("n"), 0)
+            if offset == 0:
+                features.add("op:offset_zero")
+            features.add(_feature_bucket("offset", offset, [(0, "zero"), (3, "tiny"), (10, "small")], "large"))
+        elif kind == "mutate":
+            expr = op.get("expr") if isinstance(op.get("expr"), Mapping) else {}
+            mutate_kind = str(expr.get("kind") or "unknown")
+            features.add(f"mutate:{mutate_kind}")
+            features.add(f"expr:{mutate_kind}")
+            _add_mutate_feature_subset(features, expr, column_types)
+        elif kind == "groupby":
+            keys = _string_list(op.get("keys"))
+            aggs = [agg for agg in op.get("aggs", []) or [] if isinstance(agg, Mapping)]
+            funcs = {str(agg.get("func") or "unknown") for agg in aggs}
+            if funcs and funcs <= {"count", "nunique", "min", "max", "any", "all"}:
+                features.add("groupby:exact-aggregate")
+                features.add("groupby:sorted-input")
+            features.add(_feature_bucket("groupby_keys", len(keys), [(1, "one"), (2, "two")], "many"))
+            if len(keys) > 1:
+                features.add("groupby:multi-key")
+            for key in keys:
+                if key in column_types:
+                    features.add(f"group_key_type:{column_types[key]}")
+            _add_aggregate_feature_subset(features, aggs, column_types)
+        elif kind == "aggregate":
+            aggs = [agg for agg in op.get("aggs", []) or [] if isinstance(agg, Mapping)]
+            _add_aggregate_feature_subset(features, aggs, column_types)
+        elif kind in {"tuple_absence_filter", "union_all", "drop_nulls", "distinct", "fill_null"}:
+            _add_simple_operation_feature_subset(features, kind, op, column_types)
+    if op_names:
+        features.add(f"opseq:{'>'.join(op_names)}")
+        features.add(_feature_bucket("op_count", len(op_names), [(1, "one"), (3, "few"), (5, "many")], "deep"))
+    return sorted(features)
+
+
+def _feature_bucket(prefix: str, value: int, limits: list[tuple[int, str]], fallback: str) -> str:
+    for limit, name in limits:
+        if value <= limit:
+            return f"{prefix}:{name}"
+    return f"{prefix}:{fallback}"
+
+
+def _string_list(value: Any) -> list[str]:
+    if isinstance(value, (list, tuple)):
+        return [str(item) for item in value if str(item)]
+    text = str(value or "")
+    return [text] if text else []
+
+
+def _int_value(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _sort_direction_feature(op: Mapping[str, Any]) -> str:
+    directions: set[bool] = set()
+    keys = op.get("keys")
+    if isinstance(keys, list):
+        for key in keys:
+            if not isinstance(key, Mapping):
+                continue
+            ascending = key.get("ascending", True)
+            if not isinstance(ascending, bool):
+                return "sort:asc"
+            directions.add(ascending)
+    else:
+        ascending = op.get("ascending", True)
+        if not isinstance(ascending, bool):
+            return "sort:asc"
+        if _string_list(op.get("columns")):
+            directions.add(ascending)
+    if len(directions) > 1:
+        return "sort:mixed"
+    return "sort:asc" if next(iter(directions), True) else "sort:desc"
+
+
+def _add_filter_comparator_feature_subset(features: set[str], cmp: str) -> None:
+    if cmp in {"in_set", "not_in_set"}:
+        features.add("filter:set-membership")
+        if cmp == "not_in_set":
+            features.add("filter:negative-set-membership")
+    if cmp in {"is_null", "is_not_null"}:
+        features.add("filter:null-predicate")
+        features.add(f"filter:null-predicate:{cmp}")
+    if cmp.startswith("bool_"):
+        truth = cmp.removeprefix("bool_")
+        features.add("filter:boolean-predicate")
+        features.add(f"filter:boolean-predicate:{truth}")
+    if cmp == "range_closed":
+        features.add("filter:range-closed")
+    if cmp in {"str_contains", "str_starts_with", "str_ends_with"}:
+        features.add("filter:string-pattern")
+        features.add(f"filter:{cmp.replace('str_', 'string-').replace('_', '-')}")
+
+
+def _add_mutate_feature_subset(features: set[str], expr: Mapping[str, Any], column_types: Mapping[str, str]) -> None:
+    kind = str(expr.get("kind") or "unknown")
+    source = str(expr.get("source") or "")
+    if kind == "arith_const":
+        features.add(f"arith:{expr.get('op') or 'unknown'}")
+    elif kind == "reverse_division_columns":
+        features.add("arithmetic:operand-order")
+        features.add("arithmetic:reverse-division")
+    elif kind == "abs":
+        features.add("numeric:abs")
+    elif kind == "clip":
+        features.add("numeric:clip")
+    elif kind == "bool_not":
+        features.add("boolean:not")
+    elif kind == "cast":
+        target = str(expr.get("to") or "unknown")
+        features.add(f"cast_to:{target}")
+        if source in column_types:
+            features.add(f"cast:{column_types[source]}_to_{target}")
+        if expr.get("input_domain"):
+            features.add(f"cast_domain:{expr['input_domain']}")
+    elif kind in {
+        "string_length",
+        "string_lower",
+        "string_upper",
+        "string_strip",
+        "string_null_if_empty",
+        "string_replace",
+        "string_slice",
+        "string_split_part",
+        "string_concat",
+        "string_contains",
+        "string_starts_with",
+        "string_ends_with",
+        "date_part",
+        "string_basename",
+    }:
+        feature_map = {
+            "string_length": "string:length",
+            "string_lower": "string:lower",
+            "string_upper": "string:upper",
+            "string_strip": "string:strip",
+            "string_null_if_empty": "string:null-if-empty",
+            "string_replace": "string:replace",
+            "string_slice": "string:slice",
+            "string_split_part": "string:split-first",
+            "string_concat": "string:concat",
+            "string_contains": "string:contains",
+            "string_starts_with": "string:starts-with",
+            "string_ends_with": "string:ends-with",
+            "date_part": "date:part",
+            "string_basename": "path:basename",
+        }
+        features.add(feature_map[kind])
+        if kind == "string_null_if_empty":
+            features.add("null:empty-string")
+        if kind == "date_part":
+            features.add(f"date_part:{expr.get('part') or 'unknown'}")
+
+
+def _add_aggregate_feature_subset(
+    features: set[str],
+    aggs: list[Mapping[str, Any]],
+    column_types: Mapping[str, str],
+) -> None:
+    for agg in aggs:
+        source = str(agg.get("column") or "")
+        func = str(agg.get("func") or "unknown")
+        features.add(f"agg:{func}")
+        source_type = column_types.get(source)
+        if not source_type:
+            continue
+        features.add(f"agg_source_type:{source_type}")
+        if source_type == "float" and func in {"sum", "mean"}:
+            features.add("agg:precision-float")
+        if source_type == "bool":
+            features.add("agg:boolean")
+            features.add(f"agg:{func}:bool")
+        if func == "count" and source_type == "str":
+            features.add("agg:count:str")
+        if func == "nunique":
+            features.add(f"agg:nunique:{source_type}")
+
+
+def _add_simple_operation_feature_subset(
+    features: set[str],
+    kind: str,
+    op: Mapping[str, Any],
+    column_types: Mapping[str, str],
+) -> None:
+    if kind == "tuple_absence_filter":
+        features.add("filter:tuple-absence")
+    elif kind == "union_all":
+        features.add("table:row-append")
+        features.add("union_all:append")
+    elif kind == "drop_nulls":
+        columns = _string_list(op.get("columns"))
+        features.add("null:drop")
+        features.add("drop_nulls:subset")
+        features.add(_feature_bucket("drop_nulls_columns", len(columns), [(1, "one"), (2, "two")], "many"))
+    elif kind == "distinct":
+        columns = _string_list(op.get("columns"))
+        features.add("distinct:deduplicate")
+        features.add(_feature_bucket("distinct_columns", len(columns), [(1, "one"), (2, "two")], "many"))
+    elif kind == "fill_null":
+        column = str(op.get("column") or "")
+        features.add("null:fill")
+        if column in column_types:
+            features.add(f"fill_null_type:{column_types[column]}")
+        value = op.get("value")
+        if value is False:
+            features.add("fill_null:false")
+        elif value == "":
+            features.add("fill_null:empty-string")
+        elif value == 0:
+            features.add("fill_null:zero")
+
+
+def score_candidate_feature_metrics_batch(
+    candidate_specs: Any,
+    feature_counts: Mapping[str, int | float],
+    finding_feature_counts: Mapping[str, int | float],
+) -> list[tuple[float, float, float, float, float, int, int, float, float]]:
+    native = _load_native()
+    if native is not None:
+        native_score = getattr(native, "score_candidate_feature_metrics_batch", None)
+        if native_score is not None:
+            try:
+                return [
+                    _candidate_feature_metric_tuple(item)
+                    for item in native_score(candidate_specs, dict(feature_counts), dict(finding_feature_counts))
+                ]
+            except Exception:
+                pass
+    return _score_candidate_feature_metrics_batch_fallback(
+        candidate_specs,
+        feature_counts,
+        finding_feature_counts,
+    )
+
+
+def _candidate_feature_metric_tuple(item: Any) -> tuple[float, float, float, float, float, int, int, float, float]:
+    (
+        path_novelty_total,
+        data_weighted_total,
+        finding_yield_total,
+        feature_saturation_total,
+        profile_saturation_penalty,
+        path_novelty_count,
+        data_novelty_count,
+        online_weight_total,
+        online_weight_max,
+    ) = item
+    return (
+        float(path_novelty_total),
+        float(data_weighted_total),
+        float(finding_yield_total),
+        float(feature_saturation_total),
+        float(profile_saturation_penalty),
+        int(path_novelty_count),
+        int(data_novelty_count),
+        float(online_weight_total),
+        float(online_weight_max),
+    )
+
+
+def _score_candidate_feature_metrics_batch_fallback(
+    candidate_specs: Any,
+    feature_counts: Mapping[str, int | float],
+    finding_feature_counts: Mapping[str, int | float],
+) -> list[tuple[float, float, float, float, float, int, int, float, float]]:
+    feature_counts_get = feature_counts.get
+    finding_feature_counts_get = finding_feature_counts.get
+    out: list[tuple[float, float, float, float, float, int, int, float, float]] = []
+    for specs in candidate_specs:
+        path_novelty_total = 0.0
+        data_weighted_total = 0.0
+        finding_yield_total = 0.0
+        feature_saturation_total = 0.0
+        profile_saturation_penalty = 0.0
+        path_novelty_count = 0
+        data_novelty_count = 0
+        online_weight_total = 0.0
+        online_weight_max = 1.0
+        for spec in specs:
+            (
+                feature,
+                finding_weight_base,
+                saturation_weight_base,
+                path_weight_base,
+                data_weight_base,
+                maybe_multiplier,
+                is_mixed_profile,
+            ) = spec
+            feature = str(feature)
+            count = float(feature_counts_get(feature, 0) or 0)
+            if maybe_multiplier is not None:
+                multiplier_value = float(maybe_multiplier)
+                online_weight_total += multiplier_value
+                if multiplier_value > online_weight_max:
+                    online_weight_max = multiplier_value
+            else:
+                multiplier_value = 1.0
+            path_weight_base = float(path_weight_base)
+            if path_weight_base > 0.0:
+                path_novelty_total += (path_weight_base * multiplier_value) / (1.0 + count)
+                if count == 0.0:
+                    path_novelty_count += 1
+            data_weight_base = float(data_weight_base)
+            if data_weight_base > 0.0:
+                data_weighted_total += (data_weight_base * multiplier_value) * (
+                    1.0 + 1.0 / (1.0 + count)
+                )
+                if count == 0.0:
+                    data_novelty_count += 1
+            finding_hits = float(finding_feature_counts_get(feature, 0) or 0)
+            finding_yield_total += (
+                _bounded_finding_signal_fallback(finding_hits)
+                * float(finding_weight_base)
+                * multiplier_value
+            )
+            feature_saturation_total += (
+                _feature_saturation_fallback(finding_hits)
+                * float(saturation_weight_base)
+                * multiplier_value
+            )
+            if bool(is_mixed_profile):
+                profile_saturation_penalty += _profile_saturation_fallback(count)
+        out.append(
+            (
+                path_novelty_total,
+                data_weighted_total,
+                finding_yield_total,
+                feature_saturation_total,
+                profile_saturation_penalty,
+                path_novelty_count,
+                data_novelty_count,
+                online_weight_total,
+                online_weight_max,
+            )
+        )
+    return out
+
+
+def _bounded_finding_signal_fallback(count: float) -> float:
+    if count <= 0:
+        return 0.0
+    return min(math.log1p(count), 2.0) / (1.0 + count / 50.0)
+
+
+def _feature_saturation_fallback(count: float) -> float:
+    if count <= 25:
+        return 0.0
+    return math.log1p(count - 25)
+
+
+def _profile_saturation_fallback(count: float) -> float:
+    if count <= 3:
+        return 0.0
+    return min(4.0, math.log1p(count - 3) * 1.15)
 
 
 def _result_field_fallback(result: Any, key: str, default: Any = "") -> Any:

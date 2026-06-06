@@ -14,6 +14,7 @@ def reduce_case(
     config: ExperimentConfig | None = None,
     target_kinds: Iterable[str] | None = None,
     target_roots: Iterable[str] | None = None,
+    target_suspicious_backends: Iterable[Iterable[str]] | None = None,
 ) -> Case:
     """Small deterministic reducer for the MVP.
 
@@ -26,6 +27,10 @@ def reduce_case(
     config = config or ExperimentConfig(enable_artifact=False)
     target = set(target_kinds or [])
     target_root_set = set(target_roots or [])
+    target_suspicious_set = {
+        _suspicious_key(backends)
+        for backends in (target_suspicious_backends or [])
+    }
     best = case
 
     changed = True
@@ -40,7 +45,7 @@ def reduce_case(
                 candidate_tables = list(best.tables)
                 candidate_tables[table_idx] = type(table)(table.name, table.columns, candidate_rows)
                 candidate = Case(best.case_id, best.seed, candidate_tables, best.program, best.metadata)
-                if _preserves_target(candidate, backends, config, target, target_root_set):
+                if _preserves_target(candidate, backends, config, target, target_root_set, target_suspicious_set):
                     best = candidate
                     changed = True
                     break
@@ -58,7 +63,7 @@ def reduce_case(
                 continue
             candidate_program = type(best.program)(best.program.program_id, best.program.seed, ops[:idx] + ops[idx + 1 :])
             candidate = Case(best.case_id, best.seed, best.tables, candidate_program, best.metadata)
-            if _preserves_target(candidate, backends, config, target, target_root_set):
+            if _preserves_target(candidate, backends, config, target, target_root_set, target_suspicious_set):
                 best = candidate
                 changed = True
                 break
@@ -71,7 +76,7 @@ def reduce_case(
             if _program_references_table(best.program.operations, table_name):
                 continue
             candidate = Case(best.case_id, best.seed, best.tables[:idx] + best.tables[idx + 1 :], best.program, best.metadata)
-            if _preserves_target(candidate, backends, config, target, target_root_set):
+            if _preserves_target(candidate, backends, config, target, target_root_set, target_suspicious_set):
                 best = candidate
                 changed = True
                 break
@@ -91,7 +96,7 @@ def reduce_case(
                 candidate_tables = list(best.tables)
                 candidate_tables[table_idx] = type(table)(table.name, candidate_columns, candidate_rows)
                 candidate = Case(best.case_id, best.seed, candidate_tables, best.program, best.metadata)
-                if _preserves_target(candidate, backends, config, target, target_root_set):
+                if _preserves_target(candidate, backends, config, target, target_root_set, target_suspicious_set):
                     best = candidate
                     changed = True
                     break
@@ -127,19 +132,34 @@ def _preserves_target(
     config: ExperimentConfig,
     target_kinds: set[str],
     target_roots: set[str],
+    target_suspicious_backends: set[tuple[str, ...]],
 ) -> bool:
     findings = run_loaded_case(candidate, backends, config=config, save_artifact=False)["findings"]
     findings = [finding for finding in findings if not _is_false_positive_reduction(finding)]
     if not findings:
         return False
-    if not target_kinds:
+    if not target_kinds and not target_roots and not target_suspicious_backends:
         return True
-    if not target_roots:
-        return bool(target_kinds & {finding["kind"] for finding in findings})
-    return any(
-        finding["kind"] in target_kinds and finding.get("root_cause", "unknown") in target_roots
-        for finding in findings
-    )
+    return any(_matches_target(finding, target_kinds, target_roots, target_suspicious_backends) for finding in findings)
+
+
+def _matches_target(
+    finding: dict,
+    target_kinds: set[str],
+    target_roots: set[str],
+    target_suspicious_backends: set[tuple[str, ...]],
+) -> bool:
+    if target_kinds and finding.get("kind") not in target_kinds:
+        return False
+    if target_roots and finding.get("root_cause", "unknown") not in target_roots:
+        return False
+    if target_suspicious_backends and _suspicious_key(finding.get("suspicious_backends", [])) not in target_suspicious_backends:
+        return False
+    return True
+
+
+def _suspicious_key(backends: Iterable[str]) -> tuple[str, ...]:
+    return tuple(sorted({str(backend) for backend in backends if str(backend)}))
 
 
 def _is_false_positive_reduction(finding: dict) -> bool:

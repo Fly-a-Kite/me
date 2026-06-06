@@ -925,8 +925,26 @@ FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX = ExperimentMatrix(
                 "online_reward_model": True,
                 "continual_learning": True,
                 "active_learning": True,
+                "ir_rewrite_mutations": True,
+                "operator_swarm": True,
+                "divergence_conditioned": True,
+                "shrink_mutations": True,
+                "value_catalog": True,
                 "quality_archive": True,
+                "hierarchical_archive": True,
+                "bd_axis_bandit": True,
+                "bayesian_exploration": True,
+                "seed_quota": True,
+                "seed_energy_batch": True,
+                "per_operator_energy": True,
+                "lineage_rarity": True,
+                "minhash_dedup": True,
+                "disagreement_bd_axis": True,
+                "lhs_seeding": True,
+                "champion_corpus": True,
+                "backend_pair_learning": True,
                 "runtime_cost_learning": True,
+                "cost_normalized_reward": True,
                 "scheduler_annealing": True,
             },
             oracle_profile="differential",
@@ -1022,6 +1040,276 @@ FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX = ExperimentMatrix(
             notes=(
                 "Disable the MAP-Elites quality-diversity archive while keeping the adaptive "
                 "scheduler and runtime-cost learning enabled, isolating diversity preservation."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_bd_axis_bandit",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="bd_axis_bandit",
+            factors={"bd_axis_bandit": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "behavioral_descriptor"),
+            notes=(
+                "Disable learned behavioral-descriptor axis weights while keeping the "
+                "quality-diversity archive, scheduler learning, and runtime-cost learning enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_bayesian_exploration",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="bayesian_exploration",
+            factors={"bayesian_exploration": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "good_turing"),
+            notes=(
+                "Disable Good-Turing discovery-rate feedback into adaptive exploration "
+                "while keeping scheduler learning and quality-diversity enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_seed_energy_batch",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="seed_energy_batch",
+            factors={"seed_energy_batch": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "seed_power_scheduling"),
+            notes=(
+                "Disable AFL-FAST-style seed-energy batching while keeping seed quota, "
+                "quality-diversity archive, and scheduler learning enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_per_operator_energy",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="per_operator_energy",
+            factors={"per_operator_energy": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "operator_power_scheduling"),
+            notes=(
+                "Disable AFL-FAST-style per-operator candidate energy while keeping "
+                "seed-energy batching, quality-diversity archive, and scheduler learning enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_ir_rewrite_mutations",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="ir_rewrite_mutations",
+            factors={"ir_rewrite_mutations": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "typed_ir_rewrite"),
+            notes=(
+                "Disable typed IR rewrite mutations while keeping operator learning, "
+                "seed-energy batching, and quality-diversity archive enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_operator_swarm",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="operator_swarm",
+            factors={"operator_swarm": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "mutation_operator_swarm"),
+            notes=(
+                "Disable MOPT-style mutation-operator swarm selection while keeping "
+                "operator reward accounting and the rest of the adaptive loop enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_divergence_conditioned",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="divergence_conditioned",
+            factors={"divergence_conditioned": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "divergence_conditioned_mutation"),
+            notes=(
+                "Disable divergence-conditioned mutation affinity while keeping the "
+                "same mutation operator pool and feedback loop enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_shrink_mutations",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="shrink_mutations",
+            factors={"shrink_mutations": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "grow_shrink_mutation"),
+            notes=(
+                "Disable shrink-side mutation operators while keeping growth, typed IR "
+                "rewrites, and operator learning enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_value_catalog",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="value_catalog",
+            factors={"value_catalog": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "value_catalog"),
+            notes=(
+                "Disable learned adversarial value-catalog sampling while keeping "
+                "operator learning, seed scheduling, and quality-diversity enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_hierarchical_archive",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="hierarchical_archive",
+            factors={"hierarchical_archive": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "hierarchical_map_elites"),
+            notes=(
+                "Disable hierarchical MAP-Elites cell split/merge while preserving the "
+                "base quality-diversity archive and adaptive scheduler."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_seed_quota",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="seed_quota",
+            factors={"seed_quota": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "seed_quota"),
+            notes=(
+                "Disable per-cluster seed-energy quotas while keeping AFL-FAST seed "
+                "batching and quality-diversity archive feedback enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_lineage_rarity",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="lineage_rarity",
+            factors={"lineage_rarity": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "lineage_scheduler"),
+            notes=(
+                "Disable lineage-rarity bonuses in seed selection while keeping the "
+                "lineage graph and other feedback statistics enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_minhash_dedup",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="minhash_dedup",
+            factors={"minhash_dedup": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "minhash_dedup"),
+            notes=(
+                "Disable MinHash/Jaccard near-duplicate filtering while keeping exact "
+                "signature tracking and quality-diversity feedback enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_disagreement_bd_axis",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="disagreement_bd_axis",
+            factors={"disagreement_bd_axis": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "behavioral_descriptor"),
+            notes=(
+                "Disable backend-disagreement behavioral descriptor axes while keeping "
+                "the rest of the descriptor and archive pipeline enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_lhs_seeding",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="lhs_seeding",
+            factors={"lhs_seeding": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "lhs_seeding"),
+            notes=(
+                "Disable Latin-hypercube schema initialization while keeping the "
+                "closed-loop mutation and scheduler components enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_champion_corpus",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="champion_corpus",
+            factors={"champion_corpus": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "champion_corpus"),
+            notes=(
+                "Disable cross-version champion-corpus promotion and grafting while "
+                "keeping regular corpus feedback and seed scheduling enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_backend_pair_learning",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="backend_pair_learning",
+            factors={"backend_pair_learning": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "backend_pair_bandit"),
+            notes=(
+                "Disable backend-pair priority bandit learning while keeping the "
+                "adaptive batch scheduler and other feedback scopes enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_cost_normalized_reward",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="cost_normalized_reward",
+            factors={"cost_normalized_reward": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "cost_normalized_reward"),
+            notes=(
+                "Disable elapsed-time reward normalization while keeping runtime-cost "
+                "penalties and scheduler learning enabled."
             ),
         ),
         ExperimentVariant(

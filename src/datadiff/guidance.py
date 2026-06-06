@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from collections import Counter, OrderedDict, deque
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any, Callable
@@ -100,14 +101,32 @@ from datadiff.semantic_signal import (
     semantic_signal_feature_bundle,
 )
 from datadiff.case_policy import canonical_source_issue_key, case_discovery_origin
-from datadiff.reward import (
+from datadiff.candidate_scorer import (
+    CandidateScorer,
+    CandidateScoringContext,
+    DenseCandidateScore,
+)
+from datadiff.family_novelty import (
+    candidate_family_novelty_reward,
+    family_key_matches_known_family,
+    split_family_key,
+)
+from datadiff.feature_interning import (
+    intern_feature,
+    intern_feature_id_set,
+)
+from datadiff.finding_outcomes import (
     FindingOutcomeAnalysis,
     analyze_finding_outcomes,
     is_candidate_issue_finding,
     is_rewardable_candidate_issue_finding,
+    row_has_rewardable_new_behavior,
     row_reward_signals,
+)
+from datadiff.reward import (
     feedback_summary_for_case,
 )
+from datadiff.rust_kernel import extract_case_features as _rust_extract_case_features
 from datadiff.running import (
     running_sum_partition_columns,
     sort_samples_for_running,
@@ -127,6 +146,7 @@ from datadiff.sample_semantics import (
 from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
 from datadiff.util import unique_preserve_order
+from datadiff.windowing import row_number_filter_rows
 
 
 def _semantic_signal_feature(signal: str) -> str:
@@ -184,8 +204,13 @@ def _feature_aliases(feature: str) -> frozenset[str]:
     return semantic_feature_aliases(feature)
 
 
-def _alias_expanded_features(features: set[str]) -> set[str]:
-    return alias_expanded_semantic_features(features)
+@lru_cache(maxsize=32768)
+def _alias_expanded_feature_set(features: frozenset[str]) -> frozenset[str]:
+    return frozenset(alias_expanded_semantic_features(set(features)))
+
+
+def _alias_expanded_features(features: set[str] | frozenset[str]) -> frozenset[str]:
+    return _alias_expanded_feature_set(frozenset(str(feature).strip() for feature in features if str(feature).strip()))
 
 
 @lru_cache(maxsize=None)
@@ -197,10 +222,11 @@ def _target_aliases(target: str) -> frozenset[str]:
     return frozenset(expanded)
 
 
-def _bias_target_aliases(target: str) -> set[str]:
+@lru_cache(maxsize=None)
+def _bias_target_aliases(target: str) -> frozenset[str]:
     text = str(target).strip()
     if not text:
-        return set()
+        return frozenset()
     aliases = set(_target_aliases(text))
     aliases.add(text)
     if not text.startswith(("semantic_family:", "semantic_signal:")):
@@ -209,6 +235,12 @@ def _bias_target_aliases(target: str) -> set[str]:
     return _alias_expanded_features(aliases)
 
 
+_GUIDANCE_UNICODE_STRING_FEATURE_ID = intern_feature("has:unicode_string")
+_GUIDANCE_EXPR_STRING_LOWER_FEATURE_ID = intern_feature("expr:string_lower")
+_GUIDANCE_EXPR_STRING_UPPER_FEATURE_ID = intern_feature("expr:string_upper")
+
+
+@lru_cache(maxsize=32768)
 def _canonical_feature(feature: str) -> str:
     return canonical_semantic_feature(feature)
 
@@ -266,6 +298,7 @@ def _feature_has_prefix(feature: str, prefix: str) -> bool:
     return feature_matches_prefix_alias(feature, prefix)
 
 
+@lru_cache(maxsize=32768)
 def _feature_prefix_token(feature_or_prefix: str) -> str:
     text = str(feature_or_prefix).strip()
     if ":" not in text:
@@ -273,6 +306,7 @@ def _feature_prefix_token(feature_or_prefix: str) -> str:
     return f"{text.split(':', 1)[0]}:"
 
 
+@lru_cache(maxsize=32768)
 def _feature_prefix_root(feature_or_prefix: str) -> str:
     canonical = _canonical_feature(str(feature_or_prefix).strip())
     return canonical.split(":", 1)[0] if ":" in canonical else canonical
@@ -640,6 +674,145 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "casts": {"expr:cast"},
 }
 
+
+@dataclass(frozen=True, slots=True)
+class CompiledGuidanceTarget:
+    target: str
+    required_aliases: frozenset[str]
+    required_alias_ids: frozenset[int]
+    bias_aliases: frozenset[str]
+    bias_alias_ids: frozenset[int]
+    match_features: frozenset[str]
+    match_feature_ids: frozenset[int]
+    specific_target: bool
+    unicode_case_mapping: bool
+
+
+@dataclass(frozen=True, slots=True)
+class CompiledTargetCatalog:
+    ordered_targets: tuple[str, ...]
+    ordered_target_ids: tuple[int, ...]
+    feature_target_indexes: dict[int, tuple[int, ...]]
+    unicode_case_mapping_target_indexes: tuple[int, ...]
+
+
+@lru_cache(maxsize=4096)
+def _compiled_guidance_target(target: str) -> CompiledGuidanceTarget:
+    text = str(target).strip()
+    if not text:
+        return CompiledGuidanceTarget(
+            target="",
+            required_aliases=frozenset(),
+            required_alias_ids=frozenset(),
+            bias_aliases=frozenset(),
+            bias_alias_ids=frozenset(),
+            match_features=frozenset(),
+            match_feature_ids=frozenset(),
+            specific_target=False,
+            unicode_case_mapping=False,
+        )
+    required_aliases = _target_aliases(text)
+    bias_aliases = _bias_target_aliases(text)
+    match_features: set[str] = set()
+    if text != "unicode_case_mapping":
+        match_features.update(required_aliases)
+        match_features.add(text)
+        if not text.startswith("semantic_family:"):
+            match_features.add(f"semantic_family:{text}")
+        if text.startswith("semantic_signal:"):
+            signal = text.removeprefix("semantic_signal:").strip()
+            if signal:
+                match_features.add(_semantic_signal_feature(signal))
+    return CompiledGuidanceTarget(
+        target=text,
+        required_aliases=required_aliases,
+        required_alias_ids=intern_feature_id_set(required_aliases),
+        bias_aliases=bias_aliases,
+        bias_alias_ids=intern_feature_id_set(bias_aliases),
+        match_features=frozenset(match_features),
+        match_feature_ids=intern_feature_id_set(match_features),
+        specific_target=(
+            f"semantic_family:{text}" in required_aliases
+            or any(feature.startswith("pattern:") for feature in required_aliases)
+        ),
+        unicode_case_mapping=(text == "unicode_case_mapping"),
+    )
+
+
+@lru_cache(maxsize=1024)
+def _compiled_target_catalog(targets: tuple[str, ...]) -> CompiledTargetCatalog:
+    ordered_targets = tuple(str(target).strip() for target in targets if str(target).strip())
+    feature_target_indexes: dict[int, list[int]] = {}
+    unicode_case_mapping_target_indexes: list[int] = []
+    ordered_target_ids = tuple(intern_feature(target) for target in ordered_targets)
+    for index, target in enumerate(ordered_targets):
+        compiled = _compiled_guidance_target(target)
+        if compiled.unicode_case_mapping:
+            unicode_case_mapping_target_indexes.append(index)
+        for feature_id in compiled.match_feature_ids:
+            feature_target_indexes.setdefault(feature_id, []).append(index)
+    return CompiledTargetCatalog(
+        ordered_targets=ordered_targets,
+        ordered_target_ids=ordered_target_ids,
+        feature_target_indexes={
+            feature_id: tuple(values) for feature_id, values in feature_target_indexes.items()
+        },
+        unicode_case_mapping_target_indexes=tuple(unicode_case_mapping_target_indexes),
+    )
+
+
+def _matched_targets_from_catalog(
+    expanded_features: frozenset[str] | set[str],
+    catalog: CompiledTargetCatalog,
+    *,
+    expanded_feature_ids: frozenset[int] | None = None,
+) -> list[str]:
+    if not catalog.ordered_targets:
+        return []
+    resolved_expanded_feature_ids = (
+        expanded_feature_ids
+        if expanded_feature_ids is not None
+        else intern_feature_id_set(expanded_features)
+    )
+    matched = [False] * len(catalog.ordered_targets)
+    feature_target_indexes_get = catalog.feature_target_indexes.get
+    for feature_id in resolved_expanded_feature_ids:
+        if target_indexes := feature_target_indexes_get(feature_id):
+            for index in target_indexes:
+                matched[index] = True
+    if (
+        catalog.unicode_case_mapping_target_indexes
+        and _GUIDANCE_UNICODE_STRING_FEATURE_ID in resolved_expanded_feature_ids
+        and (
+            _GUIDANCE_EXPR_STRING_LOWER_FEATURE_ID in resolved_expanded_feature_ids
+            or _GUIDANCE_EXPR_STRING_UPPER_FEATURE_ID in resolved_expanded_feature_ids
+        )
+    ):
+        for index in catalog.unicode_case_mapping_target_indexes:
+            matched[index] = True
+    if not any(matched):
+        return []
+    return [
+        target
+        for index, target in enumerate(catalog.ordered_targets)
+        if matched[index]
+    ]
+
+
+@lru_cache(maxsize=2048)
+def _matched_target_aliases(targets: tuple[str, ...]) -> frozenset[str]:
+    return _alias_expanded_features(frozenset(targets))
+
+
+@lru_cache(maxsize=2048)
+def _matched_target_alias_ids(targets: tuple[str, ...]) -> frozenset[int]:
+    return intern_feature_id_set(_matched_target_aliases(targets))
+
+
+@lru_cache(maxsize=2048)
+def _matched_target_ids(targets: tuple[str, ...]) -> frozenset[int]:
+    return intern_feature_id_set(targets)
+
 PATTERN_TARGET_WEIGHT = 8.0
 GENERIC_COMPANION_TARGET_WEIGHT = 0.25
 TEMPLATE_TARGET_BONUS = 3.0
@@ -677,37 +850,142 @@ def _source_issue_key(value: Any) -> str:
     return canonical_source_issue_key(value)
 
 
-def derive_case_features(
-    case: Case,
-    *,
-    operation_combo: dict[str, Any] | None = None,
-    frontier_buckets: list[str] | None = None,
-    exploration_objective_rules: list[ExplorationObjectiveRule] | tuple[ExplorationObjectiveRule, ...] | None = None,
-) -> set[str]:
+_CASE_FEATURE_FLAG_NAMES = (
+    "has_string_count_groupby",
+    "has_unique_count_groupby",
+    "has_bool_groupby_agg",
+    "has_exact_groupby_agg",
+    "has_set_membership_filter",
+    "has_null_predicate_filter",
+    "has_boolean_predicate_filter",
+    "has_range_filter",
+    "has_string_contains_filter",
+    "has_tuple_absence_filter",
+    "has_union_all",
+    "has_drop_nulls",
+    "has_semi_join",
+    "has_anti_join",
+    "has_distinct",
+    "has_fill_null",
+    "has_coalesce",
+    "has_case_when",
+    "has_running_sum_precision",
+    "has_partitioned_running_sum",
+    "has_path_basename_keyed_pick",
+    "has_string_basename_expr",
+    "has_row_number_filter",
+    "has_sortedness_check",
+    "has_random_case_probe",
+    "has_group_quantile_probe",
+    "has_scalar_subquery_probe",
+    "has_window_avg_probe",
+    "has_struct_distinct_probe",
+    "has_bit_compare_probe",
+    "has_round_even_probe",
+    "has_float_literal_precision_probe",
+    "has_timestamp_precision_filter_probe",
+    "has_series_rtruediv_probe",
+    "has_uint64_isin_probe",
+    "has_tuple_anti_null_probe",
+    "has_setop_all_duplicate_probe",
+    "has_json_predicate_order_probe",
+    "has_sparse_mask_probe",
+    "has_float_wrap_probe",
+    "has_index_bool_probe",
+    "has_empty_literal_groupby_probe",
+    "has_arrow_string_eq_sum_probe",
+    "has_arrow_timestamp_loc_slice_probe",
+    "has_arrow_timestamp_index_attr_probe",
+    "has_eval_inplace_alias_probe",
+    "has_bool_reduction_skipna_probe",
+    "has_dataset_isin_all_match_probe",
+    "has_run_end_null_compute_probe",
+    "has_large_string_partition_probe",
+    "has_hash_pivot_wider_probe",
+    "has_list_flatten_parent_indices_probe",
+    "has_rolling_mean_by_null_count_probe",
+    "has_csv_long_numeric_roundtrip_probe",
+)
+
+_CASE_FEATURE_PREFIX_CACHE: OrderedDict[tuple[Any, ...], "_CaseFeatureState"] = OrderedDict()
+_MAX_CASE_FEATURE_PREFIX_CACHE = 2048
+
+
+@dataclass(slots=True)
+class _CaseFeatureState:
+    features: set[str]
+    op_names: list[str]
+    available_types: dict[str, str]
+    derived_columns: set[str]
+    flags: dict[str, bool]
+
+    def clone(self) -> "_CaseFeatureState":
+        return _CaseFeatureState(
+            features=set(self.features),
+            op_names=list(self.op_names),
+            available_types=dict(self.available_types),
+            derived_columns=set(self.derived_columns),
+            flags=dict(self.flags),
+        )
+
+
+def _blank_case_feature_flags() -> dict[str, bool]:
+    return {name: False for name in _CASE_FEATURE_FLAG_NAMES}
+
+
+def _clear_case_feature_prefix_cache() -> None:
+    _CASE_FEATURE_PREFIX_CACHE.clear()
+
+
+def _case_feature_prefix_cache_get(key: tuple[Any, ...]) -> _CaseFeatureState | None:
+    cached = _CASE_FEATURE_PREFIX_CACHE.get(key)
+    if cached is None:
+        return None
+    _CASE_FEATURE_PREFIX_CACHE.move_to_end(key)
+    return cached.clone()
+
+
+def _case_feature_prefix_cache_put(key: tuple[Any, ...], state: _CaseFeatureState) -> None:
+    _CASE_FEATURE_PREFIX_CACHE[key] = state.clone()
+    _CASE_FEATURE_PREFIX_CACHE.move_to_end(key)
+    while len(_CASE_FEATURE_PREFIX_CACHE) > _MAX_CASE_FEATURE_PREFIX_CACHE:
+        _CASE_FEATURE_PREFIX_CACHE.popitem(last=False)
+
+
+def _case_feature_table_schema_key(table: Any) -> tuple[Any, ...]:
+    return (
+        getattr(table, "name", ""),
+        tuple((column.name, column.type, bool(column.nullable)) for column in getattr(table, "columns", ())),
+    )
+
+
+def _case_feature_operation_cache_key(value: Any) -> Any:
+    if hasattr(value, "to_dict") and callable(value.to_dict):
+        value = value.to_dict()
+    if isinstance(value, Mapping):
+        return tuple(
+            (str(key), _case_feature_operation_cache_key(item))
+            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+        )
+    if isinstance(value, list):
+        return tuple(_case_feature_operation_cache_key(item) for item in value)
+    if isinstance(value, tuple):
+        return tuple(_case_feature_operation_cache_key(item) for item in value)
+    if isinstance(value, set):
+        normalized = [_case_feature_operation_cache_key(item) for item in value]
+        return tuple(sorted(normalized, key=repr))
+    if isinstance(value, float):
+        if math.isnan(value):
+            return ("float", "nan")
+        if math.isinf(value):
+            return ("float", "inf", 1 if value > 0 else -1)
+    return value
+
+
+def _base_case_feature_inputs(case: Case) -> tuple[set[str], tuple[Any, ...]]:
     features: set[str] = set()
     table = case.tables[0]
     features.add("tables:multi" if len(case.tables) > 1 else "tables:single")
-    generator_profile = str(case.metadata.get("generator_profile", "")).strip()
-    if generator_profile:
-        features.add(f"generator_profile:{generator_profile}")
-    mixed_generator_profile = str(case.metadata.get("mixed_generator_profile", "")).strip()
-    if mixed_generator_profile:
-        features.add(f"mixed_generator_profile:{mixed_generator_profile}")
-    candidate_source = str(case.metadata.get("candidate_source", "")).strip()
-    if candidate_source:
-        features.add(f"source:{candidate_source}")
-    seed_lineage = case.metadata.get("seed_lineage", {})
-    if isinstance(seed_lineage, dict):
-        depth = int(seed_lineage.get("depth", 0) or 0)
-        if depth > 0:
-            features.add("source:feedback_mutation")
-            features.add(_bucket("mutation_depth", depth, [(1, "one"), (3, "shallow")], "deep"))
-    mutation = case.metadata.get("mutation", {})
-    if isinstance(mutation, dict):
-        operator_name = str(mutation.get("operator", "")).strip()
-        if operator_name and operator_name != "generated":
-            features.add(f"mutation_op:{operator_name}")
-    features.update(_quality_archive_context_features(case.metadata.get("quality_archive_context", {})))
     row_count = len(table.rows)
     col_count = len(table.columns)
     features.add(_bucket("rows", row_count, [(0, "empty"), (3, "tiny"), (10, "small"), (20, "medium")], "large"))
@@ -715,7 +993,6 @@ def derive_case_features(
     for column in table.columns:
         features.add(f"type:{column.type}")
         features.add(f"nullable:{column.type}:{column.nullable}")
-
     for row in table.rows:
         for value in row.values():
             if value is None:
@@ -745,526 +1022,601 @@ def derive_case_features(
                     features.add("has:unicode_string")
                 if " " in value:
                     features.add("has:space_string")
+    base_key = (
+        frozenset(features),
+        tuple(_case_feature_table_schema_key(source_table) for source_table in case.tables),
+    )
+    return features, base_key
 
-    op_names = []
-    table_by_name = {source_table.name: source_table for source_table in case.tables}
-    available_types = {column.name: column.type for column in table.columns}
-    has_string_count_groupby = False
-    has_unique_count_groupby = False
-    has_bool_groupby_agg = False
-    has_exact_groupby_agg = False
-    has_set_membership_filter = False
-    has_null_predicate_filter = False
-    has_boolean_predicate_filter = False
-    has_range_filter = False
-    has_string_contains_filter = False
-    has_tuple_absence_filter = False
-    has_union_all = False
-    has_drop_nulls = False
-    has_semi_join = False
-    has_anti_join = False
-    has_distinct = False
-    has_fill_null = False
-    has_coalesce = False
-    has_case_when = False
-    has_running_sum_precision = False
-    has_partitioned_running_sum = False
-    has_path_basename_keyed_pick = False
-    has_string_basename_expr = False
-    has_row_number_filter = False
-    has_sortedness_check = False
-    has_random_case_probe = False
-    has_group_quantile_probe = False
-    has_scalar_subquery_probe = False
-    has_window_avg_probe = False
-    has_struct_distinct_probe = False
-    has_bit_compare_probe = False
-    has_round_even_probe = False
-    has_float_literal_precision_probe = False
-    has_timestamp_precision_filter_probe = False
-    has_series_rtruediv_probe = False
-    has_uint64_isin_probe = False
-    has_tuple_anti_null_probe = False
-    has_setop_all_duplicate_probe = False
-    has_json_predicate_order_probe = False
-    has_sparse_mask_probe = False
-    has_float_wrap_probe = False
-    has_index_bool_probe = False
-    has_empty_literal_groupby_probe = False
-    has_arrow_string_eq_sum_probe = False
-    has_arrow_timestamp_loc_slice_probe = False
-    has_arrow_timestamp_index_attr_probe = False
-    has_eval_inplace_alias_probe = False
-    has_bool_reduction_skipna_probe = False
-    has_dataset_isin_all_match_probe = False
-    has_run_end_null_compute_probe = False
-    has_large_string_partition_probe = False
-    has_hash_pivot_wider_probe = False
-    has_list_flatten_parent_indices_probe = False
-    has_rolling_mean_by_null_count_probe = False
-    has_csv_long_numeric_roundtrip_probe = False
-    for op in case.program.operations:
-        kind = op_kind(op, "unknown")
-        op_names.append(kind)
-        features.add(f"op:{kind}")
-        if kind == "filter":
-            cmp = op_comparator(op, "unknown")
-            column = op_column(op, "unknown")
-            features.add(f"cmp:{cmp}")
-            features.add(f"filter_type:{available_types.get(column, 'derived')}")
-            parsed = parse_filter_comparator(cmp)
-            if parsed is not None and parsed.base in {"in_set", "not_in_set"}:
-                features.add("filter:set-membership")
-                if parsed.base == "not_in_set":
-                    features.add("filter:negative-set-membership")
-                has_set_membership_filter = True
-                if has_fractional_float_literal(op_value(op)):
-                    features.add("membership:fractional-literal")
-                    if available_types.get(column) == "int":
-                        features.add("membership:int-column-fractional-literal")
-            if parsed is not None and parsed.base in {"is_null", "is_not_null"}:
-                features.add("filter:null-predicate")
-                features.add(f"filter:null-predicate:{parsed.base}")
-                has_null_predicate_filter = True
-            if parsed is not None and parsed.base == "bool_predicate":
-                features.add("filter:boolean-predicate")
-                features.add(f"filter:boolean-predicate:{parsed.truth_test}")
-                has_boolean_predicate_filter = True
-            if parsed is not None and parsed.base == "range_closed":
-                features.add("filter:range-closed")
-                has_range_filter = True
-            if parsed is not None and parsed.base in {"str_contains", "str_starts_with", "str_ends_with"}:
-                features.add("filter:string-pattern")
-                features.add(f"filter:{parsed.base.replace('str_', 'string-').replace('_', '-')}")
-                has_string_contains_filter = True
-            if parsed is not None and parsed.truth_test is not None:
-                features.add("filter:truth-test")
-                features.add(f"filter:truth:{parsed.truth_test}")
-        elif kind == "tuple_absence_filter":
-            features.add("filter:tuple-absence")
-            has_tuple_absence_filter = True
-        elif kind == "union_all":
-            features.add("table:row-append")
-            features.add("union_all:append")
-            has_union_all = True
-        elif kind == "drop_nulls":
-            columns = op_columns(op)
-            features.add("null:drop")
-            features.add("drop_nulls:subset")
-            features.add(_bucket("drop_nulls_columns", len(columns), [(1, "one"), (2, "two")], "many"))
-            has_drop_nulls = True
-        elif kind in {"semi_join", "anti_join"}:
-            features.add("join:existence")
-            features.add("membership:semi_join" if kind == "semi_join" else "membership:anti_join")
-            features.add(f"membership:left_key:{','.join(join_left_keys(op)) or 'unknown'}")
-            features.add(f"membership:right_key:{','.join(join_right_keys(op)) or 'unknown'}")
-            if kind == "semi_join":
-                has_semi_join = True
-            else:
-                has_anti_join = True
-        elif kind == "distinct":
-            columns = op_columns(op)
-            features.add("distinct:deduplicate")
-            features.add(_bucket("distinct_columns", len(columns), [(1, "one"), (2, "two")], "many"))
-            has_distinct = True
-        elif kind == "fill_null":
-            column = op_column(op)
-            value = op_value(op)
-            column_type = available_types.get(column, "derived")
-            features.add("null:fill")
-            features.add(f"fill_null_type:{column_type}")
-            if value is False:
-                features.add("fill_null:false")
-            elif value == "":
-                features.add("fill_null:empty-string")
-            elif value == 0:
-                features.add("fill_null:zero")
-            has_fill_null = True
-        elif kind == "coalesce":
-            columns = op_columns(op)
-            alias = op_output_alias(op)
-            features.add("null:coalesce")
-            features.add("coalesce:columns")
-            features.add(_bucket("coalesce_columns", len(columns), [(2, "two"), (3, "three")], "many"))
-            if columns:
-                features.add(f"coalesce_type:{available_types.get(columns[0], 'derived')}")
-            if alias in available_types:
-                features.add("coalesce:overwrite")
-            if "fallback" in op:
-                features.add("coalesce:fallback")
-            has_coalesce = True
-        elif kind == "case_when":
-            column = condition_column(op)
-            cmp = condition_cmp(op, "unknown")
-            alias = op_output_alias(op, "derived")
-            output_type = _literal_feature_type(case_then_value(op), case_else_value(op))
-            features.add("conditional:case_when")
-            features.add(f"case_when_type:{available_types.get(column, 'derived')}")
-            features.add(f"case_when_cmp:{cmp}")
-            features.add(f"case_when_output:{output_type}")
-            available_types[alias] = output_type
-            has_case_when = True
-        elif kind == "row_number_filter":
-            partition_count = len(op_partition_columns(op))
-            order_count = len(normalized_order_by_keys(op))
-            features.add("row_pick:keyed")
-            features.add(f"row_pick:cmp:{op_comparator(op, 'unknown')}")
-            features.add(_bucket("row_pick_partition_count", partition_count, [(0, "none"), (1, "one")], "many"))
-            features.add(_bucket("row_pick_order_count", order_count, [(1, "one"), (2, "two")], "many"))
-            has_row_number_filter = True
-            if has_string_basename_expr:
-                has_path_basename_keyed_pick = True
-        elif kind == "running_sum":
-            source = op_source(op)
-            input_dtype = op_input_dtype(op, "float64")
-            features.add(f"running:{input_dtype}")
-            features.add(f"running_source_type:{available_types.get(source, 'derived')}")
-            if op_partition_columns(op):
-                features.add("running:partitioned")
-                has_partitioned_running_sum = True
-            if input_dtype == "float32":
-                has_running_sum_precision = True
-            available_types[op_column(op, "derived")] = "float"
-        elif kind == "sortedness_check":
-            column = op_column(op)
-            nulls = op_nulls(op, "last")
-            features.add(f"sortedness:nulls:{nulls}")
-            features.add(f"sortedness:{'asc' if op_ascending(op, True) else 'desc'}")
-            features.add(f"sortedness_source_type:{available_types.get(column, 'derived')}")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_sortedness_check = True
-        elif kind == "random_case_probe":
-            features.add("case_expr:simple")
-            features.add("case_expr:random-subject")
-            features.add(_bucket("case_probe_rows", op_rows(op, 0), [(1000, "small"), (10000, "medium")], "large"))
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_random_case_probe = True
-        elif kind == "group_quantile_probe":
-            features.add("quantile:dynamic-key")
-            features.add(_bucket("quantile_probe_values", len(op_values(op)), [(2, "tiny"), (4, "small")], "medium"))
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_group_quantile_probe = True
-        elif kind == "scalar_subquery_probe":
-            features.add("subquery:correlated-scalar")
-            features.add("subquery:nested-aggregate")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_scalar_subquery_probe = True
-        elif kind == "window_avg_probe":
-            features.add("window:rows-frame")
-            features.add("window:avg")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_window_avg_probe = True
-        elif kind == "struct_distinct_probe":
-            features.add("struct:unnest")
-            features.add("struct:distinct")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_struct_distinct_probe = True
-        elif kind == "bit_compare_probe":
-            features.add("bit:unequal-length")
-            features.add("comparison:bit-order")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_bit_compare_probe = True
-        elif kind == "round_even_probe":
-            features.add("numeric:round-even")
-            features.add("float:decimal-scale")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_round_even_probe = True
-        elif kind == "float_literal_precision_probe":
-            features.add("duckdb:float-literal-precision")
-            features.add("float:literal-cast-consistency")
-            features.add("float:decimal-literal")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_float_literal_precision_probe = True
-        elif kind == "timestamp_precision_filter_probe":
-            features.add("polars:timestamp-precision-filter")
-            features.add("timestamp:precision-filter")
-            features.add("timestamp:unit-cast")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_timestamp_precision_filter_probe = True
-        elif kind == "series_rtruediv_probe":
-            features.add("series:reverse-division")
-            features.add("arithmetic:operand-order")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_series_rtruediv_probe = True
-        elif kind == "uint64_isin_probe":
-            features.add("pandas:uint64-isin")
-            features.add("membership:unsigned-precision")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_uint64_isin_probe = True
-        elif kind == "tuple_anti_null_probe":
-            features.add("duckdb:tuple-anti-null")
-            features.add("nulls:ternary-membership")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_tuple_anti_null_probe = True
-        elif kind == "setop_all_duplicate_probe":
-            features.add("datafusion:setop-all-duplicate-count")
-            features.add("sql:setop-all")
-            features.add("setop:except-all")
-            features.add("setop:intersect-all")
-            features.add("setop:duplicate-count")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_setop_all_duplicate_probe = True
-        elif kind == "json_predicate_order_probe":
-            features.add("duckdb:json-predicate-order")
-            features.add("json:predicate-reorder")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_json_predicate_order_probe = True
-        elif kind == "sparse_mask_probe":
-            features.add("pandas:sparse-mask")
-            features.add("mask:sparse-array")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_sparse_mask_probe = True
-        elif kind == "float_wrap_probe":
-            features.add("polars:wrap-numerical")
-            features.add("cast:float-overflow")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_float_wrap_probe = True
-        elif kind == "index_bool_probe":
-            features.add("pandas:index-bool")
-            features.add("api:result-type")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_index_bool_probe = True
-        elif kind == "empty_literal_groupby_probe":
-            features.add("polars:empty-literal-groupby")
-            features.add("groupby:empty-literal")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_empty_literal_groupby_probe = True
-        elif kind == "arrow_string_eq_sum_probe":
-            features.add("pandas:arrow-string-eq-sum")
-            features.add("arrow:string-bool-reduction")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_arrow_string_eq_sum_probe = True
-        elif kind == "arrow_timestamp_loc_slice_probe":
-            features.add("pandas:arrow-timestamp-loc-slice")
-            features.add("arrow:timestamp-index-slice")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_arrow_timestamp_loc_slice_probe = True
-        elif kind == "arrow_timestamp_index_attr_probe":
-            features.add("pandas:arrow-timestamp-index-attr")
-            features.add("arrow:timestamp-index-attribute")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_arrow_timestamp_index_attr_probe = True
-        elif kind == "eval_inplace_alias_probe":
-            features.add("pandas:eval-inplace-alias")
-            features.add("copy:on-write-alias")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_eval_inplace_alias_probe = True
-        elif kind == "bool_reduction_skipna_probe":
-            features.add("pandas:bool-reduction-skipna")
-            features.add("nullable-bool:reduction")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_bool_reduction_skipna_probe = True
-        elif kind == "dataset_isin_all_match_probe":
-            features.add("pyarrow:dataset-isin-all-match")
-            features.add("dataset:membership-filter")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_dataset_isin_all_match_probe = True
-        elif kind == "run_end_null_compute_probe":
-            features.add("pyarrow:run-end-null-compute")
-            features.add("run_end:null-compute")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_run_end_null_compute_probe = True
-        elif kind == "large_string_partition_probe":
-            features.add("pyarrow:large-string-partition")
-            features.add("dataset:partition-schema")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_large_string_partition_probe = True
-        elif kind == "hash_pivot_wider_probe":
-            features.add("pyarrow:hash-pivot-wider")
-            features.add("pivot:wider-order")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_hash_pivot_wider_probe = True
-        elif kind == "list_flatten_parent_indices_probe":
-            features.add("pyarrow:list-flatten-parent-indices")
-            features.add("arrow:list-layout")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_list_flatten_parent_indices_probe = True
-        elif kind == "rolling_mean_by_null_count_probe":
-            features.add("polars:rolling-mean-by-null-count")
-            features.add("rolling:temporal-min-samples")
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_rolling_mean_by_null_count_probe = True
-        elif kind == "csv_long_numeric_roundtrip_probe":
-            features.add("csv:long-numeric-roundtrip")
-            features.add("csv:numeric-inference")
-            features.add("numeric:long-identifier")
-            features.add(_bucket("csv_probe_values", len(op_values(op)), [(3, "few"), (6, "several")], "many"))
-            available_types = {op_output_alias(op, "derived"): "bool"}
-            has_csv_long_numeric_roundtrip_probe = True
-        elif kind == "select":
-            width = len(op_columns(op))
-            features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
-        elif kind == "sort":
-            try:
-                sort_keys = normalize_sort_keys(op)
-            except ValueError:
-                sort_keys = []
-            directions = {key.ascending for key in sort_keys}
-            if len(directions) > 1:
-                features.add("sort:mixed")
-            else:
-                features.add(f"sort:{'asc' if (not sort_keys or sort_keys[0].ascending) else 'desc'}")
-        elif kind == "join":
-            features.add(f"join:{join_how(op, 'unknown')}")
-            features.add(f"join_table:{op_table(op, 'unknown')}")
-            right_table = table_by_name.get(op_table(op, ""))
-            right_keys = join_right_keys(op)
-            right_key = right_keys[0] if right_keys else ""
-            if right_table is not None:
-                for column in right_table.columns:
-                    if column.name == right_key or column.name in available_types:
-                        continue
-                    available_types[column.name] = column.type
-        elif kind == "limit":
-            limit = op_n(op, 0)
-            if limit == 0:
-                features.add("op:limit_zero")
-            features.add(_bucket("limit", limit, [(0, "zero"), (3, "tiny"), (10, "small")], "large"))
-        elif kind == "offset":
-            offset = op_n(op, 0)
-            if offset == 0:
-                features.add("op:offset_zero")
-            features.add(_bucket("offset", offset, [(0, "zero"), (3, "tiny"), (10, "small")], "large"))
-        elif kind == "mutate":
-            mutate_kind = expr_kind(op, "unknown")
-            output_column = op_column(op, "derived")
-            source_column = expr_source(op)
-            features.add(f"mutate:{mutate_kind}")
-            features.add(f"expr:{mutate_kind}")
-            if mutate_kind == "arith_const":
-                features.add(f"arith:{expr_operator(op, 'unknown')}")
-                if expr_operator(op) == "div":
-                    available_types[output_column] = "float"
-                else:
-                    available_types[output_column] = available_types.get(source_column, "derived")
-            elif mutate_kind == "reverse_division_columns":
-                features.add("arithmetic:operand-order")
-                features.add("arithmetic:reverse-division")
+
+def _initial_case_feature_state(case: Case, base_features: set[str]) -> _CaseFeatureState:
+    table = case.tables[0]
+    return _CaseFeatureState(
+        features=set(base_features),
+        op_names=[],
+        available_types={column.name: column.type for column in table.columns},
+        derived_columns=set(),
+        flags=_blank_case_feature_flags(),
+    )
+
+
+def _prefix_case_feature_state(
+    case: Case,
+    *,
+    base_features: set[str],
+    base_key: tuple[Any, ...],
+    operation_keys: tuple[Any, ...],
+) -> tuple[_CaseFeatureState, int]:
+    for prefix_length in range(len(operation_keys), -1, -1):
+        cache_key = (base_key, operation_keys[:prefix_length])
+        cached = _case_feature_prefix_cache_get(cache_key)
+        if cached is not None:
+            return cached, prefix_length
+    state = _initial_case_feature_state(case, base_features)
+    _case_feature_prefix_cache_put((base_key, ()), state)
+    return state, 0
+
+
+def _apply_case_feature_operation(
+    state: _CaseFeatureState,
+    op: dict[str, Any],
+    *,
+    table_by_name: dict[str, Any],
+) -> None:
+    features = state.features
+    op_names = state.op_names
+    available_types = state.available_types
+    derived_columns = state.derived_columns
+    flags = state.flags
+    kind = op_kind(op, "unknown")
+    op_names.append(kind)
+    features.add(f"op:{kind}")
+    if kind == "filter":
+        cmp = op_comparator(op, "unknown")
+        column = op_column(op, "unknown")
+        features.add(f"cmp:{cmp}")
+        features.add(f"filter_type:{available_types.get(column, 'derived')}")
+        if column in derived_columns:
+            features.add("filter:derived-input")
+        parsed = parse_filter_comparator(cmp)
+        if parsed is not None and parsed.base in {"in_set", "not_in_set"}:
+            features.add("filter:set-membership")
+            if parsed.base == "not_in_set":
+                features.add("filter:negative-set-membership")
+            flags["has_set_membership_filter"] = True
+            if has_fractional_float_literal(op_value(op)):
+                features.add("membership:fractional-literal")
+                if available_types.get(column) == "int":
+                    features.add("membership:int-column-fractional-literal")
+        if parsed is not None and parsed.base in {"is_null", "is_not_null"}:
+            features.add("filter:null-predicate")
+            features.add(f"filter:null-predicate:{parsed.base}")
+            flags["has_null_predicate_filter"] = True
+        if parsed is not None and parsed.base == "bool_predicate":
+            features.add("filter:boolean-predicate")
+            features.add(f"filter:boolean-predicate:{parsed.truth_test}")
+            flags["has_boolean_predicate_filter"] = True
+        if parsed is not None and parsed.base == "range_closed":
+            features.add("filter:range-closed")
+            flags["has_range_filter"] = True
+        if parsed is not None and parsed.base in {"str_contains", "str_starts_with", "str_ends_with"}:
+            features.add("filter:string-pattern")
+            features.add(f"filter:{parsed.base.replace('str_', 'string-').replace('_', '-')}")
+            flags["has_string_contains_filter"] = True
+        if parsed is not None and parsed.truth_test is not None:
+            features.add("filter:truth-test")
+            features.add(f"filter:truth:{parsed.truth_test}")
+    elif kind == "tuple_absence_filter":
+        features.add("filter:tuple-absence")
+        flags["has_tuple_absence_filter"] = True
+    elif kind == "union_all":
+        features.add("table:row-append")
+        features.add("union_all:append")
+        flags["has_union_all"] = True
+    elif kind == "drop_nulls":
+        columns = op_columns(op)
+        features.add("null:drop")
+        features.add("drop_nulls:subset")
+        features.add(_bucket("drop_nulls_columns", len(columns), [(1, "one"), (2, "two")], "many"))
+        flags["has_drop_nulls"] = True
+    elif kind in {"semi_join", "anti_join"}:
+        features.add("join:existence")
+        features.add("membership:semi_join" if kind == "semi_join" else "membership:anti_join")
+        features.add(f"membership:left_key:{','.join(join_left_keys(op)) or 'unknown'}")
+        features.add(f"membership:right_key:{','.join(join_right_keys(op)) or 'unknown'}")
+        flags["has_semi_join" if kind == "semi_join" else "has_anti_join"] = True
+    elif kind == "distinct":
+        columns = op_columns(op)
+        features.add("distinct:deduplicate")
+        features.add(_bucket("distinct_columns", len(columns), [(1, "one"), (2, "two")], "many"))
+        flags["has_distinct"] = True
+    elif kind == "fill_null":
+        column = op_column(op)
+        value = op_value(op)
+        column_type = available_types.get(column, "derived")
+        features.add("null:fill")
+        features.add(f"fill_null_type:{column_type}")
+        if value is False:
+            features.add("fill_null:false")
+        elif value == "":
+            features.add("fill_null:empty-string")
+        elif value == 0:
+            features.add("fill_null:zero")
+        flags["has_fill_null"] = True
+    elif kind == "coalesce":
+        columns = op_columns(op)
+        alias = op_output_alias(op)
+        features.add("null:coalesce")
+        features.add("coalesce:columns")
+        features.add(_bucket("coalesce_columns", len(columns), [(2, "two"), (3, "three")], "many"))
+        if columns:
+            features.add(f"coalesce_type:{available_types.get(columns[0], 'derived')}")
+        if alias in available_types:
+            features.add("coalesce:overwrite")
+        if "fallback" in op:
+            features.add("coalesce:fallback")
+        if alias and columns:
+            available_types[alias] = available_types.get(columns[0], "derived")
+        flags["has_coalesce"] = True
+        if alias:
+            derived_columns.add(alias)
+    elif kind == "case_when":
+        column = condition_column(op)
+        cmp = condition_cmp(op, "unknown")
+        alias = op_output_alias(op, "derived")
+        output_type = _literal_feature_type(case_then_value(op), case_else_value(op))
+        features.add("conditional:case_when")
+        features.add(f"case_when_type:{available_types.get(column, 'derived')}")
+        features.add(f"case_when_cmp:{cmp}")
+        features.add(f"case_when_output:{output_type}")
+        available_types[alias] = output_type
+        if column in derived_columns:
+            features.add("conditional:derived-input")
+        if alias:
+            derived_columns.add(alias)
+        flags["has_case_when"] = True
+    elif kind == "row_number_filter":
+        partition_columns = op_partition_columns(op)
+        partition_count = len(partition_columns)
+        order_keys = normalized_order_by_keys(op)
+        order_count = len(order_keys)
+        features.add("row_pick:keyed")
+        features.add(f"row_pick:cmp:{op_comparator(op, 'unknown')}")
+        features.add(_bucket("row_pick_partition_count", partition_count, [(0, "none"), (1, "one")], "many"))
+        features.add(_bucket("row_pick_order_count", order_count, [(1, "one"), (2, "two")], "many"))
+        if any(column in derived_columns for column in partition_columns):
+            features.add("row_pick:partition-derived")
+        if any(key.column in derived_columns for key in order_keys):
+            features.add("row_pick:order-derived")
+        flags["has_row_number_filter"] = True
+        if flags["has_string_basename_expr"]:
+            flags["has_path_basename_keyed_pick"] = True
+    elif kind == "running_sum":
+        source = op_source(op)
+        input_dtype = op_input_dtype(op, "float64")
+        features.add(f"running:{input_dtype}")
+        features.add(f"running_source_type:{available_types.get(source, 'derived')}")
+        if source in derived_columns:
+            features.add("running:derived-source")
+        order_keys = normalized_order_by_keys(op)
+        if any(key.column in derived_columns for key in order_keys):
+            features.add("running:order-derived")
+        partition_columns = op_partition_columns(op)
+        if partition_columns:
+            features.add("running:partitioned")
+            if any(column in derived_columns for column in partition_columns):
+                features.add("running:partition-derived")
+            flags["has_partitioned_running_sum"] = True
+        if input_dtype == "float32":
+            flags["has_running_sum_precision"] = True
+        output_column = op_column(op, "derived")
+        available_types[output_column] = "float"
+        if output_column:
+            derived_columns.add(output_column)
+    elif kind == "sortedness_check":
+        column = op_column(op)
+        nulls = op_nulls(op, "last")
+        features.add(f"sortedness:nulls:{nulls}")
+        features.add(f"sortedness:{'asc' if op_ascending(op, True) else 'desc'}")
+        features.add(f"sortedness_source_type:{available_types.get(column, 'derived')}")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_sortedness_check"] = True
+    elif kind == "random_case_probe":
+        features.add("case_expr:simple")
+        features.add("case_expr:random-subject")
+        features.add(_bucket("case_probe_rows", op_rows(op, 0), [(1000, "small"), (10000, "medium")], "large"))
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_random_case_probe"] = True
+    elif kind == "group_quantile_probe":
+        features.add("quantile:dynamic-key")
+        features.add(_bucket("quantile_probe_values", len(op_values(op)), [(2, "tiny"), (4, "small")], "medium"))
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_group_quantile_probe"] = True
+    elif kind == "scalar_subquery_probe":
+        features.add("subquery:correlated-scalar")
+        features.add("subquery:nested-aggregate")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_scalar_subquery_probe"] = True
+    elif kind == "window_avg_probe":
+        features.add("window:rows-frame")
+        features.add("window:avg")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_window_avg_probe"] = True
+    elif kind == "struct_distinct_probe":
+        features.add("struct:unnest")
+        features.add("struct:distinct")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_struct_distinct_probe"] = True
+    elif kind == "bit_compare_probe":
+        features.add("bit:unequal-length")
+        features.add("comparison:bit-order")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_bit_compare_probe"] = True
+    elif kind == "round_even_probe":
+        features.add("numeric:round-even")
+        features.add("float:decimal-scale")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_round_even_probe"] = True
+    elif kind == "float_literal_precision_probe":
+        features.add("duckdb:float-literal-precision")
+        features.add("float:literal-cast-consistency")
+        features.add("float:decimal-literal")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_float_literal_precision_probe"] = True
+    elif kind == "timestamp_precision_filter_probe":
+        features.add("polars:timestamp-precision-filter")
+        features.add("timestamp:precision-filter")
+        features.add("timestamp:unit-cast")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_timestamp_precision_filter_probe"] = True
+    elif kind == "series_rtruediv_probe":
+        features.add("series:reverse-division")
+        features.add("arithmetic:operand-order")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_series_rtruediv_probe"] = True
+    elif kind == "uint64_isin_probe":
+        features.add("pandas:uint64-isin")
+        features.add("membership:unsigned-precision")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_uint64_isin_probe"] = True
+    elif kind == "tuple_anti_null_probe":
+        features.add("duckdb:tuple-anti-null")
+        features.add("nulls:ternary-membership")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_tuple_anti_null_probe"] = True
+    elif kind == "setop_all_duplicate_probe":
+        features.add("datafusion:setop-all-duplicate-count")
+        features.add("sql:setop-all")
+        features.add("setop:except-all")
+        features.add("setop:intersect-all")
+        features.add("setop:duplicate-count")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_setop_all_duplicate_probe"] = True
+    elif kind == "json_predicate_order_probe":
+        features.add("duckdb:json-predicate-order")
+        features.add("json:predicate-reorder")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_json_predicate_order_probe"] = True
+    elif kind == "sparse_mask_probe":
+        features.add("pandas:sparse-mask")
+        features.add("mask:sparse-array")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_sparse_mask_probe"] = True
+    elif kind == "float_wrap_probe":
+        features.add("polars:wrap-numerical")
+        features.add("cast:float-overflow")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_float_wrap_probe"] = True
+    elif kind == "index_bool_probe":
+        features.add("pandas:index-bool")
+        features.add("api:result-type")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_index_bool_probe"] = True
+    elif kind == "empty_literal_groupby_probe":
+        features.add("polars:empty-literal-groupby")
+        features.add("groupby:empty-literal")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_empty_literal_groupby_probe"] = True
+    elif kind == "arrow_string_eq_sum_probe":
+        features.add("pandas:arrow-string-eq-sum")
+        features.add("arrow:string-bool-reduction")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_arrow_string_eq_sum_probe"] = True
+    elif kind == "arrow_timestamp_loc_slice_probe":
+        features.add("pandas:arrow-timestamp-loc-slice")
+        features.add("arrow:timestamp-index-slice")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_arrow_timestamp_loc_slice_probe"] = True
+    elif kind == "arrow_timestamp_index_attr_probe":
+        features.add("pandas:arrow-timestamp-index-attr")
+        features.add("arrow:timestamp-index-attribute")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_arrow_timestamp_index_attr_probe"] = True
+    elif kind == "eval_inplace_alias_probe":
+        features.add("pandas:eval-inplace-alias")
+        features.add("copy:on-write-alias")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_eval_inplace_alias_probe"] = True
+    elif kind == "bool_reduction_skipna_probe":
+        features.add("pandas:bool-reduction-skipna")
+        features.add("nullable-bool:reduction")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_bool_reduction_skipna_probe"] = True
+    elif kind == "dataset_isin_all_match_probe":
+        features.add("pyarrow:dataset-isin-all-match")
+        features.add("dataset:membership-filter")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_dataset_isin_all_match_probe"] = True
+    elif kind == "run_end_null_compute_probe":
+        features.add("pyarrow:run-end-null-compute")
+        features.add("run_end:null-compute")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_run_end_null_compute_probe"] = True
+    elif kind == "large_string_partition_probe":
+        features.add("pyarrow:large-string-partition")
+        features.add("dataset:partition-schema")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_large_string_partition_probe"] = True
+    elif kind == "hash_pivot_wider_probe":
+        features.add("pyarrow:hash-pivot-wider")
+        features.add("pivot:wider-order")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_hash_pivot_wider_probe"] = True
+    elif kind == "list_flatten_parent_indices_probe":
+        features.add("pyarrow:list-flatten-parent-indices")
+        features.add("arrow:list-layout")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_list_flatten_parent_indices_probe"] = True
+    elif kind == "rolling_mean_by_null_count_probe":
+        features.add("polars:rolling-mean-by-null-count")
+        features.add("rolling:temporal-min-samples")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_rolling_mean_by_null_count_probe"] = True
+    elif kind == "csv_long_numeric_roundtrip_probe":
+        features.add("csv:long-numeric-roundtrip")
+        features.add("csv:numeric-inference")
+        features.add("numeric:long-identifier")
+        features.add(_bucket("csv_probe_values", len(op_values(op)), [(3, "few"), (6, "several")], "many"))
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_csv_long_numeric_roundtrip_probe"] = True
+    elif kind == "select":
+        width = len(op_columns(op))
+        features.add(_bucket("select_width", width, [(1, "one"), (3, "few")], "many"))
+    elif kind == "sort":
+        try:
+            sort_keys = normalize_sort_keys(op)
+        except ValueError:
+            sort_keys = []
+        directions = {key.ascending for key in sort_keys}
+        if len(directions) > 1:
+            features.add("sort:mixed")
+        else:
+            features.add(f"sort:{'asc' if (not sort_keys or sort_keys[0].ascending) else 'desc'}")
+    elif kind == "join":
+        features.add(f"join:{join_how(op, 'unknown')}")
+        features.add(f"join_table:{op_table(op, 'unknown')}")
+        right_table = table_by_name.get(op_table(op, ""))
+        right_keys = join_right_keys(op)
+        right_key = right_keys[0] if right_keys else ""
+        if right_table is not None:
+            for column in right_table.columns:
+                if column.name == right_key or column.name in available_types:
+                    continue
+                available_types[column.name] = column.type
+    elif kind == "limit":
+        limit = op_n(op, 0)
+        if limit == 0:
+            features.add("op:limit_zero")
+        features.add(_bucket("limit", limit, [(0, "zero"), (3, "tiny"), (10, "small")], "large"))
+    elif kind == "offset":
+        offset = op_n(op, 0)
+        if offset == 0:
+            features.add("op:offset_zero")
+        features.add(_bucket("offset", offset, [(0, "zero"), (3, "tiny"), (10, "small")], "large"))
+    elif kind == "mutate":
+        mutate_kind = expr_kind(op, "unknown")
+        output_column = op_column(op, "derived")
+        source_column = expr_source(op)
+        features.add(f"mutate:{mutate_kind}")
+        features.add(f"expr:{mutate_kind}")
+        if mutate_kind == "arith_const":
+            features.add(f"arith:{expr_operator(op, 'unknown')}")
+            if expr_operator(op) == "div":
                 available_types[output_column] = "float"
-            elif mutate_kind == "abs":
-                features.add("numeric:abs")
+            else:
                 available_types[output_column] = available_types.get(source_column, "derived")
-            elif mutate_kind == "clip":
-                features.add("numeric:clip")
-                available_types[output_column] = available_types.get(source_column, "derived")
-            elif mutate_kind == "bool_not":
-                features.add("boolean:not")
-                available_types[output_column] = "bool"
-            elif mutate_kind == "add_const":
-                available_types[output_column] = available_types.get(source_column, "derived")
-            if mutate_kind == "cast":
-                target = expr_target_type(op, "unknown")
-                features.add(f"cast_to:{target}")
-                features.add(f"cast:{available_types.get(source_column, 'derived')}_to_{target}")
-                if expr_input_domain(op):
-                    features.add(f"cast_domain:{expr_input_domain(op)}")
-                available_types[output_column] = target or "derived"
-            elif mutate_kind == "string_length":
-                features.add("string:length")
-                available_types[output_column] = "int"
-            elif mutate_kind == "string_lower":
-                features.add("string:lower")
-                available_types[output_column] = "str"
-            elif mutate_kind == "string_upper":
-                features.add("string:upper")
-                available_types[output_column] = "str"
-            elif mutate_kind == "string_strip":
-                features.add("string:strip")
-                available_types[output_column] = "str"
-            elif mutate_kind == "string_null_if_empty":
-                features.add("string:null-if-empty")
-                features.add("null:empty-string")
-                available_types[output_column] = "str"
-            elif mutate_kind == "string_replace":
-                features.add("string:replace")
-                available_types[output_column] = "str"
-            elif mutate_kind == "string_slice":
-                features.add("string:slice")
-                available_types[output_column] = "str"
-            elif mutate_kind == "string_split_part":
-                features.add("string:split-first")
-                available_types[output_column] = "str"
-            elif mutate_kind == "string_concat":
-                features.add("string:concat")
-                available_types[output_column] = "str"
-            elif mutate_kind == "string_contains":
-                features.add("string:contains")
-                available_types[output_column] = "bool"
-            elif mutate_kind == "string_starts_with":
-                features.add("string:starts-with")
-                available_types[output_column] = "bool"
-            elif mutate_kind == "string_ends_with":
-                features.add("string:ends-with")
-                available_types[output_column] = "bool"
-            elif mutate_kind == "date_part":
-                features.add("date:part")
-                features.add(f"date_part:{expr_part(op, 'unknown')}")
-                available_types[output_column] = "int"
-            elif mutate_kind == "string_basename":
-                features.add("path:basename")
-                available_types[output_column] = "str"
-                has_string_basename_expr = True
-                if has_row_number_filter:
-                    has_path_basename_keyed_pick = True
-        elif kind == "groupby":
-            keys = groupby_keys(op)
-            agg_funcs = {aggregate_func(agg, "unknown") for agg in aggregate_specs(op)}
-            if agg_funcs and agg_funcs <= {"count", "nunique", "min", "max", "any", "all"}:
-                features.add("groupby:exact-aggregate")
-                features.add("groupby:sorted-input")
-                has_exact_groupby_agg = True
-            features.add(_bucket("groupby_keys", len(keys), [(1, "one"), (2, "two")], "many"))
-            if len(keys) > 1:
-                features.add("groupby:multi-key")
-            for key in keys:
-                features.add(f"group_key_type:{available_types.get(key, 'derived')}")
-            for agg in aggregate_specs(op):
-                source = aggregate_column(agg)
-                func = aggregate_func(agg, "unknown")
-                source_type = available_types.get(source, "derived")
-                features.add(f"agg:{func}")
-                features.add(f"agg_source_type:{source_type}")
-                if source_type == "float" and func in {"sum", "mean"}:
-                    features.add("agg:precision-float")
-                if source_type == "bool":
-                    features.add("agg:boolean")
-                    features.add(f"agg:{func}:bool")
-                    if func in {"min", "max", "count", "nunique", "any", "all"}:
-                        has_bool_groupby_agg = True
-                if func == "count" and source_type == "str":
-                    features.add("agg:count:str")
-                    has_string_count_groupby = True
-                if func == "nunique":
-                    features.add(f"agg:nunique:{source_type}")
-                    has_unique_count_groupby = True
-                available_types[aggregate_alias(agg, "derived")] = aggregate_feature_type(
-                    source_type,
-                    func,
-                )
-        elif kind == "aggregate":
-            for agg in aggregate_specs(op):
-                source = aggregate_column(agg)
-                func = aggregate_func(agg, "unknown")
-                source_type = available_types.get(source, "derived")
-                features.add(f"agg:{func}")
-                features.add(f"agg_source_type:{source_type}")
-                if source_type == "float" and func in {"sum", "mean"}:
-                    features.add("agg:precision-float")
-                if source_type == "bool":
-                    features.add("agg:boolean")
-                    features.add(f"agg:{func}:bool")
-                if func == "count" and source_type == "str":
-                    features.add("agg:count:str")
-                if func == "nunique":
-                    features.add(f"agg:nunique:{source_type}")
-                available_types[aggregate_alias(agg, "derived")] = aggregate_feature_type(
-                    source_type,
-                    func,
-                )
-    if op_names:
-        features.add("opseq:" + ">".join(op_names))
-        features.add(_bucket("op_count", len(op_names), [(1, "one"), (3, "few"), (5, "many")], "deep"))
-        first_op = op_names[0]
+        elif mutate_kind == "reverse_division_columns":
+            features.add("arithmetic:operand-order")
+            features.add("arithmetic:reverse-division")
+            available_types[output_column] = "float"
+        elif mutate_kind == "abs":
+            features.add("numeric:abs")
+            available_types[output_column] = available_types.get(source_column, "derived")
+        elif mutate_kind == "clip":
+            features.add("numeric:clip")
+            available_types[output_column] = available_types.get(source_column, "derived")
+        elif mutate_kind == "bool_not":
+            features.add("boolean:not")
+            available_types[output_column] = "bool"
+        elif mutate_kind == "add_const":
+            available_types[output_column] = available_types.get(source_column, "derived")
+        if mutate_kind == "cast":
+            target = expr_target_type(op, "unknown")
+            features.add(f"cast_to:{target}")
+            features.add(f"cast:{available_types.get(source_column, 'derived')}_to_{target}")
+            if expr_input_domain(op):
+                features.add(f"cast_domain:{expr_input_domain(op)}")
+            available_types[output_column] = target or "derived"
+        elif mutate_kind == "string_length":
+            features.add("string:length")
+            available_types[output_column] = "int"
+        elif mutate_kind == "string_lower":
+            features.add("string:lower")
+            available_types[output_column] = "str"
+        elif mutate_kind == "string_upper":
+            features.add("string:upper")
+            available_types[output_column] = "str"
+        elif mutate_kind == "string_strip":
+            features.add("string:strip")
+            available_types[output_column] = "str"
+        elif mutate_kind == "string_null_if_empty":
+            features.add("string:null-if-empty")
+            features.add("null:empty-string")
+            available_types[output_column] = "str"
+        elif mutate_kind == "string_replace":
+            features.add("string:replace")
+            available_types[output_column] = "str"
+        elif mutate_kind == "string_slice":
+            features.add("string:slice")
+            available_types[output_column] = "str"
+        elif mutate_kind == "string_split_part":
+            features.add("string:split-first")
+            available_types[output_column] = "str"
+        elif mutate_kind == "string_concat":
+            features.add("string:concat")
+            available_types[output_column] = "str"
+        elif mutate_kind == "string_contains":
+            features.add("string:contains")
+            available_types[output_column] = "bool"
+        elif mutate_kind == "string_starts_with":
+            features.add("string:starts-with")
+            available_types[output_column] = "bool"
+        elif mutate_kind == "string_ends_with":
+            features.add("string:ends-with")
+            available_types[output_column] = "bool"
+        elif mutate_kind == "date_part":
+            features.add("date:part")
+            features.add(f"date_part:{expr_part(op, 'unknown')}")
+            available_types[output_column] = "int"
+        elif mutate_kind == "string_basename":
+            features.add("path:basename")
+            available_types[output_column] = "str"
+            flags["has_string_basename_expr"] = True
+            if flags["has_row_number_filter"]:
+                flags["has_path_basename_keyed_pick"] = True
+        if output_column:
+            derived_columns.add(output_column)
+    elif kind == "groupby":
+        keys = groupby_keys(op)
+        agg_funcs = {aggregate_func(agg, "unknown") for agg in aggregate_specs(op)}
+        if agg_funcs and agg_funcs <= {"count", "nunique", "min", "max", "any", "all"}:
+            features.add("groupby:exact-aggregate")
+            features.add("groupby:sorted-input")
+            flags["has_exact_groupby_agg"] = True
+        features.add(_bucket("groupby_keys", len(keys), [(1, "one"), (2, "two")], "many"))
+        if len(keys) > 1:
+            features.add("groupby:multi-key")
+        for key in keys:
+            features.add(f"group_key_type:{available_types.get(key, 'derived')}")
+        for agg in aggregate_specs(op):
+            source = aggregate_column(agg)
+            func = aggregate_func(agg, "unknown")
+            source_type = available_types.get(source, "derived")
+            features.add(f"agg:{func}")
+            features.add(f"agg_source_type:{source_type}")
+            if source_type == "float" and func in {"sum", "mean"}:
+                features.add("agg:precision-float")
+            if source_type == "bool":
+                features.add("agg:boolean")
+                features.add(f"agg:{func}:bool")
+                if func in {"min", "max", "count", "nunique", "any", "all"}:
+                    flags["has_bool_groupby_agg"] = True
+            if func == "count" and source_type == "str":
+                features.add("agg:count:str")
+                flags["has_string_count_groupby"] = True
+            if func == "nunique":
+                features.add(f"agg:nunique:{source_type}")
+                flags["has_unique_count_groupby"] = True
+            alias = aggregate_alias(agg, "derived")
+            available_types[alias] = aggregate_feature_type(source_type, func)
+            derived_columns.add(alias)
+    elif kind == "aggregate":
+        for agg in aggregate_specs(op):
+            source = aggregate_column(agg)
+            func = aggregate_func(agg, "unknown")
+            source_type = available_types.get(source, "derived")
+            features.add(f"agg:{func}")
+            features.add(f"agg_source_type:{source_type}")
+            if source_type == "float" and func in {"sum", "mean"}:
+                features.add("agg:precision-float")
+            if source_type == "bool":
+                features.add("agg:boolean")
+                features.add(f"agg:{func}:bool")
+            if func == "count" and source_type == "str":
+                features.add("agg:count:str")
+            if func == "nunique":
+                features.add(f"agg:nunique:{source_type}")
+            alias = aggregate_alias(agg, "derived")
+            available_types[alias] = aggregate_feature_type(source_type, func)
+            derived_columns.add(alias)
+
+
+def _materialize_case_features(
+    case: Case,
+    state: _CaseFeatureState,
+    *,
+    operation_combo: dict[str, Any] | None = None,
+    frontier_buckets: list[str] | None = None,
+    exploration_objective_rules: list[ExplorationObjectiveRule] | tuple[ExplorationObjectiveRule, ...] | None = None,
+) -> set[str]:
+    features = set(state.features)
+    table = case.tables[0]
+    generator_profile = str(case.metadata.get("generator_profile", "")).strip()
+    if generator_profile:
+        features.add(f"generator_profile:{generator_profile}")
+    mixed_generator_profile = str(case.metadata.get("mixed_generator_profile", "")).strip()
+    if mixed_generator_profile:
+        features.add(f"mixed_generator_profile:{mixed_generator_profile}")
+    candidate_source = str(case.metadata.get("candidate_source", "")).strip()
+    if candidate_source:
+        features.add(f"source:{candidate_source}")
+    seed_lineage = case.metadata.get("seed_lineage", {})
+    if isinstance(seed_lineage, dict):
+        depth = int(seed_lineage.get("depth", 0) or 0)
+        if depth > 0:
+            features.add("source:feedback_mutation")
+            features.add(_bucket("mutation_depth", depth, [(1, "one"), (3, "shallow")], "deep"))
+    mutation = case.metadata.get("mutation", {})
+    if isinstance(mutation, dict):
+        operator_name = str(mutation.get("operator", "")).strip()
+        if operator_name and operator_name != "generated":
+            features.add(f"mutation_op:{operator_name}")
+    features.update(_quality_archive_context_features(case.metadata.get("quality_archive_context", {})))
+    if state.op_names:
+        features.add("opseq:" + ">".join(state.op_names))
+        features.add(_bucket("op_count", len(state.op_names), [(1, "one"), (3, "few"), (5, "many")], "deep"))
+        first_op = state.op_names[0]
         if first_op in {"filter", "drop_nulls", "fill_null", "distinct"}:
             features.add("materialization:input")
             features.add("pattern:input_materialization_boundary")
@@ -1276,7 +1628,7 @@ def derive_case_features(
                 features.add(f"materialization:{first_op}")
                 features.add("pattern:cleanup_input_materialization")
                 features.add(f"pattern:{first_op}_input_materialization")
-        if len(table.rows) >= 2 and "limit" not in op_names and "offset" not in op_names and not case.program.order_sensitive:
+        if len(table.rows) >= 2 and "limit" not in state.op_names and "offset" not in state.op_names and not case.program.order_sensitive:
             features.add("materialization:input-partition")
             features.add("pattern:input_partition_union_all")
     if generator_profile == "common_api_workflow" or mixed_generator_profile == "common_api_workflow":
@@ -1302,133 +1654,172 @@ def derive_case_features(
         program_pattern_features(
             case.program.operations,
             resolved_frontier_buckets,
-            op_names=op_names,
-            has_range_filter=has_range_filter,
-            has_running_sum_precision=has_running_sum_precision,
-            has_sortedness_check=has_sortedness_check,
+            op_names=state.op_names,
+            has_range_filter=state.flags["has_range_filter"],
+            has_running_sum_precision=state.flags["has_running_sum_precision"],
+            has_sortedness_check=state.flags["has_sortedness_check"],
         )
     )
-    if has_string_count_groupby:
+    if state.flags["has_string_count_groupby"]:
         features.add("pattern:string_count_groupby")
-    if has_unique_count_groupby:
+    if state.flags["has_unique_count_groupby"]:
         features.add("pattern:unique_count_groupby")
-    if has_bool_groupby_agg:
+    if state.flags["has_bool_groupby_agg"]:
         features.add("pattern:bool_null_groupby_agg")
-    if has_set_membership_filter:
+    if state.flags["has_set_membership_filter"]:
         features.add("pattern:set_membership_filter")
-    if has_null_predicate_filter:
+    if state.flags["has_null_predicate_filter"]:
         features.add("pattern:null_predicate_filter")
-    if has_boolean_predicate_filter:
+    if state.flags["has_boolean_predicate_filter"]:
         features.add("pattern:boolean_predicate_filter")
-    if has_range_filter:
+    if state.flags["has_range_filter"]:
         features.add("pattern:range_filter")
-    if has_string_contains_filter:
+    if state.flags["has_string_contains_filter"]:
         features.add("pattern:string_contains_filter")
         features.add("pattern:string_pattern_filter")
-    if has_tuple_absence_filter:
+    if state.flags["has_tuple_absence_filter"]:
         features.add("pattern:tuple_absence_filter")
-    if has_union_all:
+    if state.flags["has_union_all"]:
         features.add("pattern:union_all_row_append")
-    if has_drop_nulls:
+    if state.flags["has_drop_nulls"]:
         features.add("pattern:drop_nulls_null_filter")
-    if has_semi_join:
+    if state.flags["has_semi_join"]:
         features.add("pattern:semi_join_membership")
         features.add("pattern:semi_anti_join_null_keys")
         features.add("pattern:semi_anti_join_rewrite")
-    if has_anti_join:
+    if state.flags["has_anti_join"]:
         features.add("pattern:anti_join_exclusion")
         features.add("pattern:semi_anti_join_null_keys")
         features.add("pattern:semi_anti_join_rewrite")
-    if has_distinct:
+    if state.flags["has_distinct"]:
         features.add("pattern:distinct_deduplicate")
-    if has_fill_null:
+    if state.flags["has_fill_null"]:
         features.add("pattern:fill_null_null_semantics")
-    if has_coalesce:
+    if state.flags["has_coalesce"]:
         features.add("pattern:coalesce_null_semantics")
-    if has_case_when:
+    if state.flags["has_case_when"]:
         features.add("pattern:conditional_expression")
-    if has_exact_groupby_agg:
+    if state.flags["has_exact_groupby_agg"]:
         features.add("pattern:groupby_sorted_input")
     if generator_profile == "row_value_absence_filter" or mixed_generator_profile == "row_value_absence_filter":
         features.add("pattern:row_value_absence_filter")
     if generator_profile == "large_int_filter_groupby" or mixed_generator_profile == "large_int_filter_groupby":
         features.add("pattern:large_int_filter_groupby")
-    if has_partitioned_running_sum or generator_profile == "partitioned_running_sum":
+    if state.flags["has_partitioned_running_sum"] or generator_profile == "partitioned_running_sum":
         features.add("pattern:partitioned_running_sum")
     if (
-        has_path_basename_keyed_pick
+        state.flags["has_path_basename_keyed_pick"]
         or generator_profile == "path_basename_keyed_pick"
         or mixed_generator_profile == "path_basename_keyed_pick"
     ):
         features.add("pattern:path_basename_keyed_pick")
-    if has_random_case_probe:
+    if state.flags["has_random_case_probe"]:
         features.add("pattern:simple_case_random_subject")
-    if has_group_quantile_probe:
+    if state.flags["has_group_quantile_probe"]:
         features.add("pattern:group_quantile_key_probe")
-    if has_scalar_subquery_probe:
+    if state.flags["has_scalar_subquery_probe"]:
         features.add("pattern:scalar_subquery_double_parentheses")
-    if has_window_avg_probe:
+    if state.flags["has_window_avg_probe"]:
         features.add("pattern:window_avg_rows_frame")
-    if has_struct_distinct_probe:
+    if state.flags["has_struct_distinct_probe"]:
         features.add("pattern:struct_distinct_unnest")
-    if has_bit_compare_probe:
+    if state.flags["has_bit_compare_probe"]:
         features.add("pattern:bit_compare_unequal_length")
-    if has_round_even_probe:
+    if state.flags["has_round_even_probe"]:
         features.add("pattern:round_even_float_scale")
-    if has_float_literal_precision_probe:
+    if state.flags["has_float_literal_precision_probe"]:
         features.add("pattern:duckdb_float_literal_precision")
-    if has_timestamp_precision_filter_probe:
+    if state.flags["has_timestamp_precision_filter_probe"]:
         features.add("pattern:polars_timestamp_precision_filter")
-    if has_series_rtruediv_probe:
+    if state.flags["has_series_rtruediv_probe"]:
         features.add("pattern:series_rtruediv_operand_order")
-    if has_uint64_isin_probe:
+    if state.flags["has_uint64_isin_probe"]:
         features.add("pattern:pandas_uint64_isin_precision")
-    if has_tuple_anti_null_probe:
+    if state.flags["has_tuple_anti_null_probe"]:
         features.add("pattern:duckdb_tuple_anti_null_semantics")
-    if has_setop_all_duplicate_probe:
+    if state.flags["has_setop_all_duplicate_probe"]:
         features.add("pattern:datafusion_setop_all_duplicate_count")
-    if has_json_predicate_order_probe:
+    if state.flags["has_json_predicate_order_probe"]:
         features.add("pattern:duckdb_json_predicate_order_semantics")
-    if has_sparse_mask_probe:
+    if state.flags["has_sparse_mask_probe"]:
         features.add("pattern:pandas_sparse_array_mask_semantics")
-    if has_float_wrap_probe:
+    if state.flags["has_float_wrap_probe"]:
         features.add("pattern:polars_float_wrap_numerical_semantics")
-    if has_index_bool_probe:
+    if state.flags["has_index_bool_probe"]:
         features.add("pattern:pandas_index_bool_result_type")
-    if has_empty_literal_groupby_probe:
+    if state.flags["has_empty_literal_groupby_probe"]:
         features.add("pattern:polars_empty_literal_groupby_semantics")
-    if has_arrow_string_eq_sum_probe:
+    if state.flags["has_arrow_string_eq_sum_probe"]:
         features.add("pattern:pandas_arrow_string_eq_sum_semantics")
-    if has_arrow_timestamp_loc_slice_probe:
+    if state.flags["has_arrow_timestamp_loc_slice_probe"]:
         features.add("pattern:pandas_arrow_timestamp_loc_slice_semantics")
-    if has_arrow_timestamp_index_attr_probe:
+    if state.flags["has_arrow_timestamp_index_attr_probe"]:
         features.add("pattern:pandas_arrow_timestamp_index_attr_semantics")
-    if has_eval_inplace_alias_probe:
+    if state.flags["has_eval_inplace_alias_probe"]:
         features.add("pattern:pandas_eval_inplace_aliasing_semantics")
-    if has_bool_reduction_skipna_probe:
+    if state.flags["has_bool_reduction_skipna_probe"]:
         features.add("pattern:pandas_bool_reduction_skipna_semantics")
-    if has_dataset_isin_all_match_probe:
+    if state.flags["has_dataset_isin_all_match_probe"]:
         features.add("pattern:pyarrow_dataset_isin_all_match_semantics")
-    if has_run_end_null_compute_probe:
+    if state.flags["has_run_end_null_compute_probe"]:
         features.add("pattern:pyarrow_run_end_null_compute_semantics")
-    if has_large_string_partition_probe:
+    if state.flags["has_large_string_partition_probe"]:
         features.add("pattern:pyarrow_large_string_partition_schema_semantics")
-    if has_hash_pivot_wider_probe:
+    if state.flags["has_hash_pivot_wider_probe"]:
         features.add("pattern:pyarrow_hash_pivot_wider_order_semantics")
-    if has_list_flatten_parent_indices_probe:
+    if state.flags["has_list_flatten_parent_indices_probe"]:
         features.add("pattern:pyarrow_list_flatten_parent_indices_semantics")
-    if has_rolling_mean_by_null_count_probe:
+    if state.flags["has_rolling_mean_by_null_count_probe"]:
         features.add("pattern:polars_rolling_mean_by_null_count_semantics")
-    if has_csv_long_numeric_roundtrip_probe:
+    if state.flags["has_csv_long_numeric_roundtrip_probe"]:
         features.add("pattern:csv_long_numeric_roundtrip")
     features.update(derive_semantic_family_features(features))
-    features.update(
-        derive_exploration_objective_features(
-            features,
-            rules=exploration_objective_rules,
-        )
-    )
+    features.update(derive_exploration_objective_features(features, rules=exploration_objective_rules))
     return features
+
+
+def derive_case_features(
+    case: Case,
+    *,
+    operation_combo: dict[str, Any] | None = None,
+    frontier_buckets: list[str] | None = None,
+    exploration_objective_rules: list[ExplorationObjectiveRule] | tuple[ExplorationObjectiveRule, ...] | None = None,
+) -> set[str]:
+    base_features, base_key = _base_case_feature_inputs(case)
+    native_operation_features = _native_case_operation_features(case)
+    operation_keys = tuple(_case_feature_operation_cache_key(op) for op in case.program.operations)
+    state, start_index = _prefix_case_feature_state(
+        case,
+        base_features=base_features,
+        base_key=base_key,
+        operation_keys=operation_keys,
+    )
+    if start_index < len(case.program.operations):
+        table_by_name = {source_table.name: source_table for source_table in case.tables}
+        for index in range(start_index, len(case.program.operations)):
+            _apply_case_feature_operation(
+                state,
+                case.program.operations[index],
+                table_by_name=table_by_name,
+            )
+            _case_feature_prefix_cache_put((base_key, operation_keys[: index + 1]), state)
+    features = _materialize_case_features(
+        case,
+        state,
+        operation_combo=operation_combo,
+        frontier_buckets=frontier_buckets,
+        exploration_objective_rules=exploration_objective_rules,
+    )
+    features.update(native_operation_features)
+    return features
+
+
+def _native_case_operation_features(case: Case) -> set[str]:
+    if not case.program.operations or not case.tables:
+        return set()
+    table = case.tables[0]
+    column_types = {column.name: column.type for column in table.columns}
+    return set(_rust_extract_case_features(case.program.operations, column_types))
 
 
 def extract_case_features(case: Case) -> set[str]:
@@ -1530,7 +1921,12 @@ def _materialize_score_breakdown(
         "recent_discovery_window_count": recent_discovery_window_count,
         "discovery_bucket_count": float(len(decision.discovery_buckets)),
         "target_bonus": decision.target_bonus_metric,
-        "target_priority": decision.target_priority_metric,
+        "target_priority": max(
+            0.0,
+            decision.target_priority_metric
+            - decision.target_template_bonus_metric
+            + decision.target_no_yield_penalty_metric,
+        ),
         "target_template_matches": decision.target_template_matches_metric,
         "target_template_bonus": decision.target_template_bonus_metric,
         "target_no_yield_penalty": decision.target_no_yield_penalty_metric,
@@ -1579,8 +1975,12 @@ class CaseAnalysis:
     ordered_features: list[str]
     canonical_features: set[str]
     expanded_features: frozenset[str]
+    expanded_feature_ids: frozenset[int]
     expanded_feature_prefixes: frozenset[str]
+    expanded_feature_prefix_ids: frozenset[int]
     expanded_feature_prefix_roots: frozenset[str]
+    expanded_feature_prefix_root_ids: frozenset[int]
+    expanded_features_by_prefix_root: dict[str, tuple[str, ...]]
     canonical_feature_weight_bases: tuple[tuple[str, float, float], ...]
     feature_score_specs: tuple["FeatureScoreSpec", ...]
     canonical_feature_count_sqrt: float
@@ -1598,7 +1998,9 @@ class CaseAnalysis:
     mixed_profile_features: tuple[str, ...]
     matched_targets: list[str]
     matched_target_set: frozenset[str]
+    matched_target_ids: frozenset[int]
     matched_target_aliases: frozenset[str]
+    matched_target_alias_ids: frozenset[int]
     matched_target_count: int
     specific_target_match_count: int
     generic_target_match_count: int
@@ -1643,6 +2045,7 @@ class CandidateRootContext:
 @dataclass(slots=True)
 class TargetPenaltySpec:
     aliases: frozenset[str]
+    alias_ids: frozenset[int]
     weight: float
 
 
@@ -1651,10 +2054,14 @@ class CompiledDiscoveryBias:
     label: str
     targets: frozenset[str]
     target_aliases: frozenset[str]
+    target_alias_ids: frozenset[int]
     root_prefixes: frozenset[str]
+    root_prefix_ids: frozenset[int]
     full_prefixes: tuple[str, ...]
     exact_feature_prefixes: frozenset[str]
+    exact_feature_prefix_ids: frozenset[int]
     scan_feature_prefixes: tuple[str, ...]
+    scan_prefix_roots: tuple[tuple[str, str], ...]
     score_bonus: float
     novelty_bonus: float
     contribution_bonus: float
@@ -1864,17 +2271,30 @@ class GuidanceState:
     _known_saturated_roots: set[str] = field(default_factory=set, repr=False)
     _candidate_bug_root_hits: Counter[str] = field(default_factory=Counter, repr=False)
     _issue_replay_root_hits: Counter[str] = field(default_factory=Counter, repr=False)
-    _case_analysis_cache: OrderedDict[tuple[int, tuple[Any, ...]], CaseAnalysis] = field(default_factory=OrderedDict, repr=False)
+    _case_analysis_cache: OrderedDict[tuple[Any, ...], CaseAnalysis] = field(default_factory=OrderedDict, repr=False)
     _max_cached_case_analyses: int = field(default=128, repr=False)
     _compiled_discovery_biases: tuple[CompiledDiscoveryBias, ...] = field(default_factory=tuple, repr=False)
     _discovery_bias_keys: tuple[tuple[Any, ...], ...] = field(default_factory=tuple, repr=False)
+    _target_keys: tuple[str, ...] = field(default_factory=tuple, repr=False)
+    _compiled_target_catalog: CompiledTargetCatalog = field(
+        default_factory=lambda: _compiled_target_catalog(tuple()),
+        repr=False,
+    )
 
     def __post_init__(self) -> None:
         self.exploration_objective_rules = merge_exploration_objective_rules(
             self.exploration_objective_rules
         )
+        self._sync_compiled_targets()
         self._sync_compiled_discovery_biases()
         self._sync_family_saturation_state()
+
+    def _sync_compiled_targets(self) -> None:
+        keys = tuple(str(target).strip() for target in self.targets if str(target).strip())
+        if keys == self._target_keys:
+            return
+        self._target_keys = keys
+        self._compiled_target_catalog = _compiled_target_catalog(keys)
 
     def _sync_compiled_discovery_biases(self) -> None:
         keys = tuple(bias.key() for bias in self.discovery_biases)
@@ -1983,16 +2403,24 @@ class GuidanceState:
         self._sync_compiled_discovery_biases()
         discovery_bucket_metric_cache: dict[str, tuple[float, float, float]] = {}
         recent_discovery_window_count = len(self.recent_discovery_windows)
-        scored = [
-            self._score_case(
-                case,
-                len(candidates),
+        analyses = [self._case_analysis(case) for case in candidates]
+        scorer = CandidateScorer(
+            self._candidate_scoring_context(
                 compiled_discovery_biases=self._compiled_discovery_biases,
-                discovery_bucket_metric_cache=discovery_bucket_metric_cache,
+                recent_discovery_window_count=recent_discovery_window_count,
+            ),
+            discovery_bucket_metric_cache=discovery_bucket_metric_cache,
+        )
+        scored = [
+            self._decision_from_dense_score(
+                case,
+                analysis,
+                dense_score,
+                candidate_count=len(candidates),
                 recent_discovery_window_count=recent_discovery_window_count,
                 include_score_breakdown=False,
             )
-            for case in candidates
+            for case, analysis, dense_score in zip(candidates, analyses, scorer.score_many(analyses), strict=False)
         ]
         _apply_candidate_pool_discovery_balance(
             scored,
@@ -2075,12 +2503,14 @@ class GuidanceState:
             ]
             if boundary_avoiding_matched:
                 matched = boundary_avoiding_matched
+            matched = _pareto_reduce_decisions(matched, targeted=True)
             return self._populate_decision_diagnostics(
-                max(matched, key=_matched_decision_key),
+                _select_lexicographic_decision(matched, targeted=True),
                 include_online_weight_snapshot=include_online_weight_snapshot,
             )
+        contributing = _pareto_reduce_decisions(contributing, targeted=False)
         return self._populate_decision_diagnostics(
-            max(contributing, key=lambda decision: (decision.score, -decision.case.seed)),
+            _select_lexicographic_decision(contributing, targeted=False),
             include_online_weight_snapshot=include_online_weight_snapshot,
         )
 
@@ -2173,296 +2603,155 @@ class GuidanceState:
         include_score_breakdown: bool = True,
     ) -> GuidanceDecision:
         analysis = self._case_analysis(case)
-        feature_score_specs = analysis.feature_score_specs
-        matched_targets = analysis.matched_targets
-        matched_target_count = analysis.matched_target_count
-        specific_target_matches = analysis.specific_target_match_count
-        target_template_matches = analysis.target_template_match_count
-        target_template_bonus = _target_template_bonus_from_features(
-            analysis.target_template_features,
-            self.feature_counts,
+        recent_window_count = (
+            recent_discovery_window_count
+            if recent_discovery_window_count is not None
+            else len(self.recent_discovery_windows)
         )
-        target_priority = analysis.target_match_priority_base + target_template_bonus
-        target_no_yield_penalty = _target_no_yield_penalty(
-            analysis.canonical_features,
-            matched_targets,
-            self.feature_counts,
-            self.finding_feature_counts,
-            expanded_features=analysis.expanded_features,
-            target_penalty_specs=analysis.target_penalty_specs,
+        scorer = CandidateScorer(
+            self._candidate_scoring_context(
+                compiled_discovery_biases=compiled_discovery_biases,
+                recent_discovery_window_count=recent_window_count,
+            ),
+            discovery_bucket_metric_cache=(
+                discovery_bucket_metric_cache if discovery_bucket_metric_cache is not None else {}
+            ),
         )
-        feature_counts_get = self.feature_counts.get
-        finding_feature_counts_get = self.finding_feature_counts.get
-        root_cause_counts_get = self.root_cause_counts.get
-        online_weight_total = 0.0
-        online_weight_max = 1.0
-        path_novelty_total = 0.0
-        data_weighted_total = 0.0
-        finding_yield_total = 0.0
-        feature_saturation_total = 0.0
-        profile_saturation_penalty = 0.0
-        path_novelty_count = 0
-        data_novelty_count = 0
-        if feature_score_specs:
-            feature_multiplier = self.online_weights.multiplier_for_prefix
-            for spec in feature_score_specs:
-                count = feature_counts_get(spec.feature, 0)
-                if spec.learnable_feature_prefix is not None:
-                    multiplier_value = feature_multiplier(spec.feature, spec.learnable_feature_prefix)
-                    online_weight_total += multiplier_value
-                    if multiplier_value > online_weight_max:
-                        online_weight_max = multiplier_value
-                else:
-                    multiplier_value = 1.0
-                if spec.path_weight_base > 0.0:
-                    path_novelty_total += (spec.path_weight_base * multiplier_value) / (1.0 + count)
-                    if count == 0:
-                        path_novelty_count += 1
-                if spec.data_weight_base > 0.0:
-                    data_weighted_total += (spec.data_weight_base * multiplier_value) * (1.0 + 1.0 / (1.0 + count))
-                    if count == 0:
-                        data_novelty_count += 1
-                finding_hits = finding_feature_counts_get(spec.feature, 0)
-                finding_yield_total += _bounded_finding_signal(finding_hits) * spec.finding_weight_base * multiplier_value
-                feature_saturation_total += _feature_saturation(finding_hits) * spec.saturation_weight_base * multiplier_value
-                if spec.is_mixed_profile:
-                    profile_saturation_penalty += _profile_saturation(count)
-        path_coverage_proxy = 0.0
-        if analysis.path_feature_weight_bases:
-            path_coverage_proxy = (
-                path_novelty_total / analysis.path_feature_count_sqrt
-                + analysis.path_operation_diversity_bonus
-                + analysis.path_sequence_bonus
-            )
-        data_sensitivity = 0.0
-        if analysis.data_feature_weight_bases:
-            data_sensitivity = (data_weighted_total / analysis.data_feature_count_sqrt) * 0.35
-        frontier_buckets = analysis.frontier_buckets
-        frontier_conformance = analysis.frontier_raw_score
-        frontier_novelty_count = 0
-        if frontier_buckets:
-            frontier_counts_get = self.frontier_bucket_counts.get
-            frontier_weighted_novelty = 0.0
-            for bucket in frontier_buckets:
-                bucket_count = frontier_counts_get(bucket, 0)
-                frontier_weighted_novelty += 1.0 / (1.0 + bucket_count)
-                if bucket_count == 0:
-                    frontier_novelty_count += 1
-            frontier_conformance += (frontier_weighted_novelty / analysis.frontier_bucket_count_sqrt) * 0.35
-        discovery_buckets = analysis.discovery_buckets
-        discovery_bucket_weights = analysis.discovery_bucket_weights
-        (
-            discovery_bias_bonus,
-            discovery_bias_novelty_bonus,
-            discovery_bias_contribution_bonus,
-            discovery_bias_pool_bonus,
-            discovery_bias_keep_in_pool,
-            discovery_bias_hits,
-        ) = _apply_discovery_biases(
+        dense_score = scorer.score(analysis)
+        return self._decision_from_dense_score(
+            case,
             analysis,
-            compiled_discovery_biases
-            if compiled_discovery_biases is not None
-            else self._compiled_discovery_biases,
+            dense_score,
+            candidate_count=candidate_count,
+            recent_discovery_window_count=recent_window_count,
+            include_score_breakdown=include_score_breakdown,
         )
-        (
-            discovery_diversity_bonus,
-            discovery_stale_penalty,
-            recent_discovery_loop_penalty,
-        ) = _discovery_metrics(
-            discovery_bucket_weights,
-            self.discovery_bucket_counts,
-            self.discovery_bucket_signal_counts,
-            self.recent_discovery_stale_counts,
-            self.recent_discovery_signal_counts,
-            recent_window_count=(
+
+    def _candidate_scoring_context(
+        self,
+        *,
+        compiled_discovery_biases: tuple[CompiledDiscoveryBias, ...] | None = None,
+        recent_discovery_window_count: int | None = None,
+    ) -> CandidateScoringContext:
+        return CandidateScoringContext(
+            feature_counts=self.feature_counts,
+            finding_feature_counts=self.finding_feature_counts,
+            root_cause_counts=self.root_cause_counts,
+            frontier_bucket_counts=self.frontier_bucket_counts,
+            discovery_bucket_counts=self.discovery_bucket_counts,
+            discovery_bucket_signal_counts=self.discovery_bucket_signal_counts,
+            recent_discovery_stale_counts=self.recent_discovery_stale_counts,
+            recent_discovery_signal_counts=self.recent_discovery_signal_counts,
+            candidate_bug_root_hits=self._candidate_bug_root_hits,
+            known_saturated_roots=self._known_saturated_roots,
+            issue_replay_root_hits=self._issue_replay_root_hits,
+            issue_inspired_source_counts=self.issue_inspired_source_counts,
+            issue_replay_count=self.issue_replay_count,
+            enable_family_saturation=self.enable_family_saturation,
+            family_saturation_threshold=self.family_saturation_threshold,
+            family_saturation_penalty=self.family_saturation_penalty,
+            issue_replay_saturation_threshold=self.issue_replay_saturation_threshold,
+            issue_replay_saturation_penalty=self.issue_replay_saturation_penalty,
+            issue_replay_global_saturation_threshold=self.issue_replay_global_saturation_threshold,
+            issue_replay_global_saturation_penalty=self.issue_replay_global_saturation_penalty,
+            issue_inspired_source_saturation_threshold=self.issue_inspired_source_saturation_threshold,
+            issue_inspired_source_saturation_penalty=self.issue_inspired_source_saturation_penalty,
+            recent_discovery_window_count=(
                 recent_discovery_window_count
                 if recent_discovery_window_count is not None
                 else len(self.recent_discovery_windows)
             ),
-            bucket_metric_cache=discovery_bucket_metric_cache,
+            online_weight_updates=self.online_weights.total_updates,
+            online_multiplier_for_prefix=self.online_weights.multiplier_for_prefix,
+            compiled_discovery_biases=(
+                compiled_discovery_biases
+                if compiled_discovery_biases is not None
+                else self._compiled_discovery_biases
+            ),
+            discovery_bias_evaluator=_apply_discovery_biases,
+            discovery_metrics=_discovery_metrics,
+            target_template_bonus_from_features=_target_template_bonus_from_features,
+            target_no_yield_penalty=_target_no_yield_penalty,
         )
-        discovery_diversity_bonus += discovery_bias_novelty_bonus
-        discovery_stale_active = discovery_stale_penalty > 0.0
-        recent_discovery_loop_active = recent_discovery_loop_penalty > 0.0
-        target_bonus = 3.0 * target_priority
-        finding_yield_bonus = (finding_yield_total / analysis.canonical_feature_count_sqrt) * 0.50
-        feature_saturation_penalty = (feature_saturation_total / analysis.canonical_feature_count_sqrt) * 0.08
-        profile_saturation_active = profile_saturation_penalty > 0.0
-        predicted_roots = analysis.predicted_roots
-        root_saturation_penalty = 0.0
-        root_novelty = 0
-        root_saturation = 0
-        for root in predicted_roots:
-            root_hits = root_cause_counts_get(root, 0)
-            root_saturation_penalty += _root_saturation(root_hits)
-            if root_hits == 0:
-                root_novelty += 1
-            elif root_hits >= 12:
-                root_saturation += 1
-        resolved_semantic_boundary_penalty = analysis.resolved_semantic_boundary_penalty
-        family_saturation_penalty = 0.0
-        family_saturation_active = False
-        issue_replay_saturation_penalty = 0.0
-        issue_replay_saturation_active = False
-        issue_replay_global_saturation_penalty = 0.0
-        issue_replay_global_saturation_active = False
-        issue_inspired_source_saturation_penalty = 0.0
-        issue_inspired_source_saturation_active = False
-        if self.enable_family_saturation:
-            family_saturation_penalty, family_saturation_active = _predicted_family_saturation_state(
-                predicted_roots,
-                root_hit_counts=self._candidate_bug_root_hits,
-                known_saturated_roots=self._known_saturated_roots,
-                threshold=self.family_saturation_threshold,
-                penalty_weight=self.family_saturation_penalty,
-            )
-            issue_replay_saturation_penalty, issue_replay_saturation_active = _predicted_family_saturation_state(
-                predicted_roots,
-                root_hit_counts=self._issue_replay_root_hits,
-                known_saturated_roots=_EMPTY_ROOTS,
-                threshold=self.issue_replay_saturation_threshold,
-                penalty_weight=self.issue_replay_saturation_penalty,
-            )
-            if analysis.has_issue_replay_source:
-                issue_replay_global_saturation_penalty = _family_saturation_penalty(
-                    self.issue_replay_count,
-                    threshold=self.issue_replay_global_saturation_threshold,
-                    penalty_weight=self.issue_replay_global_saturation_penalty,
-                )
-                issue_replay_global_saturation_active = _is_globally_saturated(
-                    self.issue_replay_count,
-                    threshold=self.issue_replay_global_saturation_threshold,
-                )
-            if analysis.has_issue_inspired_source:
-                source_issue_hits = _max_source_issue_hits_for_keys(
-                    analysis.issue_inspired_source_keys,
-                    source_counts=self.issue_inspired_source_counts,
-                )
-                issue_inspired_source_saturation_penalty = _family_saturation_penalty(
-                    source_issue_hits,
-                    threshold=self.issue_inspired_source_saturation_threshold,
-                    penalty_weight=self.issue_inspired_source_saturation_penalty,
-                )
-                issue_inspired_source_saturation_active = _is_globally_saturated(
-                    source_issue_hits,
-                    threshold=self.issue_inspired_source_saturation_threshold,
-                )
-        if matched_targets:
-            saturation_multiplier = 0.35 if specific_target_matches else 0.85
-            feature_saturation_penalty *= saturation_multiplier
-            root_saturation_penalty *= saturation_multiplier
-            profile_saturation_penalty *= saturation_multiplier
-            family_saturation_penalty *= saturation_multiplier
-            issue_replay_saturation_penalty *= saturation_multiplier
-            issue_replay_global_saturation_penalty *= saturation_multiplier
-            issue_inspired_source_saturation_penalty *= saturation_multiplier
-        issue_replay_saturation_active_any = (
-            issue_replay_saturation_active or issue_replay_global_saturation_active
-        )
-        contribution_potential = (
-            frontier_conformance
-            + 0.30 * path_novelty_count
-            + 0.20 * data_novelty_count
-            + 0.45 * frontier_novelty_count
-            + 0.35 * root_novelty
-            + 0.60 * matched_target_count
-            - 0.20 * root_saturation
-            + discovery_bias_contribution_bonus
-        )
-        combo_priority = analysis.combo_priority_base
-        online_weight_mean = (
-            online_weight_total / analysis.learnable_feature_count
-            if analysis.learnable_feature_count
-            else 1.0
-        )
-        score = (
-            path_coverage_proxy
-            + data_sensitivity
-            + frontier_conformance
-            + discovery_diversity_bonus
-            + target_bonus
-            + finding_yield_bonus
-            + combo_priority
-            + discovery_bias_bonus
-        )
-        score -= (
-            feature_saturation_penalty
-            + root_saturation_penalty
-            + resolved_semantic_boundary_penalty
-            + profile_saturation_penalty
-            + family_saturation_penalty
-            + issue_replay_saturation_penalty
-            + issue_replay_global_saturation_penalty
-            + issue_inspired_source_saturation_penalty
-            + target_no_yield_penalty
-            + discovery_stale_penalty
-            + recent_discovery_loop_penalty
-        )
+
+    def _decision_from_dense_score(
+        self,
+        case: Case,
+        analysis: CaseAnalysis,
+        dense_score: DenseCandidateScore,
+        *,
+        candidate_count: int,
+        recent_discovery_window_count: int,
+        include_score_breakdown: bool,
+    ) -> GuidanceDecision:
         decision = GuidanceDecision(
             case=case,
-            score=score,
+            score=dense_score.score,
             features=analysis.ordered_features,
-            matched_targets=matched_targets,
+            matched_targets=analysis.matched_targets,
             candidate_count=candidate_count,
-            frontier_buckets=frontier_buckets,
-            discovery_buckets=discovery_buckets,
-            discovery_bias_hits=discovery_bias_hits,
+            frontier_buckets=analysis.frontier_buckets,
+            discovery_buckets=analysis.discovery_buckets,
+            discovery_bias_hits=dense_score.discovery_bias_hits,
             analysis=analysis,
-            frontier_conformance_metric=frontier_conformance,
-            contribution_potential_metric=contribution_potential,
-            target_priority_metric=target_priority,
-            specific_target_matches_metric=float(specific_target_matches),
-            discovery_bias_bonus_metric=discovery_bias_bonus,
-            discovery_diversity_bonus_metric=discovery_diversity_bonus,
-            profile_saturation_penalty_metric=-profile_saturation_penalty,
-            target_no_yield_penalty_metric=-target_no_yield_penalty,
-            discovery_stale_penalty_metric=-discovery_stale_penalty,
-            recent_discovery_loop_penalty_metric=-recent_discovery_loop_penalty,
-            resolved_semantic_boundary_penalty_metric=-resolved_semantic_boundary_penalty,
-            candidate_pool_bias_bonus_metric=discovery_bias_pool_bonus,
-            discovery_bias_keep_in_pool_flag=discovery_bias_keep_in_pool,
-            family_saturation_active_flag=(family_saturation_active or issue_replay_saturation_active_any),
-            profile_saturation_active_flag=profile_saturation_active,
-            discovery_stale_active_flag=discovery_stale_active,
-            recent_discovery_loop_active_flag=recent_discovery_loop_active,
-            issue_replay_global_saturation_active_flag=issue_replay_global_saturation_active,
-            issue_inspired_source_saturation_active_flag=issue_inspired_source_saturation_active,
-            path_coverage_proxy_metric=path_coverage_proxy,
-            data_sensitivity_metric=data_sensitivity,
-            target_bonus_metric=target_bonus,
-            target_template_matches_metric=float(target_template_matches),
-            target_template_bonus_metric=target_template_bonus,
-            finding_yield_bonus_metric=finding_yield_bonus,
-            combo_priority_metric=combo_priority,
-            online_weight_mean_metric=online_weight_mean,
-            online_weight_max_metric=online_weight_max,
-            feature_saturation_penalty_metric=-feature_saturation_penalty,
-            root_saturation_penalty_metric=-root_saturation_penalty,
-            family_saturation_penalty_metric=-family_saturation_penalty,
-            issue_replay_saturation_penalty_metric=-issue_replay_saturation_penalty,
-            issue_replay_global_saturation_penalty_metric=-issue_replay_global_saturation_penalty,
-            issue_inspired_source_saturation_penalty_metric=-issue_inspired_source_saturation_penalty,
-            issue_replay_saturation_active_flag=issue_replay_saturation_active_any,
+            frontier_conformance_metric=dense_score.frontier_conformance_metric,
+            contribution_potential_metric=dense_score.contribution_potential_metric,
+            target_priority_metric=dense_score.target_priority_metric,
+            specific_target_matches_metric=dense_score.specific_target_matches_metric,
+            discovery_bias_bonus_metric=dense_score.discovery_bias_bonus_metric,
+            discovery_diversity_bonus_metric=dense_score.discovery_diversity_bonus_metric,
+            profile_saturation_penalty_metric=dense_score.profile_saturation_penalty_metric,
+            target_no_yield_penalty_metric=dense_score.target_no_yield_penalty_metric,
+            discovery_stale_penalty_metric=dense_score.discovery_stale_penalty_metric,
+            recent_discovery_loop_penalty_metric=dense_score.recent_discovery_loop_penalty_metric,
+            resolved_semantic_boundary_penalty_metric=dense_score.resolved_semantic_boundary_penalty_metric,
+            candidate_pool_bias_bonus_metric=dense_score.candidate_pool_bias_bonus_metric,
+            discovery_bias_keep_in_pool_flag=dense_score.discovery_bias_keep_in_pool_flag,
+            family_saturation_active_flag=dense_score.family_saturation_active_flag,
+            profile_saturation_active_flag=dense_score.profile_saturation_active_flag,
+            discovery_stale_active_flag=dense_score.discovery_stale_active_flag,
+            recent_discovery_loop_active_flag=dense_score.recent_discovery_loop_active_flag,
+            issue_replay_global_saturation_active_flag=dense_score.issue_replay_global_saturation_active_flag,
+            issue_inspired_source_saturation_active_flag=(
+                dense_score.issue_inspired_source_saturation_active_flag
+            ),
+            path_coverage_proxy_metric=dense_score.path_coverage_proxy_metric,
+            data_sensitivity_metric=dense_score.data_sensitivity_metric,
+            target_bonus_metric=dense_score.target_bonus_metric,
+            target_template_matches_metric=dense_score.target_template_matches_metric,
+            target_template_bonus_metric=dense_score.target_template_bonus_metric,
+            finding_yield_bonus_metric=dense_score.finding_yield_bonus_metric,
+            combo_priority_metric=dense_score.combo_priority_metric,
+            online_weight_mean_metric=dense_score.online_weight_mean_metric,
+            online_weight_max_metric=dense_score.online_weight_max_metric,
+            feature_saturation_penalty_metric=dense_score.feature_saturation_penalty_metric,
+            root_saturation_penalty_metric=dense_score.root_saturation_penalty_metric,
+            family_saturation_penalty_metric=dense_score.family_saturation_penalty_metric,
+            issue_replay_saturation_penalty_metric=dense_score.issue_replay_saturation_penalty_metric,
+            issue_replay_global_saturation_penalty_metric=(
+                dense_score.issue_replay_global_saturation_penalty_metric
+            ),
+            issue_inspired_source_saturation_penalty_metric=(
+                dense_score.issue_inspired_source_saturation_penalty_metric
+            ),
+            issue_replay_saturation_active_flag=dense_score.issue_replay_saturation_active_flag,
             score_breakdown={},
         )
         if include_score_breakdown:
             decision.score_breakdown = _materialize_score_breakdown(
                 decision,
-                recent_discovery_window_count=float(
-                    recent_discovery_window_count
-                    if recent_discovery_window_count is not None
-                    else len(self.recent_discovery_windows)
-                ),
+                recent_discovery_window_count=float(recent_discovery_window_count),
                 online_weight_updates=float(self.online_weights.total_updates),
             )
         return decision
 
     def _case_analysis(self, case: Case) -> CaseAnalysis:
+        self._sync_compiled_targets()
         objective_rule_keys = tuple(
             rule.key()
             for rule in active_exploration_objective_rules(self.exploration_objective_rules)
         )
-        key = (id(case), objective_rule_keys)
+        key = (id(case), objective_rule_keys, self._target_keys)
         cached = self._case_analysis_cache.get(key)
         if cached is not None:
             self._case_analysis_cache.move_to_end(key)
@@ -2477,15 +2766,26 @@ class GuidanceState:
         )
         canonical_features = _canonical_features(features)
         expanded_features = frozenset(_alias_expanded_features(canonical_features))
+        expanded_feature_ids = intern_feature_id_set(expanded_features)
         expanded_feature_prefixes = frozenset(
             prefix
             for feature in expanded_features
             if (prefix := _feature_prefix_token(feature))
         )
+        expanded_feature_prefix_ids = intern_feature_id_set(expanded_feature_prefixes)
         expanded_feature_prefix_roots = frozenset(
             _feature_prefix_root(feature)
             for feature in expanded_features
         )
+        expanded_feature_prefix_root_ids = intern_feature_id_set(expanded_feature_prefix_roots)
+        expanded_features_by_prefix_root_lists: dict[str, list[str]] = {}
+        for feature in expanded_features:
+            root = _feature_prefix_root(feature)
+            expanded_features_by_prefix_root_lists.setdefault(root, []).append(feature)
+        expanded_features_by_prefix_root = {
+            root: tuple(values)
+            for root, values in expanded_features_by_prefix_root_lists.items()
+        }
         path_features = tuple(feature for feature in canonical_features if _is_path_feature(feature))
         path_feature_weight_map = {
             feature: _path_feature_weight_base(feature)
@@ -2538,16 +2838,23 @@ class GuidanceState:
             )
             for feature, finding_weight_base, saturation_weight_base in canonical_feature_weight_bases
         )
-        matched_targets = _matched_targets(canonical_features, self.targets, expanded_features=expanded_features)
+        matched_targets = _matched_targets_from_catalog(
+            expanded_features,
+            self._compiled_target_catalog,
+            expanded_feature_ids=expanded_feature_ids,
+        )
         matched_target_set = frozenset(matched_targets)
-        matched_target_aliases = frozenset(_alias_expanded_features(set(matched_targets)))
+        matched_target_ids = _matched_target_ids(tuple(matched_targets))
+        matched_target_aliases = _matched_target_aliases(tuple(matched_targets))
+        matched_target_alias_ids = _matched_target_alias_ids(tuple(matched_targets))
         matched_target_count = len(matched_targets)
         specific_target_match_count = 0
         target_template_match_count = 0
         target_template_features_list: list[str] = []
         target_penalty_specs: list[TargetPenaltySpec] = []
         for target in matched_targets:
-            is_specific_target = _is_specific_target(target)
+            compiled_target = _compiled_guidance_target(target)
+            is_specific_target = compiled_target.specific_target
             if is_specific_target:
                 specific_target_match_count += 1
             template_features = [
@@ -2558,11 +2865,12 @@ class GuidanceState:
             if template_features:
                 target_template_match_count += 1
                 target_template_features_list.extend(template_features)
-            matched_aliases = expanded_features & _target_aliases(target)
+            matched_aliases = expanded_features & compiled_target.required_aliases
             if matched_aliases:
                 target_penalty_specs.append(
                     TargetPenaltySpec(
                         aliases=frozenset(matched_aliases),
+                        alias_ids=compiled_target.required_alias_ids & expanded_feature_ids,
                         weight=(0.30 if is_specific_target else 0.08),
                     )
                 )
@@ -2594,8 +2902,12 @@ class GuidanceState:
             ordered_features=sorted(features),
             canonical_features=canonical_features,
             expanded_features=expanded_features,
+            expanded_feature_ids=expanded_feature_ids,
             expanded_feature_prefixes=expanded_feature_prefixes,
+            expanded_feature_prefix_ids=expanded_feature_prefix_ids,
             expanded_feature_prefix_roots=expanded_feature_prefix_roots,
+            expanded_feature_prefix_root_ids=expanded_feature_prefix_root_ids,
+            expanded_features_by_prefix_root=expanded_features_by_prefix_root,
             canonical_feature_weight_bases=canonical_feature_weight_bases,
             feature_score_specs=feature_score_specs,
             canonical_feature_count_sqrt=math.sqrt(max(1, len(canonical_feature_weight_bases))),
@@ -2615,7 +2927,9 @@ class GuidanceState:
             mixed_profile_features=mixed_profile_features,
             matched_targets=matched_targets,
             matched_target_set=matched_target_set,
+            matched_target_ids=matched_target_ids,
             matched_target_aliases=matched_target_aliases,
+            matched_target_alias_ids=matched_target_alias_ids,
             matched_target_count=matched_target_count,
             specific_target_match_count=specific_target_match_count,
             generic_target_match_count=generic_target_match_count,
@@ -2914,49 +3228,152 @@ class GuidanceState:
 
 
 def _matched_decision_key(decision: GuidanceDecision) -> tuple[float, ...]:
-    specific_matches = decision.specific_target_matches_metric
-    target_priority = decision.target_priority_metric or float(len(decision.matched_targets))
-    bias_bonus = decision.discovery_bias_bonus_metric
-    profile_penalty = decision.profile_saturation_penalty_metric
-    no_yield_penalty = decision.target_no_yield_penalty_metric
-    discovery_penalty = decision.discovery_stale_penalty_metric
-    recent_loop_penalty = decision.recent_discovery_loop_penalty_metric
-    discovery_bonus = decision.discovery_diversity_bonus_metric
-    if specific_matches > 0.0:
+    return _lexicographic_decision_key(decision, targeted=True)
+
+
+def _semantic_focus_decision_key(decision: GuidanceDecision) -> tuple[float, ...]:
+    return _lexicographic_decision_key(decision, targeted=True)
+
+
+def _contrast_decision_key(decision: GuidanceDecision) -> tuple[float, ...]:
+    return _lexicographic_decision_key(decision, targeted=False)
+
+
+def _select_lexicographic_decision(
+    decisions: list[GuidanceDecision],
+    *,
+    targeted: bool,
+) -> GuidanceDecision:
+    if not decisions:
+        raise ValueError("guided decision pool cannot be empty")
+    key_fn = _matched_decision_key if targeted else _contrast_decision_key
+    return max(decisions, key=key_fn)
+
+
+def _pareto_reduce_decisions(
+    decisions: list[GuidanceDecision],
+    *,
+    targeted: bool,
+) -> list[GuidanceDecision]:
+    if len(decisions) <= 1:
+        return list(decisions)
+    frontier: list[GuidanceDecision] = []
+    vectors = [_dominance_vector(decision, targeted=targeted) for decision in decisions]
+    for index, decision in enumerate(decisions):
+        dominated = False
+        for other_index, other in enumerate(decisions):
+            if other_index == index:
+                continue
+            if _dominates(vectors[other_index], vectors[index]):
+                dominated = True
+                break
+        if not dominated:
+            frontier.append(decision)
+    return frontier or list(decisions)
+
+
+def _dominance_vector(
+    decision: GuidanceDecision,
+    *,
+    targeted: bool,
+) -> tuple[float, ...]:
+    if targeted:
         return (
-            1.0,
-            bias_bonus,
-            profile_penalty,
-            no_yield_penalty,
-            discovery_penalty,
-            recent_loop_penalty,
-            specific_matches,
-            target_priority,
-            discovery_bonus,
+            decision.specific_target_matches_metric,
+            decision.target_template_bonus_metric,
+            decision.target_priority_metric or float(len(decision.matched_targets)),
+            decision.discovery_bias_bonus_metric,
+            decision.profile_saturation_penalty_metric,
+            decision.target_no_yield_penalty_metric,
+            decision.discovery_stale_penalty_metric,
+            decision.recent_discovery_loop_penalty_metric,
+            decision.resolved_semantic_boundary_penalty_metric,
+            decision.family_saturation_penalty_metric,
+            decision.issue_replay_global_saturation_penalty_metric,
+            decision.issue_inspired_source_saturation_penalty_metric,
+            decision.frontier_conformance_metric,
+            decision.contribution_potential_metric,
+            decision.discovery_diversity_bonus_metric,
+            decision.score,
+        )
+    return (
+        decision.candidate_pool_diversity_bonus_metric,
+        decision.candidate_pool_shared_bonus_metric,
+        decision.discovery_bias_bonus_metric,
+        decision.frontier_conformance_metric,
+        decision.contribution_potential_metric,
+        decision.discovery_diversity_bonus_metric,
+        decision.path_coverage_proxy_metric,
+        decision.data_sensitivity_metric,
+        decision.online_weight_mean_metric,
+        decision.profile_saturation_penalty_metric,
+        decision.family_saturation_penalty_metric,
+        decision.discovery_stale_penalty_metric,
+        decision.recent_discovery_loop_penalty_metric,
+        decision.resolved_semantic_boundary_penalty_metric,
+        decision.issue_replay_global_saturation_penalty_metric,
+        decision.issue_inspired_source_saturation_penalty_metric,
+        decision.score,
+    )
+
+
+def _dominates(left: tuple[float, ...], right: tuple[float, ...]) -> bool:
+    if len(left) != len(right):
+        return False
+    any_strict = False
+    for lhs, rhs in zip(left, right, strict=False):
+        if lhs < rhs:
+            return False
+        if lhs > rhs:
+            any_strict = True
+    return any_strict
+
+
+def _lexicographic_decision_key(
+    decision: GuidanceDecision,
+    *,
+    targeted: bool,
+) -> tuple[float, ...]:
+    if targeted:
+        return (
+            decision.specific_target_matches_metric,
+            decision.target_template_bonus_metric,
+            decision.target_priority_metric or float(len(decision.matched_targets)),
+            decision.discovery_bias_bonus_metric,
+            decision.profile_saturation_penalty_metric,
+            decision.target_no_yield_penalty_metric,
+            decision.discovery_stale_penalty_metric,
+            decision.recent_discovery_loop_penalty_metric,
+            decision.resolved_semantic_boundary_penalty_metric,
+            decision.family_saturation_penalty_metric,
+            decision.issue_replay_global_saturation_penalty_metric,
+            decision.issue_inspired_source_saturation_penalty_metric,
+            decision.frontier_conformance_metric,
+            decision.contribution_potential_metric,
+            decision.discovery_diversity_bonus_metric,
             decision.score,
             -decision.case.seed,
         )
     return (
-        0.0,
-        bias_bonus,
-        profile_penalty,
-        no_yield_penalty,
-        discovery_penalty,
-        recent_loop_penalty,
-        discovery_bonus,
+        decision.candidate_pool_diversity_bonus_metric,
+        decision.candidate_pool_shared_bonus_metric,
+        decision.discovery_bias_bonus_metric,
+        decision.frontier_conformance_metric,
+        decision.contribution_potential_metric,
+        decision.discovery_diversity_bonus_metric,
+        decision.path_coverage_proxy_metric,
+        decision.data_sensitivity_metric,
+        decision.online_weight_mean_metric,
+        decision.profile_saturation_penalty_metric,
+        decision.family_saturation_penalty_metric,
+        decision.discovery_stale_penalty_metric,
+        decision.recent_discovery_loop_penalty_metric,
+        decision.resolved_semantic_boundary_penalty_metric,
+        decision.issue_replay_global_saturation_penalty_metric,
+        decision.issue_inspired_source_saturation_penalty_metric,
         decision.score,
-        target_priority,
-        float(len(decision.matched_targets)),
         -decision.case.seed,
     )
-
-
-def _semantic_focus_decision_key(decision: GuidanceDecision) -> tuple[float, ...]:
-    return _matched_decision_key(decision)
-
-
-def _contrast_decision_key(decision: GuidanceDecision) -> tuple[float, ...]:
-    return _semantic_focus_decision_key(decision)
 
 
 def _decision_has_family_saturation(decision: GuidanceDecision) -> bool:
@@ -3004,20 +3421,30 @@ def _compile_discovery_biases(
         exact_feature_prefixes = frozenset(
             prefix for prefix in full_prefixes if _is_exact_feature_prefix(prefix)
         )
+        target_aliases = frozenset(
+            alias
+            for target in bias.targets
+            for alias in _bias_target_aliases(target)
+        )
+        root_prefixes = frozenset(_bias_prefix_root(prefix) for prefix in full_prefixes if prefix)
         compiled.append(
             CompiledDiscoveryBias(
                 label=_discovery_bias_label(bias),
                 targets=frozenset(bias.targets),
-                target_aliases=frozenset(
-                    alias
-                    for target in bias.targets
-                    for alias in _bias_target_aliases(target)
-                ),
-                root_prefixes=frozenset(_bias_prefix_root(prefix) for prefix in full_prefixes if prefix),
+                target_aliases=target_aliases,
+                target_alias_ids=intern_feature_id_set(target_aliases),
+                root_prefixes=root_prefixes,
+                root_prefix_ids=intern_feature_id_set(root_prefixes),
                 full_prefixes=full_prefixes,
                 exact_feature_prefixes=exact_feature_prefixes,
+                exact_feature_prefix_ids=intern_feature_id_set(exact_feature_prefixes),
                 scan_feature_prefixes=tuple(
                     prefix for prefix in full_prefixes if prefix not in exact_feature_prefixes
+                ),
+                scan_prefix_roots=tuple(
+                    (_normalize_bias_prefix(prefix), _bias_prefix_root(prefix))
+                    for prefix in full_prefixes
+                    if prefix not in exact_feature_prefixes
                 ),
                 score_bonus=float(bias.score_bonus),
                 novelty_bonus=float(bias.novelty_bonus),
@@ -3073,20 +3500,22 @@ def _compiled_discovery_bias_matches(
 ) -> bool:
     target_match = not bias.targets or bool(
         bias.targets & analysis.matched_target_set
-        or bias.target_aliases & (analysis.matched_target_aliases | analysis.expanded_features)
+        or bias.target_alias_ids & (analysis.matched_target_alias_ids | analysis.expanded_feature_ids)
     )
     if not target_match:
         return False
     if not bias.full_prefixes:
         return True
-    if not (analysis.expanded_feature_prefix_roots & bias.root_prefixes):
+    if not (analysis.expanded_feature_prefix_root_ids & bias.root_prefix_ids):
         return False
-    if analysis.expanded_feature_prefixes & bias.exact_feature_prefixes:
+    if analysis.expanded_feature_prefix_ids & bias.exact_feature_prefix_ids:
         return True
-    return any(
-        any(_feature_has_prefix(feature, prefix) for feature in analysis.expanded_features)
-        for prefix in bias.scan_feature_prefixes
-    )
+    features_by_root_get = analysis.expanded_features_by_prefix_root.get
+    for prefix, root in bias.scan_prefix_roots:
+        for feature in features_by_root_get(root, ()):
+            if _feature_has_prefix(feature, prefix):
+                return True
+    return False
 
 
 def _discovery_bias_label(bias: DiscoveryBias) -> str:
@@ -3185,34 +3614,11 @@ def _matched_targets(
     if expanded_features is None:
         resolved_expanded_features = _alias_expanded_features(features)
     else:
-        resolved_expanded_features = set(expanded_features)
-    matched = []
-    for target in targets:
-        normalized_target = str(target).strip()
-        if not normalized_target:
-            continue
-        if normalized_target in resolved_expanded_features:
-            matched.append(target)
-            continue
-        if f"semantic_family:{normalized_target}" in resolved_expanded_features:
-            matched.append(target)
-            continue
-        if normalized_target.startswith("semantic_signal:"):
-            signal = normalized_target.removeprefix("semantic_signal:").strip()
-            if signal and _semantic_signal_feature(signal) in resolved_expanded_features:
-                matched.append(target)
-                continue
-        if target == "unicode_case_mapping":
-            if (
-                "has:unicode_string" in resolved_expanded_features
-                and resolved_expanded_features & {"expr:string_lower", "expr:string_upper"}
-            ):
-                matched.append(target)
-            continue
-        required = _target_aliases(target)
-        if resolved_expanded_features & required:
-            matched.append(target)
-    return matched
+        resolved_expanded_features = frozenset(expanded_features)
+    return _matched_targets_from_catalog(
+        resolved_expanded_features,
+        _compiled_target_catalog(tuple(targets)),
+    )
 
 
 def _target_match_priority(
@@ -3259,6 +3665,7 @@ def _target_no_yield_penalty(
         resolved_target_penalty_specs = tuple(
             TargetPenaltySpec(
                 aliases=frozenset(matched_aliases),
+                alias_ids=intern_feature_id_set(matched_aliases),
                 weight=(0.30 if _is_specific_target(target) else 0.08),
             )
             for target in matched_targets
@@ -3362,14 +3769,17 @@ def _row_has_discovery_signal(
         known_saturated_bug_families=known_saturated_bug_families,
         finding_outcomes=finding_outcomes,
     )
-    resolved_semantic_only = (
-        bool(signals["resolved_semantic_divergence_count"])
-        and not bool(signals["candidate_bug"])
-        and not bool(signals["rewardable_semantic_divergence"])
-    )
-    if row.get("signal_new_behavior", row.get("is_new_behavior")) and not resolved_semantic_only:
+    if row_has_rewardable_new_behavior(
+        row,
+        known_saturated_bug_families=known_saturated_bug_families,
+        finding_outcomes=finding_outcomes,
+    ):
         return True
-    return bool(signals["candidate_bug"] or signals["needs_confirmation"] or reward >= 1.0)
+    return bool(
+        signals["candidate_bug"]
+        or signals["rewardable_semantic_divergence"]
+        or reward >= 1.0
+    )
 
 
 def _discovery_metrics(
@@ -3494,9 +3904,7 @@ def _specific_target_count(matched_targets: list[str]) -> int:
 
 
 def _is_specific_target(target: str) -> bool:
-    if f"semantic_family:{target}" in _target_aliases(target):
-        return True
-    return any(feature.startswith("pattern:") for feature in _target_aliases(target))
+    return _compiled_guidance_target(target).specific_target
 
 
 def _bucket(prefix: str, value: int, limits: list[tuple[int, str]], fallback: str) -> str:
@@ -3868,8 +4276,16 @@ def _guidance_reward(
             known_saturated_bug_families=known_families,
             finding_outcomes=outcomes,
         )
-        + 0.20 * signals["needs_confirmation_count"]
-        + (0.5 if row.get("signal_new_behavior", row.get("is_new_behavior")) else 0.0)
+        + 0.20 * signals["semantic_divergence_needs_confirmation_count"]
+        + (
+            0.5
+            if row_has_rewardable_new_behavior(
+                row,
+                known_saturated_bug_families=known_families,
+                finding_outcomes=outcomes,
+            )
+            else 0.0
+        )
         - 0.15 * signals["resolved_semantic_divergence_count"]
         - 2.5 * signals["false_positive_count"]
     )
@@ -3960,15 +4376,12 @@ def _candidate_issue_novelty_reward(
     family_saturation_threshold: int = 8,
     saturated_family_reward: float = 0.02,
 ) -> float:
-    if enable_family_saturation and family_saturation_threshold > 0 and previous_hits >= family_saturation_threshold:
-        return max(0.0, saturated_family_reward)
-    if previous_hits <= 0:
-        return 4.0
-    if previous_hits <= 2:
-        return 1.5
-    if previous_hits <= 8:
-        return 0.75 / math.sqrt(previous_hits)
-    return 0.10
+    return candidate_family_novelty_reward(
+        previous_hits,
+        enable_family_saturation=enable_family_saturation,
+        family_saturation_threshold=family_saturation_threshold,
+        saturated_family_reward=saturated_family_reward,
+    )
 
 
 def _family_key_matches_root_backend(
@@ -3981,14 +4394,7 @@ def _family_key_matches_root_backend(
 
 
 def _family_key_matches_known_family(candidate_family: str, known_saturated_bug_families: list[str]) -> bool:
-    candidate_root, candidate_backends = _split_family_key(candidate_family)
-    for known_family in known_saturated_bug_families:
-        known_root, known_backends = _split_family_key(known_family)
-        if known_root != candidate_root:
-            continue
-        if not known_backends or not candidate_backends or known_backends & candidate_backends:
-            return True
-    return False
+    return family_key_matches_known_family(candidate_family, known_saturated_bug_families)
 
 
 def _family_backends_active(family_backends: set[str], active_backends: list[str]) -> bool:
@@ -4045,13 +4451,7 @@ def _family_roots_for_active_backends(
 
 
 def _split_family_key(family_key: str) -> tuple[str, set[str]]:
-    root, _, backend_part = str(family_key).partition("@")
-    backends = {
-        backend.strip()
-        for backend in backend_part.split(",")
-        if backend.strip()
-    }
-    return root.strip(), backends
+    return split_family_key(family_key)
 
 
 def _finding_feature_weight(feature: str, online_weights: OnlineFeatureWeights | None = None) -> float:
@@ -4142,6 +4542,10 @@ def _is_path_feature_cached(feature: str) -> bool:
             "opseq:",
             "pattern:",
             "cmp:",
+            "conditional:",
+            "case_when_",
+            "row_pick:",
+            "coalesce:",
             "filter:",
             "filter_type:",
             "select_width:",
@@ -4190,7 +4594,7 @@ def _path_feature_weight_base(feature: str) -> float:
         return 0.8
     if feature.startswith(("running:", "running_source_type:")):
         return 1.0
-    if feature.startswith(("join:", "agg:", "expr:", "mutate:", "cmp:", "filter:", "group_key_type:")):
+    if feature.startswith(("join:", "agg:", "expr:", "mutate:", "cmp:", "filter:", "group_key_type:", "conditional:", "case_when_", "row_pick:", "coalesce:")):
         return 0.9
     if feature.startswith(("filter_type:", "select_width:", "sort:", "limit:", "offset:", "cast:", "cast_to:", "cast_domain:", "arith:")):
         return 0.7
@@ -4251,7 +4655,7 @@ def _finding_feature_weight_base(feature: str) -> float:
     if feature.startswith(("op:", "opseq:")):
         return 1.0
     if feature.startswith(
-        ("agg:", "cmp:", "expr:", "mutate:", "join:", "filter:", "filter_type:", "cast:", "cast_to:", "cast_domain:", "combo:", "running:")
+        ("agg:", "cmp:", "expr:", "mutate:", "join:", "filter:", "filter_type:", "cast:", "cast_to:", "cast_domain:", "combo:", "running:", "conditional:", "case_when_", "row_pick:", "coalesce:")
     ):
         return 0.75
     if feature.startswith(("has:", "type:", "nullable:")):
@@ -4271,7 +4675,7 @@ def _saturation_feature_weight_base(feature: str) -> float:
         return 0.7
     if feature.startswith("op:"):
         return 0.9
-    if feature.startswith(("agg:", "cmp:", "expr:", "mutate:", "join:", "filter_type:", "cast:", "cast_to:", "cast_domain:", "combo:", "running:")):
+    if feature.startswith(("agg:", "cmp:", "expr:", "mutate:", "join:", "filter_type:", "cast:", "cast_to:", "cast_domain:", "combo:", "running:", "conditional:", "case_when_", "row_pick:", "coalesce:")):
         return 0.65
     if feature.startswith(("has:", "type:", "nullable:")):
         return 0.15
@@ -4379,6 +4783,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             if right is not None:
                 samples = _join_output_samples(samples, right, op)
             last_sort_op = None
+        elif kind == "row_number_filter":
+            score, op_buckets, samples = _row_number_filter_frontier_score(samples, op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = {"keys": normalized_order_by_keys(op)}
         elif kind == "running_sum":
             score, op_buckets, samples = _running_sum_frontier_score(samples, op)
             scores.append(score)
@@ -4895,6 +5304,67 @@ def _running_sum_frontier_score(
         + 0.10 * int("running:partitioned" in buckets)
     )
     return min(1.0, score), buckets, out_samples
+
+
+def _row_number_filter_frontier_score(
+    samples: dict[str, list[Any]],
+    op: Any,
+) -> tuple[float, list[str], dict[str, list[Any]]]:
+    rows = shared_rows_from_samples(samples)
+    if not rows:
+        return 0.0, [], samples
+    try:
+        out_rows = row_number_filter_rows(rows, op)
+    except Exception:
+        return 0.0, [], samples
+    buckets = ["row_pick:keyed"]
+    partition_columns = op_partition_columns(op)
+    order_keys = normalized_order_by_keys(op)
+    comparator = op_comparator(op, "unknown")
+    value = int(op_value(op) if op_value(op) is not None else 1)
+    if partition_columns:
+        buckets.append("row_pick:partitioned")
+    if len(partition_columns) > 1:
+        buckets.append("row_pick:multi-partition")
+    if len(order_keys) > 1:
+        buckets.append("row_pick:multi-order")
+    if any(key.nulls == "first" for key in order_keys):
+        buckets.append("row_pick:nulls-first")
+    if any(
+        row.get(column) is None
+        for row in rows
+        for column in partition_columns
+    ) or any(
+        row.get(key.column) is None
+        for row in rows
+        for key in order_keys
+    ):
+        buckets.append("row_pick:null-aware")
+    buckets.append(f"row_pick:cmp:{comparator}")
+    if value == 1:
+        buckets.append("row_pick:first")
+    elif value <= 3:
+        buckets.append("row_pick:small-k")
+    else:
+        buckets.append("row_pick:deep-k")
+    kept = len(out_rows)
+    if kept == 0:
+        buckets.append("row_pick:empty-output")
+    elif kept == len(rows):
+        buckets.append("row_pick:all-pass")
+    else:
+        buckets.append("row_pick:partial-output")
+    score = (
+        0.38
+        + 0.12 * int("row_pick:partitioned" in buckets)
+        + 0.08 * int("row_pick:multi-partition" in buckets)
+        + 0.08 * int("row_pick:multi-order" in buckets)
+        + 0.08 * int("row_pick:null-aware" in buckets)
+        + 0.08 * int("row_pick:nulls-first" in buckets)
+        + 0.08 * int("row_pick:partial-output" in buckets)
+        + 0.05 * int("row_pick:small-k" in buckets)
+    )
+    return min(1.0, score), buckets, shared_samples_from_rows(out_rows, list(samples))
 
 
 def _sortedness_frontier_score(

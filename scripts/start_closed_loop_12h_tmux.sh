@@ -10,6 +10,14 @@ MAX_PARALLEL_COST=""
 SEEDS=""
 TARGET_SUITES=""
 PRESETS=""
+PROFILE_POOL=""
+PROFILE_LEARNING_WEIGHT=""
+SEMANTIC_OBJECTIVE_LEARNING_WEIGHT=""
+ENABLE_METAMORPHIC_ORACLE=""
+METAMORPHIC_RELATION_LEARNING_WEIGHT=""
+METAMORPHIC_RELATION_ORDER=""
+VERSION_PAIR_POOL=""
+VERSION_PAIR_LEARNING_WEIGHT=""
 EXPLORATION_WEIGHT=""
 GROUP_FAIRNESS_WEIGHT=""
 MAX_GROUP_PULL_GAP=""
@@ -71,6 +79,14 @@ refresh_config() {
   SEEDS="${DATADIFF_SEEDS:-1,501,1001,1501,2001,2501}"
   TARGET_SUITES="${DATADIFF_TARGET_SUITES:-latest_no_datafusion}"
   PRESETS="${DATADIFF_PRESETS:-live_issue_focus,live_cross_family}"
+  PROFILE_POOL="${DATADIFF_PROFILE_POOL:-issue_focus,discovery,discovery_fresh,deep_probe_rotation,partitioned_running_sum,join_null_sort,ordered_groupby_sort,global_null_aggregate,window_avg_rows_frame,path_basename_keyed_pick}"
+  PROFILE_LEARNING_WEIGHT="${DATADIFF_PROFILE_LEARNING_WEIGHT:-1.0}"
+  SEMANTIC_OBJECTIVE_LEARNING_WEIGHT="${DATADIFF_SEMANTIC_OBJECTIVE_LEARNING_WEIGHT:-1.0}"
+  ENABLE_METAMORPHIC_ORACLE="${DATADIFF_ENABLE_METAMORPHIC_ORACLE:-0}"
+  METAMORPHIC_RELATION_LEARNING_WEIGHT="${DATADIFF_METAMORPHIC_RELATION_LEARNING_WEIGHT:-0.0}"
+  METAMORPHIC_RELATION_ORDER="${DATADIFF_METAMORPHIC_RELATION_ORDER:-}"
+  VERSION_PAIR_POOL="${DATADIFF_VERSION_PAIR_POOL:-}"
+  VERSION_PAIR_LEARNING_WEIGHT="${DATADIFF_VERSION_PAIR_LEARNING_WEIGHT:-0.0}"
   EXPLORATION_WEIGHT="${DATADIFF_EXPLORATION_WEIGHT:-0.2}"
   GROUP_FAIRNESS_WEIGHT="${DATADIFF_GROUP_FAIRNESS_WEIGHT:-0.4}"
   MAX_GROUP_PULL_GAP="${DATADIFF_MAX_GROUP_PULL_GAP:-3}"
@@ -121,6 +137,14 @@ write_config_file() {
     printf 'DATADIFF_SEEDS=%q\n' "${SEEDS}"
     printf 'DATADIFF_TARGET_SUITES=%q\n' "${TARGET_SUITES}"
     printf 'DATADIFF_PRESETS=%q\n' "${PRESETS}"
+    printf 'DATADIFF_PROFILE_POOL=%q\n' "${PROFILE_POOL}"
+    printf 'DATADIFF_PROFILE_LEARNING_WEIGHT=%q\n' "${PROFILE_LEARNING_WEIGHT}"
+    printf 'DATADIFF_SEMANTIC_OBJECTIVE_LEARNING_WEIGHT=%q\n' "${SEMANTIC_OBJECTIVE_LEARNING_WEIGHT}"
+    printf 'DATADIFF_ENABLE_METAMORPHIC_ORACLE=%q\n' "${ENABLE_METAMORPHIC_ORACLE}"
+    printf 'DATADIFF_METAMORPHIC_RELATION_LEARNING_WEIGHT=%q\n' "${METAMORPHIC_RELATION_LEARNING_WEIGHT}"
+    printf 'DATADIFF_METAMORPHIC_RELATION_ORDER=%q\n' "${METAMORPHIC_RELATION_ORDER}"
+    printf 'DATADIFF_VERSION_PAIR_POOL=%q\n' "${VERSION_PAIR_POOL}"
+    printf 'DATADIFF_VERSION_PAIR_LEARNING_WEIGHT=%q\n' "${VERSION_PAIR_LEARNING_WEIGHT}"
     printf 'DATADIFF_EXPLORATION_WEIGHT=%q\n' "${EXPLORATION_WEIGHT}"
     printf 'DATADIFF_GROUP_FAIRNESS_WEIGHT=%q\n' "${GROUP_FAIRNESS_WEIGHT}"
     printf 'DATADIFF_MAX_GROUP_PULL_GAP=%q\n' "${MAX_GROUP_PULL_GAP}"
@@ -365,6 +389,14 @@ PY
     printf 'batch_duration=%s\n' "${BATCH_DURATION}"
     printf 'target_suites=%s\n' "${TARGET_SUITES}"
     printf 'presets=%s\n' "${PRESETS}"
+    printf 'profile_pool=%s\n' "${PROFILE_POOL}"
+    printf 'profile_learning_weight=%s\n' "${PROFILE_LEARNING_WEIGHT}"
+    printf 'semantic_objective_learning_weight=%s\n' "${SEMANTIC_OBJECTIVE_LEARNING_WEIGHT}"
+    printf 'enable_metamorphic_oracle=%s\n' "${ENABLE_METAMORPHIC_ORACLE}"
+    printf 'metamorphic_relation_learning_weight=%s\n' "${METAMORPHIC_RELATION_LEARNING_WEIGHT}"
+    printf 'metamorphic_relation_order=%s\n' "${METAMORPHIC_RELATION_ORDER}"
+    printf 'version_pair_pool=%s\n' "${VERSION_PAIR_POOL}"
+    printf 'version_pair_learning_weight=%s\n' "${VERSION_PAIR_LEARNING_WEIGHT}"
     printf 'seeds=%s\n' "${SEEDS}"
     printf 'adaptive_learning_weight=%s\n' "${ADAPTIVE_LEARNING_WEIGHT}"
     printf 'scheduler_annealing_temperature=%s\n' "${SCHEDULER_ANNEALING_TEMPERATURE}"
@@ -395,6 +427,14 @@ PY
   FREEZE_BATCH_DURATION="${BATCH_DURATION}" \
   FREEZE_TARGET_SUITES="${TARGET_SUITES}" \
   FREEZE_PRESETS="${PRESETS}" \
+  FREEZE_PROFILE_POOL="${PROFILE_POOL}" \
+  FREEZE_PROFILE_LEARNING_WEIGHT="${PROFILE_LEARNING_WEIGHT}" \
+  FREEZE_SEMANTIC_OBJECTIVE_LEARNING_WEIGHT="${SEMANTIC_OBJECTIVE_LEARNING_WEIGHT}" \
+  FREEZE_ENABLE_METAMORPHIC_ORACLE="${ENABLE_METAMORPHIC_ORACLE}" \
+  FREEZE_METAMORPHIC_RELATION_LEARNING_WEIGHT="${METAMORPHIC_RELATION_LEARNING_WEIGHT}" \
+  FREEZE_METAMORPHIC_RELATION_ORDER="${METAMORPHIC_RELATION_ORDER}" \
+  FREEZE_VERSION_PAIR_POOL="${VERSION_PAIR_POOL}" \
+  FREEZE_VERSION_PAIR_LEARNING_WEIGHT="${VERSION_PAIR_LEARNING_WEIGHT}" \
   FREEZE_SEEDS="${SEEDS}" \
   FREEZE_ADAPTIVE_LEARNING_WEIGHT="${ADAPTIVE_LEARNING_WEIGHT}" \
   FREEZE_SCHEDULER_ANNEALING_TEMPERATURE="${SCHEDULER_ANNEALING_TEMPERATURE}" \
@@ -439,6 +479,14 @@ payload = {
     "seeds": env("FREEZE_SEEDS"),
     "log_level": env("FREEZE_LOG_LEVEL"),
     "adaptive_config": {
+        "profile_pool": env("FREEZE_PROFILE_POOL"),
+        "profile_learning_weight": env("FREEZE_PROFILE_LEARNING_WEIGHT"),
+        "semantic_objective_learning_weight": env("FREEZE_SEMANTIC_OBJECTIVE_LEARNING_WEIGHT"),
+        "enable_metamorphic_oracle": env("FREEZE_ENABLE_METAMORPHIC_ORACLE") == "1",
+        "metamorphic_relation_learning_weight": env("FREEZE_METAMORPHIC_RELATION_LEARNING_WEIGHT"),
+        "metamorphic_relation_order": env("FREEZE_METAMORPHIC_RELATION_ORDER"),
+        "version_pair_pool": env("FREEZE_VERSION_PAIR_POOL"),
+        "version_pair_learning_weight": env("FREEZE_VERSION_PAIR_LEARNING_WEIGHT"),
         "adaptive_learning_weight": env("FREEZE_ADAPTIVE_LEARNING_WEIGHT"),
         "scheduler_annealing_temperature": env("FREEZE_SCHEDULER_ANNEALING_TEMPERATURE"),
         "scheduler_annealing_decay": env("FREEZE_SCHEDULER_ANNEALING_DECAY"),
@@ -477,6 +525,12 @@ _build_experiment_command() {
     .venv/bin/python -m datadiff.cli experiment
     --target-suites "${TARGET_SUITES}"
     --presets "${PRESETS}"
+    --profile-pool "${PROFILE_POOL}"
+    --profile-learning-weight "${PROFILE_LEARNING_WEIGHT}"
+    --semantic-objective-learning-weight "${SEMANTIC_OBJECTIVE_LEARNING_WEIGHT}"
+    --metamorphic-relation-learning-weight "${METAMORPHIC_RELATION_LEARNING_WEIGHT}"
+    --version-pair-pool "${VERSION_PAIR_POOL}"
+    --version-pair-learning-weight "${VERSION_PAIR_LEARNING_WEIGHT}"
     --seeds "${SEEDS}"
     --duration "${DURATION}"
     --schedule adaptive
@@ -501,6 +555,12 @@ _build_experiment_command() {
     --persist-closed-loop-state
     --skip-run-reports
   )
+  if [[ "${ENABLE_METAMORPHIC_ORACLE}" == "1" ]]; then
+    EXPERIMENT_COMMAND+=(--enable-metamorphic-oracle)
+  fi
+  if [[ -n "${METAMORPHIC_RELATION_ORDER}" ]]; then
+    EXPERIMENT_COMMAND+=(--metamorphic-relation-order "${METAMORPHIC_RELATION_ORDER}")
+  fi
   if [[ -n "${CONTINUAL_LEARNING_LEDGERS}" ]]; then
     EXPERIMENT_COMMAND+=(--continual-learning-ledgers "${CONTINUAL_LEARNING_LEDGERS}")
   fi
@@ -573,6 +633,14 @@ _launch_signature() {
   printf 'mode=adaptive_experiment\n'
   printf 'target_suites=%s\n' "${TARGET_SUITES}"
   printf 'presets=%s\n' "${PRESETS}"
+  printf 'profile_pool=%s\n' "${PROFILE_POOL}"
+  printf 'profile_learning_weight=%s\n' "${PROFILE_LEARNING_WEIGHT}"
+  printf 'semantic_objective_learning_weight=%s\n' "${SEMANTIC_OBJECTIVE_LEARNING_WEIGHT}"
+  printf 'enable_metamorphic_oracle=%s\n' "${ENABLE_METAMORPHIC_ORACLE}"
+  printf 'metamorphic_relation_learning_weight=%s\n' "${METAMORPHIC_RELATION_LEARNING_WEIGHT}"
+  printf 'metamorphic_relation_order=%s\n' "${METAMORPHIC_RELATION_ORDER}"
+  printf 'version_pair_pool=%s\n' "${VERSION_PAIR_POOL}"
+  printf 'version_pair_learning_weight=%s\n' "${VERSION_PAIR_LEARNING_WEIGHT}"
   printf 'seeds=%s\n' "${SEEDS}"
   printf 'batch_duration=%s\n' "${BATCH_DURATION}"
   printf 'jobs=%s\n' "${JOBS}"

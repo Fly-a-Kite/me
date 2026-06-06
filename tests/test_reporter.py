@@ -33,6 +33,135 @@ def _write_run(path, case_id):
     )
 
 
+def _polluted_signal_rows():
+    return [
+        {
+            "status": "bug",
+            "case": {"case_id": "resolved", "seed": 1, "program": {"operations": []}},
+            "case_index": 0,
+            "elapsed_s": 0.1,
+            "behavior_signature": "resolved",
+            "backend_status": {},
+            "quality_oracles": [],
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [
+                {
+                    "kind": "semantic_output_mismatch",
+                    "severity": "medium",
+                    "root_cause": "nan_inf_semantics",
+                    "triage_verdict": "expected_semantic_divergence",
+                    "suspicious_backends": ["duckdb"],
+                    "signature": "sig-resolved",
+                    "evidence": "expected backend semantic split",
+                }
+            ],
+        },
+        {
+            "status": "bug",
+            "case": {"case_id": "false-positive", "seed": 2, "program": {"operations": []}},
+            "case_index": 1,
+            "elapsed_s": 0.2,
+            "behavior_signature": "false-positive",
+            "backend_status": {},
+            "quality_oracles": [],
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [
+                {
+                    "kind": "semantic_output_mismatch",
+                    "severity": "medium",
+                    "root_cause": "order_only_normalization_mismatch",
+                    "triage_verdict": "normalizer_false_positive",
+                    "false_positive": True,
+                    "suspicious_backends": ["sqlite"],
+                    "signature": "sig-false-positive",
+                    "evidence": "normalizer artifact",
+                }
+            ],
+        },
+        {
+            "status": "bug",
+            "case": {"case_id": "source-issue", "seed": 3, "program": {"operations": []}},
+            "case_index": 2,
+            "elapsed_s": 0.3,
+            "behavior_signature": "source-issue",
+            "backend_status": {},
+            "quality_oracles": [],
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [
+                {
+                    "kind": "semantic_output_mismatch",
+                    "severity": "medium",
+                    "root_cause": "csv_long_numeric_roundtrip",
+                    "triage_verdict": "candidate_implementation_bug",
+                    "source_issue": "duckdb/duckdb#12345",
+                    "suspicious_backends": ["duckdb"],
+                    "signature": "sig-source-issue",
+                    "evidence": "known source issue",
+                }
+            ],
+        },
+        {
+            "status": "ok",
+            "case": {"case_id": "pure-behavior", "seed": 4, "program": {"operations": []}},
+            "case_index": 3,
+            "elapsed_s": 0.4,
+            "behavior_signature": "pure-behavior",
+            "backend_status": {},
+            "quality_oracles": [],
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [],
+        },
+        {
+            "status": "bug",
+            "case": {"case_id": "candidate", "seed": 5, "program": {"operations": []}},
+            "case_index": 4,
+            "elapsed_s": 0.5,
+            "behavior_signature": "candidate",
+            "backend_status": {},
+            "quality_oracles": [],
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [
+                {
+                    "kind": "semantic_output_mismatch",
+                    "severity": "high",
+                    "root_cause": "topk_filter_pushdown",
+                    "triage_verdict": "candidate_implementation_bug",
+                    "suspicious_backends": ["datafusion"],
+                    "signature": "sig-candidate",
+                    "evidence": "fresh candidate",
+                }
+            ],
+        },
+        {
+            "status": "bug",
+            "case": {"case_id": "semantic-needs-confirmation", "seed": 6, "program": {"operations": []}},
+            "case_index": 5,
+            "elapsed_s": 0.6,
+            "behavior_signature": "semantic-needs-confirmation",
+            "backend_status": {},
+            "quality_oracles": [],
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [
+                {
+                    "kind": "semantic_output_mismatch",
+                    "severity": "medium",
+                    "root_cause": "string_expression",
+                    "triage_verdict": "semantic_divergence_needs_confirmation",
+                    "suspicious_backends": ["sqlite"],
+                    "signature": "sig-semantic-needs-confirmation",
+                    "evidence": "needs semantic confirmation",
+                }
+            ],
+        },
+    ]
+
+
 def test_write_report_uses_run_stem_for_unique_artifact_names(tmp_path, monkeypatch):
     runs_dir = tmp_path / "runs"
     reports_dir = tmp_path / "reports"
@@ -126,6 +255,35 @@ def test_write_report_can_limit_findings_csv_rows(tmp_path, monkeypatch):
 
     assert "Findings CSV limit: 1" in md_path.read_text(encoding="utf-8")
     assert len(csv_path.read_text(encoding="utf-8").splitlines()) == 2
+
+
+def test_write_report_filters_non_rewardable_signal_new_behavior(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(reporter, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(reporter, "REPORTS_DIR", reports_dir)
+    run_file = runs_dir / "run-filtered-signal.jsonl.gz"
+    for row in _polluted_signal_rows():
+        append_jsonl(row, run_file)
+    dump_json(
+        {
+            "executed_cases": 99,
+            "new_behavior_cases": 99,
+            "signal_new_behavior_cases": 99,
+            "elapsed_s": 1.0,
+            "throughput_cases_s": 6.0,
+            "backends": [],
+            "targets": [],
+            "common_capabilities": [],
+        },
+        run_meta_path(run_file),
+    )
+
+    md_path, _ = reporter.write_report(run_file)
+    md_text = md_path.read_text(encoding="utf-8")
+
+    assert "- Raw new behavior cases: 6" in md_text
+    assert "- Signal new behavior cases: 3" in md_text
 
 
 def test_write_report_summarizes_adaptive_selection_telemetry(tmp_path, monkeypatch):
@@ -267,6 +425,68 @@ def test_write_experiment_summary_uses_manifest_stem(tmp_path, monkeypatch):
     assert int(aggregate_row["evidence_bytes"]) >= int(row["run_log_bytes"])
     assert float(aggregate_row["evidence_bytes_per_case"]) > 0.0
     assert "stage_total_case_wall_avg_ms" in aggregate_row
+
+
+def test_write_experiment_summary_filters_non_rewardable_signal_new_behavior(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    monkeypatch.setattr(reporter, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(reporter, "REPORTS_DIR", reports_dir)
+    run_file = runs_dir / "run-filtered-signal.jsonl.gz"
+    for row in _polluted_signal_rows():
+        append_jsonl(row, run_file)
+    dump_json(
+        {
+            "executed_cases": 99,
+            "new_behavior_cases": 99,
+            "signal_new_behavior_cases": 99,
+            "elapsed_s": 1.0,
+            "throughput_cases_s": 6.0,
+            "backends": [],
+            "targets": [],
+            "common_capabilities": [],
+        },
+        run_meta_path(run_file),
+    )
+    manifest = runs_dir / "experiment-filtered-signal.json"
+    dump_json(
+        {
+            "presets": ["baseline"],
+            "seeds": [1],
+            "backends": [],
+            "target_suite": "core",
+            "targets": [],
+            "common_capabilities": [],
+            "runs": [{"preset": "baseline", "seed": 1, "run_file": str(run_file), "report": ""}],
+        },
+        manifest,
+    )
+
+    _, csv_path = reporter.write_experiment_summary(manifest)
+    row = next(csv.DictReader(csv_path.open(encoding="utf-8")))
+    aggregate_csv = reports_dir / "experiment-summary-experiment-filtered-signal-aggregates.csv"
+    aggregate_row = next(csv.DictReader(aggregate_csv.open(encoding="utf-8")))
+
+    assert row["cases"] == "6"
+    assert row["new_behavior_cases"] == "6"
+    assert row["signal_new_behavior_cases"] == "3"
+    assert row["signal_new_behavior_rate"] == "0.5"
+    assert row["candidate_implementation_bug_count"] == "2"
+    assert row["rewardable_candidate_implementation_bug_count"] == "1"
+    assert row["candidate_bug_cases"] == "1"
+    assert row["candidate_bug_case_rate"] == str(1 / 6)
+    assert row["first_candidate_bug_case_index"] == "4"
+    assert row["first_candidate_bug_elapsed_s"] == "0.5"
+    assert row["candidate_bug_discovery_auc"] == str(1 / 3)
+    assert aggregate_row["new_behavior_cases"] == "6"
+    assert aggregate_row["signal_new_behavior_cases"] == "3"
+    assert aggregate_row["avg_signal_new_behavior_rate"] == "0.5"
+    assert aggregate_row["candidate_bug_cases"] == "1"
+    assert aggregate_row["candidate_bug_case_rate"] == str(1 / 6)
+    assert aggregate_row["candidate_bug_cases_per_s"] == "1.0"
+    assert aggregate_row["median_first_candidate_bug_case_index"] == "4.0"
+    assert aggregate_row["median_first_candidate_bug_elapsed_s"] == "0.5"
+    assert aggregate_row["avg_candidate_bug_discovery_auc"] == str(1 / 3)
 
 
 def test_write_experiment_summary_preserves_structured_experiment_metadata(tmp_path, monkeypatch):
@@ -1139,11 +1359,11 @@ def test_write_experiment_summary_includes_adaptive_schedule_fields(tmp_path, mo
     assert row["scheduler_stale_batches"] == "1"
     assert row["feedback_mutation_cases"] == "1"
     assert row["quality_pass_count"] == "3"
-    assert row["source_reward_adjustment_per_case"] == "0.4"
+    assert row["source_reward_adjustment_per_case"] == "0.5"
     assert row["feedback_operator_affinity_hit_rate"] == "0.0"
     assert aggregate_row["feedback_mutation_case_rate"] == "1.0"
     assert aggregate_row["quality_pass_rate"] == "1.0"
-    assert aggregate_row["seed_schedule_delta_per_case"] == "3.6"
+    assert aggregate_row["seed_schedule_delta_per_case"] == "3.75"
     assert aggregate_row["avg_scheduler_reward"] == "4.25"
     assert aggregate_row["avg_scheduler_reward_signal"] == "3.75"
     assert aggregate_row["avg_scheduler_mean_reward"] == "4.5"

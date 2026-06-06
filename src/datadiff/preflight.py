@@ -4,7 +4,7 @@ import copy
 from dataclasses import dataclass
 from typing import Any
 
-from datadiff.classification_oracle import validate_case_program
+from datadiff.case_validation import validate_case_program
 from datadiff.datagen import repair_operations
 from datadiff.dsl import Case, Program
 

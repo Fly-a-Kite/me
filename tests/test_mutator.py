@@ -8,6 +8,7 @@ from datadiff.mutator import (
     MUTATION_OPERATOR_NAMES,
     PROBE_MUTATION_OPERATOR_NAMES,
     ROOT_TARGETED_MUTATION_OPERATOR_NAMES,
+    SHRINK_MUTATION_OPERATOR_NAMES,
     SPECIALIZED_DISCOVERY_MUTATION_OPERATOR_NAMES,
     mutation_operator_profiles,
     _append_group_quantile_probe,
@@ -64,6 +65,26 @@ from datadiff.mutator import (
     mutate_case,
     mutate_case_with_metadata,
 )
+from datadiff.mutator_ir import (
+    apply_adjacent_independent_swap,
+    apply_filter_above_groupby,
+    apply_filter_pushdown,
+    apply_redundant_op_fold,
+    apply_subtree_splice,
+    apply_wrap_with_window,
+    legal_adjacent_swap_positions,
+    legal_filter_above_groupby_positions,
+    legal_filter_pushdown_positions,
+    legal_redundant_fold_positions,
+    legal_subtree_splice_positions,
+    legal_window_wrap_positions,
+)
+from datadiff.mutator_shrink import (
+    shrink_drop_tail_op,
+    shrink_fold_redundant_op,
+    shrink_inline_single_use_mutate,
+    shrink_merge_adjacent_filters,
+)
 
 
 def test_random_operation_can_mutate_string_only_available_columns():
@@ -117,12 +138,159 @@ def test_random_operation_can_append_date_part_for_date_like_string_column():
     assert any(expr["kind"] == "date_part" and expr["source"] == "dt" for expr in seen)
 
 
+def test_random_operation_can_append_bool_not_for_bool_only_available_columns():
+    table = TableData(
+        "t0",
+        [ColumnSpec("flag", "bool")],
+        [{"flag": True}, {"flag": None}, {"flag": False}],
+    )
+
+    seen = []
+    for seed in range(800):
+        op = _random_operation([table], [], random.Random(seed))
+        if op is not None and op["op"] == "mutate":
+            seen.append(op["expr"])
+
+    assert any(expr["kind"] == "bool_not" and expr["source"] == "flag" for expr in seen)
+
+
+def test_random_operation_can_append_numeric_string_cast_targets():
+    table = TableData(
+        "t0",
+        [ColumnSpec("num_s", "str")],
+        [{"num_s": "1"}, {"num_s": "-2"}, {"num_s": None}, {"num_s": "10"}],
+    )
+
+    cast_targets = set()
+    for seed in range(2400):
+        op = _random_operation([table], [], random.Random(seed))
+        if op is None or op["op"] != "mutate":
+            continue
+        expr = op["expr"]
+        if expr["kind"] == "cast" and expr.get("input_domain") == "integer_string":
+            cast_targets.add(expr["to"])
+
+    assert cast_targets == {"int", "float"}
+
+
+def test_random_operation_covers_high_risk_structural_ops():
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("row_nr", "int"),
+            ColumnSpec("id", "int"),
+            ColumnSpec("g", "str"),
+            ColumnSpec("x", "int"),
+            ColumnSpec("flag", "bool"),
+            ColumnSpec("s", "str"),
+        ],
+        [
+            {"row_nr": 0, "id": 0, "g": "a", "x": 1, "flag": True, "s": "Alpha"},
+            {"row_nr": 1, "id": 0, "g": " b ", "x": None, "flag": None, "s": ""},
+            {"row_nr": 2, "id": 1, "g": None, "x": -2, "flag": False, "s": "space value"},
+            {"row_nr": 3, "id": 1, "g": "space value", "x": 5, "flag": True, "s": "Beta"},
+        ],
+    )
+
+    target_ops = {"coalesce", "case_when", "row_number_filter", "running_sum", "fill_null", "distinct", "offset"}
+    seen_ops = set()
+
+    for seed in range(4000):
+        op = _random_operation([table], [], random.Random(seed))
+        if op is None or op["op"] not in target_ops:
+            continue
+        seen_ops.add(op["op"])
+        case = Case(f"case-random-op-{seed}", seed, [table], Program(f"prog-random-op-{seed}", seed, [op]))
+        assert validate_case_program(case) == []
+        if seen_ops == target_ops:
+            break
+
+    assert seen_ops == target_ops
+
+
+def test_random_operation_composes_derived_null_and_window_paths():
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("row_nr", "int"),
+            ColumnSpec("id", "int"),
+            ColumnSpec("g", "str"),
+            ColumnSpec("x", "int"),
+            ColumnSpec("y", "float"),
+            ColumnSpec("flag", "bool"),
+            ColumnSpec("s", "str"),
+        ],
+        [
+            {"row_nr": 0, "id": 0, "g": "a", "x": 1, "y": 0.5, "flag": True, "s": "Alpha"},
+            {"row_nr": 1, "id": 0, "g": None, "x": None, "y": None, "flag": None, "s": ""},
+            {"row_nr": 2, "id": 1, "g": "space value", "x": -2, "y": -1.5, "flag": False, "s": "Beta"},
+        ],
+    )
+    prefix_ops = [
+        {"op": "mutate", "column": "m_x", "expr": {"kind": "add_const", "source": "x", "value": 1}},
+        {"op": "coalesce", "columns": ["g", "s"], "as": "g_or_s", "fallback": "missing"},
+        {
+            "op": "case_when",
+            "as": "flag_bucket",
+            "condition": {"column": "flag", "cmp": "is_null", "value": None},
+            "then": "unknown",
+            "else": "known",
+        },
+    ]
+
+    seen = {
+        "filter_on_derived": False,
+        "case_when_on_derived": False,
+        "case_when_null_cmp": False,
+        "row_number_order_derived": False,
+        "running_sum_on_derived": False,
+    }
+
+    for seed in range(3000):
+        op = _random_operation([table], prefix_ops, random.Random(seed))
+        if op is None:
+            continue
+        case = Case(
+            f"case-random-composite-{seed}",
+            seed,
+            [table],
+            Program(f"prog-random-composite-{seed}", seed, [*prefix_ops, op]),
+        )
+        assert validate_case_program(case) == []
+        if op["op"] == "filter" and op.get("column") in {"m_x", "g_or_s", "flag_bucket"}:
+            seen["filter_on_derived"] = True
+        elif op["op"] == "case_when" and op.get("condition", {}).get("column") in {"m_x", "g_or_s", "flag_bucket"}:
+            seen["case_when_on_derived"] = True
+        elif op["op"] == "case_when" and op.get("condition", {}).get("cmp") in {"is_null", "is_not_null"}:
+            seen["case_when_null_cmp"] = True
+        elif op["op"] == "row_number_filter" and any(
+            key["column"] in {"m_x", "g_or_s", "flag_bucket"} for key in op.get("order_by", [])
+        ):
+            seen["row_number_order_derived"] = True
+        elif op["op"] == "running_sum" and op.get("source") == "m_x":
+            seen["running_sum_on_derived"] = True
+        if all(seen.values()):
+            break
+
+    assert all(seen.values()), seen
+
+
 def test_mutation_operator_profiles_expose_semantic_family_affinity_alias():
     profile = mutation_operator_profiles(allow_probe_operators=False)["append_left_join_case_membership"]
 
     assert "conditional_semantics" in profile.semantic_family_affinity
     assert profile.semantic_affinity == profile.semantic_family_affinity
     assert "cross_model_consistency" in profile.exploration_objective_affinity
+
+
+def test_mutation_operator_profiles_can_filter_shrink_mutations():
+    profiles = mutation_operator_profiles(
+        allow_probe_operators=False,
+        enable_shrink_mutations=False,
+    )
+
+    assert SHRINK_MUTATION_OPERATOR_NAMES
+    assert set(profiles).isdisjoint(SHRINK_MUTATION_OPERATOR_NAMES)
 
 
 def test_available_columns_are_deduplicated_after_overwrite_and_select():
@@ -142,6 +310,75 @@ def test_available_columns_are_deduplicated_after_overwrite_and_select():
     )
 
     assert available == ["g", "m_1"]
+
+
+def test_mutation_state_cache_reuses_schema_and_context(monkeypatch):
+    table = TableData(
+        "t0",
+        [ColumnSpec("x", "int"), ColumnSpec("g", "str")],
+        [{"x": 1, "g": "Alpha"}, {"x": None, "g": None}],
+    )
+    operations = [
+        {"op": "mutate", "column": "m_1", "expr": {"kind": "add_const", "source": "x", "value": 1}},
+        {"op": "select", "columns": ["g", "m_1"]},
+    ]
+
+    original = mutator_module.state_after_operations
+    calls = {"count": 0}
+
+    def counting_state_after_operations(*args, **kwargs):
+        calls["count"] += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(mutator_module, "state_after_operations", counting_state_after_operations)
+
+    mutator_module._available_columns([table], operations)
+    mutator_module._available_columns([table], operations)
+    assert calls["count"] == 2
+
+    calls["count"] = 0
+    cache = mutator_module._MutationStateCache()
+    with mutator_module._activate_mutation_state_cache(cache):
+        first = mutator_module._available_columns([table], operations)
+        second = mutator_module._available_columns([table], operations)
+        context = mutator_module._mutation_operation_context([table], operations)
+
+    assert first == ["g", "m_1"]
+    assert second == first
+    assert context is not None
+    assert context.available == ("g", "m_1")
+    assert calls["count"] == 1
+
+
+def test_mutation_state_cache_preserves_schema_results():
+    table = TableData(
+        "t0",
+        [ColumnSpec("x", "int"), ColumnSpec("g", "str")],
+        [{"x": 1, "g": "Alpha"}, {"x": None, "g": None}],
+    )
+    operations = [
+        {"op": "mutate", "column": "m_1", "expr": {"kind": "add_const", "source": "x", "value": 1}},
+        {
+            "op": "case_when",
+            "as": "bucket",
+            "condition": {"column": "g", "cmp": "is_null", "value": None},
+            "then": "missing",
+            "else": "present",
+        },
+        {"op": "select", "columns": ["m_1", "bucket"]},
+    ]
+
+    uncached = mutator_module._mutation_schema([table], operations)
+    with mutator_module._activate_mutation_state_cache(mutator_module._MutationStateCache()):
+        cached = mutator_module._mutation_schema([table], operations)
+        cached_again = mutator_module._mutation_schema([table], operations)
+
+    assert cached.columns == uncached.columns
+    assert cached.column_types == uncached.column_types
+    assert cached.nullable_columns == uncached.nullable_columns
+    assert cached_again.columns == uncached.columns
+    assert cached_again.column_types == uncached.column_types
+    assert cached_again.nullable_columns == uncached.nullable_columns
 
 
 def test_mutate_case_with_metadata_records_lineage_and_operator():
@@ -168,6 +405,59 @@ def test_mutate_case_with_metadata_records_lineage_and_operator():
     assert isinstance(result.metadata["mutation"]["detail"], str)
     assert isinstance(result.metadata["mutation"]["changed"], bool)
     assert isinstance(mutate_case(base, 100), Case)
+
+
+def test_mutate_case_with_metadata_records_value_catalog_entries(monkeypatch):
+    base = Case(
+        "case-base",
+        10,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": None}])],
+        Program("prog-base", 10, [{"op": "limit", "n": 1}]),
+    )
+    monkeypatch.setattr(mutator_module, "VALUE_CATALOG_SAMPLE_PROBABILITY", 1.0)
+    monkeypatch.setattr(
+        mutator_module,
+        "MUTATION_OPERATORS",
+        (mutator_module.MutationOperator("value", mutator_module._mutate_scalar_value),),
+    )
+
+    result = mutate_case_with_metadata(
+        base,
+        99,
+        value_catalog_scores={"int.zero": 6.0},
+    )
+
+    entries = result.metadata["mutation"]["value_catalog_entries"]
+    assert entries
+    assert entries[0]["entry_id"].startswith("int.")
+    assert entries[0]["column"] == "x"
+    assert entries[0]["source_root_cause"]
+    assert result.metadata["mutation"]["detail"].startswith("value_catalog:")
+
+
+def test_mutate_case_can_disable_value_catalog_sampling(monkeypatch):
+    base = Case(
+        "case-base",
+        10,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": None}])],
+        Program("prog-base", 10, [{"op": "limit", "n": 1}]),
+    )
+    monkeypatch.setattr(mutator_module, "VALUE_CATALOG_SAMPLE_PROBABILITY", 1.0)
+    monkeypatch.setattr(
+        mutator_module,
+        "MUTATION_OPERATORS",
+        (mutator_module.MutationOperator("value", mutator_module._mutate_scalar_value),),
+    )
+
+    result = mutate_case_with_metadata(
+        base,
+        99,
+        enable_value_catalog=False,
+        value_catalog_scores={"int.zero": 6.0},
+    )
+
+    assert result.metadata["mutation"]["value_catalog_entries"] == []
+    assert result.metadata["mutation"]["detail"].startswith("value:int:")
 
 
 def test_mutate_case_with_metadata_retries_unproductive_operator(monkeypatch):
@@ -237,6 +527,229 @@ def test_mutate_case_prioritizes_operator_scores(monkeypatch):
     assert result.case.tables[0].rows[0]["x"] == 99
 
 
+def test_mutate_case_prioritizes_divergence_affine_operator(monkeypatch):
+    base = Case(
+        "case-base",
+        10,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-base", 10, [{"op": "limit", "n": 1}]),
+    )
+
+    def neutral(tables, operations, rnd):
+        del operations, rnd
+        tables[0].rows[0]["x"] = -1
+        return "neutral:x"
+
+    def numeric(tables, operations, rnd):
+        del operations, rnd
+        tables[0].rows[0]["x"] = 99
+        return "numeric:x"
+
+    monkeypatch.setattr(
+        mutator_module,
+        "MUTATION_OPERATORS",
+        (
+            mutator_module.MutationOperator("neutral", neutral),
+            mutator_module.MutationOperator(
+                "numeric",
+                numeric,
+                divergence_affinity=("disagree_class:numeric",),
+            ),
+        ),
+    )
+
+    result = mutate_case_with_metadata(
+        base,
+        99,
+        disagreement={
+            "column_classes": {"x": "numeric"},
+            "mismatch_class": "value",
+        },
+    )
+
+    assert result.metadata["mutation"]["operator"] == "numeric"
+    assert result.case.tables[0].rows[0]["x"] == 99
+    assert result.metadata["mutation_plan"]["steps"][0]["divergence_affinity"] > 0.0
+
+
+def test_mutate_case_can_ablate_divergence_conditioned_affinity(monkeypatch):
+    base = Case(
+        "case-base",
+        10,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-base", 10, [{"op": "limit", "n": 1}]),
+    )
+
+    def numeric(tables, operations, rnd):
+        del operations, rnd
+        tables[0].rows[0]["x"] = 99
+        return "numeric:x"
+
+    monkeypatch.setattr(
+        mutator_module,
+        "MUTATION_OPERATORS",
+        (
+            mutator_module.MutationOperator(
+                "numeric",
+                numeric,
+                divergence_affinity=("disagree_class:numeric",),
+            ),
+        ),
+    )
+
+    result = mutate_case_with_metadata(
+        base,
+        99,
+        disagreement={
+            "column_classes": {"x": "numeric"},
+            "mismatch_class": "value",
+        },
+        enable_divergence_conditioned_mutations=False,
+    )
+
+    assert result.metadata["mutation"]["operator"] == "numeric"
+    assert result.metadata["mutation_plan"]["steps"][0]["divergence_affinity"] == 0.0
+
+
+def test_mutate_case_uses_operator_energy_for_candidate_width(monkeypatch):
+    base = Case(
+        "case-base",
+        10,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-base", 10, [{"op": "limit", "n": 1}]),
+    )
+
+    call_counts = {"cold": 0, "hot": 0}
+
+    def cold(tables, operations, rnd):
+        del operations, rnd
+        call_counts["cold"] += 1
+        tables[0].rows[0]["x"] = 10 + call_counts["cold"]
+        return f"cold:{call_counts['cold']}"
+
+    def hot(tables, operations, rnd):
+        del operations, rnd
+        call_counts["hot"] += 1
+        tables[0].rows[0]["x"] = -10
+        return "hot:x"
+
+    monkeypatch.setattr(
+        mutator_module,
+        "MUTATION_OPERATORS",
+        (
+            mutator_module.MutationOperator("cold", cold),
+            mutator_module.MutationOperator("hot", hot),
+        ),
+    )
+
+    result = mutate_case_with_metadata(
+        base,
+        99,
+        operator_scores={"cold": 3.0, "hot": 0.0},
+        operator_pulls={"hot": 20},
+        recent_operator_pulls={"hot": 8},
+    )
+
+    assert result.metadata["mutation"]["operator"] == "cold"
+    assert call_counts["cold"] > 1
+    assert result.metadata["mutation_plan"]["steps"][0]["candidate_width"] > 1
+
+
+def test_mutate_case_can_disable_operator_energy_candidate_width(monkeypatch):
+    base = Case(
+        "case-base",
+        10,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-base", 10, [{"op": "limit", "n": 1}]),
+    )
+
+    call_counts = {"cold": 0, "hot": 0}
+
+    def cold(tables, operations, rnd):
+        del operations, rnd
+        call_counts["cold"] += 1
+        tables[0].rows[0]["x"] = 10 + call_counts["cold"]
+        return f"cold:{call_counts['cold']}"
+
+    def hot(tables, operations, rnd):
+        del operations, rnd
+        call_counts["hot"] += 1
+        tables[0].rows[0]["x"] = -10
+        return "hot:x"
+
+    monkeypatch.setattr(
+        mutator_module,
+        "MUTATION_OPERATORS",
+        (
+            mutator_module.MutationOperator("cold", cold),
+            mutator_module.MutationOperator("hot", hot),
+        ),
+    )
+
+    result = mutate_case_with_metadata(
+        base,
+        99,
+        operator_scores={"cold": 3.0, "hot": 0.0},
+        operator_pulls={"hot": 20},
+        recent_operator_pulls={"hot": 8},
+        enable_per_operator_energy=False,
+    )
+
+    assert result.metadata["mutation"]["operator"] == "cold"
+    assert result.metadata["mutation_plan"]["steps"][0]["candidate_width"] == 1
+
+
+def test_mutate_case_can_disable_ir_rewrite_mutations(monkeypatch):
+    base = Case(
+        "case-base",
+        10,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-base", 10, [{"op": "limit", "n": 1}]),
+    )
+    calls = {"ir": 0, "plain": 0}
+
+    def ir_rewrite(tables, operations, rnd):
+        del tables, operations, rnd
+        calls["ir"] += 1
+        return "ir_swap_adjacent:test"
+
+    def plain(tables, operations, rnd):
+        del operations, rnd
+        calls["plain"] += 1
+        tables[0].rows[0]["x"] = 2
+        return "plain:value"
+
+    monkeypatch.setattr(
+        mutator_module,
+        "MUTATION_OPERATORS",
+        (
+            mutator_module.MutationOperator("ir_swap_adjacent", ir_rewrite),
+            mutator_module.MutationOperator("plain", plain),
+        ),
+    )
+
+    result = mutate_case_with_metadata(
+        base,
+        99,
+        operator_scores={"ir_swap_adjacent": 10.0, "plain": 1.0, "__untried__": -10.0},
+        enable_ir_rewrite_mutations=False,
+    )
+
+    assert result.metadata["mutation"]["operator"] == "plain"
+    assert calls["ir"] == 0
+    assert calls["plain"] > 0
+    profiles = mutation_operator_profiles(
+        allow_probe_operators=False,
+        enable_ir_rewrite_mutations=False,
+    )
+    assert "ir_swap_adjacent" not in profiles
+    assert "ir_pushdown_filter" not in profiles
+    assert "ir_pull_filter_above_groupby" not in profiles
+    assert "ir_wrap_with_window" not in profiles
+    assert "ir_splice_subtree" not in profiles
+    assert "ir_fold_redundant_op" not in profiles
+
+
 def test_mutate_case_uses_untried_operator_score(monkeypatch):
     base = Case(
         "case-base",
@@ -302,11 +815,456 @@ def test_mutate_case_with_metadata_does_not_mutate_original_inputs(monkeypatch):
     assert base.metadata["source_issue_alt"]["tags"] == ["alpha", "beta"]
 
 
+def test_ir_adjacent_swap_reorders_independent_local_operations_and_preserves_validity():
+    table = TableData(
+        "t0",
+        [ColumnSpec("x", "int"), ColumnSpec("y", "int")],
+        [{"x": 1, "y": 2}, {"x": 3, "y": 4}],
+    )
+    operations = [
+        {"op": "filter", "column": "x", "cmp": ">=", "value": 1},
+        {"op": "sort", "keys": [{"column": "y", "ascending": True, "nulls": "last"}]},
+        {"op": "limit", "n": 2},
+    ]
+
+    assert legal_adjacent_swap_positions([table], operations) == [0, 1]
+    detail = apply_adjacent_independent_swap([table], operations, random.Random(1))
+
+    assert detail.startswith("ir_swap_adjacent:")
+    assert operations != [
+        {"op": "filter", "column": "x", "cmp": ">=", "value": 1},
+        {"op": "sort", "keys": [{"column": "y", "ascending": True, "nulls": "last"}]},
+        {"op": "limit", "n": 2},
+    ]
+    case = Case("case-ir-swap", 1, [table], Program("prog-ir-swap", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_ir_adjacent_swap_respects_barriers_and_dependencies():
+    table = TableData(
+        "t0",
+        [ColumnSpec("x", "int"), ColumnSpec("y", "int")],
+        [{"x": 1, "y": 2}, {"x": 3, "y": 4}],
+    )
+    grouped = [
+        {"op": "filter", "column": "x", "cmp": ">=", "value": 1},
+        {"op": "groupby", "keys": ["x"], "aggs": [{"column": "y", "func": "sum", "as": "sum_y"}]},
+        {"op": "filter", "column": "sum_y", "cmp": ">=", "value": 0},
+    ]
+
+    assert legal_adjacent_swap_positions([table], grouped) == []
+    assert apply_adjacent_independent_swap([table], grouped, random.Random(1)) == "ir_swap_adjacent:no-legal-position"
+
+
+def test_mutate_case_can_select_ir_adjacent_swap_operator():
+    base = Case(
+        "case-ir-swap-base",
+        10,
+        [TableData("t0", [ColumnSpec("x", "int"), ColumnSpec("y", "int")], [{"x": 1, "y": 2}, {"x": 3, "y": 4}])],
+        Program(
+            "prog-ir-swap-base",
+            10,
+            [
+                {"op": "filter", "column": "x", "cmp": ">=", "value": 1},
+                {"op": "sort", "keys": [{"column": "y", "ascending": True, "nulls": "last"}]},
+                {"op": "limit", "n": 2},
+            ],
+        ),
+    )
+
+    result = mutate_case_with_metadata(
+        base,
+        99,
+        operator_scores={"ir_swap_adjacent": 5.0, "__untried__": -5.0},
+        allow_probe_operators=False,
+    )
+
+    assert result.metadata["mutation"]["operator"] == "ir_swap_adjacent"
+    assert result.metadata["mutation"]["detail"].startswith("ir_swap_adjacent:")
+    assert result.case.program.operations != base.program.operations
+    assert validate_case_program(result.case) == []
+
+
+def test_ir_filter_pushdown_moves_filter_before_join_when_left_columns_are_available():
+    left = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int")],
+        [{"id": 1, "x": 10}, {"id": 2, "x": -1}],
+    )
+    right = TableData(
+        "t1",
+        [ColumnSpec("id", "int"), ColumnSpec("tag", "str")],
+        [{"id": 1, "tag": "a"}, {"id": 2, "tag": "b"}],
+    )
+    operations = [
+        {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+        {"op": "filter", "column": "x", "cmp": ">=", "value": 0},
+        {"op": "sort", "keys": [{"column": "tag", "ascending": True, "nulls": "last"}]},
+    ]
+
+    assert legal_filter_pushdown_positions([left, right], operations) == [1]
+    detail = apply_filter_pushdown([left, right], operations, random.Random(1))
+
+    assert detail == "ir_pushdown_filter:1:join:filter[x]"
+    assert operations[:2] == [
+        {"op": "filter", "column": "x", "cmp": ">=", "value": 0},
+        {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+    ]
+    case = Case("case-ir-pushdown", 1, [left, right], Program("prog-ir-pushdown", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_ir_filter_pushdown_respects_join_and_mutate_dependencies():
+    left = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int")],
+        [{"id": 1, "x": 10}, {"id": 2, "x": -1}],
+    )
+    right = TableData(
+        "t1",
+        [ColumnSpec("id", "int"), ColumnSpec("tag", "str")],
+        [{"id": 1, "tag": "a"}, {"id": 2, "tag": "b"}],
+    )
+    right_column_filter = [
+        {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+        {"op": "filter", "column": "tag", "cmp": "==", "value": "a"},
+    ]
+    derived_column_filter = [
+        {"op": "mutate", "column": "m_x", "expr": {"kind": "add_const", "source": "x", "value": 1}},
+        {"op": "filter", "column": "m_x", "cmp": ">=", "value": 0},
+    ]
+
+    assert legal_filter_pushdown_positions([left, right], right_column_filter) == []
+    assert apply_filter_pushdown([left, right], right_column_filter, random.Random(1)) == (
+        "ir_pushdown_filter:no-legal-position"
+    )
+    assert legal_filter_pushdown_positions([left], derived_column_filter) == []
+    assert apply_filter_pushdown([left], derived_column_filter, random.Random(1)) == (
+        "ir_pushdown_filter:no-legal-position"
+    )
+
+
+def test_mutate_case_can_select_ir_filter_pushdown_operator():
+    left = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int")],
+        [{"id": 1, "x": 10}, {"id": 2, "x": -1}],
+    )
+    right = TableData(
+        "t1",
+        [ColumnSpec("id", "int"), ColumnSpec("tag", "str")],
+        [{"id": 1, "tag": "a"}, {"id": 2, "tag": "b"}],
+    )
+    base = Case(
+        "case-ir-pushdown-base",
+        10,
+        [left, right],
+        Program(
+            "prog-ir-pushdown-base",
+            10,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+                {"op": "filter", "column": "x", "cmp": ">=", "value": 0},
+                {"op": "sort", "keys": [{"column": "tag", "ascending": True, "nulls": "last"}]},
+            ],
+        ),
+    )
+
+    result = mutate_case_with_metadata(
+        base,
+        99,
+        operator_scores={"ir_pushdown_filter": 5.0, "__untried__": -5.0},
+        allow_probe_operators=False,
+    )
+
+    assert result.metadata["mutation"]["operator"] == "ir_pushdown_filter"
+    assert result.metadata["mutation"]["detail"].startswith("ir_pushdown_filter:")
+    assert result.case.program.operations != base.program.operations
+    assert validate_case_program(result.case) == []
+
+
+def test_ir_pull_filter_above_groupby_rewrites_having_like_filter_to_source_column():
+    table = TableData(
+        "t0",
+        [ColumnSpec("g", "str"), ColumnSpec("x", "int")],
+        [{"g": "a", "x": 1}, {"g": "a", "x": 2}, {"g": "b", "x": 5}],
+    )
+    operations = [
+        {"op": "groupby", "keys": ["g"], "aggs": [{"column": "x", "func": "sum", "as": "sum_x"}]},
+        {"op": "filter", "column": "sum_x", "cmp": ">=", "value": 3},
+        {"op": "sort", "columns": ["g"], "ascending": True},
+    ]
+
+    assert legal_filter_above_groupby_positions([table], operations) == [0]
+    detail = apply_filter_above_groupby([table], operations, random.Random(1))
+
+    assert detail == "ir_pull_filter_above_groupby:0:x"
+    assert operations[:2] == [
+        {"op": "filter", "column": "x", "cmp": ">=", "value": 3},
+        {"op": "groupby", "keys": ["g"], "aggs": [{"column": "x", "func": "sum", "as": "sum_x"}]},
+    ]
+    case = Case("case-ir-groupby-pull", 1, [table], Program("prog-ir-groupby-pull", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_mutate_case_can_select_ir_pull_filter_above_groupby_operator():
+    table = TableData(
+        "t0",
+        [ColumnSpec("g", "str"), ColumnSpec("x", "int")],
+        [{"g": "a", "x": 1}, {"g": "a", "x": 2}, {"g": "b", "x": 5}],
+    )
+    base = Case(
+        "case-ir-groupby-pull-base",
+        10,
+        [table],
+        Program(
+            "prog-ir-groupby-pull-base",
+            10,
+            [
+                {"op": "groupby", "keys": ["g"], "aggs": [{"column": "x", "func": "sum", "as": "sum_x"}]},
+                {"op": "filter", "column": "sum_x", "cmp": ">=", "value": 3},
+            ],
+        ),
+    )
+
+    result = mutate_case_with_metadata(
+        base,
+        99,
+        operator_scores={"ir_pull_filter_above_groupby": 5.0, "__untried__": -5.0},
+        allow_probe_operators=False,
+    )
+
+    assert result.metadata["mutation"]["operator"] == "ir_pull_filter_above_groupby"
+    assert result.metadata["mutation"]["detail"].startswith("ir_pull_filter_above_groupby:")
+    assert result.case.program.operations != base.program.operations
+    assert validate_case_program(result.case) == []
+
+
+def test_ir_wrap_with_window_inserts_valid_core_window_operation():
+    table = TableData(
+        "t0",
+        [ColumnSpec("g", "str"), ColumnSpec("x", "int"), ColumnSpec("y", "int")],
+        [{"g": "a", "x": 1, "y": 10}, {"g": "b", "x": 2, "y": 20}],
+    )
+    operations = [{"op": "filter", "column": "x", "cmp": ">=", "value": 1}]
+
+    assert legal_window_wrap_positions([table], operations)
+    detail = apply_wrap_with_window([table], operations, random.Random(1))
+
+    assert detail.startswith("ir_wrap_with_window:")
+    assert any(op["op"] in {"running_sum", "row_number_filter"} for op in operations)
+    case = Case("case-ir-window-wrap", 1, [table], Program("prog-ir-window-wrap", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_mutate_case_can_select_ir_wrap_with_window_operator():
+    table = TableData(
+        "t0",
+        [ColumnSpec("g", "str"), ColumnSpec("x", "int"), ColumnSpec("y", "int")],
+        [{"g": "a", "x": 1, "y": 10}, {"g": "b", "x": 2, "y": 20}],
+    )
+    base = Case(
+        "case-ir-window-wrap-base",
+        10,
+        [table],
+        Program("prog-ir-window-wrap-base", 10, [{"op": "filter", "column": "x", "cmp": ">=", "value": 1}]),
+    )
+
+    result = mutate_case_with_metadata(
+        base,
+        99,
+        operator_scores={"ir_wrap_with_window": 5.0, "__untried__": -5.0},
+        allow_probe_operators=False,
+    )
+
+    assert result.metadata["mutation"]["operator"] == "ir_wrap_with_window"
+    assert result.metadata["mutation"]["detail"].startswith("ir_wrap_with_window:")
+    assert result.case.program.operations != base.program.operations
+    assert validate_case_program(result.case) == []
+
+
+def test_ir_subtree_splice_moves_local_operation_subtree_to_legal_position():
+    table = TableData(
+        "t0",
+        [ColumnSpec("x", "int"), ColumnSpec("y", "int")],
+        [{"x": 1, "y": 10}, {"x": 2, "y": 20}],
+    )
+    operations = [
+        {"op": "filter", "column": "x", "cmp": ">=", "value": 1},
+        {"op": "sort", "columns": ["y"], "ascending": True},
+        {"op": "limit", "n": 2},
+    ]
+
+    positions = legal_subtree_splice_positions([table], operations)
+    assert positions
+
+    detail = apply_subtree_splice([table], operations, random.Random(3))
+
+    assert detail.startswith("ir_splice_subtree:")
+    assert operations != [
+        {"op": "filter", "column": "x", "cmp": ">=", "value": 1},
+        {"op": "sort", "columns": ["y"], "ascending": True},
+        {"op": "limit", "n": 2},
+    ]
+    case = Case("case-ir-splice", 1, [table], Program("prog-ir-splice", 1, operations))
+    assert validate_case_program(case) == []
+
+
+def test_mutate_case_can_select_ir_subtree_splice_operator():
+    table = TableData(
+        "t0",
+        [ColumnSpec("x", "int"), ColumnSpec("y", "int")],
+        [{"x": 1, "y": 10}, {"x": 2, "y": 20}],
+    )
+    base = Case(
+        "case-ir-splice-base",
+        10,
+        [table],
+        Program(
+            "prog-ir-splice-base",
+            10,
+            [
+                {"op": "filter", "column": "x", "cmp": ">=", "value": 1},
+                {"op": "sort", "columns": ["y"], "ascending": True},
+                {"op": "limit", "n": 2},
+            ],
+        ),
+    )
+
+    result = mutate_case_with_metadata(
+        base,
+        99,
+        operator_scores={"ir_splice_subtree": 5.0, "__untried__": -5.0},
+        allow_probe_operators=False,
+    )
+
+    assert result.metadata["mutation"]["operator"] == "ir_splice_subtree"
+    assert result.metadata["mutation"]["detail"].startswith("ir_splice_subtree:")
+    assert result.case.program.operations != base.program.operations
+    assert validate_case_program(result.case) == []
+
+
+def test_ir_redundant_fold_merges_adjacent_idempotent_operations():
+    table = TableData("t0", [ColumnSpec("x", "int"), ColumnSpec("y", "int")], [{"x": 1, "y": 2}])
+    operations = [
+        {"op": "select", "columns": ["x", "y"]},
+        {"op": "select", "columns": ["x"]},
+        {"op": "limit", "n": 10},
+        {"op": "limit", "n": 3},
+    ]
+
+    assert legal_redundant_fold_positions([table], operations) == [0, 2]
+    select_detail = apply_redundant_op_fold([table], operations, random.Random(1))
+    limit_detail = apply_redundant_op_fold([table], operations, random.Random(1))
+
+    assert select_detail == "ir_fold_redundant_op:0:select+select"
+    assert limit_detail == "ir_fold_redundant_op:1:limit+limit"
+    assert operations == [
+        {"op": "select", "columns": ["x"]},
+        {"op": "limit", "n": 3},
+    ]
+
+
+def test_mutate_case_can_select_ir_redundant_fold_operator():
+    table = TableData("t0", [ColumnSpec("x", "int"), ColumnSpec("y", "int")], [{"x": 1, "y": 2}])
+    base = Case(
+        "case-ir-fold-base",
+        10,
+        [table],
+        Program(
+            "prog-ir-fold-base",
+            10,
+            [
+                {"op": "select", "columns": ["x", "y"]},
+                {"op": "select", "columns": ["x"]},
+                {"op": "limit", "n": 10},
+            ],
+        ),
+    )
+
+    result = mutate_case_with_metadata(
+        base,
+        99,
+        operator_scores={"ir_fold_redundant_op": 5.0, "__untried__": -5.0},
+        allow_probe_operators=False,
+    )
+
+    assert result.metadata["mutation"]["operator"] == "ir_fold_redundant_op"
+    assert result.metadata["mutation"]["detail"].startswith("ir_fold_redundant_op:")
+    assert result.case.program.operations != base.program.operations
+    assert validate_case_program(result.case) == []
+
+
 def test_fallback_column_type_treats_probe_outputs_as_boolean():
     assert _fallback_column_type("unexpected_else_seen") == "bool"
     assert _fallback_column_type("sorted_ok_x") == "bool"
     assert _fallback_column_type("setop_all_duplicate_mismatch") == "bool"
     assert _fallback_column_type("rolling_mean_by_null_count_mismatch_1") == "bool"
+
+
+def test_shrink_mutators_fold_redundant_operations():
+    table = TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}, {"x": 2}])
+    operations = [
+        {"op": "sort", "columns": ["x"], "ascending": True},
+        {"op": "sort", "columns": ["x"], "ascending": False},
+        {"op": "limit", "n": 10},
+        {"op": "limit", "n": 3},
+    ]
+
+    sort_detail = shrink_fold_redundant_op([table], operations, random.Random(1))
+    limit_detail = shrink_fold_redundant_op([table], operations, random.Random(1))
+
+    assert sort_detail == "shrink_fold_redundant_op:sort:sort"
+    assert limit_detail == "shrink_fold_redundant_op:limit"
+    assert operations == [
+        {"op": "sort", "columns": ["x"], "ascending": False},
+        {"op": "limit", "n": 3},
+    ]
+
+
+def test_shrink_mutators_merge_filters_and_drop_tail():
+    table = TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}, {"x": 2}])
+    operations = [
+        {"op": "filter", "column": "x", "cmp": "range_closed", "value": [0, 10]},
+        {"op": "filter", "column": "x", "cmp": "range_closed", "value": [2, 8]},
+        {"op": "select", "columns": ["x"]},
+    ]
+
+    merge_detail = shrink_merge_adjacent_filters([table], operations, random.Random(1))
+    drop_detail = shrink_drop_tail_op([table], operations, random.Random(1))
+
+    assert merge_detail == "shrink_merge_adjacent_filters:range_closed"
+    assert operations[0] == {"op": "filter", "column": "x", "cmp": "range_closed", "value": [2, 8]}
+    assert drop_detail == "shrink_drop_tail_op:select"
+    assert len(operations) == 1
+
+
+def test_shrink_mutator_inlines_single_use_mutate_alias():
+    table = TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}, {"x": 2}])
+    operations = [
+        {"op": "mutate", "column": "m_x", "expr": {"kind": "add_const", "source": "x", "value": 1}},
+        {"op": "filter", "column": "m_x", "cmp": ">=", "value": 0},
+        {"op": "select", "columns": ["x"]},
+    ]
+
+    detail = shrink_inline_single_use_mutate([table], operations, random.Random(1))
+
+    assert detail == "shrink_inline_single_use_mutate:m_x->x"
+    assert operations[0] == {"op": "filter", "column": "x", "cmp": ">=", "value": 0}
+    assert all(op.get("op") != "mutate" for op in operations)
+
+
+def test_shrink_mutator_inlines_alias_inside_select_columns():
+    table = TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}, {"x": 2}])
+    operations = [
+        {"op": "mutate", "column": "m_x", "expr": {"kind": "add_const", "source": "x", "value": 1}},
+        {"op": "select", "columns": ["m_x"]},
+    ]
+
+    detail = shrink_inline_single_use_mutate([table], operations, random.Random(1))
+
+    assert detail == "shrink_inline_single_use_mutate:m_x->x"
+    assert operations == [{"op": "select", "columns": ["x"]}]
 
 
 def test_mutate_case_preserves_issue_profile_metadata_for_guidance():
@@ -354,6 +1312,25 @@ def test_mutate_case_can_exclude_probe_append_operators():
 def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert {"value", "nullify_value", "duplicate_row", "drop_row", "shuffle_rows"}.issubset(MUTATION_OPERATOR_NAMES)
     assert {"append_op", "drop_op", "tweak_op"}.issubset(MUTATION_OPERATOR_NAMES)
+    assert {
+        "ir_swap_adjacent",
+        "ir_pushdown_filter",
+        "ir_pull_filter_above_groupby",
+        "ir_wrap_with_window",
+        "ir_splice_subtree",
+        "ir_fold_redundant_op",
+        "shrink_drop_tail_op",
+        "shrink_fold_redundant_op",
+        "shrink_merge_adjacent_filters",
+        "shrink_inline_single_use_mutate",
+    }.issubset(MUTATION_OPERATOR_NAMES)
+    assert "ir_swap_adjacent" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "ir_pushdown_filter" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "ir_pull_filter_above_groupby" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "ir_wrap_with_window" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "ir_splice_subtree" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "ir_fold_redundant_op" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "shrink_fold_redundant_op" in DISCOVERY_MUTATION_OPERATOR_NAMES
     assert "append_order_projection" in MUTATION_OPERATOR_NAMES
     assert "append_truth_filter" in MUTATION_OPERATOR_NAMES
     assert "append_boolean_predicate_filter" in MUTATION_OPERATOR_NAMES

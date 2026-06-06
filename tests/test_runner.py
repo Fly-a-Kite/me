@@ -1,9 +1,11 @@
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from datadiff.config import ExperimentConfig
+from datadiff.champion_corpus import ChampionRegistry
 from datadiff.datagen import COMMON_API_WORKFLOW_TEMPLATES, generate_case
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.normalizer import NormalizedResult
@@ -86,6 +88,98 @@ def test_guidance_summary_includes_resolved_semantic_boundary_penalty():
     assert summary["family_diversity_guard_active"] == 1.0
 
 
+def test_select_adaptive_action_uses_choose_dense_for_best_action():
+    calls: list[tuple[str, str, tuple[str, ...]]] = []
+
+    class FakeLearning:
+        def __init__(self):
+            self.bandits = {
+                "semantic_objective": SimpleNamespace(
+                    arms={
+                        "objective_a": SimpleNamespace(pulls=3),
+                        "objective_b": SimpleNamespace(pulls=5),
+                    }
+                )
+            }
+
+        def choose_dense(self, scope, action_ids, **kwargs):
+            calls.append(("choose_dense", scope, tuple(action_ids)))
+            return SimpleNamespace(action_id="objective_b")
+
+        def rank_top(self, scope, action_ids, *, limit, **kwargs):
+            calls.append(("rank_top", scope, tuple(action_ids)))
+            assert limit == 8
+            return [
+                {"action_id": "objective_a", "score": 9.0},
+                {"action_id": "objective_b", "score": 8.0},
+            ]
+
+    feedback = SimpleNamespace(adaptive_learning=FakeLearning())
+
+    action, selection = runner_module._select_adaptive_action(
+        feedback,
+        scope="semantic_objective",
+        action_pool=("objective_a", "objective_b"),
+        context_features=("family:agg",),
+        version_id="latest->fixed",
+        learning_weight=1.0,
+        enabled=True,
+    )
+
+    assert action == "objective_b"
+    assert selection["action"] == "objective_b"
+    assert [row["action_id"] for row in selection["ranked"]] == ["objective_a", "objective_b"]
+    assert calls == [
+        ("choose_dense", "semantic_objective", ("objective_a", "objective_b")),
+        ("rank_top", "semantic_objective", ("objective_a", "objective_b")),
+    ]
+
+
+def test_select_generator_profile_uses_choose_dense_for_best_profile():
+    calls: list[tuple[str, str, tuple[str, ...]]] = []
+
+    class FakeLearning:
+        def __init__(self):
+            self.bandits = {
+                "generator_profile": SimpleNamespace(
+                    arms={
+                        "common": SimpleNamespace(pulls=4),
+                        "discovery_fresh": SimpleNamespace(pulls=6),
+                    }
+                )
+            }
+
+        def choose_dense(self, scope, action_ids, **kwargs):
+            calls.append(("choose_dense", scope, tuple(action_ids)))
+            return SimpleNamespace(action_id="discovery_fresh")
+
+        def rank_top(self, scope, action_ids, *, limit, **kwargs):
+            calls.append(("rank_top", scope, tuple(action_ids)))
+            assert limit == 8
+            return [
+                {"action_id": "common", "score": 7.0},
+                {"action_id": "discovery_fresh", "score": 6.5},
+            ]
+
+    feedback = SimpleNamespace(adaptive_learning=FakeLearning())
+
+    profile, selection = runner_module._select_generator_profile(
+        feedback,
+        ("common", "discovery_fresh"),
+        context_features=("backend:pandas",),
+        learning_weight=1.0,
+        pool_metadata={"capability_aware": True},
+    )
+
+    assert profile == "discovery_fresh"
+    assert selection["profile"] == "discovery_fresh"
+    assert [row["action_id"] for row in selection["ranked"]] == ["common", "discovery_fresh"]
+    assert calls == [
+        ("choose_dense", "generator_profile", ("common", "discovery_fresh")),
+        ("rank_top", "generator_profile", ("common", "discovery_fresh")),
+    ]
+
+
 @pytest.mark.skipif(
     any(name != "sqlite" and importlib.util.find_spec(name) is None for name in REQUIRED_BACKENDS),
     reason="data backends are not installed",
@@ -107,6 +201,37 @@ def test_run_loaded_case_smoke():
         "total_case_wall_ms",
     }
     assert row["stage_profile"]["total_case_wall_ms"] >= row["stage_profile"]["backend_execution_ms"]
+
+
+def test_runner_execute_case_passes_parallel_execution_config(monkeypatch):
+    case = Case(
+        "case-parallel-config",
+        91,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-parallel-config", 91, []),
+    )
+    captured: dict[str, object] = {}
+
+    def fake_execute_case_impl(case_arg, backends_arg, config_arg, **kwargs):
+        captured["case_id"] = case_arg.case_id
+        captured["backends"] = list(backends_arg)
+        captured["parallel"] = kwargs.get("parallel")
+        return {}, {}
+
+    monkeypatch.setattr(runner_module, "_execute_case_impl", fake_execute_case_impl)
+
+    runner_module._execute_case(
+        case,
+        ["left", "right"],
+        ExperimentConfig(enable_parallel_backend_execution=False),
+        backend_instances={},
+    )
+
+    assert captured == {
+        "case_id": "case-parallel-config",
+        "backends": ["left", "right"],
+        "parallel": False,
+    }
 
 
 @pytest.mark.skipif(
@@ -2964,6 +3089,144 @@ def test_run_loaded_case_recheck_marks_non_reproducible_candidate(monkeypatch):
     assert row["findings"][0]["false_positive_reason"] == "candidate_not_reproduced_on_immediate_recheck"
 
 
+def test_run_loaded_case_emits_disagreement_descriptor_and_fingerprint(monkeypatch):
+    case = Case(
+        "case-disagreement",
+        11,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-disagreement", 11, [{"op": "select", "columns": ["x"]}]),
+    )
+
+    def fake_execute_case(*args, **kwargs):
+        return {}, {
+            "left": NormalizedResult("left", "ok", ["x"], [[1]]),
+            "right": NormalizedResult("right", "ok", ["x"], [[2]]),
+        }
+
+    def fake_evaluate_case(*args, **kwargs):
+        return [
+            Finding(
+                finding_id="finding-disagreement",
+                kind="semantic_output_mismatch",
+                severity="critical",
+                suspicious_backends=["right"],
+                evidence="mismatch",
+                signature="sig",
+                root_cause="window_boundary",
+                mismatch_class="value",
+            )
+        ]
+
+    monkeypatch.setattr(runner_module, "_execute_case", fake_execute_case)
+    monkeypatch.setattr(runner_module, "evaluate_case", fake_evaluate_case)
+    monkeypatch.setattr(runner_module, "annotate_findings", lambda *args, **kwargs: None)
+
+    row = run_loaded_case(case, ["left", "right"], save_artifact=False, target_specs=[])
+
+    descriptor = row["disagreement_descriptor"]
+    assert descriptor["backend_groups"] == [["left"], ["right"]]
+    assert descriptor["pair_count"] == 1
+    assert descriptor["primary_root_cause"] == "window_boundary"
+    assert "disagree_pair:left|right" in descriptor["feature_tokens"]
+    assert row["case"]["metadata"]["disagreement_descriptor"] == descriptor
+    assert case.metadata["disagreement_descriptor"] == descriptor
+
+    fingerprint = row["case_fingerprint"]
+    assert len(fingerprint["minhash_signature"]) == 64
+    assert fingerprint["type_mix_token"] == "num1"
+    assert fingerprint["column_count"] == 1
+    assert "fp_type_mix:num1" in fingerprint["feature_tokens"]
+    assert row["case"]["metadata"]["case_fingerprint"] == fingerprint
+    assert case.metadata["case_fingerprint"] == fingerprint
+
+
+def test_run_loaded_case_cross_validates_differential_and_metamorphic_findings(monkeypatch):
+    case = Case(
+        "case-oracle-cross-validation",
+        12,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-oracle-cross-validation", 12, [{"op": "select", "columns": ["x"]}]),
+    )
+    variant_case = Case(
+        "case-oracle-cross-validation-mr",
+        12,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-oracle-cross-validation-mr", 12, [{"op": "select", "columns": ["x"]}]),
+    )
+    calls = {"execute": 0}
+
+    def fake_execute_case(*args, **kwargs):
+        calls["execute"] += 1
+        return {}, {
+            "left": NormalizedResult("left", "ok", ["x"], [[1]]),
+            "right": NormalizedResult("right", "ok", ["x"], [[2]]),
+        }
+
+    def fake_evaluate_case(*args, **kwargs):
+        return [
+            Finding(
+                finding_id="finding-diff",
+                kind="semantic_output_mismatch",
+                severity="critical",
+                suspicious_backends=["right"],
+                evidence="differential mismatch",
+                signature="diff",
+                root_cause="join_semantics",
+                oracle="differential",
+                mismatch_class="value",
+            )
+        ]
+
+    def fake_evaluate_metamorphic_variants(*args, **kwargs):
+        return [
+            Finding(
+                finding_id="finding-mr",
+                kind="metamorphic_join_semantics_violation",
+                severity="high",
+                suspicious_backends=["right"],
+                evidence="metamorphic mismatch",
+                signature="mr",
+                root_cause="metamorphic_join_semantics",
+                oracle="metamorphic",
+            )
+        ]
+
+    def fake_annotate_findings(case, findings, **kwargs):
+        for finding in findings:
+            finding.triage_verdict = "needs_manual_confirmation"
+            finding.paper_status = "needs_manual_confirmation"
+            finding.triage_confidence = "medium"
+            finding.adjudication = {"verdict": "needs_manual_confirmation"}
+
+    monkeypatch.setattr(runner_module, "_execute_case", fake_execute_case)
+    monkeypatch.setattr(runner_module, "evaluate_case", fake_evaluate_case)
+    monkeypatch.setattr(runner_module, "evaluate_metamorphic_variants", fake_evaluate_metamorphic_variants)
+    monkeypatch.setattr(
+        runner_module,
+        "all_metamorphic_variants",
+        lambda case_arg: [SimpleNamespace(name="join_semantics:mr", relation="join_semantics", case=variant_case)],
+    )
+    monkeypatch.setattr(runner_module, "annotate_findings", fake_annotate_findings)
+
+    row = run_loaded_case(
+        case,
+        ["left", "right"],
+        config=ExperimentConfig(enable_metamorphic_oracle=True, metamorphic_variant_limit=1),
+        save_artifact=False,
+        target_specs=[],
+    )
+
+    assert calls["execute"] == 2
+    assert row["oracle_cross_validation"]["cross_validated_count"] == 1
+    assert row["oracle_cross_validation"]["metamorphic_only_count"] == 0
+    diff_finding = next(finding for finding in row["findings"] if finding["oracle"] == "differential")
+    mr_finding = next(finding for finding in row["findings"] if finding["oracle"] == "metamorphic")
+    assert diff_finding["confidence"] == "high"
+    assert diff_finding["adjudication"]["metamorphic_support"] == "corroborated"
+    assert diff_finding["adjudication"]["oracle_complex"]["cross_validated"] is True
+    assert mr_finding["adjudication"]["metamorphic_support"] == "corroborates_differential"
+
+
 @pytest.mark.skipif(
     any(name != "sqlite" and importlib.util.find_spec(name) is None for name in REQUIRED_BACKENDS),
     reason="data backends are not installed",
@@ -4335,6 +4598,8 @@ def test_run_fuzz_uses_feedback_source_marker_for_candidate_source(tmp_path, mon
             discovery_signature=None,
             candidate_bug_families=None,
             target_keys=None,
+            disagreement_descriptor=None,
+            case_fingerprint=None,
             schedule_delta=0.0,
         ):
             return True
@@ -4400,7 +4665,11 @@ def test_run_fuzz_compact_log_omits_repeated_run_metadata():
     assert "seed_lineage" in row
     assert "mutation" in row
     assert "operation_combo" in row
+    assert row["disagreement_descriptor"]["pair_count"] == 0
+    assert len(row["case_fingerprint"]["minhash_signature"]) == 64
     assert "stage_profile" in row
+    assert row["fuzz_iteration"]["case_id"] == row["case"]["case_id"]
+    assert row["fuzz_iteration"]["stage_timings"]["total_case_wall_ms"] == row["stage_profile"]["total_case_wall_ms"]
     assert meta["stage_profile"]["case_count"] == 1
     assert meta["stage_profile"]["totals_ms"]["total_case_wall_ms"] >= 0.0
 
@@ -4430,6 +4699,10 @@ def test_run_fuzz_minimal_log_keeps_only_backend_status():
     assert "normalized" not in row
     assert "raw_results" not in row
     assert row["backend_status"] == {}
+    assert row["execution_profile"]["backend_count"] == 0
+    assert row["execution_profile"]["parallel_backend_execution"] is False
+    assert row["fuzz_iteration"]["case_id"] == row["case"]["case_id"]
+    assert row["fuzz_iteration"]["execution_profile"]["backend_count"] == 0
     assert row["guidance"]["strategy"] == "random"
     assert "frontier_conformance" in row["guidance"]
 
@@ -4442,6 +4715,29 @@ def test_run_fuzz_can_disable_run_log_compression():
     assert run_file.name.endswith(".jsonl")
     assert not run_file.name.endswith(".jsonl.gz")
     assert load_json(run_meta_path(run_file))["config"]["compress_run_log"] is False
+
+
+def test_run_fuzz_records_layered_config_metadata():
+    config = ExperimentConfig(
+        guidance_strategy="guided",
+        guidance_candidate_pool=3,
+        guidance_targets=["topk"],
+        enable_local_source_scheduler=True,
+        enable_parallel_backend_execution=False,
+        log_level="compact",
+    )
+
+    run_file = run_fuzz(cases=1, seed=55, backends=[], config=config)
+
+    meta = load_json(run_meta_path(run_file))
+    assert meta["config"]["guidance_strategy"] == "guided"
+    assert "guidance" not in meta["config"]
+    assert meta["config_layers"]["guidance"]["strategy"] == "guided"
+    assert meta["config_layers"]["guidance"]["candidate_pool"] == 3
+    assert meta["config_layers"]["guidance"]["targets"] == ["topk"]
+    assert "topk" in meta["config_layers"]["guidance"]["effective_targets"]
+    assert meta["config_layers"]["feedback"]["enable_local_source_scheduler"] is True
+    assert meta["config_layers"]["execution"]["enable_parallel_backend_execution"] is False
 
 
 def test_run_fuzz_new_behavior_uses_discovery_signature(tmp_path, monkeypatch):
@@ -4579,6 +4875,178 @@ def test_run_fuzz_persists_closed_loop_state_across_runs(monkeypatch):
     assert second_state["seen_signatures"] == ["discovery-shared"]
     assert len(first_state["signal_seen_signatures"]) == 1
     assert second_state["signal_seen_signatures"] == first_state["signal_seen_signatures"]
+
+
+def test_run_fuzz_injects_cross_version_champion_corpus(tmp_path, monkeypatch):
+    champion_path = tmp_path / "champions.jsonl"
+    registry = ChampionRegistry(champion_path)
+    donor = Case(
+        "case-donor",
+        9,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-donor", 9, [{"op": "filter", "column": "x", "cmp": ">", "value": 0}]),
+    )
+    assert registry.promote_if_stable(donor, ["family@engine"], threshold=1, version_id="old", stability=3)
+    monkeypatch.setattr(runner_module, "DEFAULT_CHAMPION_CORPUS_PATH", champion_path)
+
+    def fake_run_loaded_case(
+        case,
+        backends,
+        config=None,
+        save_artifact=True,
+        backend_instances=None,
+        environment=None,
+        target_specs=None,
+        config_payload=None,
+    ):
+        return {
+            "run_at": "2026-05-31T00:00:00Z",
+            "case": case.to_dict(),
+            "targets": target_specs or [],
+            "raw_results": {},
+            "normalized": {},
+            "metamorphic": {},
+            "findings": [],
+            "candidate_recheck": {"enabled": False, "attempts": 0, "reproduced_keys": [], "non_reproduced_keys": []},
+            "config": config_payload or (config or ExperimentConfig()).to_dict(),
+            "environment": {},
+            "status": "ok",
+            "duration_ms": 0.1,
+            "behavior_signature": "behavior-a",
+            "discovery_signature": "discovery-a",
+        }
+
+    monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
+
+    run_file = run_fuzz(
+        cases=1,
+        seed=81,
+        backends=[],
+        config=ExperimentConfig(log_level="minimal", target_version="new"),
+        persist_closed_loop_state=True,
+    )
+
+    meta = load_json(run_meta_path(run_file))
+    state = load_json(closed_loop_state_path(run_file))
+    feedback = state["feedback"]
+
+    assert meta["champion_corpus"]["injected_count"] == 1
+    assert feedback["interesting_cases"][0]["metadata"]["champion_seed"]["source_version_id"] == "old"
+    assert feedback["case_family_keys"][0] == ["family@engine"]
+
+
+def test_run_fuzz_can_disable_cross_version_champion_corpus(tmp_path, monkeypatch):
+    champion_path = tmp_path / "champions.jsonl"
+    registry = ChampionRegistry(champion_path)
+    donor = Case(
+        "case-donor",
+        9,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-donor", 9, [{"op": "filter", "column": "x", "cmp": ">", "value": 0}]),
+    )
+    assert registry.promote_if_stable(donor, ["family@engine"], threshold=1, version_id="old", stability=3)
+    monkeypatch.setattr(runner_module, "DEFAULT_CHAMPION_CORPUS_PATH", champion_path)
+
+    def fake_run_loaded_case(
+        case,
+        backends,
+        config=None,
+        save_artifact=True,
+        backend_instances=None,
+        environment=None,
+        target_specs=None,
+        config_payload=None,
+    ):
+        return {
+            "run_at": "2026-05-31T00:00:00Z",
+            "case": case.to_dict(),
+            "targets": target_specs or [],
+            "raw_results": {},
+            "normalized": {},
+            "metamorphic": {},
+            "findings": [],
+            "candidate_recheck": {"enabled": False, "attempts": 0, "reproduced_keys": [], "non_reproduced_keys": []},
+            "config": config_payload or (config or ExperimentConfig()).to_dict(),
+            "environment": {},
+            "status": "ok",
+            "duration_ms": 0.1,
+            "behavior_signature": "behavior-a",
+            "discovery_signature": "discovery-a",
+        }
+
+    monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
+
+    run_file = run_fuzz(
+        cases=1,
+        seed=82,
+        backends=[],
+        config=ExperimentConfig(
+            log_level="minimal",
+            target_version="new",
+            enable_champion_corpus=False,
+        ),
+        persist_closed_loop_state=True,
+    )
+
+    meta = load_json(run_meta_path(run_file))
+    state = load_json(closed_loop_state_path(run_file))
+
+    assert meta["champion_corpus"]["enabled"] is False
+    assert meta["champion_corpus"]["injected_count"] == 0
+    assert all(
+        "champion_seed" not in case.get("metadata", {})
+        for case in state["feedback"]["interesting_cases"]
+    )
+
+
+def test_run_fuzz_passes_lhs_schema_spec_during_cold_start(monkeypatch):
+    observed_specs = []
+
+    def fake_generate_case(seed, *, type_aware=True, profile="common", schema_spec=None):
+        observed_specs.append(schema_spec)
+        return Case(
+            f"case-{seed}",
+            seed,
+            [TableData("t0", [ColumnSpec("x", "int")], [{"x": seed}])],
+            Program(f"prog-{seed}", seed, [{"op": "limit", "n": 1}]),
+        )
+
+    def fake_run_loaded_case(
+        case,
+        backends,
+        config=None,
+        save_artifact=True,
+        backend_instances=None,
+        environment=None,
+        target_specs=None,
+        config_payload=None,
+    ):
+        return {
+            "run_at": "2026-05-31T00:00:00Z",
+            "case": case.to_dict(),
+            "targets": target_specs or [],
+            "raw_results": {},
+            "normalized": {},
+            "metamorphic": {},
+            "findings": [],
+            "candidate_recheck": {"enabled": False, "attempts": 0, "reproduced_keys": [], "non_reproduced_keys": []},
+            "config": config_payload or (config or ExperimentConfig()).to_dict(),
+            "environment": {},
+            "status": "ok",
+            "duration_ms": 0.1,
+            "behavior_signature": f"behavior-{case.seed}",
+            "discovery_signature": f"discovery-{case.seed}",
+        }
+
+    monkeypatch.setattr(runner_module, "generate_case", fake_generate_case)
+    monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
+
+    run_file = run_fuzz(cases=2, seed=90, backends=[], config=ExperimentConfig(log_level="minimal"))
+    meta = load_json(run_meta_path(run_file))
+
+    assert observed_specs
+    assert all(spec is not None for spec in observed_specs)
+    assert meta["lhs_seeding"]["enabled"] is True
 
 
 def test_run_fuzz_adaptive_profile_pool_learns_and_persists(monkeypatch):
@@ -5014,6 +5482,135 @@ def test_run_fuzz_version_pair_pool_learns_and_updates_case_config(monkeypatch):
     assert second_state["feedback"]["adaptive_learning"]["bandits"]["version_pair"]["total_pulls"] >= 3
 
 
+def test_run_fuzz_records_backend_pair_priority_and_learns_pair_rewards(monkeypatch):
+    class FakeTargetContext:
+        common_capabilities = ("op:select", "table:single")
+
+        def target_dicts(self):
+            return []
+
+        def to_dict(self):
+            return {"common_capabilities": list(self.common_capabilities)}
+
+    def fake_generate_case(seed, *, type_aware=True, profile="common"):
+        return Case(
+            case_id=f"case-{seed}",
+            seed=seed,
+            tables=[TableData("t0", [ColumnSpec("x", "int")], [{"x": seed}])],
+            program=Program(f"prog-{seed}", seed, [{"op": "select", "columns": ["x"]}]),
+            metadata={"generator_profile": profile},
+        )
+
+    def fake_run_loaded_case(
+        case,
+        backends,
+        config=None,
+        save_artifact=True,
+        backend_instances=None,
+        environment=None,
+        target_specs=None,
+        config_payload=None,
+        metamorphic_relation_order=None,
+    ):
+        descriptor = {
+            "backend_groups": [["left"], ["right"], ["third"]],
+            "pair_disagrees": [
+                {"left": "left", "right": "right", "disagrees": True},
+                {"left": "left", "right": "third", "disagrees": False},
+                {"left": "right", "right": "third", "disagrees": True},
+            ],
+            "pair_count": 2,
+            "column_classes": {"x": "numeric"},
+            "primary_root_cause": "window_boundary",
+            "mismatch_class": "value",
+            "backend_statuses": {backend: "ok" for backend in backends},
+            "feature_tokens": [
+                "mismatch:value",
+                "root:window_boundary",
+                "disagree_pair:left|right",
+                "disagree_pair:right|third",
+            ],
+        }
+        fingerprint = {
+            "minhash_signature": [case.seed] * 64,
+            "op_skeleton_hash": "select-hash",
+            "type_mix_token": "num1",
+            "null_density_bucket": 0,
+            "row_mass_bucket": 1,
+            "column_count": 1,
+            "feature_tokens": ["fp_op:select-hash", "fp_type_mix:num1", "fp_column_count:1"],
+        }
+        findings = [
+            {
+                "kind": "semantic_output_mismatch",
+                "root_cause": "window_boundary",
+                "triage_verdict": "candidate_implementation_bug",
+                "suspicious_backends": ["right"],
+                "signature": f"sig-{case.seed}",
+                "mismatch_class": "value",
+            }
+        ]
+        row_case = case.to_dict()
+        row_case.setdefault("metadata", {})["disagreement_descriptor"] = descriptor
+        row_case.setdefault("metadata", {})["case_fingerprint"] = fingerprint
+        return {
+            "run_at": "2026-05-31T00:00:00Z",
+            "case": row_case,
+            "targets": target_specs or [],
+            "raw_results": {},
+            "normalized": {},
+            "metamorphic": {},
+            "findings": findings,
+            "candidate_recheck": {"enabled": False, "attempts": 0, "reproduced_keys": [], "non_reproduced_keys": []},
+            "config": config_payload or (config or ExperimentConfig()).to_dict(),
+            "environment": environment or {},
+            "status": "bug",
+            "duration_ms": 0.1,
+            "behavior_signature": f"behavior-{case.case_id}",
+            "discovery_signature": f"discovery-{case.case_id}",
+            "disagreement_descriptor": descriptor,
+            "case_fingerprint": fingerprint,
+        }
+
+    monkeypatch.setattr(runner_module, "generate_case", fake_generate_case)
+    monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
+    monkeypatch.setattr(runner_module, "make_backend", lambda backend: object())
+    monkeypatch.setattr(runner_module, "target_context", lambda backends: FakeTargetContext())
+
+    config = ExperimentConfig(
+        enable_feedback=True,
+        backend_pair_learning_weight=1.0,
+        backend_pair_priority_limit=2,
+        persist_feedback_corpus=False,
+        log_level="compact",
+    )
+    run_file = run_fuzz(
+        cases=2,
+        seed=301,
+        backends=["third", "right", "left"],
+        config=config,
+        persist_closed_loop_state=True,
+    )
+    rows = read_jsonl(run_file)
+    meta = load_json(run_meta_path(run_file))
+    state = load_json(closed_loop_state_path(run_file))
+    bandit = state["feedback"]["adaptive_learning"]["bandits"]["backend_pair"]
+    rewards = {
+        arm["action_id"]: arm["total_reward"]
+        for arm in bandit["arms"]
+    }
+
+    assert meta["backend_pair_pool"] == ["left|right", "left|third", "right|third"]
+    assert rows[0]["backend_pair_selection"]["strategy"] == "contextual_bandit_warmup"
+    assert rows[0]["backend_pair_priority"] == ["left|right", "left|third"]
+    assert rows[0]["backend_pair_feedback"]["recorded"] == 3
+    assert set(rows[0]["backend_pair_feedback"]["disagree_pairs"]) == {"left|right", "right|third"}
+    assert rows[1]["backend_pair_selection"]["strategy"] == "contextual_bandit"
+    assert rows[1]["backend_pair_priority"][0] in {"left|right", "right|third"}
+    assert bandit["total_pulls"] == 6
+    assert rewards["left|right"] > rewards["left|third"]
+
+
 def test_run_fuzz_signal_new_behavior_uses_coarser_signal_signature(monkeypatch):
     call_index = {"value": 0}
 
@@ -5057,7 +5654,16 @@ def test_run_fuzz_signal_new_behavior_uses_coarser_signal_signature(monkeypatch)
     monkeypatch.setattr(runner_module, "generate_case", fake_generate_case)
     monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
 
-    run_file = run_fuzz(cases=2, seed=81, backends=[], config=ExperimentConfig(log_level="minimal"))
+    run_file = run_fuzz(
+        cases=2,
+        seed=81,
+        backends=[],
+        config=ExperimentConfig(
+            log_level="minimal",
+            enable_feedback=False,
+            enable_champion_corpus=False,
+        ),
+    )
 
     first, second = read_jsonl(run_file)
     assert first["is_new_behavior"] is True

@@ -5,6 +5,91 @@ from datadiff.run_journal import build_run_journal_entry, record_run_journal
 from datadiff.util import append_jsonl, read_jsonl, run_meta_path
 
 
+def _polluted_signal_rows():
+    return [
+        {
+            "case": {"case_id": "resolved", "seed": 1},
+            "case_index": 0,
+            "elapsed_s": 0.1,
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [
+                {
+                    "root_cause": "nan_inf_semantics",
+                    "triage_verdict": "expected_semantic_divergence",
+                    "suspicious_backends": ["duckdb"],
+                }
+            ],
+        },
+        {
+            "case": {"case_id": "false-positive", "seed": 2},
+            "case_index": 1,
+            "elapsed_s": 0.2,
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [
+                {
+                    "root_cause": "order_only_normalization_mismatch",
+                    "triage_verdict": "normalizer_false_positive",
+                    "false_positive": True,
+                    "suspicious_backends": ["sqlite"],
+                }
+            ],
+        },
+        {
+            "case": {"case_id": "source-issue", "seed": 3},
+            "case_index": 2,
+            "elapsed_s": 0.3,
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [
+                {
+                    "root_cause": "csv_long_numeric_roundtrip",
+                    "triage_verdict": "candidate_implementation_bug",
+                    "source_issue": "duckdb/duckdb#12345",
+                    "suspicious_backends": ["duckdb"],
+                }
+            ],
+        },
+        {
+            "case": {"case_id": "pure-behavior", "seed": 4},
+            "case_index": 3,
+            "elapsed_s": 0.4,
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [],
+        },
+        {
+            "case": {"case_id": "candidate", "seed": 5},
+            "case_index": 4,
+            "elapsed_s": 0.5,
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [
+                {
+                    "root_cause": "topk_filter_pushdown",
+                    "triage_verdict": "candidate_implementation_bug",
+                    "suspicious_backends": ["datafusion"],
+                }
+            ],
+        },
+        {
+            "case": {"case_id": "semantic-needs-confirmation", "seed": 6},
+            "case_index": 5,
+            "elapsed_s": 0.6,
+            "is_new_behavior": True,
+            "signal_new_behavior": True,
+            "findings": [
+                {
+                    "root_cause": "string_expression",
+                    "triage_verdict": "semantic_divergence_needs_confirmation",
+                    "suspicious_backends": ["sqlite"],
+                }
+            ],
+        },
+    ]
+
+
 def test_build_run_journal_entry_records_paper_facing_summary(tmp_path):
     run_file = tmp_path / "run-x.jsonl"
     append_jsonl(
@@ -135,6 +220,36 @@ def test_build_run_journal_entry_records_paper_facing_summary(tmp_path):
         "launch_duration": "24h",
         "strategy_snapshot": "reports/strategy-snapshots/frozen.json",
     }
+
+
+def test_build_run_journal_entry_filters_non_rewardable_signal_new_behavior(tmp_path):
+    run_file = tmp_path / "run-filtered-signal.jsonl"
+    for row in _polluted_signal_rows():
+        append_jsonl(row, run_file)
+    run_meta_path(run_file).write_text(
+        json.dumps(
+            {
+                "executed_cases": 99,
+                "new_behavior_cases": 99,
+                "signal_new_behavior_cases": 99,
+                "elapsed_s": 1.0,
+                "throughput_cases_s": 6.0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    entry = build_run_journal_entry(run_file, {"theme": "filtered signal"})
+    summary = entry["result_summary"]
+
+    assert entry["executed_cases"] == 6
+    assert summary["new_behavior_cases"] == 6
+    assert summary["signal_new_behavior_cases"] == 3
+    assert summary["signal_new_behavior_rate"] == 0.5
+    assert summary["candidate_bug_cases"] == 1
+    assert summary["candidate_bug_families"] == {"topk_filter_pushdown@datafusion": 1}
+    assert summary["semantic_divergence_findings"] == 1
+    assert summary["false_positive_findings"] == 1
 
 
 def test_record_run_journal_appends_jsonl_and_markdown(tmp_path):

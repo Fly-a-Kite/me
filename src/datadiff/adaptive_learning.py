@@ -3,11 +3,44 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from functools import lru_cache
 import math
 from typing import Any
 
+from datadiff.feature_interning import (
+    export_feature_counter,
+    export_feature_mapping,
+    import_feature_counter,
+    import_feature_float_mapping,
+    intern_feature,
+    intern_feature_ids,
+    resolve_feature_id,
+)
+
 ADAPTIVE_LEARNING_SCHEMA_VERSION = "adaptive-learning-v1"
 CONTINUAL_LEARNING_SCHEMA_VERSION = "cross-version-continual-learning-v1"
+_SELF_CALIBRATED_COMPONENTS = (
+    "reward_signal",
+    "model_prediction",
+    "uncertainty",
+    "exploration",
+    "version_signal",
+    "continual_priority_signal",
+    "exploration_bonus",
+    "health_penalty",
+)
+_SELF_CALIBRATED_COMPONENT_INDEX = {
+    component: index for index, component in enumerate(_SELF_CALIBRATED_COMPONENTS)
+}
+_SELF_CALIBRATED_COMPONENT_COUNT = len(_SELF_CALIBRATED_COMPONENTS)
+_REWARD_SIGNAL_COMPONENT_INDEX = _SELF_CALIBRATED_COMPONENT_INDEX["reward_signal"]
+_MODEL_PREDICTION_COMPONENT_INDEX = _SELF_CALIBRATED_COMPONENT_INDEX["model_prediction"]
+_UNCERTAINTY_COMPONENT_INDEX = _SELF_CALIBRATED_COMPONENT_INDEX["uncertainty"]
+_EXPLORATION_COMPONENT_INDEX = _SELF_CALIBRATED_COMPONENT_INDEX["exploration"]
+_VERSION_SIGNAL_COMPONENT_INDEX = _SELF_CALIBRATED_COMPONENT_INDEX["version_signal"]
+_CONTINUAL_PRIORITY_SIGNAL_COMPONENT_INDEX = _SELF_CALIBRATED_COMPONENT_INDEX["continual_priority_signal"]
+_EXPLORATION_BONUS_COMPONENT_INDEX = _SELF_CALIBRATED_COMPONENT_INDEX["exploration_bonus"]
+_HEALTH_PENALTY_COMPONENT_INDEX = _SELF_CALIBRATED_COMPONENT_INDEX["health_penalty"]
 
 
 @dataclass(slots=True)
@@ -15,36 +48,61 @@ class OnlineRewardModel:
     learning_rate: float = 0.08
     l2: float = 0.001
     max_abs_reward: float = 6.0
-    weights: dict[str, float] = field(default_factory=dict)
-    feature_counts: Counter[str] = field(default_factory=Counter)
+    _weights_dense: list[float] = field(default_factory=list, repr=False)
+    _feature_counts_dense: list[int] = field(default_factory=list, repr=False)
     total_updates: int = 0
+
+    @property
+    def weights(self) -> dict[str, float]:
+        return export_feature_mapping(self._weights_by_id())
+
+    @property
+    def feature_counts(self) -> Counter[str]:
+        return Counter(export_feature_counter(self._feature_counts_by_id()))
 
     def predict(self, features: Iterable[Any]) -> float:
         normalized = _normalize_features(features)
+        return self.predict_normalized(normalized)
+
+    def predict_normalized(self, normalized: tuple[str, ...]) -> float:
         if not normalized:
             return 0.0
+        feature_ids = _feature_ids_from_normalized(normalized)
         scale = math.sqrt(len(normalized))
-        return sum(self.weights.get(feature, 0.0) for feature in normalized) / scale
+        return self._predict_from_feature_ids(feature_ids, scale)
 
     def uncertainty(self, features: Iterable[Any]) -> float:
         normalized = _normalize_features(features)
+        return self.uncertainty_normalized(normalized)
+
+    def uncertainty_normalized(self, normalized: tuple[str, ...]) -> float:
         if not normalized:
             return 1.0
-        coldness = sum(1.0 / math.sqrt(1.0 + self.feature_counts[feature]) for feature in normalized)
+        feature_ids = _feature_ids_from_normalized(normalized)
+        coldness = self._coldness_from_feature_ids(feature_ids)
         return min(1.0, coldness / math.sqrt(len(normalized)))
 
     def update(self, features: Iterable[Any], reward: float) -> float:
         normalized = _normalize_features(features)
+        return self.update_normalized(normalized, reward)
+
+    def update_normalized(self, normalized: tuple[str, ...], reward: float) -> float:
         if not normalized:
             return 0.0
         target = _bounded(float(reward), self.max_abs_reward)
-        prediction = self.predict(normalized)
-        error = target - prediction
+        feature_ids = _feature_ids_from_normalized(normalized)
         scale = math.sqrt(len(normalized))
-        for feature in normalized:
-            current = self.weights.get(feature, 0.0)
-            self.weights[feature] = current + self.learning_rate * ((error / scale) - self.l2 * current)
-            self.feature_counts[feature] += 1
+        prediction = self._predict_from_feature_ids(feature_ids, scale)
+        error = target - prediction
+        self._ensure_dense_capacity(max(feature_ids))
+        update_base = self.learning_rate * (error / scale)
+        l2_decay = self.learning_rate * self.l2
+        weights = self._weights_dense
+        counts = self._feature_counts_dense
+        for feature_id in feature_ids:
+            current = weights[feature_id]
+            weights[feature_id] = current + update_base - (l2_decay * current)
+            counts[feature_id] += 1
         self.total_updates += 1
         return error
 
@@ -53,8 +111,8 @@ class OnlineRewardModel:
             "learning_rate": self.learning_rate,
             "l2": self.l2,
             "max_abs_reward": self.max_abs_reward,
-            "weights": dict(sorted(self.weights.items())),
-            "feature_counts": dict(self.feature_counts),
+            "weights": export_feature_mapping(self._weights_by_id()),
+            "feature_counts": export_feature_counter(self._feature_counts_by_id()),
             "total_updates": self.total_updates,
         }
 
@@ -67,18 +125,77 @@ class OnlineRewardModel:
             l2=_float_field(data, "l2", 0.001),
             max_abs_reward=_float_field(data, "max_abs_reward", 6.0),
         )
-        model.weights = {
-            str(feature): float(weight or 0.0)
-            for feature, weight in (data.get("weights", {}) or {}).items()
-        }
-        model.feature_counts = Counter(
-            {
-                str(feature): int(count or 0)
-                for feature, count in (data.get("feature_counts", {}) or {}).items()
-            }
+        model._load_dense_state(
+            weights_by_id=import_feature_float_mapping(data.get("weights", {}) or {}),
+            feature_counts_by_id=import_feature_counter(data.get("feature_counts", {}) or {}),
         )
         model.total_updates = int(data.get("total_updates", 0) or 0)
         return model
+
+    def _predict_from_feature_ids(self, feature_ids: tuple[int, ...], scale: float) -> float:
+        total = 0.0
+        weights = self._weights_dense
+        limit = len(weights)
+        for feature_id in feature_ids:
+            if feature_id < limit:
+                total += weights[feature_id]
+        return total / scale
+
+    def _coldness_from_feature_ids(self, feature_ids: tuple[int, ...]) -> float:
+        total = 0.0
+        counts = self._feature_counts_dense
+        limit = len(counts)
+        for feature_id in feature_ids:
+            count = counts[feature_id] if feature_id < limit else 0
+            total += 1.0 / math.sqrt(1.0 + count)
+        return total
+
+    def _ensure_dense_capacity(self, feature_id: int) -> None:
+        required = int(feature_id) + 1 - len(self._weights_dense)
+        if required <= 0:
+            return
+        self._weights_dense.extend([0.0] * required)
+        self._feature_counts_dense.extend([0] * required)
+
+    def _load_dense_state(
+        self,
+        *,
+        weights_by_id: Mapping[int, Any],
+        feature_counts_by_id: Mapping[int, Any],
+    ) -> None:
+        self._weights_dense = []
+        self._feature_counts_dense = []
+        max_feature_id = -1
+        for feature_id in weights_by_id:
+            max_feature_id = max(max_feature_id, int(feature_id))
+        for feature_id in feature_counts_by_id:
+            max_feature_id = max(max_feature_id, int(feature_id))
+        if max_feature_id >= 0:
+            self._ensure_dense_capacity(max_feature_id)
+        for feature_id, weight in weights_by_id.items():
+            if int(feature_id) < 0:
+                continue
+            self._weights_dense[int(feature_id)] = float(weight or 0.0)
+        for feature_id, count in feature_counts_by_id.items():
+            if int(feature_id) < 0:
+                continue
+            self._feature_counts_dense[int(feature_id)] = int(count or 0)
+
+    def _weights_by_id(self) -> dict[int, float]:
+        return {
+            feature_id: weight
+            for feature_id, weight in enumerate(self._weights_dense)
+            if float(weight) != 0.0
+        }
+
+    def _feature_counts_by_id(self) -> Counter[int]:
+        return Counter(
+            {
+                feature_id: int(count)
+                for feature_id, count in enumerate(self._feature_counts_dense)
+                if int(count) > 0
+            }
+        )
 
 
 @dataclass(slots=True)
@@ -147,12 +264,60 @@ class ActionStats:
 
 
 @dataclass(slots=True)
+class DenseBanditChoice:
+    action_id: str
+    score: float
+    pulls: int
+
+    def sort_key(self) -> tuple[float, int, str]:
+        return (self.score, -self.pulls, self.action_id)
+
+
+@dataclass(slots=True)
+class DenseBanditScore:
+    action_id: str
+    score: float
+    pulls: int
+    mean_reward: float
+    signal_components_dense: tuple[float, ...] = field(repr=False)
+    weighted_components_dense: tuple[float, ...] = field(repr=False)
+
+    def sort_key(self) -> tuple[float, int, str]:
+        return (self.score, -self.pulls, self.action_id)
+
+
+@dataclass(slots=True)
 class VersionFeedbackMemory:
-    reward_totals: Counter[str] = field(default_factory=Counter)
-    reward_counts: Counter[str] = field(default_factory=Counter)
-    runtime_cost_totals: Counter[str] = field(default_factory=Counter)
-    invalid_counts: Counter[str] = field(default_factory=Counter)
-    false_positive_counts: Counter[str] = field(default_factory=Counter)
+    _reward_totals_by_id: Counter[int] = field(default_factory=Counter, repr=False)
+    _reward_counts_by_id: Counter[int] = field(default_factory=Counter, repr=False)
+    _runtime_cost_totals_by_id: Counter[int] = field(default_factory=Counter, repr=False)
+    _invalid_counts_by_id: Counter[int] = field(default_factory=Counter, repr=False)
+    _false_positive_counts_by_id: Counter[int] = field(default_factory=Counter, repr=False)
+    _action_reward_totals_by_id: Counter[int] = field(default_factory=Counter, init=False, repr=False)
+    _action_reward_counts_by_id: Counter[int] = field(default_factory=Counter, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self._rebuild_action_indexes()
+
+    @property
+    def reward_totals(self) -> Counter[str]:
+        return Counter(export_feature_mapping(self._reward_totals_by_id))
+
+    @property
+    def reward_counts(self) -> Counter[str]:
+        return Counter(export_feature_counter(self._reward_counts_by_id))
+
+    @property
+    def runtime_cost_totals(self) -> Counter[str]:
+        return Counter(export_feature_mapping(self._runtime_cost_totals_by_id))
+
+    @property
+    def invalid_counts(self) -> Counter[str]:
+        return Counter(export_feature_counter(self._invalid_counts_by_id))
+
+    @property
+    def false_positive_counts(self) -> Counter[str]:
+        return Counter(export_feature_counter(self._false_positive_counts_by_id))
 
     def record(
         self,
@@ -167,80 +332,124 @@ class VersionFeedbackMemory:
     ) -> None:
         if not version_id:
             return
-        key = _version_key(scope, action_id, version_id)
-        self.reward_totals[key] += float(reward)
-        self.reward_counts[key] += 1
-        self.runtime_cost_totals[key] += max(0.0, float(runtime_cost))
+        key_id = _version_key_id(scope, action_id, version_id)
+        action_key_id = _scope_action_key_id(scope, action_id)
+        self._reward_totals_by_id[key_id] += float(reward)
+        self._reward_counts_by_id[key_id] += 1
+        self._runtime_cost_totals_by_id[key_id] += max(0.0, float(runtime_cost))
+        self._action_reward_totals_by_id[action_key_id] += float(reward)
+        self._action_reward_counts_by_id[action_key_id] += 1
         if not preflight_valid:
-            self.invalid_counts[key] += 1
+            self._invalid_counts_by_id[key_id] += 1
         if false_positive:
-            self.false_positive_counts[key] += 1
+            self._false_positive_counts_by_id[key_id] += 1
 
     def transfer_signal(self, *, scope: str, action_id: str, version_id: str) -> float:
         if not version_id:
             return 0.0
-        exact_key = _version_key(scope, action_id, version_id)
-        exact_count = self.reward_counts[exact_key]
+        exact_key_id = _version_key_id(scope, action_id, version_id)
+        exact_count = self._reward_counts_by_id[exact_key_id]
         if exact_count > 0:
-            return self._key_signal(exact_key)
-        prefix = f"{_token(scope)}|{_token(action_id)}|"
-        totals = 0.0
-        counts = 0
-        for key, count in self.reward_counts.items():
-            if key.startswith(prefix):
-                totals += float(self.reward_totals[key])
-                counts += int(count)
+            return self._key_signal(exact_key_id)
+        action_key_id = _scope_action_key_id(scope, action_id)
+        totals = self._action_reward_totals_by_id[action_key_id]
+        counts = self._action_reward_counts_by_id[action_key_id]
+        if counts <= 0:
+            return 0.0
         return 0.35 * _bounded_confident_mean_reward(totals, counts, max_abs=3.0)
 
     def health_penalty(self, *, scope: str, action_id: str, version_id: str) -> float:
         if not version_id:
             return 0.0
-        key = _version_key(scope, action_id, version_id)
-        count = self.reward_counts[key]
+        key_id = _version_key_id(scope, action_id, version_id)
+        count = self._reward_counts_by_id[key_id]
         if count <= 0:
             return 0.0
-        invalid_rate = self.invalid_counts[key] / count
-        false_positive_rate = self.false_positive_counts[key] / count
-        runtime_cost_rate = max(0.0, float(self.runtime_cost_totals[key]) / count)
+        invalid_rate = self._invalid_counts_by_id[key_id] / count
+        false_positive_rate = self._false_positive_counts_by_id[key_id] / count
+        runtime_cost_rate = max(0.0, float(self._runtime_cost_totals_by_id[key_id]) / count)
         return min(1.5, 0.25 * invalid_rate + 0.65 * false_positive_rate + 0.35 * runtime_cost_rate)
 
-    def _key_signal(self, key: str) -> float:
-        return _bounded_confident_mean_reward(self.reward_totals[key], self.reward_counts[key], max_abs=3.0)
+    def _key_signal(self, key_id: int) -> float:
+        return _bounded_confident_mean_reward(
+            self._reward_totals_by_id[key_id],
+            self._reward_counts_by_id[key_id],
+            max_abs=3.0,
+        )
+
+    def _rebuild_action_indexes(self) -> None:
+        self._action_reward_totals_by_id.clear()
+        self._action_reward_counts_by_id.clear()
+        for key_id, total in self._reward_totals_by_id.items():
+            action_key = _scope_action_prefix(_feature_text_from_id(key_id))
+            if not action_key:
+                continue
+            action_key_id = intern_feature(action_key)
+            self._action_reward_totals_by_id[action_key_id] += float(total)
+        for key_id, count in self._reward_counts_by_id.items():
+            action_key = _scope_action_prefix(_feature_text_from_id(key_id))
+            if not action_key:
+                continue
+            action_key_id = intern_feature(action_key)
+            self._action_reward_counts_by_id[action_key_id] += int(count)
 
     def to_state_dict(self) -> dict[str, Any]:
         return {
-            "reward_totals": dict(self.reward_totals),
-            "reward_counts": dict(self.reward_counts),
-            "runtime_cost_totals": dict(self.runtime_cost_totals),
-            "invalid_counts": dict(self.invalid_counts),
-            "false_positive_counts": dict(self.false_positive_counts),
+            "reward_totals": export_feature_mapping(self._reward_totals_by_id),
+            "reward_counts": export_feature_counter(self._reward_counts_by_id),
+            "runtime_cost_totals": export_feature_mapping(self._runtime_cost_totals_by_id),
+            "invalid_counts": export_feature_counter(self._invalid_counts_by_id),
+            "false_positive_counts": export_feature_counter(self._false_positive_counts_by_id),
         }
 
     @classmethod
     def from_state_dict(cls, data: Mapping[str, Any] | None) -> "VersionFeedbackMemory":
         if not isinstance(data, Mapping):
             return cls()
-        return cls(
-            reward_totals=_float_counter(data.get("reward_totals", {}) or {}),
-            reward_counts=_int_counter(data.get("reward_counts", {}) or {}),
-            runtime_cost_totals=_float_counter(data.get("runtime_cost_totals", {}) or {}),
-            invalid_counts=_int_counter(data.get("invalid_counts", {}) or {}),
-            false_positive_counts=_int_counter(data.get("false_positive_counts", {}) or {}),
+        memory = cls()
+        memory._reward_totals_by_id = Counter(
+            import_feature_float_mapping(data.get("reward_totals", {}) or {})
         )
+        memory._reward_counts_by_id = import_feature_counter(data.get("reward_counts", {}) or {})
+        memory._runtime_cost_totals_by_id = Counter(
+            import_feature_float_mapping(data.get("runtime_cost_totals", {}) or {})
+        )
+        memory._invalid_counts_by_id = import_feature_counter(data.get("invalid_counts", {}) or {})
+        memory._false_positive_counts_by_id = import_feature_counter(
+            data.get("false_positive_counts", {}) or {}
+        )
+        memory._rebuild_action_indexes()
+        return memory
 
 
 @dataclass(slots=True)
 class ContinualPriorityMemory:
-    feature_priority_totals: Counter[str] = field(default_factory=Counter)
-    feature_counts: Counter[str] = field(default_factory=Counter)
-    feature_health_penalty_totals: Counter[str] = field(default_factory=Counter)
-    feature_health_counts: Counter[str] = field(default_factory=Counter)
+    _feature_priority_totals_by_id: Counter[int] = field(default_factory=Counter, repr=False)
+    _feature_counts_by_id: Counter[int] = field(default_factory=Counter, repr=False)
+    _feature_health_penalty_totals_by_id: Counter[int] = field(default_factory=Counter, repr=False)
+    _feature_health_counts_by_id: Counter[int] = field(default_factory=Counter, repr=False)
     family_priorities: dict[str, float] = field(default_factory=dict)
     family_health_penalties: dict[str, float] = field(default_factory=dict)
     status_counts: Counter[str] = field(default_factory=Counter)
     imported_ledger_count: int = 0
     imported_family_count: int = 0
     imported_health_feedback_count: int = 0
+
+    @property
+    def feature_priority_totals(self) -> Counter[str]:
+        return Counter(export_feature_mapping(self._feature_priority_totals_by_id))
+
+    @property
+    def feature_counts(self) -> Counter[str]:
+        return Counter(export_feature_counter(self._feature_counts_by_id))
+
+    @property
+    def feature_health_penalty_totals(self) -> Counter[str]:
+        return Counter(export_feature_mapping(self._feature_health_penalty_totals_by_id))
+
+    @property
+    def feature_health_counts(self) -> Counter[str]:
+        return Counter(export_feature_counter(self._feature_health_counts_by_id))
 
     def ingest_ledger(self, ledger: Mapping[str, Any] | None) -> dict[str, Any]:
         if not isinstance(ledger, Mapping):
@@ -266,20 +475,21 @@ class ContinualPriorityMemory:
             self.status_counts[status] += 1
             self.imported_family_count += 1
             for feature in continual_priority_features(family=family, status=status):
-                self.feature_priority_totals[feature] += priority
-                self.feature_counts[feature] += 1
+                feature_id = intern_feature(feature)
+                self._feature_priority_totals_by_id[feature_id] += priority
+                self._feature_counts_by_id[feature_id] += 1
                 if health_penalty > 0.0:
-                    self.feature_health_penalty_totals[feature] += health_penalty
-                    self.feature_health_counts[feature] += 1
+                    self._feature_health_penalty_totals_by_id[feature_id] += health_penalty
+                    self._feature_health_counts_by_id[feature_id] += 1
         return self.summary()
 
     def merge(self, other: "ContinualPriorityMemory") -> dict[str, Any]:
         if not isinstance(other, ContinualPriorityMemory):
             return self.summary()
-        self.feature_priority_totals.update(other.feature_priority_totals)
-        self.feature_counts.update(other.feature_counts)
-        self.feature_health_penalty_totals.update(other.feature_health_penalty_totals)
-        self.feature_health_counts.update(other.feature_health_counts)
+        self._feature_priority_totals_by_id.update(other._feature_priority_totals_by_id)
+        self._feature_counts_by_id.update(other._feature_counts_by_id)
+        self._feature_health_penalty_totals_by_id.update(other._feature_health_penalty_totals_by_id)
+        self._feature_health_counts_by_id.update(other._feature_health_counts_by_id)
         self.status_counts.update(other.status_counts)
         self.imported_ledger_count += int(other.imported_ledger_count)
         self.imported_family_count += int(other.imported_family_count)
@@ -316,31 +526,33 @@ class ContinualPriorityMemory:
         )
         weighted_total = 0.0
         matched = 0
-        for feature in query_features:
-            count = int(self.feature_counts[feature])
+        for feature_id in _feature_ids_from_normalized(query_features):
+            count = int(self._feature_counts_by_id[feature_id])
             if count <= 0:
                 continue
-            weighted_total += float(self.feature_priority_totals[feature]) / count
+            weighted_total += float(self._feature_priority_totals_by_id[feature_id]) / count
             matched += 1
         if matched <= 0:
             return 0.0
         health_penalty_total = 0.0
         health_matched = 0
-        for feature in query_features:
-            count = int(self.feature_health_counts[feature])
+        for feature_id in _feature_ids_from_normalized(query_features):
+            count = int(self._feature_health_counts_by_id[feature_id])
             if count <= 0:
                 continue
-            health_penalty_total += float(self.feature_health_penalty_totals[feature]) / count
+            health_penalty_total += float(self._feature_health_penalty_totals_by_id[feature_id]) / count
             health_matched += 1
         health_penalty = health_penalty_total / health_matched if health_matched else 0.0
         return max(0.0, min(2.0, weighted_total / matched - health_penalty))
 
     def to_state_dict(self) -> dict[str, Any]:
         return {
-            "feature_priority_totals": dict(self.feature_priority_totals),
-            "feature_counts": dict(self.feature_counts),
-            "feature_health_penalty_totals": dict(self.feature_health_penalty_totals),
-            "feature_health_counts": dict(self.feature_health_counts),
+            "feature_priority_totals": export_feature_mapping(self._feature_priority_totals_by_id),
+            "feature_counts": export_feature_counter(self._feature_counts_by_id),
+            "feature_health_penalty_totals": export_feature_mapping(
+                self._feature_health_penalty_totals_by_id
+            ),
+            "feature_health_counts": export_feature_counter(self._feature_health_counts_by_id),
             "family_priorities": dict(sorted(self.family_priorities.items())),
             "family_health_penalties": dict(sorted(self.family_health_penalties.items())),
             "status_counts": dict(self.status_counts),
@@ -354,12 +566,16 @@ class ContinualPriorityMemory:
         if not isinstance(data, Mapping):
             return cls()
         return cls(
-            feature_priority_totals=_float_counter(data.get("feature_priority_totals", {}) or {}),
-            feature_counts=_int_counter(data.get("feature_counts", {}) or {}),
-            feature_health_penalty_totals=_float_counter(
-                data.get("feature_health_penalty_totals", {}) or {}
+            _feature_priority_totals_by_id=Counter(
+                import_feature_float_mapping(data.get("feature_priority_totals", {}) or {})
             ),
-            feature_health_counts=_int_counter(data.get("feature_health_counts", {}) or {}),
+            _feature_counts_by_id=import_feature_counter(data.get("feature_counts", {}) or {}),
+            _feature_health_penalty_totals_by_id=Counter(
+                import_feature_float_mapping(data.get("feature_health_penalty_totals", {}) or {})
+            ),
+            _feature_health_counts_by_id=import_feature_counter(
+                data.get("feature_health_counts", {}) or {}
+            ),
             family_priorities={
                 str(family): float(priority or 0.0)
                 for family, priority in (data.get("family_priorities", {}) or {}).items()
@@ -401,11 +617,27 @@ class ContinualPriorityMemory:
 
 @dataclass(slots=True)
 class ExplorationMemory:
-    context_counts: Counter[str] = field(default_factory=Counter)
-    action_counts: Counter[str] = field(default_factory=Counter)
-    context_reward_totals: Counter[str] = field(default_factory=Counter)
-    action_reward_totals: Counter[str] = field(default_factory=Counter)
+    _context_counts_by_id: Counter[int] = field(default_factory=Counter, repr=False)
+    _action_counts_by_id: Counter[int] = field(default_factory=Counter, repr=False)
+    _context_reward_totals_by_id: Counter[int] = field(default_factory=Counter, repr=False)
+    _action_reward_totals_by_id: Counter[int] = field(default_factory=Counter, repr=False)
     total_records: int = 0
+
+    @property
+    def context_counts(self) -> Counter[str]:
+        return Counter(export_feature_counter(self._context_counts_by_id))
+
+    @property
+    def action_counts(self) -> Counter[str]:
+        return Counter(export_feature_counter(self._action_counts_by_id))
+
+    @property
+    def context_reward_totals(self) -> Counter[str]:
+        return Counter(export_feature_mapping(self._context_reward_totals_by_id))
+
+    @property
+    def action_reward_totals(self) -> Counter[str]:
+        return Counter(export_feature_mapping(self._action_reward_totals_by_id))
 
     def record(
         self,
@@ -417,12 +649,12 @@ class ExplorationMemory:
         version_id: str = "",
     ) -> None:
         features = action_context_features(scope, action_id, context_features, version_id=version_id)
-        action_key = _action_key(scope, action_id, version_id)
-        self.action_counts[action_key] += 1
-        self.action_reward_totals[action_key] += float(reward)
-        for feature in features:
-            self.context_counts[feature] += 1
-            self.context_reward_totals[feature] += float(reward)
+        action_key_id = _action_key_id(scope, action_id, version_id)
+        self._action_counts_by_id[action_key_id] += 1
+        self._action_reward_totals_by_id[action_key_id] += float(reward)
+        for feature_id in _feature_ids_from_normalized(features):
+            self._context_counts_by_id[feature_id] += 1
+            self._context_reward_totals_by_id[feature_id] += float(reward)
         self.total_records += 1
 
     def exploration_bonus(
@@ -436,38 +668,42 @@ class ExplorationMemory:
         features = action_context_features(scope, action_id, context_features, version_id=version_id)
         if not features:
             return 0.0
-        action_key = _action_key(scope, action_id, version_id)
-        action_count = self.action_counts[action_key]
+        action_key_id = _action_key_id(scope, action_id, version_id)
+        action_count = self._action_counts_by_id[action_key_id]
         novelty = 1.0 / math.sqrt(1.0 + action_count)
-        context_coldness = sum(1.0 / math.sqrt(1.0 + self.context_counts[feature]) for feature in features)
+        feature_ids = _feature_ids_from_normalized(features)
+        context_coldness = sum(
+            1.0 / math.sqrt(1.0 + self._context_counts_by_id[feature_id])
+            for feature_id in feature_ids
+        )
         context_coldness /= math.sqrt(len(features))
-        potential = max(0.0, self._action_mean(action_key))
+        potential = max(0.0, self._action_mean(action_key_id))
         if potential <= 0.0:
-            potential = max(0.0, self._context_mean(features))
+            potential = max(0.0, self._context_mean(feature_ids))
         # Cold regions receive exploration pressure; early positive evidence keeps them from being ignored.
         return min(2.0, 0.55 * novelty + 0.35 * context_coldness + 0.20 * potential)
 
-    def _action_mean(self, action_key: str) -> float:
-        count = self.action_counts[action_key]
-        return float(self.action_reward_totals[action_key]) / count if count else 0.0
+    def _action_mean(self, action_key_id: int) -> float:
+        count = self._action_counts_by_id[action_key_id]
+        return float(self._action_reward_totals_by_id[action_key_id]) / count if count else 0.0
 
-    def _context_mean(self, features: tuple[str, ...]) -> float:
+    def _context_mean(self, feature_ids: tuple[int, ...]) -> float:
         reward = 0.0
         count = 0
-        for feature in features:
-            feature_count = self.context_counts[feature]
+        for feature_id in feature_ids:
+            feature_count = self._context_counts_by_id[feature_id]
             if feature_count <= 0:
                 continue
-            reward += float(self.context_reward_totals[feature])
+            reward += float(self._context_reward_totals_by_id[feature_id])
             count += int(feature_count)
         return reward / count if count else 0.0
 
     def to_state_dict(self) -> dict[str, Any]:
         return {
-            "context_counts": dict(self.context_counts),
-            "action_counts": dict(self.action_counts),
-            "context_reward_totals": dict(self.context_reward_totals),
-            "action_reward_totals": dict(self.action_reward_totals),
+            "context_counts": export_feature_counter(self._context_counts_by_id),
+            "action_counts": export_feature_counter(self._action_counts_by_id),
+            "context_reward_totals": export_feature_mapping(self._context_reward_totals_by_id),
+            "action_reward_totals": export_feature_mapping(self._action_reward_totals_by_id),
             "total_records": self.total_records,
         }
 
@@ -476,10 +712,14 @@ class ExplorationMemory:
         if not isinstance(data, Mapping):
             return cls()
         return cls(
-            context_counts=_int_counter(data.get("context_counts", {}) or {}),
-            action_counts=_int_counter(data.get("action_counts", {}) or {}),
-            context_reward_totals=_float_counter(data.get("context_reward_totals", {}) or {}),
-            action_reward_totals=_float_counter(data.get("action_reward_totals", {}) or {}),
+            _context_counts_by_id=import_feature_counter(data.get("context_counts", {}) or {}),
+            _action_counts_by_id=import_feature_counter(data.get("action_counts", {}) or {}),
+            _context_reward_totals_by_id=Counter(
+                import_feature_float_mapping(data.get("context_reward_totals", {}) or {})
+            ),
+            _action_reward_totals_by_id=Counter(
+                import_feature_float_mapping(data.get("action_reward_totals", {}) or {})
+            ),
             total_records=int(data.get("total_records", 0) or 0),
         )
 
@@ -494,6 +734,227 @@ class ExplorationMemory:
 
 
 @dataclass(slots=True)
+class TopLevelWeightCalibrator:
+    learning_rate: float = 0.05
+    l2: float = 0.002
+    min_scale: float = 0.25
+    max_scale: float = 3.0
+    health_min_scale: float = 0.5
+    health_max_scale: float = 3.0
+    _component_scales_dense: list[float] = field(
+        default_factory=lambda: [1.0] * _SELF_CALIBRATED_COMPONENT_COUNT,
+        repr=False,
+    )
+    _component_update_counts_dense: list[int] = field(
+        default_factory=lambda: [0] * _SELF_CALIBRATED_COMPONENT_COUNT,
+        repr=False,
+    )
+    _component_reward_totals_dense: list[float] = field(
+        default_factory=lambda: [0.0] * _SELF_CALIBRATED_COMPONENT_COUNT,
+        repr=False,
+    )
+    total_updates: int = 0
+    last_error: float = 0.0
+
+    @property
+    def component_scales(self) -> dict[str, float]:
+        return {
+            component: float(self._component_scales_dense[index])
+            for index, component in enumerate(_SELF_CALIBRATED_COMPONENTS)
+            if float(self._component_scales_dense[index]) != 1.0
+        }
+
+    @component_scales.setter
+    def component_scales(self, values: Mapping[str, Any] | None) -> None:
+        dense = [1.0] * _SELF_CALIBRATED_COMPONENT_COUNT
+        if isinstance(values, Mapping):
+            for component, scale in values.items():
+                index = _SELF_CALIBRATED_COMPONENT_INDEX.get(str(component))
+                if index is None:
+                    continue
+                dense[index] = _clip_component_scale(
+                    str(component),
+                    float(scale or 1.0),
+                    min_scale=self.min_scale,
+                    max_scale=self.max_scale,
+                    health_min_scale=self.health_min_scale,
+                    health_max_scale=self.health_max_scale,
+                )
+        self._component_scales_dense = dense
+
+    @property
+    def component_update_counts(self) -> Counter[str]:
+        return Counter(
+            {
+                component: int(self._component_update_counts_dense[index])
+                for index, component in enumerate(_SELF_CALIBRATED_COMPONENTS)
+                if int(self._component_update_counts_dense[index]) > 0
+            }
+        )
+
+    @component_update_counts.setter
+    def component_update_counts(self, values: Mapping[str, Any] | None) -> None:
+        dense = [0] * _SELF_CALIBRATED_COMPONENT_COUNT
+        if isinstance(values, Mapping):
+            for component, count in values.items():
+                index = _SELF_CALIBRATED_COMPONENT_INDEX.get(str(component))
+                if index is not None:
+                    dense[index] = int(count or 0)
+        self._component_update_counts_dense = dense
+
+    @property
+    def component_reward_totals(self) -> Counter[str]:
+        return Counter(
+            {
+                component: float(self._component_reward_totals_dense[index])
+                for index, component in enumerate(_SELF_CALIBRATED_COMPONENTS)
+                if float(self._component_reward_totals_dense[index]) != 0.0
+            }
+        )
+
+    @component_reward_totals.setter
+    def component_reward_totals(self, values: Mapping[str, Any] | None) -> None:
+        dense = [0.0] * _SELF_CALIBRATED_COMPONENT_COUNT
+        if isinstance(values, Mapping):
+            for component, total in values.items():
+                index = _SELF_CALIBRATED_COMPONENT_INDEX.get(str(component))
+                if index is not None:
+                    dense[index] = float(total or 0.0)
+        self._component_reward_totals_dense = dense
+
+    def scale(self, component: str) -> float:
+        index = _SELF_CALIBRATED_COMPONENT_INDEX.get(str(component))
+        if index is None:
+            return 1.0
+        return float(self._component_scales_dense[index] or 1.0)
+
+    def score(self, weighted_components: Mapping[str, float] | None) -> float:
+        if not weighted_components:
+            return 0.0
+        return self.score_dense(self._dense_component_values(weighted_components))
+
+    def score_dense(self, weighted_components_dense: tuple[float, ...]) -> float:
+        if not weighted_components_dense:
+            return 0.0
+        total = 0.0
+        scales = self._component_scales_dense
+        for index, value in enumerate(weighted_components_dense):
+            if value == 0.0:
+                continue
+            if index == _HEALTH_PENALTY_COMPONENT_INDEX:
+                total -= scales[index] * value
+            else:
+                total += scales[index] * value
+        return total
+
+    def update(self, weighted_components: Mapping[str, float] | None, reward: float, *, max_abs_reward: float = 6.0) -> float:
+        if not weighted_components:
+            return 0.0
+        return self.update_dense(
+            self._dense_component_values(weighted_components),
+            reward,
+            max_abs_reward=max_abs_reward,
+        )
+
+    def update_dense(
+        self,
+        weighted_components_dense: tuple[float, ...],
+        reward: float,
+        *,
+        max_abs_reward: float = 6.0,
+    ) -> float:
+        if not weighted_components_dense:
+            return 0.0
+        target = _bounded(float(reward), max_abs_reward)
+        prediction = self.score_dense(weighted_components_dense)
+        error = target - prediction
+        norm = 1.0 + sum(abs(value) for value in weighted_components_dense)
+        scales = self._component_scales_dense
+        counts = self._component_update_counts_dense
+        reward_totals = self._component_reward_totals_dense
+        for index, value in enumerate(weighted_components_dense):
+            if value == 0.0:
+                continue
+            current = scales[index]
+            component = _SELF_CALIBRATED_COMPONENTS[index]
+            sign = -1.0 if index == _HEALTH_PENALTY_COMPONENT_INDEX else 1.0
+            proposal = current + self.learning_rate * (
+                ((error * sign * value) / norm) - self.l2 * (current - 1.0)
+            )
+            scales[index] = _clip_component_scale(
+                component,
+                proposal,
+                min_scale=self.min_scale,
+                max_scale=self.max_scale,
+                health_min_scale=self.health_min_scale,
+                health_max_scale=self.health_max_scale,
+            )
+            counts[index] += 1
+            reward_totals[index] += target
+        self.total_updates += 1
+        self.last_error = error
+        return error
+
+    def snapshot(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "component": component,
+                "scale": self.scale(component),
+                "updates": int(self._component_update_counts_dense[index]),
+                "mean_reward": (
+                    float(self._component_reward_totals_dense[index]) / int(self._component_update_counts_dense[index])
+                    if self._component_update_counts_dense[index]
+                    else 0.0
+                ),
+            }
+            for index, component in enumerate(_SELF_CALIBRATED_COMPONENTS)
+        ]
+
+    def to_state_dict(self) -> dict[str, Any]:
+        return {
+            "learning_rate": self.learning_rate,
+            "l2": self.l2,
+            "min_scale": self.min_scale,
+            "max_scale": self.max_scale,
+            "health_min_scale": self.health_min_scale,
+            "health_max_scale": self.health_max_scale,
+            "component_scales": self.component_scales,
+            "component_update_counts": dict(self.component_update_counts),
+            "component_reward_totals": dict(self.component_reward_totals),
+            "total_updates": int(self.total_updates),
+            "last_error": float(self.last_error),
+        }
+
+    @classmethod
+    def from_state_dict(cls, data: Mapping[str, Any] | None) -> "TopLevelWeightCalibrator":
+        if not isinstance(data, Mapping):
+            return cls()
+        calibrator = cls(
+            learning_rate=_float_field(data, "learning_rate", 0.05),
+            l2=_float_field(data, "l2", 0.002),
+            min_scale=_float_field(data, "min_scale", 0.25),
+            max_scale=_float_field(data, "max_scale", 3.0),
+            health_min_scale=_float_field(data, "health_min_scale", 0.5),
+            health_max_scale=_float_field(data, "health_max_scale", 3.0),
+        )
+        calibrator.component_scales = data.get("component_scales", {}) or {}
+        calibrator.component_update_counts = _int_counter(data.get("component_update_counts", {}) or {})
+        calibrator.component_reward_totals = _float_counter(data.get("component_reward_totals", {}) or {})
+        calibrator.total_updates = int(data.get("total_updates", 0) or 0)
+        calibrator.last_error = float(data.get("last_error", 0.0) or 0.0)
+        return calibrator
+
+    def _dense_component_values(self, weighted_components: Mapping[str, float]) -> tuple[float, ...]:
+        return tuple(
+            float(weighted_components.get(component, 0.0) or 0.0)
+            for component in _SELF_CALIBRATED_COMPONENTS
+        )
+
+    def scales_dense(self) -> tuple[float, ...]:
+        return tuple(self._component_scales_dense)
+
+
+@dataclass(slots=True)
 class ContextualBandit:
     exploration_weight: float = 0.45
     model_weight: float = 0.35
@@ -502,6 +963,7 @@ class ContextualBandit:
     continual_priority_weight: float = 0.35
     active_learning_weight: float = 0.20
     reward_model: OnlineRewardModel = field(default_factory=OnlineRewardModel)
+    weight_calibrator: TopLevelWeightCalibrator = field(default_factory=TopLevelWeightCalibrator)
     arms: dict[str, ActionStats] = field(default_factory=dict)
     total_pulls: int = 0
 
@@ -518,7 +980,7 @@ class ContextualBandit:
         enable_reward_model: bool = True,
         enable_continual_learning: bool = True,
     ) -> str:
-        ranked = self.rank(
+        best = self.choose_dense(
             action_ids,
             scope=scope,
             context_features=context_features,
@@ -529,9 +991,37 @@ class ContextualBandit:
             enable_reward_model=enable_reward_model,
             enable_continual_learning=enable_continual_learning,
         )
-        if not ranked:
-            return ""
-        return ranked[0]["action_id"]
+        return best.action_id if best is not None else ""
+
+    def choose_dense(
+        self,
+        action_ids: Iterable[Any],
+        *,
+        scope: str,
+        context_features: Iterable[Any] = (),
+        version_id: str = "",
+        version_memory: VersionFeedbackMemory | None = None,
+        continual_priority_memory: ContinualPriorityMemory | None = None,
+        exploration_memory: ExplorationMemory | None = None,
+        enable_reward_model: bool = True,
+        enable_continual_learning: bool = True,
+    ) -> DenseBanditChoice | None:
+        best: DenseBanditChoice | None = None
+        for action_id in _unique_nonempty(action_ids):
+            choice = self._choose_action_dense(
+                action_id,
+                scope=scope,
+                context_features=context_features,
+                version_id=version_id,
+                version_memory=version_memory,
+                continual_priority_memory=continual_priority_memory,
+                exploration_memory=exploration_memory,
+                enable_reward_model=enable_reward_model,
+                enable_continual_learning=enable_continual_learning,
+            )
+            if best is None or choice.sort_key() > best.sort_key():
+                best = choice
+        return best
 
     def rank(
         self,
@@ -546,8 +1036,77 @@ class ContextualBandit:
         enable_reward_model: bool = True,
         enable_continual_learning: bool = True,
     ) -> list[dict[str, Any]]:
-        rows = [
-            self.score_action(
+        dense_rows = self.rank_dense(
+            action_ids,
+            scope=scope,
+            context_features=context_features,
+            version_id=version_id,
+            version_memory=version_memory,
+            continual_priority_memory=continual_priority_memory,
+            exploration_memory=exploration_memory,
+            enable_reward_model=enable_reward_model,
+            enable_continual_learning=enable_continual_learning,
+        )
+        calibrated_component_scales = _dense_component_dict(self.weight_calibrator.scales_dense())
+        return [
+            self._materialize_dense_score(
+                dense_row,
+                calibrated_component_scales=calibrated_component_scales,
+            )
+            for dense_row in dense_rows
+        ]
+
+    def rank_top(
+        self,
+        action_ids: Iterable[Any],
+        *,
+        scope: str,
+        limit: int,
+        context_features: Iterable[Any] = (),
+        version_id: str = "",
+        version_memory: VersionFeedbackMemory | None = None,
+        continual_priority_memory: ContinualPriorityMemory | None = None,
+        exploration_memory: ExplorationMemory | None = None,
+        enable_reward_model: bool = True,
+        enable_continual_learning: bool = True,
+    ) -> list[dict[str, Any]]:
+        if limit <= 0:
+            return []
+        dense_rows = self.rank_dense(
+            action_ids,
+            scope=scope,
+            context_features=context_features,
+            version_id=version_id,
+            version_memory=version_memory,
+            continual_priority_memory=continual_priority_memory,
+            exploration_memory=exploration_memory,
+            enable_reward_model=enable_reward_model,
+            enable_continual_learning=enable_continual_learning,
+        )[:limit]
+        calibrated_component_scales = _dense_component_dict(self.weight_calibrator.scales_dense())
+        return [
+            self._materialize_dense_score(
+                dense_row,
+                calibrated_component_scales=calibrated_component_scales,
+            )
+            for dense_row in dense_rows
+        ]
+
+    def rank_dense(
+        self,
+        action_ids: Iterable[Any],
+        *,
+        scope: str,
+        context_features: Iterable[Any] = (),
+        version_id: str = "",
+        version_memory: VersionFeedbackMemory | None = None,
+        continual_priority_memory: ContinualPriorityMemory | None = None,
+        exploration_memory: ExplorationMemory | None = None,
+        enable_reward_model: bool = True,
+        enable_continual_learning: bool = True,
+    ) -> list[DenseBanditScore]:
+        dense_rows = [
+            self._score_action_dense(
                 action_id,
                 scope=scope,
                 context_features=context_features,
@@ -560,7 +1119,7 @@ class ContextualBandit:
             )
             for action_id in _unique_nonempty(action_ids)
         ]
-        return sorted(rows, key=lambda row: (row["score"], -row["pulls"], row["action_id"]), reverse=True)
+        return sorted(dense_rows, key=DenseBanditScore.sort_key, reverse=True)
 
     def score_action(
         self,
@@ -575,71 +1134,21 @@ class ContextualBandit:
         enable_reward_model: bool = True,
         enable_continual_learning: bool = True,
     ) -> dict[str, Any]:
-        normalized_action = str(action_id).strip()
-        arm = self._arm(normalized_action)
-        features = action_context_features(scope, normalized_action, context_features, version_id=version_id)
-        reward_signal = arm.reward_signal()
-        model_prediction = self.reward_model.predict(features) if enable_reward_model else 0.0
-        uncertainty = self.reward_model.uncertainty(features) if enable_reward_model else 0.0
-        exploration = self.exploration_weight * math.sqrt(
-            math.log(self.total_pulls + 2.0) / (1.0 + arm.pulls)
+        dense_score = self._score_action_dense(
+            action_id,
+            scope=scope,
+            context_features=context_features,
+            version_id=version_id,
+            version_memory=version_memory,
+            continual_priority_memory=continual_priority_memory,
+            exploration_memory=exploration_memory,
+            enable_reward_model=enable_reward_model,
+            enable_continual_learning=enable_continual_learning,
         )
-        version_signal = (
-            version_memory.transfer_signal(scope=scope, action_id=normalized_action, version_id=version_id)
-            if enable_continual_learning and version_memory is not None
-            else 0.0
+        return self._materialize_dense_score(
+            dense_score,
+            calibrated_component_scales=_dense_component_dict(self.weight_calibrator.scales_dense()),
         )
-        continual_priority_signal = (
-            continual_priority_memory.priority_signal(
-                scope=scope,
-                action_id=normalized_action,
-                context_features=context_features,
-                version_id=version_id,
-            )
-            if enable_continual_learning and continual_priority_memory is not None
-            else 0.0
-        )
-        exploration_bonus = (
-            exploration_memory.exploration_bonus(
-                scope=scope,
-                action_id=normalized_action,
-                context_features=context_features,
-                version_id=version_id,
-            )
-            if exploration_memory is not None
-            else 0.0
-        )
-        health_penalty = arm.health_penalty()
-        if enable_continual_learning and version_memory is not None:
-            health_penalty += version_memory.health_penalty(
-                scope=scope,
-                action_id=normalized_action,
-                version_id=version_id,
-            )
-        score = (
-            reward_signal
-            + self.model_weight * model_prediction
-            + self.uncertainty_weight * uncertainty
-            + exploration
-            + self.version_weight * version_signal
-            + self.continual_priority_weight * continual_priority_signal
-            + self.active_learning_weight * exploration_bonus
-            - health_penalty
-        )
-        return {
-            "action_id": normalized_action,
-            "score": score,
-            "pulls": arm.pulls,
-            "mean_reward": arm.mean_reward,
-            "reward_signal": reward_signal,
-            "model_prediction": model_prediction,
-            "uncertainty": uncertainty,
-            "exploration": exploration,
-            "version_signal": version_signal,
-            "continual_priority_signal": continual_priority_signal,
-            "exploration_bonus": exploration_bonus,
-            "health_penalty": health_penalty,
-        }
 
     def record(
         self,
@@ -654,10 +1163,24 @@ class ContextualBandit:
         fallback_used: bool = False,
         false_positive: bool = False,
         enable_reward_model: bool = True,
+        version_memory: VersionFeedbackMemory | None = None,
+        continual_priority_memory: ContinualPriorityMemory | None = None,
+        exploration_memory: ExplorationMemory | None = None,
+        enable_continual_learning: bool = True,
     ) -> float:
         normalized_action = str(action_id).strip()
-        arm = self._arm(normalized_action)
         bounded_reward = float(reward)
+        arm, features, _, weighted_components_dense = self._score_components_dense(
+            normalized_action,
+            scope=scope,
+            context_features=context_features,
+            version_id=version_id,
+            version_memory=version_memory,
+            continual_priority_memory=continual_priority_memory,
+            exploration_memory=exploration_memory,
+            enable_reward_model=enable_reward_model,
+            enable_continual_learning=enable_continual_learning,
+        )
         arm.pulls += 1
         arm.total_reward += bounded_reward
         arm.reward_sq_total += bounded_reward * bounded_reward
@@ -671,17 +1194,190 @@ class ContextualBandit:
         if false_positive:
             arm.false_positive_count += 1
         self.total_pulls += 1
+        self.weight_calibrator.update_dense(weighted_components_dense, bounded_reward)
         if not enable_reward_model:
             return 0.0
-        return self.reward_model.update(
-            action_context_features(scope, normalized_action, context_features, version_id=version_id),
-            bounded_reward,
-        )
+        return self.reward_model.update_normalized(features, bounded_reward)
 
     def _arm(self, action_id: str) -> ActionStats:
         if action_id not in self.arms:
             self.arms[action_id] = ActionStats(action_id=action_id)
         return self.arms[action_id]
+
+    def _choose_action_dense(
+        self,
+        action_id: Any,
+        *,
+        scope: str,
+        context_features: Iterable[Any],
+        version_id: str,
+        version_memory: VersionFeedbackMemory | None,
+        continual_priority_memory: ContinualPriorityMemory | None,
+        exploration_memory: ExplorationMemory | None,
+        enable_reward_model: bool,
+        enable_continual_learning: bool,
+    ) -> DenseBanditChoice:
+        normalized_action = str(action_id).strip()
+        arm, _, _, weighted_components_dense = self._score_components_dense(
+            normalized_action,
+            scope=scope,
+            context_features=context_features,
+            version_id=version_id,
+            version_memory=version_memory,
+            continual_priority_memory=continual_priority_memory,
+            exploration_memory=exploration_memory,
+            enable_reward_model=enable_reward_model,
+            enable_continual_learning=enable_continual_learning,
+        )
+        return DenseBanditChoice(
+            action_id=normalized_action,
+            score=self.weight_calibrator.score_dense(weighted_components_dense),
+            pulls=arm.pulls,
+        )
+
+    def _score_action_dense(
+        self,
+        action_id: Any,
+        *,
+        scope: str,
+        context_features: Iterable[Any],
+        version_id: str,
+        version_memory: VersionFeedbackMemory | None,
+        continual_priority_memory: ContinualPriorityMemory | None,
+        exploration_memory: ExplorationMemory | None,
+        enable_reward_model: bool,
+        enable_continual_learning: bool,
+    ) -> DenseBanditScore:
+        normalized_action = str(action_id).strip()
+        arm, _, signal_components_dense, weighted_components_dense = self._score_components_dense(
+            normalized_action,
+            scope=scope,
+            context_features=context_features,
+            version_id=version_id,
+            version_memory=version_memory,
+            continual_priority_memory=continual_priority_memory,
+            exploration_memory=exploration_memory,
+            enable_reward_model=enable_reward_model,
+            enable_continual_learning=enable_continual_learning,
+        )
+        return DenseBanditScore(
+            action_id=normalized_action,
+            score=self.weight_calibrator.score_dense(weighted_components_dense),
+            pulls=arm.pulls,
+            mean_reward=arm.mean_reward,
+            signal_components_dense=signal_components_dense,
+            weighted_components_dense=weighted_components_dense,
+        )
+
+    def _materialize_dense_score(
+        self,
+        dense_score: DenseBanditScore,
+        *,
+        calibrated_component_scales: Mapping[str, float] | None = None,
+    ) -> dict[str, Any]:
+        row = _dense_component_dict(dense_score.signal_components_dense)
+        row.update(
+            {
+                "weighted_components": _dense_component_dict(dense_score.weighted_components_dense),
+                "calibrated_component_scales": (
+                    dict(calibrated_component_scales)
+                    if calibrated_component_scales is not None
+                    else _dense_component_dict(self.weight_calibrator.scales_dense())
+                ),
+            }
+        )
+        row.update(
+            {
+                "action_id": dense_score.action_id,
+                "score": dense_score.score,
+                "pulls": dense_score.pulls,
+                "mean_reward": dense_score.mean_reward,
+            }
+        )
+        return row
+
+    def _score_components_dense(
+        self,
+        action_id: str,
+        *,
+        scope: str,
+        context_features: Iterable[Any],
+        version_id: str,
+        version_memory: VersionFeedbackMemory | None,
+        continual_priority_memory: ContinualPriorityMemory | None,
+        exploration_memory: ExplorationMemory | None,
+        enable_reward_model: bool,
+        enable_continual_learning: bool,
+    ) -> tuple[ActionStats, tuple[str, ...], tuple[float, ...], tuple[float, ...]]:
+        normalized_scope = str(scope or "")
+        normalized_version = str(version_id or "").strip()
+        normalized_context_features = tuple(str(feature) for feature in context_features)
+        arm = self._arm(action_id)
+        features = _action_context_features_cached(
+            normalized_scope,
+            action_id,
+            normalized_context_features,
+            bool(normalized_version),
+        )
+        model_prediction = self.reward_model.predict_normalized(features) if enable_reward_model else 0.0
+        uncertainty = self.reward_model.uncertainty_normalized(features) if enable_reward_model else 0.0
+        version_signal = (
+            version_memory.transfer_signal(
+                scope=normalized_scope,
+                action_id=action_id,
+                version_id=normalized_version,
+            )
+            if enable_continual_learning and version_memory is not None
+            else 0.0
+        )
+        continual_priority_signal = (
+            continual_priority_memory.priority_signal(
+                scope=normalized_scope,
+                action_id=action_id,
+                context_features=normalized_context_features,
+                version_id=normalized_version,
+            )
+            if enable_continual_learning and continual_priority_memory is not None
+            else 0.0
+        )
+        exploration_bonus = (
+            exploration_memory.exploration_bonus(
+                scope=normalized_scope,
+                action_id=action_id,
+                context_features=normalized_context_features,
+                version_id=normalized_version,
+            )
+            if exploration_memory is not None
+            else 0.0
+        )
+        health_penalty = arm.health_penalty()
+        if enable_continual_learning and version_memory is not None:
+            health_penalty += version_memory.health_penalty(
+                scope=normalized_scope,
+                action_id=action_id,
+                version_id=normalized_version,
+            )
+        signal_components_dense = (
+            arm.reward_signal(),
+            model_prediction,
+            uncertainty,
+            self.exploration_weight * math.sqrt(math.log(self.total_pulls + 2.0) / (1.0 + arm.pulls)),
+            version_signal,
+            continual_priority_signal,
+            exploration_bonus,
+            health_penalty,
+        )
+        weighted_components_dense = (
+            signal_components_dense[_REWARD_SIGNAL_COMPONENT_INDEX],
+            self.model_weight * signal_components_dense[_MODEL_PREDICTION_COMPONENT_INDEX],
+            self.uncertainty_weight * signal_components_dense[_UNCERTAINTY_COMPONENT_INDEX],
+            signal_components_dense[_EXPLORATION_COMPONENT_INDEX],
+            self.version_weight * signal_components_dense[_VERSION_SIGNAL_COMPONENT_INDEX],
+            self.continual_priority_weight * signal_components_dense[_CONTINUAL_PRIORITY_SIGNAL_COMPONENT_INDEX],
+            self.active_learning_weight * signal_components_dense[_EXPLORATION_BONUS_COMPONENT_INDEX],
+            signal_components_dense[_HEALTH_PENALTY_COMPONENT_INDEX],
+        )
+        return arm, features, signal_components_dense, weighted_components_dense
 
     def to_state_dict(self) -> dict[str, Any]:
         return {
@@ -693,6 +1389,7 @@ class ContextualBandit:
             "active_learning_weight": self.active_learning_weight,
             "total_pulls": self.total_pulls,
             "reward_model": self.reward_model.to_state_dict(),
+            "weight_calibrator": self.weight_calibrator.to_state_dict(),
             "arms": [arm.to_state_dict() for arm in self.arms.values()],
         }
 
@@ -708,6 +1405,7 @@ class ContextualBandit:
             continual_priority_weight=_float_field(data, "continual_priority_weight", 0.35),
             active_learning_weight=_float_field(data, "active_learning_weight", 0.20),
             reward_model=OnlineRewardModel.from_state_dict(data.get("reward_model")),
+            weight_calibrator=TopLevelWeightCalibrator.from_state_dict(data.get("weight_calibrator")),
         )
         bandit.total_pulls = int(data.get("total_pulls", 0) or 0)
         for raw_arm in data.get("arms", []) or []:
@@ -724,6 +1422,29 @@ class AdaptiveLearningState:
     version_memory: VersionFeedbackMemory = field(default_factory=VersionFeedbackMemory)
     continual_priority_memory: ContinualPriorityMemory = field(default_factory=ContinualPriorityMemory)
     exploration_memory: ExplorationMemory = field(default_factory=ExplorationMemory)
+
+    def choose_dense(
+        self,
+        scope: str,
+        action_ids: Iterable[Any],
+        *,
+        context_features: Iterable[Any] = (),
+        version_id: str = "",
+        enable_active_learning: bool = True,
+        enable_reward_model: bool = True,
+        enable_continual_learning: bool = True,
+    ) -> DenseBanditChoice | None:
+        return self._bandit(scope).choose_dense(
+            action_ids,
+            scope=scope,
+            context_features=context_features,
+            version_id=version_id,
+            version_memory=self.version_memory,
+            continual_priority_memory=self.continual_priority_memory,
+            exploration_memory=self.exploration_memory if enable_active_learning else None,
+            enable_reward_model=enable_reward_model,
+            enable_continual_learning=enable_continual_learning,
+        )
 
     def choose(
         self,
@@ -762,6 +1483,31 @@ class AdaptiveLearningState:
         return self._bandit(scope).rank(
             action_ids,
             scope=scope,
+            context_features=context_features,
+            version_id=version_id,
+            version_memory=self.version_memory,
+            continual_priority_memory=self.continual_priority_memory,
+            exploration_memory=self.exploration_memory if enable_active_learning else None,
+            enable_reward_model=enable_reward_model,
+            enable_continual_learning=enable_continual_learning,
+        )
+
+    def rank_top(
+        self,
+        scope: str,
+        action_ids: Iterable[Any],
+        *,
+        limit: int,
+        context_features: Iterable[Any] = (),
+        version_id: str = "",
+        enable_active_learning: bool = True,
+        enable_reward_model: bool = True,
+        enable_continual_learning: bool = True,
+    ) -> list[dict[str, Any]]:
+        return self._bandit(scope).rank_top(
+            action_ids,
+            scope=scope,
+            limit=limit,
             context_features=context_features,
             version_id=version_id,
             version_memory=self.version_memory,
@@ -824,6 +1570,10 @@ class AdaptiveLearningState:
             fallback_used=fallback_used,
             false_positive=false_positive,
             enable_reward_model=enable_reward_model,
+            version_memory=self.version_memory,
+            continual_priority_memory=self.continual_priority_memory,
+            exploration_memory=self.exploration_memory,
+            enable_continual_learning=True,
         )
         self.version_memory.record(
             scope=normalized_scope,
@@ -879,6 +1629,10 @@ class AdaptiveLearningState:
             "max_health_penalty": max(health_penalties) if health_penalties else 0.0,
             "avg_uncertainty": _mean(uncertainties),
             "version_memory_key_count": len(self.version_memory.reward_counts),
+            "calibrated_component_scales": {
+                scope: bandit.weight_calibrator.snapshot()
+                for scope, bandit in sorted(self.bandits.items())
+            },
             "continual_priority_memory": self.continual_priority_memory.summary(),
             "exploration_memory": self.exploration_memory.summary(),
         }
@@ -924,11 +1678,12 @@ def action_context_features(
     *,
     version_id: str = "",
 ) -> tuple[str, ...]:
-    features = [f"scope:{_token(scope)}", f"action:{_token(action_id)}"]
-    if version_id:
-        features.append("version:present")
-    features.extend(_normalize_features(context_features))
-    return tuple(_unique_nonempty(features))
+    return _action_context_features_cached(
+        str(scope or ""),
+        str(action_id or ""),
+        tuple(str(feature) for feature in context_features),
+        bool(version_id),
+    )
 
 
 def context_features_from_mapping(data: Mapping[str, Any] | None) -> tuple[str, ...]:
@@ -1070,28 +1825,12 @@ def continual_priority_query_features(
     context_features: Iterable[Any] = (),
     version_id: str = "",
 ) -> tuple[str, ...]:
-    raw_features = list(context_features) + [scope, action_id, version_id]
-    out: list[str] = []
-    for raw in raw_features:
-        text = str(raw or "").strip()
-        if not text:
-            continue
-        normalized = _feature_token(text)
-        out.append(normalized)
-        prefix, _, suffix = normalized.partition(":")
-        candidates = [suffix] if suffix else [normalized]
-        if prefix in {"semantic_family", "semantic_focus_families", "guidance_targets"}:
-            candidates.append(suffix.removeprefix("semantic_family_"))
-        if prefix in {"backend", "backends", "target_suite"}:
-            candidates.append(suffix)
-        for candidate in candidates:
-            if not candidate:
-                continue
-            out.append(f"family:{_token(candidate)}")
-            out.append(f"backend:{_token(candidate)}")
-            for part in _split_semantic_parts(candidate):
-                out.append(f"family_token:{_token(part)}")
-    return tuple(_unique_nonempty(out))
+    return _continual_priority_query_features_cached(
+        str(scope or ""),
+        str(action_id or ""),
+        tuple(str(feature) for feature in context_features),
+        str(version_id or ""),
+    )
 
 
 def _ledger_priority_rows(ledger: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -1245,34 +1984,84 @@ def _bounded(value: float, max_abs: float) -> float:
     return max(-max_abs, min(max_abs, float(value)))
 
 
+def _clip_component_scale(
+    component: str,
+    value: float,
+    *,
+    min_scale: float,
+    max_scale: float,
+    health_min_scale: float,
+    health_max_scale: float,
+) -> float:
+    if component == "health_penalty":
+        return max(float(health_min_scale), min(float(health_max_scale), float(value)))
+    return max(float(min_scale), min(float(max_scale), float(value)))
+
+
 def _mean(values: Iterable[float]) -> float:
     items = [float(value) for value in values]
     return sum(items) / len(items) if items else 0.0
+
+
+def _dense_component_dict(values: Iterable[float]) -> dict[str, float]:
+    return {
+        component: float(value)
+        for component, value in zip(_SELF_CALIBRATED_COMPONENTS, values, strict=False)
+    }
 
 
 def _version_key(scope: str, action_id: str, version_id: str) -> str:
     return f"{_token(scope)}|{_token(action_id)}|{_token(version_id)}"
 
 
+def _scope_action_key(scope: str, action_id: str) -> str:
+    return f"{_token(scope)}|{_token(action_id)}"
+
+
+def _scope_action_prefix(version_key: str) -> str:
+    prefix, sep, _ = str(version_key or "").rpartition("|")
+    return prefix if sep else ""
+
+
 def _action_key(scope: str, action_id: str, version_id: str) -> str:
     return f"{_token(scope)}|{_token(action_id)}|{_token(version_id or 'any_version')}"
 
 
+def _feature_text_from_id(feature_id: int) -> str:
+    return resolve_feature_id(feature_id)
+
+
+def _version_key_id(scope: str, action_id: str, version_id: str) -> int:
+    return intern_feature(_version_key(scope, action_id, version_id))
+
+
+def _scope_action_key_id(scope: str, action_id: str) -> int:
+    return intern_feature(_scope_action_key(scope, action_id))
+
+
+def _action_key_id(scope: str, action_id: str, version_id: str) -> int:
+    return intern_feature(_action_key(scope, action_id, version_id))
+
+
 def _normalize_features(features: Iterable[Any]) -> tuple[str, ...]:
-    return tuple(_unique_nonempty([_feature_token(feature) for feature in features]))
+    return _normalize_feature_texts(tuple(str(feature) for feature in features))
+
+
+@lru_cache(maxsize=32768)
+def _feature_ids_from_normalized(normalized: tuple[str, ...]) -> tuple[int, ...]:
+    return intern_feature_ids(normalized)
 
 
 def _feature_token(value: Any) -> str:
-    text = str(value).strip()
-    if not text:
-        return ""
-    if ":" in text:
-        prefix, _, suffix = text.partition(":")
-        return f"{_token(prefix)}:{_token(suffix)}"
-    return _token(text)
+    return _cached_feature_token(str(value))
 
 
 def _token(value: Any) -> str:
+    return _cached_token(str(value))
+
+
+@lru_cache(maxsize=32768)
+def _cached_token(value: str) -> str:
     text = str(value).strip().lower()
     chars: list[str] = []
     last_sep = False
@@ -1285,6 +2074,67 @@ def _token(value: Any) -> str:
             last_sep = True
     token = "".join(chars).strip("_")
     return token[:96] if token else "none"
+
+
+@lru_cache(maxsize=32768)
+def _cached_feature_token(value: str) -> str:
+    text = str(value).strip()
+    if not text:
+        return ""
+    if ":" in text:
+        prefix, _, suffix = text.partition(":")
+        return f"{_cached_token(prefix)}:{_cached_token(suffix)}"
+    return _cached_token(text)
+
+
+@lru_cache(maxsize=32768)
+def _normalize_feature_texts(raw_features: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(_unique_nonempty(_cached_feature_token(feature) for feature in raw_features))
+
+
+@lru_cache(maxsize=32768)
+def _action_context_features_cached(
+    scope: str,
+    action_id: str,
+    context_features: tuple[str, ...],
+    version_present: bool,
+) -> tuple[str, ...]:
+    features = [f"scope:{_cached_token(scope)}", f"action:{_cached_token(action_id)}"]
+    if version_present:
+        features.append("version:present")
+    features.extend(_normalize_feature_texts(context_features))
+    return tuple(_unique_nonempty(features))
+
+
+@lru_cache(maxsize=32768)
+def _continual_priority_query_features_cached(
+    scope: str,
+    action_id: str,
+    context_features: tuple[str, ...],
+    version_id: str,
+) -> tuple[str, ...]:
+    raw_features = context_features + (scope, action_id, version_id)
+    out: list[str] = []
+    for text in raw_features:
+        stripped = str(text or "").strip()
+        if not stripped:
+            continue
+        normalized = _cached_feature_token(stripped)
+        out.append(normalized)
+        prefix, _, suffix = normalized.partition(":")
+        candidates = [suffix] if suffix else [normalized]
+        if prefix in {"semantic_family", "semantic_focus_families", "guidance_targets"}:
+            candidates.append(suffix.removeprefix("semantic_family_"))
+        if prefix in {"backend", "backends", "target_suite"}:
+            candidates.append(suffix)
+        for candidate in candidates:
+            if not candidate:
+                continue
+            out.append(f"family:{_cached_token(candidate)}")
+            out.append(f"backend:{_cached_token(candidate)}")
+            for part in _split_semantic_parts(candidate):
+                out.append(f"family_token:{_cached_token(part)}")
+    return tuple(_unique_nonempty(out))
 
 
 def _unique_nonempty(values: Iterable[Any]) -> list[str]:

@@ -122,14 +122,16 @@ class JsonlWriter:
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
+    return list(iter_jsonl(path))
+
+
+def iter_jsonl(path: Path):
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "rt", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line:
-                rows.append(json.loads(line))
-    return rows
+                yield json.loads(line)
 
 
 def read_jsonl_partial(path: Path) -> tuple[list[dict[str, Any]], bool]:

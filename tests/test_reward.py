@@ -6,6 +6,7 @@ from datadiff.reward import (
     candidate_bug_signatures,
     coerce_case_feedback_summary,
     is_known_saturated_candidate_bug_finding,
+    is_rewardable_candidate_bug_finding,
     offline_finding_buckets,
     online_case_reward,
     row_reward_signals,
@@ -139,6 +140,33 @@ def test_known_saturated_family_matches_any_suspicious_backend():
     assert signals["known_saturated_candidate_bug_count"] == 1
 
 
+def test_source_issue_candidates_are_not_fresh_online_discoveries():
+    finding = {
+        "triage_verdict": "candidate_implementation_bug",
+        "root_cause": "csv_long_numeric_roundtrip",
+        "suspicious_backends": ["duckdb"],
+        "signature": "source-issue-sig",
+        "discovery_origin": "organic",
+        "source_issue": "duckdb/duckdb#12345",
+    }
+    row = {
+        "findings": [finding],
+        "preflight": {"valid": True, "fallback_used": False},
+    }
+
+    signals = row_reward_signals(row)
+    buckets = offline_finding_buckets([finding])
+
+    assert is_rewardable_candidate_bug_finding(finding) is False
+    assert signals["candidate_bug"] is False
+    assert signals["candidate_bug_count"] == 0
+    assert signals["source_issue_candidate_bug_count"] == 1
+    assert candidate_bug_family_keys([finding]) == {}
+    assert candidate_bug_signatures([finding]) == {}
+    assert buckets["known_bug"] == 1
+    assert online_case_reward(row) < 0.0
+
+
 def test_resolved_semantic_divergence_is_not_positive_reward_signal():
     row = {
         "findings": [
@@ -182,6 +210,28 @@ def test_semantic_divergence_needs_confirmation_gets_small_positive_reward():
     assert signals["rewardable_semantic_divergence"] is True
     assert signals["needs_confirmation"] is True
     assert online_case_reward(row) > 0.0
+
+
+def test_manual_confirmation_is_not_rewardable_semantic_divergence():
+    row = {
+        "findings": [
+            {
+                "triage_verdict": "needs_manual_confirmation",
+                "root_cause": "unknown",
+                "suspicious_backends": ["duckdb", "pandas"],
+                "signature": "manual-confirmation",
+            }
+        ],
+        "preflight": {"valid": True, "fallback_used": False},
+    }
+
+    signals = row_reward_signals(row)
+
+    assert signals["semantic_divergence"] is False
+    assert signals["semantic_divergence_count"] == 0
+    assert signals["rewardable_semantic_divergence"] is False
+    assert signals["needs_confirmation"] is True
+    assert online_case_reward(row) < 0.0
 
 
 def test_offline_finding_buckets_match_paper_triage_categories():
@@ -253,6 +303,102 @@ def test_summarize_case_feedback_exposes_closed_loop_adjustments():
     assert summary["source_reward_adjustment"] > 0.0
     assert summary["guidance_reward_adjustment"] > 0.0
     assert summary["seed_schedule_delta"] > 0.0
+
+
+def test_feedback_summary_suppresses_auxiliary_rewards_for_resolved_semantic_only():
+    row = {
+        "candidate_source": "feedback_mutation",
+        "is_new_behavior": True,
+        "signal_new_behavior": True,
+        "stored_in_feedback_corpus": True,
+        "preflight": {"valid": True, "fallback_used": False},
+        "findings": [
+            {
+                "triage_verdict": "expected_semantic_divergence",
+                "root_cause": "nan_inf_semantics",
+                "suspicious_backends": ["duckdb"],
+                "signature": "resolved-semantic",
+            }
+        ],
+        "quality_oracles": [
+            {"name": "mutation", "verdict": "productive_mutation", "passed": True, "score": 1.0},
+            {"name": "feedback", "verdict": "finding_yield", "passed": True, "score": 1.0},
+            {"name": "guidance", "verdict": "guided_productive", "passed": True, "score": 1.0},
+        ],
+    }
+
+    summary = feedback_summary_for_case(row)
+
+    assert summary["candidate_bug_count"] == 0
+    assert summary["resolved_semantic_divergence_count"] == 1
+    assert summary["source_reward_adjustment"] == 0.0
+    assert summary["guidance_reward_adjustment"] == 0.0
+    assert summary["seed_schedule_delta"] == -0.25
+
+
+def test_feedback_summary_suppresses_auxiliary_rewards_for_false_positive_only():
+    row = {
+        "candidate_source": "feedback_mutation",
+        "is_new_behavior": True,
+        "signal_new_behavior": True,
+        "stored_in_feedback_corpus": True,
+        "preflight": {"valid": True, "fallback_used": False},
+        "findings": [
+            {
+                "triage_verdict": "normalizer_false_positive",
+                "root_cause": "order_only_normalization_mismatch",
+                "false_positive": True,
+                "suspicious_backends": ["sqlite"],
+                "signature": "false-positive",
+            }
+        ],
+        "quality_oracles": [
+            {"name": "mutation", "verdict": "productive_mutation", "passed": True, "score": 1.0},
+            {"name": "feedback", "verdict": "finding_yield", "passed": True, "score": 1.0},
+            {"name": "guidance", "verdict": "guided_productive", "passed": True, "score": 1.0},
+        ],
+    }
+
+    summary = feedback_summary_for_case(row)
+
+    assert summary["candidate_bug_count"] == 0
+    assert summary["false_positive_count"] == 1
+    assert summary["source_reward_adjustment"] == 0.0
+    assert summary["guidance_reward_adjustment"] == 0.0
+    assert summary["seed_schedule_delta"] == -1.0
+
+
+def test_feedback_summary_suppresses_auxiliary_rewards_for_source_issue_only():
+    row = {
+        "candidate_source": "feedback_mutation",
+        "is_new_behavior": True,
+        "signal_new_behavior": True,
+        "stored_in_feedback_corpus": True,
+        "preflight": {"valid": True, "fallback_used": False},
+        "findings": [
+            {
+                "triage_verdict": "candidate_implementation_bug",
+                "root_cause": "csv_long_numeric_roundtrip",
+                "suspicious_backends": ["duckdb"],
+                "signature": "known-source-issue",
+                "source_issue": "duckdb/duckdb#12345",
+                "discovery_origin": "organic",
+            }
+        ],
+        "quality_oracles": [
+            {"name": "mutation", "verdict": "productive_mutation", "passed": True, "score": 1.0},
+            {"name": "feedback", "verdict": "finding_yield", "passed": True, "score": 1.0},
+            {"name": "guidance", "verdict": "guided_productive", "passed": True, "score": 1.0},
+        ],
+    }
+
+    summary = feedback_summary_for_case(row)
+
+    assert summary["candidate_bug_count"] == 0
+    assert summary["source_issue_candidate_bug_count"] == 1
+    assert summary["source_reward_adjustment"] == 0.0
+    assert summary["guidance_reward_adjustment"] == 0.0
+    assert summary["seed_schedule_delta"] == 0.0
 
 
 def test_feedback_summary_tracks_semantic_affinity_hits_and_selected_operator():
@@ -338,7 +484,7 @@ def test_feedback_summary_helpers_preserve_and_aggregate_closed_loop_signals():
     aggregate = aggregate_feedback_summaries([row])
 
     assert summary["candidate_source"] == "feedback_mutation"
-    assert summary["source_reward_adjustment"] == 0.42
+    assert summary["source_reward_adjustment"] == 0.5
     assert aggregate["feedback_case_count"] == 1
     assert aggregate["feedback_mutation_cases"] == 1
     assert aggregate["stored_in_feedback_corpus_cases"] == 1
@@ -346,4 +492,44 @@ def test_feedback_summary_helpers_preserve_and_aggregate_closed_loop_signals():
     assert aggregate["productive_mutation_cases"] == 1
     assert aggregate["feedback_finding_yield_cases"] == 1
     assert aggregate["guided_productive_cases"] == 1
-    assert aggregate["source_reward_adjustment_total"] == 0.42
+    assert aggregate["source_reward_adjustment_total"] == 0.5
+
+
+def test_feedback_summary_helpers_recompute_polluted_existing_summary():
+    row = {
+        "candidate_source": "feedback_mutation",
+        "is_new_behavior": True,
+        "signal_new_behavior": True,
+        "stored_in_feedback_corpus": True,
+        "preflight": {"valid": True, "fallback_used": False},
+        "findings": [
+            {
+                "triage_verdict": "normalizer_false_positive",
+                "root_cause": "order_only_normalization_mismatch",
+                "false_positive": True,
+                "signature": "polluted-false-positive",
+            }
+        ],
+        "quality_oracles": [
+            {"name": "mutation", "verdict": "productive_mutation", "passed": True, "score": 1.0},
+            {"name": "feedback", "verdict": "finding_yield", "passed": True, "score": 1.0},
+            {"name": "guidance", "verdict": "guided_productive", "passed": True, "score": 1.0},
+        ],
+        "feedback_summary": {
+            "candidate_bug_count": 99,
+            "signal_new_behavior": True,
+            "source_reward_adjustment": 0.5,
+            "guidance_reward_adjustment": 0.25,
+        },
+    }
+
+    summary = coerce_case_feedback_summary(row)
+    aggregate = aggregate_feedback_summaries([row])
+
+    assert summary["candidate_bug_count"] == 0
+    assert summary["false_positive_count"] == 1
+    assert summary["raw_signal_new_behavior"] is True
+    assert summary["signal_new_behavior"] is False
+    assert summary["source_reward_adjustment"] == 0.0
+    assert summary["guidance_reward_adjustment"] == 0.0
+    assert aggregate["source_reward_adjustment_total"] == 0.0

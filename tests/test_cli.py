@@ -804,8 +804,14 @@ def test_cli_discovery_campaign_writes_targeted_manifest(tmp_path, monkeypatch):
         "pyarrow_list_flatten_parent_indices_semantics",
         "pyarrow_hash_pivot_wider_order_semantics",
     ]
-    assert manifest["scheduler"]["strategy"] == "adaptive_lane_yield_novelty_false_positive_weighting"
+    assert manifest["scheduler"]["strategy"] == "true_bug_acquisition_good_turing_ucb_boltzmann"
+    assert manifest["scheduler"]["bug_discovery_system"]["schema_version"] == "bug-discovery-system-v1"
     assert manifest["scheduler"]["lanes"][0]["lane_id"] == "arrow_layout"
+    assert manifest["scheduler"]["lanes"][0]["acquisition_strategy"] == (
+        "true_bug_acquisition_good_turing_ucb_boltzmann"
+    )
+    assert "good_turing_unseen_probability" in manifest["scheduler"]["lanes"][0]
+    assert "ucb_bonus" in manifest["scheduler"]["lanes"][0]
     assert manifest["summary"]["fresh_candidate_bug_families"] == {"new_arrow_family@pyarrow": 1}
     assert manifest["summary"]["candidate_pipeline"]["candidate_count"] == 1
     assert manifest["progress"]["planned_run_count"] == 1
@@ -1019,6 +1025,27 @@ def test_cli_targets_json_exposes_hidden_methodology_and_extension_contract(caps
     assert buggy_join["adapter_args"] == ["buggy_join", "join"]
 
 
+def test_cli_target_version_audit_json_uses_offline_overrides(capsys):
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "target-version-audit",
+            "--packages",
+            "pandas,polars",
+            "--latest-versions",
+            "pandas=0.0.0,polars=0.0.0",
+            "--no-network",
+            "--json",
+        ]
+    )
+
+    assert args.func(args) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["schema_version"] == "target-version-audit-v1"
+    assert [row["package"] for row in payload["target_packages"]] == ["pandas", "polars"]
+    assert payload["summary"]["outdated_target_package_count"] == 2
+
+
 def test_cli_parses_discovery_campaign_status_command():
     parser = build_parser()
     args = parser.parse_args(
@@ -1039,6 +1066,27 @@ def test_cli_parses_discovery_campaign_status_command():
     assert args.json is True
     assert args.fail_on_fresh_candidate is True
     assert args.fail_on_bug is True
+
+
+def test_cli_parses_discovery_campaign_aggregate_command():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "discovery-campaign-aggregate",
+            "--manifests",
+            "new_issue/generated/discovery-campaign*.json",
+            "--limit",
+            "4",
+            "--output",
+            "new_issue/generated/discovery-campaign-aggregate.json",
+            "--json",
+        ]
+    )
+    assert args.cmd == "discovery-campaign-aggregate"
+    assert args.manifests == "new_issue/generated/discovery-campaign*.json"
+    assert args.limit == 4
+    assert args.output == "new_issue/generated/discovery-campaign-aggregate.json"
+    assert args.json is True
 
 
 def test_cli_parses_candidate_pipeline_command():
@@ -1069,6 +1117,156 @@ def test_cli_parses_candidate_pipeline_command():
     assert args.no_standalone_reproducer is True
     assert args.json is True
     assert args.fail_on_ready is True
+
+
+def test_cli_discovery_campaign_aggregate_summarizes_manifest_glob(tmp_path, capsys):
+    run_file = tmp_path / "run-a.jsonl"
+    append_jsonl({"case": {"case_id": "case-a", "seed": 1}, "findings": []}, run_file)
+    manifest_a = tmp_path / "discovery-campaign-a.json"
+    manifest_b = tmp_path / "discovery-campaign-b.json"
+    evidence_file = tmp_path / "discovery-campaign-a-embedded_sql-seed1-fresh-candidates.json"
+    output_file = tmp_path / "aggregate.json"
+    evidence_file.write_text(
+        json.dumps(
+            {
+                "schema_version": "discovery-run-fresh-candidates-v1",
+                "source_run_file": str(run_file),
+                "fresh_candidate_bug_families": {"fresh_family@duckdb": 2},
+                "candidate_row_count": 1,
+                "candidate_rows": [
+                    {
+                        "case": {"case_id": "case-fast", "seed": 1},
+                        "case_index": 4,
+                        "elapsed_s": 0.25,
+                        "candidate_bug_families": {"fresh_family@duckdb": 1},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_a.write_text(
+        json.dumps(
+            {
+                "schema_version": "discovery-campaign-v1",
+                "status": "running",
+                "started_at": "2026-06-06T00:00:00Z",
+                "generated_at": "2026-06-06T00:00:10Z",
+                "seeds": [1],
+                "progress": {
+                    "planned_run_count": 2,
+                    "completed_run_count": 1,
+                    "remaining_run_count": 1,
+                },
+                "summary": {
+                    "fresh_candidate_bug_families": {"fresh_family@duckdb": 2},
+                    "triage_verdicts": {"candidate_implementation_bug": 2},
+                    "candidate_pipeline": {
+                        "candidate_count": 2,
+                        "rechecked_count": 2,
+                        "reproduced_count": 1,
+                        "reduced_count": 1,
+                        "issue_draft_count": 1,
+                    },
+                },
+                "runs": [
+                    {
+                        "lane_id": "embedded_sql",
+                        "theme": "Embedded SQL",
+                        "target_suite": "embedded_sql",
+                        "preset": "live_embedded_sql",
+                        "seed": 1,
+                        "cases": 10,
+                        "status": "completed",
+                        "run_file": str(run_file),
+                        "fresh_candidate_evidence": str(evidence_file),
+                        "fresh_candidate_evidence_rows": 2,
+                        "classification": {
+                            "fresh_candidate_bug_families": {"fresh_family@duckdb": 2},
+                        },
+                        "candidate_pipeline": {
+                            "summary": {
+                                "candidate_count": 2,
+                                "rechecked_count": 2,
+                                "reproduced_count": 1,
+                                "reduced_count": 1,
+                                "issue_draft_count": 1,
+                                "recheck_pass_rate": 0.5,
+                            }
+                        },
+                        "health": {
+                            "runtime": {
+                                "executed_cases": 10,
+                                "elapsed_s": 2.0,
+                            }
+                        },
+                    },
+                    {
+                        "lane_id": "embedded_sql",
+                        "status": "running",
+                        "seed": 2,
+                        "cases": 10,
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_b.write_text(
+        json.dumps(
+            {
+                "schema_version": "discovery-campaign-v1",
+                "status": "completed",
+                "started_at": "2026-06-06T00:00:20Z",
+                "completed_at": "2026-06-06T00:00:25Z",
+                "seeds": [3],
+                "progress": {
+                    "planned_run_count": 1,
+                    "completed_run_count": 1,
+                    "remaining_run_count": 0,
+                },
+                "summary": {
+                    "fresh_candidate_bug_families": {"other_family@polars": 1},
+                    "triage_verdicts": {"candidate_implementation_bug": 1},
+                },
+                "runs": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    args = build_parser().parse_args(
+        [
+            "discovery-campaign-aggregate",
+            "--manifests",
+            str(tmp_path / "discovery-campaign-*.json"),
+            "--output",
+            str(output_file),
+            "--json",
+        ]
+    )
+
+    assert args.func(args) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["schema_version"] == "discovery-campaign-aggregate-v1"
+    assert payload["manifest_count"] == 2
+    assert payload["progress"]["completed_run_count"] == 2
+    assert payload["progress"]["running_run_count"] == 1
+    assert payload["fresh_candidate_bug_family_count"] == 2
+    assert payload["fresh_candidate_evidence_rows"] == 2
+    assert payload["candidate_pipeline"]["reproduced_count"] == 1
+    assert payload["candidate_pipeline"]["rechecked_count"] == 2
+    assert payload["candidate_pipeline"]["recheck_pass_rate"] == 0.5
+    assert payload["first_candidate"]["case_id"] == "case-fast"
+    assert payload["first_candidate"]["elapsed_s"] == 0.25
+    assert payload["avg_candidate_bug_discovery_auc"] == 0.6
+    assert payload["efficiency"]["serial_cases_per_s"] == 5.0
+    assert payload["efficiency"]["parallel_cases_per_s"] == 0.4
+    assert payload["efficiency"]["parallel_capacity_cases_s"] == 5.0
+    assert payload["icse_experiment_quality"]["dimensions"]["speed"]["passed"] is True
+    assert payload["lanes"][0]["lane_id"] == "embedded_sql"
+    assert payload["icse_experiment_quality"]["schema_version"] == "icse-experiment-quality-v1"
+    assert json.loads(output_file.read_text(encoding="utf-8"))["manifest_count"] == 2
 
 
 def test_cli_discovery_campaign_status_summarizes_running_manifest(tmp_path, monkeypatch, capsys):
@@ -1246,6 +1444,10 @@ def test_cli_parses_adaptive_profile_pool_flags():
             "0.6",
             "--version-pair-learning-weight",
             "0.8",
+            "--backend-pair-learning-weight",
+            "0.9",
+            "--backend-pair-priority-limit",
+            "4",
             "--metamorphic-relation-order",
             "row_permutation,filter_idempotence",
             "--target-version",
@@ -1264,6 +1466,8 @@ def test_cli_parses_adaptive_profile_pool_flags():
     assert config.semantic_objective_learning_weight == 0.5
     assert config.metamorphic_relation_learning_weight == 0.6
     assert config.version_pair_learning_weight == 0.8
+    assert config.backend_pair_learning_weight == 0.9
+    assert config.backend_pair_priority_limit == 4
     assert config.metamorphic_relation_order == ["row_permutation", "filter_idempotence"]
     assert config.target_version == "latest"
     assert config.fixed_version == "fixed"
@@ -1533,6 +1737,13 @@ def test_cli_parses_targets_json_command():
     assert args.json is True
 
 
+def test_cli_parses_target_version_audit_command():
+    parser = build_parser()
+    args = parser.parse_args(["target-version-audit", "--no-network"])
+    assert args.cmd == "target-version-audit"
+    assert args.no_network is True
+
+
 def test_cli_prune_corpus_dry_run_and_yes(tmp_path, monkeypatch, capsys):
     corpus_dir = tmp_path / "corpus"
     interesting = corpus_dir / "interesting"
@@ -1577,6 +1788,47 @@ def test_cli_parses_experiment_command():
     assert args.no_compress_run_log is False
     assert args.target_suites is None
     assert args.metamorphic_variant_limit is None
+
+
+def test_cli_parses_experiment_per_case_adaptive_flags():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "experiment",
+            "--presets",
+            "baseline",
+            "--profile-pool",
+            "common,discovery_fresh",
+            "--profile-learning-weight",
+            "0.7",
+            "--semantic-objective-learning-weight",
+            "0.5",
+            "--enable-metamorphic-oracle",
+            "--metamorphic-relation-learning-weight",
+            "0.6",
+            "--metamorphic-relation-order",
+            "row_permutation,filter_idempotence",
+            "--version-pair-pool",
+            "latest->fixed,latest->preview",
+            "--version-pair-learning-weight",
+            "0.8",
+            "--backend-pair-learning-weight",
+            "0.9",
+            "--backend-pair-priority-limit",
+            "4",
+        ]
+    )
+    assert args.cmd == "experiment"
+    assert args.profile_pool == "common,discovery_fresh"
+    assert args.profile_learning_weight == 0.7
+    assert args.semantic_objective_learning_weight == 0.5
+    assert args.enable_metamorphic_oracle is True
+    assert args.metamorphic_relation_learning_weight == 0.6
+    assert args.metamorphic_relation_order == "row_permutation,filter_idempotence"
+    assert args.version_pair_pool == "latest->fixed,latest->preview"
+    assert args.version_pair_learning_weight == 0.8
+    assert args.backend_pair_learning_weight == 0.9
+    assert args.backend_pair_priority_limit == 4
 
 
 def test_cli_parses_multi_target_suite_experiment():
@@ -3257,6 +3509,137 @@ def test_cli_issue_bundle_prints_json(monkeypatch, capsys):
     assert captured["primary_per_family"] is True
 
 
+def test_cli_parses_adaptive_benchmark_command():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "adaptive-benchmark",
+            "--mode",
+            "replay",
+            "--learning-rounds",
+            "16",
+            "--systems-iterations",
+            "128",
+            "--profile-iterations",
+            "64",
+            "--action-pool-size",
+            "12",
+            "--profile-top-n",
+            "8",
+            "--profile-output",
+            "reports/custom.prof",
+            "--replay-run-file",
+            "runs/run-a.jsonl.gz",
+            "--replay-manifest",
+            "runs/experiment-a.json",
+            "--json",
+            "--write-report",
+            "--output-dir",
+            "reports",
+        ]
+    )
+    assert args.cmd == "adaptive-benchmark"
+    assert args.mode == "replay"
+    assert args.learning_rounds == 16
+    assert args.systems_iterations == 128
+    assert args.profile_iterations == 64
+    assert args.action_pool_size == 12
+    assert args.profile_top_n == 8
+    assert args.profile_output == "reports/custom.prof"
+    assert args.replay_run_file == ["runs/run-a.jsonl.gz"]
+    assert args.replay_manifest == ["runs/experiment-a.json"]
+    assert args.json is True
+    assert args.write_report is True
+    assert args.output_dir == "reports"
+
+
+def test_cli_adaptive_benchmark_prints_json_and_writes_reports(tmp_path, monkeypatch, capsys):
+    captured: dict[str, object] = {}
+    profile_file = tmp_path / "custom.prof"
+
+    def fake_run_adaptive_benchmark(**kwargs):
+        captured.update(kwargs)
+        if kwargs.get("profile_output"):
+            Path(kwargs["profile_output"]).write_text("profile", encoding="utf-8")
+        return {
+            "schema_version": "adaptive-benchmark-v1",
+            "generated_at": "2026-06-04T00:00:00Z",
+            "mode": "replay",
+            "learning_effectiveness": {
+                "summary": {
+                    "baseline_variant": "reward_signal_only",
+                    "best_variant_by_average_reward": "full_adaptive",
+                }
+            },
+            "systems_benchmark": {
+                "summary": {
+                    "materialized_rank_overhead_ratio": 1.25,
+                },
+                "profiler": {
+                    "enabled": True,
+                    "profile_output": str(kwargs.get("profile_output", "")),
+                    "top_functions": [],
+                },
+            },
+            "real_run_replay": {
+                "summary": {
+                    "baseline_variant": "reward_signal_only",
+                    "best_variant_by_average_reward": "full_adaptive",
+                    "event_count": 42,
+                }
+            },
+        }
+
+    def fake_write_adaptive_benchmark_markdown(payload, path):
+        Path(path).write_text(f"# {payload['schema_version']}\n", encoding="utf-8")
+
+    monkeypatch.setattr(cli, "run_adaptive_benchmark", fake_run_adaptive_benchmark)
+    monkeypatch.setattr(cli, "write_adaptive_benchmark_markdown", fake_write_adaptive_benchmark_markdown)
+    monkeypatch.setattr(cli, "utc_now", lambda: "2026-06-04T01:02:03Z")
+
+    args = build_parser().parse_args(
+        [
+            "adaptive-benchmark",
+            "--json",
+            "--write-report",
+            "--output-dir",
+            str(tmp_path),
+            "--profile-output",
+            str(profile_file),
+            "--learning-rounds",
+            "8",
+            "--systems-iterations",
+            "32",
+            "--profile-iterations",
+            "16",
+            "--action-pool-size",
+            "6",
+            "--replay-run-file",
+            str(tmp_path / "run-a.jsonl.gz"),
+            "--replay-manifest",
+            str(tmp_path / "experiment-a.json"),
+        ]
+    )
+
+    assert args.func(args) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["schema_version"] == "adaptive-benchmark-v1"
+    assert payload["output_json"] == str(tmp_path / "adaptive-benchmark-20260604T010203.json")
+    assert payload["output_markdown"] == str(tmp_path / "adaptive-benchmark-20260604T010203.md")
+    assert payload["profile_output"] == str(profile_file)
+    assert (tmp_path / "adaptive-benchmark-20260604T010203.json").exists()
+    assert (tmp_path / "adaptive-benchmark-20260604T010203.md").exists()
+    assert profile_file.exists()
+    assert captured["learning_rounds"] == 8
+    assert captured["systems_iterations"] == 32
+    assert captured["profile_iterations"] == 16
+    assert captured["action_pool_size"] == 6
+    assert Path(captured["profile_output"]) == profile_file
+    assert captured["replay_run_files"] == [tmp_path / "run-a.jsonl.gz"]
+    assert captured["replay_manifests"] == [tmp_path / "experiment-a.json"]
+
+
 def test_cli_parses_analyze_ablation_audit_command():
     parser = build_parser()
     args = parser.parse_args(
@@ -3448,6 +3831,42 @@ def test_cli_experiment_parses_adaptive_schedule_flags():
     assert args.local_source_exploration_weight == 0.2
 
 
+def test_cli_experiment_parses_strategy_snapshot_flags():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "experiment",
+            "--strategy-snapshot",
+            "reports/frozen-strategy.json",
+            "--strategy-learning",
+            "reports/strategy-learning.json",
+            "--freeze-strategy-snapshot",
+        ]
+    )
+
+    assert args.cmd == "experiment"
+    assert args.strategy_snapshot == "reports/frozen-strategy.json"
+    assert args.strategy_learning == "reports/strategy-learning.json"
+    assert args.freeze_strategy_snapshot is True
+
+
+def test_cli_fuzz_can_disable_parallel_backend_execution():
+    parser = build_parser()
+    args = parser.parse_args(["fuzz", "--disable-parallel-backend-execution"])
+    config = cli._config_from_args(args)
+
+    assert args.disable_parallel_backend_execution is True
+    assert config.enable_parallel_backend_execution is False
+
+
+def test_cli_experiment_parses_parallel_backend_execution_ablation_flag():
+    parser = build_parser()
+    args = parser.parse_args(["experiment", "--disable-parallel-backend-execution"])
+
+    assert args.cmd == "experiment"
+    assert args.disable_parallel_backend_execution is True
+
+
 def test_cli_experiment_parses_adaptive_component_ablation_flags():
     parser = build_parser()
     args = parser.parse_args(
@@ -3457,7 +3876,12 @@ def test_cli_experiment_parses_adaptive_component_ablation_flags():
             (
                 "contextual-bandit,map-elites,profile-filter,runtime-cost,"
                 "uncertainty-sampling,online-reward,cross-version-learning,"
-                "simulated-annealing,semantic-objective,mr-learning,version-pair"
+                "simulated-annealing,semantic-objective,mr-learning,version-pair,"
+                "backend-pair,typed-ir-rewrite,energy-quota,seed-power,operator-power,"
+                "latin-hypercube,champion,bd-axis-weights,good-turing,"
+                "operator-swarm,divergence-conditioned,shrink-mutations,"
+                "hierarchical-archive,lineage-rarity,minhash-dedup,"
+                "disagreement-bd-axis,cost-normalized-reward"
             ),
         ]
     )
@@ -3467,13 +3891,30 @@ def test_cli_experiment_parses_adaptive_component_ablation_flags():
         "semantic_objective_learning",
         "metamorphic_relation_learning",
         "version_pair_learning",
+        "backend_pair_learning",
+        "bd_axis_bandit",
+        "bayesian_exploration",
+        "ir_rewrite_mutations",
         "quality_archive",
+        "seed_quota",
+        "seed_energy_batch",
+        "per_operator_energy",
+        "lhs_seeding",
+        "champion_corpus",
         "profile_capability_filter",
         "runtime_cost_learning",
         "active_learning",
         "online_reward_model",
         "continual_learning",
         "scheduler_annealing",
+        "operator_swarm",
+        "divergence_conditioned",
+        "shrink_mutations",
+        "hierarchical_archive",
+        "lineage_rarity",
+        "minhash_dedup",
+        "disagreement_bd_axis",
+        "cost_normalized_reward",
     }
 
 
@@ -3530,6 +3971,7 @@ def test_run_experiment_job_propagates_local_source_scheduler(monkeypatch):
     captured = {}
 
     def fake_run_fuzz(*, cases, seed, backends, config, duration_s, **kwargs):
+        captured["enable_parallel_backend_execution"] = config.enable_parallel_backend_execution
         captured["enable_local_source_scheduler"] = config.enable_local_source_scheduler
         captured["local_source_exploration_weight"] = config.local_source_exploration_weight
         captured["checkpoint_interval_s"] = kwargs["checkpoint_interval_s"]
@@ -3551,6 +3993,7 @@ def test_run_experiment_job_propagates_local_source_scheduler(monkeypatch):
             "log_level": "compact",
             "compress_run_log": True,
             "artifact_limit": None,
+            "enable_parallel_backend_execution": False,
             "metamorphic_variant_limit": None,
             "enable_local_source_scheduler": True,
             "local_source_exploration_weight": 0.125,
@@ -3596,6 +4039,103 @@ def test_run_experiment_job_can_persist_closed_loop_state(monkeypatch):
     assert captured["persist_closed_loop_state"] is True
 
 
+def test_run_experiment_job_applies_strategy_snapshot_flags(monkeypatch):
+    captured = {}
+
+    def fake_run_fuzz(*, cases, seed, backends, config, duration_s, **kwargs):
+        captured["strategy_snapshot_path"] = config.strategy_snapshot_path
+        captured["strategy_learning_path"] = config.strategy_learning_path
+        captured["freeze_strategy_snapshot"] = config.freeze_strategy_snapshot
+        return Path("runs/fake.jsonl")
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    cli._run_experiment_job(
+        {
+            "order": 0,
+            "target_suite": "core",
+            "backends": ["pandas"],
+            "preset": "baseline",
+            "seed": 1,
+            "cases": 1,
+            "duration_s": None,
+            "log_level": "compact",
+            "compress_run_log": True,
+            "artifact_limit": None,
+            "metamorphic_variant_limit": None,
+            "strategy_snapshot": "reports/frozen-strategy.json",
+            "strategy_learning": "reports/strategy-learning.json",
+            "freeze_strategy_snapshot": True,
+            "skip_run_reports": True,
+        }
+    )
+
+    assert captured["strategy_snapshot_path"] == "reports/frozen-strategy.json"
+    assert captured["strategy_learning_path"] == "reports/strategy-learning.json"
+    assert captured["freeze_strategy_snapshot"] is True
+
+
+def test_run_experiment_job_propagates_per_case_adaptive_config(monkeypatch):
+    captured = {}
+
+    def fake_run_fuzz(*, cases, seed, backends, config, duration_s, **kwargs):
+        captured["generator_profile_pool"] = config.generator_profile_pool
+        captured["generator_profile_learning_weight"] = config.generator_profile_learning_weight
+        captured["semantic_objective_learning_weight"] = config.semantic_objective_learning_weight
+        captured["enable_metamorphic_oracle"] = config.enable_metamorphic_oracle
+        captured["oracle_mode"] = config.oracle_mode
+        captured["metamorphic_relation_learning_weight"] = config.metamorphic_relation_learning_weight
+        captured["metamorphic_relation_order"] = config.metamorphic_relation_order
+        captured["version_pair_pool"] = config.version_pair_pool
+        captured["version_pair_learning_weight"] = config.version_pair_learning_weight
+        captured["backend_pair_learning_weight"] = config.backend_pair_learning_weight
+        captured["backend_pair_priority_limit"] = config.backend_pair_priority_limit
+        return Path("runs/fake-adaptive.jsonl")
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    cli._run_experiment_job(
+        {
+            "order": 0,
+            "target_suite": "core",
+            "backends": ["pandas"],
+            "preset": "baseline",
+            "seed": 1,
+            "cases": 1,
+            "duration_s": None,
+            "log_level": "compact",
+            "compress_run_log": True,
+            "artifact_limit": None,
+            "metamorphic_variant_limit": None,
+            "profile_pool": "common,discovery_fresh",
+            "profile_learning_weight": 0.7,
+            "semantic_objective_learning_weight": 0.5,
+            "enable_metamorphic_oracle": True,
+            "metamorphic_relation_learning_weight": 0.6,
+            "metamorphic_relation_order": "row_permutation,filter_idempotence",
+            "version_pair_pool": "latest->fixed,latest->preview",
+            "version_pair_learning_weight": 0.8,
+            "backend_pair_learning_weight": 0.9,
+            "backend_pair_priority_limit": 4,
+            "skip_run_reports": True,
+        }
+    )
+
+    assert captured["generator_profile_pool"] == ["common", "discovery_fresh"]
+    assert captured["generator_profile_learning_weight"] == 0.7
+    assert captured["semantic_objective_learning_weight"] == 0.5
+    assert captured["enable_metamorphic_oracle"] is True
+    assert captured["oracle_mode"] == "both"
+    assert captured["metamorphic_relation_learning_weight"] == 0.6
+    assert captured["metamorphic_relation_order"] == ["row_permutation", "filter_idempotence"]
+    assert captured["version_pair_pool"] == ["latest->fixed", "latest->preview"]
+    assert captured["version_pair_learning_weight"] == 0.8
+    assert captured["backend_pair_learning_weight"] == 0.9
+    assert captured["backend_pair_priority_limit"] == 4
+
+
 def test_run_experiment_job_applies_adaptive_component_ablation(monkeypatch):
     captured = {}
 
@@ -3604,7 +4144,24 @@ def test_run_experiment_job_applies_adaptive_component_ablation(monkeypatch):
         captured["local_source_exploration_weight"] = config.local_source_exploration_weight
         captured["enable_profile_capability_filter"] = config.enable_profile_capability_filter
         captured["enable_mutation_operator_learning"] = config.enable_mutation_operator_learning
+        captured["enable_operator_swarm"] = config.enable_operator_swarm
+        captured["enable_ir_rewrite_mutations"] = config.enable_ir_rewrite_mutations
+        captured["enable_divergence_conditioned_mutations"] = config.enable_divergence_conditioned_mutations
+        captured["enable_shrink_mutations"] = config.enable_shrink_mutations
         captured["enable_quality_archive"] = config.enable_quality_archive
+        captured["enable_hierarchical_archive"] = config.enable_hierarchical_archive
+        captured["enable_bd_axis_bandit"] = config.enable_bd_axis_bandit
+        captured["enable_bayesian_exploration"] = config.enable_bayesian_exploration
+        captured["enable_seed_quota"] = config.enable_seed_quota
+        captured["enable_seed_energy_batch"] = config.enable_seed_energy_batch
+        captured["enable_seed_energy_tier_bandit"] = config.enable_seed_energy_tier_bandit
+        captured["enable_per_operator_energy"] = config.enable_per_operator_energy
+        captured["enable_lineage_rarity"] = config.enable_lineage_rarity
+        captured["enable_minhash_dedup"] = config.enable_minhash_dedup
+        captured["enable_disagreement_bd_axis"] = config.enable_disagreement_bd_axis
+        captured["enable_lhs_seeding"] = config.enable_lhs_seeding
+        captured["enable_champion_corpus"] = config.enable_champion_corpus
+        captured["enable_champion_graft_donor_bandit"] = config.enable_champion_graft_donor_bandit
         return Path("runs/fake-ablation.jsonl")
 
     monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
@@ -3629,7 +4186,24 @@ def test_run_experiment_job_applies_adaptive_component_ablation(monkeypatch):
                 "local_source_scheduler",
                 "profile_capability_filter",
                 "mutation_operator_learning",
+                "operator_swarm",
+                "ir_rewrite_mutations",
+                "divergence_conditioned",
+                "shrink_mutations",
                 "quality_archive",
+                "hierarchical_archive",
+                "bd_axis_bandit",
+                "bayesian_exploration",
+                "seed_quota",
+                "seed_energy_batch",
+                "seed_energy_tier",
+                "per_operator_energy",
+                "lineage_rarity",
+                "minhash_dedup",
+                "disagreement_bd_axis",
+                "lhs_seeding",
+                "champion_corpus",
+                "champion_graft_donor",
             ],
             "skip_run_reports": True,
         }
@@ -3639,13 +4213,47 @@ def test_run_experiment_job_applies_adaptive_component_ablation(monkeypatch):
     assert captured["local_source_exploration_weight"] == 0.0
     assert captured["enable_profile_capability_filter"] is False
     assert captured["enable_mutation_operator_learning"] is False
+    assert captured["enable_operator_swarm"] is False
+    assert captured["enable_ir_rewrite_mutations"] is False
+    assert captured["enable_divergence_conditioned_mutations"] is False
+    assert captured["enable_shrink_mutations"] is False
     assert captured["enable_quality_archive"] is False
+    assert captured["enable_hierarchical_archive"] is False
+    assert captured["enable_bd_axis_bandit"] is False
+    assert captured["enable_bayesian_exploration"] is False
+    assert captured["enable_seed_quota"] is False
+    assert captured["enable_seed_energy_batch"] is False
+    assert captured["enable_seed_energy_tier_bandit"] is False
+    assert captured["enable_per_operator_energy"] is False
+    assert captured["enable_lineage_rarity"] is False
+    assert captured["enable_minhash_dedup"] is False
+    assert captured["enable_disagreement_bd_axis"] is False
+    assert captured["enable_lhs_seeding"] is False
+    assert captured["enable_champion_corpus"] is False
+    assert captured["enable_champion_graft_donor_bandit"] is False
     assert result["run"]["adaptive_components"]["local_source_scheduler"] is False
     assert result["run"]["disabled_adaptive_components"] == [
+        "bayesian_exploration",
+        "bd_axis_bandit",
+        "champion_corpus",
+        "champion_graft_donor",
+        "disagreement_bd_axis",
+        "divergence_conditioned",
+        "hierarchical_archive",
+        "ir_rewrite_mutations",
+        "lhs_seeding",
+        "lineage_rarity",
         "local_source_scheduler",
+        "minhash_dedup",
         "mutation_operator_learning",
+        "operator_swarm",
+        "per_operator_energy",
         "profile_capability_filter",
         "quality_archive",
+        "seed_energy_batch",
+        "seed_energy_tier",
+        "seed_quota",
+        "shrink_mutations",
     ]
 
 
@@ -4905,7 +5513,24 @@ def test_cli_experiment_adaptive_component_ablation_manifest_and_runtime(tmp_pat
         **kwargs,
     ):
         captured["enable_local_source_scheduler"] = config.enable_local_source_scheduler
+        captured["enable_operator_swarm"] = config.enable_operator_swarm
         captured["enable_quality_archive"] = config.enable_quality_archive
+        captured["enable_bd_axis_bandit"] = config.enable_bd_axis_bandit
+        captured["enable_bayesian_exploration"] = config.enable_bayesian_exploration
+        captured["enable_seed_quota"] = config.enable_seed_quota
+        captured["enable_seed_energy_batch"] = config.enable_seed_energy_batch
+        captured["enable_seed_energy_tier_bandit"] = config.enable_seed_energy_tier_bandit
+        captured["enable_ir_rewrite_mutations"] = config.enable_ir_rewrite_mutations
+        captured["enable_divergence_conditioned_mutations"] = config.enable_divergence_conditioned_mutations
+        captured["enable_shrink_mutations"] = config.enable_shrink_mutations
+        captured["enable_per_operator_energy"] = config.enable_per_operator_energy
+        captured["enable_hierarchical_archive"] = config.enable_hierarchical_archive
+        captured["enable_lineage_rarity"] = config.enable_lineage_rarity
+        captured["enable_minhash_dedup"] = config.enable_minhash_dedup
+        captured["enable_disagreement_bd_axis"] = config.enable_disagreement_bd_axis
+        captured["enable_lhs_seeding"] = config.enable_lhs_seeding
+        captured["enable_champion_corpus"] = config.enable_champion_corpus
+        captured["enable_champion_graft_donor_bandit"] = config.enable_champion_graft_donor_bandit
         run_file = runs_dir / "run-ablation.jsonl"
         append_jsonl({"case": {"case_id": "case-1", "seed": seed}, "findings": []}, run_file)
         meta_path = Path(str(run_file).replace(".jsonl", ".meta.json"))
@@ -4955,7 +5580,13 @@ def test_cli_experiment_adaptive_component_ablation_manifest_and_runtime(tmp_pat
             (
                 "local-source-scheduler,quality-archive,runtime-cost-learning,"
                 "active-learning,online-reward-model,continual-learning,"
-                "scheduler-annealing"
+                "scheduler-annealing,seed-quota,seed-energy-batch,"
+                "seed-energy-tier,"
+                "ir-rewrite-mutations,per-operator-energy,lhs-seeding,champion-corpus,"
+                "champion-graft-donor,"
+                "bd-axis-bandit,bayesian-exploration,operator-swarm,"
+                "divergence-conditioned,shrink-mutations,hierarchical-archive,lineage-rarity,"
+                "minhash-dedup,disagreement-bd-axis,cost-normalized-reward"
             ),
             "--skip-run-reports",
         ]
@@ -4965,13 +5596,32 @@ def test_cli_experiment_adaptive_component_ablation_manifest_and_runtime(tmp_pat
     manifest = json.loads(next(runs_dir.glob("experiment-*.json")).read_text(encoding="utf-8"))
 
     assert captured["enable_local_source_scheduler"] is False
+    assert captured["enable_operator_swarm"] is False
     assert captured["enable_quality_archive"] is False
+    assert captured["enable_bd_axis_bandit"] is False
+    assert captured["enable_bayesian_exploration"] is False
+    assert captured["enable_seed_quota"] is False
+    assert captured["enable_seed_energy_batch"] is False
+    assert captured["enable_seed_energy_tier_bandit"] is False
+    assert captured["enable_ir_rewrite_mutations"] is False
+    assert captured["enable_divergence_conditioned_mutations"] is False
+    assert captured["enable_shrink_mutations"] is False
+    assert captured["enable_per_operator_energy"] is False
+    assert captured["enable_hierarchical_archive"] is False
+    assert captured["enable_lineage_rarity"] is False
+    assert captured["enable_minhash_dedup"] is False
+    assert captured["enable_disagreement_bd_axis"] is False
+    assert captured["enable_lhs_seeding"] is False
+    assert captured["enable_champion_corpus"] is False
+    assert captured["enable_champion_graft_donor_bandit"] is False
     assert manifest["adaptive_config"]["learning_weight"] == 0.75
     assert manifest["adaptive_config"]["record_learning_feedback"] is True
     assert manifest["adaptive_config"]["runtime_cost_learning"] is False
     assert manifest["adaptive_config"]["active_learning"] is False
     assert manifest["adaptive_config"]["online_reward_model"] is False
     assert manifest["adaptive_config"]["continual_learning"] is False
+    assert manifest["adaptive_config"]["bayesian_exploration"] is False
+    assert manifest["adaptive_config"]["cost_normalized_reward"] is False
     assert manifest["adaptive_config"]["scheduler_annealing"] is False
     assert manifest["adaptive_config"]["annealing_initial_temperature"] == 0.0
     assert manifest["adaptive_config"]["fine_grained_local_source_scheduler"] is False
@@ -4980,6 +5630,22 @@ def test_cli_experiment_adaptive_component_ablation_manifest_and_runtime(tmp_pat
     batch_arm = manifest["adaptive_learning"]["bandits"]["batch_arm"]["arms"][0]
     assert batch_arm["runtime_cost_total"] == 0.0
     assert manifest["adaptive_methodology"]["components"]["quality_archive"] is False
+    assert manifest["adaptive_methodology"]["components"]["bd_axis_bandit"] is False
+    assert manifest["adaptive_methodology"]["components"]["bayesian_exploration"] is False
+    assert manifest["adaptive_methodology"]["components"]["operator_swarm"] is False
+    assert manifest["adaptive_methodology"]["components"]["divergence_conditioned"] is False
+    assert manifest["adaptive_methodology"]["components"]["shrink_mutations"] is False
+    assert manifest["adaptive_methodology"]["components"]["hierarchical_archive"] is False
+    assert manifest["adaptive_methodology"]["components"]["lineage_rarity"] is False
+    assert manifest["adaptive_methodology"]["components"]["minhash_dedup"] is False
+    assert manifest["adaptive_methodology"]["components"]["disagreement_bd_axis"] is False
+    assert manifest["adaptive_methodology"]["components"]["cost_normalized_reward"] is False
+    assert manifest["adaptive_methodology"]["components"]["seed_quota"] is False
+    assert manifest["adaptive_methodology"]["components"]["seed_energy_batch"] is False
+    assert manifest["adaptive_methodology"]["components"]["ir_rewrite_mutations"] is False
+    assert manifest["adaptive_methodology"]["components"]["per_operator_energy"] is False
+    assert manifest["adaptive_methodology"]["components"]["lhs_seeding"] is False
+    assert manifest["adaptive_methodology"]["components"]["champion_corpus"] is False
     assert manifest["adaptive_methodology"]["components"]["runtime_cost_learning"] is False
     assert manifest["adaptive_methodology"]["components"]["active_learning"] is False
     assert manifest["adaptive_methodology"]["components"]["online_reward_model"] is False
@@ -4990,7 +5656,11 @@ def test_cli_experiment_adaptive_component_ablation_manifest_and_runtime(tmp_pat
     assert manifest["runs"][0]["adaptive_components"]["active_learning"] is False
     assert manifest["runs"][0]["adaptive_components"]["online_reward_model"] is False
     assert manifest["runs"][0]["adaptive_components"]["continual_learning"] is False
+    assert manifest["runs"][0]["adaptive_components"]["bayesian_exploration"] is False
     assert manifest["runs"][0]["adaptive_components"]["scheduler_annealing"] is False
+    assert manifest["runs"][0]["adaptive_components"]["bd_axis_bandit"] is False
+    assert manifest["runs"][0]["adaptive_components"]["ir_rewrite_mutations"] is False
+    assert manifest["runs"][0]["adaptive_components"]["per_operator_energy"] is False
 
 
 def test_cli_experiment_adaptive_scheduler_supports_parallel_rounds(tmp_path, monkeypatch, capsys):
@@ -5025,7 +5695,7 @@ def test_cli_experiment_adaptive_scheduler_supports_parallel_rounds(tmp_path, mo
             "datafusion_cross"
             if "datafusion" in backends
             else "dataframe"
-            if "polars" in backends
+            if set(backends) == {"pandas", "polars"}
             else "core"
         )
         if target_suite == "datafusion_cross":
@@ -5217,6 +5887,79 @@ def test_cli_experiment_adaptive_scheduler_passes_closed_loop_state_between_batc
 
     manifest = json.loads(next(runs_dir.glob("experiment-*.json")).read_text(encoding="utf-8"))
     assert [run["closed_loop_state_present"] for run in manifest["runs"]] == [True, True]
+
+
+def test_cli_experiment_adaptive_duration_is_total_matrix_budget(tmp_path, monkeypatch):
+    runs_dir = tmp_path / "runs"
+    reports_dir = tmp_path / "reports"
+    bugs_dir = tmp_path / "bugs"
+    corpus_dir = tmp_path / "corpus"
+    monkeypatch.setattr(cli, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(cli, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(cli, "BUGS_DIR", bugs_dir)
+    monkeypatch.setattr(cli, "CORPUS_DIR", corpus_dir)
+
+    captured: dict[str, object] = {}
+
+    class FakeScheduler:
+        def __init__(
+            self,
+            jobs,
+            *,
+            total_cases_budget,
+            total_duration_budget_s,
+            config,
+            learning_state=None,
+        ):
+            captured["job_count"] = len(jobs)
+            captured["total_cases_budget"] = total_cases_budget
+            captured["total_duration_budget_s"] = total_duration_budget_s
+            self.remaining_cases_budget = total_cases_budget
+            self.remaining_duration_budget_s = total_duration_budget_s
+            self.learning_state = type(
+                "LearningStateStub",
+                (),
+                {"to_state_dict": staticmethod(lambda: {})},
+            )()
+
+        def has_budget(self):
+            return False
+
+        def snapshot(self):
+            return []
+
+    monkeypatch.setattr(cli, "AdaptiveBudgetScheduler", FakeScheduler)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "experiment",
+            "--target-suites",
+            "core,datafusion_cross",
+            "--presets",
+            "live_deep_organic",
+            "--seeds",
+            "1,2",
+            "--duration",
+            "12h",
+            "--schedule",
+            "adaptive",
+            "--batch-duration",
+            "10m",
+            "--jobs",
+            "1",
+            "--skip-run-reports",
+        ]
+    )
+
+    assert args.func(args) == 0
+    assert captured["job_count"] == 4
+    assert captured["total_cases_budget"] is None
+    assert captured["total_duration_budget_s"] == 12 * 3600
+
+    manifest = json.loads(next(runs_dir.glob("experiment-*.json")).read_text(encoding="utf-8"))
+    assert manifest["duration_s"] == 12 * 3600
+    assert manifest["adaptive_config"]["total_duration_budget_s"] == 12 * 3600
 
 
 def test_cli_experiment_rejects_live_adaptive_baseline_preset(tmp_path, monkeypatch, capsys):

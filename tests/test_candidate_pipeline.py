@@ -143,11 +143,13 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
     )
 
     assert manifest["summary"]["candidate_count"] == 1
+    assert manifest["bug_discovery_system"]["schema_version"] == "bug-discovery-system-v1"
     assert manifest["summary"]["reproduced_count"] == 1
     assert manifest["summary"]["reduced_count"] == 1
     assert manifest["summary"]["needs_dedup_check_count"] == 1
     assert manifest["pipeline_issue_readiness_summary"]["needs_dedup_check_count"] == 1
     candidate = manifest["candidates"][0]
+    assert candidate["candidate_acquisition"]["rewardable_candidate_finding_count"] == 1
     assert candidate["dedup"]["status"] == "duplicate_local_family"
     assert candidate["recheck"]["reproduced"] is True
     assert candidate["triage"]["verdict"] == "candidate_implementation_bug"
@@ -165,6 +167,7 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
 
     rendered = (tmp_path / manifest["markdown_path"]).read_text(encoding="utf-8")
     assert "## Candidates" in rendered
+    assert "True bug probability" in rendered
     assert "needs_dedup_check" in rendered
 
 
@@ -194,3 +197,122 @@ def test_candidate_pipeline_artifact_config_rehydrates_discovery_biases(tmp_path
     assert config.discovery_biases
     assert isinstance(config.discovery_biases[0], DiscoveryBias)
     assert config.discovery_biases[0].targets == ["common_api_workflow"]
+
+
+def test_candidate_pipeline_ranks_high_proof_fresh_candidates_before_duplicates(tmp_path, monkeypatch):
+    new_issue_dir = tmp_path / "new_issue"
+    generated_issue_dir = new_issue_dir / "generated"
+    old_issue_dir = tmp_path / "old_issue"
+    for path in (new_issue_dir, generated_issue_dir, old_issue_dir):
+        path.mkdir(parents=True, exist_ok=True)
+
+    duplicate_family = "duplicate_family@duckdb"
+    (new_issue_dir / "duplicate.md").write_text(_issue_body(family=duplicate_family), encoding="utf-8")
+    dump_json({"confirmations": []}, tmp_path / "latest-confirmations.json")
+
+    fresh_case = Case(
+        "case-fresh",
+        11,
+        [TableData("t0", [ColumnSpec("x", "int", nullable=False)], [{"x": 1}, {"x": 2}, {"x": 3}])],
+        Program("prog-fresh", 11, [{"op": "filter", "predicate": {"column": "x", "op": ">", "value": 1}}]),
+    )
+    duplicate_case = Case(
+        "case-duplicate",
+        12,
+        [TableData("t0", [ColumnSpec("x", "int", nullable=False)], [{"x": 1}])],
+        Program("prog-duplicate", 12, [{"op": "select", "columns": ["x"]}]),
+    )
+    fresh_finding = {
+        "finding_id": "fresh",
+        "kind": "semantic_output_mismatch",
+        "suspicious_backends": ["duckdb"],
+        "signature": "sig-fresh",
+        "root_cause": "fresh_family",
+        "triage_verdict": "candidate_implementation_bug",
+        "false_positive": False,
+    }
+    duplicate_finding = {
+        "finding_id": "duplicate",
+        "kind": "semantic_output_mismatch",
+        "suspicious_backends": ["duckdb"],
+        "signature": "sig-duplicate",
+        "root_cause": "duplicate_family",
+        "triage_verdict": "candidate_implementation_bug",
+        "false_positive": False,
+    }
+    evidence_file = generated_issue_dir / "fresh-candidates.json"
+    dump_json(
+        {
+            "schema_version": "discovery-run-fresh-candidates-v1",
+            "source_run_file": "runs/run-fresh.jsonl.gz",
+            "fresh_candidate_bug_families": {"fresh_family@duckdb": 1, duplicate_family: 1},
+            "candidate_row_count": 2,
+            "candidate_rows": [
+                {
+                    "case": duplicate_case.to_dict(),
+                    "findings": [duplicate_finding],
+                    "candidate_recheck": {"attempts": 1, "non_reproduced_keys": [duplicate_family]},
+                },
+                {
+                    "case": fresh_case.to_dict(),
+                    "findings": [fresh_finding],
+                    "normalized": {
+                        "pandas": {"backend": "pandas", "status": "ok", "columns": ["x"], "rows": [[1], [2]]},
+                        "duckdb": {"backend": "duckdb", "status": "ok", "columns": ["x"], "rows": [[1], [3]]},
+                    },
+                    "raw_results": {
+                        "pandas": {"status": "ok", "rows": [[1], [2]]},
+                        "duckdb": {"status": "ok", "rows": [[1], [3]]},
+                    },
+                    "bug_dir": "bugs/bug_sig-fresh",
+                    "candidate_recheck": {"attempts": 2, "reproduced": True},
+                },
+            ],
+        },
+        evidence_file,
+    )
+
+    monkeypatch.setattr(candidate_pipeline, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(issue_readiness, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        candidate_pipeline,
+        "_process_candidate",
+        lambda **kwargs: {
+            "candidate_id": kwargs["candidate_id"],
+            "primary_family": kwargs["row"]["families"][0],
+            "families": kwargs["row"]["families"],
+            "candidate_acquisition": kwargs["row"]["candidate_acquisition"],
+            "recheck": {"attempts": 0, "reproduced": False},
+            "reduction": {},
+            "triage": {},
+            "dedup": {"status": "needs_final_upstream_dedup"},
+            "issue_draft": {},
+            "issue_readiness": {},
+        },
+    )
+
+    manifest = build_candidate_pipeline(
+        evidence_files=[evidence_file],
+        output_dir=generated_issue_dir / "candidate-pipelines",
+        latest_confirmation_files=[tmp_path / "latest-confirmations.json"],
+        new_issue_dir=new_issue_dir,
+        old_issue_dir=old_issue_dir,
+        generated_issue_dir=generated_issue_dir,
+        recheck_attempts=0,
+        reduce_artifacts=False,
+        standalone_reproducer=False,
+    )
+
+    assert [candidate["primary_family"] for candidate in manifest["candidates"]] == [
+        "fresh_family@duckdb",
+        duplicate_family,
+    ]
+    assert manifest["candidates"][0]["candidate_acquisition"]["acquisition_score"] > (
+        manifest["candidates"][1]["candidate_acquisition"]["acquisition_score"]
+    )
+    frozen = json.loads((tmp_path / manifest["frozen_candidates_path"]).read_text(encoding="utf-8"))
+    assert [candidate["families"][0] for candidate in frozen["candidates"]] == [
+        "fresh_family@duckdb",
+        duplicate_family,
+    ]
+    assert frozen["bug_discovery_system"]["schema_version"] == "bug-discovery-system-v1"

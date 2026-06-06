@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Iterable
 
-from datadiff.canonicalization import dedupe_by_canonical_key, short_canonical_hash
+from datadiff.canonicalization import compare_result_batch, dedupe_by_canonical_key, short_canonical_hash
 from datadiff.dsl import Case, ColumnSpec, Program, TableData, sort_columns
 from datadiff.operation_type_semantics import case_when_output_type
 from datadiff.expression_semantics import aggregate_output_type, cast_output_type, expr_output_type, literal_output_type
@@ -18,13 +18,6 @@ from datadiff.operation_semantics import (
     aggregate_specs,
     condition_column,
     expr_index,
-    join_how,
-    op_column,
-    op_comparator,
-    op_columns,
-    op_kind,
-    op_table,
-    op_value,
     expr_kind,
     expr_length,
     expr_new,
@@ -33,11 +26,16 @@ from datadiff.operation_semantics import (
     expr_source,
     expr_start,
     groupby_keys,
+    has_order_observer,
+    join_how,
     op_column,
+    op_comparator,
     op_columns,
+    op_kind,
     op_n,
     op_output_alias,
     op_table,
+    op_value,
     operation_names,
 )
 from datadiff.oracle import Finding
@@ -114,6 +112,9 @@ def all_metamorphic_variants(case: Case) -> list[MetamorphicVariant]:
     variants.extend(_groupby_key_permutation_variants(case))
     variants.extend(_filter_commutativity_variants(case))
     variants.extend(_select_idempotence_variants(case))
+    variants.extend(_limit_above_data_no_op_variants(case))
+    variants.extend(_offset_zero_at_tail_after_limit_variants(case))
+    variants.extend(_filter_idempotence_immediate_variants(case))
     return variants
 
 
@@ -156,11 +157,12 @@ def evaluate_metamorphic_variants(
             variant_result = normalized.get(backend)
             if variant_result is None:
                 continue
-            if _payload(base_result) == _payload(variant_result):
+            if base_result.comparison_key == variant_result.comparison_key:
                 continue
             if _relaxed_float_payload(base_result) == _relaxed_float_payload(variant_result):
                 continue
             relation = variant_name.split(":", 1)[0]
+            mismatch_class = compare_result_batch([base_result, variant_result]).mismatch_class
             sig = _signature(case, backend, variant_name, base_result, variant_result)
             findings.append(
                 Finding(
@@ -170,20 +172,21 @@ def evaluate_metamorphic_variants(
                     suspicious_backends=[backend],
                     evidence=(
                         f"Backend {backend} violates metamorphic relation {variant_name}; "
-                        f"base_status={base_result.status} variant_status={variant_result.status}"
+                        f"base_status={base_result.status} variant_status={variant_result.status}; "
+                        f"mismatch_class={mismatch_class}"
                     ),
                     signature=sig,
                     root_cause=f"metamorphic_{relation}",
                     oracle="metamorphic",
                     confidence="medium",
+                    mismatch_class=mismatch_class,
                 )
             )
     return findings
 
 
 def _row_permutation_variants(case: Case) -> list[MetamorphicVariant]:
-    ops = case.program.op_sequence()
-    if "limit" in ops or "offset" in ops:
+    if has_order_observer(case.program):
         return []
     table = case.tables[0]
     if len(table.rows) < 2:
@@ -204,8 +207,7 @@ def _filter_input_materialization_variants(case: Case) -> list[MetamorphicVarian
 
     if not case.tables or not case.program.operations:
         return []
-    ops = case.program.op_sequence()
-    if case.program.order_sensitive or "limit" in ops or "offset" in ops:
+    if case.program.order_sensitive or has_order_observer(case.program):
         return []
     filter_op = case.program.operations[0]
     if op_kind(filter_op) != "filter":
@@ -372,6 +374,8 @@ def _distinct_input_materialization_variants(case: Case, op: dict[str, Any]) -> 
 def _filter_rejecting_row_injection_variants(case: Case) -> list[MetamorphicVariant]:
     """Inject a domain row that should be removed by an existing cleaning filter."""
 
+    if has_order_observer(case.program):
+        return []
     primary = case.tables[0]
     columns = {col.name: col for col in primary.columns}
     for idx, op in enumerate(case.program.operations):
@@ -412,6 +416,8 @@ def _filter_rejecting_row_injection_variants(case: Case) -> list[MetamorphicVari
 def _join_unmatched_dimension_injection_variants(case: Case) -> list[MetamorphicVariant]:
     """Add a dimension row with no matching fact key; inner/left enrichment output is unchanged."""
 
+    if has_order_observer(case.program):
+        return []
     primary = case.tables[0]
     table_by_name = {table.name: table for table in case.tables}
     for idx, op in enumerate(case.program.operations):
@@ -459,6 +465,8 @@ def _join_unmatched_dimension_injection_variants(case: Case) -> list[Metamorphic
 def _join_inner_left_equivalence_variants(case: Case) -> list[MetamorphicVariant]:
     """Flip inner/left join mode when every base left key has a matching right key."""
 
+    if has_order_observer(case.program):
+        return []
     primary = case.tables[0]
     table_by_name = {table.name: table for table in case.tables}
     mutated: set[str] = set()
@@ -482,6 +490,8 @@ def _join_inner_left_equivalence_variants(case: Case) -> list[MetamorphicVariant
         right_values = {row.get(right_on) for row in right.rows}
         if not left_values.issubset(right_values):
             return []
+        if not _multiset_stable_tail(case, idx + 1):
+            return []
         replacement = _as_plain_mapping(op)
         replacement["how"] = "inner" if join_how(op) == "left" else "left"
         program = Program(
@@ -499,9 +509,30 @@ def _join_inner_left_equivalence_variants(case: Case) -> list[MetamorphicVariant
     return []
 
 
+def _multiset_stable_tail(case: Case, start_index: int) -> bool:
+    tail = list(case.program.operations[start_index:])
+    if has_order_observer(tail):
+        return False
+    for relative_index, op in enumerate(tail):
+        kind = op_kind(op)
+        if kind != "groupby":
+            continue
+        col_types = _column_types_before(case, start_index + relative_index)
+        for agg in aggregate_specs(op):
+            func = aggregate_func(agg)
+            source_type = col_types.get(aggregate_column(agg))
+            if func in {"mean", "any", "all"}:
+                return False
+            if func == "sum" and source_type == "float":
+                return False
+    return True
+
+
 def _join_filter_pushdown_variants(case: Case) -> list[MetamorphicVariant]:
     """Move a left-table filter before a join when intervening ops are independent."""
 
+    if has_order_observer(case.program):
+        return []
     primary_columns = {col.name for col in case.tables[0].columns}
     mutated: set[str] = set()
     ops = case.program.operations
@@ -553,6 +584,8 @@ def _join_filter_pushdown_variants(case: Case) -> list[MetamorphicVariant]:
 def _groupby_neutral_mutation_variants(case: Case) -> list[MetamorphicVariant]:
     """Aggregate over a +0 mirror of a numeric column while keeping aliases unchanged."""
 
+    if has_order_observer(case.program):
+        return []
     for idx, op in enumerate(case.program.operations):
         if op_kind(op) != "groupby":
             continue
@@ -593,6 +626,8 @@ def _groupby_neutral_mutation_variants(case: Case) -> list[MetamorphicVariant]:
 def _groupby_sorted_input_variants(case: Case) -> list[MetamorphicVariant]:
     """Pre-sort exact groupby inputs to exercise sorted aggregation paths."""
 
+    if has_order_observer(case.program):
+        return []
     for idx, op in enumerate(case.program.operations):
         if op_kind(op) != "groupby":
             continue
@@ -656,6 +691,8 @@ def _groupby_sorted_input_tail_safe(tail: list[dict[str, Any]]) -> bool:
 
 
 def _mutate_add_zero_insertion_variants(case: Case) -> list[MetamorphicVariant]:
+    if has_order_observer(case.program):
+        return []
     primary = case.tables[0]
     source = next((col.name for col in primary.columns if col.type == "int"), None)
     if source is None:
@@ -960,6 +997,8 @@ def _string_split_part_idempotence_variants(case: Case) -> list[MetamorphicVaria
 
 
 def _filter_tautology_insertion_variants(case: Case) -> list[MetamorphicVariant]:
+    if has_order_observer(case.program):
+        return []
     primary = case.tables[0]
     id_spec = _column_spec(primary, "id")
     if id_spec is None or id_spec.type != "int":
@@ -1088,6 +1127,8 @@ def _limit_offset_fusion_variants(case: Case) -> list[MetamorphicVariant]:
 
 
 def _groupby_aggregation_permutation_variants(case: Case) -> list[MetamorphicVariant]:
+    if has_order_observer(case.program):
+        return []
     ops = case.program.operations
     for idx, op in enumerate(ops):
         if op_kind(op) != "groupby":
@@ -1113,8 +1154,7 @@ def _groupby_aggregation_permutation_variants(case: Case) -> list[MetamorphicVar
 
 
 def _join_table_permutation_variants(case: Case) -> list[MetamorphicVariant]:
-    ops = case.program.op_sequence()
-    if "limit" in ops or "offset" in ops or len(case.tables) < 2:
+    if has_order_observer(case.program) or len(case.tables) < 2:
         return []
     for index, table in enumerate(case.tables[1:], start=1):
         if len(table.rows) < 2:
@@ -1158,11 +1198,278 @@ def _sort_idempotence_variants(case: Case) -> list[MetamorphicVariant]:
     return []
 
 
+_LIMIT_HUGE_THRESHOLD = 1_000_000_000  # 1B rows — far above any generated case
+
+
+def _case_total_input_row_count(case: Case) -> int:
+    return sum(len(table.rows) for table in case.tables)
+
+
+def _offset_zero_at_tail_after_limit_variants(case: Case) -> list[MetamorphicVariant]:
+    """Appending offset(0) after an existing limit must be a no-op.
+
+    The original program already has a deterministic limit; offset(0) cannot
+    drop rows and must return the same row sequence. Catches backend bugs
+    where offset 0 is incorrectly applied (e.g. consumes a row, or interacts
+    badly with limit pushdown).
+    """
+
+    ops = case.program.operations
+    if not ops:
+        return []
+    has_tail_limit = False
+    for op in reversed(ops):
+        kind = op_kind(op)
+        if kind == "limit":
+            has_tail_limit = True
+            break
+        if kind in {"select", "mutate"}:
+            continue
+        break
+    if not has_tail_limit:
+        return []
+    rewritten = list(ops) + [{"op": "offset", "n": 0}]
+    program = Program(
+        program_id=f"{case.program.program_id}-mr-offset-zero-tail",
+        seed=case.program.seed,
+        operations=rewritten,
+    )
+    return [
+        MetamorphicVariant(
+            "offset_zero_at_tail_after_limit:append",
+            "offset_zero_at_tail_after_limit",
+            Case(
+                f"{case.case_id}-mr-offset-zero-tail",
+                case.seed,
+                case.tables,
+                program,
+            ),
+        )
+    ]
+
+
+def _filter_idempotence_immediate_variants(case: Case) -> list[MetamorphicVariant]:
+    """Duplicating any filter op immediately must be a no-op.
+
+    `filter(p) ≡ filter(p) + filter(p)` is a textbook idempotence. Catches
+    optimizer bugs that re-evaluate the predicate against an already-filtered
+    intermediate or drop rows under double evaluation.
+    """
+
+    ops = case.program.operations
+    for idx, op in enumerate(ops):
+        if op_kind(op) != "filter":
+            continue
+        duplicated = ops[: idx + 1] + [_as_plain_mapping(op)] + ops[idx + 1 :]
+        program = Program(
+            program_id=f"{case.program.program_id}-mr-filter-idempotence-immediate-{idx}",
+            seed=case.program.seed,
+            operations=duplicated,
+        )
+        return [
+            MetamorphicVariant(
+                f"filter_idempotence_immediate:duplicate-{idx}",
+                "filter_idempotence_immediate",
+                Case(
+                    f"{case.case_id}-mr-filter-idempotence-immediate-{idx}",
+                    case.seed,
+                    case.tables,
+                    program,
+                ),
+            )
+        ]
+    return []
+
+
+def _limit_above_data_no_op_variants(case: Case) -> list[MetamorphicVariant]:
+    """Replace a tail limit(N) with limit(BIG) when BIG >> total input rows.
+
+    Tests backend handling of huge LIMIT values (overflow paths, signed/unsigned
+    conversions, optimizer short-circuits). Result must be unchanged because the
+    original limit is also a no-op when N exceeds the realised row count.
+    """
+
+    ops = case.program.operations
+    if not ops:
+        return []
+    total_rows = _case_total_input_row_count(case)
+    if total_rows == 0:
+        return []
+    tail_limit_idx = None
+    for idx in range(len(ops) - 1, -1, -1):
+        kind = op_kind(ops[idx])
+        if kind == "limit":
+            tail_limit_idx = idx
+            break
+        if kind in {"offset", "select", "mutate"}:
+            continue
+        break
+    if tail_limit_idx is None:
+        return []
+    try:
+        existing_n = op_n(ops[tail_limit_idx])
+    except (TypeError, ValueError):
+        return []
+    # Only valid when the existing limit is already a no-op vs realised data.
+    if existing_n is None or existing_n < total_rows:
+        return []
+    huge_op = _as_plain_mapping(ops[tail_limit_idx])
+    huge_op["n"] = max(int(existing_n), _LIMIT_HUGE_THRESHOLD)
+    rewritten = list(ops)
+    rewritten[tail_limit_idx] = huge_op
+    program = Program(
+        program_id=f"{case.program.program_id}-mr-limit-huge-{tail_limit_idx}",
+        seed=case.program.seed,
+        operations=rewritten,
+    )
+    return [
+        MetamorphicVariant(
+            f"limit_above_data_no_op:{existing_n}-to-{huge_op['n']}",
+            "limit_above_data_no_op",
+            Case(f"{case.case_id}-mr-limit-huge-{tail_limit_idx}", case.seed, case.tables, program),
+        )
+    ]
+
+
+def _distinct_after_groupby_no_op_variants(case: Case) -> list[MetamorphicVariant]:
+    """Appending distinct() after groupby+aggregate is a no-op.
+
+    GroupBy already emits one row per distinct key combination, so an extra
+    distinct must not change the result. Catches optimizer bugs that re-shuffle
+    rows or drop them under double dedup.
+    """
+
+    ops = case.program.operations
+    if not ops:
+        return []
+    last_groupby_idx = None
+    for idx in range(len(ops) - 1, -1, -1):
+        kind = op_kind(ops[idx])
+        if kind == "groupby":
+            last_groupby_idx = idx
+            break
+        # Tolerate trailing harmless ops between groupby and tail, but not
+        # any op that mutates the row identity.
+        if kind in {"select", "sort"}:
+            continue
+        break
+    if last_groupby_idx is None:
+        return []
+    if last_groupby_idx == len(ops) - 1:
+        appended_ops = list(ops) + [{"op": "distinct"}]
+    else:
+        appended_ops = list(ops[: last_groupby_idx + 1]) + [{"op": "distinct"}] + list(ops[last_groupby_idx + 1 :])
+    program = Program(
+        program_id=f"{case.program.program_id}-mr-distinct-after-groupby-{last_groupby_idx}",
+        seed=case.program.seed,
+        operations=appended_ops,
+    )
+    return [
+        MetamorphicVariant(
+            f"distinct_after_groupby_no_op:idx-{last_groupby_idx}",
+            "distinct_after_groupby_no_op",
+            Case(
+                f"{case.case_id}-mr-distinct-after-groupby-{last_groupby_idx}",
+                case.seed,
+                case.tables,
+                program,
+            ),
+        )
+    ]
+
+
+def _filter_constant_true_at_tail_variants(case: Case) -> list[MetamorphicVariant]:
+    """Tail-append a tautological filter on a column known to be all non-null.
+
+    Equivalent to no-op; tests backend handling of trivial predicate planners
+    and 'always-true' constant-folding paths, which is where DataFusion and
+    Polars optimizers have historically had bugs.
+    """
+
+    ops = case.program.operations
+    if not ops:
+        return []
+    primary = case.tables[0]
+    # Pick a column that is present in the base table and has at least one
+    # non-null entry to keep the filter safe regardless of intermediate ops.
+    candidate_col = None
+    for col in primary.columns:
+        non_nulls = [row.get(col.name) for row in primary.rows]
+        if any(value is not None for value in non_nulls) and col.type in {"int", "float", "bool", "str"}:
+            candidate_col = col.name
+            break
+    if candidate_col is None:
+        return []
+    tautology = {
+        "op": "filter",
+        "column": candidate_col,
+        "condition": {"cmp": "is_not_null", "column": candidate_col},
+    }
+    # Only append when no later op mutates the column or removes the table.
+    rewritten = list(ops) + [tautology]
+    program = Program(
+        program_id=f"{case.program.program_id}-mr-filter-constant-true-tail",
+        seed=case.program.seed,
+        operations=rewritten,
+    )
+    return [
+        MetamorphicVariant(
+            f"filter_constant_true_tail:{candidate_col}",
+            "filter_constant_true_tail",
+            Case(
+                f"{case.case_id}-mr-filter-constant-true-tail",
+                case.seed,
+                case.tables,
+                program,
+            ),
+        )
+    ]
+
+
+def _union_all_self_then_distinct_variants(case: Case) -> list[MetamorphicVariant]:
+    """UNION ALL(t, t) then DISTINCT == DISTINCT(t).
+
+    By replacing the primary input with `t UNION ALL t` and then forcing a
+    distinct at the tail, the result must equal the original program with the
+    tail distinct. Catches set-operation duplicate-counting bugs (DataFusion
+    has had these) and distinct-after-set-op planner bugs.
+    """
+
+    ops = case.program.operations
+    if not ops or len(case.tables) < 1:
+        return []
+    if case.program.order_sensitive or has_order_observer(case.program):
+        return []
+    primary = case.tables[0]
+    if len(primary.rows) == 0 or len(primary.rows) > 32:
+        return []
+    # New table = primary doubled via union-all in-source.
+    doubled = TableData(primary.name, list(primary.columns), list(primary.rows) + list(primary.rows))
+    new_tables = [doubled, *case.tables[1:]]
+    appended_ops = list(ops) + [{"op": "distinct"}]
+    program = Program(
+        program_id=f"{case.program.program_id}-mr-union-all-self-distinct",
+        seed=case.program.seed,
+        operations=appended_ops,
+    )
+    return [
+        MetamorphicVariant(
+            f"union_all_self_distinct:{primary.name}-rows{len(primary.rows)}",
+            "union_all_self_distinct",
+            Case(
+                f"{case.case_id}-mr-union-all-self-distinct",
+                case.seed,
+                new_tables,
+                program,
+            ),
+        )
+    ]
+
+
 def _input_partition_union_all_variants(case: Case) -> list[MetamorphicVariant]:
     """Rebuild the primary input through a UNION ALL partition boundary."""
 
-    ops = case.program.op_sequence()
-    if not case.tables or case.program.order_sensitive or "limit" in ops or "offset" in ops:
+    if not case.tables or case.program.order_sensitive or has_order_observer(case.program):
         return []
     base = case.tables[0]
     if len(base.rows) < 2:

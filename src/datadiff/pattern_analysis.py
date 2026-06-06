@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Any
 
 from datadiff.dsl import normalize_sort_keys
+from datadiff.finding_outcomes import backend_group_key, candidate_issue_family_keys
 from datadiff.operation_semantics import aggregate_alias, aggregate_func, aggregate_specs, op_kind
 from datadiff.reporter import latest_experiment_manifest_path
-from datadiff.reward import backend_group_key, candidate_issue_family_keys
 from datadiff.util import REPORTS_DIR, ensure_dirs, load_json, read_jsonl
 
 

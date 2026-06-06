@@ -231,11 +231,20 @@ For seeded runs:
 .venv/bin/datadiff analyze-seeded-sensitivity --manifest runs/experiment-*.json
 ```
 
+Before the final readiness claim, record the installed latest-live target package
+versions and compare them with the public latest versions:
+
+```bash
+.venv/bin/datadiff target-version-audit --output reports/target-version-audit-latest.json
+```
+
 Before claiming that the final experiment satisfies the paper target, run the readiness audit over
-the validation, live, historical, seeded, ablation, and comparison manifests:
+the validation, live, historical, seeded, ablation, comparison, and target-version
+audit manifests:
 
 ```bash
 .venv/bin/datadiff final-readiness \
+  --extra-manifest reports/target-version-audit-latest.json \
   --manifest runs/experiment-validation.json \
   --manifest runs/experiment-live-datafusion.json \
   --manifest runs/experiment-live-polars.json \
@@ -250,9 +259,9 @@ the validation, live, historical, seeded, ablation, and comparison manifests:
 
 The audit is intentionally strict by default: it checks the short validation
 smoke, all six live suites, 24h depth per live suite, fresh replay-policy
-isolation, confirmed latest-version bug evidence, confirmed historical replay
-evidence, seeded sensitivity evidence, module-ablation evidence, and
-baseline/related-scope comparison evidence. When no `--manifest` is supplied,
+isolation, target package latest-version audit, confirmed latest-version bug
+evidence, confirmed historical replay evidence, seeded sensitivity evidence,
+module-ablation evidence, and baseline/related-scope comparison evidence. When no `--manifest` is supplied,
 the CLI audits only the latest bounded set of experiment manifests so old
 scratch runs do not make the command unusable. Without explicit manifests this
 is a metadata-only status check and the `run_log_scan` gate will remain false;

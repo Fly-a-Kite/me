@@ -218,6 +218,25 @@ COMMON_DSL_CAPABILITIES: tuple[str, ...] = (
 )
 
 
+# chDB v1: SQL frontend without native running_sum / row_number_filter /
+# sortedness_check / scalar_subquery_probe. The backend stubs probe-kinds
+# in EXTENDED_FALSE_PROBE_KINDS the same way SQLite does, so those caps
+# remain advertised. Ops below are dropped to avoid routing cases that
+# would resolve to BackendResult(status="missing").
+_CHDB_DISABLED_CAPS: frozenset[str] = frozenset(
+    {
+        "op:running_sum",
+        "running:partition_by",
+        "op:row_number_filter",
+        "op:sortedness_check",
+        "op:scalar_subquery_probe",
+    }
+)
+CHDB_DSL_CAPABILITIES: tuple[str, ...] = tuple(
+    cap for cap in COMMON_DSL_CAPABILITIES if cap not in _CHDB_DISABLED_CAPS
+)
+
+
 TARGETS: dict[str, TargetSpec] = {
     "pandas": TargetSpec(
         name="pandas",
@@ -336,6 +355,20 @@ TARGETS: dict[str, TargetSpec] = {
         methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
         extension_contract=DEFAULT_TARGET_EXTENSION_CONTRACT,
     ),
+    "chdb": TargetSpec(
+        name="chdb",
+        backend="chdb",
+        family="embedded_olap",
+        layer="embedded_columnar_engine",
+        adapter="datadiff.backends.chdb_backend.ChDBBackend",
+        status="experimental",
+        capabilities=CHDB_DSL_CAPABILITIES,
+        description="Embedded ClickHouse (chDB) columnar OLAP engine — distinct optimizer family from DuckDB/SQLite.",
+        execution_model="embedded_columnar_olap",
+        portability_tier="optional_dependency",
+        methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
+        extension_contract=DEFAULT_TARGET_EXTENSION_CONTRACT,
+    ),
     "buggy_filter": TargetSpec(
         name="buggy_filter",
         backend="buggy_filter",
@@ -415,6 +448,9 @@ TARGET_SUITES: dict[str, list[str]] = {
     "core_arrow": ["pandas", "polars", "polars_lazy", "duckdb", "sqlite", "pyarrow"],
     "latest_all_engines": ["pandas", "pyarrow", "polars", "polars_lazy", "duckdb", "sqlite", "datafusion"],
     "latest_no_datafusion": ["pandas", "pyarrow", "polars", "polars_lazy", "duckdb", "sqlite"],
+    "chdb_cross": ["pandas", "duckdb", "chdb"],
+    "chdb_olap_cross": ["pandas", "duckdb", "sqlite", "chdb"],
+    "latest_with_chdb": ["pandas", "pyarrow", "polars", "polars_lazy", "duckdb", "sqlite", "chdb"],
     "seeded_filter": ["pandas", "buggy_filter"],
     "seeded_groupby": ["pandas", "buggy_groupby"],
     "seeded_join": ["pandas", "buggy_join"],

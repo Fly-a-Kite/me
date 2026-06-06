@@ -1,11 +1,12 @@
 from datadiff.case_policy import case_discovery_origin, replay_bug_filter_reason
 from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES
-from datadiff.datagen import COMMON_API_WORKFLOW_TEMPLATES, generate_case, repair_operations
+from datadiff.datagen import COMMON_API_WORKFLOW_TEMPLATES, generate_case, generate_program, repair_operations
 from datadiff.classification_oracle import validate_case_program
-from datadiff.dsl import ColumnSpec, Program, TableData, sort_columns
+from datadiff.dsl import Case, ColumnSpec, Program, TableData, sort_columns
 from datadiff.guidance import extract_case_features
 from datadiff.identifiers import is_reserved_output_name, make_safe_output_name
 from datadiff.join_keys import join_key_columns
+from datadiff.synthesis.lhs_sampler import SchemaSpec
 
 
 def _assert_program_columns_are_valid(case):
@@ -174,6 +175,22 @@ def test_generate_case_is_deterministic():
     assert a["tables"][0]["rows"] or a["tables"][0]["columns"]
 
 
+def test_generate_case_accepts_lhs_schema_spec():
+    spec = SchemaSpec(
+        column_count=5,
+        row_count=11,
+        null_density=0.35,
+        type_mix=("numeric", "string", "bool", "datetime", "decimal"),
+    )
+
+    case = generate_case(123, schema_spec=spec)
+
+    assert len(case.tables[0].columns) == 5
+    assert len(case.tables[0].rows) == 11
+    assert case.metadata["lhs_schema_spec"] == spec.to_dict()
+    assert validate_case_program(case) == []
+
+
 def test_discovery_fresh_skips_known_replay_source_mixins():
     replay_mixed = generate_case(20, profile="discovery")
     fresh = generate_case(20, profile="discovery_fresh")
@@ -190,6 +207,14 @@ def test_generate_case_edge_float_profile_is_supported():
     case = generate_case(123, profile="edge_float")
     assert case.case_id == "case-00000123"
     assert case.program.operations
+
+
+def test_generate_case_typed_grammar_profile_is_supported_and_valid():
+    case = generate_case(123, profile="typed_grammar")
+    assert case.case_id == "case-00000123-typed-grammar"
+    assert case.metadata["synthesis_model"] == "typed_grammar"
+    assert case.program.operations
+    assert validate_case_program(case) == []
 
 
 def test_generate_case_workflow_profile_is_supported_and_valid():
@@ -213,6 +238,111 @@ def test_generate_case_discovery_profile_is_supported_and_valid():
     assert case.case_id == "case-00000123-discovery"
     assert case.program.operations
     assert validate_case_program(case) == []
+
+
+def test_discovery_program_generation_covers_window_and_rich_expression_ops():
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("row_nr", "int", nullable=False),
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("x", "int", nullable=True),
+            ColumnSpec("y", "float", nullable=True),
+            ColumnSpec("flag", "bool", nullable=True),
+            ColumnSpec("s", "str", nullable=True),
+            ColumnSpec("dt", "str", nullable=True),
+            ColumnSpec("num_s", "str", nullable=True),
+        ],
+        [
+            {"row_nr": 0, "id": 0, "g": "a", "x": 1, "y": 0.5, "flag": True, "s": "Alpha", "dt": "2024-01-03", "num_s": "1"},
+            {"row_nr": 1, "id": 0, "g": " b ", "x": -2, "y": -1.5, "flag": None, "s": " Beta ", "dt": "2025-02-14T08:30:00", "num_s": "-2"},
+            {"row_nr": 2, "id": 1, "g": None, "x": None, "y": None, "flag": False, "s": "", "dt": None, "num_s": None},
+            {"row_nr": 3, "id": 1, "g": "space value", "x": 5, "y": 1.5, "flag": True, "s": "space value", "dt": "2026-01-01T00:00:00", "num_s": "10"},
+        ],
+    )
+
+    seen_ops = set()
+    seen_exprs = set()
+    numeric_string_cast_targets = set()
+
+    for seed in range(800):
+        program = generate_program(seed, table, max_ops=8, profile="discovery")
+        case = Case(f"case-discovery-{seed}", seed, [table], program)
+        assert validate_case_program(case) == []
+        for op in program.operations:
+            seen_ops.add(op["op"])
+            if op["op"] == "mutate":
+                kind = op["expr"]["kind"]
+                seen_exprs.add(kind)
+                if kind == "cast" and op["expr"].get("input_domain") == "integer_string":
+                    numeric_string_cast_targets.add(op["expr"]["to"])
+        if (
+            {"row_number_filter", "running_sum"}.issubset(seen_ops)
+            and {"bool_not", "string_concat", "date_part"}.issubset(seen_exprs)
+            and numeric_string_cast_targets == {"int", "float"}
+            and seen_exprs & {"abs", "clip"}
+        ):
+            break
+
+    assert {"row_number_filter", "running_sum"}.issubset(seen_ops)
+    assert {"bool_not", "string_concat", "date_part"}.issubset(seen_exprs)
+    assert numeric_string_cast_targets == {"int", "float"}
+    assert seen_exprs & {"abs", "clip"}
+
+
+def test_discovery_program_generation_composes_derived_null_and_window_paths():
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("row_nr", "int", nullable=False),
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("x", "int", nullable=True),
+            ColumnSpec("y", "float", nullable=True),
+            ColumnSpec("flag", "bool", nullable=True),
+            ColumnSpec("s", "str", nullable=True),
+        ],
+        [
+            {"row_nr": 0, "id": 0, "g": "a", "x": 1, "y": 0.5, "flag": True, "s": "Alpha"},
+            {"row_nr": 1, "id": 0, "g": None, "x": None, "y": None, "flag": None, "s": ""},
+            {"row_nr": 2, "id": 1, "g": "space value", "x": -2, "y": -1.5, "flag": False, "s": "Beta"},
+            {"row_nr": 3, "id": 1, "g": "", "x": 5, "y": 1.5, "flag": True, "s": None},
+        ],
+    )
+
+    seen = {
+        "filter_on_derived": False,
+        "case_when_null_cmp": False,
+        "row_number_order_derived": False,
+        "running_sum_on_derived": False,
+    }
+
+    for seed in range(1200):
+        program = generate_program(seed, table, max_ops=9, profile="discovery")
+        case = Case(f"case-discovery-composite-{seed}", seed, [table], program)
+        assert validate_case_program(case) == []
+        derived: set[str] = set()
+        for op in program.operations:
+            kind = op["op"]
+            if kind in {"mutate", "coalesce", "case_when", "running_sum"}:
+                alias = op.get("column") or op.get("as")
+                if alias:
+                    derived.add(alias)
+            if kind == "filter" and op.get("column") in derived:
+                seen["filter_on_derived"] = True
+            if kind == "case_when" and op.get("condition", {}).get("cmp") in {"is_null", "is_not_null"}:
+                seen["case_when_null_cmp"] = True
+            if kind == "row_number_filter" and any(
+                key["column"] in derived for key in op.get("order_by", [])
+            ):
+                seen["row_number_order_derived"] = True
+            if kind == "running_sum" and op.get("source") in derived:
+                seen["running_sum_on_derived"] = True
+        if all(seen.values()):
+            break
+
+    assert all(seen.values()), seen
 
 
 def test_discovery_profile_covers_per_column_sort_null_order():
