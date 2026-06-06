@@ -160,7 +160,7 @@ def test_discovery_longhaul_launcher_targets_high_yield_campaign_batches():
         "DATADIFF_DISCOVERY_LONGHAUL_LOAD_LIMIT",
         "active_discovery_campaigns",
         "mktemp",
-        "python[0-9.]*",
+        "^([^[:space:]]*\\/)?python[0-9.]*",
         "discovery-campaign",
         "--candidate-recheck-count",
         "--candidate-pipeline-recheck-attempts",

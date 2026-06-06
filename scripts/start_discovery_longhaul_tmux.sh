@@ -120,7 +120,7 @@ active_discovery_campaigns() {
   printf '%s\n' "${rows}" | awk '
     {
       sub(/^[0-9]+[[:space:]]+/, "")
-      if ($0 ~ /(^|\/)python[0-9.]*[[:space:]]+-m[[:space:]]+datadiff[.]cli[[:space:]]+discovery-campaign/) {
+      if ($0 ~ /^([^[:space:]]*\/)?python[0-9.]*[[:space:]]+-m[[:space:]]+datadiff[.]cli[[:space:]]+discovery-campaign/) {
         count += 1
       }
     }
