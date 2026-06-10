@@ -234,3 +234,45 @@ def test_prepare_authority_run_records_optional_launcher_overrides(tmp_path: Pat
     env_text = result.env_file.read_text(encoding="utf-8")
     assert "DATADIFF_CONTINUAL_LEARNING_LEDGERS" in env_text
     assert "DATADIFF_TMUX_SESSION" in env_text
+
+
+def test_prepare_authority_run_materializes_ignored_evidence_inputs_to_worktree(tmp_path: Path):
+    module = _module()
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+    _init_git_repo(project_root)
+    reports_dir = project_root / "reports"
+    reports_dir.mkdir()
+    (reports_dir / "manifest-index.json").write_text('{"manifests": []}\n', encoding="utf-8")
+    (reports_dir / "ledger-manifest.json").write_text('{"ledgers": []}\n', encoding="utf-8")
+    (reports_dir / "c5-ledger.json").write_text('{"entries": []}\n', encoding="utf-8")
+
+    result = module.prepare_authority_run(
+        _args(
+            module,
+            project_root,
+            force_worktree=True,
+            manifest_index="reports/manifest-index.json",
+            ledger_evidence_manifest="reports/ledger-manifest.json",
+            continual_learning_ledgers="reports/c5-ledger.json",
+        )
+    )
+
+    assert result.created_worktree is True
+    assert result.prepared_root != project_root
+    assert result.materialized_input_files == (
+        "reports/manifest-index.json",
+        "reports/ledger-manifest.json",
+        "reports/c5-ledger.json",
+    )
+    for relative in result.materialized_input_files:
+        assert (result.prepared_root / relative).read_text(encoding="utf-8")
+    report = json.loads(result.report_file.read_text(encoding="utf-8"))
+    assert report["materialized_input_files"] == list(result.materialized_input_files)
+    proc = subprocess.run(
+        ["git", "-C", str(result.prepared_root), "status", "--porcelain"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.stdout.strip() == ""

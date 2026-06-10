@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import shlex
 import subprocess
 import sys
@@ -54,6 +55,7 @@ class AuthorityPrepResult:
     source_code_dirty_paths: tuple[str, ...]
     prepared_workspace_dirty: bool
     created_worktree: bool
+    materialized_input_files: tuple[str, ...]
     launcher: Path
     report_file: Path
     env_file: Path
@@ -130,6 +132,19 @@ def prepare_authority_run(args: argparse.Namespace) -> AuthorityPrepResult:
     strategy_snapshot = Path(str(getattr(args, "strategy_snapshot", "") or DEFAULT_STRATEGY_SNAPSHOT))
     continual_learning_ledgers = str(getattr(args, "continual_learning_ledgers", "") or "").strip()
     tmux_session = str(getattr(args, "tmux_session", "") or "").strip()
+    materialized_input_files = tuple(
+        _materialize_authority_input_files(
+            source_root,
+            prepared_root,
+            [
+                manifest_index,
+                ledger_evidence_manifest,
+                paper_run_journal,
+                strategy_snapshot,
+                *_split_path_csv(continual_learning_ledgers),
+            ],
+        )
+    )
 
     env_payload = {
         "DATADIFF_ROOT_DIR": str(prepared_root),
@@ -171,6 +186,7 @@ def prepare_authority_run(args: argparse.Namespace) -> AuthorityPrepResult:
         "paper_run_journal": str(paper_run_journal),
         "strategy_snapshot": str(strategy_snapshot),
         "continual_learning_ledgers": continual_learning_ledgers,
+        "materialized_input_files": list(materialized_input_files),
         "tmux_session": tmux_session,
         "launch_command": launch_command,
     }
@@ -187,6 +203,7 @@ def prepare_authority_run(args: argparse.Namespace) -> AuthorityPrepResult:
         source_code_dirty_paths=source_code_dirty_paths,
         prepared_workspace_dirty=prepared_workspace_dirty,
         created_worktree=created_worktree,
+        materialized_input_files=materialized_input_files,
         launcher=prepared_root / launcher,
         report_file=report_file,
         env_file=env_file,
@@ -309,6 +326,37 @@ def _write_env_file(path: Path, payload: dict[str, str]) -> None:
         if str(value).strip()
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _split_path_csv(value: str) -> list[Path]:
+    paths: list[Path] = []
+    for item in str(value or "").split(","):
+        text = item.strip()
+        if text:
+            paths.append(Path(text))
+    return paths
+
+
+def _materialize_authority_input_files(
+    source_root: Path,
+    prepared_root: Path,
+    paths: list[Path],
+) -> list[str]:
+    materialized: list[str] = []
+    for path in paths:
+        if path.is_absolute():
+            continue
+        normalized = Path(str(path).strip())
+        if not str(normalized) or any(part == ".." for part in normalized.parts):
+            continue
+        source_path = source_root / normalized
+        prepared_path = prepared_root / normalized
+        if not source_path.is_file() or prepared_path.exists():
+            continue
+        prepared_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, prepared_path)
+        materialized.append(str(normalized))
+    return materialized
 
 
 def _workspace_dirty(root: Path) -> bool:
