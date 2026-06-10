@@ -136,13 +136,16 @@ def prepare_authority_run(args: argparse.Namespace) -> AuthorityPrepResult:
         _materialize_authority_input_files(
             source_root,
             prepared_root,
-            [
-                manifest_index,
-                ledger_evidence_manifest,
-                paper_run_journal,
-                strategy_snapshot,
-                *_split_path_csv(continual_learning_ledgers),
-            ],
+            _authority_input_file_closure(
+                source_root,
+                [
+                    manifest_index,
+                    ledger_evidence_manifest,
+                    paper_run_journal,
+                    strategy_snapshot,
+                    *_split_path_csv(continual_learning_ledgers),
+                ],
+            ),
         )
     )
 
@@ -337,6 +340,77 @@ def _split_path_csv(value: str) -> list[Path]:
     return paths
 
 
+def _authority_input_file_closure(source_root: Path, paths: list[Path]) -> list[Path]:
+    pending = list(paths)
+    out: list[Path] = []
+    seen: set[str] = set()
+    while pending:
+        relative = _authority_relative_input_path(pending.pop(0))
+        if relative is None:
+            continue
+        key = str(relative)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(relative)
+        pending.extend(_authority_referenced_input_files(source_root / relative))
+    return out
+
+
+def _authority_relative_input_path(path: Path) -> Path | None:
+    if path.is_absolute():
+        return None
+    normalized = Path(str(path).strip())
+    if not str(normalized) or any(part == ".." for part in normalized.parts):
+        return None
+    return normalized
+
+
+def _authority_referenced_input_files(source_path: Path) -> list[Path]:
+    if not source_path.is_file() or source_path.suffix not in {".json", ".jsonl"}:
+        return []
+    try:
+        payload = json.loads(source_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(payload, dict):
+        return []
+    paths: list[Path] = []
+    paths.extend(_paths_from_index_value(payload.get("manifest_files", [])))
+    paths.extend(_paths_from_index_value(payload.get("extra_manifest_files", [])))
+    paths.extend(_paths_from_index_value(payload.get("paper_run_journal_files", [])))
+    _append_ledger_reference_paths(paths, payload)
+    for command in payload.get("commands", []) or []:
+        if not isinstance(command, dict):
+            continue
+        paths.extend(_paths_from_index_value(command.get("manifest_files", [])))
+        paths.extend(_paths_from_index_value(command.get("extra_manifest_files", [])))
+        paths.extend(_paths_from_index_value(command.get("paper_run_journal_files", [])))
+    for run in payload.get("runs", []) or []:
+        if isinstance(run, dict):
+            _append_ledger_reference_paths(paths, run)
+    return paths
+
+
+def _paths_from_index_value(value: object) -> list[Path]:
+    if isinstance(value, str):
+        items = [part.strip() for part in value.split(",")]
+    elif isinstance(value, (list, tuple, set)):
+        items = [str(item).strip() for item in value]
+    else:
+        items = []
+    return [Path(item) for item in items if item]
+
+
+def _append_ledger_reference_paths(paths: list[Path], payload: dict[str, object]) -> None:
+    for key in ("version_ledger_file", "regression_ledger_file", "continual_learning_ledger_file"):
+        text = str(payload.get(key, "") or "").strip()
+        if text:
+            paths.append(Path(text))
+    for key in ("version_ledger_files", "regression_ledger_files", "continual_learning_ledger_files"):
+        paths.extend(_paths_from_index_value(payload.get(key, [])))
+
+
 def _materialize_authority_input_files(
     source_root: Path,
     prepared_root: Path,
@@ -344,10 +418,8 @@ def _materialize_authority_input_files(
 ) -> list[str]:
     materialized: list[str] = []
     for path in paths:
-        if path.is_absolute():
-            continue
-        normalized = Path(str(path).strip())
-        if not str(normalized) or any(part == ".." for part in normalized.parts):
+        normalized = _authority_relative_input_path(path)
+        if normalized is None:
             continue
         source_path = source_root / normalized
         prepared_path = prepared_root / normalized

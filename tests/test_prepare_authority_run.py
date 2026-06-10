@@ -243,9 +243,38 @@ def test_prepare_authority_run_materializes_ignored_evidence_inputs_to_worktree(
     _init_git_repo(project_root)
     reports_dir = project_root / "reports"
     reports_dir.mkdir()
-    (reports_dir / "manifest-index.json").write_text('{"manifests": []}\n', encoding="utf-8")
-    (reports_dir / "ledger-manifest.json").write_text('{"ledgers": []}\n', encoding="utf-8")
+    (reports_dir / "manifest-index.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "final-experiment-manifest-index-v1",
+                "manifest_files": [],
+                "extra_manifest_files": ["reports/nested-extra.json"],
+                "commands": [
+                    {
+                        "extra_manifest_files": ["reports/command-extra.json"],
+                        "paper_run_journal_files": ["reports/command-journal.jsonl"],
+                    }
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (reports_dir / "ledger-manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "version-ledger-evidence-manifest-v1",
+                "version_ledger_file": "reports/c5-ledger.json",
+                "runs": [{"version_ledger_file": "reports/c5-ledger.json"}],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     (reports_dir / "c5-ledger.json").write_text('{"entries": []}\n', encoding="utf-8")
+    (reports_dir / "nested-extra.json").write_text('{"runs": []}\n', encoding="utf-8")
+    (reports_dir / "command-extra.json").write_text('{"runs": []}\n', encoding="utf-8")
+    (reports_dir / "command-journal.jsonl").write_text("{}\n", encoding="utf-8")
 
     result = module.prepare_authority_run(
         _args(
@@ -254,18 +283,20 @@ def test_prepare_authority_run_materializes_ignored_evidence_inputs_to_worktree(
             force_worktree=True,
             manifest_index="reports/manifest-index.json",
             ledger_evidence_manifest="reports/ledger-manifest.json",
-            continual_learning_ledgers="reports/c5-ledger.json",
         )
     )
 
     assert result.created_worktree is True
     assert result.prepared_root != project_root
-    assert result.materialized_input_files == (
+    assert set(result.materialized_input_files) == {
         "reports/manifest-index.json",
         "reports/ledger-manifest.json",
+        "reports/nested-extra.json",
+        "reports/command-extra.json",
+        "reports/command-journal.jsonl",
         "reports/c5-ledger.json",
-    )
-    for relative in result.materialized_input_files:
+    }
+    for relative in sorted(result.materialized_input_files):
         assert (result.prepared_root / relative).read_text(encoding="utf-8")
     report = json.loads(result.report_file.read_text(encoding="utf-8"))
     assert report["materialized_input_files"] == list(result.materialized_input_files)
