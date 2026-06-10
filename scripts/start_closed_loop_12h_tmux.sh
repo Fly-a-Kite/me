@@ -2,6 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR=""
+PYTHON_CMD=""
+PYTHONPATH_VALUE=""
 SESSION_NAME=""
 DURATION=""
 BATCH_DURATION=""
@@ -71,6 +73,8 @@ FINAL_READINESS_COMMAND=()
 
 refresh_config() {
   ROOT_DIR="${DATADIFF_ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+  PYTHON_CMD="${DATADIFF_PYTHON:-}"
+  PYTHONPATH_VALUE="${DATADIFF_PYTHONPATH:-${PYTHONPATH:-}}"
   SESSION_NAME="${DATADIFF_TMUX_SESSION:-datadiff-closed-loop-12h-authority}"
   DURATION="${DATADIFF_DURATION:-12h}"
   BATCH_DURATION="${DATADIFF_BATCH_DURATION:-10m}"
@@ -122,6 +126,9 @@ refresh_config() {
   FINAL_READINESS_MANIFEST_INDEX="${DATADIFF_FINAL_READINESS_MANIFEST_INDEX:-}"
   FINAL_READINESS_EXTRA_MANIFESTS="${DATADIFF_FINAL_READINESS_EXTRA_MANIFESTS:-}"
   FINAL_READINESS_FAIL_ON_MISSING="${DATADIFF_FINAL_READINESS_FAIL_ON_MISSING:-0}"
+  if [[ -n "${PYTHONPATH_VALUE}" ]]; then
+    export PYTHONPATH="${PYTHONPATH_VALUE}"
+  fi
 }
 
 write_config_file() {
@@ -129,6 +136,8 @@ write_config_file() {
   mkdir -p "$(dirname "${config_file}")"
   {
     printf 'DATADIFF_ROOT_DIR=%q\n' "${ROOT_DIR}"
+    printf 'DATADIFF_PYTHON=%q\n' "${PYTHON_CMD}"
+    printf 'DATADIFF_PYTHONPATH=%q\n' "${PYTHONPATH_VALUE}"
     printf 'DATADIFF_TMUX_SESSION=%q\n' "${SESSION_NAME}"
     printf 'DATADIFF_DURATION=%q\n' "${DURATION}"
     printf 'DATADIFF_BATCH_DURATION=%q\n' "${BATCH_DURATION}"
@@ -308,7 +317,11 @@ _require_clean_authority_workspace() {
   fi
 }
 
-_pip_freeze_cmd() {
+_python_cmd() {
+  if [[ -n "${PYTHON_CMD}" ]]; then
+    printf '%s\n' "${PYTHON_CMD}"
+    return
+  fi
   if [[ -x "${ROOT_DIR}/.venv/bin/python" ]]; then
     printf '%s\n' "${ROOT_DIR}/.venv/bin/python"
     return
@@ -318,6 +331,10 @@ _pip_freeze_cmd() {
     return
   fi
   command -v python
+}
+
+_pip_freeze_cmd() {
+  _python_cmd
 }
 
 _prepare_freeze_snapshot() {
@@ -521,8 +538,10 @@ PY
 }
 
 _build_experiment_command() {
+  local python_cmd
+  python_cmd="$(_python_cmd)"
   EXPERIMENT_COMMAND=(
-    .venv/bin/python -m datadiff.cli experiment
+    "${python_cmd}" -m datadiff.cli experiment
     --target-suites "${TARGET_SUITES}"
     --presets "${PRESETS}"
     --profile-pool "${PROFILE_POOL}"
@@ -703,7 +722,9 @@ _jsonl_log_stem() {
 
 _manifest_run_files() {
   local manifest_path="$1"
-  "${ROOT_DIR}/.venv/bin/python" - "${manifest_path}" <<'PY'
+  local python_cmd
+  python_cmd="$(_python_cmd)"
+  "${python_cmd}" - "${manifest_path}" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -720,9 +741,11 @@ PY
 _ensure_final_readiness_manifest_index() {
   local manifest_path="$1"
   local index_path="${FINAL_READINESS_MANIFEST_INDEX%%,*}"
+  local python_cmd
   if [[ -z "${index_path}" ]]; then
     return 0
   fi
+  python_cmd="$(_python_cmd)"
   INDEX_PATH="${index_path}" \
   MANIFEST_PATH="${manifest_path}" \
   RUN_ID_VALUE="${run_id}" \
@@ -732,7 +755,7 @@ _ensure_final_readiness_manifest_index() {
   BATCH_DURATION_VALUE="${BATCH_DURATION}" \
   EVIDENCE_ROLE_VALUE="${RUN_PROVENANCE_EVIDENCE_ROLE}" \
   LAUNCH_SCRIPT_VALUE="${RUN_PROVENANCE_LAUNCH_SCRIPT}" \
-  "${ROOT_DIR}/.venv/bin/python" - <<'PY'
+  "${python_cmd}" - <<'PY'
 import json
 import os
 from pathlib import Path
@@ -814,7 +837,9 @@ _append_csv_flags() {
 
 _final_readiness_command() {
   local manifest_path="$1"
-  FINAL_READINESS_COMMAND=("${ROOT_DIR}/.venv/bin/python" -m datadiff.cli final-readiness)
+  local python_cmd
+  python_cmd="$(_python_cmd)"
+  FINAL_READINESS_COMMAND=("${python_cmd}" -m datadiff.cli final-readiness)
   if [[ -n "${FINAL_READINESS_MANIFEST_INDEX}" ]]; then
     _append_csv_flags FINAL_READINESS_COMMAND "--manifest-index" "${FINAL_READINESS_MANIFEST_INDEX}"
   else
@@ -852,6 +877,7 @@ _apply_post_run_hook_output() {
 
 _refresh_paper_evidence() {
   local manifest_path="$1"
+  local python_cmd=""
   local summary_output=""
   local analysis_output=""
   local methodology_output=""
@@ -887,24 +913,25 @@ _refresh_paper_evidence() {
     return 0
   fi
 
-  if [[ ! -x "${ROOT_DIR}/.venv/bin/python" ]]; then
-    echo "post-run evidence refresh requires ${ROOT_DIR}/.venv/bin/python"
+  python_cmd="$(_python_cmd)"
+  if [[ -z "${python_cmd}" ]]; then
+    echo "post-run evidence refresh requires a Python executable"
     POST_RUN_STATUS="failed"
     return 5
   fi
 
-  summary_output="$("${ROOT_DIR}/.venv/bin/python" -m datadiff.cli experiment-summary --manifest "${manifest_path}" --refresh)"
+  summary_output="$("${python_cmd}" -m datadiff.cli experiment-summary --manifest "${manifest_path}" --refresh)"
   printf '%s\n' "${summary_output}"
   EXPERIMENT_SUMMARY_MARKDOWN="$(_extract_output_field "${summary_output}" "markdown summary: " || true)"
   EXPERIMENT_SUMMARY_CSV="$(_extract_output_field "${summary_output}" "csv summary:      " || true)"
   EXPERIMENT_SUMMARY_AGGREGATE_CSV="$(_extract_output_field "${summary_output}" "aggregate csv:    " || true)"
 
-  analysis_output="$("${ROOT_DIR}/.venv/bin/python" -m datadiff.cli analyze-experiment --manifest "${manifest_path}" --refresh)"
+  analysis_output="$("${python_cmd}" -m datadiff.cli analyze-experiment --manifest "${manifest_path}" --refresh)"
   printf '%s\n' "${analysis_output}"
   EXPERIMENT_ANALYSIS_MARKDOWN="$(_extract_output_field "${analysis_output}" "analysis markdown: " || true)"
   EXPERIMENT_ANALYSIS_CSV="$(_extract_output_field "${analysis_output}" "analysis csv:      " || true)"
 
-  methodology_output="$("${ROOT_DIR}/.venv/bin/python" -m datadiff.cli methodology-report --manifest "${manifest_path}" --refresh)"
+  methodology_output="$("${python_cmd}" -m datadiff.cli methodology-report --manifest "${manifest_path}" --refresh)"
   printf '%s\n' "${methodology_output}"
   METHODOLOGY_REPORT_MARKDOWN="$(_extract_output_field "${methodology_output}" "methodology report markdown: " || true)"
   METHODOLOGY_REPORT_JSON="$(_extract_output_field "${methodology_output}" "methodology report json:     " || true)"
@@ -924,7 +951,7 @@ _refresh_paper_evidence() {
     fi
     run_stem="$(_jsonl_log_stem "${run_file}")"
     classify_target="${CLASSIFY_RUN_DIR}/${run_stem}.json"
-    classify_output="$("${ROOT_DIR}/.venv/bin/python" -m datadiff.cli classify-run --run-file "${run_file}" --json)"
+    classify_output="$("${python_cmd}" -m datadiff.cli classify-run --run-file "${run_file}" --json)"
     printf '%s\n' "${classify_output}" > "${classify_target}"
     run_count=$((run_count + 1))
   done < <(_manifest_run_files "${manifest_path}")

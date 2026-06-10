@@ -117,6 +117,22 @@ def test_prepare_authority_run_creates_detached_clean_worktree_from_dirty_source
     assert proc.stdout.strip() == ""
 
 
+def test_prepare_authority_run_records_external_python_for_prepared_worktree(tmp_path: Path):
+    module = _module()
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+    _init_git_repo(project_root)
+    python_path = project_root / ".venv" / "bin" / "python"
+    python_path.parent.mkdir(parents=True)
+    python_path.write_text("#!/usr/bin/env python\n", encoding="utf-8")
+
+    result = module.prepare_authority_run(_args(module, project_root))
+
+    env_text = result.env_file.read_text(encoding="utf-8")
+    assert f"DATADIFF_PYTHON={str(python_path)}" in env_text
+    assert f"DATADIFF_PYTHONPATH={str(result.prepared_root / 'src')}" in env_text
+
+
 def test_prepare_authority_run_rejects_dirty_source_code_by_default(tmp_path: Path):
     module = _module()
     project_root = tmp_path / "repo"

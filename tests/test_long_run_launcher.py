@@ -118,6 +118,9 @@ def test_authority_closed_loop_launcher_uses_final_adaptive_learning_contract():
         "DATADIFF_FINAL_READINESS_MANIFEST_INDEX",
         "DATADIFF_FINAL_READINESS_EXTRA_MANIFESTS",
         "DATADIFF_FINAL_READINESS_FAIL_ON_MISSING",
+        "DATADIFF_PYTHON",
+        "DATADIFF_PYTHONPATH",
+        "_python_cmd",
         "_final_readiness_command",
         "--manifest-index",
         "--extra-manifest",
@@ -382,6 +385,77 @@ def test_closed_loop_launcher_allows_equivalent_concurrent_launch_with_override(
     finally:
         subprocess.run(["tmux", "kill-session", "-t", session_name], check=False, capture_output=True)
         subprocess.run(["tmux", "kill-session", "-t", duplicate_session], check=False, capture_output=True)
+
+
+@pytest.mark.skipif(shutil.which("tmux") is None, reason="tmux is not installed")
+def test_closed_loop_launcher_uses_external_python_without_root_venv(tmp_path: Path):
+    project_root = tmp_path / "project-root"
+    fake_package = project_root / "src" / "datadiff"
+    fake_package.mkdir(parents=True)
+    (fake_package / "__init__.py").write_text("", encoding="utf-8")
+    (fake_package / "cli.py").write_text(
+        textwrap.dedent(
+            """\
+            import json
+            import os
+            import sys
+            from pathlib import Path
+
+            Path("logs/fake-cli.json").write_text(
+                json.dumps(
+                    {
+                        "argv": sys.argv,
+                        "executable": sys.executable,
+                        "pythonpath": os.environ.get("PYTHONPATH", ""),
+                    },
+                    sort_keys=True,
+                )
+                + "\\n",
+                encoding="utf-8",
+            )
+            """
+        ),
+        encoding="utf-8",
+    )
+    session_name = f"datadiff-test-python-{os.getpid()}-{int(time.time() * 1000)}"
+    env = os.environ.copy()
+    env.update(
+        {
+            "DATADIFF_ROOT_DIR": str(project_root),
+            "DATADIFF_TMUX_SESSION": session_name,
+            "DATADIFF_PYTHON": sys.executable,
+            "DATADIFF_PYTHONPATH": str(project_root / "src"),
+            "DATADIFF_REQUIRE_CLEAN_WORKTREE": "0",
+        }
+    )
+
+    try:
+        started = subprocess.run(
+            ["bash", str(SCRIPT_PATH)],
+            cwd=project_root,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        status_path = Path(_launcher_output_field(started.stdout, "status: "))
+        final_status = _wait_until(
+            lambda: (
+                status
+                if (status := _read_status(status_path)).get("status") == "completed"
+                else None
+            ),
+            timeout=20.0,
+        )
+        payload = json.loads((project_root / "logs" / "fake-cli.json").read_text(encoding="utf-8"))
+
+        assert final_status["post_run_status"] == "skipped"
+        assert payload["executable"] == sys.executable
+        assert payload["pythonpath"].split(os.pathsep)[0] == str(project_root / "src")
+        assert payload["argv"][0].replace(os.sep, "/").endswith("src/datadiff/cli.py")
+        assert payload["argv"][1] == "experiment"
+    finally:
+        subprocess.run(["tmux", "kill-session", "-t", session_name], check=False, capture_output=True)
 
 
 @pytest.mark.skipif(shutil.which("tmux") is None, reason="tmux is not installed")

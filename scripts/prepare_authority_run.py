@@ -137,6 +137,10 @@ def prepare_authority_run(args: argparse.Namespace) -> AuthorityPrepResult:
         "DATADIFF_FINAL_READINESS_EXTRA_MANIFESTS": str(ledger_evidence_manifest),
         "DATADIFF_REQUIRE_CLEAN_WORKTREE": "1",
     }
+    source_python = source_root / ".venv" / "bin" / "python"
+    if source_python.is_file():
+        env_payload["DATADIFF_PYTHON"] = str(source_python)
+        env_payload["DATADIFF_PYTHONPATH"] = str(prepared_root / "src")
     if continual_learning_ledgers:
         env_payload["DATADIFF_CONTINUAL_LEARNING_LEDGERS"] = continual_learning_ledgers
     if tmux_session:
