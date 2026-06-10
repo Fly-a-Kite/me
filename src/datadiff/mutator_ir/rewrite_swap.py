@@ -45,8 +45,10 @@ def legal_adjacent_swap_positions(
     if not tables or len(operations) < 2:
         return []
     out: list[int] = []
+    table_by_name = {table.name: table for table in tables}
+    prefix_states = _prefix_states(tables, operations, table_by_name)
     for index in range(len(operations) - 1):
-        if _can_swap_adjacent(tables, operations, index):
+        if _can_swap_adjacent_in_state(prefix_states[index], table_by_name, operations, index):
             out.append(index)
     return out
 
@@ -80,10 +82,40 @@ def _can_swap_adjacent(
     if left_kind not in _LOCAL_REORDERABLE_KINDS or right_kind not in _LOCAL_REORDERABLE_KINDS:
         return False
     before = state_after_operations(tables[0], operations[:index], extra_tables=tables[1:])
+    return _can_swap_adjacent_in_state(before, {table.name: table for table in tables}, operations, index)
+
+
+def _prefix_states(
+    tables: Sequence[TableData],
+    operations: Sequence[Mapping[str, Any]],
+    table_by_name: Mapping[str, TableData],
+) -> list[ProgramState]:
+    state = ProgramState.from_table(tables[0])
+    states = [state.copy()]
+    for operation in operations:
+        apply_operation_state(state, operation, tables=table_by_name)
+        states.append(state.copy())
+    return states
+
+
+def _can_swap_adjacent_in_state(
+    before: ProgramState,
+    table_by_name: Mapping[str, TableData],
+    operations: Sequence[Mapping[str, Any]],
+    index: int,
+) -> bool:
+    left = operations[index]
+    right = operations[index + 1]
+    left_kind = op_kind(left)
+    right_kind = op_kind(right)
+    if left_kind in _BARRIER_KINDS or right_kind in _BARRIER_KINDS:
+        return False
+    if left_kind not in _LOCAL_REORDERABLE_KINDS or right_kind not in _LOCAL_REORDERABLE_KINDS:
+        return False
     if not _operation_valid_in_state(left, before):
         return False
     after_left = before.copy()
-    apply_operation_state(after_left, left, tables={table.name: table for table in tables})
+    apply_operation_state(after_left, left, tables=table_by_name)
     if not _operation_valid_in_state(right, after_left):
         return False
     if _produced_columns(left) & _read_columns(right):
@@ -93,12 +125,12 @@ def _can_swap_adjacent(
     swapped = before.copy()
     if not _operation_valid_in_state(right, swapped):
         return False
-    apply_operation_state(swapped, right, tables={table.name: table for table in tables})
+    apply_operation_state(swapped, right, tables=table_by_name)
     if not _operation_valid_in_state(left, swapped):
         return False
     original_after = after_left.copy()
-    apply_operation_state(original_after, right, tables={table.name: table for table in tables})
-    apply_operation_state(swapped, left, tables={table.name: table for table in tables})
+    apply_operation_state(original_after, right, tables=table_by_name)
+    apply_operation_state(swapped, left, tables=table_by_name)
     return _state_signature(original_after) == _state_signature(swapped)
 
 

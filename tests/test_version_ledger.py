@@ -119,6 +119,59 @@ def test_version_ledger_exports_continual_learning_priorities():
     assert priorities["persistent_family@engine"] > priorities["fixed_family@engine"]
 
 
+def test_version_ledger_exports_champion_transfer_evidence():
+    ledger = build_version_ledger(
+        [
+            VersionObservation(
+                version_id="v1",
+                run_file="runs/v1.jsonl",
+                case_count=4,
+                candidate_families={"persistent_family@engine": 1},
+                metadata={
+                    "champion_transfer_observation": {
+                        "champion_seed_case_count": 1,
+                        "champion_graft_case_count": 0,
+                        "champion_candidate_family_hit_count": 1,
+                        "champion_candidate_families": {"persistent_family@engine": 1},
+                        "champion_corpus_injected_count": 1,
+                        "champion_promoted_family_count": 1,
+                        "champion_graft_donor_pulls": 0,
+                    }
+                },
+            ),
+            VersionObservation(
+                version_id="v2",
+                run_file="runs/v2.jsonl",
+                case_count=4,
+                candidate_families={"persistent_family@engine": 1, "new_family@engine": 1},
+                metadata={
+                    "champion_transfer_observation": {
+                        "champion_seed_case_count": 0,
+                        "champion_graft_case_count": 1,
+                        "champion_candidate_family_hit_count": 1,
+                        "champion_candidate_families": {"persistent_family@engine": 1},
+                        "champion_corpus_injected_count": 1,
+                        "champion_promoted_family_count": 0,
+                        "champion_graft_donor_pulls": 1,
+                    }
+                },
+            ),
+        ]
+    )
+
+    transfer = ledger["champion_transfer"]
+    measured = transfer["measured_seed_level_transfer"]
+
+    assert transfer["schema_version"] == "champion-transfer-evidence-v1"
+    assert transfer["transferable_family_count"] == 1
+    assert transfer["transferable_families"][0]["family"] == "persistent_family@engine"
+    assert transfer["measured"] is True
+    assert measured["champion_case_count"] == 2
+    assert measured["champion_candidate_family_hit_count"] == 2
+    assert measured["champion_graft_donor_pulls"] == 1
+    assert ledger["summary"]["champion_transfer_measured"] is True
+
+
 def test_version_ledger_exports_health_feedback_report():
     ledger = build_version_ledger(
         [
@@ -200,3 +253,57 @@ def test_observation_from_run_log_extracts_health_feedback_from_rows_and_meta(tm
     assert observation.false_positive_count == 1
     assert observation.duration_ms_total == pytest.approx(8.0)
     assert observation.throughput_cases_s == pytest.approx(4.0)
+
+
+def test_observation_from_run_log_extracts_champion_transfer_observation(tmp_path):
+    run_file = tmp_path / "run-v2.jsonl"
+    append_jsonl(
+        {
+            "candidate_source": "champion_corpus",
+            "case": {"metadata": {"champion_seed": {"source_version_id": "v1"}}},
+            "findings": [
+                {
+                    "triage_verdict": "candidate_implementation_bug",
+                    "root_cause": "persistent_root",
+                    "suspicious_backends": ["engine"],
+                }
+            ],
+        },
+        run_file,
+    )
+    append_jsonl(
+        {
+            "mutation": {"operator": "champion_graft"},
+            "case": {"metadata": {"champion_graft": {"donor_case_id": "case-old"}}},
+            "findings": [],
+        },
+        run_file,
+    )
+    dump_json(
+        {
+            "target_version": "v2",
+            "champion_corpus": {"enabled": True, "injected_count": 1},
+            "closed_loop_state_summary": {
+                "adaptive_learning_health": {
+                    "champion_graft_donor_pulls": 2,
+                    "champion_graft_donor_arm_count": 1,
+                },
+                "champion_corpus_health": {
+                    "enabled": True,
+                    "family_hit_count": 1,
+                    "promoted_family_count": 1,
+                },
+            },
+        },
+        run_meta_path(run_file),
+    )
+
+    observation = observation_from_run_log(run_file)
+    transfer = observation.metadata["champion_transfer_observation"]
+
+    assert transfer["champion_seed_case_count"] == 1
+    assert transfer["champion_graft_case_count"] == 1
+    assert transfer["champion_candidate_family_hit_count"] == 1
+    assert transfer["champion_candidate_families"] == {"persistent_root@engine": 1}
+    assert transfer["champion_corpus_injected_count"] == 1
+    assert transfer["champion_graft_donor_pulls"] == 2

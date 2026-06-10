@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from datadiff import runner as runner_module
 from datadiff.config import ExperimentConfig
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
@@ -168,10 +170,23 @@ def test_generate_candidate_batch_consumes_feedback_seed_energy_batch():
             self.last_candidate_metadata = metadata
             return [candidate for candidate, _ in batch]
 
+        def pop_pending_candidate(self):
+            if not self.pending:
+                return None
+            selected, metadata = self.pending.pop(0)
+            self.last_candidate_source = metadata["source"]
+            self.last_candidate_metadata = metadata
+            return SimpleNamespace(case=selected, source=metadata["source"], metadata=metadata)
+
         def candidate_quality_context(self, case, *, target_keys=None):
             return {}
 
     feedback = BatchFeedback()
+    generate_calls = []
+
+    def fake_generate_case(seed, **kwargs):
+        generate_calls.append(seed)
+        return _case(seed, profile=kwargs.get("profile", "common"))
 
     batch = generate_candidate_batch(
         seed_start=30,
@@ -184,15 +199,17 @@ def test_generate_candidate_batch_consumes_feedback_seed_energy_batch():
         generator_profile_context_features=(),
         target_capabilities=(),
         schema_spec_for_seed=lambda seed: None,
-        generate_case_fn=lambda seed, **kwargs: _case(seed, profile=kwargs.get("profile", "common")),
+        generate_case_fn=fake_generate_case,
         replay_filter_fn=lambda case, config: "",
     )
 
+    assert generate_calls == [30]
     assert [case.case_id for case in batch.candidates] == [
         "case-130-common",
         "case-131-common",
         "case-132-common",
     ]
+    assert batch.next_seed == 33
     assert [batch.candidate_meta[id(case)]["source"] for case in batch.candidates] == [
         "feedback_mutation",
         "feedback_mutation",

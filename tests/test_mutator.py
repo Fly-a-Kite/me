@@ -1,6 +1,9 @@
 import random
 
 import datadiff.mutator as mutator_module
+import datadiff.mutator_ir.rewrite_groupby as rewrite_groupby_module
+import datadiff.mutator_ir.rewrite_splice as rewrite_splice_module
+import datadiff.mutator_ir.rewrite_swap as rewrite_swap_module
 from datadiff.classification_oracle import validate_case_program
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.mutator import (
@@ -10,6 +13,9 @@ from datadiff.mutator import (
     ROOT_TARGETED_MUTATION_OPERATOR_NAMES,
     SHRINK_MUTATION_OPERATOR_NAMES,
     SPECIALIZED_DISCOVERY_MUTATION_OPERATOR_NAMES,
+    TABLE_APPEND_ONLY_MUTATION_OPERATOR_NAMES,
+    TABLE_MUTATING_MUTATION_OPERATOR_NAMES,
+    TABLE_ONLY_MUTATION_OPERATOR_NAMES,
     mutation_operator_profiles,
     _append_group_quantile_probe,
     _append_scalar_subquery_probe,
@@ -31,6 +37,7 @@ from datadiff.mutator import (
     _append_left_join_case_membership,
     _append_empty_filter_global_aggregate,
     _append_sql_union_coalesce_distinct_topk,
+    _append_coalesce_sort_topk,
     _append_boolean_membership_case_aggregate,
     _append_left_join_boolean_case_aggregate,
     _append_left_join_boolean_coalesce_case_aggregate,
@@ -38,6 +45,7 @@ from datadiff.mutator import (
     _append_left_join_boolean_coalesce_filter_aggregate,
     _append_numeric_text_boolean_antijoin_case_aggregate,
     _append_multi_key_membership_case_aggregate,
+    _append_join_filter_groupby_topk,
     _append_index_bool_probe,
     _append_empty_literal_groupby_probe,
     _append_arrow_string_eq_sum_probe,
@@ -494,6 +502,444 @@ def test_mutate_case_with_metadata_retries_unproductive_operator(monkeypatch):
     assert result.case.tables[0].rows[0]["x"] == 2
 
 
+def test_unproductive_unchanged_simulation_skips_repair(monkeypatch):
+    table = TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])
+    operations = [{"op": "limit", "n": 1}]
+
+    def fail(tables, operations, rnd):
+        del tables, operations, rnd
+        return "fail:no-compatible-column"
+
+    def fail_repair(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("unproductive unchanged candidates should not be repaired")
+
+    monkeypatch.setattr(mutator_module, "repair_operations", fail_repair)
+
+    trial_tables, trial_operations, step = mutator_module._simulate_mutation_step(
+        [table],
+        operations,
+        mutator_module.MutationOperator("fail", fail),
+        seed=99,
+        case_seed=10,
+        step_index=0,
+        candidate_rank=1,
+        candidate_width=1,
+        operator_scores={},
+        target_context={"semantic_family": set(), "semantic_signal": set(), "exploration_objective": set()},
+        disagreement=None,
+        enable_divergence_conditioned_mutations=True,
+        enable_value_catalog=False,
+        value_catalog_scores=None,
+        prior_steps=[],
+        state_cache=mutator_module._MutationStateCache(),
+    )
+
+    assert trial_tables == [table]
+    assert trial_operations == operations
+    assert step.changed is False
+    assert step.productive is False
+
+
+def test_table_only_simulation_skips_operation_clone_and_repair(monkeypatch):
+    table = TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])
+    operations = [{"op": "limit", "n": 1}]
+
+    def fail_repair(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("table-only candidates should not repair unchanged operations")
+
+    monkeypatch.setattr(mutator_module, "repair_operations", fail_repair)
+
+    trial_tables, trial_operations, step = mutator_module._simulate_mutation_step(
+        [table],
+        operations,
+        mutator_module.MutationOperator("duplicate_row", mutator_module._duplicate_row),
+        seed=99,
+        case_seed=10,
+        step_index=0,
+        candidate_rank=1,
+        candidate_width=1,
+        operator_scores={},
+        target_context={"semantic_family": set(), "semantic_signal": set(), "exploration_objective": set()},
+        disagreement=None,
+        enable_divergence_conditioned_mutations=True,
+        enable_value_catalog=False,
+        value_catalog_scores=None,
+        prior_steps=[],
+        state_cache=mutator_module._MutationStateCache(),
+    )
+
+    assert trial_operations is operations
+    assert len(trial_tables[0].rows) == 2
+    assert len(table.rows) == 1
+    assert step.changed is True
+    assert step.productive is True
+
+
+def test_table_only_simulation_shallow_copies_extra_tables(monkeypatch):
+    primary = TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])
+    extra = TableData("t1", [ColumnSpec("k", "int")], [{"k": 1}])
+    operations = [{"op": "limit", "n": 1}]
+    clone_table = mutator_module._clone_table
+
+    def clone_primary_only(table_arg):
+        if table_arg is extra:
+            raise AssertionError("table-only simulation should not deep-clone extra tables")
+        return clone_table(table_arg)
+
+    monkeypatch.setattr(mutator_module, "_clone_table", clone_primary_only)
+
+    trial_tables, trial_operations, step = mutator_module._simulate_mutation_step(
+        [primary, extra],
+        operations,
+        mutator_module.MutationOperator("duplicate_row", mutator_module._duplicate_row),
+        seed=99,
+        case_seed=10,
+        step_index=0,
+        candidate_rank=1,
+        candidate_width=1,
+        operator_scores={},
+        target_context={"semantic_family": set(), "semantic_signal": set(), "exploration_objective": set()},
+        disagreement=None,
+        enable_divergence_conditioned_mutations=True,
+        enable_value_catalog=False,
+        value_catalog_scores=None,
+        prior_steps=[],
+        state_cache=mutator_module._MutationStateCache(),
+    )
+
+    assert trial_tables[0] is not primary
+    assert trial_tables[1] is extra
+    assert len(trial_tables[0].rows) == 2
+    assert len(primary.rows) == 1
+    assert trial_operations is operations
+    assert step.changed is True
+    assert step.productive is True
+
+
+def test_mutation_state_table_cache_can_be_invalidated_after_in_place_table_mutation():
+    table = TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])
+    cache = mutator_module._MutationStateCache()
+
+    before = mutator_module._mutation_state_cache_key([table], [], cache=cache)
+    table.rows[0]["x"] = None
+    cached = mutator_module._mutation_state_cache_key([table], [], cache=cache)
+    mutator_module._invalidate_table_cache(cache, [table])
+    after = mutator_module._mutation_state_cache_key([table], [], cache=cache)
+
+    assert cached == before
+    assert after != before
+
+
+def test_mutation_state_operation_cache_can_be_invalidated_after_in_place_operation_mutation():
+    table = TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])
+    operation = {"op": "limit", "n": 1}
+    cache = mutator_module._MutationStateCache()
+
+    before = mutator_module._mutation_state_cache_key([table], [operation], cache=cache)
+    operation["n"] = 2
+    cached = mutator_module._mutation_state_cache_key([table], [operation], cache=cache)
+    mutator_module._invalidate_operation_cache(cache, [operation])
+    after = mutator_module._mutation_state_cache_key([table], [operation], cache=cache)
+
+    assert cached == before
+    assert after != before
+
+
+def test_append_only_simulation_shallow_copies_operation_list(monkeypatch):
+    table = TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])
+    operations = [{"op": "limit", "n": 1}]
+
+    def append_only(tables, operations_arg, rnd):
+        del tables, rnd
+        operations_arg.append({"op": "limit", "n": 2})
+        return "append:limit"
+
+    def fail_clone_operation(operation):
+        del operation
+        raise AssertionError("append-only simulation should not deep-clone existing operations")
+
+    def passthrough_repair(table_arg, operations_arg, extra_tables=None):
+        del table_arg, extra_tables
+        return list(operations_arg)
+
+    monkeypatch.setattr(mutator_module, "_clone_operation", fail_clone_operation)
+    monkeypatch.setattr(mutator_module, "repair_operations", passthrough_repair)
+
+    trial_tables, trial_operations, step = mutator_module._simulate_mutation_step(
+        [table],
+        operations,
+        mutator_module.MutationOperator("append_op", append_only),
+        seed=99,
+        case_seed=10,
+        step_index=0,
+        candidate_rank=1,
+        candidate_width=1,
+        operator_scores={},
+        target_context={"semantic_family": set(), "semantic_signal": set(), "exploration_objective": set()},
+        disagreement=None,
+        enable_divergence_conditioned_mutations=True,
+        enable_value_catalog=False,
+        value_catalog_scores=None,
+        prior_steps=[],
+        state_cache=mutator_module._MutationStateCache(),
+    )
+
+    assert trial_tables is not None
+    assert trial_operations is not operations
+    assert trial_operations[0] is operations[0]
+    assert trial_operations[1] == {"op": "limit", "n": 2}
+    assert operations == [{"op": "limit", "n": 1}]
+    assert step.changed is True
+    assert step.productive is True
+
+
+def test_operation_list_only_simulation_shallow_copies_operation_list(monkeypatch):
+    table = TableData(
+        "t0",
+        [ColumnSpec("x", "int"), ColumnSpec("y", "int")],
+        [{"x": 1, "y": 2}, {"x": 3, "y": 4}],
+    )
+    operations = [
+        {"op": "filter", "column": "x", "cmp": ">=", "value": 1},
+        {"op": "sort", "keys": [{"column": "y", "ascending": True, "nulls": "last"}]},
+        {"op": "limit", "n": 2},
+    ]
+
+    def fail_clone_operation(operation):
+        del operation
+        raise AssertionError("operation-list-only simulation should not deep-clone existing operations")
+
+    def passthrough_repair(table_arg, operations_arg, extra_tables=None):
+        del table_arg, extra_tables
+        return list(operations_arg)
+
+    monkeypatch.setattr(mutator_module, "_clone_operation", fail_clone_operation)
+    monkeypatch.setattr(mutator_module, "repair_operations", passthrough_repair)
+
+    trial_tables, trial_operations, step = mutator_module._simulate_mutation_step(
+        [table],
+        operations,
+        mutator_module.MutationOperator("ir_swap_adjacent", apply_adjacent_independent_swap),
+        seed=99,
+        case_seed=10,
+        step_index=0,
+        candidate_rank=1,
+        candidate_width=1,
+        operator_scores={},
+        target_context={"semantic_family": set(), "semantic_signal": set(), "exploration_objective": set()},
+        disagreement=None,
+        enable_divergence_conditioned_mutations=True,
+        enable_value_catalog=False,
+        value_catalog_scores=None,
+        prior_steps=[],
+        state_cache=mutator_module._MutationStateCache(),
+    )
+
+    assert trial_operations is not operations
+    assert trial_operations != operations
+    assert sorted(id(operation) for operation in trial_operations) == sorted(id(operation) for operation in operations)
+    assert operations == [
+        {"op": "filter", "column": "x", "cmp": ">=", "value": 1},
+        {"op": "sort", "keys": [{"column": "y", "ascending": True, "nulls": "last"}]},
+        {"op": "limit", "n": 2},
+    ]
+    assert trial_tables[0] is table
+    assert step.changed is True
+    assert step.productive is True
+
+
+def test_append_table_only_simulation_shallow_copies_table_list(monkeypatch):
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("label", "str", nullable=True),
+        ],
+        [
+            {"id": 1, "label": "A"},
+            {"id": 2, "label": "B"},
+        ],
+    )
+    operations = [{"op": "limit", "n": 2}]
+
+    def fail_clone_table(table_arg):
+        del table_arg
+        raise AssertionError("append-table-only simulation should not deep-clone existing tables")
+
+    def passthrough_repair(table_arg, operations_arg, extra_tables=None):
+        del table_arg, extra_tables
+        return list(operations_arg)
+
+    monkeypatch.setattr(mutator_module, "_clone_table", fail_clone_table)
+    monkeypatch.setattr(mutator_module, "repair_operations", passthrough_repair)
+
+    trial_tables, trial_operations, step = mutator_module._simulate_mutation_step(
+        [table],
+        operations,
+        mutator_module.MutationOperator(
+            "append_left_join_case_membership",
+            mutator_module._append_left_join_case_membership,
+        ),
+        seed=99,
+        case_seed=10,
+        step_index=0,
+        candidate_rank=1,
+        candidate_width=1,
+        operator_scores={},
+        target_context={"semantic_family": set(), "semantic_signal": set(), "exploration_objective": set()},
+        disagreement=None,
+        enable_divergence_conditioned_mutations=True,
+        enable_value_catalog=False,
+        value_catalog_scores=None,
+        prior_steps=[],
+        state_cache=mutator_module._MutationStateCache(),
+    )
+
+    assert trial_tables[0] is table
+    assert len(trial_tables) == 2
+    assert len(table.rows) == 2
+    assert len(trial_operations) > len(operations)
+    assert operations == [{"op": "limit", "n": 2}]
+    assert step.changed is True
+    assert step.productive is True
+
+
+def test_numeric_text_append_table_simulation_keeps_conservative_table_clone(monkeypatch):
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("flag", "bool", nullable=True),
+        ],
+        [
+            {"id": 1, "flag": True},
+            {"id": 2, "flag": False},
+        ],
+    )
+    operations = [{"op": "limit", "n": 2}]
+
+    def passthrough_repair(table_arg, operations_arg, extra_tables=None):
+        del table_arg, extra_tables
+        return list(operations_arg)
+
+    monkeypatch.setattr(mutator_module, "repair_operations", passthrough_repair)
+
+    trial_tables, trial_operations, step = mutator_module._simulate_mutation_step(
+        [table],
+        operations,
+        mutator_module.MutationOperator(
+            "append_numeric_text_boolean_antijoin_case_aggregate",
+            mutator_module._append_numeric_text_boolean_antijoin_case_aggregate,
+        ),
+        seed=99,
+        case_seed=10,
+        step_index=0,
+        candidate_rank=1,
+        candidate_width=1,
+        operator_scores={},
+        target_context={"semantic_family": set(), "semantic_signal": set(), "exploration_objective": set()},
+        disagreement=None,
+        enable_divergence_conditioned_mutations=True,
+        enable_value_catalog=False,
+        value_catalog_scores=None,
+        prior_steps=[],
+        state_cache=mutator_module._MutationStateCache(),
+    )
+
+    assert trial_tables[0] is not table
+    assert len(trial_tables[0].columns) == 3
+    assert len(table.columns) == 2
+    assert all("id_num_s" not in row for row in table.rows)
+    assert trial_operations != operations
+    assert step.changed is True
+    assert step.productive is True
+
+
+def test_unknown_simulation_operator_uses_conservative_table_clone():
+    table = TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])
+    operations = [{"op": "limit", "n": 1}]
+
+    def custom(tables, operations, rnd):
+        del operations, rnd
+        tables[0].rows[0]["x"] = 9
+        return "custom:x"
+
+    trial_tables, trial_operations, step = mutator_module._simulate_mutation_step(
+        [table],
+        operations,
+        mutator_module.MutationOperator("custom_unknown", custom),
+        seed=99,
+        case_seed=10,
+        step_index=0,
+        candidate_rank=1,
+        candidate_width=1,
+        operator_scores={},
+        target_context={"semantic_family": set(), "semantic_signal": set(), "exploration_objective": set()},
+        disagreement=None,
+        enable_divergence_conditioned_mutations=True,
+        enable_value_catalog=False,
+        value_catalog_scores=None,
+        prior_steps=[],
+        state_cache=mutator_module._MutationStateCache(),
+    )
+
+    assert trial_tables[0].rows[0]["x"] == 9
+    assert table.rows[0]["x"] == 1
+    assert trial_operations == operations
+    assert trial_operations is not operations
+    assert step.changed is True
+
+
+def test_clone_operation_unwraps_irnode_to_independent_dict():
+    program = Program(
+        "prog-sort",
+        1,
+        [
+            {
+                "op": "sort",
+                "keys": [{"column": "x", "ascending": True, "nulls": "last"}],
+            }
+        ],
+    )
+    operation = program.operations[0]
+
+    cloned = mutator_module._clone_operation(operation)
+
+    assert isinstance(operation, mutator_module.IRNode)
+    assert isinstance(cloned, dict)
+    assert not isinstance(cloned["keys"][0], mutator_module.IRNode)
+    cloned["keys"][0]["ascending"] = False
+    assert operation["keys"][0]["ascending"] is True
+
+
+def test_clone_row_keeps_mutable_values_independent():
+    row = {"x": 1, "payload": {"values": [1, 2]}}
+
+    cloned = mutator_module._clone_row(row)
+
+    assert cloned == row
+    assert cloned is not row
+    cloned["payload"]["values"].append(3)
+    assert row["payload"]["values"] == [1, 2]
+
+
+def test_mutation_operation_cache_key_normalizes_nested_values():
+    key = mutator_module._mutation_operation_cache_key(
+        {
+            "op": "filter",
+            "value": float("nan"),
+            "bounds": [float("-inf"), 3],
+            "tags": {"b", "a"},
+        }
+    )
+
+    assert ("value", ("float", "nan")) in key
+    assert ("bounds", (("float", "inf", -1), 3)) in key
+    assert ("tags", ("a", "b")) in key
+
+
 def test_mutate_case_prioritizes_operator_scores(monkeypatch):
     base = Case(
         "case-base",
@@ -840,6 +1286,27 @@ def test_ir_adjacent_swap_reorders_independent_local_operations_and_preserves_va
     assert validate_case_program(case) == []
 
 
+def test_legal_adjacent_swap_positions_reuses_prefix_states(monkeypatch):
+    table = TableData(
+        "t0",
+        [ColumnSpec("x", "int"), ColumnSpec("y", "int")],
+        [{"x": 1, "y": 2}, {"x": 3, "y": 4}],
+    )
+    operations = [
+        {"op": "filter", "column": "x", "cmp": ">=", "value": 1},
+        {"op": "sort", "keys": [{"column": "y", "ascending": True, "nulls": "last"}]},
+        {"op": "limit", "n": 2},
+    ]
+
+    def fail_state_after_operations(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("swap position enumeration should reuse precomputed prefix states")
+
+    monkeypatch.setattr(rewrite_swap_module, "state_after_operations", fail_state_after_operations)
+
+    assert rewrite_swap_module.legal_adjacent_swap_positions([table], operations) == [0, 1]
+
+
 def test_ir_adjacent_swap_respects_barriers_and_dependencies():
     table = TableData(
         "t0",
@@ -1057,6 +1524,26 @@ def test_ir_wrap_with_window_inserts_valid_core_window_operation():
     assert validate_case_program(case) == []
 
 
+def test_ir_wrap_with_window_reuses_prefix_states(monkeypatch):
+    table = TableData(
+        "t0",
+        [ColumnSpec("g", "str"), ColumnSpec("x", "int"), ColumnSpec("y", "int")],
+        [{"g": "a", "x": 1, "y": 10}, {"g": "b", "x": 2, "y": 20}],
+    )
+    operations = [{"op": "filter", "column": "x", "cmp": ">=", "value": 1}]
+
+    def fail_state_after_operations(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("window wrap should reuse precomputed prefix states")
+
+    monkeypatch.setattr(rewrite_groupby_module, "state_after_operations", fail_state_after_operations, raising=False)
+
+    assert rewrite_groupby_module.legal_window_wrap_positions([table], operations)
+    detail = rewrite_groupby_module.apply_wrap_with_window([table], operations, random.Random(1))
+
+    assert detail.startswith("ir_wrap_with_window:")
+
+
 def test_mutate_case_can_select_ir_wrap_with_window_operator():
     table = TableData(
         "t0",
@@ -1108,6 +1595,29 @@ def test_ir_subtree_splice_moves_local_operation_subtree_to_legal_position():
     ]
     case = Case("case-ir-splice", 1, [table], Program("prog-ir-splice", 1, operations))
     assert validate_case_program(case) == []
+
+
+def test_legal_subtree_splice_positions_reuses_prefix_states(monkeypatch):
+    table = TableData(
+        "t0",
+        [ColumnSpec("x", "int"), ColumnSpec("y", "int")],
+        [{"x": 1, "y": 10}, {"x": 2, "y": 20}],
+    )
+    operations = [
+        {"op": "filter", "column": "x", "cmp": ">=", "value": 1},
+        {"op": "sort", "columns": ["y"], "ascending": True},
+        {"op": "limit", "n": 2},
+    ]
+
+    def fail_state_after_operations(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("splice position enumeration should reuse precomputed prefix states")
+
+    monkeypatch.setattr(rewrite_splice_module, "state_after_operations", fail_state_after_operations)
+
+    positions = rewrite_splice_module.legal_subtree_splice_positions([table], operations)
+
+    assert positions
 
 
 def test_mutate_case_can_select_ir_subtree_splice_operator():
@@ -1311,6 +1821,12 @@ def test_mutate_case_can_exclude_probe_append_operators():
 
 def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert {"value", "nullify_value", "duplicate_row", "drop_row", "shuffle_rows"}.issubset(MUTATION_OPERATOR_NAMES)
+    assert {"value", "nullify_value", "duplicate_row", "drop_row", "shuffle_rows"}.issubset(
+        TABLE_MUTATING_MUTATION_OPERATOR_NAMES
+    )
+    assert {"value", "nullify_value", "duplicate_row", "drop_row", "shuffle_rows"} == set(
+        TABLE_ONLY_MUTATION_OPERATOR_NAMES
+    )
     assert {"append_op", "drop_op", "tweak_op"}.issubset(MUTATION_OPERATOR_NAMES)
     assert {
         "ir_swap_adjacent",
@@ -1375,16 +1891,40 @@ def test_specialized_discovery_mutation_operator_alias_matches_compatibility_nam
     assert "append_normalized_string_membership" in DISCOVERY_MUTATION_OPERATOR_NAMES
     assert "append_sql_distinct_null_topk" in DISCOVERY_MUTATION_OPERATOR_NAMES
     assert "append_left_join_coalesce_membership" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_left_join_coalesce_membership" in TABLE_MUTATING_MUTATION_OPERATOR_NAMES
+    assert "append_left_join_coalesce_membership" in TABLE_APPEND_ONLY_MUTATION_OPERATOR_NAMES
     assert "append_left_join_case_membership" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_left_join_case_membership" in TABLE_MUTATING_MUTATION_OPERATOR_NAMES
+    assert "append_left_join_case_membership" in TABLE_APPEND_ONLY_MUTATION_OPERATOR_NAMES
     assert "append_empty_filter_global_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
     assert "append_sql_union_coalesce_distinct_topk" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_sql_union_coalesce_distinct_topk" in TABLE_MUTATING_MUTATION_OPERATOR_NAMES
+    assert "append_sql_union_coalesce_distinct_topk" in TABLE_APPEND_ONLY_MUTATION_OPERATOR_NAMES
+    assert "append_coalesce_sort_topk" in DISCOVERY_MUTATION_OPERATOR_NAMES
     assert "append_boolean_membership_case_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_boolean_membership_case_aggregate" in TABLE_MUTATING_MUTATION_OPERATOR_NAMES
+    assert "append_boolean_membership_case_aggregate" in TABLE_APPEND_ONLY_MUTATION_OPERATOR_NAMES
     assert "append_left_join_boolean_case_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_left_join_boolean_case_aggregate" in TABLE_MUTATING_MUTATION_OPERATOR_NAMES
+    assert "append_left_join_boolean_case_aggregate" in TABLE_APPEND_ONLY_MUTATION_OPERATOR_NAMES
     assert "append_left_join_boolean_coalesce_case_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_left_join_boolean_coalesce_case_aggregate" in TABLE_MUTATING_MUTATION_OPERATOR_NAMES
+    assert "append_left_join_boolean_coalesce_case_aggregate" in TABLE_APPEND_ONLY_MUTATION_OPERATOR_NAMES
     assert "append_boolean_antijoin_case_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_boolean_antijoin_case_aggregate" in TABLE_MUTATING_MUTATION_OPERATOR_NAMES
+    assert "append_boolean_antijoin_case_aggregate" in TABLE_APPEND_ONLY_MUTATION_OPERATOR_NAMES
     assert "append_left_join_boolean_coalesce_filter_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_left_join_boolean_coalesce_filter_aggregate" in TABLE_MUTATING_MUTATION_OPERATOR_NAMES
+    assert "append_left_join_boolean_coalesce_filter_aggregate" in TABLE_APPEND_ONLY_MUTATION_OPERATOR_NAMES
     assert "append_numeric_text_boolean_antijoin_case_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_numeric_text_boolean_antijoin_case_aggregate" in TABLE_MUTATING_MUTATION_OPERATOR_NAMES
+    assert "append_numeric_text_boolean_antijoin_case_aggregate" not in TABLE_APPEND_ONLY_MUTATION_OPERATOR_NAMES
     assert "append_multi_key_membership_case_aggregate" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_multi_key_membership_case_aggregate" in TABLE_MUTATING_MUTATION_OPERATOR_NAMES
+    assert "append_multi_key_membership_case_aggregate" in TABLE_APPEND_ONLY_MUTATION_OPERATOR_NAMES
+    assert "append_join_filter_groupby_topk" in DISCOVERY_MUTATION_OPERATOR_NAMES
+    assert "append_join_filter_groupby_topk" not in TABLE_MUTATING_MUTATION_OPERATOR_NAMES
+    assert "append_join_filter_groupby_topk" not in TABLE_APPEND_ONLY_MUTATION_OPERATOR_NAMES
 
 
 def test_mutation_operator_profiles_expose_semantic_affinity_for_high_risk_discovery_ops():
@@ -2240,6 +2780,33 @@ def test_append_sql_union_coalesce_distinct_topk_mutation_stays_valid():
     assert validate_case_program(case) == []
 
 
+def test_append_coalesce_sort_topk_mutation_stays_valid_and_discoverable():
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int"),
+            ColumnSpec("x", "int", nullable=True),
+            ColumnSpec("y", "int", nullable=True),
+            ColumnSpec("g", "str", nullable=True),
+            ColumnSpec("s", "str", nullable=True),
+        ],
+        [
+            {"id": 0, "x": 2, "y": None, "g": "b", "s": None},
+            {"id": 1, "x": None, "y": 1, "g": None, "s": "a"},
+            {"id": 2, "x": 3, "y": 3, "g": "c", "s": "c"},
+        ],
+    )
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_coalesce_sort_topk([table], operations, random.Random(1))
+
+    assert detail.startswith("append_coalesce_sort_topk:")
+    assert [op["op"] for op in operations[-3:]] == ["coalesce", "sort", "limit"]
+    assert operations[-2]["keys"][0]["column"] == operations[-3]["as"]
+    case = Case("case-mut-coalesce-topk", 1, [table], Program("prog-mut-coalesce-topk", 1, operations))
+    assert validate_case_program(case) == []
+
+
 def test_append_boolean_membership_case_aggregate_mutation_stays_valid():
     table = TableData(
         "t0",
@@ -2488,5 +3055,46 @@ def test_append_multi_key_membership_case_aggregate_mutation_stays_valid():
         1,
         tables,
         Program("prog-mut-multi-key-membership-case-agg", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
+def test_append_join_filter_groupby_topk_mutation_stays_valid():
+    left = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int"),
+            ColumnSpec("g", "str"),
+            ColumnSpec("x", "int"),
+            ColumnSpec("flag", "bool"),
+        ],
+        [
+            {"id": 0, "g": "a", "x": 1, "flag": True},
+            {"id": 1, "g": "b", "x": 2, "flag": None},
+            {"id": 2, "g": "a", "x": 3, "flag": False},
+            {"id": 3, "g": None, "x": 5, "flag": True},
+        ],
+    )
+    right = TableData(
+        "t1",
+        [ColumnSpec("id", "int"), ColumnSpec("g", "str")],
+        [{"id": 0, "g": "a"}, {"id": 2, "g": "a"}, {"id": 3, "g": None}],
+    )
+    tables = [left, right]
+    operations = [{"op": "filter", "column": "id", "cmp": ">=", "value": 0}]
+
+    detail = _append_join_filter_groupby_topk(tables, operations, random.Random(1))
+
+    assert detail.startswith("append_join_filter_groupby_topk:")
+    assert [op["op"] for op in operations[-6:]] == ["join", "filter", "groupby", "select", "sort", "limit"]
+    assert isinstance(operations[-6]["left_on"], list)
+    assert operations[-4]["keys"] == operations[-3]["columns"][: len(operations[-4]["keys"])]
+    assert operations[-2]["keys"][0]["column"] == operations[-4]["aggs"][0]["as"]
+    assert len(tables) == 2
+    case = Case(
+        "case-mut-join-filter-groupby-topk",
+        1,
+        tables,
+        Program("prog-mut-join-filter-groupby-topk", 1, operations),
     )
     assert validate_case_program(case) == []

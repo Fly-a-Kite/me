@@ -607,6 +607,10 @@ class DuckDBBackend(Backend):
                     ctes = []
                     relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
                     runtime.reset_source(relation, op["as"])
+                elif kind == "arrow_bool_groupby_reduction_probe":
+                    ctes = []
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "dataset_isin_all_match_probe":
                     ctes = []
                     relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))

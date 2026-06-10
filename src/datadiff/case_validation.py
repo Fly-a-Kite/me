@@ -30,6 +30,7 @@ BOOL_ALIAS_PROBES = frozenset(
         "arrow_string_eq_sum_probe",
         "arrow_timestamp_index_attr_probe",
         "arrow_timestamp_loc_slice_probe",
+        "arrow_bool_groupby_reduction_probe",
         "bit_compare_probe",
         "bool_reduction_skipna_probe",
         "dataset_isin_all_match_probe",

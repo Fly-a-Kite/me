@@ -16,7 +16,7 @@ from datadiff.operation_semantics import (
     op_column,
     op_kind,
 )
-from datadiff.program_state import state_after_operations
+from datadiff.program_state import ProgramState, apply_operation_state
 
 
 def legal_filter_above_groupby_positions(
@@ -77,14 +77,7 @@ def legal_window_wrap_positions(
     tables: Sequence[TableData],
     operations: Sequence[Mapping[str, Any]],
 ) -> list[int]:
-    if not tables:
-        return []
-    out: list[int] = []
-    for insert_after in range(-1, len(operations)):
-        state = state_after_operations(tables[0], operations[: insert_after + 1], extra_tables=tables[1:])
-        if _window_op_for_state(state, existing_columns=set(state.available)) is not None:
-            out.append(insert_after)
-    return out
+    return [insert_after for insert_after, _ in _legal_window_wrap_candidates(tables, operations)]
 
 
 def apply_wrap_with_window(
@@ -92,16 +85,43 @@ def apply_wrap_with_window(
     operations: list[dict[str, Any]],
     rnd: random.Random,
 ) -> str:
-    positions = legal_window_wrap_positions(tables, operations)
-    if not positions:
+    candidates = _legal_window_wrap_candidates(tables, operations)
+    if not candidates:
         return "ir_wrap_with_window:no-legal-position"
-    insert_after = rnd.choice(positions)
-    state = state_after_operations(tables[0], operations[: insert_after + 1], extra_tables=tables[1:])
+    insert_after, state = rnd.choice(candidates)
     window_op = _window_op_for_state(state, existing_columns=set(state.available), rnd=rnd)
     if window_op is None:
         return "ir_wrap_with_window:no-legal-position"
     operations.insert(insert_after + 1, window_op)
     return f"ir_wrap_with_window:{insert_after + 1}:{op_kind(window_op)}"
+
+
+def _legal_window_wrap_candidates(
+    tables: Sequence[TableData],
+    operations: Sequence[Mapping[str, Any]],
+) -> list[tuple[int, ProgramState]]:
+    if not tables:
+        return []
+    states = _prefix_states(tables, operations)
+    out: list[tuple[int, ProgramState]] = []
+    for insert_after in range(-1, len(operations)):
+        state = states[insert_after + 1]
+        if _window_op_for_state(state, existing_columns=set(state.available)) is not None:
+            out.append((insert_after, state))
+    return out
+
+
+def _prefix_states(
+    tables: Sequence[TableData],
+    operations: Sequence[Mapping[str, Any]],
+) -> list[ProgramState]:
+    table_by_name = {table.name: table for table in tables}
+    state = ProgramState.from_table(tables[0])
+    states = [state.copy()]
+    for operation in operations:
+        apply_operation_state(state, operation, tables=table_by_name)
+        states.append(state.copy())
+    return states
 
 
 def _window_op_for_state(

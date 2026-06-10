@@ -14,6 +14,7 @@ ADAPTIVE_COMPONENT_DISABLE_FLAGS = {
     "bd_axis_bandit": "bd-axis-bandit",
     "bayesian_exploration": "bayesian-exploration",
     "champion_corpus": "champion-corpus",
+    "champion_graft_donor": "champion-graft-donor",
     "continual_learning": "continual-learning",
     "cost_normalized_reward": "cost-normalized-reward",
     "disagreement_bd_axis": "disagreement-bd-axis",
@@ -31,6 +32,7 @@ ADAPTIVE_COMPONENT_DISABLE_FLAGS = {
     "scheduler_annealing": "scheduler-annealing",
     "scheduler_learning": "scheduler-learning",
     "seed_energy_batch": "seed-energy-batch",
+    "seed_energy_tier": "seed-energy-tier",
     "seed_quota": "seed-quota",
     "shrink_mutations": "shrink-mutations",
     "value_catalog": "value-catalog",
@@ -110,7 +112,7 @@ def test_default_final_plan_includes_only_confirmed_historical_specs():
     assert sum(1 for command in commands if command.track == "live") == 11
     assert sum(1 for command in commands if command.track == "validation") == 1
     assert sum(1 for command in commands if command.track == "seeded") == 1
-    assert sum(1 for command in commands if command.track == "ablation") == 27
+    assert sum(1 for command in commands if command.track == "ablation") == 29
     assert sum(1 for command in commands if command.track == "comparison") == 2
     assert sum(1 for command in commands if command.track == "postprocess") == 1
 
@@ -220,7 +222,11 @@ def test_final_plan_accepts_matrix_alias_tracks():
     assert [command.name for command in comparison_only] == ["baseline_and_related_scope"]
 
     ledger_only = module.build_plan(_args(track="version_ledger"))
-    assert [command.name for command in ledger_only] == ["cross_version_regression_ledger"]
+    assert [command.name for command in ledger_only] == [
+        "cross_version_transfer_source",
+        "cross_version_transfer_target",
+        "cross_version_regression_ledger",
+    ]
 
 
 def test_final_plan_parse_args_accepts_matrix_alias_track(monkeypatch):
@@ -347,6 +353,31 @@ def test_final_plan_commands_include_structured_experiment_meta():
     assert historical_meta["variant"]["variant_id"] == "duckdb-22075"
 
 
+def test_adaptive_component_ablation_matrix_covers_claimed_adaptive_components():
+    module = _module()
+
+    commands = module.build_plan(_args(track="adaptive_component_ablation"))
+    by_name = {command.name: command for command in commands}
+    required = {
+        "operator_swarm": "operator-swarm",
+        "bd_axis_bandit": "bd-axis-bandit",
+        "backend_pair_learning": "backend-pair-learning",
+        "champion_corpus": "champion-corpus",
+        "champion_graft_donor": "champion-graft-donor",
+        "ir_rewrite_mutations": "ir-rewrite-mutations",
+        "per_operator_energy": "per-operator-energy",
+        "seed_energy_tier": "seed-energy-tier",
+    }
+
+    assert "adaptive_component_ablation:adaptive_reference" in by_name
+    for component, flag in required.items():
+        command = by_name[f"adaptive_component_ablation:no_{component}"]
+        assert _flag_value(command.command, "--disable-adaptive-components") == flag
+        meta = json.loads(_flag_value(command.command, "--experiment-meta"))
+        assert meta["variant"]["component_focus"] == component
+        assert meta["variant"]["factors"] == {component: False}
+
+
 def test_final_plan_can_append_cross_version_ledger_evidence_command():
     module = _module()
 
@@ -385,6 +416,47 @@ def test_final_plan_adds_manifest_index_driven_cross_version_ledger_by_default()
     assert _flag_value(command.command, "--evidence-manifest-output") == (
         "reports/experiment-final-version-ledger.json"
     )
+
+
+def test_version_ledger_track_collects_c5_source_target_runs_before_ledger():
+    module = _module()
+
+    commands = module.build_plan(
+        _args(
+            track="version_ledger",
+            ledger_collection_cases=25,
+            ledger_collection_seeds="7,11",
+            ledger_source_version="duckdb-1.0.0",
+            ledger_target_version="duckdb-1.1.0",
+            ledger_target_suite="embedded_sql_cross",
+            ledger_preset="live_cross_family",
+            ledger_version_pair_learning_weight=0.5,
+        )
+    )
+    by_name = {command.name: command for command in commands}
+    source = by_name["cross_version_transfer_source"]
+    target = by_name["cross_version_transfer_target"]
+    ledger = by_name["cross_version_regression_ledger"]
+
+    assert [command.name for command in commands] == [
+        "cross_version_transfer_source",
+        "cross_version_transfer_target",
+        "cross_version_regression_ledger",
+    ]
+    assert _flag_value(source.command, "--target-version") == "duckdb-1.0.0"
+    assert _flag_value(source.command, "--cases") == "25"
+    assert _flag_value(source.command, "--seeds") == "7,11"
+    assert _flag_value(source.command, "--target-suite") == "embedded_sql_cross"
+    assert _flag_value(source.command, "--presets") == "live_cross_family"
+    assert "--persist-closed-loop-state" in source.command
+    assert _flag_value(target.command, "--target-version") == "duckdb-1.1.0"
+    assert _flag_value(target.command, "--fixed-version") == "duckdb-1.0.0"
+    assert _flag_value(target.command, "--version-pair-learning-weight") == "0.5"
+    assert "--persist-closed-loop-state" in target.command
+    assert _flag_value(ledger.command, "--manifest-index") == "reports/final-experiment-manifest-index.json"
+    assert source.experiment_meta["comparison_group"] == "cross_version_continual_learning"
+    assert source.experiment_meta["variant"]["component_focus"] == "cross_version_champion_transfer"
+    assert target.experiment_meta["variant"]["variant_id"] == "c5_transfer_target"
 
 
 def test_final_plan_postprocess_readiness_audit_includes_extra_ledger_manifest():

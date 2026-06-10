@@ -10,6 +10,7 @@ from datadiff.operation_type_semantics import case_when_output_type
 from datadiff.expression_semantics import aggregate_output_type, cast_output_type, expr_output_type, literal_output_type
 from datadiff.filtering import evaluate_filter_predicate
 from datadiff.join_keys import join_key_pairs, join_key_value
+from datadiff.mutator_ir import metamorphic_rewrite_rule_metadata
 from datadiff.normalizer import NormalizedResult, _norm_value
 from datadiff.operation_semantics import (
     aggregate_alias,
@@ -66,6 +67,20 @@ def build_metamorphic_variants(
         limit=limit,
         relation_order=relation_order,
     )
+
+
+def ir_rewrite_metamorphic_rule_registry() -> dict[str, Any]:
+    rules = metamorphic_rewrite_rule_metadata()
+    return {
+        "schema_version": "ir-rewrite-metamorphic-registry-v1",
+        "rules": rules,
+        "relations": {str(rule.get("relation", "")): rule for rule in rules},
+        "methodology_claim": (
+            "Metamorphic IR rewrite variants use the same typed rewrite rule source "
+            "as mutation and reducer explanations; only semantics-preserving rules "
+            "are eligible as equality oracles."
+        ),
+    }
 
 
 def all_metamorphic_variants(case: Case) -> list[MetamorphicVariant]:

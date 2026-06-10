@@ -39,6 +39,7 @@ from .operation_semantics import (
     op_quantiles,
     op_right_columns,
     op_rows,
+    op_source,
     op_table,
     op_value,
     op_values,
@@ -47,13 +48,11 @@ from .operation_semantics import (
     expr_payload,
 )
 from .operation_type_semantics import aggregate_accepts_type, case_when_output_type
-from .program_state import ProgramState, state_after_operations
+from .program_state import state_after_operations
 from .program_validation import (
-    ValidationContext,
     normalized_row_number_filter_op,
     normalized_running_sum_op,
     normalized_sort_op,
-    validate_core_operation,
 )
 from .string_literals import (
     string_pattern_literal_for_column,
@@ -62,6 +61,23 @@ from .string_literals import (
 from .util import unique_preserve_order
 
 GeneratorProfile = str
+
+TOPK_TIEBREAKER_PREFERRED_COLUMNS = ("id", "row_id", "sample_id", "row_nr")
+ROW_ORDER_PRESERVING_FOR_REPAIR = frozenset(
+    {
+        "filter",
+        "tuple_absence_filter",
+        "drop_nulls",
+        "semi_join",
+        "anti_join",
+        "fill_null",
+        "coalesce",
+        "case_when",
+        "select",
+        "mutate",
+    }
+)
+ORDER_DEFINING_FOR_REPAIR = frozenset({"sort", "running_sum", "row_number_filter", "sortedness_check"})
 
 
 def _is_discovery_profile(profile: str) -> bool:
@@ -241,6 +257,63 @@ def _choose_compatible_key_pair(
         if multi_key_pairs and rnd.random() < 0.65:
             return rnd.choice(multi_key_pairs)
     return rnd.choice(pairs)
+
+
+def _future_topk_uses_current_order(ops: list[dict[str, Any]], start: int) -> bool:
+    for later in ops[start:]:
+        kind = op_kind(later)
+        if kind in {"limit", "offset"}:
+            return True
+        if kind in ORDER_DEFINING_FOR_REPAIR:
+            return False
+        if kind in ROW_ORDER_PRESERVING_FOR_REPAIR:
+            continue
+        return False
+    return False
+
+
+def _future_sort_topk_ahead(ops: list[dict[str, Any]], start: int) -> bool:
+    saw_order = False
+    for later in ops[start:]:
+        kind = op_kind(later)
+        if kind in ORDER_DEFINING_FOR_REPAIR:
+            saw_order = True
+            continue
+        if kind in {"limit", "offset"}:
+            if saw_order:
+                return True
+            continue
+        if kind in ROW_ORDER_PRESERVING_FOR_REPAIR:
+            continue
+        saw_order = False
+    return False
+
+
+def _extend_projection_for_topk(
+    columns: list[str],
+    available: set[str],
+    *,
+    required: set[str] | None = None,
+) -> list[str]:
+    output = unique_preserve_order(columns)
+    present = set(output)
+    required_columns = sorted((required or set()) & available)
+    for column in required_columns:
+        if column not in present:
+            output.append(column)
+            present.add(column)
+    if required_columns:
+        return output
+    for column in TOPK_TIEBREAKER_PREFERRED_COLUMNS:
+        if column in available and column not in present:
+            output.append(column)
+            present.add(column)
+    for column in sorted(available):
+        if column in present:
+            continue
+        output.append(column)
+        present.add(column)
+    return output
 
 
 def _coalesce_column_groups(available_cols: list[str], col_types: dict[str, str]) -> list[tuple[str, list[str]]]:
@@ -1094,6 +1167,26 @@ def _generate_type_oblivious_operation(
     return {"op": "groupby", "keys": [col], "aggs": [{"column": agg_col, "func": func, "as": alias}]}
 
 
+def _normalized_key_columns(op: dict[str, Any]) -> set[str]:
+    if "keys" in op:
+        return {str(key.get("column")) for key in op.get("keys", []) if isinstance(key, dict) and key.get("column")}
+    return set(op_columns(op))
+
+
+def _normalized_order_by_columns(op: dict[str, Any]) -> set[str]:
+    return {
+        str(key.get("column"))
+        for key in op.get("order_by", [])
+        if isinstance(key, dict) and key.get("column")
+    }
+
+
+def _valid_repaired_running_sum(op: dict[str, Any], available: set[str], numeric: set[str]) -> bool:
+    source = op_source(op)
+    column = op_column(op)
+    return source in available and source in numeric and bool(column) and not is_reserved_output_name(column)
+
+
 def repair_operations(
     table: TableData,
     ops: list[dict[str, Any]],
@@ -1113,20 +1206,9 @@ def repair_operations(
     numeric = {c.name for c in table.columns if c.type in {"int", "float"}}
     strings = {c.name for c in table.columns if c.type == "str"}
 
-    def current_state() -> ProgramState:
-        ordered = [column.name for column in table.columns if column.name in available]
-        extras = sorted(column for column in available if column not in ordered)
-        nullable = {
-            column.name
-            for column in table.columns
-            if column.nullable or any(row.get(column.name) is None for row in table.rows if column.name in row)
-        }
-        nullable |= {column for column in available if column not in col_types}
-        return ProgramState(ordered + extras, dict(col_types), nullable)
-
     order_pending = False
     pending_order_columns: set[str] = set()
-    for op in ops:
+    for idx, op in enumerate(ops):
         kind = op_kind(op)
         if kind == "join":
             right = table_by_name.get(op_table(op))
@@ -1217,8 +1299,7 @@ def repair_operations(
             repaired_op = normalized_running_sum_op(op, available)
             if repaired_op is None:
                 continue
-            ctx = ValidationContext(tables=table_by_name, state=current_state(), errors=[])
-            if not validate_core_operation(ctx, repaired_op, len(repaired)):
+            if not _valid_repaired_running_sum(repaired_op, available, numeric):
                 continue
             repaired.append(repaired_op)
             column = op_column(repaired_op)
@@ -1227,19 +1308,14 @@ def repair_operations(
             numeric.add(column)
             strings.discard(column)
             order_pending = True
-            pending_order_columns = {key.column for key in normalize_sort_keys(repaired_op)}
+            pending_order_columns = set()
         elif kind == "row_number_filter":
             repaired_op = normalized_row_number_filter_op(op, available)
             if repaired_op is None:
                 continue
-            ctx = ValidationContext(tables=table_by_name, state=current_state(), errors=[])
-            if not validate_core_operation(ctx, repaired_op, len(repaired)):
-                continue
             repaired.append(repaired_op)
             order_pending = True
-            pending_order_columns = {key.column for key in normalize_sort_keys({"keys": repaired_op["order_by"]})} | set(
-                op_partition_columns(repaired_op)
-            )
+            pending_order_columns = _normalized_order_by_columns(repaired_op) | set(op_partition_columns(repaired_op))
         elif kind == "sortedness_check":
             column = op_column(op)
             alias = op_output_alias(op)
@@ -1631,10 +1707,17 @@ def repair_operations(
             cols = unique_preserve_order([c for c in op_columns(op) if c in available])
             if not cols:
                 continue
+            if order_pending and _future_topk_uses_current_order(ops, idx + 1):
+                cols = _extend_projection_for_topk(cols, available, required=pending_order_columns)
+            elif _future_sort_topk_ahead(ops, idx + 1):
+                cols = _extend_projection_for_topk(cols, available)
             repaired.append({"op": "select", "columns": cols})
             available = set(cols)
             numeric &= available
             strings &= available
+            if order_pending and not pending_order_columns.issubset(available):
+                order_pending = False
+                pending_order_columns = set()
         elif kind == "distinct":
             cols = unique_preserve_order([c for c in op_columns(op) if c in available])
             if not cols:
@@ -1727,14 +1810,8 @@ def repair_operations(
             repaired_op = normalized_sort_op(op, available)
             if repaired_op is None:
                 continue
-            ctx = ValidationContext(tables=table_by_name, state=current_state(), errors=[])
-            if not validate_core_operation(ctx, repaired_op, len(repaired)):
-                continue
             repaired.append(repaired_op)
-            try:
-                pending_order_columns = {key.column for key in normalize_sort_keys(repaired_op)}
-            except ValueError:
-                pending_order_columns = set()
+            pending_order_columns = _normalized_key_columns(repaired_op)
             order_pending = bool(pending_order_columns)
         elif kind == "limit":
             if order_pending:

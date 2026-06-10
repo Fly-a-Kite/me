@@ -166,6 +166,12 @@ def _write_version_ledger_evidence_manifest(
     versions: list[str],
 ) -> None:
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    ledger_payload = _load_ledger_payload(ledger_file)
+    champion_transfer = (
+        ledger_payload.get("champion_transfer", {})
+        if isinstance(ledger_payload.get("champion_transfer", {}), dict)
+        else {}
+    )
     run_payload = {
         "target_suite": "cross_version",
         "preset": "version_ledger",
@@ -176,6 +182,7 @@ def _write_version_ledger_evidence_manifest(
         "evidence_mode": "comparison",
         "evidence_kind": "postprocess_ledger",
         "version_ledger_file": str(ledger_file),
+        "champion_transfer": champion_transfer,
     }
     dump_json(
         {
@@ -189,6 +196,7 @@ def _write_version_ledger_evidence_manifest(
             "targets": [],
             "runs": [run_payload],
             "version_ledger_file": str(ledger_file),
+            "champion_transfer": champion_transfer,
             "version_ledger_inputs": {
                 "run_files": [str(path) for path in run_files],
                 "versions": versions,
@@ -207,3 +215,11 @@ def _write_version_ledger_evidence_manifest(
         },
         manifest_path,
     )
+
+
+def _load_ledger_payload(ledger_file: Path) -> dict[str, Any]:
+    try:
+        loaded = load_json(ledger_file)
+    except Exception:  # noqa: BLE001
+        return {}
+    return loaded if isinstance(loaded, dict) else {}

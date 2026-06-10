@@ -43,6 +43,7 @@ PROBE_ROOTS = {
     "arrow_timestamp_index_attr_probe": "pandas_arrow_timestamp_index_attr_semantics",
     "eval_inplace_alias_probe": "pandas_eval_inplace_aliasing_semantics",
     "bool_reduction_skipna_probe": "pandas_bool_reduction_skipna_semantics",
+    "arrow_bool_groupby_reduction_probe": "pandas_arrow_bool_groupby_reduction_semantics",
     "dataset_isin_all_match_probe": "pyarrow_dataset_isin_all_match_semantics",
     "run_end_null_compute_probe": "pyarrow_run_end_null_compute_semantics",
     "large_string_partition_probe": "pyarrow_large_string_partition_schema_semantics",

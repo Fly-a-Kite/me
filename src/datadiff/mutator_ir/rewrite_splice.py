@@ -35,6 +35,8 @@ def legal_subtree_splice_positions(
     if not tables or not operations:
         return []
     out: list[tuple[int, int, int]] = []
+    table_by_name = {table.name: table for table in tables}
+    prefix_states = _prefix_states(tables, operations, table_by_name)
     for start in range(len(operations)):
         for width in range(1, min(3, len(operations) - start) + 1):
             subtree = operations[start : start + width]
@@ -43,7 +45,7 @@ def legal_subtree_splice_positions(
             for insert_at in range(len(operations) + 1):
                 if start <= insert_at <= start + width:
                     continue
-                if _subtree_valid_at(tables, operations, subtree, insert_at):
+                if _subtree_valid_in_state(prefix_states[insert_at], table_by_name, subtree):
                     out.append((start, width, insert_at))
     return out
 
@@ -81,6 +83,27 @@ def _subtree_valid_at(
         return False
     table_by_name = {table.name: table for table in tables}
     before = state_after_operations(tables[0], operations[:insert_at], extra_tables=tables[1:])
+    return _subtree_valid_in_state(before, table_by_name, subtree)
+
+
+def _prefix_states(
+    tables: Sequence[TableData],
+    operations: Sequence[Mapping[str, Any]],
+    table_by_name: Mapping[str, TableData],
+) -> list[ProgramState]:
+    state = ProgramState.from_table(tables[0])
+    states = [state.copy()]
+    for operation in operations:
+        apply_operation_state(state, operation, tables=table_by_name)
+        states.append(state.copy())
+    return states
+
+
+def _subtree_valid_in_state(
+    before: ProgramState,
+    table_by_name: Mapping[str, TableData],
+    subtree: Sequence[Mapping[str, Any]],
+) -> bool:
     trial = before.copy()
     for operation in subtree:
         if not _operation_valid_in_state(operation, trial):

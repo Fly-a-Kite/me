@@ -595,6 +595,15 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "pandas_bool_reduction_skipna_semantics": {"pattern:pandas_bool_reduction_skipna_semantics"},
     "bool_reduction_skipna_probe": {"op:bool_reduction_skipna_probe"},
     "bool_reduction_skipna": {"pandas:bool-reduction-skipna", "nullable-bool:reduction"},
+    "pandas_arrow_bool_groupby_reduction_semantics": {
+        "pattern:pandas_arrow_bool_groupby_reduction_semantics"
+    },
+    "arrow_bool_groupby_reduction_probe": {"op:arrow_bool_groupby_reduction_probe"},
+    "arrow_bool_groupby_reduction": {
+        "pandas:arrow-bool-groupby-reduction",
+        "arrow:boolean-groupby",
+        "nullable-bool:groupby-reduction",
+    },
     "pyarrow_dataset_isin_all_match_semantics": {"pattern:pyarrow_dataset_isin_all_match_semantics"},
     "dataset_isin_all_match_probe": {"op:dataset_isin_all_match_probe"},
     "dataset_membership_filter": {"pyarrow:dataset-isin-all-match", "dataset:membership-filter"},
@@ -898,6 +907,7 @@ _CASE_FEATURE_FLAG_NAMES = (
     "has_arrow_timestamp_index_attr_probe",
     "has_eval_inplace_alias_probe",
     "has_bool_reduction_skipna_probe",
+    "has_arrow_bool_groupby_reduction_probe",
     "has_dataset_isin_all_match_probe",
     "has_run_end_null_compute_probe",
     "has_large_string_partition_probe",
@@ -1366,6 +1376,13 @@ def _apply_case_feature_operation(
         state.available_types = {op_output_alias(op, "derived"): "bool"}
         available_types = state.available_types
         flags["has_bool_reduction_skipna_probe"] = True
+    elif kind == "arrow_bool_groupby_reduction_probe":
+        features.add("pandas:arrow-bool-groupby-reduction")
+        features.add("arrow:boolean-groupby")
+        features.add("nullable-bool:groupby-reduction")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_arrow_bool_groupby_reduction_probe"] = True
     elif kind == "dataset_isin_all_match_probe":
         features.add("pyarrow:dataset-isin-all-match")
         features.add("dataset:membership-filter")
@@ -1759,6 +1776,8 @@ def _materialize_case_features(
         features.add("pattern:pandas_eval_inplace_aliasing_semantics")
     if state.flags["has_bool_reduction_skipna_probe"]:
         features.add("pattern:pandas_bool_reduction_skipna_semantics")
+    if state.flags["has_arrow_bool_groupby_reduction_probe"]:
+        features.add("pattern:pandas_arrow_bool_groupby_reduction_semantics")
     if state.flags["has_dataset_isin_all_match_probe"]:
         features.add("pattern:pyarrow_dataset_isin_all_match_semantics")
     if state.flags["has_run_end_null_compute_probe"]:
@@ -5942,6 +5961,11 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("pandas_eval_inplace_aliasing_semantics")
     if "pattern:pandas_bool_reduction_skipna_semantics" in features or "op:bool_reduction_skipna_probe" in features:
         roots.add("pandas_bool_reduction_skipna_semantics")
+    if (
+        "pattern:pandas_arrow_bool_groupby_reduction_semantics" in features
+        or "op:arrow_bool_groupby_reduction_probe" in features
+    ):
+        roots.add("pandas_arrow_bool_groupby_reduction_semantics")
     if "pattern:pyarrow_dataset_isin_all_match_semantics" in features or "op:dataset_isin_all_match_probe" in features:
         roots.add("pyarrow_dataset_isin_all_match_semantics")
     if "pattern:pyarrow_run_end_null_compute_semantics" in features or "op:run_end_null_compute_probe" in features:

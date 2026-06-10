@@ -49,8 +49,9 @@ def build_semantic_boundary_rules(
     null_filter_literal_boundary: BoundaryPredicate,
     modulo_boundary: BoundaryPredicate,
     unicode_case_mapping_boundary: BoundaryPredicate,
+    semantic_contract_lattice_boundary: BoundaryPredicate | None = None,
 ) -> tuple[SemanticBoundaryRule, ...]:
-    return (
+    rules = [
         SemanticBoundaryRule(
             rule_id="boundary:root_nan_inf_semantics",
             reason="root cause nan_inf_semantics is a known cross-engine semantic boundary",
@@ -94,7 +95,19 @@ def build_semantic_boundary_rules(
             reason="case changes case for non-ASCII text; Unicode case mapping support differs across engines",
             predicate=unicode_case_mapping_boundary,
         ),
-    )
+    ]
+    if semantic_contract_lattice_boundary is not None:
+        rules.append(
+            SemanticBoundaryRule(
+                rule_id="boundary:semantic_contract_lattice",
+                reason=(
+                    "finding root/mismatch maps to a case semantic-contract axis "
+                    "whose joined policy is boundary/probe"
+                ),
+                predicate=semantic_contract_lattice_boundary,
+            )
+        )
+    return tuple(rules)
 
 
 def semantic_rule_records(

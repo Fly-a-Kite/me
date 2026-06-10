@@ -185,6 +185,10 @@ def sort_key_signature(row: Mapping[str, Any], sort_keys: Sequence[SortKey]) -> 
     return mapping_projection_key(row, [sort_key.column for sort_key in sort_keys])
 
 
+def row_signature(row: Mapping[str, Any]) -> str:
+    return mapping_projection_key(row, sorted(str(column) for column in row))
+
+
 def rows_have_duplicate_sort_key(rows: Sequence[Mapping[str, Any]], sort_keys: Sequence[SortKey]) -> bool:
     seen: set[str] = set()
     for row in rows:
@@ -195,10 +199,38 @@ def rows_have_duplicate_sort_key(rows: Sequence[Mapping[str, Any]], sort_keys: S
     return False
 
 
+def rows_have_observable_duplicate_sort_key(rows: Sequence[Mapping[str, Any]], sort_keys: Sequence[SortKey]) -> bool:
+    seen: dict[str, set[str]] = {}
+    for row in rows:
+        key = sort_key_signature(row, sort_keys)
+        signatures = seen.setdefault(key, set())
+        signatures.add(row_signature(row))
+        if len(signatures) > 1:
+            return True
+    return False
+
+
 def sort_boundary_splits_tie(rows: Sequence[Mapping[str, Any]], sort_keys: Sequence[SortKey], boundary: int) -> bool:
     if boundary <= 0 or boundary >= len(rows):
         return False
     return sort_key_signature(rows[boundary - 1], sort_keys) == sort_key_signature(rows[boundary], sort_keys)
+
+
+def sort_boundary_splits_observable_tie(
+    rows: Sequence[Mapping[str, Any]],
+    sort_keys: Sequence[SortKey],
+    boundary: int,
+) -> bool:
+    if not sort_boundary_splits_tie(rows, sort_keys, boundary):
+        return False
+    tie_key = sort_key_signature(rows[boundary], sort_keys)
+    start = boundary - 1
+    while start > 0 and sort_key_signature(rows[start - 1], sort_keys) == tie_key:
+        start -= 1
+    end = boundary + 1
+    while end < len(rows) and sort_key_signature(rows[end], sort_keys) == tie_key:
+        end += 1
+    return len({row_signature(row) for row in rows[start:end]}) > 1
 
 
 def sort_window_boundary_splits_tie(
@@ -208,3 +240,16 @@ def sort_window_boundary_splits_tie(
     end: int,
 ) -> bool:
     return sort_boundary_splits_tie(rows, sort_keys, start) or sort_boundary_splits_tie(rows, sort_keys, end)
+
+
+def sort_window_boundary_splits_observable_tie(
+    rows: Sequence[Mapping[str, Any]],
+    sort_keys: Sequence[SortKey],
+    start: int,
+    end: int,
+) -> bool:
+    return sort_boundary_splits_observable_tie(rows, sort_keys, start) or sort_boundary_splits_observable_tie(
+        rows,
+        sort_keys,
+        end,
+    )

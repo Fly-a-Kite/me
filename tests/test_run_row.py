@@ -118,6 +118,9 @@ def test_apply_iteration_row_updates_records_metadata_backend_pairs_and_quality_
     assert row["quality_oracles"] == update.quality_oracles
     assert row["case"]["metadata"]["disagreement_descriptor"]["mismatch_class"] == "value"
     assert row["case"]["metadata"]["case_fingerprint"]["hash"] == "abc"
+    assert row["semantic_contract_lattice"]["schema_version"] == "semantic-contract-lattice-v1"
+    assert row["case"]["metadata"]["semantic_contract_lattice"] == row["semantic_contract_lattice"]
+    assert case.metadata["semantic_contract_lattice"] == row["semantic_contract_lattice"]
     assert case.metadata["disagreement_descriptor"]["mismatch_class"] == "value"
     assert case.metadata["case_fingerprint"]["hash"] == "abc"
 

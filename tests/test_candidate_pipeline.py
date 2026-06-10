@@ -65,6 +65,10 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
         [TableData("t0", [ColumnSpec("x", "int", nullable=False)], [{"x": 1}, {"x": 2}])],
         Program("prog-fresh", 7, [{"op": "select", "columns": ["x"]}]),
     )
+    case.metadata["mutation"] = {
+        "operator": "ir_pushdown_filter",
+        "detail": "ir_pushdown_filter:test",
+    }
     finding = {
         "finding_id": "f-1",
         "kind": "semantic_output_mismatch",
@@ -77,6 +81,7 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
         "paper_status": "candidate_bug_needs_external_confirmation",
         "triage_confidence": "high",
         "false_positive": False,
+        "mismatch_class": "row_order",
     }
     evidence_file = generated_issue_dir / "fresh-candidates.json"
     dump_json(
@@ -91,6 +96,18 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
                 {
                     "case": case.to_dict(),
                     "findings": [finding],
+                    "mutation": {
+                        "operator": "ir_pushdown_filter",
+                        "detail": "ir_pushdown_filter:test",
+                    },
+                    "semantic_contract_lattice": {
+                        "schema_version": "semantic-contract-lattice-v1",
+                        "case_id": "case-fresh",
+                        "boundary_axes": ["ordering"],
+                        "strict_axes": ["null", "nan", "dtype_coercion"],
+                        "contract_tags": ["ordering_boundary"],
+                        "operation_contracts": [{"operation": "limit"}],
+                    },
                     "normalized": {
                         "pandas": {"backend": "pandas", "status": "ok", "columns": ["x"], "rows": [[1], [2]]},
                         "duckdb": {"backend": "duckdb", "status": "ok", "columns": ["x"], "rows": [[1], [3]]},
@@ -147,9 +164,16 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
     assert manifest["summary"]["reproduced_count"] == 1
     assert manifest["summary"]["reduced_count"] == 1
     assert manifest["summary"]["needs_dedup_check_count"] == 1
+    assert manifest["summary"]["semantic_contract_candidate_count"] == 1
+    assert manifest["summary"]["semantic_contract_boundary_axes"] == ["ordering"]
+    assert manifest["summary"]["semantic_contract_matched_boundary_axes"] == ["ordering"]
+    assert manifest["summary"]["ir_rewrite_candidate_count"] == 1
+    assert manifest["summary"]["ir_rewrite_rules"] == ["ir.rewrite.filter_pushdown"]
     assert manifest["pipeline_issue_readiness_summary"]["needs_dedup_check_count"] == 1
     candidate = manifest["candidates"][0]
     assert candidate["candidate_acquisition"]["rewardable_candidate_finding_count"] == 1
+    assert candidate["semantic_contract_evidence"]["matched_boundary_axes"] == ["ordering"]
+    assert candidate["ir_rewrite_evidence"]["operators"] == ["ir_pushdown_filter"]
     assert candidate["dedup"]["status"] == "duplicate_local_family"
     assert candidate["recheck"]["reproduced"] is True
     assert candidate["triage"]["verdict"] == "candidate_implementation_bug"
@@ -160,6 +184,9 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
     assert (tmp_path / manifest["frozen_candidates_path"]).is_file()
     assert (tmp_path / manifest["strategy_snapshot_path"]).is_file()
     assert (tmp_path / candidate["issue_draft"]["path"]).is_file()
+    frozen = json.loads((tmp_path / manifest["frozen_candidates_path"]).read_text(encoding="utf-8"))
+    assert frozen["candidates"][0]["semantic_contract_evidence"]["boundary_axes"] == ["ordering"]
+    assert frozen["candidates"][0]["ir_rewrite_evidence"]["rule_ids"] == ["ir.rewrite.filter_pushdown"]
     assert (bugs_dir / "bug_sig-fresh" / "reduced_case.json").is_file()
     stored_config = json.loads((bugs_dir / "bug_sig-fresh" / "config.json").read_text(encoding="utf-8"))
     assert stored_config["freeze_strategy_snapshot"] is True
@@ -168,7 +195,12 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
     rendered = (tmp_path / manifest["markdown_path"]).read_text(encoding="utf-8")
     assert "## Candidates" in rendered
     assert "True bug probability" in rendered
+    assert "Semantic-contract candidates" in rendered
+    assert "IR rewrite candidates" in rendered
     assert "needs_dedup_check" in rendered
+    issue_text = (tmp_path / candidate["issue_draft"]["path"]).read_text(encoding="utf-8")
+    assert "Semantic contract boundary axes" in issue_text
+    assert "IR rewrite rules" in issue_text
 
 
 def test_candidate_pipeline_artifact_config_rehydrates_discovery_biases(tmp_path):

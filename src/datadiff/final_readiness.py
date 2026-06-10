@@ -34,8 +34,10 @@ from datadiff.finding_outcomes import (
 )
 from datadiff.historical import list_historical_bugs
 from datadiff.icse_experiment_quality import score_final_readiness_summary
+from datadiff.mutator_ir import ir_rewrite_rule_metadata, ir_rewrite_rule_registry_payload
 from datadiff.run_provenance import current_workspace_git_commit
 from datadiff.runner import _configured_guidance_targets
+from datadiff.semantic_contracts import finding_contract_axes
 from datadiff.target_version_audit import TARGET_VERSION_AUDIT_SCHEMA_VERSION
 from datadiff.targets import TARGETS, TARGET_SUITES, target_context
 from datadiff.util import REPORTS_DIR, RUNS_DIR, dump_json, ensure_dirs, iter_jsonl, load_json, read_jsonl, run_meta_path, utc_now
@@ -280,6 +282,8 @@ def build_final_readiness(
     adaptive_live_component_evidence = _adaptive_live_component_evidence_summary(live_runs)
     continual_learning_absorption = _continual_learning_absorption_summary(audited_runs)
     target_version_audit = _target_version_audit_summary(manifests)
+    semantic_contract_lattice = _semantic_contract_lattice_summary(audited_runs)
+    ir_rewrite_rule_evidence = _ir_rewrite_rule_evidence_summary(audited_runs)
     rewardable_live_families = Counter()
     confirmed_live_families = Counter()
     external_confirmed_live_families = _confirmed_latest_family_counter(latest_confirmations)
@@ -381,6 +385,8 @@ def build_final_readiness(
             "cross_version_ledger": cross_version_ledger,
             "continual_learning_absorption": continual_learning_absorption,
             "target_version_audit": target_version_audit,
+            "semantic_contract_lattice": semantic_contract_lattice,
+            "ir_rewrite_rule_evidence": ir_rewrite_rule_evidence,
             "runtime_efficiency": runtime_efficiency,
             "discovery_responsiveness": discovery_responsiveness,
             "closed_loop_state_persistence": closed_loop_state_persistence,
@@ -579,6 +585,8 @@ def _manifest_runs(
             known_bug_families,
         )
         adaptive_selection_telemetry = _adaptive_selection_telemetry_from_rows(rows)
+        semantic_contract_lattice = _semantic_contract_lattice_rows_summary(rows)
+        ir_rewrite_rule_evidence = _ir_rewrite_rule_rows_summary(rows)
         registered_matrix = registered_experiment_matrix_for_run(
             evidence_mode=evidence_mode,
             target_suite=target_suite,
@@ -639,6 +647,8 @@ def _manifest_runs(
                 "run_log_scanned": run_log_scanned,
                 "run_log_scan_skipped": bool(not run_log_scanned and run_file.is_file()),
                 "adaptive_selection_telemetry": adaptive_selection_telemetry,
+                "semantic_contract_lattice": semantic_contract_lattice,
+                "ir_rewrite_rule_evidence": ir_rewrite_rule_evidence,
                 "run_meta": dict(meta),
                 "stage_profile_present": _stage_profile_present(meta),
                 "stage_profile_totals": _stage_profile_totals(meta),
@@ -680,6 +690,220 @@ def _manifest_runs(
             }
         )
     return out
+
+
+def _semantic_contract_lattice_rows_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    boundary_axes: Counter[str] = Counter()
+    strict_axes: Counter[str] = Counter()
+    finding_axes: Counter[str] = Counter()
+    matched_boundary_axes: Counter[str] = Counter()
+    contract_rows = 0
+    operation_contract_count = 0
+    for row in rows:
+        lattice = _semantic_contract_lattice_from_row(row)
+        if not lattice:
+            continue
+        contract_rows += 1
+        row_finding_axes = sorted(
+            {
+                axis
+                for finding in row.get("findings", []) or []
+                if isinstance(finding, dict)
+                for axis in finding_contract_axes(finding)
+            }
+        )
+        row_boundary_axes = _string_list(lattice.get("boundary_axes", []))
+        boundary_axes.update(row_boundary_axes)
+        strict_axes.update(_string_list(lattice.get("strict_axes", [])))
+        finding_axes.update(row_finding_axes)
+        matched_boundary_axes.update(sorted(set(row_boundary_axes) & set(row_finding_axes)))
+        operation_contract_count += len(lattice.get("operation_contracts", []) or [])
+    case_row_count = len(rows)
+    return {
+        "schema_version": "semantic-contract-lattice-evidence-v1",
+        "case_row_count": case_row_count,
+        "contract_row_count": contract_rows,
+        "contract_row_rate": contract_rows / case_row_count if case_row_count else 0.0,
+        "operation_contract_count": operation_contract_count,
+        "boundary_axes": sorted(boundary_axes),
+        "strict_axes": sorted(strict_axes),
+        "finding_axes": sorted(finding_axes),
+        "matched_boundary_axes": sorted(matched_boundary_axes),
+        "boundary_axis_counts": dict(boundary_axes.most_common()),
+        "matched_boundary_axis_counts": dict(matched_boundary_axes.most_common()),
+    }
+
+
+def _semantic_contract_lattice_from_row(row: dict[str, Any]) -> dict[str, Any]:
+    direct = row.get("semantic_contract_lattice", {})
+    if isinstance(direct, dict) and direct:
+        return direct
+    case_payload = row.get("case", {}) if isinstance(row.get("case", {}), dict) else {}
+    case_metadata = case_payload.get("metadata", {}) if isinstance(case_payload.get("metadata", {}), dict) else {}
+    metadata_lattice = case_metadata.get("semantic_contract_lattice", {})
+    if isinstance(metadata_lattice, dict) and metadata_lattice:
+        return metadata_lattice
+    return {}
+
+
+def _ir_rewrite_rule_rows_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    rule_ids: Counter[str] = Counter()
+    operators: Counter[str] = Counter()
+    semantics_classes: Counter[str] = Counter()
+    contract_axes: Counter[str] = Counter()
+    rewrite_rows = 0
+    rule_count = 0
+    for row in rows:
+        rules = _ir_rewrite_rules_from_row(row)
+        if not rules:
+            continue
+        rewrite_rows += 1
+        rule_count += len(rules)
+        for rule in rules:
+            if rule.get("rule_id"):
+                rule_ids[str(rule.get("rule_id"))] += 1
+            if rule.get("operator"):
+                operators[str(rule.get("operator"))] += 1
+            if rule.get("semantics_class"):
+                semantics_classes[str(rule.get("semantics_class"))] += 1
+            contract_axes.update(_string_list(rule.get("contract_axes", [])))
+    case_row_count = len(rows)
+    registry = ir_rewrite_rule_registry_payload()
+    return {
+        "schema_version": "ir-rewrite-rule-evidence-v1",
+        "case_row_count": case_row_count,
+        "rewrite_row_count": rewrite_rows,
+        "rewrite_row_rate": rewrite_rows / case_row_count if case_row_count else 0.0,
+        "rule_count": rule_count,
+        "rule_ids": sorted(rule_ids),
+        "operators": sorted(operators),
+        "semantics_classes": sorted(semantics_classes),
+        "contract_axes": sorted(contract_axes),
+        "rule_counts": dict(rule_ids.most_common()),
+        "operator_counts": dict(operators.most_common()),
+        "registered_rule_count": len(registry.get("rules", []) or []),
+        "registered_semantics_classes": list(registry.get("semantics_classes", []) or []),
+    }
+
+
+def _ir_rewrite_rules_from_row(row: dict[str, Any]) -> list[dict[str, Any]]:
+    rules: list[dict[str, Any]] = []
+    for metadata in _row_metadata_sources(row):
+        mutation = metadata.get("mutation", {}) if isinstance(metadata.get("mutation", {}), dict) else {}
+        existing_rules = mutation.get("ir_rewrite_rules", [])
+        if isinstance(existing_rules, list):
+            rules.extend(dict(rule) for rule in existing_rules if isinstance(rule, dict))
+        existing_rule = mutation.get("ir_rewrite_rule", {})
+        if isinstance(existing_rule, dict) and existing_rule:
+            rules.append(dict(existing_rule))
+        operator = str(mutation.get("operator", "") or "")
+        if operator:
+            inferred = ir_rewrite_rule_metadata(operator, detail=str(mutation.get("detail", "") or ""))
+            if inferred:
+                rules.append(inferred)
+    return _dedupe_ir_rewrite_rules(rules)
+
+
+def _row_metadata_sources(row: dict[str, Any]) -> list[dict[str, Any]]:
+    sources: list[dict[str, Any]] = []
+    row_mutation = row.get("mutation", {})
+    if isinstance(row_mutation, dict) and row_mutation:
+        sources.append({"mutation": row_mutation})
+    row_metadata = row.get("metadata", {})
+    if isinstance(row_metadata, dict) and row_metadata:
+        sources.append(row_metadata)
+    case_payload = row.get("case", {}) if isinstance(row.get("case", {}), dict) else {}
+    case_metadata = case_payload.get("metadata", {}) if isinstance(case_payload.get("metadata", {}), dict) else {}
+    if case_metadata:
+        sources.append(case_metadata)
+    return sources
+
+
+def _dedupe_ir_rewrite_rules(rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for rule in rules:
+        key = (
+            str(rule.get("rule_id", "")),
+            str(rule.get("operator", "")),
+            str(rule.get("detail", "")),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(rule)
+    return deduped
+
+
+def _semantic_contract_lattice_summary(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    summaries = [
+        run.get("semantic_contract_lattice", {})
+        for run in runs
+        if isinstance(run.get("semantic_contract_lattice", {}), dict)
+    ]
+    boundary_axes: Counter[str] = Counter()
+    strict_axes: Counter[str] = Counter()
+    finding_axes: Counter[str] = Counter()
+    matched_boundary_axes: Counter[str] = Counter()
+    for summary in summaries:
+        boundary_axes.update(summary.get("boundary_axis_counts", {}) or {})
+        strict_axes.update({axis: 1 for axis in summary.get("strict_axes", []) or []})
+        finding_axes.update({axis: 1 for axis in summary.get("finding_axes", []) or []})
+        matched_boundary_axes.update(summary.get("matched_boundary_axis_counts", {}) or {})
+    case_row_count = sum(int(summary.get("case_row_count", 0) or 0) for summary in summaries)
+    contract_row_count = sum(int(summary.get("contract_row_count", 0) or 0) for summary in summaries)
+    return {
+        "schema_version": "semantic-contract-lattice-evidence-v1",
+        "run_count": len(summaries),
+        "case_row_count": case_row_count,
+        "contract_row_count": contract_row_count,
+        "contract_row_rate": contract_row_count / case_row_count if case_row_count else 0.0,
+        "operation_contract_count": sum(
+            int(summary.get("operation_contract_count", 0) or 0) for summary in summaries
+        ),
+        "boundary_axes": sorted(boundary_axes),
+        "strict_axes": sorted(strict_axes),
+        "finding_axes": sorted(finding_axes),
+        "matched_boundary_axes": sorted(matched_boundary_axes),
+        "boundary_axis_counts": dict(boundary_axes.most_common()),
+        "matched_boundary_axis_counts": dict(matched_boundary_axes.most_common()),
+    }
+
+
+def _ir_rewrite_rule_evidence_summary(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    summaries = [
+        run.get("ir_rewrite_rule_evidence", {})
+        for run in runs
+        if isinstance(run.get("ir_rewrite_rule_evidence", {}), dict)
+    ]
+    rule_ids: Counter[str] = Counter()
+    operators: Counter[str] = Counter()
+    semantics_classes: Counter[str] = Counter()
+    contract_axes: Counter[str] = Counter()
+    for summary in summaries:
+        rule_ids.update(summary.get("rule_counts", {}) or {})
+        operators.update(summary.get("operator_counts", {}) or {})
+        semantics_classes.update({item: 1 for item in summary.get("semantics_classes", []) or []})
+        contract_axes.update({item: 1 for item in summary.get("contract_axes", []) or []})
+    case_row_count = sum(int(summary.get("case_row_count", 0) or 0) for summary in summaries)
+    rewrite_row_count = sum(int(summary.get("rewrite_row_count", 0) or 0) for summary in summaries)
+    registry = ir_rewrite_rule_registry_payload()
+    return {
+        "schema_version": "ir-rewrite-rule-evidence-v1",
+        "run_count": len(summaries),
+        "case_row_count": case_row_count,
+        "rewrite_row_count": rewrite_row_count,
+        "rewrite_row_rate": rewrite_row_count / case_row_count if case_row_count else 0.0,
+        "rule_count": sum(int(summary.get("rule_count", 0) or 0) for summary in summaries),
+        "rule_ids": sorted(rule_ids),
+        "operators": sorted(operators),
+        "semantics_classes": sorted(semantics_classes),
+        "contract_axes": sorted(contract_axes),
+        "rule_counts": dict(rule_ids.most_common()),
+        "operator_counts": dict(operators.most_common()),
+        "registered_rule_count": len(registry.get("rules", []) or []),
+        "registered_semantics_classes": list(registry.get("semantics_classes", []) or []),
+    }
 
 
 def _normalize_evidence_mode(value: Any) -> str:
@@ -1209,6 +1433,11 @@ def _cross_version_ledger_summary(runs: list[dict[str, Any]]) -> dict[str, Any]:
     family_counts: list[int] = []
     health_observation_counts: list[int] = []
     health_feedback_reports: list[dict[str, Any]] = []
+    champion_transfer_rows: list[dict[str, Any]] = []
+    champion_transferable_family_count = 0
+    champion_transfer_measured_count = 0
+    champion_transfer_champion_case_count = 0
+    champion_transfer_candidate_hit_count = 0
     invalid_case_count = 0
     fallback_case_count = 0
     false_positive_count = 0
@@ -1271,6 +1500,34 @@ def _cross_version_ledger_summary(runs: list[dict[str, Any]]) -> dict[str, Any]:
                             "ledger_file": str(ledger.get("ledger_file", "")),
                         }
                     )
+        champion_transfer = ledger.get("champion_transfer", {})
+        if (
+            isinstance(champion_transfer, dict)
+            and str(champion_transfer.get("schema_version", "") or "") == "champion-transfer-evidence-v1"
+        ):
+            measured = (
+                champion_transfer.get("measured_seed_level_transfer", {})
+                if isinstance(champion_transfer.get("measured_seed_level_transfer", {}), dict)
+                else {}
+            )
+            transferable_count = int(champion_transfer.get("transferable_family_count", 0) or 0)
+            champion_cases = int(measured.get("champion_case_count", 0) or 0)
+            candidate_hits = int(measured.get("champion_candidate_family_hit_count", 0) or 0)
+            champion_transferable_family_count += transferable_count
+            champion_transfer_champion_case_count += champion_cases
+            champion_transfer_candidate_hit_count += candidate_hits
+            champion_transfer_measured_count += int(bool(champion_transfer.get("measured", False)))
+            champion_transfer_rows.append(
+                {
+                    "ledger_file": str(ledger.get("ledger_file", "")),
+                    "transferable_family_count": transferable_count,
+                    "measured": bool(champion_transfer.get("measured", False)),
+                    "champion_case_count": champion_cases,
+                    "champion_candidate_family_hit_count": candidate_hits,
+                    "cold_start_lift_factor": float(measured.get("cold_start_lift_factor", 0.0) or 0.0),
+                    "lift_factor_available": bool(measured.get("lift_factor_available", False)),
+                }
+            )
     priority_families.sort(key=lambda row: (-float(row["priority"]), row["family"], row["ledger_file"]))
     invalid_ledgers = [ledger for ledger in ledgers if not ledger.get("valid")]
     return {
@@ -1286,6 +1543,14 @@ def _cross_version_ledger_summary(runs: list[dict[str, Any]]) -> dict[str, Any]:
         "max_family_count": max(family_counts) if family_counts else 0,
         "transition_counts": dict(sorted(transition_counts.items())),
         "priority_families": priority_families[:10],
+        "champion_transfer": {
+            "ledger_count": len(champion_transfer_rows),
+            "measured_ledger_count": champion_transfer_measured_count,
+            "transferable_family_count": champion_transferable_family_count,
+            "champion_case_count": champion_transfer_champion_case_count,
+            "champion_candidate_family_hit_count": champion_transfer_candidate_hit_count,
+            "ledgers": champion_transfer_rows[:10],
+        },
         "health_observation_count": sum(health_observation_counts),
         "max_health_observation_count": max(health_observation_counts) if health_observation_counts else 0,
         "health_feedback_report_count": len(health_feedback_reports),
@@ -1332,6 +1597,7 @@ def _load_version_ledger(path_value: str) -> dict[str, Any]:
         "health": health,
         "health_feedback_report": health_feedback_report,
         "continual_learning": data.get("continual_learning", {}),
+        "champion_transfer": data.get("champion_transfer", {}),
     }
 
 
@@ -3084,7 +3350,14 @@ def _render_markdown(audit: dict[str, Any]) -> str:
                 f"`{summary.get('cross_version_ledger', {}).get('min_throughput_cases_s', 0.0):.6g}`; "
                 "invalid ledgers "
                 f"`{len(summary.get('cross_version_ledger', {}).get('invalid_ledger_files', []))}`; "
-                f"transitions `{summary.get('cross_version_ledger', {}).get('transition_counts', {})}`"
+                f"transitions `{summary.get('cross_version_ledger', {}).get('transition_counts', {})}`; "
+                "champion transfer "
+                f"`{summary.get('cross_version_ledger', {}).get('champion_transfer', {}).get('ledger_count', 0)}` ledgers/"
+                f"`{summary.get('cross_version_ledger', {}).get('champion_transfer', {}).get('measured_ledger_count', 0)}` measured; "
+                "champion cases "
+                f"`{summary.get('cross_version_ledger', {}).get('champion_transfer', {}).get('champion_case_count', 0)}`; "
+                "champion candidate hits "
+                f"`{summary.get('cross_version_ledger', {}).get('champion_transfer', {}).get('champion_candidate_family_hit_count', 0)}`"
             ),
             (
                 "- Continual-learning absorption: "
@@ -3118,6 +3391,24 @@ def _render_markdown(audit: dict[str, Any]) -> str:
             f"- Live families: `{', '.join(summary['live_families']) or 'none'}`",
             f"- Structured semantic focus families: `{', '.join(summary.get('semantic_focus_families', [])) or 'none'}`",
             f"- Structured semantic focus signals: `{', '.join(summary.get('semantic_focus_signals', [])) or 'none'}`",
+            (
+                "- Semantic contract lattice evidence: "
+                f"`{summary.get('semantic_contract_lattice', {}).get('contract_row_count', 0)}` / "
+                f"`{summary.get('semantic_contract_lattice', {}).get('case_row_count', 0)}` rows; "
+                "boundary axes "
+                f"`{', '.join(summary.get('semantic_contract_lattice', {}).get('boundary_axes', [])) or 'none'}`; "
+                "matched axes "
+                f"`{', '.join(summary.get('semantic_contract_lattice', {}).get('matched_boundary_axes', [])) or 'none'}`"
+            ),
+            (
+                "- IR rewrite rule evidence: "
+                f"`{summary.get('ir_rewrite_rule_evidence', {}).get('rewrite_row_count', 0)}` / "
+                f"`{summary.get('ir_rewrite_rule_evidence', {}).get('case_row_count', 0)}` rows; "
+                "rules "
+                f"`{', '.join(summary.get('ir_rewrite_rule_evidence', {}).get('rule_ids', [])) or 'none'}`; "
+                "semantic classes "
+                f"`{', '.join(summary.get('ir_rewrite_rule_evidence', {}).get('semantics_classes', [])) or 'none'}`"
+            ),
             f"- Rewardable latest candidate families: `{len(summary['rewardable_live_candidate_families'])}`",
             f"- External confirmed latest candidate families: `{len(summary.get('external_confirmed_live_candidate_families', {}))}`",
             f"- Known/saturated latest candidate families: `{len(summary['known_saturated_live_candidate_families'])}`",

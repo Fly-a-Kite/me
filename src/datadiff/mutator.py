@@ -24,6 +24,7 @@ from datadiff.mutator_ir import (
     apply_redundant_op_fold,
     apply_subtree_splice,
     apply_wrap_with_window,
+    ir_rewrite_rule_metadata,
 )
 from datadiff.operation_semantics import aggregate_alias, aggregate_column, aggregate_func, aggregate_specs, op_ascending, op_column, op_kind, op_n, operation_count
 from datadiff.program_state import ProgramState, state_after_operations
@@ -73,6 +74,8 @@ BOOLEAN_PROBE_OUTPUT_PREFIXES = (
     "list_flatten_parent_indices_mismatch",
     "rolling_mean_by_null_count_mismatch",
 )
+BOOLEAN_PROBE_OUTPUT_PREFIX_SET = frozenset(BOOLEAN_PROBE_OUTPUT_PREFIXES)
+BOOLEAN_PROBE_OUTPUT_UNDERSCORE_PREFIXES = tuple(f"{prefix}_" for prefix in BOOLEAN_PROBE_OUTPUT_PREFIXES)
 
 IMMUTABLE_VALUE_TYPES = (str, bytes, int, float, bool, type(None))
 NUMERIC_ALIAS_PREFIXES = ("m_", "sum_", "min_", "max_", "count_", "nunique_", "uniq_")
@@ -102,12 +105,71 @@ SHRINK_MUTATION_OPERATOR_NAMES = frozenset(
         "shrink_inline_single_use_mutate",
     }
 )
+OPERATION_LIST_ONLY_MUTATION_OPERATOR_NAMES = frozenset(
+    {
+        "drop_op",
+        "ir_swap_adjacent",
+        "ir_pushdown_filter",
+        "ir_pull_filter_above_groupby",
+        "ir_wrap_with_window",
+        "ir_splice_subtree",
+        "ir_fold_redundant_op",
+        "shrink_drop_tail_op",
+        "shrink_fold_redundant_op",
+        "shrink_merge_adjacent_filters",
+    }
+)
+TABLE_MUTATING_MUTATION_OPERATOR_NAMES = frozenset(
+    {
+        "value",
+        "nullify_value",
+        "duplicate_row",
+        "drop_row",
+        "shuffle_rows",
+        "append_normalized_string_membership",
+        "append_left_join_coalesce_membership",
+        "append_left_join_case_membership",
+        "append_sql_union_coalesce_distinct_topk",
+        "append_boolean_membership_case_aggregate",
+        "append_left_join_boolean_case_aggregate",
+        "append_left_join_boolean_coalesce_case_aggregate",
+        "append_boolean_antijoin_case_aggregate",
+        "append_left_join_boolean_coalesce_filter_aggregate",
+        "append_numeric_text_boolean_antijoin_case_aggregate",
+        "append_multi_key_membership_case_aggregate",
+    }
+)
+TABLE_APPEND_ONLY_MUTATION_OPERATOR_NAMES = frozenset(
+    {
+        "append_normalized_string_membership",
+        "append_left_join_coalesce_membership",
+        "append_left_join_case_membership",
+        "append_sql_union_coalesce_distinct_topk",
+        "append_boolean_membership_case_aggregate",
+        "append_left_join_boolean_case_aggregate",
+        "append_left_join_boolean_coalesce_case_aggregate",
+        "append_boolean_antijoin_case_aggregate",
+        "append_left_join_boolean_coalesce_filter_aggregate",
+        "append_multi_key_membership_case_aggregate",
+    }
+)
+TABLE_ONLY_MUTATION_OPERATOR_NAMES = frozenset(
+    {
+        "value",
+        "nullify_value",
+        "duplicate_row",
+        "drop_row",
+        "shuffle_rows",
+    }
+)
 
 
 @dataclass(slots=True)
 class _MutationStateCache:
     schema_by_key: dict[tuple[Any, ...], "MutationSchema"] = field(default_factory=dict)
     context_by_key: dict[tuple[Any, ...], "MutationOperationContext | None"] = field(default_factory=dict)
+    table_key_by_identity: dict[int, tuple[Any, ...]] = field(default_factory=dict)
+    operation_key_by_identity: dict[int, tuple[Any, Any]] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -436,6 +498,10 @@ def mutate_case_with_metadata(
             "mutation_plan": plan.to_dict(),
         }
     )
+    ir_rewrite_rules = _mutation_ir_rewrite_rule_metadata(plan.steps)
+    if ir_rewrite_rules:
+        metadata["mutation"]["ir_rewrite_rules"] = ir_rewrite_rules
+        metadata["mutation"]["ir_rewrite_rule"] = ir_rewrite_rules[0]
     program = Program(
         program_id=f"{case.program.program_id}-mut-{seed}",
         seed=seed,
@@ -449,6 +515,15 @@ def mutate_case_with_metadata(
         metadata=metadata,
     )
     return MutationResult(mutated, metadata)
+
+
+def _mutation_ir_rewrite_rule_metadata(steps: Sequence[MutationPlanStep]) -> list[dict[str, Any]]:
+    rules: list[dict[str, Any]] = []
+    for step in steps:
+        payload = ir_rewrite_rule_metadata(step.operator, detail=step.detail)
+        if payload:
+            rules.append(payload)
+    return rules
 
 
 def _build_mutation_plan(
@@ -596,9 +671,22 @@ def _apply_mutation_plan(
         step_rnd = random.Random(step.replay_seed)
         with _activate_mutation_state_cache(state_cache):
             detail = operator.apply(tables, operations, step_rnd)
-        operations = repair_operations(tables[0], operations, extra_tables=tables[1:])
-        if not operations:
-            operations = [{"op": "limit", "n": len(tables[0].rows)}]
+        preserves_tables = _operator_preserves_tables(operator)
+        preserves_operations = _operator_preserves_operations(operator)
+        appends_operations_only = _operator_appends_operations_only(operator)
+        mutates_operation_list_only = _operator_mutates_operation_list_only(operator)
+        if not preserves_tables:
+            _invalidate_table_cache(state_cache, tables)
+        if (
+            not preserves_operations
+            and not appends_operations_only
+            and not mutates_operation_list_only
+        ):
+            _invalidate_operation_cache(state_cache, operations)
+        if not preserves_operations:
+            operations = repair_operations(tables[0], operations, extra_tables=tables[1:])
+            if not operations:
+                operations = [{"op": "limit", "n": len(tables[0].rows)}]
         if step.detail != detail:
             step.detail = detail
     return tables, operations
@@ -623,8 +711,27 @@ def _simulate_mutation_step(
     prior_steps: Sequence[MutationPlanStep],
     state_cache: _MutationStateCache | None = None,
 ) -> tuple[list[TableData], list[dict[str, Any]], MutationPlanStep]:
-    trial_tables = _clone_tables(current_tables)
-    trial_operations = _clone_operations(current_operations)
+    preserves_tables = _operator_preserves_tables(operator)
+    preserves_operations = _operator_preserves_operations(operator)
+    appends_tables_only = _operator_appends_tables_only(operator)
+    appends_operations_only = _operator_appends_operations_only(operator)
+    mutates_operation_list_only = _operator_mutates_operation_list_only(operator)
+    trial_tables = (
+        current_tables
+        if preserves_tables
+        else list(current_tables)
+        if appends_tables_only
+        else _clone_primary_table_only(current_tables)
+        if preserves_operations
+        else _clone_tables(current_tables)
+    )
+    trial_operations = (
+        current_operations
+        if preserves_operations
+        else list(current_operations)
+        if appends_operations_only or mutates_operation_list_only
+        else _clone_operations(current_operations)
+    )
     replay_seed = _mutation_candidate_seed(seed, case_seed, step_index, candidate_rank, operator.name)
     trial_rnd = random.Random(replay_seed)
     value_context = (
@@ -638,11 +745,26 @@ def _simulate_mutation_step(
     )
     with _activate_value_catalog_context(value_context), _activate_mutation_state_cache(state_cache):
         detail = operator.apply(trial_tables, trial_operations, trial_rnd)
-    trial_operations = repair_operations(trial_tables[0], trial_operations, extra_tables=trial_tables[1:])
-    if not trial_operations:
-        trial_operations = [{"op": "limit", "n": len(trial_tables[0].rows)}]
-    changed = trial_tables != current_tables or trial_operations != current_operations
-    productive = changed and not _mutation_detail_is_unproductive(detail)
+    if state_cache is not None and not preserves_tables and not appends_tables_only:
+        _invalidate_table_cache(state_cache, trial_tables)
+    if (
+        state_cache is not None
+        and not preserves_operations
+        and not appends_operations_only
+        and not mutates_operation_list_only
+    ):
+        _invalidate_operation_cache(state_cache, trial_operations)
+    detail_unproductive = _mutation_detail_is_unproductive(detail)
+    if preserves_operations:
+        changed = trial_tables != current_tables
+    elif detail_unproductive and trial_tables == current_tables and trial_operations == current_operations:
+        changed = False
+    else:
+        trial_operations = repair_operations(trial_tables[0], trial_operations, extra_tables=trial_tables[1:])
+        if not trial_operations:
+            trial_operations = [{"op": "limit", "n": len(trial_tables[0].rows)}]
+        changed = trial_tables != current_tables or trial_operations != current_operations
+    productive = changed and not detail_unproductive
     operator_score = _mutation_operator_score(operator.name, operator_scores)
     target_affinity = _mutation_target_affinity(operator, target_context)
     divergence_affinity = (
@@ -677,6 +799,26 @@ def _simulate_mutation_step(
         resulting_operation_count=len(trial_operations),
         replay_seed=replay_seed,
     )
+
+
+def _operator_preserves_tables(operator: MutationOperator) -> bool:
+    return operator.name in MUTATION_OPERATOR_NAMES and operator.name not in TABLE_MUTATING_MUTATION_OPERATOR_NAMES
+
+
+def _operator_preserves_operations(operator: MutationOperator) -> bool:
+    return operator.name in TABLE_ONLY_MUTATION_OPERATOR_NAMES
+
+
+def _operator_appends_operations_only(operator: MutationOperator) -> bool:
+    return operator.name in APPEND_ONLY_MUTATION_OPERATOR_NAMES
+
+
+def _operator_appends_tables_only(operator: MutationOperator) -> bool:
+    return operator.name in TABLE_APPEND_ONLY_MUTATION_OPERATOR_NAMES
+
+
+def _operator_mutates_operation_list_only(operator: MutationOperator) -> bool:
+    return operator.name in OPERATION_LIST_ONLY_MUTATION_OPERATOR_NAMES
 
 
 def _resolve_mutation_plan_depth(
@@ -1087,9 +1229,15 @@ def _mutation_detail_is_unproductive(detail: str) -> bool:
     )
 
 
-def _mutation_schema(tables: list[TableData], operations: list[dict[str, Any]]) -> MutationSchema:
+def _mutation_schema(
+    tables: list[TableData],
+    operations: list[dict[str, Any]],
+    *,
+    cache_key: tuple[Any, ...] | None = None,
+) -> MutationSchema:
     cache = _ACTIVE_MUTATION_STATE_CACHE.get()
-    cache_key = _mutation_state_cache_key(tables, operations) if cache is not None else None
+    if cache is not None and cache_key is None:
+        cache_key = _mutation_state_cache_key(tables, operations, cache=cache)
     if cache is not None and cache_key is not None:
         cached = cache.schema_by_key.get(cache_key)
         if cached is not None:
@@ -1105,9 +1253,8 @@ def _mutation_schema(tables: list[TableData], operations: list[dict[str, Any]]) 
         extra_tables=tables[1:],
     )
     nullable_columns = set(state.nullable_columns)
-    for name in state.columns:
-        if _base_table_column_has_null(tables, name):
-            nullable_columns.add(name)
+    base_null_columns = _base_table_null_columns(tables)
+    nullable_columns.update(name for name in state.columns if name in base_null_columns)
     schema = MutationSchema(list(state.columns), dict(state.column_types), nullable_columns)
     if cache is not None and cache_key is not None:
         cache.schema_by_key[cache_key] = schema
@@ -1118,10 +1265,17 @@ def _base_table_column_has_null(tables: list[TableData], name: str) -> bool:
     return any(name in row and row.get(name) is None for table in tables for row in table.rows)
 
 
+def _base_table_null_columns(tables: list[TableData]) -> set[str]:
+    null_columns: set[str] = set()
+    for table in tables:
+        null_columns.update(_table_null_columns(table))
+    return null_columns
+
+
 def _fallback_column_type(name: str) -> str:
     if name.startswith("sorted_ok_"):
         return "bool"
-    if any(name == prefix or name.startswith(f"{prefix}_") for prefix in BOOLEAN_PROBE_OUTPUT_PREFIXES):
+    if name in BOOLEAN_PROBE_OUTPUT_PREFIX_SET or name.startswith(BOOLEAN_PROBE_OUTPUT_UNDERSCORE_PREFIXES):
         return "bool"
     if name.startswith(("any_", "all_")):
         return "bool"
@@ -1138,6 +1292,12 @@ def _clone_tables(tables: list[TableData]) -> list[TableData]:
     return [_clone_table(table) for table in tables]
 
 
+def _clone_primary_table_only(tables: list[TableData]) -> list[TableData]:
+    if not tables:
+        return []
+    return [_clone_table(tables[0]), *tables[1:]]
+
+
 def _clone_table(table: TableData) -> TableData:
     return TableData(
         table.name,
@@ -1147,7 +1307,10 @@ def _clone_table(table: TableData) -> TableData:
 
 
 def _clone_row(row: dict[str, Any]) -> dict[str, Any]:
-    return {key: _clone_value(value) for key, value in row.items()}
+    for value in row.values():
+        if not isinstance(value, IMMUTABLE_VALUE_TYPES):
+            return {key: _clone_value(item) for key, item in row.items()}
+    return dict(row)
 
 
 def _clone_operations(operations: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1156,7 +1319,7 @@ def _clone_operations(operations: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _clone_operation(operation: dict[str, Any]) -> dict[str, Any]:
     if isinstance(operation, IRNode):
-        return operation.copy()
+        return operation.to_dict()
     return {
         key: _clone_value(value)
         for key, value in operation.items()
@@ -1392,12 +1555,13 @@ def _append_tuple_absence_filter_probe(
         return "append_tuple_absence_filter:no-right-table"
     available = _available_columns(tables, operations)
     right = rnd.choice(tables[1:])
-    right_columns = [column.name for column in right.columns]
+    left_types = {column: _column_type(tables, column) for column in available}
+    right_types = {column.name: column.type for column in right.columns}
     pairs = [
         (left, right_column)
-        for left in available
-        for right_column in right_columns
-        if _column_type(tables, left) == right.column_type(right_column)
+        for left, left_type in left_types.items()
+        for right_column, right_type in right_types.items()
+        if left_type == right_type
     ]
     left_seen: set[str] = set()
     right_seen: set[str] = set()
@@ -2325,6 +2489,55 @@ def _append_sql_union_coalesce_distinct_topk(
     return f"append_sql_union_coalesce_distinct_topk:{table_name}:{source}:label={label_col}"
 
 
+def _append_coalesce_sort_topk(
+    tables: list[TableData],
+    operations: list[dict[str, Any]],
+    rnd: random.Random,
+) -> str:
+    if not tables:
+        return "append_coalesce_sort_topk:none"
+    context = _mutation_operation_context(tables, operations)
+    if context is None:
+        return "append_coalesce_sort_topk:no-context"
+    groups = _coalesce_column_groups(context)
+    if not groups:
+        return "append_coalesce_sort_topk:no-compatible-columns"
+    output_type, candidates = rnd.choice(groups)
+    width = rnd.randint(2, min(3, len(candidates)))
+    columns = rnd.sample(candidates, width)
+    used_columns = set(context.available) | {op.get("as", "") for op in operations if isinstance(op, dict)}
+    alias = make_safe_output_name(f"co_topk_{columns[0]}", used=used_columns)
+    used_columns.add(alias)
+    coalesce_op: dict[str, Any] = {"op": "coalesce", "columns": columns, "as": alias}
+    if rnd.random() < 0.85:
+        coalesce_op["fallback"] = _literal_for_type(output_type, rnd)
+    sort_keys = [
+        {
+            "column": alias,
+            "ascending": rnd.choice([True, False]),
+            "nulls": rnd.choice(["first", "last"]),
+        }
+    ]
+    tie_candidates = [column for column in context.available if column not in columns]
+    if tie_candidates and rnd.random() < 0.80:
+        tie_column = rnd.choice(tie_candidates)
+        sort_keys.append(
+            {
+                "column": tie_column,
+                "ascending": rnd.choice([True, False]),
+                "nulls": rnd.choice(["first", "last"]),
+            }
+        )
+    operations.extend(
+        [
+            coalesce_op,
+            {"op": "sort", "keys": sort_keys},
+            {"op": "limit", "n": rnd.randint(1, max(1, min(len(tables[0].rows) + 2, 8)))},
+        ]
+    )
+    return f"append_coalesce_sort_topk:{','.join(columns)}:as={alias}"
+
+
 def _append_boolean_membership_case_aggregate(
     tables: list[TableData],
     operations: list[dict[str, Any]],
@@ -2944,6 +3157,105 @@ def _append_multi_key_membership_case_aggregate(
     return f"append_multi_key_membership_case_aggregate:{join_kind}:{','.join(left_keys)}"
 
 
+def _append_join_filter_groupby_topk(
+    tables: list[TableData],
+    operations: list[dict[str, Any]],
+    rnd: random.Random,
+) -> str:
+    context = _mutation_operation_context(tables, operations)
+    if context is None:
+        return "append_join_filter_groupby_topk:none"
+    membership_pairs = _compatible_membership_key_pairs_for_context(context)
+    if not membership_pairs:
+        return "append_join_filter_groupby_topk:no-compatible-right-table"
+    right, left_columns, right_columns = _choose_membership_key_pair(membership_pairs, rnd)
+    group_candidates = [
+        column
+        for column in context.available
+        if context.column_type(column) in {"int", "str", "bool"}
+    ]
+    group_keys = unique_preserve_order(
+        [
+            *left_columns,
+            *(
+                [rnd.choice([column for column in group_candidates if column not in left_columns])]
+                if len(left_columns) < 2 and any(column not in left_columns for column in group_candidates)
+                else []
+            ),
+        ]
+    )
+    if not group_keys:
+        return "append_join_filter_groupby_topk:no-group-key"
+
+    value_candidates = [column for column in [*context.numeric, *context.bools] if column not in group_keys]
+    if not value_candidates:
+        value_candidates = [*context.numeric, *context.bools]
+    if not value_candidates:
+        return "append_join_filter_groupby_topk:no-aggregate-column"
+
+    filter_candidates = [
+        column
+        for column in [*context.numeric, *context.bools, *group_keys]
+        if column in context.available
+    ]
+    filter_column = rnd.choice(filter_candidates or group_keys)
+    filter_type = context.column_type(filter_column)
+    if filter_type == "bool":
+        filter_op = {"op": "filter", "column": filter_column, "cmp": "bool_is_not_false", "value": None}
+    elif filter_type in {"int", "float"}:
+        filter_cmp = rnd.choice([">=", "!=", "range_closed"])
+        filter_op = {
+            "op": "filter",
+            "column": filter_column,
+            "cmp": filter_cmp,
+            "value": (
+                sorted(rnd.sample(_literal_list_for_type(filter_type, rnd), 2))
+                if filter_cmp == "range_closed"
+                else _literal_for_type(filter_type, rnd)
+            ),
+        }
+    else:
+        filter_op = {"op": "filter", "column": filter_column, "cmp": "is_not_null", "value": None}
+
+    used_columns = set(context.available) | set(group_keys)
+    count_alias = make_safe_output_name("count_joined_rows", used=used_columns)
+    used_columns.add(count_alias)
+    value_column = rnd.choice(value_candidates)
+    if context.column_type(value_column) == "bool":
+        value_func = rnd.choice(["any", "all", "count", "nunique"])
+    else:
+        value_func = rnd.choice(["sum", "min", "max", "count", "nunique"])
+    value_alias = make_safe_output_name(f"{value_func}_{value_column}", used=used_columns)
+    aggs = [
+        {"column": group_keys[0], "func": "count", "as": count_alias},
+        {"column": value_column, "func": value_func, "as": value_alias},
+    ]
+    projection = unique_preserve_order([*group_keys, count_alias, value_alias])
+    operations.extend(
+        [
+            {
+                "op": "join",
+                "table": right.name,
+                "left_on": join_key_arg(left_columns),
+                "right_on": join_key_arg(right_columns),
+                "how": rnd.choice(["inner", "left"]),
+            },
+            filter_op,
+            {"op": "groupby", "keys": group_keys, "aggs": aggs},
+            {"op": "select", "columns": projection},
+            {
+                "op": "sort",
+                "keys": [
+                    {"column": count_alias, "ascending": False, "nulls": "last"},
+                    {"column": group_keys[0], "ascending": True, "nulls": "last"},
+                ],
+            },
+            {"op": "limit", "n": rnd.randint(1, 4)},
+        ]
+    )
+    return f"append_join_filter_groupby_topk:{right.name}:{','.join(group_keys)}"
+
+
 def _case_when_literals_for_type(typ: str, rnd: random.Random) -> tuple[Any, Any]:
     if typ == "int":
         return rnd.choice([1, 10]), rnd.choice([0, -1])
@@ -3006,14 +3318,14 @@ def _mutation_operation_context(
     operations: list[dict[str, Any]],
 ) -> MutationOperationContext | None:
     cache = _ACTIVE_MUTATION_STATE_CACHE.get()
-    cache_key = _mutation_state_cache_key(tables, operations) if cache is not None else None
+    cache_key = _mutation_state_cache_key(tables, operations, cache=cache) if cache is not None else None
     if cache is not None and cache_key is not None and cache_key in cache.context_by_key:
         return cache.context_by_key[cache_key]
     if not tables:
         if cache is not None and cache_key is not None:
             cache.context_by_key[cache_key] = None
         return None
-    schema = _mutation_schema(tables, operations)
+    schema = _mutation_schema(tables, operations, cache_key=cache_key)
     available = tuple(schema.available)
     if not available:
         if cache is not None and cache_key is not None:
@@ -3049,32 +3361,108 @@ def _mutation_operation_context(
 def _mutation_state_cache_key(
     tables: list[TableData],
     operations: list[dict[str, Any]],
+    *,
+    cache: _MutationStateCache | None = None,
 ) -> tuple[Any, ...]:
     return (
-        tuple(_mutation_table_cache_key(table) for table in tables),
-        tuple(_mutation_operation_cache_key(operation) for operation in operations),
+        tuple(_mutation_table_cache_key_cached(table, cache=cache) for table in tables),
+        tuple(_mutation_operation_cache_key_cached(operation, cache=cache) for operation in operations),
     )
+
+
+def _mutation_table_cache_key_cached(
+    table: TableData,
+    *,
+    cache: _MutationStateCache | None = None,
+) -> tuple[Any, ...]:
+    if cache is None:
+        return _mutation_table_cache_key(table)
+    table_id = id(table)
+    cached = cache.table_key_by_identity.get(table_id)
+    if cached is not None:
+        return cached
+    key = _mutation_table_cache_key(table)
+    cache.table_key_by_identity[table_id] = key
+    return key
+
+
+def _invalidate_table_cache(cache: _MutationStateCache, tables: list[TableData]) -> None:
+    for table in tables:
+        cache.table_key_by_identity.pop(id(table), None)
+
+
+def _mutation_operation_cache_key_cached(
+    operation: Any,
+    *,
+    cache: _MutationStateCache | None = None,
+) -> Any:
+    if cache is None:
+        return _mutation_operation_cache_key(operation)
+    operation_id = id(operation)
+    cached = cache.operation_key_by_identity.get(operation_id)
+    if cached is not None:
+        cached_operation, cached_key = cached
+        if cached_operation is operation:
+            return cached_key
+    key = _mutation_operation_cache_key(operation)
+    cache.operation_key_by_identity[operation_id] = (operation, key)
+    return key
+
+
+def _invalidate_operation_cache(cache: _MutationStateCache, operations: Sequence[Any]) -> None:
+    for operation in operations:
+        operation_id = id(operation)
+        cached = cache.operation_key_by_identity.get(operation_id)
+        if cached is not None and cached[0] is operation:
+            cache.operation_key_by_identity.pop(operation_id, None)
 
 
 def _mutation_table_cache_key(table: TableData) -> tuple[Any, ...]:
     column_specs = tuple((column.name, column.type, bool(column.nullable)) for column in table.columns)
+    null_columns = _table_null_columns(table)
     null_flags = tuple(
         (
             column.name,
-            any(column.name in row and row.get(column.name) is None for row in table.rows),
+            column.name in null_columns,
         )
         for column in table.columns
     )
     return (table.name, column_specs, null_flags)
 
 
+def _table_null_columns(table: TableData) -> set[str]:
+    column_names = {column.name for column in table.columns}
+    null_columns: set[str] = set()
+    for row in table.rows:
+        for key, value in row.items():
+            if value is None and key in column_names:
+                null_columns.add(key)
+        if len(null_columns) >= len(column_names):
+            break
+    return null_columns
+
+
 def _mutation_operation_cache_key(value: Any) -> Any:
+    if value is None or isinstance(value, (str, bytes, int, bool)):
+        return value
+    if isinstance(value, float):
+        if math.isnan(value):
+            return ("float", "nan")
+        if math.isinf(value):
+            return ("float", "inf", 1 if value > 0 else -1)
+        return value
     if isinstance(value, IRNode):
         value = value.to_dict()
+    if type(value) is dict:
+        return tuple([(str(key), _mutation_operation_cache_key(item)) for key, item in value.items()])
+    if type(value) is list:
+        return tuple([_mutation_operation_cache_key(item) for item in value])
+    if type(value) is tuple:
+        return tuple([_mutation_operation_cache_key(item) for item in value])
     if isinstance(value, Mapping):
         return tuple(
             (str(key), _mutation_operation_cache_key(item))
-            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+            for key, item in value.items()
         )
     if isinstance(value, list):
         return tuple(_mutation_operation_cache_key(item) for item in value)
@@ -3083,11 +3471,6 @@ def _mutation_operation_cache_key(value: Any) -> Any:
     if isinstance(value, set):
         normalized = [_mutation_operation_cache_key(item) for item in value]
         return tuple(sorted(normalized, key=repr))
-    if isinstance(value, float):
-        if math.isnan(value):
-            return ("float", "nan")
-        if math.isinf(value):
-            return ("float", "inf", 1 if value > 0 else -1)
     return value
 
 
@@ -3732,6 +4115,12 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
         semantic_signal_affinity=("union_coalesce_distinct_topk",),
     ),
     MutationOperator(
+        "append_coalesce_sort_topk",
+        _append_coalesce_sort_topk,
+        semantic_family_affinity=("null_semantics", "topk_ordering", "type_coercion"),
+        semantic_signal_affinity=("coalesce_sort_topk", "coalesced_topk"),
+    ),
+    MutationOperator(
         "append_boolean_membership_case_aggregate",
         _append_boolean_membership_case_aggregate,
         semantic_family_affinity=(
@@ -3787,6 +4176,12 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
         _append_multi_key_membership_case_aggregate,
         semantic_family_affinity=("join_membership", "conditional_semantics", "aggregation_cardinality"),
         semantic_signal_affinity=("multi_key_membership_aggregation", "multi_key_semi_anti_join"),
+    ),
+    MutationOperator(
+        "append_join_filter_groupby_topk",
+        _append_join_filter_groupby_topk,
+        semantic_family_affinity=("join_membership", "aggregation_cardinality", "topk_ordering"),
+        semantic_signal_affinity=("join_filter_groupby", "multi_key_groupby_topk", "groupby_having_topk"),
     ),
     MutationOperator(
         "ir_swap_adjacent",
@@ -3919,3 +4314,8 @@ DISCOVERY_MUTATION_OPERATOR_PROFILES: Mapping[str, MutationOperator] = MappingPr
 )
 MUTATION_OPERATOR_NAMES = tuple(operator.name for operator in MUTATION_OPERATORS)
 DISCOVERY_MUTATION_OPERATOR_NAMES = tuple(operator.name for operator in DISCOVERY_MUTATION_OPERATORS)
+APPEND_ONLY_MUTATION_OPERATOR_NAMES = frozenset(
+    operator.name
+    for operator in MUTATION_OPERATORS
+    if operator.name == "append_op" or operator.name.startswith("append_")
+)

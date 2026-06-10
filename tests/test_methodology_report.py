@@ -87,6 +87,17 @@ def _write_run(
         if idx == 0:
             row.update(
                 {
+                    "semantic_contract_lattice": {
+                        "schema_version": "semantic-contract-lattice-v1",
+                        "case_id": f"case-{path.stem}-{idx}",
+                        "boundary_axes": ["ordering", "null"],
+                        "strict_axes": ["nan", "dtype_coercion"],
+                        "operation_contracts": [{"operation": "limit"}],
+                    },
+                    "mutation": {
+                        "operator": "ir_pushdown_filter",
+                        "detail": "ir_pushdown_filter:test",
+                    },
                     "generator_profile_selection": {
                         "strategy": "contextual_bandit",
                         "profile": "discovery_fresh",
@@ -305,6 +316,14 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
                 "issue_draft_count": 1,
                 "needs_dedup_check_count": 1,
                 "already_submitted_or_confirmed_count": 0,
+                "semantic_contract_candidate_count": 2,
+                "semantic_contract_boundary_axes": ["ordering", "null"],
+                "semantic_contract_matched_boundary_axes": ["ordering"],
+                "ir_rewrite_candidate_count": 1,
+                "ir_rewrite_rule_count": 1,
+                "ir_rewrite_rules": ["ir.rewrite.filter_pushdown"],
+                "ir_rewrite_operators": ["ir_pushdown_filter"],
+                "ir_rewrite_semantics_classes": ["semantics_preserving"],
             },
             "candidates": [
                 {
@@ -897,6 +916,16 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
     assert report["candidate_pipeline"]["reproduced_count"] == 1
     assert report["candidate_pipeline"]["strategy_snapshot_count"] == 1
     assert report["candidate_pipeline"]["strategy_learning_count"] == 1
+    assert report["candidate_pipeline"]["semantic_contract_candidate_count"] == 2
+    assert report["candidate_pipeline"]["semantic_contract_boundary_axes"] == ["null", "ordering"]
+    assert report["candidate_pipeline"]["ir_rewrite_candidate_count"] == 1
+    assert report["candidate_pipeline"]["ir_rewrite_rules"] == ["ir.rewrite.filter_pushdown"]
+    assert report["semantic_contract_evidence"]["contract_row_count"] == 3
+    assert report["semantic_contract_evidence"]["case_row_count"] == 6
+    assert report["semantic_contract_evidence"]["boundary_axes"] == ["null", "ordering"]
+    assert report["ir_rewrite_rule_evidence"]["rewrite_row_count"] == 3
+    assert report["ir_rewrite_rule_evidence"]["rule_ids"] == ["ir.rewrite.filter_pushdown"]
+    assert report["ir_rewrite_rule_evidence"]["registered_rule_count"] >= 6
     assert report["offline_oracle"]["classified_findings"] == 4
     assert report["offline_oracle"]["buckets"] == {
         "new_bug": 1,
@@ -938,6 +967,11 @@ def test_write_methodology_report_links_evidence_chain_and_space_metrics(tmp_pat
     assert "### Adaptive Final Arms" in md
     assert "| core:baseline:seed1 | core | 3 | 4.20 | 3.40 | 3.70 | 0 |" in md
     assert "## Candidate Pipeline" in md
+    assert "Semantic-contract candidates: 2" in md
+    assert "IR rewrite candidates: 1" in md
+    assert "## Semantic Contract And IR Evidence" in md
+    assert "Contract-lattice rows: 3 / 6 scanned cases" in md
+    assert "IR rewrite rows: 3 / 6 scanned cases" in md
     assert "### Candidate Family First Seen" in md
     assert "fresh_root@polars" in md
     assert "- Known bug: 1" in md

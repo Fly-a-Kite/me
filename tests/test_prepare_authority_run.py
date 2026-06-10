@@ -60,6 +60,7 @@ def _args(module, project_root: Path, **overrides):
         "strategy_snapshot": str(module.DEFAULT_STRATEGY_SNAPSHOT),
         "continual_learning_ledgers": "",
         "tmux_session": "",
+        "allow_source_code_dirty": False,
     }
     data.update(overrides)
     return type("Args", (), data)()
@@ -114,6 +115,74 @@ def test_prepare_authority_run_creates_detached_clean_worktree_from_dirty_source
         text=True,
     )
     assert proc.stdout.strip() == ""
+
+
+def test_prepare_authority_run_rejects_dirty_source_code_by_default(tmp_path: Path):
+    module = _module()
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+    _init_git_repo(project_root)
+    src_dir = project_root / "src" / "datadiff"
+    src_dir.mkdir(parents=True)
+    (src_dir / "new_contract.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="would exclude uncommitted code changes"):
+        module.prepare_authority_run(_args(module, project_root))
+
+
+def test_prepare_authority_run_allows_explicit_head_only_dirty_code_snapshot(tmp_path: Path):
+    module = _module()
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+    head = _init_git_repo(project_root)
+    scripts_dir = project_root / "scripts"
+    (scripts_dir / "helper.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    result = module.prepare_authority_run(
+        _args(module, project_root, allow_source_code_dirty=True)
+    )
+
+    assert result.created_worktree is True
+    assert result.prepared_head_commit == head
+    assert result.source_code_dirty_paths == ("scripts/helper.py",)
+    report = json.loads(result.report_file.read_text(encoding="utf-8"))
+    assert report["source_code_dirty_paths"] == ["scripts/helper.py"]
+
+
+def test_prepare_authority_run_rejects_dirty_rust_kernel_code(tmp_path: Path):
+    module = _module()
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+    _init_git_repo(project_root)
+    rust_dir = project_root / "rust_kernel" / "src"
+    rust_dir.mkdir(parents=True)
+    (rust_dir / "lib.rs").write_text("pub fn value() -> u8 { 1 }\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="rust_kernel/src/lib.rs"):
+        module.prepare_authority_run(_args(module, project_root))
+
+
+def test_prepare_authority_run_rejects_renamed_source_code_old_path(tmp_path: Path):
+    module = _module()
+    project_root = tmp_path / "repo"
+    project_root.mkdir()
+    _init_git_repo(project_root)
+    src_dir = project_root / "src" / "datadiff"
+    docs_dir = project_root / "docs"
+    src_dir.mkdir(parents=True)
+    docs_dir.mkdir(parents=True)
+    source_file = src_dir / "contract.py"
+    source_file.write_text("VALUE = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "src/datadiff/contract.py"], cwd=project_root, check=True)
+    subprocess.run(["git", "commit", "-m", "add source"], cwd=project_root, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "mv", "src/datadiff/contract.py", "docs/contract.py"],
+        cwd=project_root,
+        check=True,
+    )
+
+    with pytest.raises(SystemExit, match="src/datadiff/contract.py"):
+        module.prepare_authority_run(_args(module, project_root))
 
 
 def test_prepare_authority_run_rejects_non_authority_launcher(tmp_path: Path):

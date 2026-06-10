@@ -34,7 +34,9 @@ from datadiff.finding_outcomes import (
     row_has_rewardable_new_behavior,
 )
 from datadiff.icse_experiment_quality import score_methodology_report
+from datadiff.mutator_ir import ir_rewrite_rule_metadata, ir_rewrite_rule_registry_payload
 from datadiff.reporter import latest_experiment_manifest_path, write_experiment_summary_report
+from datadiff.semantic_contracts import finding_contract_axes
 from datadiff.util import (
     PROJECT_ROOT,
     REPORTS_DIR,
@@ -222,6 +224,8 @@ def _build_methodology_report(
     artifact_reproducibility = run_log_evidence["artifact_reproducibility"]
     offline_oracle = run_log_evidence["offline_oracle"]
     candidate_discovery = run_log_evidence["candidate_discovery"]
+    semantic_contract_evidence = run_log_evidence["semantic_contract_lattice"]
+    ir_rewrite_rule_evidence = run_log_evidence["ir_rewrite_rules"]
     candidate_cases = _int(candidate_discovery.get("candidate_bug_cases"))
     candidate_families = dict(candidate_discovery.get("candidate_bug_families", {}) or {})
     candidate_family_first_seen = candidate_discovery.get("candidate_family_first_seen", {}) or {}
@@ -413,6 +417,8 @@ def _build_methodology_report(
         "adaptive_learning_evidence": adaptive_learning_evidence,
         "adaptive_selection": adaptive_selection,
         "candidate_pipeline": candidate_pipeline,
+        "semantic_contract_evidence": semantic_contract_evidence,
+        "ir_rewrite_rule_evidence": ir_rewrite_rule_evidence,
         "offline_oracle": offline_oracle,
         "run_log_scan": run_log_evidence["run_log_scan"],
         "reproducibility": {
@@ -1090,6 +1096,8 @@ def _render_markdown(
     adaptive_evidence_qd = adaptive_evidence.get("quality_diversity", {})
     adaptive_evidence_continual = adaptive_evidence.get("continual_learning", {})
     adaptive_selection = report.get("adaptive_selection", {})
+    semantic_contract_evidence = report.get("semantic_contract_evidence", {})
+    ir_rewrite_rule_evidence = report.get("ir_rewrite_rule_evidence", {})
     evidence_chain = report.get("evidence_chain", {})
     lines = [
         "# DataDiffFuzz Methodology Report",
@@ -1437,9 +1445,25 @@ def _render_markdown(
             f"- Reproduced candidates: {candidate_pipeline.get('reproduced_count', 0)} ({_fmt_percent(candidate_pipeline.get('recheck_pass_rate', 0.0))})",
             f"- Reduced artifacts: {candidate_pipeline.get('reduced_count', 0)}",
             f"- Candidate-bug triage verdicts: {candidate_pipeline.get('candidate_bug_verdict_count', 0)}",
+            f"- Semantic-contract candidates: {candidate_pipeline.get('semantic_contract_candidate_count', 0)}; "
+            f"boundary axes: {', '.join(candidate_pipeline.get('semantic_contract_boundary_axes', [])) or 'none'}",
+            f"- IR rewrite candidates: {candidate_pipeline.get('ir_rewrite_candidate_count', 0)}; "
+            f"rules: {', '.join(candidate_pipeline.get('ir_rewrite_rules', [])) or 'none'}",
             f"- Issue drafts: {candidate_pipeline.get('issue_draft_count', 0)}",
             f"- Needs dedup check: {candidate_pipeline.get('needs_dedup_check_count', 0)}",
             f"- Already confirmed/submitted: {candidate_pipeline.get('already_submitted_or_confirmed_count', 0)}",
+            "",
+            "## Semantic Contract And IR Evidence",
+            "",
+            f"- Contract-lattice rows: {semantic_contract_evidence.get('contract_row_count', 0)} / "
+            f"{semantic_contract_evidence.get('case_row_count', 0)} scanned cases",
+            f"- Contract boundary axes: {', '.join(semantic_contract_evidence.get('boundary_axes', [])) or 'none'}",
+            f"- Matched finding boundary axes: {', '.join(semantic_contract_evidence.get('matched_boundary_axes', [])) or 'none'}",
+            f"- IR rewrite rows: {ir_rewrite_rule_evidence.get('rewrite_row_count', 0)} / "
+            f"{ir_rewrite_rule_evidence.get('case_row_count', 0)} scanned cases",
+            f"- IR rewrite rules observed: {', '.join(ir_rewrite_rule_evidence.get('rule_ids', [])) or 'none'}",
+            f"- IR rewrite semantic classes observed: {', '.join(ir_rewrite_rule_evidence.get('semantics_classes', [])) or 'none'}",
+            f"- Registered IR rewrite rules: {ir_rewrite_rule_evidence.get('registered_rule_count', 0)}",
             "",
             "## Offline Oracle Buckets",
             "",
@@ -1585,6 +1609,19 @@ def _run_log_evidence(
     raw_new_behavior_cases = 0
     signal_new_behavior_cases = 0
     candidate_bug_cases = 0
+    case_row_count = 0
+    contract_row_count = 0
+    contract_operation_count = 0
+    contract_boundary_axes: Counter[str] = Counter()
+    contract_strict_axes: Counter[str] = Counter()
+    contract_finding_axes: Counter[str] = Counter()
+    contract_matched_boundary_axes: Counter[str] = Counter()
+    ir_rewrite_row_count = 0
+    ir_rewrite_rule_count = 0
+    ir_rewrite_rules: Counter[str] = Counter()
+    ir_rewrite_operators: Counter[str] = Counter()
+    ir_rewrite_semantics_classes: Counter[str] = Counter()
+    ir_rewrite_contract_axes: Counter[str] = Counter()
     for run_row in run_rows:
         run_path = _resolve_existing_path(run_row.get("run_file", ""))
         if run_path is None:
@@ -1605,9 +1642,26 @@ def _run_log_evidence(
         known_saturated = _known_saturated_families_for_run(run_path)
         run_hits: list[int] = []
         for fallback_idx, item in enumerate(_iter_jsonl(run_path)):
+            case_row_count += 1
             findings = item.get("findings", []) or []
             total_findings += len(findings)
             buckets.update(offline_finding_buckets(findings, known_saturated))
+            contract_evidence = _semantic_contract_evidence_from_run_item(item, findings)
+            if contract_evidence:
+                contract_row_count += 1
+                contract_operation_count += int(contract_evidence.get("operation_contract_count", 0) or 0)
+                contract_boundary_axes.update(contract_evidence.get("boundary_axes", []) or [])
+                contract_strict_axes.update(contract_evidence.get("strict_axes", []) or [])
+                contract_finding_axes.update(contract_evidence.get("finding_axes", []) or [])
+                contract_matched_boundary_axes.update(contract_evidence.get("matched_boundary_axes", []) or [])
+            rewrite_evidence = _ir_rewrite_evidence_from_run_item(item)
+            if rewrite_evidence:
+                ir_rewrite_row_count += 1
+                ir_rewrite_rule_count += int(rewrite_evidence.get("rule_count", 0) or 0)
+                ir_rewrite_rules.update(rewrite_evidence.get("rule_ids", []) or [])
+                ir_rewrite_operators.update(rewrite_evidence.get("operators", []) or [])
+                ir_rewrite_semantics_classes.update(rewrite_evidence.get("semantics_classes", []) or [])
+                ir_rewrite_contract_axes.update(rewrite_evidence.get("contract_axes", []) or [])
             raw_new_behavior_cases += int(bool(item.get("is_new_behavior")))
             signal_new_behavior_cases += int(
                 row_has_rewardable_new_behavior(item, known_saturated)
@@ -1682,6 +1736,26 @@ def _run_log_evidence(
         "offline_oracle": _offline_oracle_summary_from_buckets(buckets, total_findings),
         "candidate_discovery": candidate_discovery,
         "candidate_family_first_seen": candidate_family_first_seen,
+        "semantic_contract_lattice": _semantic_contract_run_log_summary(
+            case_row_count=case_row_count,
+            contract_row_count=contract_row_count,
+            operation_contract_count=contract_operation_count,
+            boundary_axes=contract_boundary_axes,
+            strict_axes=contract_strict_axes,
+            finding_axes=contract_finding_axes,
+            matched_boundary_axes=contract_matched_boundary_axes,
+            source=_scan_source(scanned, missing),
+        ),
+        "ir_rewrite_rules": _ir_rewrite_run_log_summary(
+            case_row_count=case_row_count,
+            rewrite_row_count=ir_rewrite_row_count,
+            rule_count=ir_rewrite_rule_count,
+            rule_ids=ir_rewrite_rules,
+            operators=ir_rewrite_operators,
+            semantics_classes=ir_rewrite_semantics_classes,
+            contract_axes=ir_rewrite_contract_axes,
+            source=_scan_source(scanned, missing),
+        ),
         "closed_loop_new_behavior": {
             "raw_new_behavior_cases": raw_new_behavior_cases,
             "signal_new_behavior_cases": signal_new_behavior_cases,
@@ -1706,6 +1780,8 @@ def _empty_run_log_evidence(
         "offline_oracle": _offline_oracle_summary_from_buckets(Counter(), 0),
         "candidate_discovery": candidate_discovery,
         "candidate_family_first_seen": {},
+        "semantic_contract_lattice": _semantic_contract_run_log_summary(source="summary"),
+        "ir_rewrite_rules": _ir_rewrite_run_log_summary(source="summary"),
         "closed_loop_new_behavior": _summary_new_behavior_counts(run_rows),
         "run_log_scan": {
             "run_logs_total": len(run_rows),
@@ -1713,6 +1789,179 @@ def _empty_run_log_evidence(
             "run_logs_missing": 0,
             "run_logs_scan_skipped": True,
         },
+    }
+
+
+def _semantic_contract_evidence_from_run_item(
+    item: dict[str, Any],
+    findings: list[dict[str, Any]],
+) -> dict[str, Any]:
+    lattice = _semantic_contract_lattice_from_run_item(item)
+    if not lattice:
+        return {}
+    finding_axes = sorted(
+        {
+            axis
+            for finding in findings
+            if isinstance(finding, dict)
+            for axis in finding_contract_axes(finding)
+        }
+    )
+    boundary_axes = _string_list(lattice.get("boundary_axes", []))
+    strict_axes = _string_list(lattice.get("strict_axes", []))
+    return {
+        "boundary_axes": boundary_axes,
+        "strict_axes": strict_axes,
+        "finding_axes": finding_axes,
+        "matched_boundary_axes": sorted(set(boundary_axes) & set(finding_axes)),
+        "operation_contract_count": len(lattice.get("operation_contracts", []) or []),
+    }
+
+
+def _semantic_contract_lattice_from_run_item(item: dict[str, Any]) -> dict[str, Any]:
+    direct = item.get("semantic_contract_lattice", {})
+    if isinstance(direct, dict) and direct:
+        return direct
+    case_payload = item.get("case", {}) if isinstance(item.get("case", {}), dict) else {}
+    case_metadata = case_payload.get("metadata", {}) if isinstance(case_payload.get("metadata", {}), dict) else {}
+    metadata_lattice = case_metadata.get("semantic_contract_lattice", {})
+    if isinstance(metadata_lattice, dict) and metadata_lattice:
+        return metadata_lattice
+    return {}
+
+
+def _ir_rewrite_evidence_from_run_item(item: dict[str, Any]) -> dict[str, Any]:
+    rules = _ir_rewrite_rules_from_run_item(item)
+    if not rules:
+        return {}
+    return {
+        "rule_count": len(rules),
+        "rule_ids": sorted({str(rule.get("rule_id", "")) for rule in rules if rule.get("rule_id")}),
+        "operators": sorted({str(rule.get("operator", "")) for rule in rules if rule.get("operator")}),
+        "semantics_classes": sorted(
+            {str(rule.get("semantics_class", "")) for rule in rules if rule.get("semantics_class")}
+        ),
+        "contract_axes": sorted(
+            {
+                axis
+                for rule in rules
+                for axis in _string_list(rule.get("contract_axes", []))
+            }
+        ),
+    }
+
+
+def _ir_rewrite_rules_from_run_item(item: dict[str, Any]) -> list[dict[str, Any]]:
+    rules: list[dict[str, Any]] = []
+    for metadata in _run_item_metadata_sources(item):
+        mutation = metadata.get("mutation", {}) if isinstance(metadata.get("mutation", {}), dict) else {}
+        existing_rules = mutation.get("ir_rewrite_rules", [])
+        if isinstance(existing_rules, list):
+            rules.extend(dict(rule) for rule in existing_rules if isinstance(rule, dict))
+        existing_rule = mutation.get("ir_rewrite_rule", {})
+        if isinstance(existing_rule, dict) and existing_rule:
+            rules.append(dict(existing_rule))
+        operator = str(mutation.get("operator", "") or "")
+        if operator:
+            inferred = ir_rewrite_rule_metadata(operator, detail=str(mutation.get("detail", "") or ""))
+            if inferred:
+                rules.append(inferred)
+    return _dedupe_ir_rule_payloads(rules)
+
+
+def _run_item_metadata_sources(item: dict[str, Any]) -> list[dict[str, Any]]:
+    sources: list[dict[str, Any]] = []
+    row_mutation = item.get("mutation", {})
+    if isinstance(row_mutation, dict) and row_mutation:
+        sources.append({"mutation": row_mutation})
+    row_metadata = item.get("metadata", {})
+    if isinstance(row_metadata, dict) and row_metadata:
+        sources.append(row_metadata)
+    case_payload = item.get("case", {}) if isinstance(item.get("case", {}), dict) else {}
+    case_metadata = case_payload.get("metadata", {}) if isinstance(case_payload.get("metadata", {}), dict) else {}
+    if case_metadata:
+        sources.append(case_metadata)
+    return sources
+
+
+def _dedupe_ir_rule_payloads(rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for rule in rules:
+        key = (
+            str(rule.get("rule_id", "")),
+            str(rule.get("operator", "")),
+            str(rule.get("detail", "")),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(rule)
+    return deduped
+
+
+def _semantic_contract_run_log_summary(
+    *,
+    case_row_count: int = 0,
+    contract_row_count: int = 0,
+    operation_contract_count: int = 0,
+    boundary_axes: Counter[str] | None = None,
+    strict_axes: Counter[str] | None = None,
+    finding_axes: Counter[str] | None = None,
+    matched_boundary_axes: Counter[str] | None = None,
+    source: str,
+) -> dict[str, Any]:
+    boundary_axes = boundary_axes or Counter()
+    strict_axes = strict_axes or Counter()
+    finding_axes = finding_axes or Counter()
+    matched_boundary_axes = matched_boundary_axes or Counter()
+    return {
+        "schema_version": "semantic-contract-lattice-evidence-v1",
+        "source": source,
+        "case_row_count": int(case_row_count),
+        "contract_row_count": int(contract_row_count),
+        "contract_row_rate": contract_row_count / case_row_count if case_row_count else 0.0,
+        "operation_contract_count": int(operation_contract_count),
+        "boundary_axes": sorted(boundary_axes),
+        "strict_axes": sorted(strict_axes),
+        "finding_axes": sorted(finding_axes),
+        "matched_boundary_axes": sorted(matched_boundary_axes),
+        "boundary_axis_counts": dict(boundary_axes.most_common()),
+        "matched_boundary_axis_counts": dict(matched_boundary_axes.most_common()),
+    }
+
+
+def _ir_rewrite_run_log_summary(
+    *,
+    case_row_count: int = 0,
+    rewrite_row_count: int = 0,
+    rule_count: int = 0,
+    rule_ids: Counter[str] | None = None,
+    operators: Counter[str] | None = None,
+    semantics_classes: Counter[str] | None = None,
+    contract_axes: Counter[str] | None = None,
+    source: str,
+) -> dict[str, Any]:
+    registry = ir_rewrite_rule_registry_payload()
+    rule_ids = rule_ids or Counter()
+    operators = operators or Counter()
+    semantics_classes = semantics_classes or Counter()
+    contract_axes = contract_axes or Counter()
+    return {
+        "schema_version": "ir-rewrite-rule-evidence-v1",
+        "source": source,
+        "case_row_count": int(case_row_count),
+        "rewrite_row_count": int(rewrite_row_count),
+        "rewrite_row_rate": rewrite_row_count / case_row_count if case_row_count else 0.0,
+        "rule_count": int(rule_count),
+        "rule_ids": sorted(rule_ids),
+        "operators": sorted(operators),
+        "semantics_classes": sorted(semantics_classes),
+        "contract_axes": sorted(contract_axes),
+        "rule_counts": dict(rule_ids.most_common()),
+        "operator_counts": dict(operators.most_common()),
+        "registered_rule_count": len(registry.get("rules", []) or []),
+        "registered_semantics_classes": list(registry.get("semantics_classes", []) or []),
     }
 
 
@@ -2530,6 +2779,15 @@ def _candidate_pipeline_metrics(generated_dir: Path) -> dict[str, Any]:
             "issue_draft_count": 0,
             "needs_dedup_check_count": 0,
             "already_submitted_or_confirmed_count": 0,
+            "semantic_contract_candidate_count": 0,
+            "semantic_contract_boundary_axes": [],
+            "semantic_contract_matched_boundary_axes": [],
+            "semantic_contract_operation_contract_count": 0,
+            "ir_rewrite_candidate_count": 0,
+            "ir_rewrite_rule_count": 0,
+            "ir_rewrite_rules": [],
+            "ir_rewrite_operators": [],
+            "ir_rewrite_semantics_classes": [],
             "strategy_snapshot_count": 0,
             "strategy_learning_count": 0,
         }
@@ -2537,11 +2795,26 @@ def _candidate_pipeline_metrics(generated_dir: Path) -> dict[str, Any]:
     aggregate: Counter[str] = Counter()
     strategy_snapshot_paths: list[str] = []
     strategy_learning_paths: list[str] = []
+    semantic_contract_boundary_axes: set[str] = set()
+    semantic_contract_matched_boundary_axes: set[str] = set()
+    ir_rewrite_rules: set[str] = set()
+    ir_rewrite_operators: set[str] = set()
+    ir_rewrite_semantics_classes: set[str] = set()
     for path in paths:
         data = load_json(path)
         if not isinstance(data, dict):
             continue
         summary = data.get("summary", {}) if isinstance(data.get("summary"), dict) else {}
+        contract_summary = (
+            summary.get("semantic_contract_evidence", {})
+            if isinstance(summary.get("semantic_contract_evidence", {}), dict)
+            else {}
+        )
+        rewrite_summary = (
+            summary.get("ir_rewrite_evidence", {})
+            if isinstance(summary.get("ir_rewrite_evidence", {}), dict)
+            else {}
+        )
         aggregate.update(
             {
                 "candidate_count": int(summary.get("candidate_count", 0) or 0),
@@ -2554,7 +2827,55 @@ def _candidate_pipeline_metrics(generated_dir: Path) -> dict[str, Any]:
                 "already_submitted_or_confirmed_count": int(
                     summary.get("already_submitted_or_confirmed_count", 0) or 0
                 ),
+                "semantic_contract_candidate_count": int(
+                    summary.get(
+                        "semantic_contract_candidate_count",
+                        contract_summary.get("candidate_count", 0),
+                    )
+                    or 0
+                ),
+                "semantic_contract_operation_contract_count": int(
+                    summary.get(
+                        "semantic_contract_operation_contract_count",
+                        contract_summary.get("operation_contract_count", 0),
+                    )
+                    or 0
+                ),
+                "ir_rewrite_candidate_count": int(
+                    summary.get("ir_rewrite_candidate_count", rewrite_summary.get("candidate_count", 0)) or 0
+                ),
+                "ir_rewrite_rule_count": int(
+                    summary.get("ir_rewrite_rule_count", rewrite_summary.get("rule_count", 0)) or 0
+                ),
             }
+        )
+        semantic_contract_boundary_axes.update(
+            _string_list(
+                summary.get(
+                    "semantic_contract_boundary_axes",
+                    contract_summary.get("boundary_axes", []),
+                )
+            )
+        )
+        semantic_contract_matched_boundary_axes.update(
+            _string_list(
+                summary.get(
+                    "semantic_contract_matched_boundary_axes",
+                    contract_summary.get("matched_boundary_axes", []),
+                )
+            )
+        )
+        ir_rewrite_rules.update(_string_list(summary.get("ir_rewrite_rules", rewrite_summary.get("rule_ids", []))))
+        ir_rewrite_operators.update(
+            _string_list(summary.get("ir_rewrite_operators", rewrite_summary.get("operators", [])))
+        )
+        ir_rewrite_semantics_classes.update(
+            _string_list(
+                summary.get(
+                    "ir_rewrite_semantics_classes",
+                    rewrite_summary.get("semantics_classes", []),
+                )
+            )
         )
         snapshot_path = str(data.get("strategy_snapshot_path", "") or "")
         if snapshot_path:
@@ -2572,6 +2893,11 @@ def _candidate_pipeline_metrics(generated_dir: Path) -> dict[str, Any]:
         "recheck_pass_rate": (
             aggregate["reproduced_count"] / aggregate["candidate_count"] if aggregate["candidate_count"] else 0.0
         ),
+        "semantic_contract_boundary_axes": sorted(semantic_contract_boundary_axes),
+        "semantic_contract_matched_boundary_axes": sorted(semantic_contract_matched_boundary_axes),
+        "ir_rewrite_rules": sorted(ir_rewrite_rules),
+        "ir_rewrite_operators": sorted(ir_rewrite_operators),
+        "ir_rewrite_semantics_classes": sorted(ir_rewrite_semantics_classes),
         "strategy_snapshot_count": len(sorted(set(strategy_snapshot_paths))),
         "strategy_learning_count": len(sorted(set(strategy_learning_paths))),
         "strategy_snapshot_paths": sorted(set(strategy_snapshot_paths)),

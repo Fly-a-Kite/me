@@ -21,6 +21,27 @@ DEFAULT_MANIFEST_INDEX = Path("reports/final-experiment-manifest-index.json")
 DEFAULT_LEDGER_EVIDENCE_MANIFEST = Path("reports/experiment-final-version-ledger.json")
 DEFAULT_PAPER_RUN_JOURNAL = Path("reports/paper-run-journal.jsonl")
 DEFAULT_STRATEGY_SNAPSHOT = Path("reports/strategy-snapshots/final-frozen-strategy-snapshot.json")
+AUTHORITY_CODE_DIRTY_PREFIXES = (
+    "rust_kernel/",
+    "src/",
+    "scripts/",
+    "tests/",
+)
+AUTHORITY_CODE_DIRTY_FILES = frozenset(
+    {
+        "AGENTS.md",
+        "Cargo.lock",
+        "Cargo.toml",
+        "pyproject.toml",
+        "pytest.ini",
+        "requirements.txt",
+        "requirements-dev.txt",
+        "setup.cfg",
+        "setup.py",
+        "tox.ini",
+        "uv.lock",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +51,7 @@ class AuthorityPrepResult:
     source_head_commit: str
     prepared_head_commit: str
     source_workspace_dirty: bool
+    source_code_dirty_paths: tuple[str, ...]
     prepared_workspace_dirty: bool
     created_worktree: bool
     launcher: Path
@@ -64,6 +86,15 @@ def prepare_authority_run(args: argparse.Namespace) -> AuthorityPrepResult:
 
     source_head_commit = _git_stdout(source_root, "rev-parse", "HEAD")
     source_workspace_dirty = _workspace_dirty(source_root)
+    source_code_dirty_paths = tuple(_source_code_dirty_paths(source_root))
+    if source_code_dirty_paths and not bool(getattr(args, "allow_source_code_dirty", False)):
+        preview = ", ".join(source_code_dirty_paths[:8])
+        suffix = "" if len(source_code_dirty_paths) <= 8 else f", ... ({len(source_code_dirty_paths)} total)"
+        raise SystemExit(
+            "authority preparation would exclude uncommitted code changes from the clean "
+            f"worktree: {preview}{suffix}. Commit or stash these changes, or pass "
+            "--allow-source-code-dirty only for an explicit HEAD-only authority run."
+        )
     prepared_root = _resolve_prepared_root(
         source_root,
         head_commit=source_head_commit,
@@ -125,6 +156,7 @@ def prepare_authority_run(args: argparse.Namespace) -> AuthorityPrepResult:
         "source_head_commit": source_head_commit,
         "prepared_head_commit": prepared_head_commit,
         "source_workspace_dirty": source_workspace_dirty,
+        "source_code_dirty_paths": list(source_code_dirty_paths),
         "prepared_workspace_dirty": prepared_workspace_dirty,
         "created_worktree": created_worktree,
         "launcher": str(launcher),
@@ -148,6 +180,7 @@ def prepare_authority_run(args: argparse.Namespace) -> AuthorityPrepResult:
         source_head_commit=source_head_commit,
         prepared_head_commit=prepared_head_commit,
         source_workspace_dirty=source_workspace_dirty,
+        source_code_dirty_paths=source_code_dirty_paths,
         prepared_workspace_dirty=prepared_workspace_dirty,
         created_worktree=created_worktree,
         launcher=prepared_root / launcher,
@@ -181,6 +214,14 @@ def parse_args() -> argparse.Namespace:
         "--force-worktree",
         action="store_true",
         help="always use a dedicated detached worktree even when the current root is already clean",
+    )
+    parser.add_argument(
+        "--allow-source-code-dirty",
+        action="store_true",
+        help=(
+            "allow authority preparation when source/scripts/tests or project config files have "
+            "uncommitted changes; the prepared worktree will still run the current HEAD only"
+        ),
     )
     parser.add_argument(
         "--launcher",
@@ -274,6 +315,41 @@ def _workspace_dirty(root: Path) -> bool:
         text=True,
     )
     return bool(proc.stdout.strip())
+
+
+def _workspace_status_paths(root: Path) -> list[str]:
+    proc = subprocess.run(
+        ["git", "-C", str(root), "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        check=True,
+        capture_output=True,
+    )
+    entries = [item.decode("utf-8", errors="replace") for item in proc.stdout.split(b"\0") if item]
+    paths: list[str] = []
+    i = 0
+    while i < len(entries):
+        entry = entries[i]
+        status = entry[:2]
+        path = entry[3:] if len(entry) > 3 else ""
+        if path:
+            paths.append(path)
+        if status[:1] in {"R", "C"} or status[1:2] in {"R", "C"}:
+            if i + 1 < len(entries):
+                paths.append(entries[i + 1])
+            i += 2
+        else:
+            i += 1
+    return paths
+
+
+def _source_code_dirty_paths(root: Path) -> list[str]:
+    dirty: list[str] = []
+    for path in _workspace_status_paths(root):
+        normalized = path.strip().lstrip("/")
+        if not normalized:
+            continue
+        if normalized in AUTHORITY_CODE_DIRTY_FILES or normalized.startswith(AUTHORITY_CODE_DIRTY_PREFIXES):
+            dirty.append(normalized)
+    return sorted(dict.fromkeys(dirty))
 
 
 def _git_toplevel(root: Path) -> Path:

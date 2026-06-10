@@ -130,6 +130,13 @@ def _attach_case_fingerprint_to_row_case(
     _attach_metadata_to_row_case(row, "case_fingerprint", fingerprint)
 
 
+def _attach_semantic_contract_lattice_to_row_case(
+    row: dict[str, Any],
+    lattice: dict[str, Any],
+) -> None:
+    _attach_metadata_to_row_case(row, "semantic_contract_lattice", lattice)
+
+
 def _fingerprint_anchor_result(normalized: dict[str, Any]) -> Any | None:
     ok_items = [
         (backend, result)

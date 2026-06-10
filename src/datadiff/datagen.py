@@ -70,6 +70,7 @@ from .profile_generators import (
     generate_pandas_arrow_timestamp_index_attr_semantics_case,
     generate_pandas_eval_inplace_aliasing_semantics_case,
     generate_pandas_bool_reduction_skipna_semantics_case,
+    generate_pandas_arrow_bool_groupby_reduction_semantics_case,
     generate_pyarrow_dataset_isin_all_match_semantics_case,
     generate_pyarrow_run_end_null_compute_semantics_case,
     generate_pyarrow_large_string_partition_schema_semantics_case,
@@ -149,6 +150,7 @@ GeneratorProfile = Literal[
     "pandas_arrow_timestamp_index_attr_semantics",
     "pandas_eval_inplace_aliasing_semantics",
     "pandas_bool_reduction_skipna_semantics",
+    "pandas_arrow_bool_groupby_reduction_semantics",
     "pyarrow_dataset_isin_all_match_semantics",
     "pyarrow_run_end_null_compute_semantics",
     "pyarrow_large_string_partition_schema_semantics",
@@ -416,6 +418,9 @@ def _type_aware_profile_generators() -> dict[str, Callable[[int], Case]]:
             "pandas_arrow_timestamp_index_attr_semantics": generate_pandas_arrow_timestamp_index_attr_semantics_case,
             "pandas_eval_inplace_aliasing_semantics": generate_pandas_eval_inplace_aliasing_semantics_case,
             "pandas_bool_reduction_skipna_semantics": generate_pandas_bool_reduction_skipna_semantics_case,
+            "pandas_arrow_bool_groupby_reduction_semantics": (
+                generate_pandas_arrow_bool_groupby_reduction_semantics_case
+            ),
             "pyarrow_dataset_isin_all_match_semantics": generate_pyarrow_dataset_isin_all_match_semantics_case,
             "pyarrow_run_end_null_compute_semantics": generate_pyarrow_run_end_null_compute_semantics_case,
             "pyarrow_large_string_partition_schema_semantics": generate_pyarrow_large_string_partition_schema_semantics_case,

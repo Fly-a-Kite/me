@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any
 
 
@@ -77,8 +78,14 @@ def lhs_schemas(
 
 def schema_spec_for_seed(seed: int, *, sample_count: int = 256) -> SchemaSpec:
     count = max(1, int(sample_count))
-    rnd = random.Random(0x5EED_1A5 ^ int(seed // count))
-    return lhs_schemas(count, rnd=rnd)[int(seed) % count]
+    block = int(seed) // count
+    return _lhs_schema_block(block, count)[int(seed) % count]
+
+
+@lru_cache(maxsize=128)
+def _lhs_schema_block(block: int, count: int) -> tuple[SchemaSpec, ...]:
+    rnd = random.Random(0x5EED_1A5 ^ int(block))
+    return tuple(lhs_schemas(count, rnd=rnd))
 
 
 def _permuted_bins(count: int, rnd: random.Random) -> list[int]:

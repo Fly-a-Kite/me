@@ -7,7 +7,11 @@ from datadiff.dsl import Case, Program, normalize_sort_keys
 from datadiff.filtering import evaluate_filter_predicate
 from datadiff.join_keys import join_key_pairs
 from datadiff.normalizer import NormalizedResult, _norm_value
-from datadiff.ordering_semantics import rows_have_duplicate_sort_key, sort_row_mappings, sort_window_boundary_splits_tie
+from datadiff.ordering_semantics import (
+    rows_have_observable_duplicate_sort_key,
+    sort_row_mappings,
+    sort_window_boundary_splits_observable_tie,
+)
 from datadiff.operation_semantics import (
     aggregate_functions,
     condition_cmp,
@@ -20,6 +24,24 @@ from datadiff.operation_semantics import (
 )
 from datadiff.program_analysis import case_uses_precision_sensitive_float_arithmetic
 from datadiff.reference_semantics import reference_result
+
+
+ROW_ORDER_PRESERVING_AFTER_ORDER = frozenset(
+    {
+        "filter",
+        "tuple_absence_filter",
+        "drop_nulls",
+        "semi_join",
+        "anti_join",
+        "fill_null",
+        "coalesce",
+        "case_when",
+        "select",
+        "mutate",
+        "limit",
+        "offset",
+    }
+)
 
 
 def normalizer_errors(normalized: dict[str, NormalizedResult | dict[str, Any]]) -> list[str]:
@@ -143,7 +165,7 @@ def is_sort_tie_order_only_mismatch(case: Case) -> bool:
     rows = _reference_rows_before_operation(case, op_index)
     if rows is None:
         return False
-    return rows_have_duplicate_sort_key(rows, sort_keys)
+    return rows_have_observable_duplicate_sort_key(rows, sort_keys)
 
 
 def is_sort_topk_tie_cutoff_mismatch(case: Case) -> bool:
@@ -182,7 +204,7 @@ def is_sort_topk_tie_cutoff_mismatch(case: Case) -> bool:
                 return False
             end = min(end, start + limit)
             saw_topk = True
-            if sort_window_boundary_splits_tie(sorted_rows, sort_keys, start, end):
+            if sort_window_boundary_splits_observable_tie(sorted_rows, sort_keys, start, end):
                 return True
             continue
         if kind == "offset":
@@ -192,7 +214,7 @@ def is_sort_topk_tie_cutoff_mismatch(case: Case) -> bool:
                 return False
             start = min(end, start + offset)
             saw_topk = True
-            if sort_window_boundary_splits_tie(sorted_rows, sort_keys, start, end):
+            if sort_window_boundary_splits_observable_tie(sorted_rows, sort_keys, start, end):
                 return True
             continue
         if saw_topk:
@@ -224,12 +246,7 @@ def has_limit_or_offset_without_defined_order(case: Case) -> bool:
             if not order_defined and _unordered_offset_changes_result(case, idx, offset):
                 return True
             continue
-        if kind in {
-            "filter",
-            "tuple_absence_filter",
-            "select",
-            "mutate",
-        }:
+        if kind in ROW_ORDER_PRESERVING_AFTER_ORDER:
             continue
         if kind == "sortedness_check":
             order_defined = True
@@ -297,21 +314,11 @@ def _relaxed_float_precision_row(row: list[Any]) -> list[Any]:
 
 
 def _last_order_defining_operation_index(case: Case) -> int | None:
-    row_order_preserving = {
-        "filter",
-        "tuple_absence_filter",
-        "running_sum",
-        "row_number_filter",
-        "select",
-        "mutate",
-        "limit",
-        "offset",
-    }
     for idx in range(len(case.program.operations) - 1, -1, -1):
         kind = op_kind(case.program.operations[idx])
         if kind in {"sort", "running_sum", "row_number_filter", "sortedness_check"}:
             return idx
-        if kind in row_order_preserving:
+        if kind in ROW_ORDER_PRESERVING_AFTER_ORDER:
             continue
         return None
     return None

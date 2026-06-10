@@ -107,6 +107,7 @@ def _pandas_bool_probe_handlers(pd: Any, op: dict[str, Any]) -> dict[str, Any]:
         "arrow_timestamp_index_attr_probe": lambda: _pandas_arrow_timestamp_index_attr_mismatch(pd),
         "eval_inplace_alias_probe": lambda: _pandas_eval_inplace_alias_mismatch(pd),
         "bool_reduction_skipna_probe": lambda: _pandas_bool_reduction_skipna_mismatch(pd),
+        "arrow_bool_groupby_reduction_probe": lambda: _pandas_arrow_bool_groupby_reduction_mismatch(pd),
         "csv_long_numeric_roundtrip_probe": lambda: _pandas_csv_long_numeric_roundtrip_mismatch(pd, op),
     }
 
@@ -501,3 +502,41 @@ def _pandas_bool_reduction_skipna_mismatch(pd) -> bool:
             except (TypeError, ValueError):
                 return True
     return False
+
+
+def _pandas_arrow_bool_groupby_reduction_mismatch(pd) -> bool:
+    def normalize(mapping: dict[str, Any]) -> dict[str, bool | None]:
+        normalized: dict[str, bool | None] = {}
+        for key, value in mapping.items():
+            if pd.isna(value):
+                normalized[str(key)] = None
+            else:
+                normalized[str(key)] = bool(value)
+        return normalized
+
+    expected = {
+        "any_skipna_true": {"a": True, "b": False, "c": False, "d": True},
+        "all_skipna_true": {"a": True, "b": False, "c": True, "d": False},
+        "any_skipna_false": {"a": True, "b": None, "c": None, "d": True},
+        "all_skipna_false": {"a": None, "b": False, "c": None, "d": False},
+    }
+    try:
+        frame = pd.DataFrame(
+            {
+                "g": pd.array(["a", "a", "b", "b", "c", "c", "d", "d"], dtype="string"),
+                "flag": pd.array(
+                    [True, pd.NA, False, pd.NA, pd.NA, pd.NA, True, False],
+                    dtype="bool[pyarrow]",
+                ),
+            }
+        )
+        grouped = frame.groupby("g", dropna=False)["flag"]
+        observed = {
+            "any_skipna_true": normalize(grouped.any(skipna=True).astype("object").to_dict()),
+            "all_skipna_true": normalize(grouped.all(skipna=True).astype("object").to_dict()),
+            "any_skipna_false": normalize(grouped.any(skipna=False).astype("object").to_dict()),
+            "all_skipna_false": normalize(grouped.all(skipna=False).astype("object").to_dict()),
+        }
+    except Exception:  # noqa: BLE001
+        return True
+    return observed != expected

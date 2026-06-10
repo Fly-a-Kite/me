@@ -39,6 +39,7 @@ from datadiff.bandit_selection import (
 )
 from datadiff.backends import make_backend
 from datadiff.backends.base import Backend
+from datadiff import champion_corpus as _champion_corpus
 from datadiff.champion_corpus import ChampionRegistry, DEFAULT_CHAMPION_CORPUS_PATH
 from datadiff.classification_oracle import annotate_findings
 from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES, ExperimentConfig
@@ -155,6 +156,17 @@ from datadiff.util import (
 )
 
 ProgressCallback = Callable[[dict[str, Any]], None]
+_RUNNER_IMPORT_DEFAULT_CHAMPION_CORPUS_PATH = Path(DEFAULT_CHAMPION_CORPUS_PATH)
+
+
+def _default_champion_corpus_path() -> Path:
+    configured_path = Path(DEFAULT_CHAMPION_CORPUS_PATH)
+    if configured_path != _RUNNER_IMPORT_DEFAULT_CHAMPION_CORPUS_PATH:
+        return configured_path
+    module_configured_path = Path(_champion_corpus.DEFAULT_CHAMPION_CORPUS_PATH)
+    if module_configured_path != _RUNNER_IMPORT_DEFAULT_CHAMPION_CORPUS_PATH:
+        return module_configured_path
+    return _champion_corpus.default_champion_corpus_path()
 
 
 def _parallel_backend_execution_active(config: ExperimentConfig, backends: list[str]) -> bool:
@@ -309,8 +321,9 @@ def run_fuzz(
     guidance_targets = _configured_guidance_targets(config)
     guided = config.guidance_strategy == "guided"
     candidate_pool = max(1, config.guidance_candidate_pool if guided else 1)
+    champion_corpus_path = _default_champion_corpus_path()
     champion_registry = (
-        ChampionRegistry(DEFAULT_CHAMPION_CORPUS_PATH)
+        ChampionRegistry(champion_corpus_path)
         if config.enable_champion_corpus
         else None
     )
@@ -415,7 +428,7 @@ def run_fuzz(
             "champion_corpus": {
                 "enabled": config.enable_champion_corpus,
                 "donor_bandit_enabled": config.enable_champion_graft_donor_bandit,
-                "path": str(DEFAULT_CHAMPION_CORPUS_PATH),
+                "path": str(champion_corpus_path),
                 "version_id": champion_version_id,
                 "injected_count": champion_injected_count,
             },

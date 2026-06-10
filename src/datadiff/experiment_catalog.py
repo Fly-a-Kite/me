@@ -936,12 +936,14 @@ FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX = ExperimentMatrix(
                 "bayesian_exploration": True,
                 "seed_quota": True,
                 "seed_energy_batch": True,
+                "seed_energy_tier": True,
                 "per_operator_energy": True,
                 "lineage_rarity": True,
                 "minhash_dedup": True,
                 "disagreement_bd_axis": True,
                 "lhs_seeding": True,
                 "champion_corpus": True,
+                "champion_graft_donor": True,
                 "backend_pair_learning": True,
                 "runtime_cost_learning": True,
                 "cost_normalized_reward": True,
@@ -1100,6 +1102,21 @@ FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX = ExperimentMatrix(
             notes=(
                 "Disable AFL-FAST-style per-operator candidate energy while keeping "
                 "seed-energy batching, quality-diversity archive, and scheduler learning enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_seed_energy_tier",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="seed_energy_tier",
+            factors={"seed_energy_tier": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "seed_power_scheduling"),
+            notes=(
+                "Disable the learned seed-energy tier bandit while keeping seed-energy "
+                "batching, seed quota, and the rest of the adaptive scheduler enabled."
             ),
         ),
         ExperimentVariant(
@@ -1280,6 +1297,21 @@ FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX = ExperimentMatrix(
             notes=(
                 "Disable cross-version champion-corpus promotion and grafting while "
                 "keeping regular corpus feedback and seed scheduling enabled."
+            ),
+        ),
+        ExperimentVariant(
+            id="no_champion_graft_donor",
+            preset="live_deep_organic",
+            base_preset="live_deep_organic",
+            comparison_role="contrast",
+            component_focus="champion_graft_donor",
+            factors={"champion_graft_donor": False},
+            oracle_profile="differential",
+            rq_tags=("RQ4", "RQ6"),
+            analysis_tags=("ablation", "adaptive_component", "champion_corpus"),
+            notes=(
+                "Disable the champion-graft donor bandit while keeping champion-corpus "
+                "promotion, regular corpus feedback, and seed scheduling enabled."
             ),
         ),
         ExperimentVariant(

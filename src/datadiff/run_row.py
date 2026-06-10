@@ -10,8 +10,10 @@ from datadiff.quality_oracles import evaluate_quality_oracles
 from datadiff.run_metadata import (
     _attach_case_fingerprint_to_row_case,
     _attach_disagreement_descriptor_to_row_case,
+    _attach_semantic_contract_lattice_to_row_case,
 )
 from datadiff.run_signatures import signal_signature
+from datadiff.semantic_contracts import semantic_contract_lattice_payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +61,9 @@ def apply_iteration_row_updates(
     case_fingerprint = row.get("case_fingerprint", {})
     if isinstance(case_fingerprint, dict):
         _attach_case_fingerprint_to_row_case(row, case_fingerprint)
+    semantic_contract_lattice = semantic_contract_lattice_payload(case)
+    row["semantic_contract_lattice"] = semantic_contract_lattice
+    _attach_semantic_contract_lattice_to_row_case(row, semantic_contract_lattice)
 
     backend_pair_context = _backend_pair_context_features(
         case_learning_context=tuple(row.get("case_learning_context", []) or ()),
@@ -92,6 +97,11 @@ def apply_iteration_row_updates(
         and str(row_case.get("case_id", "") or "") == case.case_id
     ):
         case.metadata["case_fingerprint"] = case_fingerprint
+    if (
+        isinstance(case.metadata, dict)
+        and str(row_case.get("case_id", "") or "") == case.case_id
+    ):
+        case.metadata["semantic_contract_lattice"] = semantic_contract_lattice
 
     row["operation_combo"] = selected_meta["operation_combo"]
     row["preflight"] = preflight_row

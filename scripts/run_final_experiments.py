@@ -638,6 +638,12 @@ def jobs_arg(value: object) -> str:
     return str(max(1, int(text)))
 
 
+def max_parallel_cost_args(value: object) -> list[str]:
+    if value is None:
+        return []
+    return ["--max-parallel-cost", f"{max(0.0, float(value)):g}"]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -697,6 +703,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--comparison-cases", type=int, default=2000, help="cases per baseline/comparison run")
     parser.add_argument("--comparison-seeds", default="1,1001,2001", help="baseline/comparison seeds")
     parser.add_argument("--jobs", default="auto", help="parallel experiment jobs, or 'auto'")
+    parser.add_argument(
+        "--max-parallel-cost",
+        type=float,
+        default=None,
+        help="override datadiff experiment cost limiter when planning parallel final runs",
+    )
     parser.add_argument("--artifact-limit", type=int, default=50, help="bug artifacts per run")
     parser.add_argument(
         "--log-level",
@@ -723,6 +735,43 @@ def parse_args() -> argparse.Namespace:
         "--ledger-run-files",
         default="",
         help="comma-separated cross-version run logs used to build the final regression ledger",
+    )
+    parser.add_argument(
+        "--ledger-collection-cases",
+        type=int,
+        default=200,
+        help="cases per C5 source/target collection run when --track version_ledger is executed",
+    )
+    parser.add_argument(
+        "--ledger-collection-seeds",
+        default="1,1001",
+        help="seeds for C5 source/target collection runs",
+    )
+    parser.add_argument(
+        "--ledger-source-version",
+        default="c5-source",
+        help="source dependency version/commit label for C5 champion-transfer collection",
+    )
+    parser.add_argument(
+        "--ledger-target-version",
+        default="c5-target",
+        help="target dependency version/commit label for C5 champion-transfer collection",
+    )
+    parser.add_argument(
+        "--ledger-target-suite",
+        default="datafusion_cross",
+        help="target suite for C5 source/target collection runs",
+    )
+    parser.add_argument(
+        "--ledger-preset",
+        default="live_deep_organic",
+        help="preset for C5 source/target collection runs",
+    )
+    parser.add_argument(
+        "--ledger-version-pair-learning-weight",
+        type=float,
+        default=0.75,
+        help="version-pair learning weight used by the C5 target collection run",
     )
     parser.add_argument(
         "--ledger-versions",
@@ -798,6 +847,8 @@ def build_plan(args: argparse.Namespace) -> list[FinalCommand]:
         commands.extend(adaptive_component_ablation_commands(args, strategy_snapshot=strategy_snapshot))
     if _track_selected(selected, "comparison", FINAL_COMPARISON_MATRIX.id):
         commands.append(method_comparison_command(args, strategy_snapshot=strategy_snapshot))
+    if "version_ledger" in selected and not str(getattr(args, "ledger_run_files", "") or "").strip():
+        commands.extend(version_ledger_collection_commands(args, strategy_snapshot=strategy_snapshot))
     if _track_selected(selected, "comparison", "version_ledger"):
         ledger_command = version_ledger_evidence_command(args)
         if ledger_command is not None:
@@ -881,6 +932,7 @@ def short_validation_command(args: argparse.Namespace, *, strategy_snapshot: str
         jobs_arg(args.jobs),
         "--skip-run-reports",
     ]
+    cmd.extend(max_parallel_cost_args(getattr(args, "max_parallel_cost", None)))
     _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
     _append_experiment_meta(
         cmd,
@@ -962,6 +1014,7 @@ def live_discovery_commands(args: argparse.Namespace, *, strategy_snapshot: str)
         _append_continual_learning_args(cmd, args)
         if args.skip_run_reports:
             cmd.append("--skip-run-reports")
+        cmd.extend(max_parallel_cost_args(getattr(args, "max_parallel_cost", None)))
         _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
         experiment_meta = FINAL_LIVE_DISCOVERY_MATRIX.command_experiment_meta_for_campaign(campaign)
         _append_experiment_meta(cmd, experiment_meta)
@@ -1039,6 +1092,7 @@ def historical_replay_commands(args: argparse.Namespace, *, strategy_snapshot: s
         ]
         if args.skip_run_reports:
             cmd.append("--skip-run-reports")
+        cmd.extend(max_parallel_cost_args(getattr(args, "max_parallel_cost", None)))
         _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
         experiment_meta = build_historical_experiment_meta(spec)
         _append_experiment_meta(cmd, experiment_meta)
@@ -1144,6 +1198,7 @@ def seeded_sensitivity_command(args: argparse.Namespace, *, strategy_snapshot: s
         jobs_arg(args.jobs),
         "--skip-run-reports",
     ]
+    cmd.extend(max_parallel_cost_args(getattr(args, "max_parallel_cost", None)))
     _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
     experiment_meta = FINAL_SEEDED_SENSITIVITY_MATRIX.command_experiment_meta(
         target_suites=FINAL_SEEDED_SENSITIVITY_MATRIX.target_suites,
@@ -1193,6 +1248,7 @@ def module_ablation_command(args: argparse.Namespace, *, strategy_snapshot: str)
         jobs_arg(args.jobs),
         "--skip-run-reports",
     ]
+    cmd.extend(max_parallel_cost_args(getattr(args, "max_parallel_cost", None)))
     _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
     experiment_meta = FINAL_MODULE_ABLATION_MATRIX.command_experiment_meta(
         target_suites=FINAL_MODULE_ABLATION_MATRIX.target_suites,
@@ -1251,6 +1307,8 @@ def adaptive_component_ablation_commands(args: argparse.Namespace, *, strategy_s
             disabled_components.append("seed-quota")
         if variant.id == "no_seed_energy_batch":
             disabled_components.append("seed-energy-batch")
+        if variant.id == "no_seed_energy_tier":
+            disabled_components.append("seed-energy-tier")
         if variant.id == "no_per_operator_energy":
             disabled_components.append("per-operator-energy")
         if variant.id == "no_ir_rewrite_mutations":
@@ -1271,6 +1329,8 @@ def adaptive_component_ablation_commands(args: argparse.Namespace, *, strategy_s
             disabled_components.append("lhs-seeding")
         if variant.id == "no_champion_corpus":
             disabled_components.append("champion-corpus")
+        if variant.id == "no_champion_graft_donor":
+            disabled_components.append("champion-graft-donor")
         if variant.id == "no_backend_pair_learning":
             disabled_components.append("backend-pair-learning")
         if variant.id == "no_cost_normalized_reward":
@@ -1320,6 +1380,7 @@ def adaptive_component_ablation_commands(args: argparse.Namespace, *, strategy_s
         _append_continual_learning_args(cmd, args)
         if disabled_components:
             cmd.extend(["--disable-adaptive-components", ",".join(disabled_components)])
+        cmd.extend(max_parallel_cost_args(getattr(args, "max_parallel_cost", None)))
         _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
         experiment_meta = _adaptive_component_experiment_meta(variant)
         _append_experiment_meta(cmd, experiment_meta)
@@ -1411,6 +1472,7 @@ def method_comparison_command(args: argparse.Namespace, *, strategy_snapshot: st
         jobs_arg(args.jobs),
         "--skip-run-reports",
     ]
+    cmd.extend(max_parallel_cost_args(getattr(args, "max_parallel_cost", None)))
     _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
     experiment_meta = FINAL_COMPARISON_MATRIX.command_experiment_meta(
         target_suites=FINAL_COMPARISON_MATRIX.target_suites,
@@ -1437,6 +1499,168 @@ def method_comparison_command(args: argparse.Namespace, *, strategy_snapshot: st
         },
         experiment_meta=experiment_meta,
     )
+
+
+def version_ledger_collection_commands(args: argparse.Namespace, *, strategy_snapshot: str) -> list[FinalCommand]:
+    source_version = str(getattr(args, "ledger_source_version", "") or "c5-source").strip()
+    target_version = str(getattr(args, "ledger_target_version", "") or "c5-target").strip()
+    cases = max(1, int(getattr(args, "ledger_collection_cases", 200) or 200))
+    seeds = str(getattr(args, "ledger_collection_seeds", "") or "1,1001").strip()
+    preset = str(getattr(args, "ledger_preset", "") or "live_deep_organic").strip()
+    target_suite = str(getattr(args, "ledger_target_suite", "") or "datafusion_cross").strip()
+    common = [
+        str(DATADIFF),
+        "experiment",
+        "--cases",
+        str(cases),
+        "--seeds",
+        seeds,
+        "--presets",
+        preset,
+        "--target-suite",
+        target_suite,
+        "--evidence-mode",
+        "comparison",
+        "--schedule",
+        "adaptive",
+        "--batch-cases",
+        str(min(100, cases)),
+        "--adaptive-learning-weight",
+        str(_adaptive_learning_weight(args)),
+        "--scheduler-annealing-temperature",
+        str(_scheduler_annealing_temperature(args)),
+        "--scheduler-annealing-decay",
+        str(_scheduler_annealing_decay(args)),
+        "--scheduler-annealing-min-temperature",
+        str(_scheduler_annealing_min_temperature(args)),
+        "--replay-bug-source-issues",
+        ",".join(replay_source_issues()),
+        "--artifact-limit",
+        str(max(0, int(args.artifact_limit))),
+        "--log-level",
+        str(args.log_level),
+        "--jobs",
+        jobs_arg(args.jobs),
+        "--skip-run-reports",
+        "--persist-closed-loop-state",
+    ]
+    _append_continual_learning_args(common, args)
+    common.extend(max_parallel_cost_args(getattr(args, "max_parallel_cost", None)))
+    _append_strategy_snapshot_args(common, strategy_snapshot=strategy_snapshot)
+    source_meta = _version_transfer_experiment_meta(
+        role="source",
+        source_version=source_version,
+        target_version=target_version,
+        target_suite=target_suite,
+        preset=preset,
+    )
+    target_meta = _version_transfer_experiment_meta(
+        role="target",
+        source_version=source_version,
+        target_version=target_version,
+        target_suite=target_suite,
+        preset=preset,
+    )
+    source_cmd = [
+        *common,
+        "--target-version",
+        source_version,
+        "--run-theme",
+        f"final-c5-transfer:source:{source_version}",
+        "--paper-notes",
+        (
+            "C5 source-version collection run: promotes stable candidate families "
+            "into the champion corpus for seed-level cross-version transfer."
+        ),
+    ]
+    _append_experiment_meta(source_cmd, source_meta)
+    target_cmd = [
+        *common,
+        "--target-version",
+        target_version,
+        "--fixed-version",
+        source_version,
+        "--version-pair-learning-weight",
+        str(max(0.0, float(getattr(args, "ledger_version_pair_learning_weight", 0.75) or 0.0))),
+        "--run-theme",
+        f"final-c5-transfer:target:{source_version}->{target_version}",
+        "--paper-notes",
+        (
+            "C5 target-version collection run: measures champion corpus injection, "
+            "champion graft donor learning, and cold-start candidate yield."
+        ),
+    ]
+    _append_experiment_meta(target_cmd, target_meta)
+    return [
+        FinalCommand(
+            track="comparison",
+            name="cross_version_transfer_source",
+            command=source_cmd,
+            purpose=(
+                "Collect source-version candidate families and champion promotions for "
+                "C5 cross-version seed transfer."
+            ),
+            count_as_real_bugs=False,
+            expected_output="experiment manifest and run log tagged with the C5 source version",
+            notes=(
+                "Use exact dependency versions/commits via --ledger-source-version for paper evidence; "
+                "default c5-source/c5-target labels are smoke labels only."
+            ),
+            replay_bug_policy={"enable_replay_bug": False, "source_issues": replay_source_issues()},
+            experiment_meta=source_meta,
+        ),
+        FinalCommand(
+            track="comparison",
+            name="cross_version_transfer_target",
+            command=target_cmd,
+            purpose=(
+                "Collect target-version champion injection/graft outcomes for C5 "
+                "cross-version seed transfer."
+            ),
+            count_as_real_bugs=False,
+            expected_output="experiment manifest and run log tagged with the C5 target version",
+            notes=(
+                "Run after the source collection in the matching target-version environment. "
+                "The following version-ledger command converts both manifests into audited evidence."
+            ),
+            replay_bug_policy={"enable_replay_bug": False, "source_issues": replay_source_issues()},
+            experiment_meta=target_meta,
+        ),
+    ]
+
+
+def _version_transfer_experiment_meta(
+    *,
+    role: str,
+    source_version: str,
+    target_version: str,
+    target_suite: str,
+    preset: str,
+) -> dict[str, object]:
+    version = source_version if role == "source" else target_version
+    return {
+        "matrix_id": "baseline_scope_comparison",
+        "comparison_group": "cross_version_continual_learning",
+        "counts_as_real_bugs": False,
+        "track": "comparison",
+        "target_suites": [target_suite],
+        "scope_kind": "cross_version",
+        "analysis_tags": ["cross_version", "continual_learning", "champion_transfer", f"c5_{role}"],
+        "variant": {
+            "variant_id": f"c5_transfer_{role}",
+            "comparison_role": "support",
+            "component_focus": "cross_version_champion_transfer",
+            "source_version": source_version,
+            "target_version": target_version,
+            "target_suite": target_suite,
+            "preset": preset,
+            "version": version,
+        },
+        "methodology_claim": (
+            "C5 evidence is collected as a two-run source/target chain and reduced to a "
+            "version ledger that reports seed-level champion transfer and cold-start yield."
+        ),
+    }
 
 
 def version_ledger_evidence_command(args: argparse.Namespace) -> FinalCommand | None:

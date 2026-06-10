@@ -2583,6 +2583,37 @@ def generate_pandas_bool_reduction_skipna_semantics_case(seed: int) -> Case:
     )
 
 
+def generate_pandas_arrow_bool_groupby_reduction_semantics_case(seed: int) -> Case:
+    table = TableData(
+        "t0",
+        [ColumnSpec("probe_id", "int", nullable=False)],
+        [{"probe_id": 0}],
+    )
+    alias = make_safe_output_name("arrow_bool_groupby_reduction_mismatch", used={column.name for column in table.columns})
+    program = Program(
+        f"prog-{seed:08d}-pandas-arrow-bool-groupby-reduction-semantics",
+        seed,
+        [{"op": "arrow_bool_groupby_reduction_probe", "as": alias}],
+    )
+    return Case(
+        case_id=f"case-{seed:08d}-pandas-arrow-bool-groupby-reduction-semantics",
+        seed=seed,
+        tables=[table],
+        program=program,
+        metadata={
+            "generator_profile": "pandas_arrow_bool_groupby_reduction_semantics",
+            "issue_inspiration": "Arrow-backed nullable boolean groupby reductions should match pandas nullable boolean semantics",
+            "expected_arrow_bool_groupby_reduction_mismatch": False,
+            "expected_groupby_reductions": {
+                "any_skipna_true": {"a": True, "b": False, "c": False, "d": True},
+                "all_skipna_true": {"a": True, "b": False, "c": True, "d": False},
+                "any_skipna_false": {"a": True, "b": None, "c": None, "d": True},
+                "all_skipna_false": {"a": None, "b": False, "c": None, "d": False},
+            },
+        },
+    )
+
+
 def generate_pyarrow_dataset_isin_all_match_semantics_case(seed: int) -> Case:
     table = TableData(
         "t0",

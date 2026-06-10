@@ -2,6 +2,7 @@ from datadiff.case_policy import case_discovery_origin, replay_bug_filter_reason
 from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES
 from datadiff.datagen import COMMON_API_WORKFLOW_TEMPLATES, generate_case, generate_program, repair_operations
 from datadiff.classification_oracle import validate_case_program
+from datadiff.classification_signals import is_sort_topk_tie_cutoff_mismatch
 from datadiff.dsl import Case, ColumnSpec, Program, TableData, sort_columns
 from datadiff.guidance import extract_case_features
 from datadiff.identifiers import is_reserved_output_name, make_safe_output_name
@@ -410,6 +411,7 @@ def test_discovery_profile_mixes_issue_inspired_templates():
         "pandas_arrow_timestamp_loc_slice_semantics",
         "pandas_arrow_timestamp_index_attr_semantics",
         "pandas_eval_inplace_aliasing_semantics",
+        "pandas_arrow_bool_groupby_reduction_semantics",
         "pyarrow_dataset_isin_all_match_semantics",
         "pyarrow_large_string_partition_schema_semantics",
         "pyarrow_hash_pivot_wider_order_semantics",
@@ -460,6 +462,7 @@ def test_generate_case_deep_probe_rotation_profile_covers_deep_targets_with_poli
         "duckdb_json_predicate_order_semantics",
         "pandas_arrow_timestamp_index_attr_semantics",
         "pyarrow_run_end_null_compute_semantics",
+        "pandas_arrow_bool_groupby_reduction_semantics",
         "polars_rolling_mean_by_null_count_semantics",
         "csv_long_numeric_roundtrip",
     }.issubset(mixed_profiles)
@@ -1343,6 +1346,20 @@ def test_generate_case_pandas_bool_reduction_skipna_semantics_profile_is_support
     assert validate_case_program(case) == []
 
 
+def test_generate_case_pandas_arrow_bool_groupby_reduction_semantics_profile_is_supported_and_valid():
+    case = generate_case(148, profile="pandas_arrow_bool_groupby_reduction_semantics")
+    features = extract_case_features(case)
+
+    assert case.case_id == "case-00000148-pandas-arrow-bool-groupby-reduction-semantics"
+    assert case.program.operations == [
+        {"op": "arrow_bool_groupby_reduction_probe", "as": "arrow_bool_groupby_reduction_mismatch"}
+    ]
+    assert "pattern:pandas_arrow_bool_groupby_reduction_semantics" in features
+    assert "pandas:arrow-bool-groupby-reduction" in features
+    assert "source_issue" not in case.metadata
+    assert validate_case_program(case) == []
+
+
 def test_generate_case_pyarrow_dataset_isin_all_match_semantics_profile_is_supported_and_valid():
     case = generate_case(145, profile="pyarrow_dataset_isin_all_match_semantics")
     features = extract_case_features(case)
@@ -2166,6 +2183,59 @@ def test_repair_preserves_limit_after_sort_select_projection():
     )
 
     assert [op["op"] for op in repaired] == ["sort", "select", "limit"]
+
+
+def test_repair_retains_preferred_tiebreaker_for_select_before_sort_topk():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "int"), ColumnSpec("s", "str")],
+        [
+            {"id": 1, "x": 10, "s": "a"},
+            {"id": 2, "x": 10, "s": "b"},
+            {"id": 3, "x": 5, "s": "c"},
+        ],
+    )
+    repaired = repair_operations(
+        table,
+        [
+            {"op": "select", "columns": ["x"]},
+            {"op": "filter", "column": "x", "cmp": "!=", "value": -1},
+            {"op": "sort", "columns": ["x"], "ascending": False},
+            {"op": "offset", "n": 1},
+        ],
+    )
+
+    assert repaired[0] == {"op": "select", "columns": ["x", "id", "s"]}
+    assert sort_columns(repaired[2]) == ["x", "id", "s"]
+    case = Case("case-repaired-pre-sort-topk", 1, [table], Program("prog-repaired-pre-sort-topk", 1, repaired))
+    assert validate_case_program(case) == []
+    assert is_sort_topk_tie_cutoff_mismatch(case) is False
+
+
+def test_repair_keeps_sort_keys_through_projection_before_topk():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("g", "str"), ColumnSpec("s", "str")],
+        [
+            {"id": 1, "g": "same", "s": "a"},
+            {"id": 2, "g": "same", "s": "b"},
+            {"id": 3, "g": "other", "s": "c"},
+        ],
+    )
+    repaired = repair_operations(
+        table,
+        [
+            {"op": "sort", "columns": ["g"], "ascending": True},
+            {"op": "select", "columns": ["g"]},
+            {"op": "limit", "n": 2},
+        ],
+    )
+
+    assert [op["op"] for op in repaired] == ["sort", "select", "limit"]
+    assert set(sort_columns(repaired[0])).issubset(set(repaired[1]["columns"]))
+    case = Case("case-repaired-post-sort-topk", 1, [table], Program("prog-repaired-post-sort-topk", 1, repaired))
+    assert validate_case_program(case) == []
+    assert is_sort_topk_tie_cutoff_mismatch(case) is False
 
 
 def test_repair_drops_groupby_aggregation_alias_colliding_with_key():

@@ -4,6 +4,7 @@ from datadiff.metamorphic import (
     all_metamorphic_variants,
     build_metamorphic_variants,
     evaluate_metamorphic_variants,
+    ir_rewrite_metamorphic_rule_registry,
     select_metamorphic_variants,
 )
 from datadiff.normalizer import NormalizedResult
@@ -28,6 +29,16 @@ def test_metamorphic_relation_order_prioritizes_requested_relation_under_limit()
     )
 
     assert [variant.relation for variant in selected] == ["row_permutation"]
+
+
+def test_metamorphic_exposes_semantics_preserving_ir_rewrite_rule_registry():
+    registry = ir_rewrite_metamorphic_rule_registry()
+    operators = {row["operator"] for row in registry["rules"]}
+
+    assert registry["schema_version"] == "ir-rewrite-metamorphic-registry-v1"
+    assert {"ir_swap_adjacent", "ir_pushdown_filter", "ir_fold_redundant_op"}.issubset(operators)
+    assert "ir_pull_filter_above_groupby" not in operators
+    assert registry["relations"]["filter_pushdown"]["operator"] == "ir_pushdown_filter"
 
 
 def test_metamorphic_ignores_float_precision_only_differences():

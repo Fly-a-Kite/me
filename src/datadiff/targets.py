@@ -171,6 +171,7 @@ COMMON_DSL_CAPABILITIES: tuple[str, ...] = (
     "op:arrow_timestamp_index_attr_probe",
     "op:eval_inplace_alias_probe",
     "op:bool_reduction_skipna_probe",
+    "op:arrow_bool_groupby_reduction_probe",
     "op:dataset_isin_all_match_probe",
     "op:run_end_null_compute_probe",
     "op:large_string_partition_probe",

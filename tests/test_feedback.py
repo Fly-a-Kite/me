@@ -308,6 +308,31 @@ def test_feedback_record_caps_candidate_bug_family_storage():
     assert len(state.interesting_cases) == 2
 
 
+def test_feedback_schedule_penalizes_overused_candidate_family():
+    state = FeedbackState(max_cases_per_candidate_family=4)
+    repeated = _case(1)
+    fresh = _case(2)
+
+    assert state.record(
+        repeated,
+        "0000000000000001",
+        True,
+        candidate_bug_families=["repeated_family@engine"],
+    )
+    assert state.record(
+        fresh,
+        "0000000000000002",
+        True,
+        candidate_bug_families=["fresh_family@engine"],
+    )
+    state.stored_candidate_bug_families["repeated_family@engine"] = 16
+    repeated_index = state.interesting_cases.index(repeated)
+    fresh_index = state.interesting_cases.index(fresh)
+
+    assert state._case_family_reuse_penalty(repeated_index) > state._case_family_reuse_penalty(fresh_index)
+    assert state._case_seed_schedule_score(repeated_index) < state._case_seed_schedule_score(fresh_index)
+
+
 def test_feedback_promotes_stable_candidate_family_to_champion(tmp_path):
     registry = ChampionRegistry(tmp_path / "champions.jsonl")
     state = FeedbackState(
@@ -615,6 +640,25 @@ def test_feedback_schedule_score_rewards_rare_target_keys_without_changing_reten
     assert state._case_target_novelty_score(rare_index) > state._case_target_novelty_score(common_index)
     assert state._case_seed_schedule_score(rare_index) > state._case_seed_schedule_score(common_index)
     assert state.case_target_keys[rare_index] == ["target:rare"]
+
+
+def test_seed_frontier_priority_matches_frontier_row_fields():
+    state = FeedbackState(enable_seed_energy_tier_bandit=False)
+    assert state.record(_case(1), "0000000000000001", False, target_keys=["target:common"])
+    assert state.record(_case(2), "0000000000000002", False, target_keys=["target:rare"])
+    index = 1
+
+    row = state._seed_frontier_row(index)
+    priority = state._seed_frontier_priority(index)
+
+    assert priority == (
+        -float(row["schedule_score"]),
+        -float(row["reward_prior"]),
+        -float(row["target_novelty_score"]),
+        int(row["mutation_pulls"]),
+        int(row["recent_parent_pulls"]) + int(row["recent_cluster_pulls"]),
+        int(row["index"]),
+    )
 
 
 def test_feedback_cluster_keys_group_similar_seed_structure():
@@ -2175,9 +2219,12 @@ def test_feedback_mutations_avoid_direct_probe_append_operators():
         selected = state.choose_case(seed, generated)
         operator_name = state.last_candidate_metadata["mutation"]["operator"]
         seen.add(operator_name)
-        assert selected.case_id.endswith(f"-mut-{seed}")
+        if state.last_candidate_source == "feedback_mutation":
+            mutation_seed = state.last_candidate_metadata["seed_lineage"]["mutation_seed"]
+            assert selected.case_id.endswith(f"-mut-{mutation_seed}")
+            assert mutation_seed >= seed
         assert operator_name not in PROBE_MUTATION_OPERATOR_NAMES
         assert operator_name not in ROOT_TARGETED_MUTATION_OPERATOR_NAMES
         assert operator_name not in SPECIALIZED_DISCOVERY_MUTATION_OPERATOR_NAMES
 
-    assert seen
+    assert seen - {"generated"}

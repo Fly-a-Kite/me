@@ -1045,6 +1045,49 @@ def test_classification_keeps_unique_sort_limit_mismatch_as_candidate_bug():
     assert classification.false_positive is False
 
 
+def test_classification_keeps_identical_duplicate_sort_limit_mismatch_as_candidate_bug():
+    case = Case(
+        "case-identical-duplicate-sort-limit",
+        47,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int"), ColumnSpec("s", "str")],
+                [{"id": 1, "s": "a"}, {"id": 1, "s": "a"}, {"id": 2, "s": "b"}],
+            )
+        ],
+        Program(
+            "prog-identical-duplicate-sort-limit",
+            47,
+            [
+                {
+                    "op": "sort",
+                    "keys": [
+                        {"column": "id", "ascending": True, "nulls": "last"},
+                        {"column": "s", "ascending": True, "nulls": "last"},
+                    ],
+                },
+                {"op": "limit", "n": 1},
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "ordering_or_limit",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["id", "s"], [[1, "a"]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["id", "s"], [[2, "b"]]),
+    }
+
+    classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "common"}, ["pandas", "duckdb"])
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.false_positive is False
+
+
 def test_classification_excludes_limit_before_any_defined_order():
     case = Case(
         "case-limit-before-order",
@@ -1138,6 +1181,55 @@ def test_classification_allows_unordered_offset_that_discards_all_rows():
 
     assert classification.verdict == "candidate_implementation_bug"
     assert classification.false_positive is False
+
+
+def test_classification_preserves_defined_order_through_rowwise_ops_before_limit():
+    case = Case(
+        "case-running-sum-case-limit",
+        47,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("x", "int"), ColumnSpec("y", "int")],
+                [{"x": 1, "y": 10}, {"x": 2, "y": 20}],
+            )
+        ],
+        Program(
+            "prog-running-sum-case-limit",
+            47,
+            [
+                {
+                    "op": "running_sum",
+                    "source": "y",
+                    "column": "run_y",
+                    "order_by": [{"column": "x", "ascending": True, "nulls": "last"}],
+                },
+                {
+                    "op": "case_when",
+                    "as": "bucket",
+                    "condition": {"column": "run_y", "cmp": ">", "value": 10},
+                    "then": 1,
+                    "else": 0,
+                },
+                {"op": "limit", "n": 1},
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "arithmetic_expression",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb"],
+    }
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", ["x", "y", "run_y", "bucket"], [[1, 10, 10, 0]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["x", "y", "run_y", "bucket"], [[2, 20, 30, 1]]),
+    }
+
+    classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "common"}, ["pandas", "duckdb"])
+
+    assert classification.false_positive is False
+    assert classification.false_positive_reason == ""
 
 
 def test_classification_marks_float_precision_order_boundary_not_candidate_bug():

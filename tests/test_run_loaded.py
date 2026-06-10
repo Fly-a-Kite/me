@@ -106,7 +106,10 @@ def test_run_loaded_case_impl_emits_row_shape_metadata_and_signatures():
     assert row["discovery_signature"]
     assert row["disagreement_descriptor"]["pair_count"] == 0
     assert row["case"]["metadata"]["case_fingerprint"] == row["case_fingerprint"]
+    assert row["semantic_contract_lattice"]["schema_version"] == "semantic-contract-lattice-v1"
+    assert row["case"]["metadata"]["semantic_contract_lattice"] == row["semantic_contract_lattice"]
     assert case.metadata["disagreement_descriptor"] == row["disagreement_descriptor"]
+    assert case.metadata["semantic_contract_lattice"] == row["semantic_contract_lattice"]
     assert row["execution_profile"]["parallel_backend_execution"] is False
 
 

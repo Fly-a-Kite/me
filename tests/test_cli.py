@@ -489,6 +489,7 @@ def test_cli_version_ledger_writes_final_readiness_evidence_manifest(tmp_path, c
     assert evidence["evidence_kind"] == "postprocess_ledger"
     assert evidence["runs"][0]["evidence_kind"] == "postprocess_ledger"
     assert evidence["runs"][0]["version_ledger_file"] == str(ledger)
+    assert evidence["champion_transfer"]["schema_version"] == "champion-transfer-evidence-v1"
     assert evidence["experiment_meta"]["comparison_group"] == "cross_version_continual_learning"
 
 
@@ -1498,6 +1499,13 @@ def test_cli_parses_pyarrow_groupby_filter_cast_membership_profile():
     assert args.profile == "pyarrow_groupby_filter_cast_membership"
 
 
+def test_cli_parses_pandas_arrow_bool_groupby_reduction_profile():
+    parser = build_parser()
+    args = parser.parse_args(["fuzz", "--profile", "pandas_arrow_bool_groupby_reduction_semantics"])
+    assert args.cmd == "fuzz"
+    assert args.profile == "pandas_arrow_bool_groupby_reduction_semantics"
+
+
 def test_cli_parses_polars_reverse_division_columns_profile():
     parser = build_parser()
     args = parser.parse_args(["fuzz", "--profile", "polars_reverse_division_columns"])
@@ -2106,6 +2114,17 @@ def test_cli_parses_targeted_guided_experiment_presets():
         == "pandas_bool_reduction_skipna_semantics"
     )
     assert _preset_config("pandas_bool_reduction_skipna_semantics_metamorphic").enable_metamorphic_oracle is True
+    assert (
+        _preset_config("pandas_arrow_bool_groupby_reduction_semantics").generator_profile
+        == "pandas_arrow_bool_groupby_reduction_semantics"
+    )
+    assert (
+        _preset_config("pandas_arrow_bool_groupby_reduction_semantics").guidance_targets[0]
+        == "pandas_arrow_bool_groupby_reduction_semantics"
+    )
+    assert (
+        _preset_config("pandas_arrow_bool_groupby_reduction_semantics_metamorphic").enable_metamorphic_oracle is True
+    )
     assert (
         _preset_config("pyarrow_dataset_isin_all_match_semantics").generator_profile
         == "pyarrow_dataset_isin_all_match_semantics"

@@ -23,6 +23,7 @@ DEFAULT_FALSE_PROBE_KINDS: frozenset[str] = frozenset(
         "sparse_mask_probe",
         "index_bool_probe",
         "eval_inplace_alias_probe",
+        "arrow_bool_groupby_reduction_probe",
         "dataset_isin_all_match_probe",
         "run_end_null_compute_probe",
         "large_string_partition_probe",

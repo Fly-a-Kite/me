@@ -890,6 +890,7 @@ def test_final_readiness_passes_when_all_evidence_tracks_are_present(tmp_path):
     assert audit["summary"]["cross_version_ledger"]["ledger_count"] == 1
     assert audit["summary"]["cross_version_ledger"]["max_version_count"] == 2
     assert audit["summary"]["cross_version_ledger"]["transition_counts"]["new"] == 1
+    assert audit["summary"]["cross_version_ledger"]["champion_transfer"]["ledger_count"] == 1
     assert audit["summary"]["discovery_responsiveness"]["best_first_candidate_elapsed_s"] == 0.25
     assert audit["summary"]["comparison_runs"] == 2
     assert audit["summary"]["baseline_comparison"]["complete_group_count"] == 1
@@ -2994,6 +2995,76 @@ def test_final_readiness_records_registered_structured_semantic_focus(tmp_path):
     assert "common_api_workflow" in run["semantic_focus_signals"]
     assert "materialization_boundary" in audit["summary"]["semantic_focus_families"]
     assert "common_api_workflow" in audit["summary"]["semantic_focus_signals"]
+
+
+def test_final_readiness_summarizes_semantic_contract_and_ir_rewrite_evidence(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="validation-semantic-contract-ir",
+        evidence_mode="validation",
+        target_suite="datafusion_cross",
+        preset="validation_smoke",
+        seed=41,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+    )
+    run_file = Path(load_json(manifest)["runs"][0]["run_file"])
+    run_file.write_text("", encoding="utf-8")
+    append_jsonl(
+        {
+            "case_index": 0,
+            "elapsed_s": 0.1,
+            "case": {"case_id": "case-contract-ir", "seed": 41, "program": {"operations": []}},
+            "semantic_contract_lattice": {
+                "schema_version": "semantic-contract-lattice-v1",
+                "case_id": "case-contract-ir",
+                "boundary_axes": ["ordering"],
+                "strict_axes": ["null", "nan"],
+                "operation_contracts": [{"operation": "limit"}],
+            },
+            "mutation": {
+                "operator": "ir_pushdown_filter",
+                "detail": "ir_pushdown_filter:test",
+            },
+            "findings": [
+                {
+                    "kind": "semantic_output_mismatch",
+                    "root_cause": "ordering_or_limit",
+                    "mismatch_class": "row_order",
+                    "triage_verdict": "candidate_implementation_bug",
+                    "signature": "sig-contract-ir",
+                    "suspicious_backends": ["duckdb"],
+                }
+            ],
+        },
+        run_file,
+    )
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+        ),
+    )
+
+    contract = audit["summary"]["semantic_contract_lattice"]
+    rewrite = audit["summary"]["ir_rewrite_rule_evidence"]
+    assert contract["contract_row_count"] == 1
+    assert contract["case_row_count"] == 1
+    assert contract["boundary_axes"] == ["ordering"]
+    assert contract["matched_boundary_axes"] == ["ordering"]
+    assert rewrite["rewrite_row_count"] == 1
+    assert rewrite["rule_ids"] == ["ir.rewrite.filter_pushdown"]
+    assert rewrite["semantics_classes"] == ["semantics_preserving"]
+    md = final_readiness._render_markdown(audit)
+    assert "Semantic contract lattice evidence" in md
+    assert "IR rewrite rule evidence" in md
 
 
 def test_final_readiness_flags_registered_semantic_focus_metadata_drift(tmp_path):

@@ -30,6 +30,7 @@ DEEP_PROBE_ROTATION_PROFILES = (
     "pandas_arrow_timestamp_index_attr_semantics",
     "pandas_eval_inplace_aliasing_semantics",
     "pandas_bool_reduction_skipna_semantics",
+    "pandas_arrow_bool_groupby_reduction_semantics",
     "pyarrow_dataset_isin_all_match_semantics",
     "pyarrow_run_end_null_compute_semantics",
     "pyarrow_large_string_partition_schema_semantics",
@@ -228,6 +229,8 @@ def discovery_issue_inspired_case(
         return mixed("pandas_eval_inplace_aliasing_semantics")
     if seed % 193 == 110:
         return mixed("pandas_bool_reduction_skipna_semantics")
+    if seed % 239 == 84:
+        return mixed("pandas_arrow_bool_groupby_reduction_semantics")
     if seed % 163 == 82:
         return mixed("pyarrow_dataset_isin_all_match_semantics")
     if seed % 197 == 112:

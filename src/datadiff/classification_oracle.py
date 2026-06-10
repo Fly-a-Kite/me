@@ -31,6 +31,7 @@ from datadiff.normalizer import NormalizedResult
 from datadiff.operation_semantics import has_order_observer
 from datadiff.oracle import Finding
 from datadiff.reference_semantics import reference_result
+from datadiff.semantic_contracts import finding_matches_contract_boundary as _finding_matches_contract_boundary
 from datadiff.semantic_boundaries import (
     SemanticBoundaryMatch,
     build_documented_semantic_rules,
@@ -41,6 +42,13 @@ from datadiff.semantic_boundaries import (
     semantic_rule_records,
 )
 from datadiff.dynamic_strategy import StrategyRuleRecord
+
+PRE_REFERENCE_SEMANTIC_BOUNDARY_RULE_IDS = frozenset(
+    {
+        "boundary:modulo_semantics",
+        "boundary:unicode_case_mapping",
+    }
+)
 
 
 @dataclass(slots=True)
@@ -370,12 +378,17 @@ def classify_finding(
 
     semantic_boundary_matches = _semantic_boundary_matches(case, finding, config)
     semantic_boundary_reasons = [match.reason for match in semantic_boundary_matches]
-    if semantic_boundary_reasons and str(_get(finding, "root_cause", "")) != "ordering_or_limit":
+    pre_reference_boundary_matches = [
+        match
+        for match in semantic_boundary_matches
+        if match.rule_id in PRE_REFERENCE_SEMANTIC_BOUNDARY_RULE_IDS
+    ]
+    if pre_reference_boundary_matches:
         return _classification(
             "expected_semantic_divergence",
             "valid_finding_not_bug",
             "medium",
-            evidence="; ".join(semantic_boundary_reasons),
+            evidence="; ".join(match.reason for match in pre_reference_boundary_matches),
             recommendation=[
                 "Keep as a valid semantic-divergence finding.",
                 "Do not count as an implementation bug unless a backend-specific specification is contradicted.",
@@ -388,7 +401,7 @@ def classify_finding(
                 attribution_gate="semantic_boundary",
                 countable_as_valid_finding=True,
                 needs_manual_review=False,
-                boundary_rule_ids=[match.rule_id for match in semantic_boundary_matches],
+                boundary_rule_ids=[match.rule_id for match in pre_reference_boundary_matches],
             ),
         )
 
@@ -693,6 +706,7 @@ SEMANTIC_BOUNDARY_RULES = build_semantic_boundary_rules(
     null_filter_literal_boundary=_null_filter_literal_boundary,
     modulo_boundary=_modulo_boundary,
     unicode_case_mapping_boundary=_unicode_case_mapping_boundary,
+    semantic_contract_lattice_boundary=_finding_matches_contract_boundary,
 )
 
 

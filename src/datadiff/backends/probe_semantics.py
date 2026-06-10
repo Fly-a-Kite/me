@@ -18,6 +18,7 @@ EXTENDED_FALSE_PROBE_KINDS: frozenset[str] = frozenset(
         "arrow_timestamp_loc_slice_probe",
         "arrow_timestamp_index_attr_probe",
         "bool_reduction_skipna_probe",
+        "arrow_bool_groupby_reduction_probe",
         "list_flatten_parent_indices_probe",
         "rolling_mean_by_null_count_probe",
         "csv_long_numeric_roundtrip_probe",

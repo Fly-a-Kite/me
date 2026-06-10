@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter, deque
 from dataclasses import dataclass, field
+from functools import lru_cache
 import heapq
 import math
 from typing import Any
@@ -155,6 +156,7 @@ class FeedbackState:
     last_source_reward: float | None = None
     seed_frontier_heap: list[tuple[float, float, float, int, int, int]] = field(default_factory=list, repr=False)
     seed_frontier_dirty: bool = field(default=True, repr=False)
+    seed_metadata_aligned_count: int = field(default=-1, repr=False)
 
     def __post_init__(self) -> None:
         self.enable_ir_rewrite_mutations = bool(self.enable_ir_rewrite_mutations)
@@ -200,6 +202,11 @@ class FeedbackState:
         self.last_candidate_batch_metadata = [dict(item.metadata) for item in batch]
         self.last_candidate_batch_sources = [item.source for item in batch]
         return [item.case for item in batch]
+
+    def pop_pending_candidate(self) -> _SelectedCandidate | None:
+        if not self.pending_candidate_batch:
+            return None
+        return self._commit_selected_candidate(self.pending_candidate_batch.popleft())
 
     def choose_case(self, seed: int, generated: Case) -> Case:
         return self.select_case(seed, generated)
@@ -668,6 +675,7 @@ class FeedbackState:
                 schedule_delta=schedule_delta,
             )
         self._seed_corpus_view().record_stored_counters(record)
+        self.seed_metadata_aligned_count = len(self.interesting_cases)
         if has_finding:
             self._record_champion_family_hits(case, family_keys)
         if self.persist_to_disk and self.persisted_count < max(0, self.max_persisted):
@@ -908,6 +916,7 @@ class FeedbackState:
             if self.enable_quality_archive
             else 0.0
         )
+        family_reuse_penalty = self._case_family_reuse_penalty(index)
         pull_penalty = (1.0 + self.case_mutation_pulls[index]) ** 0.5
         recent_penalty = 1.0 + self._recent_parent_pull_count(index)
         recent_cluster_penalty = 1.0 + (0.50 * self._recent_cluster_pull_count(cluster_key))
@@ -919,9 +928,28 @@ class FeedbackState:
             + cluster_novelty
             + elite_bonus
             + (0.35 * lineage_rarity)
-        ) / (pull_penalty * recent_penalty * recent_cluster_penalty * (1.0 + archive_health_penalty))
+        ) / (
+            pull_penalty
+            * recent_penalty
+            * recent_cluster_penalty
+            * (1.0 + archive_health_penalty)
+            * family_reuse_penalty
+        )
         energy_multiplier = 1.0 + (0.04 * max(0, self._case_seed_energy(index) - 1))
         return score * energy_multiplier
+
+    def _case_family_reuse_penalty(self, index: int) -> float:
+        if index >= len(self.case_family_keys):
+            return 1.0
+        families = [family for family in self.case_family_keys[index] if family]
+        if not families:
+            return 1.0
+        family_limit = max(1, int(self.max_cases_per_candidate_family or 8))
+        max_family_count = max(int(self.stored_candidate_bug_families[family]) for family in families)
+        if max_family_count <= 1:
+            return 1.0
+        saturation_ratio = max_family_count / float(family_limit)
+        return 1.0 + min(2.0, 0.60 * math.log1p(saturation_ratio))
 
     def _case_seed_energy(self, index: int) -> int:
         self._align_seed_metadata_lengths()
@@ -1098,8 +1126,19 @@ class FeedbackState:
         return self.recent_mutation_cluster_counts[cluster_key]
 
     def _align_seed_metadata_lengths(self) -> None:
+        case_count = len(self.interesting_cases)
+        if (
+            self.seed_metadata_aligned_count == case_count
+            and len(self.lineage.nodes) >= case_count
+            and (
+                not self.enable_quality_archive
+                or not self.interesting_cases
+                or not self.quality_archive.is_empty()
+            )
+        ):
+            return
         metadata_changed = False
-        while len(self.case_utilities) < len(self.interesting_cases):
+        while len(self.case_utilities) < case_count:
             self.case_utilities.append(
                 _case_seed_utility(
                     self.interesting_cases[len(self.case_utilities)],
@@ -1108,16 +1147,16 @@ class FeedbackState:
                 )
             )
             metadata_changed = True
-        while len(self.case_family_keys) < len(self.interesting_cases):
+        while len(self.case_family_keys) < case_count:
             self.case_family_keys.append([])
             metadata_changed = True
-        while len(self.case_profile_keys) < len(self.interesting_cases):
+        while len(self.case_profile_keys) < case_count:
             self.case_profile_keys.append("")
             metadata_changed = True
-        while len(self.case_target_keys) < len(self.interesting_cases):
+        while len(self.case_target_keys) < case_count:
             self.case_target_keys.append(_normalize_target_keys(_case_target_keys(self.interesting_cases[len(self.case_target_keys)])))
             metadata_changed = True
-        while len(self.case_cluster_keys) < len(self.interesting_cases):
+        while len(self.case_cluster_keys) < case_count:
             index = len(self.case_cluster_keys)
             profile_key = self.case_profile_keys[index] if index < len(self.case_profile_keys) else ""
             target_keys = self.case_target_keys[index] if index < len(self.case_target_keys) else []
@@ -1125,7 +1164,7 @@ class FeedbackState:
                 _case_cluster_key(self.interesting_cases[index], profile_key=profile_key, target_keys=target_keys)
             )
             metadata_changed = True
-        while len(self.case_behavioral_descriptors) < len(self.interesting_cases):
+        while len(self.case_behavioral_descriptors) < case_count:
             index = len(self.case_behavioral_descriptors)
             profile_key = self.case_profile_keys[index] if index < len(self.case_profile_keys) else ""
             target_keys = self.case_target_keys[index] if index < len(self.case_target_keys) else []
@@ -1139,26 +1178,27 @@ class FeedbackState:
                 )
             )
             metadata_changed = True
-        while len(self.case_mutation_pulls) < len(self.interesting_cases):
+        while len(self.case_mutation_pulls) < case_count:
             self.case_mutation_pulls.append(0)
             metadata_changed = True
-        while len(self.case_schedule_rewards) < len(self.interesting_cases):
+        while len(self.case_schedule_rewards) < case_count:
             self.case_schedule_rewards.append(0.0)
             metadata_changed = True
-        while len(self.case_schedule_feedback_totals) < len(self.interesting_cases):
+        while len(self.case_schedule_feedback_totals) < case_count:
             self.case_schedule_feedback_totals.append(0.0)
             metadata_changed = True
-        while len(self.case_schedule_feedback_counts) < len(self.interesting_cases):
+        while len(self.case_schedule_feedback_counts) < case_count:
             self.case_schedule_feedback_counts.append(0)
             metadata_changed = True
         if self.enable_quality_archive and (
             metadata_changed or (self.interesting_cases and self.quality_archive.is_empty())
         ):
             self._sync_quality_archive()
-        if metadata_changed or len(self.lineage.nodes) < len(self.interesting_cases):
+        if metadata_changed or len(self.lineage.nodes) < case_count:
             self._sync_lineage()
         if metadata_changed:
             self._mark_seed_frontier_dirty()
+        self.seed_metadata_aligned_count = case_count
 
     def _sync_lineage(self) -> None:
         for index, case in enumerate(self.interesting_cases):
@@ -1706,17 +1746,7 @@ class FeedbackState:
     ) -> dict[str, Any]:
         self._align_seed_metadata_lengths()
         frontier_snapshot = self._seed_frontier_snapshot(limit=8)
-        frontier_rank = next(
-            (
-                position
-                for position, row in enumerate(
-                    self._seed_frontier_snapshot(limit=len(self.interesting_cases)),
-                    start=1,
-                )
-                if int(row["index"]) == index
-            ),
-            0,
-        )
+        frontier_rank = self._seed_frontier_rank(index)
         target_keys = self.case_target_keys[index] if index < len(self.case_target_keys) else []
         semantic_family_targets = [
             str(key).removeprefix("semantic_family:").strip()
@@ -2520,6 +2550,16 @@ class FeedbackState:
                 break
         return rows
 
+    def _seed_frontier_rank(self, index: int) -> int:
+        self._ensure_seed_frontier()
+        selected = next(
+            (priority for priority in self.seed_frontier_heap if int(priority[-1]) == int(index)),
+            None,
+        )
+        if selected is None:
+            return 0
+        return 1 + sum(1 for priority in self.seed_frontier_heap if priority < selected)
+
     def _ensure_seed_frontier(self) -> None:
         if not self.seed_frontier_dirty:
             return
@@ -2531,13 +2571,13 @@ class FeedbackState:
         self.seed_frontier_dirty = False
 
     def _seed_frontier_priority(self, index: int) -> tuple[float, float, float, int, int, int]:
-        row = self._seed_frontier_row(index)
+        cluster_key = self._case_cluster_key_at(index)
         return (
-            -float(row["schedule_score"]),
-            -float(row["reward_prior"]),
-            -float(row["target_novelty_score"]),
-            int(row["mutation_pulls"]),
-            int(row["recent_parent_pulls"]) + int(row["recent_cluster_pulls"]),
+            -float(self._case_seed_schedule_score(index)),
+            -float(self._case_seed_schedule_reward(index)),
+            -float(self._case_target_novelty_score(index)),
+            int(self.case_mutation_pulls[index]),
+            int(self._recent_parent_pull_count(index)) + int(self._recent_cluster_pull_count(cluster_key)),
             int(index),
         )
 
@@ -2795,11 +2835,17 @@ def _normalize_operator_target_stat_key(value: Any) -> str:
     return _operator_target_stat_key(normalized_operator, normalized_target_key)
 
 
+@lru_cache(maxsize=4096)
 def _legacy_target_key_alias(target_key: str) -> str:
     return semantic_signal_legacy_target_key_alias(target_key)
 
 
 def _contextual_target_descriptors(values: list[Any] | tuple[Any, ...]) -> list[_ContextualTargetDescriptor]:
+    return list(_contextual_target_descriptors_cached(tuple(str(value) for value in values)))
+
+
+@lru_cache(maxsize=512)
+def _contextual_target_descriptors_cached(values: tuple[str, ...]) -> tuple[_ContextualTargetDescriptor, ...]:
     descriptors: list[_ContextualTargetDescriptor] = []
     for target_key in _normalize_target_keys(values)[:8]:
         semantic_family = ""
@@ -2824,7 +2870,7 @@ def _contextual_target_descriptors(values: list[Any] | tuple[Any, ...]) -> list[
                 exploration_objective=exploration_objective,
             )
         )
-    return descriptors
+    return tuple(descriptors)
 
 
 def _operator_target_stat_keys(operator: str, target_key: str) -> tuple[str, ...]:

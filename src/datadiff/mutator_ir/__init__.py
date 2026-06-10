@@ -20,8 +20,17 @@ from datadiff.mutator_ir.rewrite_swap import (
     apply_adjacent_independent_swap,
     legal_adjacent_swap_positions,
 )
+from datadiff.mutator_ir.rules import (
+    IRRewriteRule,
+    ir_rewrite_rule_for_operator,
+    ir_rewrite_rule_metadata,
+    ir_rewrite_rule_registry_payload,
+    metamorphic_rewrite_rule_metadata,
+    registered_ir_rewrite_rules,
+)
 
 __all__ = [
+    "IRRewriteRule",
     "apply_adjacent_independent_swap",
     "apply_filter_pushdown",
     "apply_filter_above_groupby",
@@ -34,4 +43,9 @@ __all__ = [
     "legal_redundant_fold_positions",
     "legal_subtree_splice_positions",
     "legal_window_wrap_positions",
+    "ir_rewrite_rule_for_operator",
+    "ir_rewrite_rule_metadata",
+    "ir_rewrite_rule_registry_payload",
+    "metamorphic_rewrite_rule_metadata",
+    "registered_ir_rewrite_rules",
 ]

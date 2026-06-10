@@ -24,9 +24,11 @@ from datadiff.run_logging import STAGE_PROFILE_KEYS, _empty_stage_profile
 from datadiff.run_metadata import (
     _attach_case_fingerprint_to_row_case,
     _attach_disagreement_descriptor_to_row_case,
+    _attach_semantic_contract_lattice_to_row_case,
     _fingerprint_anchor_result,
 )
 from datadiff.run_signatures import behavior_signature, discovery_signature
+from datadiff.semantic_contracts import semantic_contract_lattice_payload
 from datadiff.targets import describe_targets
 from datadiff.util import utc_now
 
@@ -217,9 +219,13 @@ def run_loaded_case_impl(
     case_fingerprint = compute_fingerprint(case, _fingerprint_anchor_result(normalized)).to_dict()
     row["case_fingerprint"] = case_fingerprint
     _attach_case_fingerprint_to_row_case(row, case_fingerprint)
+    semantic_contract_lattice = semantic_contract_lattice_payload(case)
+    row["semantic_contract_lattice"] = semantic_contract_lattice
+    _attach_semantic_contract_lattice_to_row_case(row, semantic_contract_lattice)
     if isinstance(case.metadata, dict):
         case.metadata["disagreement_descriptor"] = disagreement_descriptor
         case.metadata["case_fingerprint"] = case_fingerprint
+        case.metadata["semantic_contract_lattice"] = semantic_contract_lattice
     if countable_findings and save_artifact and config.enable_artifact:
         artifact_started = time.perf_counter()
         bug_dir = save_bug_artifact_fn(

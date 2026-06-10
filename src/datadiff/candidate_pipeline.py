@@ -21,6 +21,7 @@ from datadiff.finding_outcomes import candidate_issue_family_keys
 from datadiff.reducer import reduce_case
 from datadiff.reproducer_scripts import write_reduced_reproducer
 from datadiff.runner import run_loaded_case
+from datadiff.semantic_contracts import finding_contract_axes, semantic_contract_lattice_payload
 from datadiff.triage import (
     build_triage_report,
     standalone_reproducer_rule_records,
@@ -30,6 +31,7 @@ from datadiff.triage import (
 )
 from datadiff.classification_oracle import documented_semantic_rule_records
 from datadiff.classification_oracle import semantic_boundary_rule_records
+from datadiff.mutator_ir import ir_rewrite_rule_metadata
 from datadiff.util import PROJECT_ROOT, dump_json, load_json, slugify, utc_now
 
 CANDIDATE_PIPELINE_SCHEMA_VERSION = "candidate-pipeline-v1"
@@ -122,6 +124,8 @@ def build_candidate_pipeline(
                 "findings": row.get("findings", []),
                 "normalized": row.get("normalized", {}),
                 "raw_results": row.get("raw_results", {}),
+                "semantic_contract_evidence": _semantic_contract_evidence(row),
+                "ir_rewrite_evidence": _ir_rewrite_evidence(row),
                 "config": {
                     **row_config,
                     "strategy_snapshot_path": str(strategy_snapshot_path),
@@ -227,30 +231,46 @@ def render_candidate_pipeline_markdown(manifest: dict[str, Any]) -> str:
         f"- Reproduced candidates: `{summary.get('reproduced_count', 0)}`",
         f"- Reduced artifacts: `{summary.get('reduced_count', 0)}`",
         f"- Candidate-bug triage verdicts: `{summary.get('candidate_bug_verdict_count', 0)}`",
+        f"- Semantic-contract candidates: `{summary.get('semantic_contract_candidate_count', 0)}`; "
+        f"boundary axes: `{', '.join(summary.get('semantic_contract_boundary_axes', [])) or 'none'}`",
+        f"- IR rewrite candidates: `{summary.get('ir_rewrite_candidate_count', 0)}`; "
+        f"rules: `{', '.join(summary.get('ir_rewrite_rules', [])) or 'none'}`",
         f"- Local duplicate families: `{summary.get('local_duplicate_candidate_count', 0)}`",
         f"- Issue drafts: `{summary.get('issue_draft_count', 0)}`",
         f"- Needs dedup check: `{summary.get('needs_dedup_check_count', 0)}`",
         "",
         "## Candidates",
         "",
-        "| Candidate | Family | Score | True bug probability | Reproduced | Triage | Dedup | Issue readiness |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Candidate | Family | Score | True bug probability | Contract axes | IR rewrites | Reproduced | Triage | Dedup | Issue readiness |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for candidate in manifest.get("candidates", []):
         issue_readiness = candidate.get("issue_readiness", {})
         acquisition = candidate.get("candidate_acquisition", {}) if isinstance(candidate.get("candidate_acquisition"), dict) else {}
+        contract_evidence = (
+            candidate.get("semantic_contract_evidence", {})
+            if isinstance(candidate.get("semantic_contract_evidence", {}), dict)
+            else {}
+        )
+        ir_evidence = (
+            candidate.get("ir_rewrite_evidence", {})
+            if isinstance(candidate.get("ir_rewrite_evidence", {}), dict)
+            else {}
+        )
         lines.append(
             f"| `{candidate.get('candidate_id', '')}` | "
             f"`{candidate.get('primary_family', '')}` | "
             f"`{float(acquisition.get('acquisition_score', 0.0) or 0.0):.2f}` | "
             f"`{float(acquisition.get('true_bug_probability', 0.0) or 0.0):.2f}` | "
+            f"`{', '.join(contract_evidence.get('matched_boundary_axes', []) or contract_evidence.get('finding_axes', [])) or 'none'}` | "
+            f"`{', '.join(ir_evidence.get('operators', [])) or 'none'}` | "
             f"`{str(candidate.get('recheck', {}).get('reproduced', False)).lower()}` | "
             f"`{candidate.get('triage', {}).get('verdict', '')}` | "
             f"`{candidate.get('dedup', {}).get('status', '')}` | "
             f"`{issue_readiness.get('readiness_status', '')}` |"
         )
     if not manifest.get("candidates"):
-        lines.append("| none |  | 0.00 | 0.00 | false |  |  |  |")
+        lines.append("| none |  | 0.00 | 0.00 | none | none | false |  |  |  |")
     lines.append("")
     return "\n".join(lines)
 
@@ -274,6 +294,16 @@ def _process_candidate(
     backends = _candidate_backends(row)
     config_data = row.get("config", {}) if isinstance(row.get("config", {}), dict) else {}
     config = ExperimentConfig.from_payload(config_data)
+    semantic_contract_evidence = (
+        dict(row.get("semantic_contract_evidence", {}))
+        if isinstance(row.get("semantic_contract_evidence", {}), dict)
+        else {}
+    )
+    ir_rewrite_evidence = (
+        dict(row.get("ir_rewrite_evidence", {}))
+        if isinstance(row.get("ir_rewrite_evidence", {}), dict)
+        else {}
+    )
     artifact_dir, artifact_created = _ensure_candidate_artifact_dir(row)
     recheck = _recheck_candidate(case, backends, config, families, attempts=recheck_attempts)
 
@@ -375,6 +405,8 @@ def _process_candidate(
                 pipeline_dir=pipeline_dir,
                 triage=triage,
                 dedup=dedup,
+                semantic_contract_evidence=semantic_contract_evidence,
+                ir_rewrite_evidence=ir_rewrite_evidence,
             ),
             encoding="utf-8",
         )
@@ -395,6 +427,11 @@ def _process_candidate(
             "dedup_status": str(dedup.get("status", "")),
             "source_run_file": str(row.get("source_run_file", "")),
             "source_evidence_file": str(row.get("source_evidence_file", "")),
+            "semantic_contract_boundary_axes": list(semantic_contract_evidence.get("boundary_axes", []) or []),
+            "semantic_contract_matched_boundary_axes": list(
+                semantic_contract_evidence.get("matched_boundary_axes", []) or []
+            ),
+            "ir_rewrite_rules": list(ir_rewrite_evidence.get("rule_ids", []) or []),
         },
         output_dir=pipeline_dir / "strategy-learning",
         learning_id="candidate-pipeline-learning",
@@ -408,6 +445,8 @@ def _process_candidate(
         "source_evidence_file": str(row.get("source_evidence_file", "")),
         "source_run_file": str(row.get("source_run_file", "")),
         "case_id": row.get("case", {}).get("case_id", ""),
+        "semantic_contract_evidence": semantic_contract_evidence,
+        "ir_rewrite_evidence": ir_rewrite_evidence,
         "bug_dir": _project_display_path(artifact_dir) if artifact_dir is not None else "",
         "artifact_created": artifact_created,
         "initial_candidate_recheck": dict(row.get("candidate_recheck", {}) or {}),
@@ -426,6 +465,125 @@ def _load_evidence_payload(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"candidate evidence must be a JSON object: {path}")
     return payload
+
+
+def _semantic_contract_evidence(row: dict[str, Any]) -> dict[str, Any]:
+    lattice = _semantic_contract_lattice_from_row(row)
+    if not lattice:
+        return {}
+    finding_axes = sorted(
+        {
+            axis
+            for finding in row.get("findings", []) or []
+            if isinstance(finding, dict)
+            for axis in finding_contract_axes(finding)
+        }
+    )
+    boundary_axes = _string_list(lattice.get("boundary_axes", []))
+    strict_axes = _string_list(lattice.get("strict_axes", []))
+    return {
+        "schema_version": str(lattice.get("schema_version", "")),
+        "case_id": str(lattice.get("case_id", "")),
+        "boundary_axes": boundary_axes,
+        "strict_axes": strict_axes,
+        "contract_tags": _string_list(lattice.get("contract_tags", [])),
+        "finding_axes": finding_axes,
+        "matched_boundary_axes": sorted(set(boundary_axes) & set(finding_axes)),
+        "operation_contract_count": len(lattice.get("operation_contracts", []) or []),
+    }
+
+
+def _semantic_contract_lattice_from_row(row: dict[str, Any]) -> dict[str, Any]:
+    direct = row.get("semantic_contract_lattice", {})
+    if isinstance(direct, dict) and direct:
+        return direct
+    case_payload = row.get("case", {}) if isinstance(row.get("case", {}), dict) else {}
+    case_metadata = case_payload.get("metadata", {}) if isinstance(case_payload.get("metadata", {}), dict) else {}
+    metadata_lattice = case_metadata.get("semantic_contract_lattice", {})
+    if isinstance(metadata_lattice, dict) and metadata_lattice:
+        return metadata_lattice
+    try:
+        return semantic_contract_lattice_payload(Case.from_dict(case_payload))
+    except (KeyError, TypeError, ValueError):
+        return {}
+
+
+def _ir_rewrite_evidence(row: dict[str, Any]) -> dict[str, Any]:
+    rules = _ir_rewrite_rules_from_row(row)
+    if not rules:
+        return {}
+    return {
+        "rule_count": len(rules),
+        "rule_ids": sorted({str(rule.get("rule_id", "")) for rule in rules if rule.get("rule_id")}),
+        "operators": sorted({str(rule.get("operator", "")) for rule in rules if rule.get("operator")}),
+        "relations": sorted({str(rule.get("relation", "")) for rule in rules if rule.get("relation")}),
+        "semantics_classes": sorted(
+            {str(rule.get("semantics_class", "")) for rule in rules if rule.get("semantics_class")}
+        ),
+        "contract_axes": sorted(
+            {
+                axis
+                for rule in rules
+                for axis in _string_list(rule.get("contract_axes", []))
+            }
+        ),
+        "rules": rules,
+    }
+
+
+def _ir_rewrite_rules_from_row(row: dict[str, Any]) -> list[dict[str, Any]]:
+    rules: list[dict[str, Any]] = []
+    for metadata in _candidate_metadata_sources(row):
+        mutation = metadata.get("mutation", {}) if isinstance(metadata.get("mutation", {}), dict) else {}
+        existing_rules = mutation.get("ir_rewrite_rules", [])
+        if isinstance(existing_rules, list):
+            rules.extend(dict(rule) for rule in existing_rules if isinstance(rule, dict))
+        existing_rule = mutation.get("ir_rewrite_rule", {})
+        if isinstance(existing_rule, dict) and existing_rule:
+            rules.append(dict(existing_rule))
+        operator = str(mutation.get("operator", "") or "")
+        if operator:
+            inferred = ir_rewrite_rule_metadata(operator, detail=str(mutation.get("detail", "") or ""))
+            if inferred:
+                rules.append(inferred)
+    return _dedupe_rule_payloads(rules)
+
+
+def _candidate_metadata_sources(row: dict[str, Any]) -> list[dict[str, Any]]:
+    sources: list[dict[str, Any]] = []
+    row_mutation = row.get("mutation", {})
+    if isinstance(row_mutation, dict) and row_mutation:
+        sources.append({"mutation": row_mutation})
+    row_metadata = row.get("metadata", {})
+    if isinstance(row_metadata, dict):
+        sources.append(row_metadata)
+    case_payload = row.get("case", {}) if isinstance(row.get("case", {}), dict) else {}
+    case_metadata = case_payload.get("metadata", {}) if isinstance(case_payload.get("metadata", {}), dict) else {}
+    if case_metadata:
+        sources.append(case_metadata)
+    return sources
+
+
+def _dedupe_rule_payloads(rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for rule in rules:
+        key = (
+            str(rule.get("rule_id", "")),
+            str(rule.get("operator", "")),
+            str(rule.get("detail", "")),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(rule)
+    return deduped
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item)]
 
 
 def _candidate_pipeline_manifest_evidence_files(manifest_file: Path | None) -> list[Path]:
@@ -638,6 +796,8 @@ def _issue_draft_markdown(
     pipeline_dir: Path,
     triage: dict[str, Any],
     dedup: dict[str, Any],
+    semantic_contract_evidence: dict[str, Any] | None = None,
+    ir_rewrite_evidence: dict[str, Any] | None = None,
 ) -> str:
     reproducer_path = artifact_dir / "reproduce_reduced.py"
     if not reproducer_path.is_file():
@@ -692,6 +852,23 @@ def _issue_draft_markdown(
         f"- Triage JSON: `{triage.get('triage_json', '')}`",
         f"- Triage markdown: `{triage.get('triage_markdown', '')}`",
     ]
+    contract_evidence = semantic_contract_evidence or {}
+    if contract_evidence:
+        lines.extend(
+            [
+                f"- Semantic contract boundary axes: `{', '.join(contract_evidence.get('boundary_axes', [])) or 'none'}`",
+                f"- Finding contract axes: `{', '.join(contract_evidence.get('finding_axes', [])) or 'none'}`",
+                f"- Matched contract boundary axes: `{', '.join(contract_evidence.get('matched_boundary_axes', [])) or 'none'}`",
+            ]
+        )
+    rewrite_evidence = ir_rewrite_evidence or {}
+    if rewrite_evidence:
+        lines.extend(
+            [
+                f"- IR rewrite rules: `{', '.join(rewrite_evidence.get('rule_ids', [])) or 'none'}`",
+                f"- IR rewrite semantic classes: `{', '.join(rewrite_evidence.get('semantics_classes', [])) or 'none'}`",
+            ]
+        )
     reduced_case_path = artifact_dir / "reduced_case.json"
     reduced_reproducer_path = artifact_dir / "reproduce_reduced.py"
     if reduced_case_path.is_file():
@@ -715,6 +892,8 @@ def _candidate_pipeline_summary(candidates: list[dict[str, Any]], queue: dict[st
         for candidate in candidates
         if candidate.get("dedup", {}).get("status") in {"duplicate_local_family", "duplicate_pipeline_family"}
     )
+    contract_summary = _semantic_contract_candidate_summary(candidates)
+    rewrite_summary = _ir_rewrite_candidate_summary(candidates)
     return {
         "candidate_count": len(candidates),
         "unique_family_count": len({candidate.get("primary_family", "") for candidate in candidates if candidate.get("primary_family")}),
@@ -734,6 +913,101 @@ def _candidate_pipeline_summary(candidates: list[dict[str, Any]], queue: dict[st
         "already_submitted_or_confirmed_count": readiness_counts.get("already_submitted_or_confirmed", 0),
         "not_latest_reproducible_count": readiness_counts.get("not_latest_reproducible", 0),
         "submission_group_count": int(queue.get("summary", {}).get("submission_group_count", 0) or 0),
+        "semantic_contract_candidate_count": contract_summary["candidate_count"],
+        "semantic_contract_boundary_axes": contract_summary["boundary_axes"],
+        "semantic_contract_matched_boundary_axes": contract_summary["matched_boundary_axes"],
+        "semantic_contract_operation_contract_count": contract_summary["operation_contract_count"],
+        "semantic_contract_evidence": contract_summary,
+        "ir_rewrite_candidate_count": rewrite_summary["candidate_count"],
+        "ir_rewrite_rule_count": rewrite_summary["rule_count"],
+        "ir_rewrite_rules": rewrite_summary["rule_ids"],
+        "ir_rewrite_operators": rewrite_summary["operators"],
+        "ir_rewrite_semantics_classes": rewrite_summary["semantics_classes"],
+        "ir_rewrite_evidence": rewrite_summary,
+    }
+
+
+def _semantic_contract_candidate_summary(candidates: list[dict[str, Any]]) -> dict[str, Any]:
+    evidence_rows = [
+        candidate.get("semantic_contract_evidence", {})
+        for candidate in candidates
+        if isinstance(candidate.get("semantic_contract_evidence", {}), dict)
+        and candidate.get("semantic_contract_evidence", {})
+    ]
+    return {
+        "candidate_count": len(evidence_rows),
+        "boundary_axes": sorted(
+            {
+                axis
+                for evidence in evidence_rows
+                for axis in _string_list(evidence.get("boundary_axes", []))
+            }
+        ),
+        "matched_boundary_axes": sorted(
+            {
+                axis
+                for evidence in evidence_rows
+                for axis in _string_list(evidence.get("matched_boundary_axes", []))
+            }
+        ),
+        "finding_axes": sorted(
+            {
+                axis
+                for evidence in evidence_rows
+                for axis in _string_list(evidence.get("finding_axes", []))
+            }
+        ),
+        "contract_tags": sorted(
+            {
+                tag
+                for evidence in evidence_rows
+                for tag in _string_list(evidence.get("contract_tags", []))
+            }
+        ),
+        "operation_contract_count": sum(
+            int(evidence.get("operation_contract_count", 0) or 0) for evidence in evidence_rows
+        ),
+    }
+
+
+def _ir_rewrite_candidate_summary(candidates: list[dict[str, Any]]) -> dict[str, Any]:
+    evidence_rows = [
+        candidate.get("ir_rewrite_evidence", {})
+        for candidate in candidates
+        if isinstance(candidate.get("ir_rewrite_evidence", {}), dict)
+        and candidate.get("ir_rewrite_evidence", {})
+    ]
+    return {
+        "candidate_count": len(evidence_rows),
+        "rule_count": sum(int(evidence.get("rule_count", 0) or 0) for evidence in evidence_rows),
+        "rule_ids": sorted(
+            {
+                rule_id
+                for evidence in evidence_rows
+                for rule_id in _string_list(evidence.get("rule_ids", []))
+            }
+        ),
+        "operators": sorted(
+            {
+                operator
+                for evidence in evidence_rows
+                for operator in _string_list(evidence.get("operators", []))
+            }
+        ),
+        "semantics_classes": sorted(
+            {
+                semantics_class
+                for evidence in evidence_rows
+                for semantics_class in _string_list(evidence.get("semantics_classes", []))
+            }
+        ),
+        "contract_axes": sorted(
+            {
+                axis
+                for evidence in evidence_rows
+                for axis in _string_list(evidence.get("contract_axes", []))
+            }
+        ),
     }
 
 

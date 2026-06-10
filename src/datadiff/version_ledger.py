@@ -14,6 +14,7 @@ from datadiff.finding_outcomes import (
 from datadiff.util import dump_json, read_jsonl, run_meta_path, utc_now
 
 VERSION_LEDGER_SCHEMA_VERSION = "version-ledger-v1"
+CHAMPION_TRANSFER_SCHEMA_VERSION = "champion-transfer-evidence-v1"
 OBSERVATION_PRESENT = "present"
 OBSERVATION_ABSENT = "absent"
 
@@ -61,19 +62,35 @@ def observation_from_run_log(
     fallback_case_count = 0
     false_positive_count = 0
     duration_ms_total = 0.0
+    champion_seed_case_count = 0
+    champion_graft_case_count = 0
+    champion_candidate_families: Counter[str] = Counter()
     for row in rows:
         preflight = row.get("preflight", {}) if isinstance(row.get("preflight", {}), dict) else {}
         invalid_case_count += int(not bool(preflight.get("valid", True)))
         fallback_case_count += int(bool(preflight.get("fallback_used", False)))
         duration_ms_total += _float_value(row.get("duration_ms"))
+        row_champion_source = _row_is_champion_seed(row)
+        row_champion_graft = _row_is_champion_graft(row)
+        champion_seed_case_count += int(row_champion_source)
+        champion_graft_case_count += int(row_champion_graft)
         for finding in row.get("findings", []) or []:
             if not isinstance(finding, dict):
                 continue
             false_positive_count += int(is_false_positive_finding(finding))
             if is_candidate_issue_finding(finding):
-                family_counter[candidate_issue_family_key(finding)] += 1
+                family = candidate_issue_family_key(finding)
+                family_counter[family] += 1
+                if row_champion_source or row_champion_graft:
+                    champion_candidate_families[family] += 1
     merged_metadata = dict(meta)
     merged_metadata.update(dict(metadata or {}))
+    merged_metadata["champion_transfer_observation"] = _champion_transfer_observation(
+        meta,
+        champion_seed_case_count=champion_seed_case_count,
+        champion_graft_case_count=champion_graft_case_count,
+        champion_candidate_families=champion_candidate_families,
+    )
     meta_preflight = meta.get("preflight", {}) if isinstance(meta.get("preflight", {}), dict) else {}
     invalid_case_count = max(invalid_case_count, int(meta_preflight.get("invalid_cases", 0) or 0))
     fallback_case_count = max(fallback_case_count, int(meta_preflight.get("fallback_cases", 0) or 0))
@@ -150,6 +167,11 @@ def build_version_ledger(
     continual_learning = continual_learning_summary(family_rows, version_order=version_order)
     health = ledger_health_summary(normalized)
     health_feedback_report = ledger_health_feedback_report(health)
+    champion_transfer = champion_transfer_summary(
+        normalized,
+        family_rows=family_rows,
+        version_order=version_order,
+    )
     return {
         "schema_version": VERSION_LEDGER_SCHEMA_VERSION,
         "generated_at": generated_at or utc_now(),
@@ -172,15 +194,71 @@ def build_version_ledger(
             "min_throughput_cases_s": health["min_throughput_cases_s"],
             "max_invalid_rate": health["max_invalid_rate"],
             "max_false_positive_rate": health["max_false_positive_rate"],
+            "champion_transferable_family_count": champion_transfer["transferable_family_count"],
+            "champion_transfer_measured": champion_transfer["measured"],
         },
         "health": health,
         "health_feedback_report": health_feedback_report,
         "continual_learning": continual_learning,
         "adaptive_learning_seed": continual_learning.get("adaptive_learning_seed", {}),
+        "champion_transfer": champion_transfer,
         "methodology_claim": (
             "The same semantic corpus can be replayed across versions to separate "
             "new bugs, fixes, regressions, persistent known failures, and unhealthy "
             "exploration regions that should be downweighted in future runs."
+        ),
+    }
+
+
+def champion_transfer_summary(
+    observations: Iterable[VersionObservation],
+    *,
+    family_rows: Iterable[Mapping[str, Any]],
+    version_order: Iterable[Any],
+) -> dict[str, Any]:
+    normalized = list(observations)
+    versions = [str(version).strip() for version in version_order if str(version).strip()]
+    target_version = versions[-1] if versions else ""
+    source_versions = versions[:-1]
+    transferable = []
+    for row in family_rows:
+        if not isinstance(row, Mapping):
+            continue
+        family = str(row.get("family", "") or "").strip()
+        if not family:
+            continue
+        states = row.get("observations", []) or []
+        present_versions = [
+            str(state.get("version_id", "") or "").strip()
+            for state in states
+            if isinstance(state, Mapping) and str(state.get("state", "") or "") == OBSERVATION_PRESENT
+        ]
+        source_present = [version for version in present_versions if version in source_versions]
+        if not source_present:
+            continue
+        transferable.append(
+            {
+                "family": family,
+                "status": str(row.get("status", "") or ""),
+                "source_versions": source_present,
+                "target_present": target_version in present_versions,
+                "priority": _transfer_priority(str(row.get("status", "") or "")),
+            }
+        )
+    transferable.sort(key=lambda row: (-float(row["priority"]), row["family"]))
+    measured = _measured_champion_transfer(normalized)
+    return {
+        "schema_version": CHAMPION_TRANSFER_SCHEMA_VERSION,
+        "target_version": target_version,
+        "source_versions": source_versions,
+        "transferable_family_count": len(transferable),
+        "transferable_families": transferable[:20],
+        "measured": bool(measured["champion_case_count"] > 0),
+        "measured_seed_level_transfer": measured,
+        "methodology_claim": (
+            "Cross-version champion evidence is tracked at seed level: source-version "
+            "families identify transferable donor seeds, and run metadata records whether "
+            "champion injection/grafting produced cold-start candidate yield."
         ),
     }
 
@@ -338,6 +416,127 @@ def _float_health_field(value: Mapping[str, Any], health: Mapping[str, Any], key
     if direct:
         return direct
     return _float_value(health.get(key))
+
+
+def _row_is_champion_seed(row: Mapping[str, Any]) -> bool:
+    case = row.get("case", {}) if isinstance(row.get("case", {}), Mapping) else {}
+    metadata = case.get("metadata", {}) if isinstance(case.get("metadata", {}), Mapping) else {}
+    return str(row.get("candidate_source", "") or "") == "champion_corpus" or (
+        "champion_seed" in metadata and isinstance(metadata.get("champion_seed"), Mapping)
+    )
+
+
+def _row_is_champion_graft(row: Mapping[str, Any]) -> bool:
+    case = row.get("case", {}) if isinstance(row.get("case", {}), Mapping) else {}
+    metadata = case.get("metadata", {}) if isinstance(case.get("metadata", {}), Mapping) else {}
+    mutation = row.get("mutation", {}) if isinstance(row.get("mutation", {}), Mapping) else {}
+    return str(mutation.get("operator", "") or "") == "champion_graft" or (
+        "champion_graft" in metadata and isinstance(metadata.get("champion_graft"), Mapping)
+    )
+
+
+def _champion_transfer_observation(
+    meta: Mapping[str, Any],
+    *,
+    champion_seed_case_count: int,
+    champion_graft_case_count: int,
+    champion_candidate_families: Counter[str],
+) -> dict[str, Any]:
+    champion_corpus = meta.get("champion_corpus", {}) if isinstance(meta.get("champion_corpus", {}), Mapping) else {}
+    closed_loop = (
+        meta.get("closed_loop_state_summary", {})
+        if isinstance(meta.get("closed_loop_state_summary", {}), Mapping)
+        else {}
+    )
+    adaptive_health = (
+        closed_loop.get("adaptive_learning_health", {})
+        if isinstance(closed_loop.get("adaptive_learning_health", {}), Mapping)
+        else {}
+    )
+    champion_health = (
+        closed_loop.get("champion_corpus_health", {})
+        if isinstance(closed_loop.get("champion_corpus_health", {}), Mapping)
+        else {}
+    )
+    return {
+        "schema_version": "champion-transfer-observation-v1",
+        "champion_seed_case_count": max(0, int(champion_seed_case_count)),
+        "champion_graft_case_count": max(0, int(champion_graft_case_count)),
+        "champion_candidate_family_hit_count": sum(champion_candidate_families.values()),
+        "champion_candidate_family_count": len(champion_candidate_families),
+        "champion_candidate_families": dict(sorted(champion_candidate_families.items())),
+        "champion_corpus_enabled": bool(champion_corpus.get("enabled", champion_health.get("enabled", False))),
+        "champion_corpus_injected_count": max(0, int(champion_corpus.get("injected_count", 0) or 0)),
+        "champion_promoted_family_count": max(0, int(champion_health.get("promoted_family_count", 0) or 0)),
+        "champion_family_hit_count": max(0, int(champion_health.get("family_hit_count", 0) or 0)),
+        "champion_graft_donor_pulls": max(0, int(adaptive_health.get("champion_graft_donor_pulls", 0) or 0)),
+        "champion_graft_donor_arm_count": max(0, int(adaptive_health.get("champion_graft_donor_arm_count", 0) or 0)),
+    }
+
+
+def _measured_champion_transfer(observations: list[VersionObservation]) -> dict[str, Any]:
+    champion_seed_cases = 0
+    champion_graft_cases = 0
+    champion_candidate_hits = 0
+    champion_candidate_families: Counter[str] = Counter()
+    injected_count = 0
+    promoted_count = 0
+    donor_pulls = 0
+    total_cases = 0
+    total_candidate_hits = 0
+    for observation in observations:
+        total_cases += max(0, int(observation.case_count))
+        total_candidate_hits += sum(int(value or 0) for value in observation.candidate_families.values())
+        transfer = (
+            observation.metadata.get("champion_transfer_observation", {})
+            if isinstance(observation.metadata, Mapping)
+            else {}
+        )
+        if not isinstance(transfer, Mapping):
+            continue
+        champion_seed_cases += int(transfer.get("champion_seed_case_count", 0) or 0)
+        champion_graft_cases += int(transfer.get("champion_graft_case_count", 0) or 0)
+        champion_candidate_hits += int(transfer.get("champion_candidate_family_hit_count", 0) or 0)
+        injected_count += int(transfer.get("champion_corpus_injected_count", 0) or 0)
+        promoted_count += int(transfer.get("champion_promoted_family_count", 0) or 0)
+        donor_pulls += int(transfer.get("champion_graft_donor_pulls", 0) or 0)
+        families = transfer.get("champion_candidate_families", {})
+        if isinstance(families, Mapping):
+            champion_candidate_families.update({str(key): int(value or 0) for key, value in families.items()})
+    champion_cases = champion_seed_cases + champion_graft_cases
+    non_champion_cases = max(0, total_cases - champion_cases)
+    non_champion_hits = max(0, total_candidate_hits - champion_candidate_hits)
+    champion_rate = champion_candidate_hits / champion_cases if champion_cases else 0.0
+    non_champion_rate = non_champion_hits / non_champion_cases if non_champion_cases else 0.0
+    lift_available = bool(champion_cases and non_champion_cases and non_champion_rate > 0.0)
+    return {
+        "champion_seed_case_count": champion_seed_cases,
+        "champion_graft_case_count": champion_graft_cases,
+        "champion_case_count": champion_cases,
+        "champion_candidate_family_hit_count": champion_candidate_hits,
+        "champion_candidate_family_count": len(champion_candidate_families),
+        "champion_candidate_families": dict(sorted(champion_candidate_families.items())),
+        "champion_corpus_injected_count": injected_count,
+        "champion_promoted_family_count": promoted_count,
+        "champion_graft_donor_pulls": donor_pulls,
+        "overall_case_count": total_cases,
+        "overall_candidate_family_hit_count": total_candidate_hits,
+        "non_champion_case_count": non_champion_cases,
+        "non_champion_candidate_family_hit_count": non_champion_hits,
+        "champion_candidate_rate": champion_rate,
+        "non_champion_candidate_rate": non_champion_rate,
+        "cold_start_lift_factor": champion_rate / non_champion_rate if lift_available else 0.0,
+        "lift_factor_available": lift_available,
+    }
+
+
+def _transfer_priority(status: str) -> float:
+    return {
+        "regression": 4.0,
+        "new": 3.0,
+        "persistent": 2.0,
+        "fixed": 1.0,
+    }.get(str(status or ""), 0.0)
 
 
 def _float_value(value: Any) -> float:

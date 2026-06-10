@@ -4,9 +4,12 @@ from datadiff.dsl import SortKey
 from datadiff.ordering_semantics import (
     compare_row_mappings,
     rows_have_duplicate_sort_key,
+    rows_have_observable_duplicate_sort_key,
+    sort_boundary_splits_observable_tie,
     sort_boundary_splits_tie,
     sort_key_signature,
     sort_row_mappings,
+    sort_window_boundary_splits_observable_tie,
     sort_window_boundary_splits_tie,
 )
 
@@ -56,3 +59,32 @@ def test_sort_boundary_tie_detection_marks_cutoff_inside_tie_group():
 
     assert sort_boundary_splits_tie(rows, keys, 1) is True
     assert sort_window_boundary_splits_tie(rows, keys, 0, 1) is True
+
+
+def test_observable_tie_detection_ignores_identical_duplicate_rows():
+    rows = [
+        {"x": 1, "s": "a"},
+        {"x": 1, "s": "a"},
+        {"x": 2, "s": "c"},
+    ]
+    keys = [SortKey("x", True, "last"), SortKey("s", True, "last")]
+
+    assert rows_have_duplicate_sort_key(rows, keys) is True
+    assert rows_have_observable_duplicate_sort_key(rows, keys) is False
+    assert sort_boundary_splits_tie(rows, keys, 1) is True
+    assert sort_boundary_splits_observable_tie(rows, keys, 1) is False
+    assert sort_window_boundary_splits_observable_tie(rows, keys, 0, 1) is False
+
+
+def test_observable_tie_detection_keeps_nonidentical_tie_groups():
+    rows = [
+        {"x": 1, "s": "a"},
+        {"x": 1, "s": "a"},
+        {"x": 1, "s": "b"},
+        {"x": 2, "s": "c"},
+    ]
+    keys = [SortKey("x", True, "last")]
+
+    assert rows_have_observable_duplicate_sort_key(rows, keys) is True
+    assert sort_boundary_splits_observable_tie(rows, keys, 1) is True
+    assert sort_window_boundary_splits_observable_tie(rows, keys, 0, 1) is True

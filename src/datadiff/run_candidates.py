@@ -138,51 +138,55 @@ def _append_candidate(
             ),
             pool_metadata=generator_profile_pool_metadata,
         )
-        generated = _generate_case_with_optional_schema(
-            case_seed,
-            type_aware=config.enable_type_aware_generation,
-            profile=selected_profile,
-            schema_spec=schema_spec_for_seed(case_seed),
-            generate_case_fn=generate_case_fn,
-        )
-        generated_replay_skip_reason = replay_filter_fn(generated, config)
-        if generated_replay_skip_reason:
-            last_replay_skip_reason = generated_replay_skip_reason
-            state.replay_filtered_candidates += 1
-            skipped_replay_candidates += 1
-            if skipped_replay_candidates <= REPLAY_FILTER_EXTRA_ATTEMPTS_PER_CANDIDATE:
-                continue
-            replay_fallback_used = True
-            state.replay_fallback_candidates += 1
-            (
+        pending = _pop_pending_feedback_candidate(feedback)
+        if pending is None:
+            generated = _generate_case_with_optional_schema(
                 case_seed,
-                candidate,
-                source,
-                metadata,
-                profile_selection,
-                preflight,
-                last_saturated_family_skip_reason,
-            ) = _fallback_candidate(
-                state,
-                config=config,
-                guidance=None,
-                generator_profile_pool=generator_profile_pool,
-                generator_profile_pool_metadata=generator_profile_pool_metadata,
-                schema_spec_for_seed=schema_spec_for_seed,
+                type_aware=config.enable_type_aware_generation,
+                profile=selected_profile,
+                schema_spec=schema_spec_for_seed(case_seed),
                 generate_case_fn=generate_case_fn,
-                replay_filter_fn=replay_filter_fn,
-                strategy="fresh_fallback",
-                source="generated_fresh_fallback",
-                replay_error_prefix="fresh fallback generated replay candidate",
-                previous_saturation_reason=last_saturated_family_skip_reason,
             )
-            break
-        selected, source, metadata = _select_feedback_candidate(
-            feedback,
-            case_seed,
-            generated,
-            max_batch=candidate_slots_remaining,
-        )
+            generated_replay_skip_reason = replay_filter_fn(generated, config)
+            if generated_replay_skip_reason:
+                last_replay_skip_reason = generated_replay_skip_reason
+                state.replay_filtered_candidates += 1
+                skipped_replay_candidates += 1
+                if skipped_replay_candidates <= REPLAY_FILTER_EXTRA_ATTEMPTS_PER_CANDIDATE:
+                    continue
+                replay_fallback_used = True
+                state.replay_fallback_candidates += 1
+                (
+                    case_seed,
+                    candidate,
+                    source,
+                    metadata,
+                    profile_selection,
+                    preflight,
+                    last_saturated_family_skip_reason,
+                ) = _fallback_candidate(
+                    state,
+                    config=config,
+                    guidance=None,
+                    generator_profile_pool=generator_profile_pool,
+                    generator_profile_pool_metadata=generator_profile_pool_metadata,
+                    schema_spec_for_seed=schema_spec_for_seed,
+                    generate_case_fn=generate_case_fn,
+                    replay_filter_fn=replay_filter_fn,
+                    strategy="fresh_fallback",
+                    source="generated_fresh_fallback",
+                    replay_error_prefix="fresh fallback generated replay candidate",
+                    previous_saturation_reason=last_saturated_family_skip_reason,
+                )
+                break
+            selected, source, metadata = _select_feedback_candidate(
+                feedback,
+                case_seed,
+                generated,
+                max_batch=candidate_slots_remaining,
+            )
+        else:
+            selected, source, metadata = pending
         preflight = preflight_case(
             selected,
             enable_validation=config.enable_preflight_validation,
@@ -372,6 +376,20 @@ def _select_feedback_candidate(
         or _generated_candidate_metadata(generated)
     )
     return selected, source, metadata
+
+
+def _pop_pending_feedback_candidate(feedback: Any) -> tuple[Case, str, dict[str, Any]] | None:
+    if feedback is None:
+        return None
+    popper = getattr(feedback, "pop_pending_candidate", None)
+    if not callable(popper):
+        return None
+    selected = popper()
+    if selected is None:
+        return None
+    case = selected.case
+    metadata = dict(selected.metadata or case.metadata or {})
+    return case, str(selected.source or metadata.get("source", "feedback_mutation") or "feedback_mutation"), metadata
 
 
 def _candidate_saturated_roots(guidance: Any, candidate: Case) -> list[str]:

@@ -24,6 +24,7 @@ from datadiff.experiment_metadata import (
     resolved_run_semantics,
 )
 from datadiff.experiment_catalog import registered_experiment_meta_defaults, resolve_historical_experiment_meta
+from datadiff.preset_catalog import build_experiment_config
 
 
 def test_resolved_run_semantics_ignores_empty_explicit_variant_overlay() -> None:
@@ -361,6 +362,24 @@ def test_registered_final_matrix_variant_metadata_keeps_executable_overlay_detai
         "metamorphic_variant_limit_8",
     ]
     assert "join_membership" in deep_variant["semantic_focus_families"]
+
+
+def test_guided_groupby_preset_uses_groupby_focused_discovery_targets() -> None:
+    config = build_experiment_config("guided_groupby")
+
+    assert config.generator_profile == "discovery"
+    assert config.guidance_strategy == "guided"
+    assert config.guidance_candidate_pool == 8
+    assert config.family_saturation_threshold == 16
+    assert {
+        "groupby_aggregation",
+        "multi_key_groupby",
+        "null_agg_topk",
+        "join_filter_groupby",
+        "groupby_having_topk",
+    }.issubset(config.guidance_targets)
+    assert config.discovery_biases
+    assert config.discovery_biases[0].keep_in_pool is True
 
 
 def test_registered_experiment_meta_defaults_promotes_uniform_scope_kind_for_single_suite_selection() -> None:
