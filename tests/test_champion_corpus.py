@@ -43,6 +43,19 @@ def test_champion_registry_promotes_stable_family_and_loads_cross_version(tmp_pa
     assert other_version[0].stability == 3
 
 
+def test_champion_registry_skips_corrupt_jsonl_rows(tmp_path):
+    clean_registry = ChampionRegistry(tmp_path / "clean.jsonl")
+    assert clean_registry.promote_if_stable(_case(1), ["family@engine"], threshold=1, version_id="v1", stability=1)
+    valid_line = clean_registry.path.read_text(encoding="utf-8").strip()
+
+    champion_path = tmp_path / "champions.jsonl"
+    champion_path.write_text(f"not-json\n{valid_line}\n", encoding="utf-8")
+
+    registry = ChampionRegistry(champion_path)
+
+    assert [champion.case_id for champion in registry.champions_for_version("v2")] == ["case-1"]
+
+
 def test_champion_registry_grafts_donor_operations_onto_host(tmp_path):
     registry = ChampionRegistry(tmp_path / "champions.jsonl")
     donor = _case(
@@ -121,6 +134,60 @@ def test_champion_registry_caches_version_queries_and_returns_copy(tmp_path, mon
             lambda _self: (_ for _ in ()).throw(AssertionError("cached version query should not reread champions")),
         )
         assert [champion.case_id for champion in registry.champions_for_version("v2")] == ["case-1"]
+
+
+def test_champion_registry_limit_query_uses_lightweight_topn_read(tmp_path, monkeypatch):
+    registry = ChampionRegistry(tmp_path / "champions.jsonl")
+    for seed, stability in [(1, 1), (2, 4), (3, 2), (4, 3)]:
+        assert registry.promote_if_stable(
+            _case(seed),
+            [f"family-{seed}@engine"],
+            threshold=1,
+            version_id="v1",
+            stability=stability,
+        )
+
+    cold_registry = ChampionRegistry(registry.path)
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            ChampionRegistry,
+            "_read_all",
+            lambda _self: (_ for _ in ()).throw(AssertionError("limit query should not hydrate full corpus")),
+        )
+        champions = cold_registry.champions_for_version("v2", limit=2)
+
+    assert [champion.case_id for champion in champions] == ["case-2", "case-4"]
+    assert all(champion.case_payload for champion in champions)
+
+
+def test_champion_registry_smaller_limit_reuses_broader_query_cache(tmp_path, monkeypatch):
+    registry = ChampionRegistry(tmp_path / "champions.jsonl")
+    for seed, stability in [(1, 1), (2, 4), (3, 2), (4, 3)]:
+        assert registry.promote_if_stable(
+            _case(seed),
+            [f"family-{seed}@engine"],
+            threshold=1,
+            version_id="v1",
+            stability=stability,
+        )
+
+    cold_registry = ChampionRegistry(registry.path)
+    assert [champion.case_id for champion in cold_registry.champions_for_version("v2", limit=3)] == [
+        "case-2",
+        "case-4",
+        "case-3",
+    ]
+
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            champion_corpus,
+            "_iter_jsonl_text_lenient",
+            lambda _path: (_ for _ in ()).throw(AssertionError("smaller limit should reuse broader cache")),
+        )
+        assert [champion.case_id for champion in cold_registry.champions_for_version("v2", limit=2)] == [
+            "case-2",
+            "case-4",
+        ]
 
 
 def test_champion_registry_keeps_cache_hot_after_append_promotion(tmp_path, monkeypatch):

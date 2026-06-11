@@ -1,0 +1,2879 @@
+{
+  "bug_discovery_system": {
+    "objective": "maximize externally reproducible fresh implementation bug yield per unit budget",
+    "schema_version": "bug-discovery-system-v1",
+    "stages": [
+      "generate_or_mutate_candidate",
+      "score_by_acquisition",
+      "execute_differential_oracles",
+      "filter_rewardable_fresh_candidates",
+      "recheck_reproducibility",
+      "reduce_preserving_root_cause",
+      "write_reproducer_and_issue_draft"
+    ],
+    "theory": {
+      "budget": "Boltzmann allocation over acquisition free energy",
+      "candidate_priority": "multi-objective proof/reproducibility/dedup utility",
+      "exploration": "UCB optimism under sparse lane samples",
+      "novelty": "Good-Turing unseen-family probability"
+    }
+  },
+  "candidate_count": 1,
+  "candidates": [
+    {
+      "bug_dir": "/root/datadiff_fuzz_lab/bugs/bug_4be91de69a497228",
+      "candidate_acquisition": {
+        "acquisition_score": 5.534375,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "conditional_expression@datafusion,duckdb,pyarrow,sqlite"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.9475,
+        "recheck_prior": 0.85,
+        "reduction_potential": 1.0,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9960668549274264
+      },
+      "candidate_id": "conditional_expression-datafusion-duckdb-pyarrow-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 2,
+            "reproduced_keys": [
+              "accept_reject_mismatch:conditional_expression@datafusion,duckdb,pyarrow,sqlite:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 1,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:conditional_expression@datafusion,duckdb,pyarrow,sqlite:accept_reject"
+        ]
+      },
+      "case": {
+        "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1215-mut-1295-mut-810-mut-799-mut-3145-mut-3339-mut-684-mut-690-mut-1622-mut-1627-mut-1686-mut-713-mut-5456-mut-7023-mut-7274-mut-7423-mut-7469-mut-98",
+        "metadata": {
+          "candidate_source": "feedback_mutation",
+          "case_fingerprint": {
+            "column_count": 2,
+            "feature_tokens": [
+              "fp_op:bd5ad747c85a4919",
+              "fp_type_mix:num3_str2_bool5",
+              "fp_null_density:0",
+              "fp_row_mass:7",
+              "fp_column_count:2"
+            ],
+            "minhash_signature": [
+              17169201474594755,
+              95009781605776900,
+              1202921262517305700,
+              595016702369860734,
+              508069907568310269,
+              201526608575250058,
+              306906934962771356,
+              857448042754365922,
+              872770243763843515,
+              645455565446568893,
+              35342339065731115,
+              199890806840381761,
+              212953438140170412,
+              866469363295646256,
+              369925381209091400,
+              176592686791719405,
+              9263371181549847,
+              250933887475542911,
+              53982645577903652,
+              17546570167924304,
+              268222965839740683,
+              280517845367717635,
+              95245969055013093,
+              513796351634054518,
+              190098792960417417,
+              523104045616452573,
+              663618854037016939,
+              2972318742176957749,
+              530514895429061278,
+              786224894185020048,
+              177458603601923541,
+              447272430397532917,
+              481541331455451477,
+              35289553841345954,
+              121701089237567278,
+              255410209247893031,
+              240768225162960093,
+              685909026987177887,
+              190859323405532289,
+              210782575078440818,
+              731643265146072679,
+              235284542941306283,
+              417389109070084562,
+              569892770842088651,
+              19786482385890721,
+              462069540177263413,
+              281945334048177863,
+              184687615724556098,
+              347243981311394666,
+              264040153295229258,
+              202850371293399910,
+              543702046443426720,
+              385739713496578422,
+              330769698234291251,
+              593954438682493245,
+              299521163781283221,
+              31423095310549896,
+              489907872136984726,
+              1417719261547631823,
+              280086865218903580,
+              90925237754284934,
+              145342149702247786,
+              401170636432279493,
+              645808042563711116
+            ],
+            "null_density_bucket": 0,
+            "op_skeleton_hash": "bd5ad747c85a4919",
+            "row_mass_bucket": 7,
+            "type_mix_token": "num3_str2_bool5"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "datafusion"
+              ],
+              [
+                "duckdb"
+              ],
+              [
+                "pandas",
+                "polars",
+                "polars_lazy"
+              ],
+              [
+                "pyarrow"
+              ],
+              [
+                "sqlite"
+              ]
+            ],
+            "backend_statuses": {
+              "datafusion": "error:ValueError",
+              "duckdb": "error:CatalogException",
+              "pandas": "ok",
+              "polars": "ok",
+              "polars_lazy": "ok",
+              "pyarrow": "error:KeyError",
+              "sqlite": "error:OperationalError"
+            },
+            "column_classes": {
+              "b1": "unknown",
+              "b1_num_bucket": "unknown"
+            },
+            "feature_tokens": [
+              "column:b1:unknown",
+              "column:b1_num_bucket:unknown",
+              "disagree_class:unknown",
+              "disagree_pair:datafusion|duckdb",
+              "disagree_pair:datafusion|pandas",
+              "disagree_pair:datafusion|polars",
+              "disagree_pair:datafusion|polars_lazy",
+              "disagree_pair:datafusion|pyarrow",
+              "disagree_pair:datafusion|sqlite",
+              "disagree_pair:duckdb|pandas",
+              "disagree_pair:duckdb|polars",
+              "disagree_pair:duckdb|polars_lazy",
+              "disagree_pair:duckdb|pyarrow",
+              "disagree_pair:duckdb|sqlite",
+              "disagree_pair:pandas|pyarrow",
+              "disagree_pair:pandas|sqlite",
+              "disagree_pair:polars_lazy|pyarrow",
+              "disagree_pair:polars_lazy|sqlite",
+              "disagree_pair:polars|pyarrow",
+              "disagree_pair:polars|sqlite",
+              "disagree_pair:pyarrow|sqlite",
+              "group:datafusion",
+              "group:duckdb",
+              "group:pandas+polars+polars_lazy",
+              "group:pyarrow",
+              "group:sqlite",
+              "group_count:5",
+              "mismatch:status",
+              "root:conditional_expression",
+              "status:datafusion:error:ValueError",
+              "status:duckdb:error:CatalogException",
+              "status:pandas:ok",
+              "status:polars:ok",
+              "status:polars_lazy:ok",
+              "status:pyarrow:error:KeyError",
+              "status:sqlite:error:OperationalError"
+            ],
+            "mismatch_class": "status",
+            "pair_count": 18,
+            "pair_disagrees": [
+              {
+                "disagrees": true,
+                "left": "datafusion",
+                "right": "duckdb"
+              },
+              {
+                "disagrees": true,
+                "left": "datafusion",
+                "right": "pandas"
+              },
+              {
+                "disagrees": true,
+                "left": "datafusion",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "datafusion",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": true,
+                "left": "datafusion",
+                "right": "pyarrow"
+              },
+              {
+                "disagrees": true,
+                "left": "datafusion",
+                "right": "sqlite"
+              },
+              {
+                "disagrees": true,
+                "left": "duckdb",
+                "right": "pandas"
+              },
+              {
+                "disagrees": true,
+                "left": "duckdb",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "duckdb",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": true,
+                "left": "duckdb",
+                "right": "pyarrow"
+              },
+              {
+                "disagrees": true,
+                "left": "duckdb",
+                "right": "sqlite"
+              },
+              {
+                "disagrees": false,
+                "left": "pandas",
+                "right": "polars"
+              },
+              {
+                "disagrees": false,
+                "left": "pandas",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "pyarrow"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "sqlite"
+              },
+              {
+                "disagrees": false,
+                "left": "polars",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": true,
+                "left": "polars",
+                "right": "pyarrow"
+              },
+              {
+                "disagrees": true,
+                "left": "polars",
+                "right": "sqlite"
+              },
+              {
+                "disagrees": true,
+                "left": "polars_lazy",
+                "right": "pyarrow"
+              },
+              {
+                "disagrees": true,
+                "left": "polars_lazy",
+                "right": "sqlite"
+              },
+              {
+                "disagrees": true,
+                "left": "pyarrow",
+                "right": "sqlite"
+              }
+            ],
+            "primary_root_cause": "conditional_expression"
+          },
+          "feedback_decision": {
+            "attempt": 3,
+            "cluster_key": "profile=generic|targets=champion_family_conditional_expression_datafusion_duckdb|ops=filter>mutate>select>sort>row_number_filter>case_when>more4;rep=filter3,row_number_filter4,sort3",
+            "cluster_novelty_score": 0.175,
+            "cluster_reward": 0.0,
+            "exploration_objective_targets": [],
+            "frontier_head": [
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-3361-mut-3389-mut-1193-mut-1204-champion-mut-7261-mut-382-mut-9161",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 1,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-3361-mut-3389-mut-1193-mut-1204-champion-mut-7261-mut-382-mut-7365-mut-7416-mut-1774-mut-2264",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 5,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-3361-mut-3389-mut-1193-mut-1204-champion-mut-7261-mut-382-mut-7365-mut-7416-mut-7871-mut-7962",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 6,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-587-mut-1002-mut-101-mut-1611-mut-1599-mut-83-mut-139-mut-30-mut-222-mut-7294-mut-7293-mut-1549-mut-1979",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 7,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-3361-mut-3389-mut-1193-mut-1204-champion-mut-7261-mut-382-mut-7365-mut-7416-mut-7871",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 9,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-1058-mut-2258-mut-7362-mut-7726-mut-1736-mut-1821",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 10,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-1058-mut-2258-mut-4596-mut-7450-mut-7539",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 11,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-587-mut-1002-mut-101-mut-1611-mut-1599-mut-83-mut-139-mut-30-mut-222-mut-1525",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 13,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              }
+            ],
+            "frontier_rank": 16,
+            "frontier_size": 16,
+            "mutation_plan": {
+              "annealing_temperature": 0.1042272475902735,
+              "changed": true,
+              "executed_depth": 1,
+              "planned_depth": 2,
+              "steps": [
+                {
+                  "candidate_width": 3,
+                  "changed": true,
+                  "detail": "shrink_fold_redundant_op:sort:sort",
+                  "divergence_affinity": 0.0,
+                  "fallback_used": false,
+                  "heuristic_score": 1.7004931568585475,
+                  "novelty_bonus": 0.18,
+                  "operator": "shrink_fold_redundant_op",
+                  "operator_score": 0.2604931568585474,
+                  "productive": true,
+                  "repair_changed": false,
+                  "replay_seed": 107452660,
+                  "resulting_operation_count": 12,
+                  "target_affinity": 0.0
+                }
+              ],
+              "strategy": "adaptive_multi_step_planning",
+              "top_operators": [
+                {
+                  "operator": "append_range_filter",
+                  "score": 0.2632413016039794
+                },
+                {
+                  "operator": "append_left_join_coalesce_membership",
+                  "score": 0.2599265841266429
+                },
+                {
+                  "operator": "append_boolean_predicate_filter",
+                  "score": 0.2608233649121993
+                },
+                {
+                  "operator": "shrink_fold_redundant_op",
+                  "score": 0.2604931568585474
+                },
+                {
+                  "operator": "ir_fold_redundant_op",
+                  "score": 0.2604515454377255
+                },
+                {
+                  "operator": "append_left_join_boolean_coalesce_case_aggregate",
+                  "score": 0.2593931619822112
+                },
+                {
+                  "operator": "append_multi_key_membership_case_aggregate",
+                  "score": 0.2607758730252646
+                },
+                {
+                  "operator": "append_left_join_case_membership",
+                  "score": 0.26069311891920943
+                }
+              ]
+            },
+            "mutation_pulls": 3,
+            "mutation_seed": 98,
+            "operator_score_count": 37,
+            "operator_score_top": [
+              {
+                "mean_reward": 0.2632413016039794,
+                "operator": "append_range_filter"
+              },
+              {
+                "mean_reward": 0.2608233649121993,
+                "operator": "append_boolean_predicate_filter"
+              },
+              {
+                "mean_reward": 0.2607758730252646,
+                "operator": "append_multi_key_membership_case_aggregate"
+              },
+              {
+                "mean_reward": 0.26074932121177596,
+                "operator": "nullify_value"
+              },
+              {
+                "mean_reward": 0.26069311891920943,
+                "operator": "append_left_join_case_membership"
+              },
+              {
+                "mean_reward": 0.26066032502725145,
+                "operator": "ir_swap_adjacent"
+              },
+              {
+                "mean_reward": 0.26062150849134375,
+                "operator": "append_sql_distinct_null_topk"
+              },
+              {
+                "mean_reward": 0.2605572914897523,
+                "operator": "drop_op"
+              }
+            ],
+            "parent_case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1215-mut-1295-mut-810-mut-799-mut-3145-mut-3339-mut-684-mut-690-mut-1622-mut-1627-mut-1686-mut-713-mut-5456-mut-7023-mut-7274-mut-7423-mut-7469",
+            "parent_index": 12,
+            "planned_mutation_depth": 2,
+            "quality_archive_cluster_reward": 0.0,
+            "quality_archive_elite_bonus": 0.25,
+            "quality_archive_elite_indexes": [
+              12
+            ],
+            "quality_archive_health_penalty": 0.0,
+            "recent_cluster_pulls": 3,
+            "recent_operator_pulls": 1,
+            "recent_parent_pulls": 3,
+            "retention_utility": 11.7,
+            "schedule_base_reward": 3.25,
+            "schedule_feedback_count": 0,
+            "schedule_feedback_reward": 0.0,
+            "schedule_reward": 3.25,
+            "schedule_score": 0.2784,
+            "seed_energy": 5,
+            "seed_energy_tier": "med",
+            "seed_energy_tier_context": [
+              "seed_pulls:hot",
+              "seed_feedback:none",
+              "cluster_outcomes:none",
+              "recent_pull_rate:busy",
+              "target_key_count:few",
+              "schedule_reward:high",
+              "cluster:profile=generic|targets=champion_family_conditional_expression_datafusion_duckdb|ops=filter>mutate>select>sort>row_number_filter>case_when>more4;rep=filter3,row_number_filter4,sort3",
+              "target:champion_family:conditional_expression@datafusion,duckdb"
+            ],
+            "selected_operator": "shrink_fold_redundant_op",
+            "selected_operator_score": 0.2604931568585474,
+            "semantic_family_targets": [],
+            "semantic_signal_targets": [],
+            "swarm_particle_id": 9,
+            "target_key_count": 1,
+            "target_keys": [
+              "champion_family:conditional_expression@datafusion,duckdb"
+            ],
+            "target_novelty_score": 0.125,
+            "value_catalog_entry_count": 0
+          },
+          "feedback_selection": {
+            "attempt": 3,
+            "cluster_key": "profile=generic|targets=champion_family_conditional_expression_datafusion_duckdb|ops=filter>mutate>select>sort>row_number_filter>case_when>more4;rep=filter3,row_number_filter4,sort3",
+            "cluster_novelty_score": 0.175,
+            "cluster_reward": 0.0,
+            "exploration_objective_targets": [],
+            "frontier_head": [
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-3361-mut-3389-mut-1193-mut-1204-champion-mut-7261-mut-382-mut-9161",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 1,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-3361-mut-3389-mut-1193-mut-1204-champion-mut-7261-mut-382-mut-7365-mut-7416-mut-1774-mut-2264",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 5,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-3361-mut-3389-mut-1193-mut-1204-champion-mut-7261-mut-382-mut-7365-mut-7416-mut-7871-mut-7962",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 6,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-587-mut-1002-mut-101-mut-1611-mut-1599-mut-83-mut-139-mut-30-mut-222-mut-7294-mut-7293-mut-1549-mut-1979",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 7,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-3361-mut-3389-mut-1193-mut-1204-champion-mut-7261-mut-382-mut-7365-mut-7416-mut-7871",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 9,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-1058-mut-2258-mut-7362-mut-7726-mut-1736-mut-1821",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 10,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-1058-mut-2258-mut-4596-mut-7450-mut-7539",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 11,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-587-mut-1002-mut-101-mut-1611-mut-1599-mut-83-mut-139-mut-30-mut-222-mut-1525",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.0,
+                "index": 13,
+                "reward_prior": 3.25,
+                "schedule_score": 5.76,
+                "seed_energy": 6,
+                "target_novelty_score": 0.125
+              }
+            ],
+            "frontier_rank": 16,
+            "frontier_size": 16,
+            "mutation_plan": {
+              "annealing_temperature": 0.1042272475902735,
+              "changed": true,
+              "executed_depth": 1,
+              "planned_depth": 2,
+              "steps": [
+                {
+                  "candidate_width": 3,
+                  "changed": true,
+                  "detail": "shrink_fold_redundant_op:sort:sort",
+                  "divergence_affinity": 0.0,
+                  "fallback_used": false,
+                  "heuristic_score": 1.7004931568585475,
+                  "novelty_bonus": 0.18,
+                  "operator": "shrink_fold_redundant_op",
+                  "operator_score": 0.2604931568585474,
+                  "productive": true,
+                  "repair_changed": false,
+                  "replay_seed": 107452660,
+                  "resulting_operation_count": 12,
+                  "target_affinity": 0.0
+                }
+              ],
+              "strategy": "adaptive_multi_step_planning",
+              "top_operators": [
+                {
+                  "operator": "append_range_filter",
+                  "score": 0.2632413016039794
+                },
+                {
+                  "operator": "append_left_join_coalesce_membership",
+                  "score": 0.2599265841266429
+                },
+                {
+                  "operator": "append_boolean_predicate_filter",
+                  "score": 0.2608233649121993
+                },
+                {
+                  "operator": "shrink_fold_redundant_op",
+                  "score": 0.2604931568585474
+                },
+                {
+                  "operator": "ir_fold_redundant_op",
+                  "score": 0.2604515454377255
+                },
+                {
+                  "operator": "append_left_join_boolean_coalesce_case_aggregate",
+                  "score": 0.2593931619822112
+                },
+                {
+                  "operator": "append_multi_key_membership_case_aggregate",
+                  "score": 0.2607758730252646
+                },
+                {
+                  "operator": "append_left_join_case_membership",
+                  "score": 0.26069311891920943
+                }
+              ]
+            },
+            "mutation_pulls": 3,
+            "mutation_seed": 98,
+            "operator_score_count": 37,
+            "operator_score_top": [
+              {
+                "mean_reward": 0.2632413016039794,
+                "operator": "append_range_filter"
+              },
+              {
+                "mean_reward": 0.2608233649121993,
+                "operator": "append_boolean_predicate_filter"
+              },
+              {
+                "mean_reward": 0.2607758730252646,
+                "operator": "append_multi_key_membership_case_aggregate"
+              },
+              {
+                "mean_reward": 0.26074932121177596,
+                "operator": "nullify_value"
+              },
+              {
+                "mean_reward": 0.26069311891920943,
+                "operator": "append_left_join_case_membership"
+              },
+              {
+                "mean_reward": 0.26066032502725145,
+                "operator": "ir_swap_adjacent"
+              },
+              {
+                "mean_reward": 0.26062150849134375,
+                "operator": "append_sql_distinct_null_topk"
+              },
+              {
+                "mean_reward": 0.2605572914897523,
+                "operator": "drop_op"
+              }
+            ],
+            "parent_case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1215-mut-1295-mut-810-mut-799-mut-3145-mut-3339-mut-684-mut-690-mut-1622-mut-1627-mut-1686-mut-713-mut-5456-mut-7023-mut-7274-mut-7423-mut-7469",
+            "parent_index": 12,
+            "planned_mutation_depth": 2,
+            "quality_archive_cluster_reward": 0.0,
+            "quality_archive_elite_bonus": 0.25,
+            "quality_archive_elite_indexes": [
+              12
+            ],
+            "quality_archive_health_penalty": 0.0,
+            "recent_cluster_pulls": 3,
+            "recent_operator_pulls": 1,
+            "recent_parent_pulls": 3,
+            "retention_utility": 11.7,
+            "schedule_base_reward": 3.25,
+            "schedule_feedback_count": 0,
+            "schedule_feedback_reward": 0.0,
+            "schedule_reward": 3.25,
+            "schedule_score": 0.2784,
+            "seed_energy": 5,
+            "seed_energy_tier": "med",
+            "seed_energy_tier_context": [
+              "seed_pulls:hot",
+              "seed_feedback:none",
+              "cluster_outcomes:none",
+              "recent_pull_rate:busy",
+              "target_key_count:few",
+              "schedule_reward:high",
+              "cluster:profile=generic|targets=champion_family_conditional_expression_datafusion_duckdb|ops=filter>mutate>select>sort>row_number_filter>case_when>more4;rep=filter3,row_number_filter4,sort3",
+              "target:champion_family:conditional_expression@datafusion,duckdb"
+            ],
+            "selected_operator": "shrink_fold_redundant_op",
+            "selected_operator_score": 0.2604931568585474,
+            "semantic_family_targets": [],
+            "semantic_signal_targets": [],
+            "swarm_particle_id": 9,
+            "target_key_count": 1,
+            "target_keys": [
+              "champion_family:conditional_expression@datafusion,duckdb"
+            ],
+            "target_novelty_score": 0.125,
+            "value_catalog_entry_count": 0
+          },
+          "mutation": {
+            "changed": true,
+            "detail": "shrink_fold_redundant_op:sort:sort",
+            "detail_sequence": [
+              "shrink_fold_redundant_op:sort:sort"
+            ],
+            "executed_steps": 1,
+            "multi_step": false,
+            "operator": "shrink_fold_redundant_op",
+            "operator_sequence": [
+              "shrink_fold_redundant_op"
+            ],
+            "plan_depth": 2,
+            "value_catalog_entries": []
+          },
+          "mutation_plan": {
+            "annealing_temperature": 0.1042272475902735,
+            "changed": true,
+            "executed_depth": 1,
+            "planned_depth": 2,
+            "steps": [
+              {
+                "candidate_width": 3,
+                "changed": true,
+                "detail": "shrink_fold_redundant_op:sort:sort",
+                "divergence_affinity": 0.0,
+                "fallback_used": false,
+                "heuristic_score": 1.7004931568585475,
+                "novelty_bonus": 0.18,
+                "operator": "shrink_fold_redundant_op",
+                "operator_score": 0.2604931568585474,
+                "productive": true,
+                "repair_changed": false,
+                "replay_seed": 107452660,
+                "resulting_operation_count": 12,
+                "target_affinity": 0.0
+              }
+            ],
+            "strategy": "adaptive_multi_step_planning",
+            "top_operators": [
+              {
+                "operator": "append_range_filter",
+                "score": 0.2632413016039794
+              },
+              {
+                "operator": "append_left_join_coalesce_membership",
+                "score": 0.2599265841266429
+              },
+              {
+                "operator": "append_boolean_predicate_filter",
+                "score": 0.2608233649121993
+              },
+              {
+                "operator": "shrink_fold_redundant_op",
+                "score": 0.2604931568585474
+              },
+              {
+                "operator": "ir_fold_redundant_op",
+                "score": 0.2604515454377255
+              },
+              {
+                "operator": "append_left_join_boolean_coalesce_case_aggregate",
+                "score": 0.2593931619822112
+              },
+              {
+                "operator": "append_multi_key_membership_case_aggregate",
+                "score": 0.2607758730252646
+              },
+              {
+                "operator": "append_left_join_case_membership",
+                "score": 0.26069311891920943
+              }
+            ]
+          },
+          "mutation_selection": {
+            "annealing_decay": 0.85,
+            "annealing_temperature": 0.1042272475902735,
+            "candidate_count": 1,
+            "executed_depth": 1,
+            "multi_step": false,
+            "plan": {
+              "annealing_temperature": 0.1042272475902735,
+              "changed": true,
+              "executed_depth": 1,
+              "planned_depth": 2,
+              "steps": [
+                {
+                  "candidate_width": 3,
+                  "changed": true,
+                  "detail": "shrink_fold_redundant_op:sort:sort",
+                  "divergence_affinity": 0.0,
+                  "fallback_used": false,
+                  "heuristic_score": 1.7004931568585475,
+                  "novelty_bonus": 0.18,
+                  "operator": "shrink_fold_redundant_op",
+                  "operator_score": 0.2604931568585474,
+                  "productive": true,
+                  "repair_changed": false,
+                  "replay_seed": 107452660,
+                  "resulting_operation_count": 12,
+                  "target_affinity": 0.0
+                }
+              ],
+              "strategy": "adaptive_multi_step_planning",
+              "top_operators": [
+                {
+                  "operator": "append_range_filter",
+                  "score": 0.2632413016039794
+                },
+                {
+                  "operator": "append_left_join_coalesce_membership",
+                  "score": 0.2599265841266429
+                },
+                {
+                  "operator": "append_boolean_predicate_filter",
+                  "score": 0.2608233649121993
+                },
+                {
+                  "operator": "shrink_fold_redundant_op",
+                  "score": 0.2604931568585474
+                },
+                {
+                  "operator": "ir_fold_redundant_op",
+                  "score": 0.2604515454377255
+                },
+                {
+                  "operator": "append_left_join_boolean_coalesce_case_aggregate",
+                  "score": 0.2593931619822112
+                },
+                {
+                  "operator": "append_multi_key_membership_case_aggregate",
+                  "score": 0.2607758730252646
+                },
+                {
+                  "operator": "append_left_join_case_membership",
+                  "score": 0.26069311891920943
+                }
+              ]
+            },
+            "planned_depth": 2,
+            "selected_operator": "shrink_fold_redundant_op",
+            "selected_operator_score": 0.2604931568585474,
+            "selected_score_rank": 1,
+            "strategy": "feedback_score_with_annealed_tail",
+            "top_operators": [
+              {
+                "operator": "append_range_filter",
+                "score": 0.2632413016039794
+              },
+              {
+                "operator": "append_left_join_coalesce_membership",
+                "score": 0.2599265841266429
+              },
+              {
+                "operator": "append_boolean_predicate_filter",
+                "score": 0.2608233649121993
+              },
+              {
+                "operator": "shrink_fold_redundant_op",
+                "score": 0.2604931568585474
+              },
+              {
+                "operator": "ir_fold_redundant_op",
+                "score": 0.2604515454377255
+              },
+              {
+                "operator": "append_left_join_boolean_coalesce_case_aggregate",
+                "score": 0.2593931619822112
+              },
+              {
+                "operator": "append_multi_key_membership_case_aggregate",
+                "score": 0.2607758730252646
+              },
+              {
+                "operator": "append_left_join_case_membership",
+                "score": 0.26069311891920943
+              }
+            ]
+          },
+          "quality_archive_context": {
+            "archive_axis_reward": 0.0,
+            "archive_axis_weights": {},
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "generic"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:bd5ad747c85a4919"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:0"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num3_str2_bool5"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:7"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:4"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:4",
+              "null_density_axis": "null:0",
+              "op_skeleton_axis": "op:bd5ad747c85a4919",
+              "profile_axis": "generic",
+              "row_mass_axis": "rows:7",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num3_str2_bool5"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=generic|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=filter>mutate>select>sort>row_number_filter>case_when>more4;rep=filter3,row_number_filter4,sort2",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 25,
+            "target_keys": [
+              "champion_family:conditional_expression@datafusion,duckdb",
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          },
+          "seed_lineage": {
+            "depth": 1,
+            "mutation_seed": 98,
+            "parent_case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1215-mut-1295-mut-810-mut-799-mut-3145-mut-3339-mut-684-mut-690-mut-1622-mut-1627-mut-1686-mut-713-mut-5456-mut-7023-mut-7274-mut-7423-mut-7469",
+            "parent_index": 12,
+            "parent_seed": 7469,
+            "root_seed": 7469
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "cmp": "is_null",
+              "column": "b3",
+              "op": "filter",
+              "value": null
+            },
+            {
+              "column": "m_0",
+              "expr": {
+                "kind": "cast",
+                "source": "id",
+                "to": "str"
+              },
+              "op": "mutate"
+            },
+            {
+              "columns": [
+                "b1"
+              ],
+              "op": "select"
+            },
+            {
+              "ascending": false,
+              "columns": [
+                "b1"
+              ],
+              "op": "sort"
+            },
+            {
+              "cmp": "==",
+              "op": "row_number_filter",
+              "order_by": [
+                {
+                  "ascending": true,
+                  "column": "b1",
+                  "nulls": "first"
+                }
+              ],
+              "partition_by": [],
+              "value": 2
+            },
+            {
+              "cmp": "==",
+              "op": "row_number_filter",
+              "order_by": [
+                {
+                  "ascending": false,
+                  "column": "b1",
+                  "nulls": "first"
+                }
+              ],
+              "partition_by": [],
+              "value": 2
+            },
+            {
+              "cmp": "==",
+              "op": "row_number_filter",
+              "order_by": [
+                {
+                  "ascending": false,
+                  "column": "b1",
+                  "nulls": "first"
+                }
+              ],
+              "partition_by": [],
+              "value": 2
+            },
+            {
+              "as": "b1_num_bucket",
+              "condition": {
+                "cmp": "bool_is_true",
+                "column": "b1",
+                "value": null
+              },
+              "else": "null_or_false_unmatched_number",
+              "op": "case_when",
+              "then": "true_unmatched_number"
+            },
+            {
+              "cmp": "bool_is_true",
+              "column": "b1",
+              "op": "filter",
+              "value": null
+            },
+            {
+              "cmp": "==",
+              "op": "row_number_filter",
+              "order_by": [
+                {
+                  "ascending": true,
+                  "column": "b1",
+                  "nulls": "last"
+                }
+              ],
+              "partition_by": [
+                "b1_num_bucket"
+              ],
+              "value": 2
+            },
+            {
+              "ascending": true,
+              "columns": [
+                "b1_num_bucket",
+                "b1"
+              ],
+              "op": "sort"
+            },
+            {
+              "cmp": "bool_is_false",
+              "column": "b1",
+              "op": "filter",
+              "value": null
+            }
+          ],
+          "program_id": "prog-00000752-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1215-mut-1295-mut-810-mut-799-mut-3145-mut-3339-mut-684-mut-690-mut-1622-mut-1627-mut-1686-mut-713-mut-5456-mut-7023-mut-7274-mut-7423-mut-7469-mut-98",
+          "seed": 98
+        },
+        "seed": 98,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "b1",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "b2",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "b3",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "b4",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "id_num_s",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "id_num_s",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 2,
+                "id_num_s": "2"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": true,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": true,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": true,
+                "id": 129,
+                "id_num_s": "129"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": true,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": true,
+                "b4": true,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": false,
+                "b4": false,
+                "id": 41,
+                "id_num_s": "41"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": false,
+                "id": 0,
+                "id_num_s": null
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": false,
+                "b4": true,
+                "id": 4,
+                "id_num_s": "4"
+              },
+              {
+                "b1": true,
+                "b2": null,
+                "b3": true,
+                "b4": true,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": false,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": true,
+                "b4": false,
+                "id": 29,
+                "id_num_s": "29"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 3,
+                "id_num_s": "3"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": true,
+                "b4": false,
+                "id": 2,
+                "id_num_s": "2"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": false,
+                "b4": false,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": true,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 4,
+                "id_num_s": "4"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": false,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": true,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": false,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": true,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": false,
+                "b4": true,
+                "id": 3,
+                "id_num_s": "3"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": true,
+                "b4": null,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": true,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": false,
+                "id": 0,
+                "id_num_s": null
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": true,
+                "b2": null,
+                "b3": false,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": null,
+                "b4": false,
+                "id": 60,
+                "id_num_s": null
+              },
+              {
+                "b1": true,
+                "b2": null,
+                "b3": false,
+                "b4": true,
+                "id": 49,
+                "id_num_s": "49"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": true,
+                "id": 112,
+                "id_num_s": "112"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": false,
+                "b4": false,
+                "id": 1,
+                "id_num_s": null
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": false,
+                "id": 1,
+                "id_num_s": null
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 4,
+                "id_num_s": "4"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": false,
+                "id": 21,
+                "id_num_s": "21"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": false,
+                "b4": true,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": false,
+                "b4": true,
+                "id": 17,
+                "id_num_s": "17"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": true,
+                "b4": true,
+                "id": 0,
+                "id_num_s": null
+              },
+              {
+                "b1": true,
+                "b2": null,
+                "b3": false,
+                "b4": null,
+                "id": 120,
+                "id_num_s": null
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": null,
+                "b4": true,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 1,
+                "id_num_s": null
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": true,
+                "id": 1,
+                "id_num_s": null
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": false,
+                "b4": true,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": true,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": true,
+                "b4": false,
+                "id": 16,
+                "id_num_s": "16"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": null,
+                "b4": false,
+                "id": 1,
+                "id_num_s": null
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": false,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": null,
+                "id": 1,
+                "id_num_s": null
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": null,
+                "b4": false,
+                "id": 1,
+                "id_num_s": null
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": false,
+                "b4": true,
+                "id": 4,
+                "id_num_s": "4"
+              },
+              {
+                "b1": true,
+                "b2": null,
+                "b3": false,
+                "b4": true,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": true,
+                "id": 54,
+                "id_num_s": "54"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": false,
+                "b4": false,
+                "id": 4,
+                "id_num_s": "4"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": true,
+                "b4": false,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": false,
+                "b4": true,
+                "id": 78,
+                "id_num_s": "78"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": true,
+                "id": 2,
+                "id_num_s": "2"
+              },
+              {
+                "b1": null,
+                "b2": true,
+                "b3": true,
+                "b4": true,
+                "id": 94,
+                "id_num_s": "94"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": false,
+                "b4": true,
+                "id": 0,
+                "id_num_s": null
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": false,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 74,
+                "id_num_s": "74"
+              },
+              {
+                "b1": null,
+                "b2": true,
+                "b3": true,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": true,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": false,
+                "b4": true,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": false,
+                "id": 0,
+                "id_num_s": null
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": false,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": false,
+                "b4": false,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": false,
+                "b4": false,
+                "id": 4,
+                "id_num_s": "4"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": true,
+                "b4": false,
+                "id": 104,
+                "id_num_s": "中文"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": true,
+                "id": 3,
+                "id_num_s": "3"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": false,
+                "id": 23,
+                "id_num_s": "23"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": true,
+                "b4": false,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": true,
+                "b2": null,
+                "b3": false,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": null,
+                "b4": false,
+                "id": 1,
+                "id_num_s": null
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": true,
+                "id": 132,
+                "id_num_s": "132"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": true,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": true,
+                "id": 2,
+                "id_num_s": "2"
+              },
+              {
+                "b1": false,
+                "b2": null,
+                "b3": false,
+                "b4": false,
+                "id": 1,
+                "id_num_s": null
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": false,
+                "id": 2,
+                "id_num_s": "2"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": false,
+                "id": 1,
+                "id_num_s": null
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": true,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": null,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 8,
+                "id_num_s": "8"
+              },
+              {
+                "b1": false,
+                "b2": null,
+                "b3": true,
+                "b4": false,
+                "id": 61,
+                "id_num_s": "61"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": false,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": false,
+                "id": 106,
+                "id_num_s": "106"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": true,
+                "id": 0,
+                "id_num_s": null
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": true,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 2,
+                "id_num_s": "2"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": true,
+                "b4": true,
+                "id": 3,
+                "id_num_s": "3"
+              },
+              {
+                "b1": null,
+                "b2": null,
+                "b3": true,
+                "b4": false,
+                "id": 2,
+                "id_num_s": "2"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": false,
+                "b4": true,
+                "id": 14,
+                "id_num_s": "14"
+              },
+              {
+                "b1": true,
+                "b2": null,
+                "b3": true,
+                "b4": null,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": null,
+                "b4": false,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": null,
+                "b2": false,
+                "b3": null,
+                "b4": false,
+                "id": 2,
+                "id_num_s": "2"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": true,
+                "id": 2,
+                "id_num_s": "2"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": true,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": true,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": null,
+                "b4": true,
+                "id": 3,
+                "id_num_s": "3"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": true,
+                "b4": null,
+                "id": 127,
+                "id_num_s": "127"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": true,
+                "id": 39,
+                "id_num_s": "39"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": true,
+                "b4": true,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": true,
+                "b4": false,
+                "id": 2,
+                "id_num_s": "2"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": true,
+                "id": 1,
+                "id_num_s": null
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": true,
+                "b4": true,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": false,
+                "b4": false,
+                "id": 0,
+                "id_num_s": null
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": false,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": null,
+                "b3": true,
+                "b4": false,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": true,
+                "id": 4,
+                "id_num_s": "4"
+              },
+              {
+                "b1": null,
+                "b2": true,
+                "b3": null,
+                "b4": false,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": null,
+                "b2": true,
+                "b3": true,
+                "b4": true,
+                "id": 88,
+                "id_num_s": "88"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": true,
+                "b4": false,
+                "id": 1,
+                "id_num_s": null
+              },
+              {
+                "b1": false,
+                "b2": null,
+                "b3": false,
+                "b4": false,
+                "id": 9,
+                "id_num_s": "9"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": false,
+                "b4": true,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": false,
+                "b4": true,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": true,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": true,
+                "b4": false,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": false,
+                "b4": false,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": false,
+                "b4": true,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": false,
+                "b4": true,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "b3": true,
+                "b4": true,
+                "id": 69,
+                "id_num_s": "69"
+              },
+              {
+                "b1": false,
+                "b2": null,
+                "b3": true,
+                "b4": true,
+                "id": 1,
+                "id_num_s": null
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 0,
+                "id_num_s": null
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": true,
+                "b4": true,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": null,
+                "b4": true,
+                "id": 1,
+                "id_num_s": "1"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": true,
+                "b4": true,
+                "id": 55,
+                "id_num_s": null
+              },
+              {
+                "b1": false,
+                "b2": null,
+                "b3": true,
+                "b4": true,
+                "id": 3,
+                "id_num_s": "3"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": null,
+                "b4": false,
+                "id": 13,
+                "id_num_s": "13"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "b3": null,
+                "b4": true,
+                "id": 0,
+                "id_num_s": null
+              },
+              {
+                "b1": null,
+                "b2": true,
+                "b3": true,
+                "b4": null,
+                "id": 0,
+                "id_num_s": "0"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 67,
+                "id_num_s": "67"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "b3": false,
+                "b4": false,
+                "id": 46,
+                "id_num_s": "46"
+              }
+            ]
+          },
+          {
+            "columns": [
+              {
+                "name": "num_value",
+                "nullable": false,
+                "type": "int"
+              }
+            ],
+            "name": "t_numeric_antijoin_mut",
+            "rows": [
+              {
+                "num_value": 1
+              },
+              {
+                "num_value": 2
+              },
+              {
+                "num_value": 3
+              }
+            ]
+          },
+          {
+            "columns": [
+              {
+                "name": "num_value",
+                "nullable": false,
+                "type": "int"
+              }
+            ],
+            "name": "t_numeric_antijoin_mut_1",
+            "rows": [
+              {
+                "num_value": 1
+              },
+              {
+                "num_value": 2
+              },
+              {
+                "num_value": 3
+              }
+            ]
+          },
+          {
+            "columns": [
+              {
+                "name": "flag_key",
+                "nullable": false,
+                "type": "bool"
+              }
+            ],
+            "name": "t_bool_antijoin_mut",
+            "rows": [
+              {
+                "flag_key": true
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": 1,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 1,
+        "compress_run_log": true,
+        "discovery_biases": [],
+        "effective_guidance_targets": [
+          "simple_case_random_subject",
+          "random_case_probe",
+          "group_quantile_key_probe",
+          "group_quantile_probe",
+          "scalar_subquery_double_parentheses",
+          "scalar_subquery_probe",
+          "window_avg_rows_frame",
+          "window_avg_probe",
+          "struct_distinct_unnest",
+          "struct_distinct_probe",
+          "bit_compare_unequal_length",
+          "bit_compare_probe",
+          "round_even_float_scale",
+          "round_even_probe",
+          "series_rtruediv_operand_order",
+          "series_rtruediv_probe",
+          "pandas_uint64_isin_precision",
+          "uint64_isin_probe",
+          "duckdb_tuple_anti_null_semantics",
+          "tuple_anti_null_probe",
+          "datafusion_setop_all_duplicate_count",
+          "setop_all_duplicate_probe",
+          "duckdb_json_predicate_order_semantics",
+          "json_predicate_order_probe",
+          "pandas_sparse_array_mask_semantics",
+          "sparse_mask_probe",
+          "polars_float_wrap_numerical_semantics",
+          "float_wrap_probe",
+          "pandas_index_bool_result_type",
+          "index_bool_probe",
+          "polars_empty_literal_groupby_semantics",
+          "empty_literal_groupby_probe",
+          "pandas_arrow_string_eq_sum_semantics",
+          "arrow_string_eq_sum_probe",
+          "pandas_arrow_timestamp_loc_slice_semantics",
+          "arrow_timestamp_loc_slice_probe",
+          "pandas_arrow_timestamp_index_attr_semantics",
+          "arrow_timestamp_index_attr_probe",
+          "pandas_eval_inplace_aliasing_semantics",
+          "eval_inplace_alias_probe",
+          "pandas_bool_reduction_skipna_semantics",
+          "bool_reduction_skipna_probe",
+          "pyarrow_dataset_isin_all_match_semantics",
+          "dataset_isin_all_match_probe",
+          "pyarrow_run_end_null_compute_semantics",
+          "run_end_null_compute_probe",
+          "pyarrow_large_string_partition_schema_semantics",
+          "large_string_partition_probe",
+          "pyarrow_hash_pivot_wider_order_semantics",
+          "hash_pivot_wider_probe",
+          "pyarrow_list_flatten_parent_indices_semantics",
+          "list_flatten_parent_indices_probe",
+          "polars_rolling_mean_by_null_count_semantics",
+          "rolling_mean_by_null_count_probe",
+          "pyarrow_groupby_filter_cast_membership",
+          "running_sum_precision",
+          "partitioned_running_sum",
+          "path_basename_keyed_pick",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "list_layout",
+          "dataset_membership_filter",
+          "rolling_temporal_nulls",
+          "numeric",
+          "strings",
+          "nulls"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": true,
+        "generator_profile": "deep_probe_rotation",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 4,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "simple_case_random_subject",
+          "random_case_probe",
+          "group_quantile_key_probe",
+          "group_quantile_probe",
+          "scalar_subquery_double_parentheses",
+          "scalar_subquery_probe",
+          "window_avg_rows_frame",
+          "window_avg_probe",
+          "struct_distinct_unnest",
+          "struct_distinct_probe",
+          "bit_compare_unequal_length",
+          "bit_compare_probe",
+          "round_even_float_scale",
+          "round_even_probe",
+          "series_rtruediv_operand_order",
+          "series_rtruediv_probe",
+          "pandas_uint64_isin_precision",
+          "uint64_isin_probe",
+          "duckdb_tuple_anti_null_semantics",
+          "tuple_anti_null_probe",
+          "datafusion_setop_all_duplicate_count",
+          "setop_all_duplicate_probe",
+          "duckdb_json_predicate_order_semantics",
+          "json_predicate_order_probe",
+          "pandas_sparse_array_mask_semantics",
+          "sparse_mask_probe",
+          "polars_float_wrap_numerical_semantics",
+          "float_wrap_probe",
+          "pandas_index_bool_result_type",
+          "index_bool_probe",
+          "polars_empty_literal_groupby_semantics",
+          "empty_literal_groupby_probe",
+          "pandas_arrow_string_eq_sum_semantics",
+          "arrow_string_eq_sum_probe",
+          "pandas_arrow_timestamp_loc_slice_semantics",
+          "arrow_timestamp_loc_slice_probe",
+          "pandas_arrow_timestamp_index_attr_semantics",
+          "arrow_timestamp_index_attr_probe",
+          "pandas_eval_inplace_aliasing_semantics",
+          "eval_inplace_alias_probe",
+          "pandas_bool_reduction_skipna_semantics",
+          "bool_reduction_skipna_probe",
+          "pyarrow_dataset_isin_all_match_semantics",
+          "dataset_isin_all_match_probe",
+          "pyarrow_run_end_null_compute_semantics",
+          "run_end_null_compute_probe",
+          "pyarrow_large_string_partition_schema_semantics",
+          "large_string_partition_probe",
+          "pyarrow_hash_pivot_wider_order_semantics",
+          "hash_pivot_wider_probe",
+          "pyarrow_list_flatten_parent_indices_semantics",
+          "list_flatten_parent_indices_probe",
+          "polars_rolling_mean_by_null_count_semantics",
+          "rolling_mean_by_null_count_probe",
+          "pyarrow_groupby_filter_cast_membership",
+          "running_sum_precision",
+          "partitioned_running_sum",
+          "path_basename_keyed_pick",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "list_layout",
+          "dataset_membership_filter",
+          "rolling_temporal_nulls",
+          "numeric",
+          "strings",
+          "nulls"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.25,
+        "log_level": "minimal",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 2,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [],
+        "semantic_focus_signals": [],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "/root/datadiff_fuzz_lab/new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-smoke-arrow-bool-groupby-20260607T070808/strategy-learning/candidate-pipeline-learning.json",
+        "strategy_snapshot_path": "/root/datadiff_fuzz_lab/new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-smoke-arrow-bool-groupby-20260607T070808/strategy-snapshot.json",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "families": [
+        "conditional_expression@datafusion,duckdb,pyarrow,sqlite"
+      ],
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'pyarrow': 'error', 'polars': 'ok', 'polars_lazy': 'ok', 'duckdb': 'error', 'sqlite': 'error', 'datafusion': 'error'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-4be91de69a497228",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "conditional_expression",
+          "severity": "high",
+          "signature": "4be91de69a497228",
+          "source_issue": "",
+          "suspicious_backends": [
+            "datafusion",
+            "duckdb",
+            "pyarrow",
+            "sqlite"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas', 'polars', 'polars_lazy'] and disagrees with ['datafusion', 'duckdb', 'pyarrow', 'sqlite'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "datafusion": {
+          "backend": "datafusion",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"ValueError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "Schema error: Schema contains duplicate qualified field name t0.id_num_s",
+          "error_type": "ValueError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        },
+        "duckdb": {
+          "backend": "duckdb",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"CatalogException\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "Catalog Error: Column with name id_num_s already exists!",
+          "error_type": "CatalogException",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "b1",
+            "b1_num_bucket"
+          ],
+          "comparison_key": "{\"columns\":[\"b1\",\"b1_num_bucket\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "ok",
+          "unordered_row_signature": "[]"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [
+            "b1",
+            "b1_num_bucket"
+          ],
+          "comparison_key": "{\"columns\":[\"b1\",\"b1_num_bucket\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "ok",
+          "unordered_row_signature": "[]"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [
+            "b1",
+            "b1_num_bucket"
+          ],
+          "comparison_key": "{\"columns\":[\"b1\",\"b1_num_bucket\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "ok",
+          "unordered_row_signature": "[]"
+        },
+        "pyarrow": {
+          "backend": "pyarrow",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"KeyError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "'Field \"id_num_s\" exists 2 times in schema'",
+          "error_type": "KeyError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        },
+        "sqlite": {
+          "backend": "sqlite",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"OperationalError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "duplicate column name: id_num_s",
+          "error_type": "OperationalError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        }
+      },
+      "raw_results": {
+        "datafusion": {
+          "backend": "datafusion",
+          "duration_ms": 8.377063990337774,
+          "error": "Schema error: Schema contains duplicate qualified field name t0.id_num_s",
+          "error_type": "ValueError",
+          "status": "error"
+        },
+        "duckdb": {
+          "backend": "duckdb",
+          "duration_ms": 31.66132800106425,
+          "error": "Catalog Error: Column with name id_num_s already exists!",
+          "error_type": "CatalogException",
+          "status": "error"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 29.14839099685196,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 15.523473994107917,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 9.269141010008752,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pyarrow": {
+          "backend": "pyarrow",
+          "duration_ms": 14.833938999800012,
+          "error": "'Field \"id_num_s\" exists 2 times in schema'",
+          "error_type": "KeyError",
+          "status": "error"
+        },
+        "sqlite": {
+          "backend": "sqlite",
+          "duration_ms": 3.7757609970867634,
+          "error": "duplicate column name: id_num_s",
+          "error_type": "OperationalError",
+          "status": "error"
+        }
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-smoke-arrow-bool-groupby-deep_probe_rotation-seed84-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T070803-1780816083949406957.jsonl.gz"
+    }
+  ],
+  "evidence_files": [
+    "new_issue/generated/discovery-campaign-smoke-arrow-bool-groupby-deep_probe_rotation-seed84-fresh-candidates.json"
+  ],
+  "generated_at": "2026-06-07T07:09:11Z",
+  "generated_by": "datadiff candidate-pipeline",
+  "manifest_file": "new_issue/generated/discovery-campaign-smoke-arrow-bool-groupby.json",
+  "schema_version": "candidate-freeze-v1",
+  "strategy_snapshot_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-smoke-arrow-bool-groupby-20260607T070808/strategy-snapshot.json"
+}

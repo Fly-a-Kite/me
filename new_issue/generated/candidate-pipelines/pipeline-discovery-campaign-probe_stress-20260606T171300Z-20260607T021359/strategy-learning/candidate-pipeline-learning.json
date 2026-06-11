@@ -1,0 +1,97 @@
+{
+  "events": [
+    {
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00000735-issue-focus-csv-long-numeric-roundtrip",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "primary_family": "csv_long_numeric_roundtrip@polars,polars_lazy",
+      "recorded_at": "2026-06-07T02:14:18Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "csv_long_numeric_roundtrip"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed501-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T002726-1780792046283706436.jsonl.gz",
+      "suspicious_backends": [
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "candidate_implementation_bug"
+    },
+    {
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00000801-issue-focus-csv-long-numeric-roundtrip",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "primary_family": "csv_long_numeric_roundtrip@polars,polars_lazy",
+      "recorded_at": "2026-06-07T02:14:18Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "csv_long_numeric_roundtrip"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed501-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T002726-1780792046283706436.jsonl.gz",
+      "suspicious_backends": [
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "candidate_implementation_bug"
+    },
+    {
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00001333-issue-focus-csv-long-numeric-roundtrip",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "primary_family": "csv_long_numeric_roundtrip@polars,polars_lazy",
+      "recorded_at": "2026-06-07T02:14:18Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "csv_long_numeric_roundtrip"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed501-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T002726-1780792046283706436.jsonl.gz",
+      "suspicious_backends": [
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "candidate_implementation_bug"
+    },
+    {
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00001517-issue-focus-csv-long-numeric-roundtrip",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "primary_family": "csv_long_numeric_roundtrip@polars,polars_lazy",
+      "recorded_at": "2026-06-07T02:14:19Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "csv_long_numeric_roundtrip"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed501-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T002726-1780792046283706436.jsonl.gz",
+      "suspicious_backends": [
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "candidate_implementation_bug"
+    }
+  ],
+  "schema_version": "dynamic-strategy-learning-v1"
+}

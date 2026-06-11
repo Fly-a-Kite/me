@@ -1,0 +1,864 @@
+{
+  "bug_audit": {
+    "skipped": true
+  },
+  "cases_per_lane_seed": 220,
+  "completed_at": "",
+  "duration": null,
+  "generated_at": "2026-06-07T05:27:43Z",
+  "generated_by": "datadiff discovery-campaign",
+  "health_stop_reason": "",
+  "lane_ids": [
+    "polars_lazy",
+    "arrow_probe_stress"
+  ],
+  "lanes": [
+    {
+      "default": true,
+      "discovery_biases": [
+        {
+          "candidate_pool_bonus": 0.0,
+          "contribution_bonus": 0.1,
+          "feature_prefixes": [
+            "expr:",
+            "pattern:"
+          ],
+          "keep_in_pool": true,
+          "novelty_bonus": 0.1,
+          "score_bonus": 0.3,
+          "targets": [
+            "polars_reverse_division_columns",
+            "polars_rolling_mean_by_null_count_semantics"
+          ]
+        }
+      ],
+      "id": "polars_lazy",
+      "preset": "live_polars_deep_organic_metamorphic",
+      "semantic_focus_families": [
+        "stateful_ordering",
+        "backend_specific_semantics"
+      ],
+      "semantic_focus_signals": [
+        "polars_reverse_division_columns",
+        "polars_rolling_mean_by_null_count_semantics"
+      ],
+      "target_suite": "polars_cross",
+      "theme": "Organic Polars eager/lazy state, sortedness, nullable dtype, and expression equivalence"
+    },
+    {
+      "default": false,
+      "discovery_biases": [],
+      "id": "arrow_probe_stress",
+      "preset": "live_arrow_issue_focus_metamorphic",
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "target_suite": "arrow_cross",
+      "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts"
+    }
+  ],
+  "progress": {
+    "completed_run_count": 2,
+    "current_lane_id": "arrow_probe_stress",
+    "current_seed": 7001,
+    "planned_run_count": 4,
+    "remaining_run_count": 2
+  },
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "candidate_pipeline": {
+        "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-longhaul-20260607T0325CST-batch0000-20260607T014836/manifest.json",
+        "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-longhaul-20260607T0325CST-batch0000-20260607T014836/manifest.md",
+        "status": "ok",
+        "summary": {
+          "already_submitted_or_confirmed_count": 0,
+          "artifact_created_count": 0,
+          "candidate_bug_verdict_count": 0,
+          "candidate_count": 4,
+          "issue_draft_count": 0,
+          "local_duplicate_candidate_count": 3,
+          "needs_dedup_check_count": 0,
+          "needs_reproducer_or_evidence_count": 0,
+          "not_latest_reproducible_count": 0,
+          "ready_to_submit_count": 0,
+          "recheck_pass_rate": 1.0,
+          "rechecked_count": 4,
+          "reduced_count": 4,
+          "reproduced_count": 4,
+          "submission_group_count": 0,
+          "unique_family_count": 1
+        }
+      },
+      "cases": 220,
+      "classification": {
+        "candidate_bug_families": {
+          "running_sum_precision@polars_lazy": 4
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-mut-894-mut-5548-mut-5294-mut-6032-mut-2965-mut-7036",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'polars'] and disagrees with ['polars_lazy'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 7036,
+              "signature": "564c3c36b358b5d1",
+              "suspicious": [
+                "polars_lazy"
+              ]
+            },
+            {
+              "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-mut-894-mut-5548-mut-5294-mut-6032-mut-2965-mut-8030",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'polars'] and disagrees with ['polars_lazy'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 8030,
+              "signature": "b21eb9dfae0fb490",
+              "suspicious": [
+                "polars_lazy"
+              ]
+            },
+            {
+              "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-mut-894-mut-5548-mut-5294-mut-6032-mut-2965-mut-8053",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'polars'] and disagrees with ['polars_lazy'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 8053,
+              "signature": "b6286763475f9f8d",
+              "suspicious": [
+                "polars_lazy"
+              ]
+            },
+            {
+              "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-mut-894-mut-5548-mut-5294-mut-6032-mut-2965-mut-8103",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'polars'] and disagrees with ['polars_lazy'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 8103,
+              "signature": "577121493b1e8de0",
+              "suspicious": [
+                "polars_lazy"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157-mut-7041",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 7041,
+              "signature": "853dfdbd9dc9f1aa",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-7136",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 7136,
+              "signature": "9f9a7bf15d79a4e1",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00007136-discovery-fresh",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 7136,
+              "signature": "600c284cd70a83ff",
+              "suspicious": [
+                "pandas",
+                "polars",
+                "polars_lazy"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157-mut-7213",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 7213,
+              "signature": "a190ab0f11d786ef",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-champion-mut-7234",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families; filter compares against NULL; engines intentionally differ on NULL predicate semantics",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 7234,
+              "signature": "cc5479e817e3cc60",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "running_sum_precision@polars_lazy": 4
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 4,
+          "semantic_divergence": 44
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260606T235352-1780790032042245304.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 4,
+          "expected_semantic_divergence": 44
+        },
+        "unsaturated_candidate_bug_families": {
+          "running_sum_precision@polars_lazy": 4
+        }
+      },
+      "completed_at": "2026-06-07T01:49:55Z",
+      "csv": "reports/findings-run-20260606T235352-1780790032042245304.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7001-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 4,
+      "health": {
+        "bytes": 5298505,
+        "candidate_bug_families": {
+          "metamorphic_join_inner_left_equivalence@polars": 16,
+          "metamorphic_join_inner_left_equivalence@polars_lazy": 16,
+          "running_sum_precision@polars_lazy": 4
+        },
+        "examples": [
+          {
+            "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-mut-894-mut-5548-mut-5294-mut-6032-mut-2965-mut-7036",
+            "kind": "semantic_output_mismatch",
+            "root": "running_sum_precision",
+            "seed": 7036,
+            "status": "bug",
+            "suspicious": [
+              "polars_lazy"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-champion-mut-7234",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 7234,
+            "status": "bug",
+            "suspicious": [
+              "polars"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-champion-mut-7234",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 7234,
+            "status": "bug",
+            "suspicious": [
+              "polars_lazy"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-champion-mut-7234-mut-7249",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 7249,
+            "status": "bug",
+            "suspicious": [
+              "polars"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-champion-mut-7234-mut-7249",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 7249,
+            "status": "bug",
+            "suspicious": [
+              "polars_lazy"
+            ]
+          }
+        ],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "metamorphic_join_inner_left_equivalence@polars": 16,
+          "metamorphic_join_inner_left_equivalence@polars_lazy": 16,
+          "running_sum_precision@polars_lazy": 4
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 220,
+        "run_file": "runs/run-20260606T235352-1780790032042245304.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 6881.329367137994,
+          "evidence_bytes_per_case": 24084.113636363636,
+          "executed_cases": 220,
+          "meta_file": "runs/run-20260606T235352-1780790032042245304.meta.json",
+          "next_seed": 8894,
+          "run_log_bytes": 5298505,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 38.877948200057624,
+              "generate_mutate_ms": 30830.208471972837,
+              "logging_artifact_ms": 0.5534056140856013,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 319.84459035064157,
+              "scheduler_feedback_ms": 65.55019493647374,
+              "total_case_wall_ms": 31255.034611074097
+            },
+            "case_count": 220,
+            "share_of_total": {
+              "backend_execution_ms": 0.001243893941691001,
+              "generate_mutate_ms": 0.9864077533623739,
+              "logging_artifact_ms": 1.7706127059911234e-05,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.010233378216683086,
+              "scheduler_feedback_ms": 0.0020972683521920782,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.03197056677022567
+        },
+        "statuses": {
+          "bug": 20,
+          "ok": 200
+        }
+      },
+      "lane_id": "polars_lazy",
+      "preset": "live_polars_deep_organic_metamorphic",
+      "report": "reports/report-run-20260606T235352-1780790032042245304.md",
+      "run_file": "runs/run-20260606T235352-1780790032042245304.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 1.0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 0.0,
+        "priority_rank": 1,
+        "score": 2.2798345101319635,
+        "yield_rate": 0.0
+      },
+      "seed": 7001,
+      "semantic_focus_families": [
+        "stateful_ordering",
+        "backend_specific_semantics"
+      ],
+      "semantic_focus_signals": [
+        "polars_reverse_division_columns",
+        "polars_rolling_mean_by_null_count_semantics"
+      ],
+      "started_at": "2026-06-06T23:53:52Z",
+      "status": "completed",
+      "target_suite": "polars_cross",
+      "theme": "Organic Polars eager/lazy state, sortedness, nullable dtype, and expression equivalence"
+    },
+    {
+      "backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "candidate_pipeline": {
+        "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-longhaul-20260607T0325CST-batch0000-20260607T045347/manifest.json",
+        "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-longhaul-20260607T0325CST-batch0000-20260607T045347/manifest.md",
+        "status": "ok",
+        "summary": {
+          "already_submitted_or_confirmed_count": 0,
+          "artifact_created_count": 10,
+          "candidate_bug_verdict_count": 0,
+          "candidate_count": 16,
+          "issue_draft_count": 0,
+          "local_duplicate_candidate_count": 14,
+          "needs_dedup_check_count": 0,
+          "needs_reproducer_or_evidence_count": 0,
+          "not_latest_reproducible_count": 0,
+          "ready_to_submit_count": 0,
+          "recheck_pass_rate": 1.0,
+          "rechecked_count": 16,
+          "reduced_count": 16,
+          "reproduced_count": 16,
+          "submission_group_count": 0,
+          "unique_family_count": 2
+        }
+      },
+      "cases": 220,
+      "classification": {
+        "candidate_bug_families": {
+          "ordering_or_limit@polars,polars_lazy": 14,
+          "running_sum_precision@polars_lazy": 2
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-8166",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "semantic_output_mismatch",
+              "root": "ordering_or_limit",
+              "seed": 8166,
+              "signature": "9eb733dcc44794af",
+              "suspicious": [
+                "polars",
+                "polars_lazy"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-8166-mut-8158",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "semantic_output_mismatch",
+              "root": "ordering_or_limit",
+              "seed": 8158,
+              "signature": "9eb733dcc44794af",
+              "suspicious": [
+                "polars",
+                "polars_lazy"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-8166-mut-8158-mut-8171",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "semantic_output_mismatch",
+              "root": "ordering_or_limit",
+              "seed": 8171,
+              "signature": "9eb733dcc44794af",
+              "suspicious": [
+                "polars",
+                "polars_lazy"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-8166-mut-8197",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "semantic_output_mismatch",
+              "root": "ordering_or_limit",
+              "seed": 8197,
+              "signature": "bdfa85636bc96372",
+              "suspicious": [
+                "polars",
+                "polars_lazy"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-8166-mut-8197-mut-8198",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "semantic_output_mismatch",
+              "root": "ordering_or_limit",
+              "seed": 8198,
+              "signature": "bdfa85636bc96372",
+              "suspicious": [
+                "polars",
+                "polars_lazy"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157-mut-1015-mut-3671-mut-3930-mut-1573-mut-1766-mut-7117",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 7117,
+              "signature": "53a5710bb549030c",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00007127-discovery-fresh",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 7127,
+              "signature": "36c2677733caa7a2",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711-mut-3143-mut-925-champion-mut-7151",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 7151,
+              "signature": "16eb63a3908d6795",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711-mut-3143-champion-mut-7164",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 7164,
+              "signature": "361f5bb359c6cfa0",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711-mut-3143-mut-925-mut-7204",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 7204,
+              "signature": "d12b92ec18ef0f1e",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "ordering_or_limit@polars,polars_lazy": 14,
+          "running_sum_precision@polars_lazy": 2
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 16,
+          "semantic_divergence": 110
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 16,
+          "expected_semantic_divergence": 110
+        },
+        "unsaturated_candidate_bug_families": {
+          "ordering_or_limit@polars,polars_lazy": 14,
+          "running_sum_precision@polars_lazy": 2
+        }
+      },
+      "completed_at": "2026-06-07T05:27:43Z",
+      "csv": "reports/findings-run-20260607T014955-1780796995255133765.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 16,
+      "health": {
+        "bytes": 6391966,
+        "candidate_bug_families": {
+          "metamorphic_join_inner_left_equivalence@polars": 44,
+          "metamorphic_join_inner_left_equivalence@polars_lazy": 44,
+          "ordering_or_limit@polars,polars_lazy": 14,
+          "running_sum_precision@polars_lazy": 2
+        },
+        "examples": [
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711-mut-3143-mut-925-champion-mut-7151",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 7151,
+            "status": "bug",
+            "suspicious": [
+              "polars"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711-mut-3143-mut-925-champion-mut-7151",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 7151,
+            "status": "bug",
+            "suspicious": [
+              "polars_lazy"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711-mut-3143-champion-mut-7164",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 7164,
+            "status": "bug",
+            "suspicious": [
+              "polars"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711-mut-3143-champion-mut-7164",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 7164,
+            "status": "bug",
+            "suspicious": [
+              "polars_lazy"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-3361-mut-3389-mut-1193-mut-1204-champion-mut-7261",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 7261,
+            "status": "bug",
+            "suspicious": [
+              "polars"
+            ]
+          }
+        ],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "metamorphic_join_inner_left_equivalence@polars": 44,
+          "metamorphic_join_inner_left_equivalence@polars_lazy": 44,
+          "ordering_or_limit@polars,polars_lazy": 14,
+          "running_sum_precision@polars_lazy": 2
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 220,
+        "run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 11027.771133017013,
+          "evidence_bytes_per_case": 29054.390909090907,
+          "executed_cases": 220,
+          "meta_file": "runs/run-20260607T014955-1780796995255133765.meta.json",
+          "next_seed": 8862,
+          "run_log_bytes": 6391966,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 33.11722987319544,
+              "generate_mutate_ms": 49634.816856640835,
+              "logging_artifact_ms": 0.6802399858398448,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 374.1002918500189,
+              "scheduler_feedback_ms": 60.80877700402528,
+              "total_case_wall_ms": 50103.523395353914
+            },
+            "case_count": 220,
+            "share_of_total": {
+              "backend_execution_ms": 0.0006609760677283305,
+              "generate_mutate_ms": 0.9906452379603199,
+              "logging_artifact_ms": 1.3576689616661236e-05,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.0074665465919051335,
+              "scheduler_feedback_ms": 0.0012136626904299523,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.019949634186850567
+        },
+        "statuses": {
+          "bug": 60,
+          "ok": 160
+        }
+      },
+      "lane_id": "polars_lazy",
+      "preset": "live_polars_deep_organic_metamorphic",
+      "report": "reports/report-run-20260607T014955-1780796995255133765.md",
+      "run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 1.5,
+        "current_runs": 1,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 1.0,
+        "priority_rank": 1,
+        "score": 5.724649575020964,
+        "yield_rate": 3.0
+      },
+      "seed": 7102,
+      "semantic_focus_families": [
+        "stateful_ordering",
+        "backend_specific_semantics"
+      ],
+      "semantic_focus_signals": [
+        "polars_reverse_division_columns",
+        "polars_rolling_mean_by_null_count_semantics"
+      ],
+      "started_at": "2026-06-07T01:49:55Z",
+      "status": "completed",
+      "target_suite": "polars_cross",
+      "theme": "Organic Polars eager/lazy state, sortedness, nullable dtype, and expression equivalence"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "pyarrow"
+      ],
+      "cases": 220,
+      "duration": null,
+      "lane_id": "arrow_probe_stress",
+      "preset": "live_arrow_issue_focus_metamorphic",
+      "scheduler": {
+        "budget_multiplier": 0.5,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 0.0,
+        "priority_rank": 1,
+        "score": 2.41703671331538,
+        "yield_rate": 0.0
+      },
+      "seed": 7001,
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "started_at": "2026-06-07T05:27:43Z",
+      "status": "running",
+      "target_suite": "arrow_cross",
+      "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts"
+    }
+  ],
+  "scheduler": {
+    "bug_discovery_system": {
+      "objective": "maximize externally reproducible fresh implementation bug yield per unit budget",
+      "schema_version": "bug-discovery-system-v1",
+      "stages": [
+        "generate_or_mutate_candidate",
+        "score_by_acquisition",
+        "execute_differential_oracles",
+        "filter_rewardable_fresh_candidates",
+        "recheck_reproducibility",
+        "reduce_preserving_root_cause",
+        "write_reproducer_and_issue_draft"
+      ],
+      "theory": {
+        "budget": "Boltzmann allocation over acquisition free energy",
+        "candidate_priority": "multi-objective proof/reproducibility/dedup utility",
+        "exploration": "UCB optimism under sparse lane samples",
+        "novelty": "Good-Turing unseen-family probability"
+      }
+    },
+    "generated_at": "2026-06-07T05:27:43Z",
+    "history_manifest_count": 8,
+    "history_window": 8,
+    "lanes": [
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.5,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "arrow_probe_stress",
+        "novelty_rate": 0.0,
+        "pending_runs": 1,
+        "preset": "live_arrow_issue_focus_metamorphic",
+        "priority_rank": 1,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.41703671331538,
+        "target_suite": "arrow_cross",
+        "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts",
+        "ucb_bonus": 0.6670367133153801,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 1.5,
+        "candidate_total": 20,
+        "completed_runs": 2,
+        "current_runs": 2,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.8812908992306927,
+        "first_seen_family_count": 2,
+        "free_energy": -5.526258179846138,
+        "fresh_candidate_total": 20,
+        "good_turing_unseen_probability": 0.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "polars_lazy",
+        "novelty_rate": 1.0,
+        "pending_runs": 0,
+        "preset": "live_polars_deep_organic_metamorphic",
+        "priority_rank": 2,
+        "proof_yield": 1.0,
+        "saturation_rate": 0.0,
+        "score": 5.911372005838136,
+        "target_suite": "polars_cross",
+        "theme": "Organic Polars eager/lazy state, sortedness, nullable dtype, and expression equivalence",
+        "ucb_bonus": 0.3851138259919979,
+        "unique_fresh_family_count": 2,
+        "yield_rate": 3.0
+      }
+    ],
+    "score_weights": {
+      "boltzmann_temperature": 0.85,
+      "entropy_weight": 0.2,
+      "false_positive_penalty": 1.25,
+      "issue_inspired_weight": 0.2,
+      "novelty_rate": 0.75,
+      "proof_weight": 0.6,
+      "saturation_penalty": 0.75,
+      "uncertainty_weight": 0.45,
+      "yield_rate": 1.0
+    },
+    "strategy": "true_bug_acquisition_good_turing_ucb_boltzmann"
+  },
+  "schema_version": "discovery-campaign-v1",
+  "seeds": [
+    7001,
+    7102
+  ],
+  "started_at": "2026-06-06T23:53:52Z",
+  "status": "running",
+  "stopped_by_health": false,
+  "summary": {
+    "candidate_pipeline": {
+      "already_submitted_or_confirmed_count": 0,
+      "candidate_bug_verdict_count": 0,
+      "candidate_count": 20,
+      "issue_draft_count": 0,
+      "needs_dedup_check_count": 0,
+      "pipeline_count": 2,
+      "rechecked_count": 20,
+      "reduced_count": 20,
+      "reproduced_count": 20
+    },
+    "fresh_candidate_bug_families": {
+      "ordering_or_limit@polars,polars_lazy": 14,
+      "running_sum_precision@polars_lazy": 6
+    },
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {},
+    "run_count": 2,
+    "triage_verdicts": {
+      "candidate_implementation_bug": 20,
+      "expected_semantic_divergence": 154
+    }
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "guided_discovery_campaign",
+    "true_bug_acquisition_scheduler",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence",
+    "candidate_pipeline"
+  ]
+}

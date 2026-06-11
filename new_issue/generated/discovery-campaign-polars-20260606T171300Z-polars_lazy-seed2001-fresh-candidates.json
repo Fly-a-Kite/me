@@ -1,0 +1,3510 @@
+{
+  "candidate_row_count": 2,
+  "candidate_rows": [
+    {
+      "bug_dir": "/root/datadiff_fuzz_lab/bugs/bug_e6487f1ae212865d",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 4,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 4,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 4,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+        ]
+      },
+      "case": {
+        "case_id": "case-00002232-discovery-fresh",
+        "metadata": {
+          "case_fingerprint": {
+            "column_count": 2,
+            "feature_tokens": [
+              "fp_op:1302cf0814d5bd02",
+              "fp_type_mix:num2_str1_bool1",
+              "fp_null_density:0",
+              "fp_row_mass:7",
+              "fp_column_count:2"
+            ],
+            "minhash_signature": [
+              740573150451004778,
+              141937930170720308,
+              114559894422411252,
+              57956440882005394,
+              236941227180825683,
+              779304316723074933,
+              516358098186668898,
+              757135217160047587,
+              508249320346932031,
+              204901301001528267,
+              314876365735071376,
+              58046562693877278,
+              39735772619009315,
+              162165652265728029,
+              369925381209091400,
+              176592686791719405,
+              201972786666200230,
+              250933887475542911,
+              452578259936308784,
+              29571026245738735,
+              1342327697454534715,
+              117928921677610692,
+              78673234204931571,
+              155830290991095775,
+              254391953090133952,
+              790008602337900417,
+              32129629116285925,
+              38212859493283288,
+              463892725874586430,
+              36966418084281284,
+              191325049627489824,
+              592775370894640902,
+              339389358360535882,
+              35289553841345954,
+              2677721031552220,
+              1353349475588738083,
+              186873361631162124,
+              626373875293552951,
+              212748632346269540,
+              59080665736199197,
+              509198312879258245,
+              26018753519682581,
+              322494836741906134,
+              55582697476411621,
+              392487222418642341,
+              22277062571805216,
+              1302731130493973862,
+              143230276752494843,
+              137276608433628306,
+              407385618552759481,
+              46929248603722200,
+              147977954195829948,
+              618922713357691941,
+              95772712676568019,
+              285091094266942450,
+              68336483623792746,
+              116894994781627568,
+              4413470693957912,
+              88347408777805174,
+              24589637310646676,
+              37945401598112264,
+              12396727006621830,
+              51647148480038142,
+              123168576046300258
+            ],
+            "null_density_bucket": 0,
+            "op_skeleton_hash": "1302cf0814d5bd02",
+            "row_mass_bucket": 7,
+            "type_mix_token": "num2_str1_bool1"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "pandas",
+                "polars"
+              ],
+              [
+                "polars_lazy"
+              ]
+            ],
+            "backend_statuses": {
+              "pandas": "ok",
+              "polars": "ok",
+              "polars_lazy": "ok"
+            },
+            "column_classes": {
+              "all_b2": "bool",
+              "id": "numeric"
+            },
+            "feature_tokens": [
+              "column:all_b2:bool",
+              "column:id:numeric",
+              "disagree_class:bool",
+              "disagree_class:numeric",
+              "disagree_pair:pandas|polars_lazy",
+              "disagree_pair:polars|polars_lazy",
+              "group:pandas+polars",
+              "group:polars_lazy",
+              "group_count:2",
+              "mismatch:row_order",
+              "root:running_sum_precision",
+              "status:pandas:ok",
+              "status:polars:ok",
+              "status:polars_lazy:ok"
+            ],
+            "mismatch_class": "row_order",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": false,
+                "left": "pandas",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": true,
+                "left": "polars",
+                "right": "polars_lazy"
+              }
+            ],
+            "primary_root_cause": "running_sum_precision"
+          },
+          "lhs_schema_spec": {
+            "column_count": 4,
+            "null_density": 0.37812500000000004,
+            "row_count": 151,
+            "type_mix": [
+              "numeric",
+              "string",
+              "bool",
+              "numeric"
+            ]
+          },
+          "quality_archive_context": {
+            "archive_axis_reward": 0.9548986213679265,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.5410738378023354,
+              "bd_column_count": 1.5412257161907519,
+              "bd_null_density": 1.5417580571692722,
+              "bd_op_skeleton": 1.542187556824315,
+              "bd_profile": 1.5424283535751409,
+              "bd_row_mass": 1.5413897206229645,
+              "bd_target_class": 1.5419645634218857,
+              "bd_type_mix": 1.541566819167103
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "generic"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:1302cf0814d5bd02"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:0"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num2_str1_bool1"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:7"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:2"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:2",
+              "null_density_axis": "null:0",
+              "op_skeleton_axis": "op:1302cf0814d5bd02",
+              "profile_axis": "generic",
+              "row_mass_axis": "rows:7",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num2_str1_bool1"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=generic|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=mutate>case_when>running_sum>groupby",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 24,
+            "target_keys": [
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "column": "m_0",
+              "expr": {
+                "kind": "string_null_if_empty",
+                "source": "s1"
+              },
+              "op": "mutate"
+            },
+            {
+              "as": "cw_0",
+              "condition": {
+                "cmp": "is_not_null",
+                "column": "m_0",
+                "value": null
+              },
+              "else": 0,
+              "op": "case_when",
+              "then": 10
+            },
+            {
+              "column": "run_cw_0",
+              "input_dtype": "float32",
+              "op": "running_sum",
+              "order_by": [
+                {
+                  "ascending": false,
+                  "column": "m_0",
+                  "nulls": "first"
+                },
+                {
+                  "ascending": true,
+                  "column": "cw_0",
+                  "nulls": "first"
+                }
+              ],
+              "partition_by": [
+                "id"
+              ],
+              "source": "cw_0"
+            },
+            {
+              "aggs": [
+                {
+                  "as": "all_b2",
+                  "column": "b2",
+                  "func": "all"
+                }
+              ],
+              "keys": [
+                "id"
+              ],
+              "op": "groupby"
+            }
+          ],
+          "program_id": "prog-00002232",
+          "seed": 2232
+        },
+        "seed": 2232,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "s1",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "b2",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "f3",
+                "nullable": true,
+                "type": "float"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 0,
+                "s1": "beta"
+              },
+              {
+                "b2": null,
+                "f3": null,
+                "id": 1,
+                "s1": "space value"
+              },
+              {
+                "b2": false,
+                "f3": 3.075,
+                "id": 2,
+                "s1": "beta"
+              },
+              {
+                "b2": true,
+                "f3": 0.5,
+                "id": 3,
+                "s1": "alpha"
+              },
+              {
+                "b2": true,
+                "f3": 0.0,
+                "id": 4,
+                "s1": ""
+              },
+              {
+                "b2": false,
+                "f3": -0.5,
+                "id": 0,
+                "s1": "uQgHZR"
+              },
+              {
+                "b2": false,
+                "f3": -9.409,
+                "id": 1,
+                "s1": "space value"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 2,
+                "s1": "中文"
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 1,
+                "s1": ""
+              },
+              {
+                "b2": true,
+                "f3": 0.0,
+                "id": 9,
+                "s1": "beta"
+              },
+              {
+                "b2": false,
+                "f3": -13.601,
+                "id": 1,
+                "s1": "gamma"
+              },
+              {
+                "b2": true,
+                "f3": 0.5,
+                "id": 11,
+                "s1": "toR"
+              },
+              {
+                "b2": true,
+                "f3": 0.0,
+                "id": 12,
+                "s1": "a"
+              },
+              {
+                "b2": false,
+                "f3": 1.056,
+                "id": 1,
+                "s1": "space value"
+              },
+              {
+                "b2": true,
+                "f3": 0.0,
+                "id": 0,
+                "s1": "FrhjMl"
+              },
+              {
+                "b2": false,
+                "f3": 1.0,
+                "id": 1,
+                "s1": "gamma"
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 1,
+                "s1": "GI"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 17,
+                "s1": "beta"
+              },
+              {
+                "b2": true,
+                "f3": 1.0,
+                "id": 3,
+                "s1": "a"
+              },
+              {
+                "b2": true,
+                "f3": 0.0,
+                "id": 19,
+                "s1": null
+              },
+              {
+                "b2": true,
+                "f3": -6.655,
+                "id": 0,
+                "s1": "NX"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 1,
+                "s1": "FnbsHKD"
+              },
+              {
+                "b2": false,
+                "f3": -1.0,
+                "id": 22,
+                "s1": "osd"
+              },
+              {
+                "b2": false,
+                "f3": 34.709,
+                "id": 3,
+                "s1": "alpha"
+              },
+              {
+                "b2": false,
+                "f3": -3.843,
+                "id": 1,
+                "s1": "中文"
+              },
+              {
+                "b2": null,
+                "f3": -1.0,
+                "id": 0,
+                "s1": "space value"
+              },
+              {
+                "b2": true,
+                "f3": null,
+                "id": 1,
+                "s1": "qfCviJya"
+              },
+              {
+                "b2": false,
+                "f3": -0.5,
+                "id": 2,
+                "s1": "wYOrzrib"
+              },
+              {
+                "b2": true,
+                "f3": -1.0,
+                "id": 3,
+                "s1": "YyYiV"
+              },
+              {
+                "b2": false,
+                "f3": -44.286,
+                "id": 0,
+                "s1": "A"
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 0,
+                "s1": "中文"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 0,
+                "s1": ""
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 2,
+                "s1": "A"
+              },
+              {
+                "b2": true,
+                "f3": -1.0,
+                "id": 1,
+                "s1": "中文"
+              },
+              {
+                "b2": false,
+                "f3": 0.5,
+                "id": 1,
+                "s1": "xZouiG"
+              },
+              {
+                "b2": true,
+                "f3": -1.0,
+                "id": 0,
+                "s1": "δelta"
+              },
+              {
+                "b2": true,
+                "f3": 1.0,
+                "id": 36,
+                "s1": "中文"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 1,
+                "s1": "rCrAEoDQ"
+              },
+              {
+                "b2": false,
+                "f3": -0.5,
+                "id": 0,
+                "s1": "gamma"
+              },
+              {
+                "b2": null,
+                "f3": 49.638,
+                "id": 39,
+                "s1": "A"
+              },
+              {
+                "b2": true,
+                "f3": 0.5,
+                "id": 40,
+                "s1": "δelta"
+              },
+              {
+                "b2": true,
+                "f3": 0.0,
+                "id": 1,
+                "s1": "alpha"
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 42,
+                "s1": "gamma"
+              },
+              {
+                "b2": true,
+                "f3": 0.0,
+                "id": 1,
+                "s1": "space value"
+              },
+              {
+                "b2": true,
+                "f3": 1.0,
+                "id": 44,
+                "s1": "aZJB"
+              },
+              {
+                "b2": true,
+                "f3": null,
+                "id": 0,
+                "s1": "OwIAh"
+              },
+              {
+                "b2": false,
+                "f3": -0.5,
+                "id": 0,
+                "s1": "a"
+              },
+              {
+                "b2": true,
+                "f3": 0.5,
+                "id": 47,
+                "s1": null
+              },
+              {
+                "b2": true,
+                "f3": 1.0,
+                "id": 0,
+                "s1": "space value"
+              },
+              {
+                "b2": false,
+                "f3": -0.5,
+                "id": 4,
+                "s1": "hCmHXwS"
+              },
+              {
+                "b2": false,
+                "f3": -1.0,
+                "id": 50,
+                "s1": "aRYZxs"
+              },
+              {
+                "b2": false,
+                "f3": -0.5,
+                "id": 51,
+                "s1": "gamma"
+              },
+              {
+                "b2": false,
+                "f3": -0.5,
+                "id": 0,
+                "s1": "beta"
+              },
+              {
+                "b2": false,
+                "f3": 0.5,
+                "id": 0,
+                "s1": "vKnKBoW"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 4,
+                "s1": ""
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 0,
+                "s1": "WR"
+              },
+              {
+                "b2": false,
+                "f3": -1.0,
+                "id": 1,
+                "s1": "XhyzsztT"
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 2,
+                "s1": "xmh"
+              },
+              {
+                "b2": true,
+                "f3": null,
+                "id": 58,
+                "s1": ""
+              },
+              {
+                "b2": true,
+                "f3": 27.531,
+                "id": 4,
+                "s1": "Y"
+              },
+              {
+                "b2": true,
+                "f3": -1.0,
+                "id": 0,
+                "s1": "hMKpWLJ"
+              },
+              {
+                "b2": false,
+                "f3": -1.0,
+                "id": 0,
+                "s1": "alpha"
+              },
+              {
+                "b2": false,
+                "f3": 1.0,
+                "id": 0,
+                "s1": "space value"
+              },
+              {
+                "b2": null,
+                "f3": -1.0,
+                "id": 63,
+                "s1": "J"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 4,
+                "s1": "qgTt"
+              },
+              {
+                "b2": false,
+                "f3": 0.5,
+                "id": 65,
+                "s1": "中文"
+              },
+              {
+                "b2": false,
+                "f3": -0.5,
+                "id": 0,
+                "s1": "beta"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 2,
+                "s1": "gamma"
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 3,
+                "s1": "A"
+              },
+              {
+                "b2": true,
+                "f3": 1.0,
+                "id": 4,
+                "s1": "UC"
+              },
+              {
+                "b2": true,
+                "f3": null,
+                "id": 0,
+                "s1": null
+              },
+              {
+                "b2": false,
+                "f3": 1.0,
+                "id": 0,
+                "s1": "A"
+              },
+              {
+                "b2": false,
+                "f3": 1.0,
+                "id": 0,
+                "s1": "alpha"
+              },
+              {
+                "b2": false,
+                "f3": 10.514,
+                "id": 0,
+                "s1": "eNBYBRW"
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 74,
+                "s1": "gamma"
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 1,
+                "s1": "gamma"
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 1,
+                "s1": "beta"
+              },
+              {
+                "b2": false,
+                "f3": -0.5,
+                "id": 77,
+                "s1": "R"
+              },
+              {
+                "b2": true,
+                "f3": 0.5,
+                "id": 78,
+                "s1": "xUgGCSMv"
+              },
+              {
+                "b2": false,
+                "f3": -1.0,
+                "id": 1,
+                "s1": "a"
+              },
+              {
+                "b2": null,
+                "f3": 2.668,
+                "id": 0,
+                "s1": "δelta"
+              },
+              {
+                "b2": true,
+                "f3": 0.5,
+                "id": 1,
+                "s1": "中文"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 82,
+                "s1": "beta"
+              },
+              {
+                "b2": true,
+                "f3": 0.5,
+                "id": 1,
+                "s1": null
+              },
+              {
+                "b2": false,
+                "f3": -13.137,
+                "id": 0,
+                "s1": "A"
+              },
+              {
+                "b2": true,
+                "f3": -1.0,
+                "id": 85,
+                "s1": "alpha"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 0,
+                "s1": "ByhCBHSe"
+              },
+              {
+                "b2": false,
+                "f3": -1.0,
+                "id": 87,
+                "s1": "alpha"
+              },
+              {
+                "b2": true,
+                "f3": 0.0,
+                "id": 1,
+                "s1": "alpha"
+              },
+              {
+                "b2": true,
+                "f3": 1.0,
+                "id": 0,
+                "s1": "gamma"
+              },
+              {
+                "b2": true,
+                "f3": 0.0,
+                "id": 0,
+                "s1": "alpha"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 1,
+                "s1": "alpha"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 92,
+                "s1": "δelta"
+              },
+              {
+                "b2": true,
+                "f3": 0.0,
+                "id": 0,
+                "s1": null
+              },
+              {
+                "b2": true,
+                "f3": 1.0,
+                "id": 4,
+                "s1": "beta"
+              },
+              {
+                "b2": true,
+                "f3": null,
+                "id": 1,
+                "s1": "space value"
+              },
+              {
+                "b2": false,
+                "f3": -0.5,
+                "id": 1,
+                "s1": "oOU"
+              },
+              {
+                "b2": false,
+                "f3": -7.149,
+                "id": 2,
+                "s1": "rZyN"
+              },
+              {
+                "b2": false,
+                "f3": -1.0,
+                "id": 3,
+                "s1": "δelta"
+              },
+              {
+                "b2": true,
+                "f3": -14.84,
+                "id": 4,
+                "s1": "eqilyWG"
+              },
+              {
+                "b2": true,
+                "f3": -18.577,
+                "id": 0,
+                "s1": "δelta"
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 1,
+                "s1": "δelta"
+              },
+              {
+                "b2": true,
+                "f3": -1.0,
+                "id": 1,
+                "s1": "A"
+              },
+              {
+                "b2": false,
+                "f3": 1.0,
+                "id": 0,
+                "s1": "δelta"
+              },
+              {
+                "b2": false,
+                "f3": 1.0,
+                "id": 4,
+                "s1": ""
+              },
+              {
+                "b2": false,
+                "f3": 1.0,
+                "id": 105,
+                "s1": "A"
+              },
+              {
+                "b2": null,
+                "f3": 0.5,
+                "id": 106,
+                "s1": "a"
+              },
+              {
+                "b2": false,
+                "f3": 1.0,
+                "id": 2,
+                "s1": "OEBDnXuv"
+              },
+              {
+                "b2": true,
+                "f3": -1.0,
+                "id": 1,
+                "s1": "beta"
+              },
+              {
+                "b2": false,
+                "f3": -0.5,
+                "id": 1,
+                "s1": null
+              },
+              {
+                "b2": true,
+                "f3": 0.0,
+                "id": 0,
+                "s1": "space value"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 1,
+                "s1": "lAK"
+              },
+              {
+                "b2": false,
+                "f3": -0.5,
+                "id": 0,
+                "s1": "A"
+              },
+              {
+                "b2": false,
+                "f3": 1.0,
+                "id": 113,
+                "s1": "δelta"
+              },
+              {
+                "b2": false,
+                "f3": 36.296,
+                "id": 1,
+                "s1": "A"
+              },
+              {
+                "b2": false,
+                "f3": 1.0,
+                "id": 1,
+                "s1": "beta"
+              },
+              {
+                "b2": null,
+                "f3": 31.751,
+                "id": 0,
+                "s1": "alpha"
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 117,
+                "s1": "alpha"
+              },
+              {
+                "b2": null,
+                "f3": -3.074,
+                "id": 118,
+                "s1": "gamma"
+              },
+              {
+                "b2": false,
+                "f3": 0.5,
+                "id": 1,
+                "s1": null
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 0,
+                "s1": "z"
+              },
+              {
+                "b2": true,
+                "f3": 0.5,
+                "id": 121,
+                "s1": "gamma"
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 0,
+                "s1": "wupPkPi"
+              },
+              {
+                "b2": true,
+                "f3": 0.0,
+                "id": 123,
+                "s1": "mUP"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 0,
+                "s1": "中文"
+              },
+              {
+                "b2": false,
+                "f3": -41.088,
+                "id": 0,
+                "s1": "NGKkEwPS"
+              },
+              {
+                "b2": false,
+                "f3": 23.179,
+                "id": 1,
+                "s1": "beta"
+              },
+              {
+                "b2": false,
+                "f3": null,
+                "id": 127,
+                "s1": null
+              },
+              {
+                "b2": null,
+                "f3": 0.0,
+                "id": 0,
+                "s1": "zee"
+              },
+              {
+                "b2": true,
+                "f3": 1.0,
+                "id": 129,
+                "s1": "space value"
+              },
+              {
+                "b2": null,
+                "f3": 0.0,
+                "id": 1,
+                "s1": "alpha"
+              },
+              {
+                "b2": null,
+                "f3": -1.0,
+                "id": 1,
+                "s1": "space value"
+              },
+              {
+                "b2": true,
+                "f3": -1.0,
+                "id": 2,
+                "s1": "中文"
+              },
+              {
+                "b2": false,
+                "f3": -0.5,
+                "id": 1,
+                "s1": ""
+              },
+              {
+                "b2": false,
+                "f3": -10.444,
+                "id": 134,
+                "s1": "gxapIntv"
+              },
+              {
+                "b2": true,
+                "f3": 15.765,
+                "id": 135,
+                "s1": "gamma"
+              },
+              {
+                "b2": true,
+                "f3": 0.0,
+                "id": 0,
+                "s1": ""
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 0,
+                "s1": "A"
+              },
+              {
+                "b2": false,
+                "f3": 0.5,
+                "id": 0,
+                "s1": "HiO"
+              },
+              {
+                "b2": false,
+                "f3": 0.5,
+                "id": 139,
+                "s1": "中文"
+              },
+              {
+                "b2": false,
+                "f3": -0.5,
+                "id": 0,
+                "s1": "e"
+              },
+              {
+                "b2": false,
+                "f3": -0.5,
+                "id": 1,
+                "s1": "gamma"
+              },
+              {
+                "b2": true,
+                "f3": -1.0,
+                "id": 142,
+                "s1": "cwLNKmx"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 1,
+                "s1": "alpha"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 1,
+                "s1": "中文"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 0,
+                "s1": "gamma"
+              },
+              {
+                "b2": true,
+                "f3": -0.5,
+                "id": 1,
+                "s1": "L"
+              },
+              {
+                "b2": false,
+                "f3": -1.0,
+                "id": 2,
+                "s1": "alpha"
+              },
+              {
+                "b2": false,
+                "f3": null,
+                "id": 3,
+                "s1": "gamma"
+              },
+              {
+                "b2": false,
+                "f3": 0.5,
+                "id": 4,
+                "s1": "CqLlgb"
+              },
+              {
+                "b2": false,
+                "f3": 0.0,
+                "id": 0,
+                "s1": null
+              }
+            ]
+          }
+        ]
+      },
+      "case_index": 28,
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [
+          {
+            "candidate_pool_bonus": 0.0,
+            "contribution_bonus": 0.1,
+            "feature_prefixes": [
+              "expr:",
+              "pattern:"
+            ],
+            "keep_in_pool": true,
+            "novelty_bonus": 0.1,
+            "score_bonus": 0.3,
+            "targets": [
+              "polars_reverse_division_columns",
+              "polars_rolling_mean_by_null_count_semantics"
+            ]
+          }
+        ],
+        "effective_guidance_targets": [
+          "common_workflow",
+          "operation_combo",
+          "filter",
+          "truth_filter",
+          "mutate",
+          "groupby",
+          "groupby_sorted_input",
+          "strings",
+          "casts",
+          "nulls",
+          "aggregation",
+          "global_aggregation",
+          "sort_limit",
+          "topk",
+          "running_sum_precision",
+          "running_sum",
+          "partitioned_running_sum",
+          "running_sum_partitioned",
+          "path_basename_keyed_pick",
+          "path_projection",
+          "keyed_row_pick",
+          "sortedness_null_placement",
+          "sortedness",
+          "window_avg_rows_frame",
+          "window_avg_probe",
+          "polars_timestamp_precision_filter",
+          "timestamp_precision_filter_probe",
+          "polars_float_wrap_numerical_semantics",
+          "float_wrap_probe",
+          "polars_empty_literal_groupby_semantics",
+          "empty_literal_groupby_probe",
+          "polars_rolling_mean_by_null_count_semantics",
+          "rolling_mean_by_null_count_probe",
+          "expressions",
+          "semantic_family:stateful_ordering",
+          "semantic_family:backend_specific_semantics",
+          "semantic_signal:polars_reverse_division_columns",
+          "semantic_signal:polars_rolling_mean_by_null_count_semantics"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": false,
+        "generator_profile": "discovery_fresh",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "common_workflow",
+          "operation_combo",
+          "filter",
+          "truth_filter",
+          "mutate",
+          "groupby",
+          "groupby_sorted_input",
+          "strings",
+          "casts",
+          "nulls",
+          "aggregation",
+          "global_aggregation",
+          "sort_limit",
+          "topk",
+          "running_sum_precision",
+          "running_sum",
+          "partitioned_running_sum",
+          "running_sum_partitioned",
+          "path_basename_keyed_pick",
+          "path_projection",
+          "keyed_row_pick",
+          "sortedness_null_placement",
+          "sortedness",
+          "window_avg_rows_frame",
+          "window_avg_probe",
+          "polars_timestamp_precision_filter",
+          "timestamp_precision_filter_probe",
+          "polars_float_wrap_numerical_semantics",
+          "float_wrap_probe",
+          "polars_empty_literal_groupby_semantics",
+          "empty_literal_groupby_probe",
+          "polars_rolling_mean_by_null_count_semantics",
+          "rolling_mean_by_null_count_probe",
+          "expressions"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.45,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [
+          "stateful_ordering",
+          "backend_specific_semantics"
+        ],
+        "semantic_focus_signals": [
+          "polars_reverse_division_columns",
+          "polars_rolling_mean_by_null_count_semantics"
+        ],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "",
+        "strategy_snapshot_path": "",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "elapsed_s": 1761.102335,
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Backends returned different canonical tables; mismatch_class=row_order; shapes={'pandas': (42, 2), 'polars': (42, 2), 'polars_lazy': (42, 2)}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-e6487f1ae212865d",
+          "kind": "semantic_output_mismatch",
+          "mismatch_class": "row_order",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "running_sum_precision",
+          "severity": "critical",
+          "signature": "e6487f1ae212865d",
+          "source_issue": "",
+          "suspicious_backends": [
+            "polars_lazy"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas', 'polars'] and disagrees with ['polars_lazy'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "all_b2",
+            "id"
+          ],
+          "comparison_key": "{\"columns\":[\"all_b2\",\"id\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,0]\\\",\\\"[false,1]\\\",\\\"[false,2]\\\",\\\"[false,3]\\\",\\\"[false,4]\\\",\\\"[true,9]\\\",\\\"[true,11]\\\",\\\"[true,12]\\\",\\\"[false,17]\\\",\\\"[true,19]\\\",\\\"[false,22]\\\",\\\"[true,36]\\\",\\\"[null,39]\\\",\\\"[true,40]\\\",\\\"[true,42]\\\",\\\"[true,44]\\\",\\\"[true,47]\\\",\\\"[false,50]\\\",\\\"[false,51]\\\",\\\"[true,58]\\\",\\\"[null,63]\\\",\\\"[false,65]\\\",\\\"[true,74]\\\",\\\"[false,77]\\\",\\\"[true,78]\\\",\\\"[false,82]\\\",\\\"[true,85]\\\",\\\"[false,87]\\\",\\\"[false,92]\\\",\\\"[false,105]\\\",\\\"[null,106]\\\",\\\"[false,113]\\\",\\\"[true,117]\\\",\\\"[null,118]\\\",\\\"[true,121]\\\",\\\"[true,123]\\\",\\\"[false,127]\\\",\\\"[true,129]\\\",\\\"[false,134]\\\",\\\"[true,135]\\\",\\\"[false,139]\\\",\\\"[true,142]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false,0]\",\"[false,1]\",\"[false,2]\",\"[false,3]\",\"[false,4]\",\"[true,9]\",\"[true,11]\",\"[true,12]\",\"[false,17]\",\"[true,19]\",\"[false,22]\",\"[true,36]\",\"[null,39]\",\"[true,40]\",\"[true,42]\",\"[true,44]\",\"[true,47]\",\"[false,50]\",\"[false,51]\",\"[true,58]\",\"[null,63]\",\"[false,65]\",\"[true,74]\",\"[false,77]\",\"[true,78]\",\"[false,82]\",\"[true,85]\",\"[false,87]\",\"[false,92]\",\"[false,105]\",\"[null,106]\",\"[false,113]\",\"[true,117]\",\"[null,118]\",\"[true,121]\",\"[true,123]\",\"[false,127]\",\"[true,129]\",\"[false,134]\",\"[true,135]\",\"[false,139]\",\"[true,142]\"]",
+          "row_count": 42,
+          "rows": [
+            [
+              false,
+              0
+            ],
+            [
+              false,
+              1
+            ],
+            [
+              false,
+              2
+            ],
+            [
+              false,
+              3
+            ],
+            [
+              false,
+              4
+            ],
+            [
+              true,
+              9
+            ],
+            [
+              true,
+              11
+            ],
+            [
+              true,
+              12
+            ],
+            [
+              false,
+              17
+            ],
+            [
+              true,
+              19
+            ],
+            [
+              false,
+              22
+            ],
+            [
+              true,
+              36
+            ],
+            [
+              null,
+              39
+            ],
+            [
+              true,
+              40
+            ],
+            [
+              true,
+              42
+            ],
+            [
+              true,
+              44
+            ],
+            [
+              true,
+              47
+            ],
+            [
+              false,
+              50
+            ],
+            [
+              false,
+              51
+            ],
+            [
+              true,
+              58
+            ],
+            [
+              null,
+              63
+            ],
+            [
+              false,
+              65
+            ],
+            [
+              true,
+              74
+            ],
+            [
+              false,
+              77
+            ],
+            [
+              true,
+              78
+            ],
+            [
+              false,
+              82
+            ],
+            [
+              true,
+              85
+            ],
+            [
+              false,
+              87
+            ],
+            [
+              false,
+              92
+            ],
+            [
+              false,
+              105
+            ],
+            [
+              null,
+              106
+            ],
+            [
+              false,
+              113
+            ],
+            [
+              true,
+              117
+            ],
+            [
+              null,
+              118
+            ],
+            [
+              true,
+              121
+            ],
+            [
+              true,
+              123
+            ],
+            [
+              false,
+              127
+            ],
+            [
+              true,
+              129
+            ],
+            [
+              false,
+              134
+            ],
+            [
+              true,
+              135
+            ],
+            [
+              false,
+              139
+            ],
+            [
+              true,
+              142
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false,0]\",\"[false,105]\",\"[false,113]\",\"[false,127]\",\"[false,134]\",\"[false,139]\",\"[false,17]\",\"[false,1]\",\"[false,22]\",\"[false,2]\",\"[false,3]\",\"[false,4]\",\"[false,50]\",\"[false,51]\",\"[false,65]\",\"[false,77]\",\"[false,82]\",\"[false,87]\",\"[false,92]\",\"[null,106]\",\"[null,118]\",\"[null,39]\",\"[null,63]\",\"[true,117]\",\"[true,11]\",\"[true,121]\",\"[true,123]\",\"[true,129]\",\"[true,12]\",\"[true,135]\",\"[true,142]\",\"[true,19]\",\"[true,36]\",\"[true,40]\",\"[true,42]\",\"[true,44]\",\"[true,47]\",\"[true,58]\",\"[true,74]\",\"[true,78]\",\"[true,85]\",\"[true,9]\"]"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [
+            "all_b2",
+            "id"
+          ],
+          "comparison_key": "{\"columns\":[\"all_b2\",\"id\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,0]\\\",\\\"[false,1]\\\",\\\"[false,2]\\\",\\\"[false,3]\\\",\\\"[false,4]\\\",\\\"[true,9]\\\",\\\"[true,11]\\\",\\\"[true,12]\\\",\\\"[false,17]\\\",\\\"[true,19]\\\",\\\"[false,22]\\\",\\\"[true,36]\\\",\\\"[null,39]\\\",\\\"[true,40]\\\",\\\"[true,42]\\\",\\\"[true,44]\\\",\\\"[true,47]\\\",\\\"[false,50]\\\",\\\"[false,51]\\\",\\\"[true,58]\\\",\\\"[null,63]\\\",\\\"[false,65]\\\",\\\"[true,74]\\\",\\\"[false,77]\\\",\\\"[true,78]\\\",\\\"[false,82]\\\",\\\"[true,85]\\\",\\\"[false,87]\\\",\\\"[false,92]\\\",\\\"[false,105]\\\",\\\"[null,106]\\\",\\\"[false,113]\\\",\\\"[true,117]\\\",\\\"[null,118]\\\",\\\"[true,121]\\\",\\\"[true,123]\\\",\\\"[false,127]\\\",\\\"[true,129]\\\",\\\"[false,134]\\\",\\\"[true,135]\\\",\\\"[false,139]\\\",\\\"[true,142]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false,0]\",\"[false,1]\",\"[false,2]\",\"[false,3]\",\"[false,4]\",\"[true,9]\",\"[true,11]\",\"[true,12]\",\"[false,17]\",\"[true,19]\",\"[false,22]\",\"[true,36]\",\"[null,39]\",\"[true,40]\",\"[true,42]\",\"[true,44]\",\"[true,47]\",\"[false,50]\",\"[false,51]\",\"[true,58]\",\"[null,63]\",\"[false,65]\",\"[true,74]\",\"[false,77]\",\"[true,78]\",\"[false,82]\",\"[true,85]\",\"[false,87]\",\"[false,92]\",\"[false,105]\",\"[null,106]\",\"[false,113]\",\"[true,117]\",\"[null,118]\",\"[true,121]\",\"[true,123]\",\"[false,127]\",\"[true,129]\",\"[false,134]\",\"[true,135]\",\"[false,139]\",\"[true,142]\"]",
+          "row_count": 42,
+          "rows": [
+            [
+              false,
+              0
+            ],
+            [
+              false,
+              1
+            ],
+            [
+              false,
+              2
+            ],
+            [
+              false,
+              3
+            ],
+            [
+              false,
+              4
+            ],
+            [
+              true,
+              9
+            ],
+            [
+              true,
+              11
+            ],
+            [
+              true,
+              12
+            ],
+            [
+              false,
+              17
+            ],
+            [
+              true,
+              19
+            ],
+            [
+              false,
+              22
+            ],
+            [
+              true,
+              36
+            ],
+            [
+              null,
+              39
+            ],
+            [
+              true,
+              40
+            ],
+            [
+              true,
+              42
+            ],
+            [
+              true,
+              44
+            ],
+            [
+              true,
+              47
+            ],
+            [
+              false,
+              50
+            ],
+            [
+              false,
+              51
+            ],
+            [
+              true,
+              58
+            ],
+            [
+              null,
+              63
+            ],
+            [
+              false,
+              65
+            ],
+            [
+              true,
+              74
+            ],
+            [
+              false,
+              77
+            ],
+            [
+              true,
+              78
+            ],
+            [
+              false,
+              82
+            ],
+            [
+              true,
+              85
+            ],
+            [
+              false,
+              87
+            ],
+            [
+              false,
+              92
+            ],
+            [
+              false,
+              105
+            ],
+            [
+              null,
+              106
+            ],
+            [
+              false,
+              113
+            ],
+            [
+              true,
+              117
+            ],
+            [
+              null,
+              118
+            ],
+            [
+              true,
+              121
+            ],
+            [
+              true,
+              123
+            ],
+            [
+              false,
+              127
+            ],
+            [
+              true,
+              129
+            ],
+            [
+              false,
+              134
+            ],
+            [
+              true,
+              135
+            ],
+            [
+              false,
+              139
+            ],
+            [
+              true,
+              142
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false,0]\",\"[false,105]\",\"[false,113]\",\"[false,127]\",\"[false,134]\",\"[false,139]\",\"[false,17]\",\"[false,1]\",\"[false,22]\",\"[false,2]\",\"[false,3]\",\"[false,4]\",\"[false,50]\",\"[false,51]\",\"[false,65]\",\"[false,77]\",\"[false,82]\",\"[false,87]\",\"[false,92]\",\"[null,106]\",\"[null,118]\",\"[null,39]\",\"[null,63]\",\"[true,117]\",\"[true,11]\",\"[true,121]\",\"[true,123]\",\"[true,129]\",\"[true,12]\",\"[true,135]\",\"[true,142]\",\"[true,19]\",\"[true,36]\",\"[true,40]\",\"[true,42]\",\"[true,44]\",\"[true,47]\",\"[true,58]\",\"[true,74]\",\"[true,78]\",\"[true,85]\",\"[true,9]\"]"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [
+            "all_b2",
+            "id"
+          ],
+          "comparison_key": "{\"columns\":[\"all_b2\",\"id\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,82]\\\",\\\"[false,50]\\\",\\\"[false,17]\\\",\\\"[false,0]\\\",\\\"[true,47]\\\",\\\"[false,113]\\\",\\\"[false,87]\\\",\\\"[true,121]\\\",\\\"[true,58]\\\",\\\"[false,2]\\\",\\\"[true,78]\\\",\\\"[null,39]\\\",\\\"[true,42]\\\",\\\"[true,85]\\\",\\\"[false,51]\\\",\\\"[null,63]\\\",\\\"[true,44]\\\",\\\"[false,4]\\\",\\\"[false,127]\\\",\\\"[false,134]\\\",\\\"[true,123]\\\",\\\"[true,19]\\\",\\\"[true,74]\\\",\\\"[true,12]\\\",\\\"[true,11]\\\",\\\"[false,22]\\\",\\\"[true,142]\\\",\\\"[true,9]\\\",\\\"[true,36]\\\",\\\"[false,139]\\\",\\\"[null,118]\\\",\\\"[false,77]\\\",\\\"[false,105]\\\",\\\"[false,3]\\\",\\\"[true,135]\\\",\\\"[false,92]\\\",\\\"[true,129]\\\",\\\"[true,40]\\\",\\\"[true,117]\\\",\\\"[false,1]\\\",\\\"[false,65]\\\",\\\"[null,106]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false,82]\",\"[false,50]\",\"[false,17]\",\"[false,0]\",\"[true,47]\",\"[false,113]\",\"[false,87]\",\"[true,121]\",\"[true,58]\",\"[false,2]\",\"[true,78]\",\"[null,39]\",\"[true,42]\",\"[true,85]\",\"[false,51]\",\"[null,63]\",\"[true,44]\",\"[false,4]\",\"[false,127]\",\"[false,134]\",\"[true,123]\",\"[true,19]\",\"[true,74]\",\"[true,12]\",\"[true,11]\",\"[false,22]\",\"[true,142]\",\"[true,9]\",\"[true,36]\",\"[false,139]\",\"[null,118]\",\"[false,77]\",\"[false,105]\",\"[false,3]\",\"[true,135]\",\"[false,92]\",\"[true,129]\",\"[true,40]\",\"[true,117]\",\"[false,1]\",\"[false,65]\",\"[null,106]\"]",
+          "row_count": 42,
+          "rows": [
+            [
+              false,
+              82
+            ],
+            [
+              false,
+              50
+            ],
+            [
+              false,
+              17
+            ],
+            [
+              false,
+              0
+            ],
+            [
+              true,
+              47
+            ],
+            [
+              false,
+              113
+            ],
+            [
+              false,
+              87
+            ],
+            [
+              true,
+              121
+            ],
+            [
+              true,
+              58
+            ],
+            [
+              false,
+              2
+            ],
+            [
+              true,
+              78
+            ],
+            [
+              null,
+              39
+            ],
+            [
+              true,
+              42
+            ],
+            [
+              true,
+              85
+            ],
+            [
+              false,
+              51
+            ],
+            [
+              null,
+              63
+            ],
+            [
+              true,
+              44
+            ],
+            [
+              false,
+              4
+            ],
+            [
+              false,
+              127
+            ],
+            [
+              false,
+              134
+            ],
+            [
+              true,
+              123
+            ],
+            [
+              true,
+              19
+            ],
+            [
+              true,
+              74
+            ],
+            [
+              true,
+              12
+            ],
+            [
+              true,
+              11
+            ],
+            [
+              false,
+              22
+            ],
+            [
+              true,
+              142
+            ],
+            [
+              true,
+              9
+            ],
+            [
+              true,
+              36
+            ],
+            [
+              false,
+              139
+            ],
+            [
+              null,
+              118
+            ],
+            [
+              false,
+              77
+            ],
+            [
+              false,
+              105
+            ],
+            [
+              false,
+              3
+            ],
+            [
+              true,
+              135
+            ],
+            [
+              false,
+              92
+            ],
+            [
+              true,
+              129
+            ],
+            [
+              true,
+              40
+            ],
+            [
+              true,
+              117
+            ],
+            [
+              false,
+              1
+            ],
+            [
+              false,
+              65
+            ],
+            [
+              null,
+              106
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false,0]\",\"[false,105]\",\"[false,113]\",\"[false,127]\",\"[false,134]\",\"[false,139]\",\"[false,17]\",\"[false,1]\",\"[false,22]\",\"[false,2]\",\"[false,3]\",\"[false,4]\",\"[false,50]\",\"[false,51]\",\"[false,65]\",\"[false,77]\",\"[false,82]\",\"[false,87]\",\"[false,92]\",\"[null,106]\",\"[null,118]\",\"[null,39]\",\"[null,63]\",\"[true,117]\",\"[true,11]\",\"[true,121]\",\"[true,123]\",\"[true,129]\",\"[true,12]\",\"[true,135]\",\"[true,142]\",\"[true,19]\",\"[true,36]\",\"[true,40]\",\"[true,42]\",\"[true,44]\",\"[true,47]\",\"[true,58]\",\"[true,74]\",\"[true,78]\",\"[true,85]\",\"[true,9]\"]"
+        }
+      },
+      "raw_results": {
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 17.561064996698406,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 25.896683997416403,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 2.7448359978734516,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        }
+      },
+      "status": "bug"
+    },
+    {
+      "bug_dir": "/root/datadiff_fuzz_lab/bugs/bug_8ee7acf817f7ca54",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 7,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 6,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 7,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+        ]
+      },
+      "case": {
+        "case_id": "case-00002345-discovery-fresh",
+        "metadata": {
+          "case_fingerprint": {
+            "column_count": 2,
+            "feature_tokens": [
+              "fp_op:8610074d115e7605",
+              "fp_type_mix:num7_str5_bool2",
+              "fp_null_density:1",
+              "fp_row_mass:6",
+              "fp_column_count:2"
+            ],
+            "minhash_signature": [
+              17169201474594755,
+              95009781605776900,
+              336248756881835292,
+              471595940790868959,
+              323277747092458838,
+              764690445057940940,
+              516358098186668898,
+              800137747277649879,
+              122828140759039517,
+              506270225229255240,
+              401987006885207492,
+              306824668852765571,
+              51690219430628004,
+              250439476360276814,
+              81134217066363979,
+              224111668583644937,
+              734956891977940298,
+              250933887475542911,
+              1109521942230450386,
+              22853859876117928,
+              268222965839740683,
+              1394530663458215605,
+              95245969055013093,
+              513796351634054518,
+              394890646110825599,
+              523104045616452573,
+              20789801317216848,
+              274610446790591062,
+              113105315664062610,
+              63386100174736704,
+              198278835625315105,
+              2262506297207109267,
+              127623428916853231,
+              381797691681816234,
+              121701089237567278,
+              1242363243812309031,
+              523325135916795595,
+              260197317992903558,
+              181068797009396664,
+              153590349930592429,
+              478725821371851879,
+              977866761529632,
+              556157563149058442,
+              470722466634959318,
+              495326276900186511,
+              39792666991405685,
+              767238095338451233,
+              184687615724556098,
+              395648288636071908,
+              1109012530375959998,
+              98028433775623441,
+              108348129135985860,
+              385739713496578422,
+              420100504374356591,
+              165527811568299920,
+              307948055604760274,
+              404191470620041628,
+              40448200160803842,
+              515187288546232745,
+              221816199072685761,
+              162550869647751519,
+              454206599961840741,
+              195059342185033659,
+              123168576046300258
+            ],
+            "null_density_bucket": 1,
+            "op_skeleton_hash": "8610074d115e7605",
+            "row_mass_bucket": 6,
+            "type_mix_token": "num7_str5_bool2"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "pandas",
+                "polars"
+              ],
+              [
+                "polars_lazy"
+              ]
+            ],
+            "backend_statuses": {
+              "pandas": "ok",
+              "polars": "ok",
+              "polars_lazy": "ok"
+            },
+            "column_classes": {
+              "j": "numeric",
+              "min_cw_0": "numeric"
+            },
+            "feature_tokens": [
+              "column:j:numeric",
+              "column:min_cw_0:numeric",
+              "disagree_class:numeric",
+              "disagree_pair:pandas|polars_lazy",
+              "disagree_pair:polars|polars_lazy",
+              "group:pandas+polars",
+              "group:polars_lazy",
+              "group_count:2",
+              "mismatch:row_order",
+              "root:running_sum_precision",
+              "status:pandas:ok",
+              "status:polars:ok",
+              "status:polars_lazy:ok"
+            ],
+            "mismatch_class": "row_order",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": false,
+                "left": "pandas",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": true,
+                "left": "polars",
+                "right": "polars_lazy"
+              }
+            ],
+            "primary_root_cause": "running_sum_precision"
+          },
+          "quality_archive_context": {
+            "archive_axis_reward": 0.47009103988727274,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.5109255163245021,
+              "bd_column_count": 1.5110773947129186,
+              "bd_null_density": 1.5116097356914389,
+              "bd_op_skeleton": 1.5120392353464818,
+              "bd_profile": 1.5122800320973078,
+              "bd_row_mass": 1.5112413991451312,
+              "bd_target_class": 1.5118162419440524,
+              "bd_type_mix": 1.5114184976892697
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "generic"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:8610074d115e7605"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:1"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num7_str5_bool2"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:6"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:4"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:4",
+              "null_density_axis": "null:1",
+              "op_skeleton_axis": "op:8610074d115e7605",
+              "profile_axis": "generic",
+              "row_mass_axis": "rows:6",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num7_str5_bool2"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=generic|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=join>mutate>case_when>running_sum>filter>sort>more2",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 24,
+            "target_keys": [
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "how": "inner",
+              "left_on": "id",
+              "op": "join",
+              "right_on": "id",
+              "table": "t1"
+            },
+            {
+              "column": "m_0",
+              "expr": {
+                "kind": "string_concat",
+                "other": "g",
+                "sep": "-",
+                "source": "s"
+              },
+              "op": "mutate"
+            },
+            {
+              "as": "cw_0",
+              "condition": {
+                "cmp": "!=",
+                "column": "m_0",
+                "value": "missing"
+              },
+              "else": 0,
+              "op": "case_when",
+              "then": 10
+            },
+            {
+              "column": "run_cw_0",
+              "input_dtype": "float32",
+              "op": "running_sum",
+              "order_by": [
+                {
+                  "ascending": true,
+                  "column": "m_0",
+                  "nulls": "last"
+                },
+                {
+                  "ascending": false,
+                  "column": "tag",
+                  "nulls": "first"
+                },
+                {
+                  "ascending": true,
+                  "column": "z",
+                  "nulls": "last"
+                }
+              ],
+              "partition_by": [
+                "id",
+                "flag"
+              ],
+              "source": "cw_0"
+            },
+            {
+              "cmp": "!=",
+              "column": "run_cw_0",
+              "op": "filter",
+              "value": -1.0
+            },
+            {
+              "ascending": true,
+              "columns": [
+                "flag",
+                "cw_0",
+                "g",
+                "id",
+                "j",
+                "m_0",
+                "run_cw_0",
+                "s",
+                "tag",
+                "x",
+                "y",
+                "z"
+              ],
+              "op": "sort"
+            },
+            {
+              "cmp": "==",
+              "op": "row_number_filter",
+              "order_by": [
+                {
+                  "ascending": true,
+                  "column": "cw_0",
+                  "nulls": "first"
+                },
+                {
+                  "ascending": true,
+                  "column": "z",
+                  "nulls": "last"
+                },
+                {
+                  "ascending": false,
+                  "column": "g",
+                  "nulls": "first"
+                }
+              ],
+              "partition_by": [
+                "x",
+                "cw_0"
+              ],
+              "value": 1
+            },
+            {
+              "aggs": [
+                {
+                  "as": "min_cw_0",
+                  "column": "cw_0",
+                  "func": "min"
+                }
+              ],
+              "keys": [
+                "j"
+              ],
+              "op": "groupby"
+            }
+          ],
+          "program_id": "prog-00002345",
+          "seed": 2345
+        },
+        "seed": 2345,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "g",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "x",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "y",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "flag",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "s",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "flag": false,
+                "g": "",
+                "id": 0,
+                "s": "alpha",
+                "x": 10,
+                "y": -0.5
+              },
+              {
+                "flag": false,
+                "g": "beta",
+                "id": 0,
+                "s": "space value",
+                "x": -1,
+                "y": null
+              },
+              {
+                "flag": true,
+                "g": "alpha",
+                "id": 2,
+                "s": "XK",
+                "x": -2,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "beta",
+                "id": 1,
+                "s": "vPaMIvf",
+                "x": null,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "space value",
+                "id": 0,
+                "s": "δelta",
+                "x": 1,
+                "y": -0.5
+              },
+              {
+                "flag": null,
+                "g": "δelta",
+                "id": 1,
+                "s": "gamma",
+                "x": null,
+                "y": 0.5
+              },
+              {
+                "flag": true,
+                "g": "alpha",
+                "id": 1,
+                "s": "",
+                "x": 1,
+                "y": null
+              },
+              {
+                "flag": null,
+                "g": "a",
+                "id": 0,
+                "s": "gamma",
+                "x": -1,
+                "y": 0.5
+              },
+              {
+                "flag": true,
+                "g": "A",
+                "id": 8,
+                "s": "ktVcfHYm",
+                "x": null,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "a",
+                "id": 0,
+                "s": "alpha",
+                "x": 0,
+                "y": -0.5
+              },
+              {
+                "flag": null,
+                "g": "alpha",
+                "id": 0,
+                "s": "gamma",
+                "x": 2,
+                "y": null
+              },
+              {
+                "flag": true,
+                "g": null,
+                "id": 11,
+                "s": "beta",
+                "x": null,
+                "y": -48.696
+              },
+              {
+                "flag": false,
+                "g": "A",
+                "id": 0,
+                "s": "A",
+                "x": 1,
+                "y": -22.451
+              },
+              {
+                "flag": true,
+                "g": "A",
+                "id": 1,
+                "s": "space value",
+                "x": 1,
+                "y": 0.5
+              },
+              {
+                "flag": false,
+                "g": "SPvbpk",
+                "id": 0,
+                "s": "alpha",
+                "x": 93,
+                "y": -1.0
+              },
+              {
+                "flag": false,
+                "g": "a",
+                "id": 0,
+                "s": "mLIUspc",
+                "x": 0,
+                "y": -1.0
+              },
+              {
+                "flag": null,
+                "g": "L",
+                "id": 0,
+                "s": "δelta",
+                "x": -10,
+                "y": -1.0
+              },
+              {
+                "flag": null,
+                "g": "中文",
+                "id": 1,
+                "s": "a",
+                "x": null,
+                "y": -0.5
+              },
+              {
+                "flag": null,
+                "g": null,
+                "id": 0,
+                "s": "δelta",
+                "x": -2,
+                "y": -1.0
+              },
+              {
+                "flag": true,
+                "g": "",
+                "id": 19,
+                "s": "alpha",
+                "x": 1,
+                "y": 0.5
+              },
+              {
+                "flag": false,
+                "g": null,
+                "id": 1,
+                "s": "QobT",
+                "x": -1,
+                "y": null
+              },
+              {
+                "flag": null,
+                "g": null,
+                "id": 0,
+                "s": "a",
+                "x": 10,
+                "y": 0.5
+              },
+              {
+                "flag": false,
+                "g": "alpha",
+                "id": 2,
+                "s": "w",
+                "x": 2,
+                "y": 0.0
+              },
+              {
+                "flag": true,
+                "g": "UGQeeO",
+                "id": 3,
+                "s": "space value",
+                "x": -73,
+                "y": 28.704
+              },
+              {
+                "flag": false,
+                "g": "alpha",
+                "id": 24,
+                "s": "gamma",
+                "x": 10,
+                "y": 41.559
+              },
+              {
+                "flag": false,
+                "g": "I",
+                "id": 0,
+                "s": "alpha",
+                "x": null,
+                "y": -31.583
+              },
+              {
+                "flag": true,
+                "g": "A",
+                "id": 2,
+                "s": null,
+                "x": 10,
+                "y": -1.0
+              },
+              {
+                "flag": true,
+                "g": "δelta",
+                "id": 27,
+                "s": "beta",
+                "x": 2,
+                "y": 1.0
+              }
+            ]
+          },
+          {
+            "columns": [
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "j",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "z",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "tag",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "g",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "x",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "flag",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "s",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t1",
+            "rows": [
+              {
+                "flag": false,
+                "g": "",
+                "id": 0,
+                "j": 10,
+                "s": "alpha",
+                "tag": null,
+                "x": 10,
+                "z": 0.0
+              },
+              {
+                "flag": null,
+                "g": "δelta",
+                "id": 1,
+                "j": null,
+                "s": "gamma",
+                "tag": "alpha",
+                "x": null,
+                "z": -1.0
+              },
+              {
+                "flag": true,
+                "g": "A",
+                "id": 2,
+                "j": -10,
+                "s": null,
+                "tag": "beta",
+                "x": 10,
+                "z": -1.0
+              },
+              {
+                "flag": true,
+                "g": "UGQeeO",
+                "id": 3,
+                "j": -2,
+                "s": "space value",
+                "tag": null,
+                "x": -73,
+                "z": -41.344
+              },
+              {
+                "flag": false,
+                "g": "space value",
+                "id": 4,
+                "j": 0,
+                "s": "δelta",
+                "tag": null,
+                "x": 1,
+                "z": -1.0
+              },
+              {
+                "flag": true,
+                "g": "A",
+                "id": 2,
+                "j": null,
+                "s": null,
+                "tag": null,
+                "x": 10,
+                "z": -44.348
+              },
+              {
+                "flag": false,
+                "g": "A",
+                "id": 0,
+                "j": -2,
+                "s": "A",
+                "tag": "",
+                "x": 1,
+                "z": -0.5
+              },
+              {
+                "flag": null,
+                "g": "δelta",
+                "id": 1,
+                "j": -5,
+                "s": "gamma",
+                "tag": "",
+                "x": null,
+                "z": 1.0
+              },
+              {
+                "flag": true,
+                "g": "A",
+                "id": 2,
+                "j": -2,
+                "s": null,
+                "tag": "alpha",
+                "x": 10,
+                "z": 0.0
+              },
+              {
+                "flag": false,
+                "g": "a",
+                "id": 4,
+                "j": null,
+                "s": "alpha",
+                "tag": "中文",
+                "x": 0,
+                "z": -1.0
+              },
+              {
+                "flag": false,
+                "g": "alpha",
+                "id": 2,
+                "j": 0,
+                "s": "w",
+                "tag": null,
+                "x": 2,
+                "z": 1.0
+              },
+              {
+                "flag": true,
+                "g": "A",
+                "id": 2,
+                "j": 1,
+                "s": null,
+                "tag": "中文",
+                "x": 10,
+                "z": 0.5
+              },
+              {
+                "flag": true,
+                "g": "alpha",
+                "id": 2,
+                "j": -1,
+                "s": "XK",
+                "tag": "tuPBNstT",
+                "x": -2,
+                "z": 0.0
+              },
+              {
+                "flag": true,
+                "g": "A",
+                "id": 13,
+                "j": -10,
+                "s": "space value",
+                "tag": "A",
+                "x": 1,
+                "z": 0.0
+              },
+              {
+                "flag": true,
+                "g": "A",
+                "id": 2,
+                "j": 2,
+                "s": null,
+                "tag": "kWIZ",
+                "x": 10,
+                "z": 42.579
+              },
+              {
+                "flag": true,
+                "g": "A",
+                "id": 8,
+                "j": 8,
+                "s": "ktVcfHYm",
+                "tag": "tag_8",
+                "x": null,
+                "z": 8.0
+              },
+              {
+                "flag": true,
+                "g": null,
+                "id": 11,
+                "j": 11,
+                "s": "beta",
+                "tag": "tag_11",
+                "x": null,
+                "z": 11.0
+              },
+              {
+                "flag": true,
+                "g": "",
+                "id": 19,
+                "j": 19,
+                "s": "alpha",
+                "tag": "tag_19",
+                "x": 1,
+                "z": 19.0
+              },
+              {
+                "flag": false,
+                "g": "alpha",
+                "id": 24,
+                "j": 24,
+                "s": "gamma",
+                "tag": "tag_24",
+                "x": 10,
+                "z": 24.0
+              },
+              {
+                "flag": true,
+                "g": "δelta",
+                "id": 27,
+                "j": 27,
+                "s": "beta",
+                "tag": "tag_27",
+                "x": 2,
+                "z": 27.0
+              }
+            ]
+          }
+        ]
+      },
+      "case_index": 43,
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [
+          {
+            "candidate_pool_bonus": 0.0,
+            "contribution_bonus": 0.1,
+            "feature_prefixes": [
+              "expr:",
+              "pattern:"
+            ],
+            "keep_in_pool": true,
+            "novelty_bonus": 0.1,
+            "score_bonus": 0.3,
+            "targets": [
+              "polars_reverse_division_columns",
+              "polars_rolling_mean_by_null_count_semantics"
+            ]
+          }
+        ],
+        "effective_guidance_targets": [
+          "common_workflow",
+          "operation_combo",
+          "filter",
+          "truth_filter",
+          "mutate",
+          "groupby",
+          "groupby_sorted_input",
+          "strings",
+          "casts",
+          "nulls",
+          "aggregation",
+          "global_aggregation",
+          "sort_limit",
+          "topk",
+          "running_sum_precision",
+          "running_sum",
+          "partitioned_running_sum",
+          "running_sum_partitioned",
+          "path_basename_keyed_pick",
+          "path_projection",
+          "keyed_row_pick",
+          "sortedness_null_placement",
+          "sortedness",
+          "window_avg_rows_frame",
+          "window_avg_probe",
+          "polars_timestamp_precision_filter",
+          "timestamp_precision_filter_probe",
+          "polars_float_wrap_numerical_semantics",
+          "float_wrap_probe",
+          "polars_empty_literal_groupby_semantics",
+          "empty_literal_groupby_probe",
+          "polars_rolling_mean_by_null_count_semantics",
+          "rolling_mean_by_null_count_probe",
+          "expressions",
+          "semantic_family:stateful_ordering",
+          "semantic_family:backend_specific_semantics",
+          "semantic_signal:polars_reverse_division_columns",
+          "semantic_signal:polars_rolling_mean_by_null_count_semantics"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": false,
+        "generator_profile": "discovery_fresh",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "common_workflow",
+          "operation_combo",
+          "filter",
+          "truth_filter",
+          "mutate",
+          "groupby",
+          "groupby_sorted_input",
+          "strings",
+          "casts",
+          "nulls",
+          "aggregation",
+          "global_aggregation",
+          "sort_limit",
+          "topk",
+          "running_sum_precision",
+          "running_sum",
+          "partitioned_running_sum",
+          "running_sum_partitioned",
+          "path_basename_keyed_pick",
+          "path_projection",
+          "keyed_row_pick",
+          "sortedness_null_placement",
+          "sortedness",
+          "window_avg_rows_frame",
+          "window_avg_probe",
+          "polars_timestamp_precision_filter",
+          "timestamp_precision_filter_probe",
+          "polars_float_wrap_numerical_semantics",
+          "float_wrap_probe",
+          "polars_empty_literal_groupby_semantics",
+          "empty_literal_groupby_probe",
+          "polars_rolling_mean_by_null_count_semantics",
+          "rolling_mean_by_null_count_probe",
+          "expressions"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.45,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [
+          "stateful_ordering",
+          "backend_specific_semantics"
+        ],
+        "semantic_focus_signals": [
+          "polars_reverse_division_columns",
+          "polars_rolling_mean_by_null_count_semantics"
+        ],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "",
+        "strategy_snapshot_path": "",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "elapsed_s": 2942.858054,
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Backends returned different canonical tables; mismatch_class=row_order; shapes={'pandas': (3, 2), 'polars': (3, 2), 'polars_lazy': (3, 2)}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-8ee7acf817f7ca54",
+          "kind": "semantic_output_mismatch",
+          "mismatch_class": "row_order",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "running_sum_precision",
+          "severity": "critical",
+          "signature": "8ee7acf817f7ca54",
+          "source_issue": "",
+          "suspicious_backends": [
+            "polars_lazy"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas', 'polars'] and disagrees with ['polars_lazy'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "j",
+            "min_cw_0"
+          ],
+          "comparison_key": "{\"columns\":[\"j\",\"min_cw_0\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-2,0]\\\",\\\"[null,0]\\\",\\\"[11,0]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[-2,0]\",\"[null,0]\",\"[11,0]\"]",
+          "row_count": 3,
+          "rows": [
+            [
+              -2,
+              0
+            ],
+            [
+              null,
+              0
+            ],
+            [
+              11,
+              0
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[-2,0]\",\"[11,0]\",\"[null,0]\"]"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [
+            "j",
+            "min_cw_0"
+          ],
+          "comparison_key": "{\"columns\":[\"j\",\"min_cw_0\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-2,0]\\\",\\\"[null,0]\\\",\\\"[11,0]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[-2,0]\",\"[null,0]\",\"[11,0]\"]",
+          "row_count": 3,
+          "rows": [
+            [
+              -2,
+              0
+            ],
+            [
+              null,
+              0
+            ],
+            [
+              11,
+              0
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[-2,0]\",\"[11,0]\",\"[null,0]\"]"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [
+            "j",
+            "min_cw_0"
+          ],
+          "comparison_key": "{\"columns\":[\"j\",\"min_cw_0\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null,0]\\\",\\\"[11,0]\\\",\\\"[-2,0]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[null,0]\",\"[11,0]\",\"[-2,0]\"]",
+          "row_count": 3,
+          "rows": [
+            [
+              null,
+              0
+            ],
+            [
+              11,
+              0
+            ],
+            [
+              -2,
+              0
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[-2,0]\",\"[11,0]\",\"[null,0]\"]"
+        }
+      },
+      "raw_results": {
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 41.62153200013563,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 14.208497996150982,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 9.553188006975688,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        }
+      },
+      "status": "bug"
+    }
+  ],
+  "fresh_candidate_bug_families": {
+    "running_sum_precision@pandas": 1,
+    "running_sum_precision@pandas,polars,polars_lazy": 1,
+    "running_sum_precision@polars_lazy": 2
+  },
+  "generated_at": "2026-06-07T04:24:56Z",
+  "generated_by": "datadiff discovery-run",
+  "schema_version": "discovery-run-fresh-candidates-v1",
+  "source_run_file": "runs/run-20260606T220225-1780783345616036486.jsonl.gz"
+}

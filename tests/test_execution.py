@@ -17,6 +17,11 @@ class _FakeFrame:
         return list(self._rows)
 
 
+class _NoDeepcopyPayload:
+    def __deepcopy__(self, memo):
+        raise AssertionError("raw execution summaries must not deepcopy backend data")
+
+
 class _FakeBackend(Backend):
     def __init__(self, name: str):
         self.name = name
@@ -75,6 +80,20 @@ def test_execute_case_uses_backend_instances_and_normalizes_results():
     assert normalized["left"].backend == "left"
     assert normalized["left"].columns == ["a", "b"]
     assert normalized["left"].rows == [[1, 2], [3, 4]]
+
+
+def test_backend_result_summary_skips_backend_data_payload():
+    payload = _NoDeepcopyPayload()
+    result = BackendResult("left", "ok", data=payload, duration_ms=1.25)
+
+    assert result.summary_dict() == {
+        "backend": "left",
+        "status": "ok",
+        "error_type": "",
+        "error": "",
+        "duration_ms": 1.25,
+    }
+    assert result.to_dict()["data"] is payload
 
 
 def test_execute_case_constructs_backends_when_instances_missing(monkeypatch):

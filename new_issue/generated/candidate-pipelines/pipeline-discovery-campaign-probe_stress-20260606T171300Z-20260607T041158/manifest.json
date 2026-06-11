@@ -1,0 +1,1407 @@
+{
+  "bug_discovery_system": {
+    "objective": "maximize externally reproducible fresh implementation bug yield per unit budget",
+    "schema_version": "bug-discovery-system-v1",
+    "stages": [
+      "generate_or_mutate_candidate",
+      "score_by_acquisition",
+      "execute_differential_oracles",
+      "filter_rewardable_fresh_candidates",
+      "recheck_reproducibility",
+      "reduce_preserving_root_cause",
+      "write_reproducer_and_issue_draft"
+    ],
+    "theory": {
+      "budget": "Boltzmann allocation over acquisition free energy",
+      "candidate_priority": "multi-objective proof/reproducibility/dedup utility",
+      "exploration": "UCB optimism under sparse lane samples",
+      "novelty": "Good-Turing unseen-family probability"
+    }
+  },
+  "candidates": [
+    {
+      "artifact_created": false,
+      "bug_dir": "bugs/bug_1ccab94bdd003141",
+      "candidate_acquisition": {
+        "acquisition_score": 5.098957718841947,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "csv_long_numeric_roundtrip@polars,polars_lazy"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.8450488750216346,
+        "recheck_prior": 0.85,
+        "reduction_potential": 0.3169925001442312,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9939339175322763
+      },
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00001609-issue-focus-csv-long-numeric-roundtrip",
+      "case_id": "case-00001609-issue-focus-csv-long-numeric-roundtrip",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "",
+        "status": "needs_final_upstream_dedup"
+      },
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "initial_candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "issue_draft": {
+        "path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001609-issue-focus-csv-long.md",
+        "status_text": "Needs final upstream dedup before submission"
+      },
+      "issue_readiness": {
+        "blocking_reasons": [
+          "needs final upstream duplicate check before submission"
+        ],
+        "confirmed_latest_match": {},
+        "counts_as_confirmed": false,
+        "discovery_basis": "Automated candidate pipeline from `runs/run-20260607T021439-1780798479224195303.jsonl.gz`",
+        "discovery_time": "2026-06-07T04:12:19Z",
+        "evidence_found": {
+          "discovery_record": true,
+          "environment": true,
+          "expected": true,
+          "observed_or_actual": true,
+          "project_evidence": true,
+          "reproducer": true
+        },
+        "family_guess": "csv_long_numeric_roundtrip@polars,polars_lazy",
+        "missing_evidence": [],
+        "missing_referenced_paths": [],
+        "old_known_urls_mentioned": [],
+        "path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001609-issue-focus-csv-long.md",
+        "priority": "medium",
+        "priority_score": 81,
+        "readiness_status": "needs_dedup_check",
+        "safe_for_paper_confirmed_count": false,
+        "source": "manual",
+        "status_text": "Needs final upstream dedup before submission",
+        "title": "Auto Issue Draft: csv_long_numeric_roundtrip@polars,polars_lazy",
+        "upstream_urls": [],
+        "warnings": []
+      },
+      "primary_family": "csv_long_numeric_roundtrip@polars,polars_lazy",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 2,
+            "candidate_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 3,
+            "candidate_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "status": "bug"
+          }
+        ],
+        "attempts": 3,
+        "reproduced": true,
+        "reproduced_families": [
+          "csv_long_numeric_roundtrip@polars,polars_lazy"
+        ]
+      },
+      "reduction": {
+        "original_operations": 1,
+        "original_rows": 1,
+        "performed": true,
+        "reduced_case_path": "bugs/bug_1ccab94bdd003141/reduced_case.json",
+        "reduced_operations": 1,
+        "reduced_reproducer_path": "bugs/bug_1ccab94bdd003141/reproduce_reduced.py",
+        "reduced_rows": 1,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+      "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/strategy-learning/candidate-pipeline-learning.json",
+      "triage": {
+        "paper_status": "candidate_bug_needs_external_confirmation",
+        "reproduced_roots": [
+          "csv_long_numeric_roundtrip"
+        ],
+        "suspicious_backends": [
+          "polars",
+          "polars_lazy"
+        ],
+        "triage_confidence": "high",
+        "triage_json": "bugs/bug_1ccab94bdd003141/triage.json",
+        "triage_markdown": "bugs/bug_1ccab94bdd003141/triage.md",
+        "verdict": "candidate_implementation_bug"
+      }
+    },
+    {
+      "artifact_created": false,
+      "bug_dir": "bugs/bug_1ccab94bdd003141",
+      "candidate_acquisition": {
+        "acquisition_score": 5.098957718841947,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "csv_long_numeric_roundtrip@polars,polars_lazy"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.8450488750216346,
+        "recheck_prior": 0.85,
+        "reduction_potential": 0.3169925001442312,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9939339175322763
+      },
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00001632-issue-focus-csv-long-numeric-roundtrip",
+      "case_id": "case-00001632-issue-focus-csv-long-numeric-roundtrip",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00001609-issue-focus-csv-long-numeric-roundtrip",
+        "status": "duplicate_pipeline_family"
+      },
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "initial_candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "issue_draft": {
+        "path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001632-issue-focus-csv-long.md",
+        "status_text": "Needs final upstream dedup before submission"
+      },
+      "issue_readiness": {
+        "blocking_reasons": [
+          "needs final upstream duplicate check before submission"
+        ],
+        "confirmed_latest_match": {},
+        "counts_as_confirmed": false,
+        "discovery_basis": "Automated candidate pipeline from `runs/run-20260607T021439-1780798479224195303.jsonl.gz`",
+        "discovery_time": "2026-06-07T04:12:19Z",
+        "evidence_found": {
+          "discovery_record": true,
+          "environment": true,
+          "expected": true,
+          "observed_or_actual": true,
+          "project_evidence": true,
+          "reproducer": true
+        },
+        "family_guess": "csv_long_numeric_roundtrip@polars,polars_lazy",
+        "missing_evidence": [],
+        "missing_referenced_paths": [],
+        "old_known_urls_mentioned": [],
+        "path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001632-issue-focus-csv-long.md",
+        "priority": "medium",
+        "priority_score": 81,
+        "readiness_status": "needs_dedup_check",
+        "safe_for_paper_confirmed_count": false,
+        "source": "manual",
+        "status_text": "Needs final upstream dedup before submission",
+        "title": "Auto Issue Draft: csv_long_numeric_roundtrip@polars,polars_lazy",
+        "upstream_urls": [],
+        "warnings": []
+      },
+      "primary_family": "csv_long_numeric_roundtrip@polars,polars_lazy",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 2,
+            "candidate_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 3,
+            "candidate_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "status": "bug"
+          }
+        ],
+        "attempts": 3,
+        "reproduced": true,
+        "reproduced_families": [
+          "csv_long_numeric_roundtrip@polars,polars_lazy"
+        ]
+      },
+      "reduction": {
+        "original_operations": 1,
+        "original_rows": 1,
+        "performed": true,
+        "reduced_case_path": "bugs/bug_1ccab94bdd003141/reduced_case.json",
+        "reduced_operations": 1,
+        "reduced_reproducer_path": "bugs/bug_1ccab94bdd003141/reproduce_reduced.py",
+        "reduced_rows": 1,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+      "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/strategy-learning/candidate-pipeline-learning.json",
+      "triage": {
+        "paper_status": "candidate_bug_needs_external_confirmation",
+        "reproduced_roots": [
+          "csv_long_numeric_roundtrip"
+        ],
+        "suspicious_backends": [
+          "polars",
+          "polars_lazy"
+        ],
+        "triage_confidence": "high",
+        "triage_json": "bugs/bug_1ccab94bdd003141/triage.json",
+        "triage_markdown": "bugs/bug_1ccab94bdd003141/triage.md",
+        "verdict": "candidate_implementation_bug"
+      }
+    },
+    {
+      "artifact_created": false,
+      "bug_dir": "bugs/bug_342547b6ee046401",
+      "candidate_acquisition": {
+        "acquisition_score": 5.098957718841947,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.8450488750216346,
+        "recheck_prior": 0.85,
+        "reduction_potential": 0.3169925001442312,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9939339175322763
+      },
+      "candidate_id": "pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001639-issue-focus-pyarrow-list-flatten-parent-i",
+      "case_id": "case-00001639-issue-focus-pyarrow-list-flatten-parent-indices-semantics",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "",
+        "status": "needs_final_upstream_dedup"
+      },
+      "families": [
+        "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+      ],
+      "initial_candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "issue_draft": {
+        "path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001639-i.md",
+        "status_text": "Needs final upstream dedup before submission"
+      },
+      "issue_readiness": {
+        "blocking_reasons": [
+          "needs final upstream duplicate check before submission"
+        ],
+        "confirmed_latest_match": {},
+        "counts_as_confirmed": false,
+        "discovery_basis": "Automated candidate pipeline from `runs/run-20260607T021439-1780798479224195303.jsonl.gz`",
+        "discovery_time": "2026-06-07T04:12:19Z",
+        "evidence_found": {
+          "discovery_record": true,
+          "environment": true,
+          "expected": true,
+          "observed_or_actual": true,
+          "project_evidence": true,
+          "reproducer": true
+        },
+        "family_guess": "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy",
+        "missing_evidence": [],
+        "missing_referenced_paths": [],
+        "old_known_urls_mentioned": [],
+        "path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001639-i.md",
+        "priority": "medium",
+        "priority_score": 81,
+        "readiness_status": "needs_dedup_check",
+        "safe_for_paper_confirmed_count": false,
+        "source": "manual",
+        "status_text": "Needs final upstream dedup before submission",
+        "title": "Auto Issue Draft: pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy",
+        "upstream_urls": [],
+        "warnings": []
+      },
+      "primary_family": "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 2,
+            "candidate_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 3,
+            "candidate_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "status": "bug"
+          }
+        ],
+        "attempts": 3,
+        "reproduced": true,
+        "reproduced_families": [
+          "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+        ]
+      },
+      "reduction": {
+        "original_operations": 1,
+        "original_rows": 1,
+        "performed": true,
+        "reduced_case_path": "bugs/bug_342547b6ee046401/reduced_case.json",
+        "reduced_operations": 1,
+        "reduced_reproducer_path": "bugs/bug_342547b6ee046401/reproduce_reduced.py",
+        "reduced_rows": 1,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+      "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/strategy-learning/candidate-pipeline-learning.json",
+      "triage": {
+        "paper_status": "candidate_bug_needs_external_confirmation",
+        "reproduced_roots": [
+          "pyarrow_list_flatten_parent_indices_semantics"
+        ],
+        "suspicious_backends": [
+          "polars",
+          "polars_lazy"
+        ],
+        "triage_confidence": "high",
+        "triage_json": "bugs/bug_342547b6ee046401/triage.json",
+        "triage_markdown": "bugs/bug_342547b6ee046401/triage.md",
+        "verdict": "candidate_implementation_bug"
+      }
+    },
+    {
+      "artifact_created": false,
+      "bug_dir": "bugs/bug_1ccab94bdd003141",
+      "candidate_acquisition": {
+        "acquisition_score": 5.098957718841947,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "csv_long_numeric_roundtrip@polars,polars_lazy"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.8450488750216346,
+        "recheck_prior": 0.85,
+        "reduction_potential": 0.3169925001442312,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9939339175322763
+      },
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00001701-issue-focus-csv-long-numeric-roundtrip",
+      "case_id": "case-00001701-issue-focus-csv-long-numeric-roundtrip",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00001609-issue-focus-csv-long-numeric-roundtrip",
+        "status": "duplicate_pipeline_family"
+      },
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "initial_candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "issue_draft": {
+        "path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001701-issue-focus-csv-long.md",
+        "status_text": "Needs final upstream dedup before submission"
+      },
+      "issue_readiness": {
+        "blocking_reasons": [
+          "needs final upstream duplicate check before submission"
+        ],
+        "confirmed_latest_match": {},
+        "counts_as_confirmed": false,
+        "discovery_basis": "Automated candidate pipeline from `runs/run-20260607T021439-1780798479224195303.jsonl.gz`",
+        "discovery_time": "2026-06-07T04:12:19Z",
+        "evidence_found": {
+          "discovery_record": true,
+          "environment": true,
+          "expected": true,
+          "observed_or_actual": true,
+          "project_evidence": true,
+          "reproducer": true
+        },
+        "family_guess": "csv_long_numeric_roundtrip@polars,polars_lazy",
+        "missing_evidence": [],
+        "missing_referenced_paths": [],
+        "old_known_urls_mentioned": [],
+        "path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001701-issue-focus-csv-long.md",
+        "priority": "medium",
+        "priority_score": 81,
+        "readiness_status": "needs_dedup_check",
+        "safe_for_paper_confirmed_count": false,
+        "source": "manual",
+        "status_text": "Needs final upstream dedup before submission",
+        "title": "Auto Issue Draft: csv_long_numeric_roundtrip@polars,polars_lazy",
+        "upstream_urls": [],
+        "warnings": []
+      },
+      "primary_family": "csv_long_numeric_roundtrip@polars,polars_lazy",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 2,
+            "candidate_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 3,
+            "candidate_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "status": "bug"
+          }
+        ],
+        "attempts": 3,
+        "reproduced": true,
+        "reproduced_families": [
+          "csv_long_numeric_roundtrip@polars,polars_lazy"
+        ]
+      },
+      "reduction": {
+        "original_operations": 1,
+        "original_rows": 1,
+        "performed": true,
+        "reduced_case_path": "bugs/bug_1ccab94bdd003141/reduced_case.json",
+        "reduced_operations": 1,
+        "reduced_reproducer_path": "bugs/bug_1ccab94bdd003141/reproduce_reduced.py",
+        "reduced_rows": 1,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+      "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/strategy-learning/candidate-pipeline-learning.json",
+      "triage": {
+        "paper_status": "candidate_bug_needs_external_confirmation",
+        "reproduced_roots": [
+          "csv_long_numeric_roundtrip"
+        ],
+        "suspicious_backends": [
+          "polars",
+          "polars_lazy"
+        ],
+        "triage_confidence": "high",
+        "triage_json": "bugs/bug_1ccab94bdd003141/triage.json",
+        "triage_markdown": "bugs/bug_1ccab94bdd003141/triage.md",
+        "verdict": "candidate_implementation_bug"
+      }
+    },
+    {
+      "artifact_created": false,
+      "bug_dir": "bugs/bug_1ccab94bdd003141",
+      "candidate_acquisition": {
+        "acquisition_score": 5.098957718841947,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "csv_long_numeric_roundtrip@polars,polars_lazy"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.8450488750216346,
+        "recheck_prior": 0.85,
+        "reduction_potential": 0.3169925001442312,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9939339175322763
+      },
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00001747-issue-focus-csv-long-numeric-roundtrip",
+      "case_id": "case-00001747-issue-focus-csv-long-numeric-roundtrip",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00001609-issue-focus-csv-long-numeric-roundtrip",
+        "status": "duplicate_pipeline_family"
+      },
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "initial_candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "issue_draft": {
+        "path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001747-issue-focus-csv-long.md",
+        "status_text": "Needs final upstream dedup before submission"
+      },
+      "issue_readiness": {
+        "blocking_reasons": [
+          "needs final upstream duplicate check before submission"
+        ],
+        "confirmed_latest_match": {},
+        "counts_as_confirmed": false,
+        "discovery_basis": "Automated candidate pipeline from `runs/run-20260607T021439-1780798479224195303.jsonl.gz`",
+        "discovery_time": "2026-06-07T04:12:19Z",
+        "evidence_found": {
+          "discovery_record": true,
+          "environment": true,
+          "expected": true,
+          "observed_or_actual": true,
+          "project_evidence": true,
+          "reproducer": true
+        },
+        "family_guess": "csv_long_numeric_roundtrip@polars,polars_lazy",
+        "missing_evidence": [],
+        "missing_referenced_paths": [],
+        "old_known_urls_mentioned": [],
+        "path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001747-issue-focus-csv-long.md",
+        "priority": "medium",
+        "priority_score": 81,
+        "readiness_status": "needs_dedup_check",
+        "safe_for_paper_confirmed_count": false,
+        "source": "manual",
+        "status_text": "Needs final upstream dedup before submission",
+        "title": "Auto Issue Draft: csv_long_numeric_roundtrip@polars,polars_lazy",
+        "upstream_urls": [],
+        "warnings": []
+      },
+      "primary_family": "csv_long_numeric_roundtrip@polars,polars_lazy",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 2,
+            "candidate_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 3,
+            "candidate_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "csv_long_numeric_roundtrip@polars,polars_lazy"
+            ],
+            "status": "bug"
+          }
+        ],
+        "attempts": 3,
+        "reproduced": true,
+        "reproduced_families": [
+          "csv_long_numeric_roundtrip@polars,polars_lazy"
+        ]
+      },
+      "reduction": {
+        "original_operations": 1,
+        "original_rows": 1,
+        "performed": true,
+        "reduced_case_path": "bugs/bug_1ccab94bdd003141/reduced_case.json",
+        "reduced_operations": 1,
+        "reduced_reproducer_path": "bugs/bug_1ccab94bdd003141/reproduce_reduced.py",
+        "reduced_rows": 1,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+      "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/strategy-learning/candidate-pipeline-learning.json",
+      "triage": {
+        "paper_status": "candidate_bug_needs_external_confirmation",
+        "reproduced_roots": [
+          "csv_long_numeric_roundtrip"
+        ],
+        "suspicious_backends": [
+          "polars",
+          "polars_lazy"
+        ],
+        "triage_confidence": "high",
+        "triage_json": "bugs/bug_1ccab94bdd003141/triage.json",
+        "triage_markdown": "bugs/bug_1ccab94bdd003141/triage.md",
+        "verdict": "candidate_implementation_bug"
+      }
+    },
+    {
+      "artifact_created": false,
+      "bug_dir": "bugs/bug_342547b6ee046401",
+      "candidate_acquisition": {
+        "acquisition_score": 5.098957718841947,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.8450488750216346,
+        "recheck_prior": 0.85,
+        "reduction_potential": 0.3169925001442312,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9939339175322763
+      },
+      "candidate_id": "pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001872-issue-focus-pyarrow-list-flatten-parent-i",
+      "case_id": "case-00001872-issue-focus-pyarrow-list-flatten-parent-indices-semantics",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001639-issue-focus-pyarrow-list-flatten-parent-i",
+        "status": "duplicate_pipeline_family"
+      },
+      "families": [
+        "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+      ],
+      "initial_candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "issue_draft": {
+        "path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001872-i.md",
+        "status_text": "Needs final upstream dedup before submission"
+      },
+      "issue_readiness": {
+        "blocking_reasons": [
+          "needs final upstream duplicate check before submission"
+        ],
+        "confirmed_latest_match": {},
+        "counts_as_confirmed": false,
+        "discovery_basis": "Automated candidate pipeline from `runs/run-20260607T021439-1780798479224195303.jsonl.gz`",
+        "discovery_time": "2026-06-07T04:12:20Z",
+        "evidence_found": {
+          "discovery_record": true,
+          "environment": true,
+          "expected": true,
+          "observed_or_actual": true,
+          "project_evidence": true,
+          "reproducer": true
+        },
+        "family_guess": "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy",
+        "missing_evidence": [],
+        "missing_referenced_paths": [],
+        "old_known_urls_mentioned": [],
+        "path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001872-i.md",
+        "priority": "medium",
+        "priority_score": 81,
+        "readiness_status": "needs_dedup_check",
+        "safe_for_paper_confirmed_count": false,
+        "source": "manual",
+        "status_text": "Needs final upstream dedup before submission",
+        "title": "Auto Issue Draft: pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy",
+        "upstream_urls": [],
+        "warnings": []
+      },
+      "primary_family": "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 2,
+            "candidate_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 3,
+            "candidate_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "status": "bug"
+          }
+        ],
+        "attempts": 3,
+        "reproduced": true,
+        "reproduced_families": [
+          "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+        ]
+      },
+      "reduction": {
+        "original_operations": 1,
+        "original_rows": 1,
+        "performed": true,
+        "reduced_case_path": "bugs/bug_342547b6ee046401/reduced_case.json",
+        "reduced_operations": 1,
+        "reduced_reproducer_path": "bugs/bug_342547b6ee046401/reproduce_reduced.py",
+        "reduced_rows": 1,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+      "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/strategy-learning/candidate-pipeline-learning.json",
+      "triage": {
+        "paper_status": "candidate_bug_needs_external_confirmation",
+        "reproduced_roots": [
+          "pyarrow_list_flatten_parent_indices_semantics"
+        ],
+        "suspicious_backends": [
+          "polars",
+          "polars_lazy"
+        ],
+        "triage_confidence": "high",
+        "triage_json": "bugs/bug_342547b6ee046401/triage.json",
+        "triage_markdown": "bugs/bug_342547b6ee046401/triage.md",
+        "verdict": "candidate_implementation_bug"
+      }
+    },
+    {
+      "artifact_created": true,
+      "bug_dir": "bugs/bug_342547b6ee046401",
+      "candidate_acquisition": {
+        "acquisition_score": 5.098957718841947,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.8450488750216346,
+        "recheck_prior": 0.85,
+        "reduction_potential": 0.3169925001442312,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9939339175322763
+      },
+      "candidate_id": "pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00004668-issue-focus-pyarrow-list-flatten-parent-i",
+      "case_id": "case-00004668-issue-focus-pyarrow-list-flatten-parent-indices-semantics",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001639-issue-focus-pyarrow-list-flatten-parent-i",
+        "status": "duplicate_pipeline_family"
+      },
+      "families": [
+        "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+      ],
+      "initial_candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "issue_draft": {
+        "path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00004668-i.md",
+        "status_text": "Needs final upstream dedup before submission"
+      },
+      "issue_readiness": {
+        "blocking_reasons": [
+          "needs final upstream duplicate check before submission"
+        ],
+        "confirmed_latest_match": {},
+        "counts_as_confirmed": false,
+        "discovery_basis": "Automated candidate pipeline from `runs/run-20260607T021439-1780798479224195303.jsonl.gz`",
+        "discovery_time": "2026-06-07T04:12:20Z",
+        "evidence_found": {
+          "discovery_record": true,
+          "environment": true,
+          "expected": true,
+          "observed_or_actual": true,
+          "project_evidence": true,
+          "reproducer": true
+        },
+        "family_guess": "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy",
+        "missing_evidence": [],
+        "missing_referenced_paths": [],
+        "old_known_urls_mentioned": [],
+        "path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00004668-i.md",
+        "priority": "medium",
+        "priority_score": 81,
+        "readiness_status": "needs_dedup_check",
+        "safe_for_paper_confirmed_count": false,
+        "source": "manual",
+        "status_text": "Needs final upstream dedup before submission",
+        "title": "Auto Issue Draft: pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy",
+        "upstream_urls": [],
+        "warnings": []
+      },
+      "primary_family": "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 2,
+            "candidate_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 3,
+            "candidate_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "finding_count": 1,
+            "matched_families": [
+              "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+            ],
+            "status": "bug"
+          }
+        ],
+        "attempts": 3,
+        "reproduced": true,
+        "reproduced_families": [
+          "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+        ]
+      },
+      "reduction": {
+        "original_operations": 1,
+        "original_rows": 1,
+        "performed": true,
+        "reduced_case_path": "bugs/bug_342547b6ee046401/reduced_case.json",
+        "reduced_operations": 1,
+        "reduced_reproducer_path": "bugs/bug_342547b6ee046401/reproduce_reduced.py",
+        "reduced_rows": 1,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+      "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/strategy-learning/candidate-pipeline-learning.json",
+      "triage": {
+        "paper_status": "candidate_bug_needs_external_confirmation",
+        "reproduced_roots": [
+          "pyarrow_list_flatten_parent_indices_semantics"
+        ],
+        "suspicious_backends": [
+          "polars",
+          "polars_lazy"
+        ],
+        "triage_confidence": "high",
+        "triage_json": "bugs/bug_342547b6ee046401/triage.json",
+        "triage_markdown": "bugs/bug_342547b6ee046401/triage.md",
+        "verdict": "candidate_implementation_bug"
+      }
+    }
+  ],
+  "existing_issue_readiness_summary": {
+    "already_submitted_or_confirmed_count": 15,
+    "already_submitted_or_confirmed_family_count": 10,
+    "confirmed_count_eligible_count": 13,
+    "confirmed_count_eligible_families": [
+      "datafusion_limit_idempotence@datafusion",
+      "distinct_null_topk@datafusion",
+      "groupby_aggregation@datafusion",
+      "groupby_aggregation@polars,polars_lazy",
+      "grouped_topk_null_sort_key@datafusion",
+      "negative_zero_comparison@datafusion",
+      "polars_reflected_arithmetic_operand_order@polars",
+      "pyarrow_sliced_bool_groupby_any_all@pyarrow"
+    ],
+    "confirmed_count_eligible_family_count": 8,
+    "duplicate_family_draft_count": 0,
+    "duplicate_family_draft_groups": {},
+    "issue_document_count": 20,
+    "needs_dedup_check": [],
+    "needs_dedup_check_count": 0,
+    "needs_dedup_check_families": [],
+    "needs_dedup_check_family_count": 0,
+    "needs_reproducer_or_evidence": [
+      "new_issue/datafusion_22554_followup_comment.md",
+      "new_issue/datafusion_null_group_key_candidate.md",
+      "new_issue/duckdb_groupby_neutral_mutation_not_upstream.md",
+      "new_issue/generated/polars_vector_division_rounding.md"
+    ],
+    "needs_reproducer_or_evidence_count": 4,
+    "needs_reproducer_or_evidence_family_count": 4,
+    "not_latest_reproducible_count": 1,
+    "not_latest_reproducible_family_count": 1,
+    "ready_to_submit": [],
+    "ready_to_submit_count": 0,
+    "ready_to_submit_families": [],
+    "ready_to_submit_family_count": 0,
+    "submission_group_count": 0,
+    "submission_group_families": [],
+    "submission_groups_needs_dedup_count": 0,
+    "submission_groups_ready_to_submit_count": 0,
+    "top_priority": [
+      "new_issue/generated/polars_vector_division_rounding.md",
+      "new_issue/datafusion_null_group_key_candidate.md",
+      "new_issue/duckdb_groupby_neutral_mutation_not_upstream.md",
+      "new_issue/datafusion_22554_followup_comment.md",
+      "new_issue/datafusion_limit_idempotence.md"
+    ]
+  },
+  "frozen_candidates_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/frozen-candidates.json",
+  "generated_at": "2026-06-07T04:12:40Z",
+  "generated_by": "datadiff candidate-pipeline",
+  "inputs": {
+    "evidence_files": [
+      "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json"
+    ],
+    "generated_issue_dir": "new_issue/generated",
+    "manifest_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z.json",
+    "new_issue_dir": "new_issue",
+    "old_issue_dir": "old_issue",
+    "output_dir": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158",
+    "recheck_attempts": 3,
+    "reduce_artifacts": true,
+    "standalone_reproducer": true
+  },
+  "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/manifest.json",
+  "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/manifest.md",
+  "pipeline_issue_readiness_summary": {
+    "already_submitted_or_confirmed_count": 0,
+    "already_submitted_or_confirmed_family_count": 0,
+    "confirmed_count_eligible_count": 0,
+    "confirmed_count_eligible_families": [],
+    "confirmed_count_eligible_family_count": 0,
+    "duplicate_family_draft_count": 5,
+    "duplicate_family_draft_groups": {
+      "csv_long_numeric_roundtrip@polars,polars_lazy": [
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001609-issue-focus-csv-long.md",
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001632-issue-focus-csv-long.md",
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001701-issue-focus-csv-long.md",
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001747-issue-focus-csv-long.md"
+      ],
+      "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy": [
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001639-i.md",
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001872-i.md",
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00004668-i.md"
+      ]
+    },
+    "issue_document_count": 7,
+    "needs_dedup_check": [
+      "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001609-issue-focus-csv-long.md",
+      "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001632-issue-focus-csv-long.md",
+      "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001701-issue-focus-csv-long.md",
+      "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001747-issue-focus-csv-long.md",
+      "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001639-i.md",
+      "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001872-i.md",
+      "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00004668-i.md"
+    ],
+    "needs_dedup_check_count": 7,
+    "needs_dedup_check_families": [
+      "csv_long_numeric_roundtrip@polars,polars_lazy",
+      "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+    ],
+    "needs_dedup_check_family_count": 2,
+    "needs_reproducer_or_evidence": [],
+    "needs_reproducer_or_evidence_count": 0,
+    "needs_reproducer_or_evidence_family_count": 0,
+    "not_latest_reproducible_count": 0,
+    "not_latest_reproducible_family_count": 0,
+    "ready_to_submit": [],
+    "ready_to_submit_count": 0,
+    "ready_to_submit_families": [],
+    "ready_to_submit_family_count": 0,
+    "submission_group_count": 2,
+    "submission_group_families": [
+      "csv_long_numeric_roundtrip@polars,polars_lazy",
+      "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+    ],
+    "submission_groups_needs_dedup_count": 2,
+    "submission_groups_ready_to_submit_count": 0,
+    "top_priority": [
+      "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001609-issue-focus-csv-long.md",
+      "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001632-issue-focus-csv-long.md",
+      "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001701-issue-focus-csv-long.md",
+      "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001747-issue-focus-csv-long.md",
+      "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001639-i.md"
+    ]
+  },
+  "schema_version": "candidate-pipeline-v1",
+  "strategy_snapshot_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/strategy-snapshot.json",
+  "submission_groups": [
+    {
+      "family": "csv_long_numeric_roundtrip@polars,polars_lazy",
+      "issue_count": 4,
+      "issue_paths": [
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001609-issue-focus-csv-long.md",
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001632-issue-focus-csv-long.md",
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001701-issue-focus-csv-long.md",
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001747-issue-focus-csv-long.md"
+      ],
+      "needs_dedup_check": true,
+      "primary_issue_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001609-issue-focus-csv-long.md",
+      "primary_title": "Auto Issue Draft: csv_long_numeric_roundtrip@polars,polars_lazy",
+      "priority": "medium",
+      "priority_score": 81,
+      "status_counts": {
+        "needs_dedup_check": 4
+      },
+      "submission_status": "needs_dedup_check",
+      "supporting_issue_paths": [
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001632-issue-focus-csv-long.md",
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001701-issue-focus-csv-long.md",
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/csv_long_numeric_roundtrip-polars-polars_lazy-case-00001747-issue-focus-csv-long.md"
+      ]
+    },
+    {
+      "family": "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy",
+      "issue_count": 3,
+      "issue_paths": [
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001639-i.md",
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001872-i.md",
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00004668-i.md"
+      ],
+      "needs_dedup_check": true,
+      "primary_issue_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001639-i.md",
+      "primary_title": "Auto Issue Draft: pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy",
+      "priority": "medium",
+      "priority_score": 81,
+      "status_counts": {
+        "needs_dedup_check": 3
+      },
+      "submission_status": "needs_dedup_check",
+      "supporting_issue_paths": [
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001872-i.md",
+        "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/issue-drafts/pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00004668-i.md"
+      ]
+    }
+  ],
+  "summary": {
+    "already_submitted_or_confirmed_count": 0,
+    "artifact_created_count": 1,
+    "candidate_bug_verdict_count": 7,
+    "candidate_count": 7,
+    "issue_draft_count": 7,
+    "local_duplicate_candidate_count": 5,
+    "needs_dedup_check_count": 7,
+    "needs_reproducer_or_evidence_count": 0,
+    "not_latest_reproducible_count": 0,
+    "ready_to_submit_count": 0,
+    "recheck_pass_rate": 1.0,
+    "rechecked_count": 7,
+    "reduced_count": 7,
+    "reproduced_count": 7,
+    "submission_group_count": 2,
+    "unique_family_count": 2
+  }
+}

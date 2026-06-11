@@ -11,7 +11,7 @@
     "datafusion": "53.0.0",
     "duckdb": "1.5.3",
     "pandas": "3.0.3",
-    "platform": "Linux-6.17.0-29-generic-x86_64-with-glibc2.39",
+    "platform": "Linux-6.17.0-35-generic-x86_64-with-glibc2.39",
     "polars": "1.41.0",
     "pyarrow": "24.0.0",
     "pysqlite3_binary": "0.5.4.post2",
@@ -20,7 +20,7 @@
     "sqlite_runtime": "pysqlite3"
   },
   "evidence_mode": "deterministic_probe",
-  "generated_at": "2026-05-26T23:21:17Z",
+  "generated_at": "2026-06-06T17:10:11Z",
   "generated_by": "datadiff bug-audit",
   "issue_files": [
     "new_issue/generated/distinct_null_topk.md",
@@ -29,12 +29,12 @@
     "new_issue/generated/polars_vector_division_rounding.md",
     "new_issue/generated/pyarrow_sliced_bool_groupby_any_all.md"
   ],
-  "local_report_json": "reports/bug-audit-20260526T232117.json",
-  "local_report_markdown": "reports/bug-audit-20260526T232117.md",
+  "local_report_json": "reports/bug-audit-20260606T171011.json",
+  "local_report_markdown": "reports/bug-audit-20260606T171011.md",
   "manifest_path": "new_issue/generated/manifest.json",
   "methodology": "Each probe encodes a backend-independent invariant or a zero-offset control. The command executes the current installed libraries and classifies a candidate only when the target backend violates that invariant.",
-  "output_json": "reports/bug-audit-20260526T232117.json",
-  "output_markdown": "reports/bug-audit-20260526T232117.md",
+  "output_json": "reports/bug-audit-20260606T171011.json",
+  "output_markdown": "reports/bug-audit-20260606T171011.md",
   "reproduction_command": "datadiff bug-audit --write-issues --overwrite-issues",
   "results": [
     {
@@ -257,6 +257,146 @@
       "target_backend": "datafusion",
       "title": "DataFusion duplicate ordered LIMIT idempotence",
       "version": "53.0.0"
+    },
+    {
+      "candidate_bug": false,
+      "details": {
+        "checked_queries": 3,
+        "first_mismatch": null,
+        "mismatch_count": 0,
+        "sample_mismatches": [],
+        "sweep": "duckdb_cte_inline_equivalence"
+      },
+      "error": "",
+      "error_type": "",
+      "evidence": "Reading a non-recursive, deterministic query through an inline subquery and through an explicit WITH CTE must yield identical result rows; checked queries=3, mismatches=0.",
+      "expected": {
+        "mismatch_count": 0,
+        "relation": "inline subquery ≡ named CTE"
+      },
+      "family": "duckdb_cte_inline_equivalence",
+      "invariant": "Reading a deterministic, non-recursive query through an inline subquery and through an explicit WITH CTE must yield identical result rows.",
+      "observed": {
+        "first_mismatch": null,
+        "mismatch_count": 0
+      },
+      "probe_id": "duckdb_cte_inline_equivalence",
+      "status": "no_bug_detected",
+      "target_backend": "duckdb",
+      "title": "DuckDB inline subquery vs explicit CTE equivalence",
+      "version": "1.5.3"
+    },
+    {
+      "candidate_bug": false,
+      "details": {
+        "checked_queries": 2,
+        "first_mismatch": null,
+        "mismatch_count": 0,
+        "sample_mismatches": [],
+        "sweep": "duckdb_left_anti_join_equivalence"
+      },
+      "error": "",
+      "error_type": "",
+      "evidence": "ANTI JOIN and LEFT JOIN + IS NULL filter are standard SQL equivalents; any divergence indicates a planner or null-handling bug. Checked queries=2, mismatches=0.",
+      "expected": {
+        "mismatch_count": 0,
+        "relation": "ANTI JOIN ≡ LEFT JOIN ... WHERE right.key IS NULL (mixed NULLs on both sides)"
+      },
+      "family": "duckdb_left_anti_join_equivalence",
+      "invariant": "ANTI JOIN must produce the same rows as LEFT JOIN ... WHERE right.key IS NULL for any predicate combination over NULLable join keys.",
+      "observed": {
+        "first_mismatch": null,
+        "mismatch_count": 0
+      },
+      "probe_id": "duckdb_left_anti_join_equivalence",
+      "status": "no_bug_detected",
+      "target_backend": "duckdb",
+      "title": "DuckDB ANTI JOIN vs LEFT JOIN IS NULL equivalence",
+      "version": "1.5.3"
+    },
+    {
+      "candidate_bug": false,
+      "details": {
+        "checked_frames": 2,
+        "first_mismatch": null,
+        "mismatch_count": 0,
+        "sample_mismatches": [],
+        "sweep": "pandas_arrow_groupby_size_count"
+      },
+      "error": "",
+      "error_type": "",
+      "evidence": "For Arrow-backed pandas extension dtypes, the sum of groupby.size() values must equal the input row count regardless of null handling on the grouping key; checked frames=2, mismatches=0.",
+      "expected": {
+        "mismatch_count": 0,
+        "relation": "sum(groupby.size()) == n_rows"
+      },
+      "family": "pandas_arrow_groupby_size_count",
+      "invariant": "For Arrow-backed extension dtypes, sum(groupby.size()) must equal the input row count regardless of null handling on the grouping key.",
+      "observed": {
+        "first_mismatch": null,
+        "mismatch_count": 0
+      },
+      "probe_id": "pandas_arrow_groupby_size_count",
+      "status": "no_bug_detected",
+      "target_backend": "pandas",
+      "title": "pandas Arrow-backed groupby.size() row-count consistency",
+      "version": "3.0.3"
+    },
+    {
+      "candidate_bug": false,
+      "details": {
+        "checked_frames": 2,
+        "first_mismatch": null,
+        "mismatch_count": 0,
+        "sample_mismatches": [],
+        "sweep": "polars_concat_select_pushdown"
+      },
+      "error": "",
+      "error_type": "",
+      "evidence": "Selecting columns after concat must equal selecting the same columns from each frame and concatenating; this catches projection-pushdown ordering and null-handling bugs. Checked frames=2, mismatches=0.",
+      "expected": {
+        "mismatch_count": 0,
+        "relation": "concat∘select ≡ select-each∘concat for shared columns"
+      },
+      "family": "polars_concat_select_pushdown",
+      "invariant": "concat(frames).select(cols) must equal concat(frame.select(cols) for frame in frames) for any column subset shared across frames.",
+      "observed": {
+        "first_mismatch": null,
+        "mismatch_count": 0
+      },
+      "probe_id": "polars_concat_select_pushdown",
+      "status": "no_bug_detected",
+      "target_backend": "polars",
+      "title": "Polars concat-select projection pushdown equivalence",
+      "version": "1.41.0"
+    },
+    {
+      "candidate_bug": false,
+      "details": {
+        "checked_queries": 3,
+        "first_mismatch": null,
+        "mismatch_count": 0,
+        "sample_mismatches": [],
+        "sweep": "polars_lazy_eager_equivalence"
+      },
+      "error": "",
+      "error_type": "",
+      "evidence": "Polars eager and lazy execution paths share the same logical plan; any divergence on pure (no-IO) pipelines indicates a planner-vs-evaluator bug. Checked queries=3, mismatches=0.",
+      "expected": {
+        "mismatch_count": 0,
+        "relation": "eager(query) ≡ lazy(query).collect() for pure pipelines"
+      },
+      "family": "polars_lazy_eager_equivalence",
+      "invariant": "For pure (no-IO) Polars pipelines, df.lazy().pipeline().collect() must equal df.pipeline() exactly.",
+      "observed": {
+        "first_mismatch": null,
+        "mismatch_count": 0
+      },
+      "probe_id": "polars_lazy_eager_equivalence",
+      "status": "no_bug_detected",
+      "target_backend": "polars",
+      "title": "Polars lazy.collect() vs eager pipeline equivalence",
+      "version": "1.41.0"
     },
     {
       "candidate_bug": true,

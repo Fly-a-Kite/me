@@ -1,0 +1,143 @@
+{
+  "classification_boundary_rules": [
+    {
+      "kind": "semantic_boundary_rule",
+      "metadata": {},
+      "priority": 100,
+      "reason": "root cause nan_inf_semantics is a known cross-engine semantic boundary",
+      "rule_id": "boundary:root_nan_inf_semantics"
+    },
+    {
+      "kind": "semantic_boundary_rule",
+      "metadata": {},
+      "priority": 101,
+      "reason": "root cause null_semantics is a known cross-engine semantic boundary",
+      "rule_id": "boundary:root_null_semantics"
+    },
+    {
+      "kind": "semantic_boundary_rule",
+      "metadata": {},
+      "priority": 102,
+      "reason": "root cause ordering_or_limit is a known cross-engine semantic boundary",
+      "rule_id": "boundary:root_ordering_or_limit"
+    },
+    {
+      "kind": "semantic_boundary_rule",
+      "metadata": {},
+      "priority": 103,
+      "reason": "case contains NaN or Infinity values",
+      "rule_id": "boundary:special_float_values"
+    },
+    {
+      "kind": "semantic_boundary_rule",
+      "metadata": {},
+      "priority": 104,
+      "reason": "join key contains NULL values; NULL join semantics differ across target families",
+      "rule_id": "boundary:join_null_keys"
+    },
+    {
+      "kind": "semantic_boundary_rule",
+      "metadata": {},
+      "priority": 105,
+      "reason": "filter compares against NULL; engines intentionally differ on NULL predicate semantics",
+      "rule_id": "boundary:null_filter_literal"
+    },
+    {
+      "kind": "semantic_boundary_rule",
+      "metadata": {},
+      "priority": 106,
+      "reason": "case uses modulo; negative/float remainder semantics differ across engines",
+      "rule_id": "boundary:modulo_semantics"
+    },
+    {
+      "kind": "semantic_boundary_rule",
+      "metadata": {},
+      "priority": 107,
+      "reason": "case changes case for non-ASCII text; Unicode case mapping support differs across engines",
+      "rule_id": "boundary:unicode_case_mapping"
+    }
+  ],
+  "classification_documented_rules": [
+    {
+      "kind": "documented_semantic_rule",
+      "metadata": {},
+      "priority": 100,
+      "reason": "Polars documents NaN/NULL floating-point behavior for this mismatch class.",
+      "rule_id": "documented:polars_nan_inf_semantics"
+    }
+  ],
+  "generated_at": "2026-06-05T04:38:57Z",
+  "learning_summary": {},
+  "metadata": {
+    "generated_by": "datadiff candidate-pipeline",
+    "pipeline_dir": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-watch-20260605T043857",
+    "source_manifest_file": "/tmp/pytest-of-root/pytest-1590/test_cli_discovery_campaign_wa0/discovery-campaign-watch.json"
+  },
+  "reproducer_rules": [
+    {
+      "kind": "standalone_reproducer",
+      "metadata": {},
+      "priority": 100,
+      "reason": "DataFusion grouped top-k null sort-key reproducer",
+      "rule_id": "repro:datafusion_grouped_topk_null_sort_key"
+    },
+    {
+      "kind": "standalone_reproducer",
+      "metadata": {},
+      "priority": 101,
+      "reason": "DataFusion groupby aggregation reproducer",
+      "rule_id": "repro:datafusion_groupby_aggregation"
+    },
+    {
+      "kind": "standalone_reproducer",
+      "metadata": {},
+      "priority": 102,
+      "reason": "DataFusion outer-join truth-filter reproducer",
+      "rule_id": "repro:datafusion_outer_join_truth_filter"
+    },
+    {
+      "kind": "standalone_reproducer",
+      "metadata": {},
+      "priority": 103,
+      "reason": "DataFusion negative-zero reproducer",
+      "rule_id": "repro:datafusion_negative_zero_comparison"
+    },
+    {
+      "kind": "standalone_reproducer",
+      "metadata": {},
+      "priority": 104,
+      "reason": "DataFusion joined order/offset reproducer",
+      "rule_id": "repro:datafusion_joined_order_offset_projection"
+    },
+    {
+      "kind": "standalone_reproducer",
+      "metadata": {},
+      "priority": 105,
+      "reason": "DataFusion ordered top-k projection reproducer",
+      "rule_id": "repro:datafusion_ordered_topk_projection"
+    },
+    {
+      "kind": "standalone_reproducer",
+      "metadata": {},
+      "priority": 106,
+      "reason": "Polars reverse-division reproducer",
+      "rule_id": "repro:polars_reverse_division_operand_order"
+    },
+    {
+      "kind": "standalone_reproducer",
+      "metadata": {},
+      "priority": 107,
+      "reason": "DuckDB tuple-absence reproducer",
+      "rule_id": "repro:duckdb_tuple_absence_null_filter"
+    },
+    {
+      "kind": "standalone_reproducer",
+      "metadata": {},
+      "priority": 108,
+      "reason": "Generic edge-float fallback reproducer",
+      "rule_id": "repro:edge_float_fallback"
+    }
+  ],
+  "schema_version": "dynamic-strategy-snapshot-v1",
+  "snapshot_id": "strategy-snapshot"
+}

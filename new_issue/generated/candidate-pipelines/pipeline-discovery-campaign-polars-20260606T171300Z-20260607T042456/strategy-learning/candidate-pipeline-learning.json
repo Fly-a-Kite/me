@@ -1,0 +1,55 @@
+{
+  "events": [
+    {
+      "candidate_id": "running_sum_precision-polars_lazy-case-00002232-discovery-fresh",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "primary_family": "running_sum_precision@polars_lazy",
+      "recorded_at": "2026-06-07T04:26:09Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_case_when_idempotence",
+        "metamorphic_string_null_if_empty_idempotence",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-polars-20260606T171300Z-polars_lazy-seed2001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T220225-1780783345616036486.jsonl.gz",
+      "suspicious_backends": [
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-polars_lazy-case-00002345-discovery-fresh",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "primary_family": "running_sum_precision@polars_lazy",
+      "recorded_at": "2026-06-07T04:27:50Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_case_when_idempotence",
+        "metamorphic_filter_idempotence_immediate",
+        "metamorphic_sort_idempotence",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-polars-20260606T171300Z-polars_lazy-seed2001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T220225-1780783345616036486.jsonl.gz",
+      "suspicious_backends": [
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    }
+  ],
+  "schema_version": "dynamic-strategy-learning-v1"
+}

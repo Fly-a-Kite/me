@@ -1,0 +1,3167 @@
+{
+  "events": [
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-06T21:17:34Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1055",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-06T21:21:23Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-1063",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recorded_at": "2026-06-06T21:25:20Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-06T21:29:10Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1083",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-06T21:33:08Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1083-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-06T21:37:14Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1090",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recorded_at": "2026-06-06T21:41:40Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T21:46:39Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T21:51:41Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1106-",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-06T21:55:46Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:00:45Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1137-mut-1",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:03:36Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1137-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:06:26Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1171",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:08:25Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1170",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:12:12Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1170-mut-1178",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:16:48Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-10",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:21:55Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1214",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:26:49Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1170-mut-1221",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:30:41Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1171-mut-12",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:32:39Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:37:51Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1248",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:41:46Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1264",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:46:42Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1170-mut-1257",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:50:29Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1137-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:53:13Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T22:58:15Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1083-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-06T23:02:25Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1170-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T23:07:49Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T23:13:05Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1137-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-06T23:15:26Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-champ",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T23:20:13Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-champ",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T23:25:12Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1170-mut-1333",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recorded_at": "2026-06-06T23:29:49Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-champ",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T23:34:53Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-10",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T23:40:18Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1170-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T23:45:56Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-champion-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recorded_at": "2026-06-06T23:50:38Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1171-mut-13",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-06T23:52:49Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-13",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-06T23:57:51Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T00:03:20Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1170-mut-1403",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T00:07:33Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-champ",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T00:12:35Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1137-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-07T00:15:00Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-10",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T00:20:26Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1461",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T00:25:20Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T00:30:39Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1171-mut-14",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-07T00:32:39Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-14",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T00:37:52Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1264-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T00:42:57Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1137-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-07T00:45:35Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-15",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T00:50:37Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T00:56:02Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-10",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T01:01:38Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-17",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T01:06:52Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T01:12:03Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-10",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T01:17:54Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T01:23:02Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00001898-discovery-fresh",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recorded_at": "2026-06-07T01:24:32Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "sqlite"
+      ],
+      "triage_verdict": "needs_manual_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00001972-discovery-fresh",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recorded_at": "2026-06-07T01:25:03Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "sqlite"
+      ],
+      "triage_verdict": "candidate_implementation_bug"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1264-mut-2809",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T01:28:47Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-28",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T01:34:03Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1170-mut-2872",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T01:38:09Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1083-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T01:42:25Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-champ",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T01:49:05Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-2925",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T01:53:08Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T01:58:11Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1170-mut-2",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T02:03:44Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1171-mut-29",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-07T02:06:09Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "topk_filter_pushdown-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1106-ch",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "topk_filter_pushdown@duckdb,sqlite"
+      ],
+      "primary_family": "topk_filter_pushdown@duckdb,sqlite",
+      "recorded_at": "2026-06-07T02:11:03Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "topk_filter_pushdown@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "topk_filter_pushdown"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-10",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T02:16:34Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1137-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-07T02:19:29Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-champ",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T02:24:33Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1214-mut-3053",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T02:28:09Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1083-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T02:32:12Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T02:37:15Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1170-mut-3095",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T02:40:16Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T02:45:27Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1264-mut-3",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T02:52:46Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T02:58:58Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1214-mut-3",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T03:06:46Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1106-",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T03:10:49Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-3287",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T03:15:37Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1137-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-07T03:18:01Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T03:24:05Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1171-mut-33",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-07T03:26:47Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-champ",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T03:31:38Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1214-mut-3",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T03:36:33Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1137-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-07T03:39:04Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T03:43:52Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-3375",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T03:47:39Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1170-mut-3707",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T03:51:29Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1055-mut-3716",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T03:55:16Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3720",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T03:58:59Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-10",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T04:04:02Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "topk_filter_pushdown-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-champion-mu",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "topk_filter_pushdown@duckdb,sqlite"
+      ],
+      "primary_family": "topk_filter_pushdown@duckdb,sqlite",
+      "recorded_at": "2026-06-07T04:08:30Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "topk_filter_pushdown@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "topk_filter_pushdown"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1171-mut-37",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-07T04:10:43Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1170-mut-3780",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T04:14:25Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T04:19:33Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1137-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-07T04:22:19Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T04:27:34Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-10",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T04:32:52Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-champion-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recorded_at": "2026-06-07T04:36:22Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-3936",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T04:40:08Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1171-mut-39",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-07T04:42:30Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-10",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T04:47:41Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T04:52:46Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1170-mut-4009",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T04:56:24Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1137-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-07T04:58:58Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-4045",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T05:02:24Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T05:07:27Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1214-mut-4",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T05:12:20Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1055-mut-4067",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "primary_family": "conditional_expression@duckdb,sqlite",
+      "recorded_at": "2026-06-07T05:16:11Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-10",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T05:21:29Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1137-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "primary_family": "ordering_or_limit@duckdb,sqlite",
+      "recorded_at": "2026-06-07T05:24:08Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T05:28:53Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-champ",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T05:33:44Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-41",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T05:38:45Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T05:43:32Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1264-mut-4",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T05:48:16Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "grouped_topk_null_sort_key-duckdb-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-champ",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "primary_family": "grouped_topk_null_sort_key@duckdb,sqlite",
+      "recorded_at": "2026-06-07T05:53:02Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "grouped_topk_null_sort_key@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "grouped_topk_null_sort_key",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "pandas",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00001933-discovery-fresh",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recorded_at": "2026-06-07T05:53:44Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "metamorphic_filter_commutativity",
+        "metamorphic_filter_idempotence_immediate",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00002648-discovery-fresh",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recorded_at": "2026-06-07T05:53:56Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "reproduced_roots": [
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb",
+        "sqlite"
+      ],
+      "triage_verdict": "candidate_implementation_bug"
+    }
+  ],
+  "schema_version": "dynamic-strategy-learning-v1"
+}

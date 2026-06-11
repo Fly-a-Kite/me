@@ -1,0 +1,416 @@
+{
+  "bug_discovery_system": {
+    "objective": "maximize externally reproducible fresh implementation bug yield per unit budget",
+    "schema_version": "bug-discovery-system-v1",
+    "stages": [
+      "generate_or_mutate_candidate",
+      "score_by_acquisition",
+      "execute_differential_oracles",
+      "filter_rewardable_fresh_candidates",
+      "recheck_reproducibility",
+      "reduce_preserving_root_cause",
+      "write_reproducer_and_issue_draft"
+    ],
+    "theory": {
+      "budget": "Boltzmann allocation over acquisition free energy",
+      "candidate_priority": "multi-objective proof/reproducibility/dedup utility",
+      "exploration": "UCB optimism under sparse lane samples",
+      "novelty": "Good-Turing unseen-family probability"
+    }
+  },
+  "candidates": [
+    {
+      "artifact_created": false,
+      "bug_dir": "bugs/bug_e6487f1ae212865d",
+      "candidate_acquisition": {
+        "acquisition_score": 5.534375,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "running_sum_precision@polars_lazy"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.9475,
+        "recheck_prior": 0.85,
+        "reduction_potential": 1.0,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9960668549274264
+      },
+      "candidate_id": "running_sum_precision-polars_lazy-case-00002232-discovery-fresh",
+      "case_id": "case-00002232-discovery-fresh",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "",
+        "status": "needs_final_upstream_dedup"
+      },
+      "families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "initial_candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 4,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 4,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 4,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+        ]
+      },
+      "issue_draft": {},
+      "issue_readiness": {},
+      "primary_family": "running_sum_precision@polars_lazy",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [
+              "running_sum_precision@polars_lazy"
+            ],
+            "finding_count": 4,
+            "matched_families": [
+              "running_sum_precision@polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 2,
+            "candidate_families": [
+              "running_sum_precision@polars_lazy"
+            ],
+            "finding_count": 4,
+            "matched_families": [
+              "running_sum_precision@polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 3,
+            "candidate_families": [
+              "running_sum_precision@polars_lazy"
+            ],
+            "finding_count": 4,
+            "matched_families": [
+              "running_sum_precision@polars_lazy"
+            ],
+            "status": "bug"
+          }
+        ],
+        "attempts": 3,
+        "reproduced": true,
+        "reproduced_families": [
+          "running_sum_precision@polars_lazy"
+        ]
+      },
+      "reduction": {
+        "original_operations": 4,
+        "original_rows": 151,
+        "performed": true,
+        "reduced_case_path": "bugs/bug_e6487f1ae212865d/reduced_case.json",
+        "reduced_operations": 4,
+        "reduced_reproducer_path": "bugs/bug_e6487f1ae212865d/reproduce_reduced.py",
+        "reduced_rows": 3,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-polars-20260606T171300Z-polars_lazy-seed2001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T220225-1780783345616036486.jsonl.gz",
+      "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-polars-20260606T171300Z-20260607T042456/strategy-learning/candidate-pipeline-learning.json",
+      "triage": {
+        "paper_status": "valid_finding_not_confirmed_bug",
+        "reproduced_roots": [
+          "metamorphic_case_when_idempotence",
+          "metamorphic_string_null_if_empty_idempotence",
+          "metamorphic_union_all_empty_append",
+          "running_sum_precision"
+        ],
+        "suspicious_backends": [
+          "polars_lazy"
+        ],
+        "triage_confidence": "medium",
+        "triage_json": "bugs/bug_e6487f1ae212865d/triage.json",
+        "triage_markdown": "bugs/bug_e6487f1ae212865d/triage.md",
+        "verdict": "semantic_divergence_needs_confirmation"
+      }
+    },
+    {
+      "artifact_created": false,
+      "bug_dir": "bugs/bug_8ee7acf817f7ca54",
+      "candidate_acquisition": {
+        "acquisition_score": 5.534375,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "running_sum_precision@polars_lazy"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.9475,
+        "recheck_prior": 0.85,
+        "reduction_potential": 1.0,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9960668549274264
+      },
+      "candidate_id": "running_sum_precision-polars_lazy-case-00002345-discovery-fresh",
+      "case_id": "case-00002345-discovery-fresh",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "running_sum_precision-polars_lazy-case-00002232-discovery-fresh",
+        "status": "duplicate_pipeline_family"
+      },
+      "families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "initial_candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 7,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 6,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 7,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+        ]
+      },
+      "issue_draft": {},
+      "issue_readiness": {},
+      "primary_family": "running_sum_precision@polars_lazy",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [
+              "running_sum_precision@polars_lazy"
+            ],
+            "finding_count": 6,
+            "matched_families": [
+              "running_sum_precision@polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 2,
+            "candidate_families": [
+              "running_sum_precision@polars_lazy"
+            ],
+            "finding_count": 6,
+            "matched_families": [
+              "running_sum_precision@polars_lazy"
+            ],
+            "status": "bug"
+          },
+          {
+            "attempt": 3,
+            "candidate_families": [
+              "running_sum_precision@polars_lazy"
+            ],
+            "finding_count": 6,
+            "matched_families": [
+              "running_sum_precision@polars_lazy"
+            ],
+            "status": "bug"
+          }
+        ],
+        "attempts": 3,
+        "reproduced": true,
+        "reproduced_families": [
+          "running_sum_precision@polars_lazy"
+        ]
+      },
+      "reduction": {
+        "original_operations": 8,
+        "original_rows": 28,
+        "performed": true,
+        "reduced_case_path": "bugs/bug_8ee7acf817f7ca54/reduced_case.json",
+        "reduced_operations": 8,
+        "reduced_reproducer_path": "bugs/bug_8ee7acf817f7ca54/reproduce_reduced.py",
+        "reduced_rows": 2,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-polars-20260606T171300Z-polars_lazy-seed2001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T220225-1780783345616036486.jsonl.gz",
+      "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-polars-20260606T171300Z-20260607T042456/strategy-learning/candidate-pipeline-learning.json",
+      "triage": {
+        "paper_status": "valid_finding_not_confirmed_bug",
+        "reproduced_roots": [
+          "metamorphic_case_when_idempotence",
+          "metamorphic_filter_idempotence_immediate",
+          "metamorphic_sort_idempotence",
+          "running_sum_precision"
+        ],
+        "suspicious_backends": [
+          "polars_lazy"
+        ],
+        "triage_confidence": "medium",
+        "triage_json": "bugs/bug_8ee7acf817f7ca54/triage.json",
+        "triage_markdown": "bugs/bug_8ee7acf817f7ca54/triage.md",
+        "verdict": "semantic_divergence_needs_confirmation"
+      }
+    }
+  ],
+  "existing_issue_readiness_summary": {
+    "already_submitted_or_confirmed_count": 15,
+    "already_submitted_or_confirmed_family_count": 10,
+    "confirmed_count_eligible_count": 13,
+    "confirmed_count_eligible_families": [
+      "datafusion_limit_idempotence@datafusion",
+      "distinct_null_topk@datafusion",
+      "groupby_aggregation@datafusion",
+      "groupby_aggregation@polars,polars_lazy",
+      "grouped_topk_null_sort_key@datafusion",
+      "negative_zero_comparison@datafusion",
+      "polars_reflected_arithmetic_operand_order@polars",
+      "pyarrow_sliced_bool_groupby_any_all@pyarrow"
+    ],
+    "confirmed_count_eligible_family_count": 8,
+    "duplicate_family_draft_count": 0,
+    "duplicate_family_draft_groups": {},
+    "issue_document_count": 20,
+    "needs_dedup_check": [],
+    "needs_dedup_check_count": 0,
+    "needs_dedup_check_families": [],
+    "needs_dedup_check_family_count": 0,
+    "needs_reproducer_or_evidence": [
+      "new_issue/datafusion_22554_followup_comment.md",
+      "new_issue/datafusion_null_group_key_candidate.md",
+      "new_issue/duckdb_groupby_neutral_mutation_not_upstream.md",
+      "new_issue/generated/polars_vector_division_rounding.md"
+    ],
+    "needs_reproducer_or_evidence_count": 4,
+    "needs_reproducer_or_evidence_family_count": 4,
+    "not_latest_reproducible_count": 1,
+    "not_latest_reproducible_family_count": 1,
+    "ready_to_submit": [],
+    "ready_to_submit_count": 0,
+    "ready_to_submit_families": [],
+    "ready_to_submit_family_count": 0,
+    "submission_group_count": 0,
+    "submission_group_families": [],
+    "submission_groups_needs_dedup_count": 0,
+    "submission_groups_ready_to_submit_count": 0,
+    "top_priority": [
+      "new_issue/generated/polars_vector_division_rounding.md",
+      "new_issue/datafusion_null_group_key_candidate.md",
+      "new_issue/duckdb_groupby_neutral_mutation_not_upstream.md",
+      "new_issue/datafusion_22554_followup_comment.md",
+      "new_issue/datafusion_limit_idempotence.md"
+    ]
+  },
+  "frozen_candidates_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-polars-20260606T171300Z-20260607T042456/frozen-candidates.json",
+  "generated_at": "2026-06-07T04:28:10Z",
+  "generated_by": "datadiff candidate-pipeline",
+  "inputs": {
+    "evidence_files": [
+      "new_issue/generated/discovery-campaign-polars-20260606T171300Z-polars_lazy-seed2001-fresh-candidates.json"
+    ],
+    "generated_issue_dir": "new_issue/generated",
+    "manifest_file": "new_issue/generated/discovery-campaign-polars-20260606T171300Z.json",
+    "new_issue_dir": "new_issue",
+    "old_issue_dir": "old_issue",
+    "output_dir": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-polars-20260606T171300Z-20260607T042456",
+    "recheck_attempts": 3,
+    "reduce_artifacts": true,
+    "standalone_reproducer": true
+  },
+  "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-polars-20260606T171300Z-20260607T042456/manifest.json",
+  "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-polars-20260606T171300Z-20260607T042456/manifest.md",
+  "pipeline_issue_readiness_summary": {
+    "already_submitted_or_confirmed_count": 0,
+    "already_submitted_or_confirmed_family_count": 0,
+    "confirmed_count_eligible_count": 0,
+    "confirmed_count_eligible_families": [],
+    "confirmed_count_eligible_family_count": 0,
+    "duplicate_family_draft_count": 0,
+    "duplicate_family_draft_groups": {},
+    "issue_document_count": 0,
+    "needs_dedup_check": [],
+    "needs_dedup_check_count": 0,
+    "needs_dedup_check_families": [],
+    "needs_dedup_check_family_count": 0,
+    "needs_reproducer_or_evidence": [],
+    "needs_reproducer_or_evidence_count": 0,
+    "needs_reproducer_or_evidence_family_count": 0,
+    "not_latest_reproducible_count": 0,
+    "not_latest_reproducible_family_count": 0,
+    "ready_to_submit": [],
+    "ready_to_submit_count": 0,
+    "ready_to_submit_families": [],
+    "ready_to_submit_family_count": 0,
+    "submission_group_count": 0,
+    "submission_group_families": [],
+    "submission_groups_needs_dedup_count": 0,
+    "submission_groups_ready_to_submit_count": 0,
+    "top_priority": []
+  },
+  "schema_version": "candidate-pipeline-v1",
+  "strategy_snapshot_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-polars-20260606T171300Z-20260607T042456/strategy-snapshot.json",
+  "submission_groups": [],
+  "summary": {
+    "already_submitted_or_confirmed_count": 0,
+    "artifact_created_count": 0,
+    "candidate_bug_verdict_count": 0,
+    "candidate_count": 2,
+    "issue_draft_count": 0,
+    "local_duplicate_candidate_count": 1,
+    "needs_dedup_check_count": 0,
+    "needs_reproducer_or_evidence_count": 0,
+    "not_latest_reproducible_count": 0,
+    "ready_to_submit_count": 0,
+    "recheck_pass_rate": 1.0,
+    "rechecked_count": 2,
+    "reduced_count": 2,
+    "reproduced_count": 2,
+    "submission_group_count": 0,
+    "unique_family_count": 1
+  }
+}

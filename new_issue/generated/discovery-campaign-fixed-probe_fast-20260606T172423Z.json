@@ -1,0 +1,1536 @@
+{
+  "bug_audit": {
+    "skipped": true
+  },
+  "cases_per_lane_seed": 140,
+  "completed_at": "",
+  "duration": null,
+  "generated_at": "2026-06-07T08:51:28Z",
+  "generated_by": "datadiff discovery-campaign",
+  "health_stop_reason": "",
+  "lane_ids": [
+    "arrow_probe_stress",
+    "duckdb_probe_stress"
+  ],
+  "lanes": [
+    {
+      "default": false,
+      "discovery_biases": [],
+      "id": "arrow_probe_stress",
+      "preset": "live_arrow_issue_focus_metamorphic",
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "target_suite": "arrow_cross",
+      "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts"
+    },
+    {
+      "default": false,
+      "discovery_biases": [],
+      "id": "duckdb_probe_stress",
+      "preset": "live_duckdb_issue_focus_metamorphic",
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "target_suite": "embedded_sql_cross",
+      "theme": "DuckDB/SQLite probe stress lane; issue-inspired sources remain separated from fresh counts"
+    }
+  ],
+  "progress": {
+    "completed_run_count": 4,
+    "current_lane_id": "duckdb_probe_stress",
+    "current_seed": 511,
+    "planned_run_count": 6,
+    "remaining_run_count": 2
+  },
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "pyarrow"
+      ],
+      "candidate_pipeline": {
+        "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-fixed-probe_fast-20260606T172423Z-20260606T172914/manifest.json",
+        "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-fixed-probe_fast-20260606T172423Z-20260606T172914/manifest.md",
+        "status": "ok",
+        "summary": {
+          "already_submitted_or_confirmed_count": 0,
+          "artifact_created_count": 8,
+          "candidate_bug_verdict_count": 1,
+          "candidate_count": 22,
+          "issue_draft_count": 1,
+          "local_duplicate_candidate_count": 18,
+          "needs_dedup_check_count": 1,
+          "needs_reproducer_or_evidence_count": 0,
+          "not_latest_reproducible_count": 0,
+          "ready_to_submit_count": 0,
+          "recheck_pass_rate": 1.0,
+          "rechecked_count": 22,
+          "reduced_count": 22,
+          "reproduced_count": 22,
+          "submission_group_count": 1,
+          "unique_family_count": 4
+        }
+      },
+      "cases": 140,
+      "classification": {
+        "candidate_bug_families": {
+          "conditional_expression@duckdb": 16,
+          "distinct_duplicate_elimination@duckdb": 1,
+          "groupby_aggregation@duckdb": 4,
+          "running_sum_precision@duckdb": 1
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-259",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'pyarrow'] and disagrees with ['duckdb'].",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 259,
+              "signature": "f9bf1b796ba2b350",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'pyarrow'] and disagrees with ['duckdb'].",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 353,
+              "signature": "3cb0dbae369a7225",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'pyarrow'] and disagrees with ['duckdb'].",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 447,
+              "signature": "69542d441b40b628",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-259-champion-mut-594",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'pyarrow'] and disagrees with ['duckdb'].",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 594,
+              "signature": "6293867c24045d8d",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-champion-mut-729",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'pyarrow'] and disagrees with ['duckdb'].",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 729,
+              "signature": "fcd5e8bbb95c8c81",
+              "suspicious": [
+                "duckdb"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-31",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 31,
+              "signature": "9a69cf227ee2acfa",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-149",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 149,
+              "signature": "80f0c0a284c40905",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-mut-159",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 159,
+              "signature": "847a8cb7d31f11e3",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-314",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 314,
+              "signature": "4f666aef21d39e2c",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-champion-mut-333",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 333,
+              "signature": "e4ee3cf4b1ad830c",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb": 16,
+          "distinct_duplicate_elimination@duckdb": 1,
+          "groupby_aggregation@duckdb": 4,
+          "running_sum_precision@duckdb": 1
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 22,
+          "semantic_divergence": 41
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260606T172423-1780766663846121855.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 22,
+          "expected_semantic_divergence": 41
+        },
+        "unsaturated_candidate_bug_families": {
+          "conditional_expression@duckdb": 16,
+          "distinct_duplicate_elimination@duckdb": 1,
+          "groupby_aggregation@duckdb": 4,
+          "running_sum_precision@duckdb": 1
+        }
+      },
+      "completed_at": "2026-06-06T17:34:12Z",
+      "csv": "reports/findings-run-20260606T172423-1780766663846121855.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-fixed-probe_fast-20260606T172423Z-arrow_probe_stress-seed11-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 22,
+      "health": {
+        "bytes": 3037165,
+        "candidate_bug_families": {
+          "conditional_expression@duckdb": 16,
+          "distinct_duplicate_elimination@duckdb": 1,
+          "groupby_aggregation@duckdb": 4,
+          "metamorphic_join_inner_left_equivalence@duckdb": 10,
+          "metamorphic_join_inner_left_equivalence@pyarrow": 10,
+          "running_sum_precision@duckdb": 1
+        },
+        "examples": [
+          {
+            "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-259",
+            "kind": "semantic_output_mismatch",
+            "root": "conditional_expression",
+            "seed": 259,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          },
+          {
+            "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353",
+            "kind": "semantic_output_mismatch",
+            "root": "conditional_expression",
+            "seed": 353,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-407",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 407,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-407",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 407,
+            "status": "bug",
+            "suspicious": [
+              "pyarrow"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-443",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 443,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          }
+        ],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb": 16,
+          "distinct_duplicate_elimination@duckdb": 1,
+          "groupby_aggregation@duckdb": 4,
+          "metamorphic_join_inner_left_equivalence@duckdb": 10,
+          "metamorphic_join_inner_left_equivalence@pyarrow": 10,
+          "running_sum_precision@duckdb": 1
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 140,
+        "run_file": "runs/run-20260606T172423-1780766663846121855.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 289.3624040750001,
+          "evidence_bytes_per_case": 21694.035714285714,
+          "executed_cases": 140,
+          "meta_file": "runs/run-20260606T172423-1780766663846121855.meta.json",
+          "next_seed": 2357,
+          "run_log_bytes": 3037165,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 43.19182312917422,
+              "generate_mutate_ms": 1606.9331782639242,
+              "logging_artifact_ms": 0.6184994001419649,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 368.07554740698833,
+              "scheduler_feedback_ms": 36.02634681472929,
+              "total_case_wall_ms": 2054.8453950149583
+            },
+            "case_count": 140,
+            "share_of_total": {
+              "backend_execution_ms": 0.021019500169675687,
+              "generate_mutate_ms": 0.78202145142517,
+              "logging_artifact_ms": 0.0003009955890805413,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.1791256647823419,
+              "scheduler_feedback_ms": 0.01753238803373187,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.48382235573254806
+        },
+        "statuses": {
+          "bug": 32,
+          "ok": 108
+        }
+      },
+      "lane_id": "arrow_probe_stress",
+      "preset": "live_arrow_issue_focus_metamorphic",
+      "report": "reports/report-run-20260606T172423-1780766663846121855.md",
+      "run_file": "runs/run-20260606T172423-1780766663846121855.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 1.0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 0.0,
+        "priority_rank": 1,
+        "score": 2.2798345101319635,
+        "yield_rate": 0.0
+      },
+      "seed": 11,
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "started_at": "2026-06-06T17:24:23Z",
+      "status": "completed",
+      "target_suite": "arrow_cross",
+      "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "pyarrow"
+      ],
+      "candidate_pipeline": {
+        "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-fixed-probe_fast-20260606T172423Z-20260606T174512/manifest.json",
+        "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-fixed-probe_fast-20260606T172423Z-20260606T174512/manifest.md",
+        "status": "ok",
+        "summary": {
+          "already_submitted_or_confirmed_count": 0,
+          "artifact_created_count": 45,
+          "candidate_bug_verdict_count": 0,
+          "candidate_count": 64,
+          "issue_draft_count": 0,
+          "local_duplicate_candidate_count": 60,
+          "needs_dedup_check_count": 0,
+          "needs_reproducer_or_evidence_count": 0,
+          "not_latest_reproducible_count": 0,
+          "ready_to_submit_count": 0,
+          "recheck_pass_rate": 1.0,
+          "rechecked_count": 64,
+          "reduced_count": 64,
+          "reproduced_count": 64,
+          "submission_group_count": 0,
+          "unique_family_count": 4
+        }
+      },
+      "cases": 140,
+      "classification": {
+        "candidate_bug_families": {
+          "conditional_expression@duckdb,pyarrow": 53,
+          "grouped_topk_null_sort_key@duckdb,pyarrow": 4,
+          "ordering_or_limit@duckdb": 1,
+          "running_sum_precision@duckdb,pyarrow": 6
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-540",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'pyarrow'].",
+              "kind": "accept_reject_mismatch",
+              "root": "conditional_expression",
+              "seed": 540,
+              "signature": "a8760685c2ad2137",
+              "suspicious": [
+                "duckdb",
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-540-mut-547",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'pyarrow'].",
+              "kind": "accept_reject_mismatch",
+              "root": "running_sum_precision",
+              "seed": 547,
+              "signature": "7d482fd11ff481d0",
+              "suspicious": [
+                "duckdb",
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'pyarrow'].",
+              "kind": "accept_reject_mismatch",
+              "root": "conditional_expression",
+              "seed": 559,
+              "signature": "da6c685a3b6fd9b5",
+              "suspicious": [
+                "duckdb",
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'pyarrow'].",
+              "kind": "accept_reject_mismatch",
+              "root": "conditional_expression",
+              "seed": 579,
+              "signature": "0e96bf597c499172",
+              "suspicious": [
+                "duckdb",
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-593",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'pyarrow'].",
+              "kind": "accept_reject_mismatch",
+              "root": "running_sum_precision",
+              "seed": 593,
+              "signature": "5fc32c910a788b45",
+              "suspicious": [
+                "duckdb",
+                "pyarrow"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-677-champion-mut-806-mut-717",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 717,
+              "signature": "6302e4b73387ca01",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-677-champion-mut-806-mut-805",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 805,
+              "signature": "7f978a8ab9285a80",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-677-champion-mut-806-mut-717-mut-805",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 805,
+              "signature": "1ee264d061d318ed",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-905",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 905,
+              "signature": "8b58497a7b1aea04",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-677-champion-mut-806-mut-988",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 988,
+              "signature": "0dae34d38e7c45ec",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb,pyarrow": 53,
+          "grouped_topk_null_sort_key@duckdb,pyarrow": 4,
+          "ordering_or_limit@duckdb": 1,
+          "running_sum_precision@duckdb,pyarrow": 6
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 64,
+          "semantic_divergence": 42
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260606T173412-1780767252905887540.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 64,
+          "expected_semantic_divergence": 42
+        },
+        "unsaturated_candidate_bug_families": {
+          "conditional_expression@duckdb,pyarrow": 53,
+          "grouped_topk_null_sort_key@duckdb,pyarrow": 4,
+          "ordering_or_limit@duckdb": 1,
+          "running_sum_precision@duckdb,pyarrow": 6
+        }
+      },
+      "completed_at": "2026-06-06T21:05:37Z",
+      "csv": "reports/findings-run-20260606T173412-1780767252905887540.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-fixed-probe_fast-20260606T172423Z-arrow_probe_stress-seed511-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 64,
+      "health": {
+        "bytes": 4094051,
+        "candidate_bug_families": {
+          "conditional_expression@duckdb,pyarrow": 53,
+          "grouped_topk_null_sort_key@duckdb,pyarrow": 4,
+          "metamorphic_join_inner_left_equivalence@duckdb": 18,
+          "metamorphic_join_inner_left_equivalence@pyarrow": 18,
+          "ordering_or_limit@duckdb": 1,
+          "running_sum_precision@duckdb,pyarrow": 6
+        },
+        "examples": [
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-540",
+            "kind": "accept_reject_mismatch",
+            "root": "conditional_expression",
+            "seed": 540,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "pyarrow"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-540-mut-547",
+            "kind": "accept_reject_mismatch",
+            "root": "running_sum_precision",
+            "seed": 547,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "pyarrow"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559",
+            "kind": "accept_reject_mismatch",
+            "root": "conditional_expression",
+            "seed": 559,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "pyarrow"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579",
+            "kind": "accept_reject_mismatch",
+            "root": "conditional_expression",
+            "seed": 579,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "pyarrow"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-593",
+            "kind": "accept_reject_mismatch",
+            "root": "running_sum_precision",
+            "seed": 593,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "pyarrow"
+            ]
+          }
+        ],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb,pyarrow": 53,
+          "grouped_topk_null_sort_key@duckdb,pyarrow": 4,
+          "metamorphic_join_inner_left_equivalence@duckdb": 18,
+          "metamorphic_join_inner_left_equivalence@pyarrow": 18,
+          "ordering_or_limit@duckdb": 1,
+          "running_sum_precision@duckdb,pyarrow": 6
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 140,
+        "run_file": "runs/run-20260606T173412-1780767252905887540.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 656.5332862099967,
+          "evidence_bytes_per_case": 29243.22142857143,
+          "executed_cases": 140,
+          "meta_file": "runs/run-20260606T173412-1780767252905887540.meta.json",
+          "next_seed": 2874,
+          "run_log_bytes": 4094051,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 41.092522849222796,
+              "generate_mutate_ms": 3856.632715021832,
+              "logging_artifact_ms": 0.9098364498640876,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 705.6722060426442,
+              "scheduler_feedback_ms": 64.98299455758699,
+              "total_case_wall_ms": 4669.29027492115
+            },
+            "case_count": 140,
+            "share_of_total": {
+              "backend_execution_ms": 0.008800592901651787,
+              "generate_mutate_ms": 0.8259569416225593,
+              "logging_artifact_ms": 0.00019485540548867502,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.15113050688513058,
+              "scheduler_feedback_ms": 0.01391710318516969,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.21324128256799463
+        },
+        "statuses": {
+          "bug": 82,
+          "ok": 58
+        }
+      },
+      "lane_id": "arrow_probe_stress",
+      "preset": "live_arrow_issue_focus_metamorphic",
+      "report": "reports/report-run-20260606T173412-1780767252905887540.md",
+      "run_file": "runs/run-20260606T173412-1780767252905887540.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 1.5,
+        "current_runs": 1,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 1.0,
+        "priority_rank": 1,
+        "score": 5.843320009611966,
+        "yield_rate": 3.0
+      },
+      "seed": 511,
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "started_at": "2026-06-06T17:34:12Z",
+      "status": "completed",
+      "target_suite": "arrow_cross",
+      "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "pyarrow"
+      ],
+      "candidate_pipeline": {
+        "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-fixed-probe_fast-20260606T172423Z-20260606T212007/manifest.json",
+        "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-fixed-probe_fast-20260606T172423Z-20260606T212007/manifest.md",
+        "status": "ok",
+        "summary": {
+          "already_submitted_or_confirmed_count": 0,
+          "artifact_created_count": 40,
+          "candidate_bug_verdict_count": 0,
+          "candidate_count": 56,
+          "issue_draft_count": 0,
+          "local_duplicate_candidate_count": 52,
+          "needs_dedup_check_count": 0,
+          "needs_reproducer_or_evidence_count": 0,
+          "not_latest_reproducible_count": 0,
+          "ready_to_submit_count": 0,
+          "recheck_pass_rate": 1.0,
+          "rechecked_count": 56,
+          "reduced_count": 56,
+          "reproduced_count": 56,
+          "submission_group_count": 0,
+          "unique_family_count": 4
+        }
+      },
+      "cases": 140,
+      "classification": {
+        "candidate_bug_families": {
+          "conditional_expression@duckdb,pyarrow": 37,
+          "grouped_topk_null_sort_key@duckdb,pyarrow": 8,
+          "ordering_or_limit@duckdb": 3,
+          "running_sum_precision@duckdb,pyarrow": 8
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1045",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'pyarrow'].",
+              "kind": "accept_reject_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1045,
+              "signature": "8bad62aae4c71f5c",
+              "suspicious": [
+                "duckdb",
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1107",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'pyarrow'].",
+              "kind": "accept_reject_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1107,
+              "signature": "e10e296baed6726b",
+              "suspicious": [
+                "duckdb",
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-1123",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'pyarrow'].",
+              "kind": "accept_reject_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1123,
+              "signature": "785986b472adf6ac",
+              "suspicious": [
+                "duckdb",
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1215",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'pyarrow'].",
+              "kind": "accept_reject_mismatch",
+              "root": "conditional_expression",
+              "seed": 1215,
+              "signature": "eb211cbe3a1fcd5d",
+              "suspicious": [
+                "duckdb",
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1215-mut-1211",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'pyarrow'].",
+              "kind": "accept_reject_mismatch",
+              "root": "conditional_expression",
+              "seed": 1211,
+              "signature": "30036a98b839c1b7",
+              "suspicious": [
+                "duckdb",
+                "pyarrow"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-champion-mut-1161",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1161,
+              "signature": "9b9e70f576b21c2b",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-champion-mut-1161-mut-1165",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1165,
+              "signature": "3f7c6050db9840a4",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-champion-mut-1161-mut-1165-mut-1185",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1185,
+              "signature": "7f5bcd236c9f4c6b",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-1266",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1266,
+              "signature": "7536fabc27c717d1",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-1352",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1352,
+              "signature": "1640d5b687a69e22",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb,pyarrow": 37,
+          "grouped_topk_null_sort_key@duckdb,pyarrow": 8,
+          "ordering_or_limit@duckdb": 3,
+          "running_sum_precision@duckdb,pyarrow": 8
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 56,
+          "semantic_divergence": 40
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260606T210537-1780779937295221326.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 56,
+          "expected_semantic_divergence": 40
+        },
+        "unsaturated_candidate_bug_families": {
+          "conditional_expression@duckdb,pyarrow": 37,
+          "grouped_topk_null_sort_key@duckdb,pyarrow": 8,
+          "ordering_or_limit@duckdb": 3,
+          "running_sum_precision@duckdb,pyarrow": 8
+        }
+      },
+      "completed_at": "2026-06-07T00:30:07Z",
+      "csv": "reports/findings-run-20260606T210537-1780779937295221326.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-fixed-probe_fast-20260606T172423Z-arrow_probe_stress-seed1011-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 56,
+      "health": {
+        "bytes": 3868902,
+        "candidate_bug_families": {
+          "conditional_expression@duckdb,pyarrow": 37,
+          "grouped_topk_null_sort_key@duckdb,pyarrow": 8,
+          "metamorphic_join_inner_left_equivalence@duckdb": 12,
+          "metamorphic_join_inner_left_equivalence@pyarrow": 12,
+          "ordering_or_limit@duckdb": 3,
+          "running_sum_precision@duckdb,pyarrow": 8
+        },
+        "examples": [
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1045",
+            "kind": "accept_reject_mismatch",
+            "root": "running_sum_precision",
+            "seed": 1045,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "pyarrow"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1107",
+            "kind": "accept_reject_mismatch",
+            "root": "running_sum_precision",
+            "seed": 1107,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "pyarrow"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-1123",
+            "kind": "accept_reject_mismatch",
+            "root": "running_sum_precision",
+            "seed": 1123,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "pyarrow"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-champion-mut-1161",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 1161,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-champion-mut-1161",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 1161,
+            "status": "bug",
+            "suspicious": [
+              "pyarrow"
+            ]
+          }
+        ],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb,pyarrow": 37,
+          "grouped_topk_null_sort_key@duckdb,pyarrow": 8,
+          "metamorphic_join_inner_left_equivalence@duckdb": 12,
+          "metamorphic_join_inner_left_equivalence@pyarrow": 12,
+          "ordering_or_limit@duckdb": 3,
+          "running_sum_precision@duckdb,pyarrow": 8
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 140,
+        "run_file": "runs/run-20260606T210537-1780779937295221326.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 866.7598745020005,
+          "evidence_bytes_per_case": 27635.014285714286,
+          "executed_cases": 140,
+          "meta_file": "runs/run-20260606T210537-1780779937295221326.meta.json",
+          "next_seed": 3429,
+          "run_log_bytes": 3868902,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 53.510584157057956,
+              "generate_mutate_ms": 5244.061299749694,
+              "logging_artifact_ms": 1.08242325768515,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 777.8013625855237,
+              "scheduler_feedback_ms": 90.61818839280542,
+              "total_case_wall_ms": 6167.073858142766
+            },
+            "case_count": 140,
+            "share_of_total": {
+              "backend_execution_ms": 0.008676819085992403,
+              "generate_mutate_ms": 0.8503321705521067,
+              "logging_artifact_ms": 0.00017551650630160044,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.12612162274634428,
+              "scheduler_feedback_ms": 0.014693871109254946,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.16152109034862444
+        },
+        "statuses": {
+          "bug": 68,
+          "ok": 72
+        }
+      },
+      "lane_id": "arrow_probe_stress",
+      "preset": "live_arrow_issue_focus_metamorphic",
+      "report": "reports/report-run-20260606T210537-1780779937295221326.md",
+      "run_file": "runs/run-20260606T210537-1780779937295221326.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 1.5,
+        "current_runs": 2,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 1.0,
+        "priority_rank": 1,
+        "score": 5.854159725068125,
+        "yield_rate": 3.0
+      },
+      "seed": 1011,
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "started_at": "2026-06-06T21:05:37Z",
+      "status": "completed",
+      "target_suite": "arrow_cross",
+      "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "sqlite"
+      ],
+      "candidate_pipeline": {
+        "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-fixed-probe_fast-20260606T172423Z-20260607T005459/manifest.json",
+        "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-fixed-probe_fast-20260606T172423Z-20260607T005459/manifest.md",
+        "status": "ok",
+        "summary": {
+          "already_submitted_or_confirmed_count": 0,
+          "artifact_created_count": 65,
+          "candidate_bug_verdict_count": 0,
+          "candidate_count": 85,
+          "issue_draft_count": 0,
+          "local_duplicate_candidate_count": 82,
+          "needs_dedup_check_count": 0,
+          "needs_reproducer_or_evidence_count": 0,
+          "not_latest_reproducible_count": 0,
+          "ready_to_submit_count": 0,
+          "recheck_pass_rate": 1.0,
+          "rechecked_count": 85,
+          "reduced_count": 85,
+          "reproduced_count": 85,
+          "submission_group_count": 0,
+          "unique_family_count": 3
+        }
+      },
+      "cases": 140,
+      "classification": {
+        "candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 27,
+          "grouped_topk_null_sort_key@duckdb,sqlite": 55,
+          "running_sum_precision@duckdb,sqlite": 4
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-587-mut-1002-mut-3146-mut-35",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "grouped_topk_null_sort_key",
+              "seed": 35,
+              "signature": "a866dc52b495699d",
+              "suspicious": [
+                "duckdb",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-587-mut-1002-mut-3146-mut-35-mut-45",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "grouped_topk_null_sort_key",
+              "seed": 45,
+              "signature": "ae189bd201ff9b29",
+              "suspicious": [
+                "duckdb",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-587-mut-1002-mut-3146-mut-35-mut-45-mut-65",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "running_sum_precision",
+              "seed": 65,
+              "signature": "9678a74229074554",
+              "suspicious": [
+                "duckdb",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-587-mut-1002-mut-101",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "grouped_topk_null_sort_key",
+              "seed": 101,
+              "signature": "6d50189c1355c1d6",
+              "suspicious": [
+                "duckdb",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1215-mut-1295-mut-810-mut-799-mut-3145-mut-3339-champion-mut-110",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "conditional_expression",
+              "seed": 110,
+              "signature": "1c1a542aa1e5ed09",
+              "suspicious": [
+                "duckdb",
+                "sqlite"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157-mut-1015-mut-334",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 334,
+              "signature": "b4fe365f8ad08980",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711-mut-3143-mut-769",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 769,
+              "signature": "0b2d0ee26af9aa83",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711-mut-3143-mut-769-mut-770",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 770,
+              "signature": "fdc977259734aa40",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711-mut-3143-mut-769-mut-770-mut-783",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 783,
+              "signature": "772db9f958666202",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711-mut-3143-mut-769-mut-861",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 861,
+              "signature": "9191650e0de91f93",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 27,
+          "grouped_topk_null_sort_key@duckdb,sqlite": 55,
+          "running_sum_precision@duckdb,sqlite": 4
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 86,
+          "semantic_divergence": 29
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260607T003007-1780792207603508309.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 86,
+          "expected_semantic_divergence": 29
+        },
+        "unsaturated_candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 27,
+          "grouped_topk_null_sort_key@duckdb,sqlite": 55,
+          "running_sum_precision@duckdb,sqlite": 4
+        }
+      },
+      "completed_at": "2026-06-07T08:51:28Z",
+      "csv": "reports/findings-run-20260607T003007-1780792207603508309.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-fixed-probe_fast-20260606T172423Z-duckdb_probe_stress-seed11-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 85,
+      "health": {
+        "bytes": 4996360,
+        "candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 27,
+          "grouped_topk_null_sort_key@duckdb,sqlite": 54,
+          "metamorphic_join_inner_left_equivalence@duckdb": 16,
+          "metamorphic_join_inner_left_equivalence@sqlite": 16,
+          "running_sum_precision@duckdb,sqlite": 4
+        },
+        "examples": [
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-587-mut-1002-mut-3146-mut-35",
+            "kind": "accept_reject_mismatch",
+            "root": "grouped_topk_null_sort_key",
+            "seed": 35,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-587-mut-1002-mut-3146-mut-35-mut-45",
+            "kind": "accept_reject_mismatch",
+            "root": "grouped_topk_null_sort_key",
+            "seed": 45,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-587-mut-1002-mut-3146-mut-35-mut-45-mut-65",
+            "kind": "accept_reject_mismatch",
+            "root": "running_sum_precision",
+            "seed": 65,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-587-mut-1002-mut-101",
+            "kind": "accept_reject_mismatch",
+            "root": "grouped_topk_null_sort_key",
+            "seed": 101,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1215-mut-1295-mut-810-mut-799-mut-3145-mut-3339-champion-mut-110",
+            "kind": "accept_reject_mismatch",
+            "root": "conditional_expression",
+            "seed": 110,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          }
+        ],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 27,
+          "grouped_topk_null_sort_key@duckdb,sqlite": 54,
+          "metamorphic_join_inner_left_equivalence@duckdb": 16,
+          "metamorphic_join_inner_left_equivalence@sqlite": 16,
+          "running_sum_precision@duckdb,sqlite": 4
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 140,
+        "run_file": "runs/run-20260607T003007-1780792207603508309.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 1486.699632830001,
+          "evidence_bytes_per_case": 35688.28571428572,
+          "executed_cases": 140,
+          "meta_file": "runs/run-20260607T003007-1780792207603508309.meta.json",
+          "next_seed": 2378,
+          "run_log_bytes": 4996360,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 51.83623826378607,
+              "generate_mutate_ms": 9057.340194156752,
+              "logging_artifact_ms": 1.2835728999302123,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 1364.593480449756,
+              "scheduler_feedback_ms": 114.68523722069222,
+              "total_case_wall_ms": 10589.738722990916
+            },
+            "case_count": 140,
+            "share_of_total": {
+              "backend_execution_ms": 0.004894949688536383,
+              "generate_mutate_ms": 0.8552940191520267,
+              "logging_artifact_ms": 0.00012120911889388768,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.1288599762605235,
+              "scheduler_feedback_ms": 0.010829845780019495,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.09416831544748791
+        },
+        "statuses": {
+          "bug": 101,
+          "ok": 39
+        }
+      },
+      "lane_id": "duckdb_probe_stress",
+      "preset": "live_duckdb_issue_focus_metamorphic",
+      "report": "reports/report-run-20260607T003007-1780792207603508309.md",
+      "run_file": "runs/run-20260607T003007-1780792207603508309.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 0.5,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 0.0,
+        "priority_rank": 1,
+        "score": 2.499299150041928,
+        "yield_rate": 0.0
+      },
+      "seed": 11,
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "started_at": "2026-06-07T00:30:07Z",
+      "status": "completed",
+      "target_suite": "embedded_sql_cross",
+      "theme": "DuckDB/SQLite probe stress lane; issue-inspired sources remain separated from fresh counts"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 140,
+      "duration": null,
+      "lane_id": "duckdb_probe_stress",
+      "preset": "live_duckdb_issue_focus_metamorphic",
+      "scheduler": {
+        "budget_multiplier": 1.112393436559499,
+        "current_runs": 1,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 1.0,
+        "priority_rank": 1,
+        "score": 6.065122751741157,
+        "yield_rate": 3.0
+      },
+      "seed": 511,
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "started_at": "2026-06-07T08:51:28Z",
+      "status": "running",
+      "target_suite": "embedded_sql_cross",
+      "theme": "DuckDB/SQLite probe stress lane; issue-inspired sources remain separated from fresh counts"
+    }
+  ],
+  "scheduler": {
+    "bug_discovery_system": {
+      "objective": "maximize externally reproducible fresh implementation bug yield per unit budget",
+      "schema_version": "bug-discovery-system-v1",
+      "stages": [
+        "generate_or_mutate_candidate",
+        "score_by_acquisition",
+        "execute_differential_oracles",
+        "filter_rewardable_fresh_candidates",
+        "recheck_reproducibility",
+        "reduce_preserving_root_cause",
+        "write_reproducer_and_issue_draft"
+      ],
+      "theory": {
+        "budget": "Boltzmann allocation over acquisition free energy",
+        "candidate_priority": "multi-objective proof/reproducibility/dedup utility",
+        "exploration": "UCB optimism under sparse lane samples",
+        "novelty": "Good-Turing unseen-family probability"
+      }
+    },
+    "generated_at": "2026-06-07T08:51:28Z",
+    "history_manifest_count": 8,
+    "history_window": 8,
+    "lanes": [
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 1.112393436559499,
+        "candidate_total": 86,
+        "completed_runs": 1,
+        "current_runs": 1,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.7211822160518666,
+        "first_seen_family_count": 3,
+        "free_energy": -5.494236443210373,
+        "fresh_candidate_total": 86,
+        "good_turing_unseen_probability": 0.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "duckdb_probe_stress",
+        "novelty_rate": 1.0,
+        "pending_runs": 1,
+        "preset": "live_duckdb_issue_focus_metamorphic",
+        "priority_rank": 1,
+        "proof_yield": 1.0,
+        "saturation_rate": 0.0,
+        "score": 6.065122751741157,
+        "target_suite": "embedded_sql_cross",
+        "theme": "DuckDB/SQLite probe stress lane; issue-inspired sources remain separated from fresh counts",
+        "ucb_bonus": 0.5708863085307838,
+        "unique_fresh_family_count": 3,
+        "yield_rate": 3.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.887606563440501,
+        "candidate_total": 142,
+        "completed_runs": 3,
+        "current_runs": 3,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.5978281534801262,
+        "first_seen_family_count": 8,
+        "free_energy": -5.4695656306960245,
+        "fresh_candidate_total": 142,
+        "good_turing_unseen_probability": 0.014084507042253521,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "arrow_probe_stress",
+        "novelty_rate": 1.0,
+        "pending_runs": 0,
+        "preset": "live_arrow_issue_focus_metamorphic",
+        "priority_rank": 2,
+        "proof_yield": 1.0,
+        "saturation_rate": 0.0,
+        "score": 5.873243210744698,
+        "target_suite": "arrow_cross",
+        "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts",
+        "ucb_bonus": 0.4036775800486728,
+        "unique_fresh_family_count": 8,
+        "yield_rate": 3.0
+      }
+    ],
+    "score_weights": {
+      "boltzmann_temperature": 0.85,
+      "entropy_weight": 0.2,
+      "false_positive_penalty": 1.25,
+      "issue_inspired_weight": 0.2,
+      "novelty_rate": 0.75,
+      "proof_weight": 0.6,
+      "saturation_penalty": 0.75,
+      "uncertainty_weight": 0.45,
+      "yield_rate": 1.0
+    },
+    "strategy": "true_bug_acquisition_good_turing_ucb_boltzmann"
+  },
+  "schema_version": "discovery-campaign-v1",
+  "seeds": [
+    11,
+    511,
+    1011
+  ],
+  "started_at": "2026-06-06T17:24:23Z",
+  "status": "running",
+  "stopped_by_health": false,
+  "summary": {
+    "candidate_pipeline": {
+      "already_submitted_or_confirmed_count": 0,
+      "candidate_bug_verdict_count": 1,
+      "candidate_count": 227,
+      "issue_draft_count": 1,
+      "needs_dedup_check_count": 1,
+      "pipeline_count": 4,
+      "rechecked_count": 227,
+      "reduced_count": 227,
+      "reproduced_count": 227
+    },
+    "fresh_candidate_bug_families": {
+      "conditional_expression@duckdb": 16,
+      "conditional_expression@duckdb,pyarrow": 90,
+      "conditional_expression@duckdb,sqlite": 27,
+      "distinct_duplicate_elimination@duckdb": 1,
+      "groupby_aggregation@duckdb": 4,
+      "grouped_topk_null_sort_key@duckdb,pyarrow": 12,
+      "grouped_topk_null_sort_key@duckdb,sqlite": 55,
+      "ordering_or_limit@duckdb": 4,
+      "running_sum_precision@duckdb": 1,
+      "running_sum_precision@duckdb,pyarrow": 14,
+      "running_sum_precision@duckdb,sqlite": 4
+    },
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {},
+    "run_count": 4,
+    "triage_verdicts": {
+      "candidate_implementation_bug": 228,
+      "expected_semantic_divergence": 152
+    }
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "guided_discovery_campaign",
+    "true_bug_acquisition_scheduler",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence",
+    "candidate_pipeline"
+  ]
+}

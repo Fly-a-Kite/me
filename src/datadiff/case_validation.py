@@ -28,6 +28,7 @@ from datadiff.program_validation import (
 BOOL_ALIAS_PROBES = frozenset(
     {
         "arrow_string_eq_sum_probe",
+        "arrow_string_contains_na_probe",
         "arrow_timestamp_index_attr_probe",
         "arrow_timestamp_loc_slice_probe",
         "arrow_bool_groupby_reduction_probe",
@@ -50,6 +51,7 @@ BOOL_ALIAS_PROBES = frozenset(
         "sparse_mask_probe",
         "struct_distinct_probe",
         "timestamp_precision_filter_probe",
+        "polars_timezone_filter_probe",
         "tuple_anti_null_probe",
         "uint64_isin_probe",
         "window_avg_probe",

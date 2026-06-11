@@ -1,0 +1,11 @@
+{
+  "candidate_row_count": 0,
+  "candidate_rows": [],
+  "fresh_candidate_bug_families": {
+    "running_sum_precision@polars_lazy,polars_streaming": 2
+  },
+  "generated_at": "2026-06-07T09:53:48Z",
+  "generated_by": "datadiff discovery-run",
+  "schema_version": "discovery-run-fresh-candidates-v1",
+  "source_run_file": "runs/run-20260607T042812-1780806492170915768.jsonl.gz"
+}

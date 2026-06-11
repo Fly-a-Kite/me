@@ -1163,7 +1163,9 @@ def test_cli_discovery_campaign_aggregate_summarizes_manifest_glob(tmp_path, cap
                     "fresh_candidate_bug_families": {"fresh_family@duckdb": 2},
                     "triage_verdicts": {"candidate_implementation_bug": 2},
                     "candidate_pipeline": {
-                        "candidate_count": 2,
+                        "candidate_count": 3,
+                        "processed_candidate_count": 2,
+                        "skipped_duplicate_candidate_count": 1,
                         "rechecked_count": 2,
                         "reproduced_count": 1,
                         "reduced_count": 1,
@@ -1187,7 +1189,9 @@ def test_cli_discovery_campaign_aggregate_summarizes_manifest_glob(tmp_path, cap
                         },
                         "candidate_pipeline": {
                             "summary": {
-                                "candidate_count": 2,
+                                "candidate_count": 3,
+                                "processed_candidate_count": 2,
+                                "skipped_duplicate_candidate_count": 1,
                                 "rechecked_count": 2,
                                 "reproduced_count": 1,
                                 "reduced_count": 1,
@@ -1257,6 +1261,8 @@ def test_cli_discovery_campaign_aggregate_summarizes_manifest_glob(tmp_path, cap
     assert payload["fresh_candidate_evidence_rows"] == 2
     assert payload["candidate_pipeline"]["reproduced_count"] == 1
     assert payload["candidate_pipeline"]["rechecked_count"] == 2
+    assert payload["candidate_pipeline"]["processed_candidate_count"] == 2
+    assert payload["candidate_pipeline"]["skipped_duplicate_candidate_count"] == 1
     assert payload["candidate_pipeline"]["recheck_pass_rate"] == 0.5
     assert payload["first_candidate"]["case_id"] == "case-fast"
     assert payload["first_candidate"]["elapsed_s"] == 0.25

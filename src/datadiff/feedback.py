@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 import heapq
 import math
-from typing import Any
+from typing import Any, Mapping
 
 from datadiff.adaptive_learning import AdaptiveLearningState
 from datadiff.behavioral_descriptor import BehavioralDescriptor, compute_behavioral_descriptor
@@ -157,6 +157,10 @@ class FeedbackState:
     seed_frontier_heap: list[tuple[float, float, float, int, int, int]] = field(default_factory=list, repr=False)
     seed_frontier_dirty: bool = field(default=True, repr=False)
     seed_metadata_aligned_count: int = field(default=-1, repr=False)
+    mutation_operator_score_cache: dict[tuple[Any, ...], dict[str, float]] = field(default_factory=dict, repr=False)
+    value_catalog_score_cache: dict[tuple[Any, ...], dict[str, float]] = field(default_factory=dict, repr=False)
+    mutation_swarm_choice_cache: dict[tuple[Any, ...], str] = field(default_factory=dict, repr=False)
+    mutation_score_cache_epoch: int = field(default=0, repr=False)
 
     def __post_init__(self) -> None:
         self.enable_ir_rewrite_mutations = bool(self.enable_ir_rewrite_mutations)
@@ -267,6 +271,7 @@ class FeedbackState:
             source = self.source_scheduler.choose_source(feedback_available=bool(self.interesting_cases))
             if source != "feedback_mutation":
                 return [self._generated_selected_candidate(generated)]
+        champion_donors = self._champion_donors_for_mutation_batch()
         excluded_indexes: set[int] = set()
         batch: list[_SelectedCandidate] = []
         mutation_seed = int(seed)
@@ -282,6 +287,7 @@ class FeedbackState:
                     base_index,
                     mutation_seed=mutation_seed,
                     attempt=parent_attempt + local_attempt,
+                    champion_donors=champion_donors,
                 )
                 mutation_seed += 1
                 if selected is not None:
@@ -298,6 +304,7 @@ class FeedbackState:
         *,
         mutation_seed: int,
         attempt: int,
+        champion_donors: list[ChampionSeed] | None = None,
     ) -> _SelectedCandidate | None:
         base = self.interesting_cases[base_index]
         parent_target_keys = self.case_target_keys[base_index] if base_index < len(self.case_target_keys) else []
@@ -330,6 +337,7 @@ class FeedbackState:
             plan_depth=plan_depth,
             disagreement_descriptor=disagreement_descriptor,
             value_catalog_scores=value_catalog_scores,
+            champion_donors=champion_donors,
         )
         if not result.metadata.get("mutation", {}).get("changed"):
             return None
@@ -384,18 +392,15 @@ class FeedbackState:
         plan_depth: int,
         disagreement_descriptor: Any | None,
         value_catalog_scores: dict[str, float] | None,
+        champion_donors: list[ChampionSeed] | None = None,
     ) -> Any:
         try:
-            champion_donors: list[ChampionSeed] = (
-                self.champion_registry.champions_for_version(self.champion_version_id, limit=4)
-                if self.enable_champion_corpus and self.champion_registry is not None
-                else []
-            )
+            resolved_champion_donors = list(champion_donors or [])
             champion_donor_selection: dict[str, Any] = {}
-            if champion_donors:
-                champion_donors, champion_donor_selection = self._choose_champion_graft_donors(
+            if resolved_champion_donors:
+                resolved_champion_donors, champion_donor_selection = self._choose_champion_graft_donors(
                     base,
-                    champion_donors,
+                    resolved_champion_donors,
                     target_keys=target_keys,
                 )
             result = mutate_case_with_metadata(
@@ -408,7 +413,7 @@ class FeedbackState:
                 disagreement=disagreement_descriptor,
                 operator_pulls=self.mutation_operator_pulls,
                 recent_operator_pulls=self.recent_mutation_operator_counts,
-                champion_donors=champion_donors,
+                champion_donors=resolved_champion_donors,
                 enable_ir_rewrite_mutations=self.enable_ir_rewrite_mutations,
                 enable_divergence_conditioned_mutations=self.enable_divergence_conditioned_mutations,
                 enable_shrink_mutations=self.enable_shrink_mutations,
@@ -453,6 +458,11 @@ class FeedbackState:
                     allow_probe_operators=False,
                     operator_scores=operator_scores,
                 )
+
+    def _champion_donors_for_mutation_batch(self) -> list[ChampionSeed]:
+        if not (self.enable_champion_corpus and self.champion_registry is not None):
+            return []
+        return self.champion_registry.champions_for_version(self.champion_version_id, limit=4)
 
     def _commit_selected_candidate(self, selected: _SelectedCandidate) -> _SelectedCandidate:
         self.last_candidate_source = selected.source
@@ -1229,10 +1239,24 @@ class FeedbackState:
         target_keys: list[str] | None = None,
         swarm_particle_id: int | None = None,
     ) -> dict[str, float]:
+        self._sync_recent_operator_counts()
+        normalized_targets = tuple(_normalize_target_keys(target_keys or []))
+        cache_key = (
+            self.mutation_score_cache_epoch,
+            normalized_targets,
+            swarm_particle_id,
+            self.enable_mutation_operator_learning,
+            self.enable_operator_swarm,
+            self.enable_ir_rewrite_mutations,
+            self.enable_shrink_mutations,
+            self.enable_per_operator_energy,
+        )
+        cached = self.mutation_operator_score_cache.get(cache_key)
+        if cached is not None:
+            return dict(cached)
         operator_profiles = self._mutation_operator_profiles()
         if self.enable_operator_swarm and swarm_particle_id is not None:
             self.operator_swarm.ensure_operators(operator_profiles)
-        self._sync_recent_operator_counts()
         known_operators = list(operator_profiles)
         known_operator_set = set(known_operators)
         for operator_source in (
@@ -1310,6 +1334,7 @@ class FeedbackState:
             )
         if total_pulls >= 8:
             scores["__untried__"] = 0.15
+        self._store_mutation_operator_score_cache(cache_key, scores)
         return scores
 
     def _choose_mutation_swarm_particle_id(
@@ -1327,14 +1352,34 @@ class FeedbackState:
             return None
         action_ids = [str(particle.particle_id) for particle in self.operator_swarm.particles]
         if self.enable_mutation_operator_learning:
-            choice = self.adaptive_learning.choose(
-                "mutation_operator_swarm",
-                action_ids=action_ids,
-                context_features=self._mutation_swarm_context_features(index, target_keys=target_keys),
+            context_features = self._mutation_swarm_context_features(index, target_keys=target_keys)
+            cache_key = (
+                self.mutation_score_cache_epoch,
+                int(index),
+                tuple(_normalize_target_keys(target_keys)),
+                tuple(action_ids),
+                context_features,
             )
+            choice = self.mutation_swarm_choice_cache.get(cache_key)
+            if choice is None:
+                choice = self.adaptive_learning.choose(
+                    "mutation_operator_swarm",
+                    action_ids=action_ids,
+                    context_features=context_features,
+                )
+                self._store_mutation_swarm_choice_cache(cache_key, choice)
         else:
             choice = action_ids[int(mutation_seed) % len(action_ids)]
         return self.operator_swarm.select_particle(choice).particle_id
+
+    def _store_mutation_swarm_choice_cache(
+        self,
+        key: tuple[Any, ...],
+        choice: str,
+    ) -> None:
+        if len(self.mutation_swarm_choice_cache) >= 128:
+            self.mutation_swarm_choice_cache.clear()
+        self.mutation_swarm_choice_cache[key] = str(choice)
 
     def _mutation_operator_learning_bonus(
         self,
@@ -1361,6 +1406,15 @@ class FeedbackState:
     ) -> dict[str, float]:
         if not self.enable_value_catalog:
             return {}
+        cache_key = (
+            self.mutation_score_cache_epoch,
+            tuple(_normalize_target_keys(target_keys or [])),
+            _cache_key_value(disagreement),
+            self.enable_mutation_operator_learning,
+        )
+        cached = self.value_catalog_score_cache.get(cache_key)
+        if cached is not None:
+            return dict(cached)
         learning_active = self.enable_mutation_operator_learning and self._learning_scope_has_feedback(
             "value_catalog_entry"
         )
@@ -1385,7 +1439,32 @@ class FeedbackState:
                 - float(row.get("health_penalty", 0.0) or 0.0)
             )
             scores[entry.entry_id] = max(-2.0, min(6.0, score))
+        self._store_value_catalog_score_cache(cache_key, scores)
         return scores
+
+    def _invalidate_mutation_score_caches(self) -> None:
+        self.mutation_score_cache_epoch += 1
+        self.mutation_operator_score_cache.clear()
+        self.value_catalog_score_cache.clear()
+        self.mutation_swarm_choice_cache.clear()
+
+    def _store_mutation_operator_score_cache(
+        self,
+        key: tuple[Any, ...],
+        scores: dict[str, float],
+    ) -> None:
+        if len(self.mutation_operator_score_cache) >= 128:
+            self.mutation_operator_score_cache.clear()
+        self.mutation_operator_score_cache[key] = dict(scores)
+
+    def _store_value_catalog_score_cache(
+        self,
+        key: tuple[Any, ...],
+        scores: dict[str, float],
+    ) -> None:
+        if len(self.value_catalog_score_cache) >= 128:
+            self.value_catalog_score_cache.clear()
+        self.value_catalog_score_cache[key] = dict(scores)
 
     def _choose_champion_graft_donors(
         self,
@@ -1638,6 +1717,7 @@ class FeedbackState:
             self._decrement_recent_operator_count(evicted)
         self.recent_mutation_operators.append(operator)
         self.recent_mutation_operator_counts[operator] += 1
+        self._invalidate_mutation_score_caches()
 
     def _decrement_recent_parent_count(self, index: int) -> None:
         self.recent_mutation_parent_counts[index] -= 1
@@ -1668,6 +1748,7 @@ class FeedbackState:
         if sum(self.recent_mutation_operator_counts.values()) == len(self.recent_mutation_operators):
             return
         self.recent_mutation_operator_counts = Counter(self.recent_mutation_operators)
+        self._invalidate_mutation_score_caches()
 
     def _mutation_operator_target_affinity(
         self,
@@ -2014,6 +2095,7 @@ class FeedbackState:
             fallback_used=fallback_used,
             false_positive=false_positive,
         )
+        self._invalidate_mutation_score_caches()
 
     def _record_bd_axis_outcome_reward(
         self,
@@ -2763,11 +2845,70 @@ def _operator_target_stat_key(operator: str, target_key: str) -> str:
 
 
 def _normalize_target_key(value: Any) -> str:
+    return _normalize_target_key_cached(str(value))
+
+
+@lru_cache(maxsize=8192)
+def _normalize_target_key_cached(value: str) -> str:
     return canonical_target_key(value)
 
 
 def _normalize_target_keys(values: list[Any] | tuple[Any, ...]) -> list[str]:
-    return _unique_nonempty([_normalize_target_key(value) for value in values])
+    return list(_normalize_target_keys_cached(tuple(str(value) for value in values)))
+
+
+@lru_cache(maxsize=2048)
+def _normalize_target_keys_cached(values: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(_unique_nonempty([_normalize_target_key(value) for value in values]))
+
+
+def _cache_key_value(value: Any) -> Any:
+    feature_tokens = getattr(value, "feature_tokens", None)
+    if callable(feature_tokens):
+        return (
+            tuple(feature_tokens()),
+            str(getattr(value, "primary_root_cause", "") or ""),
+            str(getattr(value, "mismatch_class", "") or ""),
+        )
+    if isinstance(value, Mapping):
+        raw_tokens = value.get("feature_tokens")
+        tokens = tuple(str(token) for token in raw_tokens) if isinstance(raw_tokens, list | tuple) else ()
+        if tokens:
+            return (
+                tokens,
+                str(value.get("primary_root_cause", "") or ""),
+                str(value.get("mismatch_class", "") or ""),
+            )
+        return (
+            tokens,
+            str(value.get("primary_root_cause", "") or ""),
+            str(value.get("mismatch_class", "") or ""),
+            _cache_key_simple(value.get("backend_statuses")),
+            _cache_key_simple(value.get("column_classes")),
+            _cache_key_simple(value.get("backend_groups")),
+            _cache_key_simple(value.get("pair_disagrees")),
+        )
+    return value
+
+
+def _cache_key_simple(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return tuple(
+            (str(key), _cache_key_simple(item))
+            for key, item in sorted(value.items(), key=lambda item: str(item[0]))
+        )
+    if isinstance(value, list):
+        return tuple(_cache_key_simple(item) for item in value)
+    if isinstance(value, tuple):
+        return tuple(_cache_key_simple(item) for item in value)
+    if isinstance(value, set):
+        return tuple(sorted(_cache_key_simple(item) for item in value))
+    if isinstance(value, float):
+        if math.isnan(value):
+            return ("float", "nan")
+        if math.isinf(value):
+            return ("float", "inf", 1 if value > 0 else -1)
+    return value
 
 
 def _normalize_int_counter(raw: dict[str, Any]) -> Counter[str]:

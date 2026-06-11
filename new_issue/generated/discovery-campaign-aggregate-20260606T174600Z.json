@@ -1,0 +1,613 @@
+{
+  "avg_candidate_bug_discovery_auc": 0.46125772446383123,
+  "candidate_pipeline": {
+    "candidate_bug_verdict_count": 11,
+    "candidate_count": 131,
+    "issue_draft_count": 11,
+    "needs_dedup_check_count": 11,
+    "pipeline_count": 8,
+    "recheck_pass_rate": 0.9923664122137404,
+    "rechecked_count": 131,
+    "reduced_count": 130,
+    "reproduced_count": 130
+  },
+  "coverage": {
+    "lane_count": 13,
+    "preset_count": 15,
+    "presets": [
+      "live_arrow_deep_organic_metamorphic",
+      "live_arrow_issue_focus_metamorphic",
+      "live_arrow_metamorphic",
+      "live_common_api_workflow_metamorphic",
+      "live_datafusion_common_api_metamorphic",
+      "live_datafusion_deep_organic_metamorphic",
+      "live_datafusion_fresh_metamorphic",
+      "live_deep_organic_metamorphic",
+      "live_deep_probe_rotation_metamorphic",
+      "live_duckdb_issue_focus_metamorphic",
+      "live_embedded_sql_deep_organic_metamorphic",
+      "live_polars_deep_organic_metamorphic",
+      "live_polars_issue_focus_metamorphic",
+      "live_polars_streaming_deep_organic_metamorphic",
+      "live_polars_streaming_metamorphic"
+    ],
+    "seed_count": 97,
+    "target_suite_count": 8,
+    "target_suites": [
+      "arrow_cross",
+      "datafusion_cross",
+      "duckdb_storage_cross",
+      "embedded_sql_cross",
+      "latest_all_engines",
+      "latest_no_datafusion",
+      "polars_cross",
+      "polars_streaming_cross"
+    ]
+  },
+  "efficiency": {
+    "avg_run_throughput_cases_s": 0.5018838005544641,
+    "cases": 3420,
+    "cases_per_s": 0.5018838005544641,
+    "elapsed_s": 7509.899904794998,
+    "executed_cases": 3420,
+    "parallel_cases_per_s": 0.005600048468255748,
+    "planned_cases": 1688076,
+    "serial_cases_per_s": 0.45539887926021,
+    "serial_elapsed_s": 7509.899904794998,
+    "wall_elapsed_s": 610709.0
+  },
+  "first_candidate": {
+    "case_id": "case-00000610-discovery-fresh",
+    "case_index": 13,
+    "elapsed_s": 10.29001,
+    "evidence_file": "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed501-fresh-candidates.json",
+    "families": [
+      "running_sum_precision@duckdb",
+      "running_sum_precision@duckdb,pandas,sqlite"
+    ],
+    "lane_id": "embedded_sql",
+    "manifest_file": "new_issue/generated/discovery-campaign-priority-20260606T171008Z.json",
+    "seed": 501,
+    "source_run_file": "runs/run-20260606T172152-1780766512875628479.jsonl.gz"
+  },
+  "fresh_candidate_bug_families": {
+    "conditional_expression@duckdb": 21,
+    "conditional_expression@duckdb,pandas,sqlite": 12,
+    "conditional_expression@polars_lazy": 25,
+    "distinct_null_topk@datafusion": 25,
+    "groupby_aggregation@polars_lazy": 10,
+    "running_sum_precision@duckdb": 9,
+    "running_sum_precision@duckdb,pandas,sqlite": 19,
+    "running_sum_precision@polars_lazy": 60
+  },
+  "fresh_candidate_bug_family_count": 23,
+  "fresh_candidate_evidence_rows": 168,
+  "generated_at": "2026-06-06T17:50:10Z",
+  "icse_experiment_quality": {
+    "dimensions": {
+      "coverage": {
+        "evidence": {
+          "axis_count": 23,
+          "preset_count": 0,
+          "run_count": 17,
+          "target_suite_count": 0
+        },
+        "observed": 23.0,
+        "passed": true,
+        "reason": "target reached",
+        "score": 100.0,
+        "target": 8.0,
+        "weight": 0.2
+      },
+      "real_bug_yield": {
+        "confirmed_observed": 11,
+        "confirmed_target": 1,
+        "evidence": {
+          "candidate_bug_families": 23,
+          "candidate_bug_verdict_count": 11,
+          "pipeline_reproduced_count": 130
+        },
+        "observed": 130,
+        "passed": true,
+        "reason": "target bug yield reached",
+        "score": 100.0,
+        "target": 5,
+        "weight": 0.3
+      },
+      "reproducibility": {
+        "evidence": {
+          "artifact_reproducer_coverage": 1.0,
+          "candidate_pipeline_recheck_pass_rate": 0.9923664122137404,
+          "issue_bundle_clean_execution": false,
+          "run_log_coverage": 1.0
+        },
+        "observed": 1.0,
+        "passed": true,
+        "reason": "target reached",
+        "score": 100.0,
+        "target": 1.0,
+        "weight": 0.15
+      },
+      "speed": {
+        "auc_observed": 0.46125772446383123,
+        "auc_target": 0.2,
+        "evidence": {
+          "avg_candidate_bug_discovery_auc": 0.46125772446383123,
+          "first_candidate_elapsed_s": 10.29001
+        },
+        "observed": 10.29001,
+        "passed": true,
+        "reason": "fast candidate discovery reached",
+        "score": 100.0,
+        "target": 21600.0,
+        "weight": 0.15
+      },
+      "throughput": {
+        "evidence": {
+          "cases": 3420,
+          "elapsed_s": 7509.899904794998
+        },
+        "observed": 0.5018838005544641,
+        "passed": false,
+        "reason": "below target",
+        "score": 10.038,
+        "target": 5.0,
+        "weight": 0.2
+      }
+    },
+    "grade": "B",
+    "methodology_claim": "ICSE experiment evidence is grade B with score 82.0; prioritize the weakest dimensions before final claims.",
+    "optimization_priorities": [
+      {
+        "dimension": "throughput",
+        "passed": false,
+        "reason": "below target",
+        "score": 10.038
+      },
+      {
+        "dimension": "coverage",
+        "passed": true,
+        "reason": "target reached",
+        "score": 100.0
+      },
+      {
+        "dimension": "real_bug_yield",
+        "passed": true,
+        "reason": "target bug yield reached",
+        "score": 100.0
+      },
+      {
+        "dimension": "reproducibility",
+        "passed": true,
+        "reason": "target reached",
+        "score": 100.0
+      },
+      {
+        "dimension": "speed",
+        "passed": true,
+        "reason": "fast candidate discovery reached",
+        "score": 100.0
+      }
+    ],
+    "overall_score": 82.008,
+    "ready_for_icse_claim": false,
+    "schema_version": "icse-experiment-quality-v1",
+    "source": "methodology_report",
+    "thresholds": {
+      "target_confirmed_bug_families": 1,
+      "target_coverage_axes": 8,
+      "target_discovery_auc": 0.2,
+      "target_first_bug_elapsed_s": 21600.0,
+      "target_live_suites": 4,
+      "target_real_bug_families": 5,
+      "target_reproduced_bug_families": 1,
+      "target_reproducer_coverage": 1.0,
+      "target_throughput_cases_s": 5.0
+    }
+  },
+  "issue_inspired_unsaturated_candidate_bug_families": {},
+  "known_saturated_candidate_bug_families": {
+    "grouped_topk_null_sort_key@datafusion": 16,
+    "joined_order_offset_projection@datafusion": 1,
+    "tuple_absence_null_filter@duckdb": 10
+  },
+  "lanes": [
+    {
+      "candidate_pipeline": {
+        "artifact_created_count": 40,
+        "candidate_bug_verdict_count": 4,
+        "candidate_count": 93,
+        "issue_draft_count": 4,
+        "local_duplicate_candidate_count": 85,
+        "needs_dedup_check_count": 4,
+        "rechecked_count": 93,
+        "reduced_count": 93,
+        "reproduced_count": 93,
+        "submission_group_count": 3,
+        "unique_family_count": 8
+      },
+      "completed_runs": 4,
+      "first_candidate": {
+        "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-164",
+        "case_index": 18,
+        "elapsed_s": 10.780224,
+        "evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-polars_lazy-seed11-fresh-candidates.json",
+        "families": [
+          "conditional_expression@polars_lazy",
+          "running_sum_precision@polars_lazy"
+        ],
+        "lane_id": "polars_lazy",
+        "manifest_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z.json",
+        "seed": 11,
+        "source_run_file": "runs/run-20260606T172423-1780766663847726280.jsonl.gz"
+      },
+      "fresh_candidate_evidence_rows": 93,
+      "fresh_candidate_total": 95,
+      "lane_id": "polars_lazy",
+      "planned_runs": 30,
+      "presets": [
+        "live_polars_deep_organic_metamorphic"
+      ],
+      "running_runs": 1,
+      "seed_count": 30,
+      "target_suites": [
+        "polars_cross"
+      ],
+      "theme": "Organic Polars eager/lazy state, sortedness, nullable dtype, and expression equivalence",
+      "unique_fresh_family_count": 4
+    },
+    {
+      "candidate_pipeline": {},
+      "completed_runs": 0,
+      "first_candidate": null,
+      "fresh_candidate_evidence_rows": 26,
+      "fresh_candidate_total": 26,
+      "lane_id": "datafusion_common_api",
+      "planned_runs": 23,
+      "presets": [
+        "live_common_api_workflow_metamorphic",
+        "live_datafusion_common_api_metamorphic"
+      ],
+      "running_runs": 1,
+      "seed_count": 19,
+      "target_suites": [
+        "datafusion_cross"
+      ],
+      "theme": "DataFusion daily low-complexity SQL/DataFrame workflows, including nullable DISTINCT top-k",
+      "unique_fresh_family_count": 2
+    },
+    {
+      "candidate_pipeline": {
+        "artifact_created_count": 8,
+        "candidate_bug_verdict_count": 1,
+        "candidate_count": 22,
+        "issue_draft_count": 1,
+        "local_duplicate_candidate_count": 18,
+        "needs_dedup_check_count": 1,
+        "rechecked_count": 22,
+        "reduced_count": 22,
+        "reproduced_count": 22,
+        "submission_group_count": 1,
+        "unique_family_count": 4
+      },
+      "completed_runs": 3,
+      "first_candidate": {
+        "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-259",
+        "case_index": 14,
+        "elapsed_s": 12.005301,
+        "evidence_file": "new_issue/generated/discovery-campaign-fixed-probe_fast-20260606T172423Z-arrow_probe_stress-seed11-fresh-candidates.json",
+        "families": [
+          "conditional_expression@duckdb",
+          "distinct_duplicate_elimination@duckdb",
+          "groupby_aggregation@duckdb",
+          "running_sum_precision@duckdb"
+        ],
+        "lane_id": "arrow_probe_stress",
+        "manifest_file": "new_issue/generated/discovery-campaign-fixed-probe_fast-20260606T172423Z.json",
+        "seed": 11,
+        "source_run_file": "runs/run-20260606T172423-1780766663846121855.jsonl.gz"
+      },
+      "fresh_candidate_evidence_rows": 22,
+      "fresh_candidate_total": 24,
+      "lane_id": "arrow_probe_stress",
+      "planned_runs": 7,
+      "presets": [
+        "live_arrow_issue_focus_metamorphic"
+      ],
+      "running_runs": 3,
+      "seed_count": 7,
+      "target_suites": [
+        "arrow_cross"
+      ],
+      "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts",
+      "unique_fresh_family_count": 5
+    },
+    {
+      "candidate_pipeline": {
+        "candidate_bug_verdict_count": 3,
+        "candidate_count": 11,
+        "issue_draft_count": 3,
+        "local_duplicate_candidate_count": 8,
+        "needs_dedup_check_count": 3,
+        "rechecked_count": 11,
+        "reduced_count": 11,
+        "reproduced_count": 11,
+        "submission_group_count": 2,
+        "unique_family_count": 3
+      },
+      "completed_runs": 1,
+      "first_candidate": {
+        "case_id": "case-00000882-discovery-fresh",
+        "case_index": 110,
+        "elapsed_s": 208.151627,
+        "evidence_file": "new_issue/generated/discovery-campaign-arrow_datafusion-20260606T171300Z-arrow_layout-seed1-fresh-candidates.json",
+        "families": [
+          "conditional_expression@duckdb",
+          "groupby_aggregation@duckdb",
+          "running_sum_precision@duckdb"
+        ],
+        "lane_id": "arrow_layout",
+        "manifest_file": "new_issue/generated/discovery-campaign-arrow_datafusion-20260606T171300Z.json",
+        "seed": 1,
+        "source_run_file": "runs/run-20260606T171300-1780765980750549841.jsonl.gz"
+      },
+      "fresh_candidate_evidence_rows": 11,
+      "fresh_candidate_total": 13,
+      "lane_id": "arrow_layout",
+      "planned_runs": 38,
+      "presets": [
+        "live_arrow_deep_organic_metamorphic",
+        "live_arrow_metamorphic"
+      ],
+      "running_runs": 1,
+      "seed_count": 38,
+      "target_suites": [
+        "arrow_cross"
+      ],
+      "theme": "Organic Arrow table/list layout, nullable aggregation, string/cast, and compute equivalence",
+      "unique_fresh_family_count": 3
+    },
+    {
+      "candidate_pipeline": {
+        "candidate_bug_verdict_count": 2,
+        "candidate_count": 2,
+        "issue_draft_count": 2,
+        "needs_dedup_check_count": 2,
+        "rechecked_count": 2,
+        "reduced_count": 2,
+        "reproduced_count": 2,
+        "submission_group_count": 2,
+        "unique_family_count": 2
+      },
+      "completed_runs": 5,
+      "first_candidate": {
+        "case_id": "case-00000610-discovery-fresh",
+        "case_index": 13,
+        "elapsed_s": 10.29001,
+        "evidence_file": "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed501-fresh-candidates.json",
+        "families": [
+          "running_sum_precision@duckdb",
+          "running_sum_precision@duckdb,pandas,sqlite"
+        ],
+        "lane_id": "embedded_sql",
+        "manifest_file": "new_issue/generated/discovery-campaign-priority-20260606T171008Z.json",
+        "seed": 501,
+        "source_run_file": "runs/run-20260606T172152-1780766512875628479.jsonl.gz"
+      },
+      "fresh_candidate_evidence_rows": 5,
+      "fresh_candidate_total": 39,
+      "lane_id": "embedded_sql",
+      "planned_runs": 40,
+      "presets": [
+        "live_embedded_sql_deep_organic_metamorphic"
+      ],
+      "running_runs": 4,
+      "seed_count": 38,
+      "target_suites": [
+        "embedded_sql_cross"
+      ],
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references",
+      "unique_fresh_family_count": 6
+    },
+    {
+      "candidate_pipeline": {},
+      "completed_runs": 2,
+      "first_candidate": null,
+      "fresh_candidate_evidence_rows": 4,
+      "fresh_candidate_total": 4,
+      "lane_id": "common_api_workflow",
+      "planned_runs": 77,
+      "presets": [
+        "live_common_api_workflow_metamorphic"
+      ],
+      "running_runs": 0,
+      "seed_count": 73,
+      "target_suites": [
+        "latest_no_datafusion"
+      ],
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, string clean/replace/slice/concat, nullable boolean not, drop-null, mutate, union-all, semi/anti join, fill-null/coalesce, case-when, distinct, join, groupby, sort, and slice",
+      "unique_fresh_family_count": 1
+    },
+    {
+      "candidate_pipeline": {
+        "candidate_bug_verdict_count": 1,
+        "candidate_count": 3,
+        "issue_draft_count": 1,
+        "needs_dedup_check_count": 1,
+        "rechecked_count": 3,
+        "reduced_count": 2,
+        "reproduced_count": 2,
+        "submission_group_count": 1,
+        "unique_family_count": 3
+      },
+      "completed_runs": 1,
+      "first_candidate": {
+        "case_id": "case-00000157-discovery-fresh",
+        "case_index": 15,
+        "elapsed_s": 31.078307,
+        "evidence_file": "new_issue/generated/discovery-campaign-common_cross-20260606T171300Z-cross_family-seed1-fresh-candidates.json",
+        "families": [
+          "running_sum_precision@duckdb,pandas,polars,polars_lazy,pyarrow,sqlite",
+          "running_sum_precision@duckdb,polars_lazy,sqlite",
+          "running_sum_precision@polars,polars_lazy",
+          "running_sum_precision@polars_lazy"
+        ],
+        "lane_id": "cross_family",
+        "manifest_file": "new_issue/generated/discovery-campaign-common_cross-20260606T171300Z.json",
+        "seed": 1,
+        "source_run_file": "runs/run-20260606T171300-1780765980781593047.jsonl.gz"
+      },
+      "fresh_candidate_evidence_rows": 3,
+      "fresh_candidate_total": 4,
+      "lane_id": "cross_family",
+      "planned_runs": 10,
+      "presets": [
+        "live_deep_organic_metamorphic"
+      ],
+      "running_runs": 1,
+      "seed_count": 10,
+      "target_suites": [
+        "latest_no_datafusion"
+      ],
+      "theme": "Organic cross-family Python API, Arrow, DataFrame, and embedded SQL semantics without DataFusion saturation",
+      "unique_fresh_family_count": 4
+    },
+    {
+      "candidate_pipeline": {},
+      "completed_runs": 0,
+      "first_candidate": null,
+      "fresh_candidate_evidence_rows": 3,
+      "fresh_candidate_total": 3,
+      "lane_id": "deep_probe_rotation",
+      "planned_runs": 1,
+      "presets": [
+        "live_deep_probe_rotation_metamorphic"
+      ],
+      "running_runs": 0,
+      "seed_count": 1,
+      "target_suites": [
+        "latest_all_engines"
+      ],
+      "theme": "Low-rate deterministic deep probe rotation across Python API, Arrow layout, nullable dtype, lazy/streaming, embedded SQL, and query-engine semantic edges",
+      "unique_fresh_family_count": 2
+    }
+  ],
+  "manifest_count": 96,
+  "manifest_files": [
+    "new_issue/generated/discovery-campaign-arrow-list-layout-s11201-manifest.json",
+    "new_issue/generated/discovery-campaign-arrow_datafusion-20260606T171300Z.json",
+    "new_issue/generated/discovery-campaign-bool-not-organic-s8902-manifest.json",
+    "new_issue/generated/discovery-campaign-case-when-organic-s7602-manifest.json",
+    "new_issue/generated/discovery-campaign-coalesce-organic-s8002-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-basename-smoke-s84-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-bool-not-s8901-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-case-when-s7601-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-coalesce-s8001-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-distinct-null-topk-s9101-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-distinct-s7401-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-distinct-smoke-s7301-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-drop-nulls-s7801-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-expanded-s9501-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-fill-null-s7501-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-final-smoke-s7201-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-mr-s7102-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-mr-smoke-s7101-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-numeric-abs-s8401-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-numeric-clip-s8301-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-s7002-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-semi-anti-join-s7901-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-smoke-s7001-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-string-concat-s8801-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-string-contains-s8101-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-string-pattern-s8201-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-string-replace-s8601-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-string-slice-s8701-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-string-strip-s8501-manifest.json",
+    "new_issue/generated/discovery-campaign-common-api-union-all-s7701-manifest.json",
+    "new_issue/generated/discovery-campaign-common-multikey-groupby-empty-s10101-manifest.json",
+    "new_issue/generated/discovery-campaign-common_cross-20260606T171300Z.json",
+    "new_issue/generated/discovery-campaign-datafusion-common-api-distinct-null-topk-focused-s25-manifest.json",
+    "new_issue/generated/discovery-campaign-datafusion-common-api-distinct-null-topk-s25-manifest.json",
+    "new_issue/generated/discovery-campaign-datafusion-common-api-distinct-null-topk-s9201-manifest.json",
+    "new_issue/generated/discovery-campaign-datafusion-latest-53-s10601-manifest.json",
+    "new_issue/generated/discovery-campaign-date-part-expr-s10901-manifest.json",
+    "new_issue/generated/discovery-campaign-deep-fresh-nondatafusion-s11701-manifest.json",
+    "new_issue/generated/discovery-campaign-deep-probe-smoke-manifest.json",
+    "new_issue/generated/discovery-campaign-default-low-complexity-s9301-manifest.json",
+    "new_issue/generated/discovery-campaign-distinct-organic-s7402-manifest.json",
+    "new_issue/generated/discovery-campaign-drop-nulls-organic-s7802-manifest.json",
+    "new_issue/generated/discovery-campaign-duckdb-storage-smoke-s44001-manifest.json",
+    "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z.json",
+    "new_issue/generated/discovery-campaign-fast-s901-manifest.json",
+    "new_issue/generated/discovery-campaign-fill-coalesce-interactions-s10839-manifest.json",
+    "new_issue/generated/discovery-campaign-fill-null-organic-s7502-manifest.json",
+    "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z.json",
+    "new_issue/generated/discovery-campaign-fixed-embedded_fast-20260606T172423Z.json",
+    "new_issue/generated/discovery-campaign-fixed-probe_fast-20260606T172423Z.json",
+    "new_issue/generated/discovery-campaign-input-filter-boundary-smoke-s2-manifest.json",
+    "new_issue/generated/discovery-campaign-input-partition-union-smoke-s12001-manifest.json",
+    "new_issue/generated/discovery-campaign-low-complexity-datafusion-s9402-manifest.json",
+    "new_issue/generated/discovery-campaign-low-complexity-nondatafusion-s9401-manifest.json",
+    "new_issue/generated/discovery-campaign-lowcomplex-expanded-s9601-manifest.json",
+    "new_issue/generated/discovery-campaign-lowcomplex-expanded-s9801-9901-manifest.json",
+    "new_issue/generated/discovery-campaign-manifest.json",
+    "new_issue/generated/discovery-campaign-materialization-adaptive-s40-400-after-pyarrow-schema-manifest.json",
+    "new_issue/generated/discovery-campaign-materialization-adaptive-s40-400-manifest.json",
+    "new_issue/generated/discovery-campaign-materialization-boundaries-s40-manifest.json",
+    "new_issue/generated/discovery-campaign-multikey-common-s10001-manifest.json",
+    "new_issue/generated/discovery-campaign-negative-membership-s10201-manifest.json",
+    "new_issue/generated/discovery-campaign-nullable-bool-reduction-s11001-manifest.json",
+    "new_issue/generated/discovery-campaign-numeric-abs-organic-s8402-manifest.json",
+    "new_issue/generated/discovery-campaign-numeric-clip-organic-s8302-manifest.json",
+    "new_issue/generated/discovery-campaign-nunique-common-s9701-manifest.json",
+    "new_issue/generated/discovery-campaign-organic-s2701-manifest.json",
+    "new_issue/generated/discovery-campaign-organic-s2702-manifest.json",
+    "new_issue/generated/discovery-campaign-organic-s3301-manifest.json",
+    "new_issue/generated/discovery-campaign-polars-20260606T171300Z.json",
+    "new_issue/generated/discovery-campaign-pool-diversity-deep-s9300-9400-manifest.json",
+    "new_issue/generated/discovery-campaign-post-status-clean-s12101-manifest.json",
+    "new_issue/generated/discovery-campaign-priority-20260606T171008Z.json",
+    "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z.json",
+    "new_issue/generated/discovery-campaign-reclass-embedded-20260606T173700Z.json",
+    "new_issue/generated/discovery-campaign-reclass-probe-common-20260606T173700Z.json",
+    "new_issue/generated/discovery-campaign-semi-anti-join-organic-s7902-manifest.json",
+    "new_issue/generated/discovery-campaign-string-cleaning-s10401-manifest.json",
+    "new_issue/generated/discovery-campaign-string-concat-organic-s8802-manifest.json",
+    "new_issue/generated/discovery-campaign-string-contains-expr-s10501-manifest.json",
+    "new_issue/generated/discovery-campaign-string-contains-organic-s8102-manifest.json",
+    "new_issue/generated/discovery-campaign-string-length-s11501-manifest.json",
+    "new_issue/generated/discovery-campaign-string-lower-s11601-manifest.json",
+    "new_issue/generated/discovery-campaign-string-null-if-empty-s11401-manifest.json",
+    "new_issue/generated/discovery-campaign-string-pattern-expr-s10701-manifest.json",
+    "new_issue/generated/discovery-campaign-string-pattern-organic-s8202-manifest.json",
+    "new_issue/generated/discovery-campaign-string-replace-organic-s8602-manifest.json",
+    "new_issue/generated/discovery-campaign-string-slice-organic-s8702-manifest.json",
+    "new_issue/generated/discovery-campaign-string-split-part-s11301-manifest.json",
+    "new_issue/generated/discovery-campaign-string-strip-organic-s8502-manifest.json",
+    "new_issue/generated/discovery-campaign-string-upper-s10301-manifest.json",
+    "new_issue/generated/discovery-campaign-system-fresh-20260531T0010-manifest.json",
+    "new_issue/generated/discovery-campaign-system-smoke-manifest.json",
+    "new_issue/generated/discovery-campaign-tight-reward-deep-s9700-9900-manifest.json",
+    "new_issue/generated/discovery-campaign-type-cast-boundary-s11101-manifest.json",
+    "new_issue/generated/discovery-campaign-union-all-organic-s7702-manifest.json"
+  ],
+  "progress": {
+    "completed_run_count": 17,
+    "planned_run_count": 151,
+    "remaining_run_count": 134,
+    "running_run_count": 11
+  },
+  "schema_version": "discovery-campaign-aggregate-v1",
+  "status_counts": {
+    "completed": 1,
+    "running": 11,
+    "unknown": 84
+  },
+  "triage_verdicts": {
+    "candidate_implementation_bug": 236,
+    "expected_semantic_divergence": 1357,
+    "needs_manual_confirmation": 11,
+    "non_reproducible_candidate": 2,
+    "normalizer_false_positive": 10
+  }
+}

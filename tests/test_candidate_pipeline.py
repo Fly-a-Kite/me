@@ -160,6 +160,8 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
     )
 
     assert manifest["summary"]["candidate_count"] == 1
+    assert manifest["summary"]["processed_candidate_count"] == 1
+    assert manifest["summary"]["skipped_duplicate_candidate_count"] == 0
     assert manifest["bug_discovery_system"]["schema_version"] == "bug-discovery-system-v1"
     assert manifest["summary"]["reproduced_count"] == 1
     assert manifest["summary"]["reduced_count"] == 1
@@ -195,6 +197,7 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
     rendered = (tmp_path / manifest["markdown_path"]).read_text(encoding="utf-8")
     assert "## Candidates" in rendered
     assert "True bug probability" in rendered
+    assert "Skipped duplicate candidates" in rendered
     assert "Semantic-contract candidates" in rendered
     assert "IR rewrite candidates" in rendered
     assert "needs_dedup_check" in rendered
@@ -348,3 +351,177 @@ def test_candidate_pipeline_ranks_high_proof_fresh_candidates_before_duplicates(
         duplicate_family,
     ]
     assert frozen["bug_discovery_system"]["schema_version"] == "bug-discovery-system-v1"
+
+
+def test_candidate_pipeline_skips_duplicate_family_after_actionable_representative(tmp_path, monkeypatch):
+    new_issue_dir, generated_issue_dir, old_issue_dir, evidence_file, family = _duplicate_family_pipeline_fixture(
+        tmp_path,
+        row_count=4,
+    )
+    processed_ids: list[str] = []
+
+    def fake_process_candidate(**kwargs):
+        processed_ids.append(kwargs["candidate_id"])
+        row = kwargs["row"]
+        return _fake_processed_candidate(
+            candidate_id=kwargs["candidate_id"],
+            row=row,
+            actionable=True,
+        )
+
+    monkeypatch.setattr(candidate_pipeline, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(issue_readiness, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(candidate_pipeline, "_process_candidate", fake_process_candidate)
+
+    manifest = build_candidate_pipeline(
+        evidence_files=[evidence_file],
+        output_dir=generated_issue_dir / "candidate-pipelines",
+        latest_confirmation_files=[tmp_path / "latest-confirmations.json"],
+        new_issue_dir=new_issue_dir,
+        old_issue_dir=old_issue_dir,
+        generated_issue_dir=generated_issue_dir,
+        recheck_attempts=0,
+        reduce_artifacts=False,
+        standalone_reproducer=False,
+    )
+
+    assert len(processed_ids) == 1
+    assert manifest["summary"]["candidate_count"] == 4
+    assert manifest["summary"]["processed_candidate_count"] == 1
+    assert manifest["summary"]["skipped_duplicate_candidate_count"] == 3
+    assert [candidate["primary_family"] for candidate in manifest["candidates"]] == [family] * 4
+    skipped = manifest["candidates"][1:]
+    assert all(candidate["pipeline_processing"]["status"] == "skipped_duplicate_family" for candidate in skipped)
+    assert {candidate["pipeline_processing"]["reason"] for candidate in skipped} == {
+        "actionable_family_representative_exists"
+    }
+    assert all(candidate["dedup"]["pipeline_duplicate_of"] == processed_ids[0] for candidate in skipped)
+    assert all(candidate["recheck"]["attempts"] == 0 for candidate in skipped)
+
+
+def test_candidate_pipeline_caps_duplicate_family_expensive_processing(tmp_path, monkeypatch):
+    new_issue_dir, generated_issue_dir, old_issue_dir, evidence_file, family = _duplicate_family_pipeline_fixture(
+        tmp_path,
+        row_count=5,
+    )
+    processed_ids: list[str] = []
+
+    def fake_process_candidate(**kwargs):
+        processed_ids.append(kwargs["candidate_id"])
+        return _fake_processed_candidate(
+            candidate_id=kwargs["candidate_id"],
+            row=kwargs["row"],
+            actionable=False,
+        )
+
+    monkeypatch.setattr(candidate_pipeline, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(issue_readiness, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(candidate_pipeline, "CANDIDATE_PIPELINE_MAX_EXPENSIVE_ROWS_PER_FAMILY", 2)
+    monkeypatch.setattr(candidate_pipeline, "_process_candidate", fake_process_candidate)
+
+    manifest = build_candidate_pipeline(
+        evidence_files=[evidence_file],
+        output_dir=generated_issue_dir / "candidate-pipelines",
+        latest_confirmation_files=[tmp_path / "latest-confirmations.json"],
+        new_issue_dir=new_issue_dir,
+        old_issue_dir=old_issue_dir,
+        generated_issue_dir=generated_issue_dir,
+        recheck_attempts=0,
+        reduce_artifacts=False,
+        standalone_reproducer=False,
+    )
+
+    assert len(processed_ids) == 2
+    assert manifest["summary"]["candidate_count"] == 5
+    assert manifest["summary"]["processed_candidate_count"] == 2
+    assert manifest["summary"]["skipped_duplicate_candidate_count"] == 3
+    assert [candidate["primary_family"] for candidate in manifest["candidates"]] == [family] * 5
+    skipped = manifest["candidates"][2:]
+    assert {candidate["pipeline_processing"]["reason"] for candidate in skipped} == {
+        "family_expensive_processing_cap_reached"
+    }
+    assert all(candidate["dedup"]["pipeline_duplicate_of"] == processed_ids[0] for candidate in skipped)
+
+
+def _duplicate_family_pipeline_fixture(tmp_path, *, row_count: int):
+    new_issue_dir = tmp_path / "new_issue"
+    generated_issue_dir = new_issue_dir / "generated"
+    old_issue_dir = tmp_path / "old_issue"
+    for path in (new_issue_dir, generated_issue_dir, old_issue_dir):
+        path.mkdir(parents=True, exist_ok=True)
+    dump_json({"confirmations": []}, tmp_path / "latest-confirmations.json")
+
+    family_root = "duplicate_family"
+    family = f"{family_root}@duckdb"
+    rows = []
+    for index in range(row_count):
+        case = Case(
+            f"case-duplicate-{index}",
+            index,
+            [TableData("t0", [ColumnSpec("x", "int", nullable=False)], [{"x": index}, {"x": index + 1}])],
+            Program(f"prog-duplicate-{index}", index, [{"op": "select", "columns": ["x"]}]),
+        )
+        rows.append(
+            {
+                "case": case.to_dict(),
+                "findings": [
+                    {
+                        "finding_id": f"duplicate-{index}",
+                        "kind": "semantic_output_mismatch",
+                        "suspicious_backends": ["duckdb"],
+                        "signature": f"sig-duplicate-{index}",
+                        "root_cause": family_root,
+                        "triage_verdict": "candidate_implementation_bug",
+                        "paper_status": "candidate_bug_needs_external_confirmation",
+                        "triage_confidence": "high",
+                        "false_positive": False,
+                    }
+                ],
+                "normalized": {
+                    "pandas": {"backend": "pandas", "status": "ok", "columns": ["x"], "rows": [[index]]},
+                    "duckdb": {"backend": "duckdb", "status": "ok", "columns": ["x"], "rows": [[index + 1]]},
+                },
+                "raw_results": {
+                    "pandas": {"status": "ok", "rows": [[index]]},
+                    "duckdb": {"status": "ok", "rows": [[index + 1]]},
+                },
+                "candidate_recheck": {"attempts": 1, "reproduced": True},
+            }
+        )
+
+    evidence_file = generated_issue_dir / "fresh-candidates.json"
+    dump_json(
+        {
+            "schema_version": "discovery-run-fresh-candidates-v1",
+            "source_run_file": "runs/run-duplicates.jsonl.gz",
+            "fresh_candidate_bug_families": {family: row_count},
+            "candidate_row_count": row_count,
+            "candidate_rows": rows,
+        },
+        evidence_file,
+    )
+    return new_issue_dir, generated_issue_dir, old_issue_dir, evidence_file, family
+
+
+def _fake_processed_candidate(*, candidate_id: str, row: dict, actionable: bool) -> dict:
+    return {
+        "candidate_id": candidate_id,
+        "primary_family": row["families"][0],
+        "families": row["families"],
+        "candidate_acquisition": dict(row.get("candidate_acquisition", {}) or {}),
+        "source_evidence_file": str(row.get("source_evidence_file", "")),
+        "source_run_file": str(row.get("source_run_file", "")),
+        "case_id": row.get("case", {}).get("case_id", ""),
+        "semantic_contract_evidence": {},
+        "ir_rewrite_evidence": {},
+        "bug_dir": "",
+        "artifact_created": False,
+        "initial_candidate_recheck": dict(row.get("candidate_recheck", {}) or {}),
+        "recheck": {"attempts": 1, "reproduced": False},
+        "reduction": {"requested": False, "performed": False},
+        "triage": {"verdict": "candidate_implementation_bug" if actionable else ""},
+        "dedup": {"status": "needs_final_upstream_dedup", "pipeline_duplicate_of": ""},
+        "issue_draft": {"path": f"new_issue/generated/{candidate_id}.md"} if actionable else {},
+        "strategy_learning_path": "",
+        "issue_readiness": {},
+    }

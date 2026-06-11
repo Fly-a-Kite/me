@@ -1,0 +1,4595 @@
+{
+  "candidate_row_count": 7,
+  "candidate_rows": [
+    {
+      "bug_dir": "/root/datadiff_fuzz_lab/bugs/bug_1ccab94bdd003141",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "case": {
+        "case_id": "case-00001609-issue-focus-csv-long-numeric-roundtrip",
+        "metadata": {
+          "case_fingerprint": {
+            "column_count": 1,
+            "feature_tokens": [
+              "fp_op:31eb3b69906ee450",
+              "fp_type_mix:num1",
+              "fp_null_density:0",
+              "fp_row_mass:2",
+              "fp_column_count:1"
+            ],
+            "minhash_signature": [
+              109828634809894621,
+              53941965423571634,
+              289685627313298057,
+              98994334173035537,
+              253636995463446780,
+              940137593733003780,
+              510210319129344921,
+              752485816394471232,
+              3277052508587818525,
+              506800303511531385,
+              633758677384902911,
+              266125185907639289,
+              151227128292770346,
+              505510530341821903,
+              3103656666576039516,
+              3654527288822437618,
+              1171879595419353931,
+              691904893375809793,
+              2915886146647342375,
+              947012612454253156,
+              6694164866576696258,
+              804714251351317012,
+              1735548707924472708,
+              2575304759254038033,
+              2514598823958886235,
+              4198050785584519307,
+              555630700804639955,
+              1863191935912464843,
+              67227429047460189,
+              451623366697933930,
+              58047199166602815,
+              249056295996622982,
+              619376697487496495,
+              35289553841345954,
+              2013225534659399699,
+              2639644628666475872,
+              1657563200663350983,
+              608457110027218981,
+              2452052855269654276,
+              2983635719627470872,
+              1173761073426015365,
+              235284542941306283,
+              2349667705947885197,
+              2816026893485570097,
+              1255825407668898682,
+              4779178783640622113,
+              689901542164397644,
+              627878070976131066,
+              967906519727402650,
+              865874688467549900,
+              1367775314652262544,
+              161562671135046198,
+              4436176070371966354,
+              420100504374356591,
+              370133735928417148,
+              1019425532449420622,
+              539971713899296378,
+              1730863726622638958,
+              3256268418982037787,
+              44572191519424862,
+              71527184954054592,
+              261368185942488471,
+              1112410683266807618,
+              305953200453405747
+            ],
+            "null_density_bucket": 0,
+            "op_skeleton_hash": "31eb3b69906ee450",
+            "row_mass_bucket": 2,
+            "type_mix_token": "num1"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "pandas"
+              ],
+              [
+                "polars",
+                "polars_lazy"
+              ]
+            ],
+            "backend_statuses": {
+              "pandas": "ok",
+              "polars": "error:NameError",
+              "polars_lazy": "error:NameError"
+            },
+            "column_classes": {
+              "csv_long_numeric_roundtrip_mismatch": "bool"
+            },
+            "feature_tokens": [
+              "column:csv_long_numeric_roundtrip_mismatch:bool",
+              "disagree_class:bool",
+              "disagree_pair:pandas|polars",
+              "disagree_pair:pandas|polars_lazy",
+              "group:pandas",
+              "group:polars+polars_lazy",
+              "group_count:2",
+              "mismatch:status",
+              "root:csv_long_numeric_roundtrip",
+              "status:pandas:ok",
+              "status:polars:error:NameError",
+              "status:polars_lazy:error:NameError"
+            ],
+            "mismatch_class": "status",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": false,
+                "left": "polars",
+                "right": "polars_lazy"
+              }
+            ],
+            "primary_root_cause": "csv_long_numeric_roundtrip"
+          },
+          "expected_csv_long_numeric_roundtrip_mismatch": false,
+          "expected_csv_values": [
+            "99999999999999999999",
+            "9007199254740993",
+            "18446744073709551615",
+            "12345678901234567890",
+            "100000000000000000612"
+          ],
+          "generator_profile": "issue_focus",
+          "issue_inspiration": "CSV long numeric identifiers should round-trip without lossy inference",
+          "mixed_generator_profile": "csv_long_numeric_roundtrip",
+          "quality_archive_context": {
+            "archive_axis_reward": 1.0963306354022881,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.6447718643262106,
+              "bd_column_count": 1.6449888285673124,
+              "bd_null_density": 1.645727852480685,
+              "bd_op_skeleton": 1.6463034156454972,
+              "bd_profile": 1.6466191843943943,
+              "bd_row_mass": 1.645219887358294,
+              "bd_target_class": 1.646006671451204,
+              "bd_type_mix": 1.645465918867192
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "csv_long_numeric_roundtrip"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:31eb3b69906ee450"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:0"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num1"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:1"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:1"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:1",
+              "null_density_axis": "null:0",
+              "op_skeleton_axis": "op:31eb3b69906ee450",
+              "profile_axis": "csv_long_numeric_roundtrip",
+              "row_mass_axis": "rows:1",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num1"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=csv_long_numeric_roundtrip|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=csv_long_numeric_roundtrip_probe",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "csv_long_numeric_roundtrip",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 24,
+            "target_keys": [
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "as": "csv_long_numeric_roundtrip_mismatch",
+              "op": "csv_long_numeric_roundtrip_probe",
+              "values": [
+                "99999999999999999999",
+                "9007199254740993",
+                "18446744073709551615",
+                "12345678901234567890",
+                "100000000000000000612"
+              ]
+            }
+          ],
+          "program_id": "prog-00001609-csv-long-numeric-roundtrip",
+          "seed": 1609
+        },
+        "seed": 1609,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "probe_id",
+                "nullable": false,
+                "type": "int"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "probe_id": 0
+              }
+            ]
+          }
+        ]
+      },
+      "case_index": 36,
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [],
+        "effective_guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": false,
+        "generator_profile": "issue_focus",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.5,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [],
+        "semantic_focus_signals": [],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "",
+        "strategy_snapshot_path": "",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "elapsed_s": 909.14639,
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'polars': 'error', 'polars_lazy': 'error'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-1ccab94bdd003141",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "csv_long_numeric_roundtrip",
+          "severity": "high",
+          "signature": "1ccab94bdd003141",
+          "source_issue": "",
+          "suspicious_backends": [
+            "polars",
+            "polars_lazy"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "csv_long_numeric_roundtrip_mismatch"
+          ],
+          "comparison_key": "{\"columns\":[\"csv_long_numeric_roundtrip_mismatch\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false]\"]",
+          "row_count": 1,
+          "rows": [
+            [
+              false
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false]\"]"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        }
+      },
+      "raw_results": {
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 4.923063999740407,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 4.594792000716552,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 4.609059993526898,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        }
+      },
+      "status": "bug"
+    },
+    {
+      "bug_dir": "/root/datadiff_fuzz_lab/bugs/bug_1ccab94bdd003141",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "case": {
+        "case_id": "case-00001632-issue-focus-csv-long-numeric-roundtrip",
+        "metadata": {
+          "case_fingerprint": {
+            "column_count": 1,
+            "feature_tokens": [
+              "fp_op:31eb3b69906ee450",
+              "fp_type_mix:num1",
+              "fp_null_density:0",
+              "fp_row_mass:2",
+              "fp_column_count:1"
+            ],
+            "minhash_signature": [
+              109828634809894621,
+              53941965423571634,
+              289685627313298057,
+              98994334173035537,
+              253636995463446780,
+              940137593733003780,
+              510210319129344921,
+              752485816394471232,
+              3277052508587818525,
+              506800303511531385,
+              633758677384902911,
+              266125185907639289,
+              151227128292770346,
+              505510530341821903,
+              3103656666576039516,
+              3654527288822437618,
+              1171879595419353931,
+              691904893375809793,
+              2915886146647342375,
+              947012612454253156,
+              6694164866576696258,
+              804714251351317012,
+              1735548707924472708,
+              2575304759254038033,
+              2514598823958886235,
+              4198050785584519307,
+              555630700804639955,
+              1863191935912464843,
+              67227429047460189,
+              451623366697933930,
+              58047199166602815,
+              249056295996622982,
+              619376697487496495,
+              35289553841345954,
+              2013225534659399699,
+              2639644628666475872,
+              1657563200663350983,
+              608457110027218981,
+              2452052855269654276,
+              2983635719627470872,
+              1173761073426015365,
+              235284542941306283,
+              2349667705947885197,
+              2816026893485570097,
+              1255825407668898682,
+              4779178783640622113,
+              689901542164397644,
+              627878070976131066,
+              967906519727402650,
+              865874688467549900,
+              1367775314652262544,
+              161562671135046198,
+              4436176070371966354,
+              420100504374356591,
+              370133735928417148,
+              1019425532449420622,
+              539971713899296378,
+              1730863726622638958,
+              3256268418982037787,
+              44572191519424862,
+              71527184954054592,
+              261368185942488471,
+              1112410683266807618,
+              305953200453405747
+            ],
+            "null_density_bucket": 0,
+            "op_skeleton_hash": "31eb3b69906ee450",
+            "row_mass_bucket": 2,
+            "type_mix_token": "num1"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "pandas"
+              ],
+              [
+                "polars",
+                "polars_lazy"
+              ]
+            ],
+            "backend_statuses": {
+              "pandas": "ok",
+              "polars": "error:NameError",
+              "polars_lazy": "error:NameError"
+            },
+            "column_classes": {
+              "csv_long_numeric_roundtrip_mismatch": "bool"
+            },
+            "feature_tokens": [
+              "column:csv_long_numeric_roundtrip_mismatch:bool",
+              "disagree_class:bool",
+              "disagree_pair:pandas|polars",
+              "disagree_pair:pandas|polars_lazy",
+              "group:pandas",
+              "group:polars+polars_lazy",
+              "group_count:2",
+              "mismatch:status",
+              "root:csv_long_numeric_roundtrip",
+              "status:pandas:ok",
+              "status:polars:error:NameError",
+              "status:polars_lazy:error:NameError"
+            ],
+            "mismatch_class": "status",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": false,
+                "left": "polars",
+                "right": "polars_lazy"
+              }
+            ],
+            "primary_root_cause": "csv_long_numeric_roundtrip"
+          },
+          "expected_csv_long_numeric_roundtrip_mismatch": false,
+          "expected_csv_values": [
+            "12345678901234567890",
+            "99999999999999999999",
+            "9007199254740993",
+            "18446744073709551615"
+          ],
+          "generator_profile": "issue_focus",
+          "issue_inspiration": "CSV long numeric identifiers should round-trip without lossy inference",
+          "mixed_generator_profile": "csv_long_numeric_roundtrip",
+          "quality_archive_context": {
+            "archive_axis_reward": 1.0963306354022881,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.6447718643262106,
+              "bd_column_count": 1.6449888285673124,
+              "bd_null_density": 1.645727852480685,
+              "bd_op_skeleton": 1.6463034156454972,
+              "bd_profile": 1.6466191843943943,
+              "bd_row_mass": 1.645219887358294,
+              "bd_target_class": 1.646006671451204,
+              "bd_type_mix": 1.645465918867192
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "csv_long_numeric_roundtrip"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:31eb3b69906ee450"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:0"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num1"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:1"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:1"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:1",
+              "null_density_axis": "null:0",
+              "op_skeleton_axis": "op:31eb3b69906ee450",
+              "profile_axis": "csv_long_numeric_roundtrip",
+              "row_mass_axis": "rows:1",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num1"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=csv_long_numeric_roundtrip|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=csv_long_numeric_roundtrip_probe",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "csv_long_numeric_roundtrip",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 24,
+            "target_keys": [
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "as": "csv_long_numeric_roundtrip_mismatch",
+              "op": "csv_long_numeric_roundtrip_probe",
+              "values": [
+                "12345678901234567890",
+                "99999999999999999999",
+                "9007199254740993",
+                "18446744073709551615"
+              ]
+            }
+          ],
+          "program_id": "prog-00001632-csv-long-numeric-roundtrip",
+          "seed": 1632
+        },
+        "seed": 1632,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "probe_id",
+                "nullable": false,
+                "type": "int"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "probe_id": 0
+              }
+            ]
+          }
+        ]
+      },
+      "case_index": 37,
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [],
+        "effective_guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": false,
+        "generator_profile": "issue_focus",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.5,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [],
+        "semantic_focus_signals": [],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "",
+        "strategy_snapshot_path": "",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "elapsed_s": 909.342831,
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'polars': 'error', 'polars_lazy': 'error'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-1ccab94bdd003141",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "csv_long_numeric_roundtrip",
+          "severity": "high",
+          "signature": "1ccab94bdd003141",
+          "source_issue": "",
+          "suspicious_backends": [
+            "polars",
+            "polars_lazy"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "csv_long_numeric_roundtrip_mismatch"
+          ],
+          "comparison_key": "{\"columns\":[\"csv_long_numeric_roundtrip_mismatch\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false]\"]",
+          "row_count": 1,
+          "rows": [
+            [
+              false
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false]\"]"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        }
+      },
+      "raw_results": {
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 5.594719987129793,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 4.569994009216316,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 10.675163997802883,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        }
+      },
+      "status": "bug"
+    },
+    {
+      "bug_dir": "/root/datadiff_fuzz_lab/bugs/bug_342547b6ee046401",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "case": {
+        "case_id": "case-00001639-issue-focus-pyarrow-list-flatten-parent-indices-semantics",
+        "metadata": {
+          "case_fingerprint": {
+            "column_count": 1,
+            "feature_tokens": [
+              "fp_op:612035ec8b00f3f1",
+              "fp_type_mix:num1",
+              "fp_null_density:0",
+              "fp_row_mass:2",
+              "fp_column_count:1"
+            ],
+            "minhash_signature": [
+              115357800336098090,
+              1555439874560853020,
+              289685627313298057,
+              50474733849790199,
+              1005625882614503611,
+              2202736671808331776,
+              510210319129344921,
+              752485816394471232,
+              3277052508587818525,
+              506800303511531385,
+              633758677384902911,
+              730712939693564342,
+              151227128292770346,
+              408415670393596432,
+              1074465978445672418,
+              454764480862480113,
+              1171879595419353931,
+              4168100420043631156,
+              160551074702825131,
+              1264371885630764339,
+              6694164866576696258,
+              6135687143972835718,
+              1735548707924472708,
+              2575304759254038033,
+              1413471060855443198,
+              633440231974721503,
+              555630700804639955,
+              1863191935912464843,
+              1728557290274878700,
+              451623366697933930,
+              58047199166602815,
+              2211244006427443159,
+              619376697487496495,
+              35289553841345954,
+              817022688047049099,
+              526777741729921004,
+              1657563200663350983,
+              294233979854251784,
+              2452052855269654276,
+              1785856799038267980,
+              1173761073426015365,
+              235284542941306283,
+              2393845472174469932,
+              911963518240988715,
+              640500667141389033,
+              409088971755130316,
+              689901542164397644,
+              161271153300142868,
+              967906519727402650,
+              865874688467549900,
+              98212798783138030,
+              161562671135046198,
+              3936766431445543351,
+              420100504374356591,
+              4914560863212705422,
+              1019425532449420622,
+              391003732769326674,
+              1730863726622638958,
+              1151650134561263961,
+              44572191519424862,
+              71527184954054592,
+              1054768117031177326,
+              582550469551970380,
+              305953200453405747
+            ],
+            "null_density_bucket": 0,
+            "op_skeleton_hash": "612035ec8b00f3f1",
+            "row_mass_bucket": 2,
+            "type_mix_token": "num1"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "pandas"
+              ],
+              [
+                "polars",
+                "polars_lazy"
+              ]
+            ],
+            "backend_statuses": {
+              "pandas": "ok",
+              "polars": "error:NameError",
+              "polars_lazy": "error:NameError"
+            },
+            "column_classes": {
+              "list_flatten_parent_indices_mismatch": "bool"
+            },
+            "feature_tokens": [
+              "column:list_flatten_parent_indices_mismatch:bool",
+              "disagree_class:bool",
+              "disagree_pair:pandas|polars",
+              "disagree_pair:pandas|polars_lazy",
+              "group:pandas",
+              "group:polars+polars_lazy",
+              "group_count:2",
+              "mismatch:status",
+              "root:pyarrow_list_flatten_parent_indices_semantics",
+              "status:pandas:ok",
+              "status:polars:error:NameError",
+              "status:polars_lazy:error:NameError"
+            ],
+            "mismatch_class": "status",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": false,
+                "left": "polars",
+                "right": "polars_lazy"
+              }
+            ],
+            "primary_root_cause": "pyarrow_list_flatten_parent_indices_semantics"
+          },
+          "expected_list_flatten_parent_indices_mismatch": false,
+          "expected_list_flatten_values": [
+            1,
+            2,
+            null,
+            3
+          ],
+          "expected_list_parent_indices": [
+            0,
+            0,
+            3,
+            3
+          ],
+          "generator_profile": "issue_focus",
+          "mixed_generator_profile": "pyarrow_list_flatten_parent_indices_semantics",
+          "quality_archive_context": {
+            "archive_axis_reward": 1.0963306354022881,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.6447718643262106,
+              "bd_column_count": 1.6449888285673124,
+              "bd_null_density": 1.645727852480685,
+              "bd_op_skeleton": 1.6463034156454972,
+              "bd_profile": 1.6466191843943943,
+              "bd_row_mass": 1.645219887358294,
+              "bd_target_class": 1.646006671451204,
+              "bd_type_mix": 1.645465918867192
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "pyarrow_list_flatten_parent_indices_semantics"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:612035ec8b00f3f1"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:0"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num1"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:1"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:1"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:1",
+              "null_density_axis": "null:0",
+              "op_skeleton_axis": "op:612035ec8b00f3f1",
+              "profile_axis": "pyarrow_list_flatten_parent_indices_semantics",
+              "row_mass_axis": "rows:1",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num1"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=pyarrow_list_flatten_parent_indices_semantics|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=list_flatten_parent_indices_probe",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "pyarrow_list_flatten_parent_indices_semantics",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 24,
+            "target_keys": [
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "as": "list_flatten_parent_indices_mismatch",
+              "op": "list_flatten_parent_indices_probe"
+            }
+          ],
+          "program_id": "prog-00001639-pyarrow-list-flatten-parent-indices-semantics",
+          "seed": 1639
+        },
+        "seed": 1639,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "probe_id",
+                "nullable": false,
+                "type": "int"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "probe_id": 0
+              }
+            ]
+          }
+        ]
+      },
+      "case_index": 38,
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [],
+        "effective_guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": false,
+        "generator_profile": "issue_focus",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.5,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [],
+        "semantic_focus_signals": [],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "",
+        "strategy_snapshot_path": "",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "elapsed_s": 909.473295,
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'polars': 'error', 'polars_lazy': 'error'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-342547b6ee046401",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "pyarrow_list_flatten_parent_indices_semantics",
+          "severity": "high",
+          "signature": "342547b6ee046401",
+          "source_issue": "",
+          "suspicious_backends": [
+            "polars",
+            "polars_lazy"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "list_flatten_parent_indices_mismatch"
+          ],
+          "comparison_key": "{\"columns\":[\"list_flatten_parent_indices_mismatch\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false]\"]",
+          "row_count": 1,
+          "rows": [
+            [
+              false
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false]\"]"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        }
+      },
+      "raw_results": {
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 1.3744869938818738,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 0.23467199935112149,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 0.18241199722979218,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        }
+      },
+      "status": "bug"
+    },
+    {
+      "bug_dir": "/root/datadiff_fuzz_lab/bugs/bug_1ccab94bdd003141",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "case": {
+        "case_id": "case-00001701-issue-focus-csv-long-numeric-roundtrip",
+        "metadata": {
+          "case_fingerprint": {
+            "column_count": 1,
+            "feature_tokens": [
+              "fp_op:31eb3b69906ee450",
+              "fp_type_mix:num1",
+              "fp_null_density:0",
+              "fp_row_mass:2",
+              "fp_column_count:1"
+            ],
+            "minhash_signature": [
+              109828634809894621,
+              53941965423571634,
+              289685627313298057,
+              98994334173035537,
+              253636995463446780,
+              940137593733003780,
+              510210319129344921,
+              752485816394471232,
+              3277052508587818525,
+              506800303511531385,
+              633758677384902911,
+              266125185907639289,
+              151227128292770346,
+              505510530341821903,
+              3103656666576039516,
+              3654527288822437618,
+              1171879595419353931,
+              691904893375809793,
+              2915886146647342375,
+              947012612454253156,
+              6694164866576696258,
+              804714251351317012,
+              1735548707924472708,
+              2575304759254038033,
+              2514598823958886235,
+              4198050785584519307,
+              555630700804639955,
+              1863191935912464843,
+              67227429047460189,
+              451623366697933930,
+              58047199166602815,
+              249056295996622982,
+              619376697487496495,
+              35289553841345954,
+              2013225534659399699,
+              2639644628666475872,
+              1657563200663350983,
+              608457110027218981,
+              2452052855269654276,
+              2983635719627470872,
+              1173761073426015365,
+              235284542941306283,
+              2349667705947885197,
+              2816026893485570097,
+              1255825407668898682,
+              4779178783640622113,
+              689901542164397644,
+              627878070976131066,
+              967906519727402650,
+              865874688467549900,
+              1367775314652262544,
+              161562671135046198,
+              4436176070371966354,
+              420100504374356591,
+              370133735928417148,
+              1019425532449420622,
+              539971713899296378,
+              1730863726622638958,
+              3256268418982037787,
+              44572191519424862,
+              71527184954054592,
+              261368185942488471,
+              1112410683266807618,
+              305953200453405747
+            ],
+            "null_density_bucket": 0,
+            "op_skeleton_hash": "31eb3b69906ee450",
+            "row_mass_bucket": 2,
+            "type_mix_token": "num1"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "pandas"
+              ],
+              [
+                "polars",
+                "polars_lazy"
+              ]
+            ],
+            "backend_statuses": {
+              "pandas": "ok",
+              "polars": "error:NameError",
+              "polars_lazy": "error:NameError"
+            },
+            "column_classes": {
+              "csv_long_numeric_roundtrip_mismatch": "bool"
+            },
+            "feature_tokens": [
+              "column:csv_long_numeric_roundtrip_mismatch:bool",
+              "disagree_class:bool",
+              "disagree_pair:pandas|polars",
+              "disagree_pair:pandas|polars_lazy",
+              "group:pandas",
+              "group:polars+polars_lazy",
+              "group_count:2",
+              "mismatch:status",
+              "root:csv_long_numeric_roundtrip",
+              "status:pandas:ok",
+              "status:polars:error:NameError",
+              "status:polars_lazy:error:NameError"
+            ],
+            "mismatch_class": "status",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": false,
+                "left": "polars",
+                "right": "polars_lazy"
+              }
+            ],
+            "primary_root_cause": "csv_long_numeric_roundtrip"
+          },
+          "expected_csv_long_numeric_roundtrip_mismatch": false,
+          "expected_csv_values": [
+            "99999999999999999999",
+            "9007199254740993",
+            "18446744073709551615",
+            "12345678901234567890",
+            "100000000000000000704"
+          ],
+          "generator_profile": "issue_focus",
+          "issue_inspiration": "CSV long numeric identifiers should round-trip without lossy inference",
+          "mixed_generator_profile": "csv_long_numeric_roundtrip",
+          "quality_archive_context": {
+            "archive_axis_reward": 0.7309739404103355,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.6447718643262106,
+              "bd_column_count": 1.6449888285673124,
+              "bd_null_density": 1.645727852480685,
+              "bd_op_skeleton": 1.6463034156454972,
+              "bd_profile": 1.6466191843943943,
+              "bd_row_mass": 1.645219887358294,
+              "bd_target_class": 1.646006671451204,
+              "bd_type_mix": 1.645465918867192
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "csv_long_numeric_roundtrip"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:31eb3b69906ee450"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:0"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num1"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:1"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:1"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:1",
+              "null_density_axis": "null:0",
+              "op_skeleton_axis": "op:31eb3b69906ee450",
+              "profile_axis": "csv_long_numeric_roundtrip",
+              "row_mass_axis": "rows:1",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num1"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=csv_long_numeric_roundtrip|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=csv_long_numeric_roundtrip_probe",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "csv_long_numeric_roundtrip",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 24,
+            "target_keys": [
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "as": "csv_long_numeric_roundtrip_mismatch",
+              "op": "csv_long_numeric_roundtrip_probe",
+              "values": [
+                "99999999999999999999",
+                "9007199254740993",
+                "18446744073709551615",
+                "12345678901234567890",
+                "100000000000000000704"
+              ]
+            }
+          ],
+          "program_id": "prog-00001701-csv-long-numeric-roundtrip",
+          "seed": 1701
+        },
+        "seed": 1701,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "probe_id",
+                "nullable": false,
+                "type": "int"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "probe_id": 0
+              }
+            ]
+          }
+        ]
+      },
+      "case_index": 42,
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [],
+        "effective_guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": false,
+        "generator_profile": "issue_focus",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.5,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [],
+        "semantic_focus_signals": [],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "",
+        "strategy_snapshot_path": "",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "elapsed_s": 910.195939,
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'polars': 'error', 'polars_lazy': 'error'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-1ccab94bdd003141",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "csv_long_numeric_roundtrip",
+          "severity": "high",
+          "signature": "1ccab94bdd003141",
+          "source_issue": "",
+          "suspicious_backends": [
+            "polars",
+            "polars_lazy"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "csv_long_numeric_roundtrip_mismatch"
+          ],
+          "comparison_key": "{\"columns\":[\"csv_long_numeric_roundtrip_mismatch\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false]\"]",
+          "row_count": 1,
+          "rows": [
+            [
+              false
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false]\"]"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        }
+      },
+      "raw_results": {
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 5.118084998684935,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 1.834025009884499,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 3.830572997685522,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        }
+      },
+      "status": "bug"
+    },
+    {
+      "bug_dir": "/root/datadiff_fuzz_lab/bugs/bug_1ccab94bdd003141",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "case": {
+        "case_id": "case-00001747-issue-focus-csv-long-numeric-roundtrip",
+        "metadata": {
+          "case_fingerprint": {
+            "column_count": 1,
+            "feature_tokens": [
+              "fp_op:31eb3b69906ee450",
+              "fp_type_mix:num1",
+              "fp_null_density:0",
+              "fp_row_mass:2",
+              "fp_column_count:1"
+            ],
+            "minhash_signature": [
+              109828634809894621,
+              53941965423571634,
+              289685627313298057,
+              98994334173035537,
+              253636995463446780,
+              940137593733003780,
+              510210319129344921,
+              752485816394471232,
+              3277052508587818525,
+              506800303511531385,
+              633758677384902911,
+              266125185907639289,
+              151227128292770346,
+              505510530341821903,
+              3103656666576039516,
+              3654527288822437618,
+              1171879595419353931,
+              691904893375809793,
+              2915886146647342375,
+              947012612454253156,
+              6694164866576696258,
+              804714251351317012,
+              1735548707924472708,
+              2575304759254038033,
+              2514598823958886235,
+              4198050785584519307,
+              555630700804639955,
+              1863191935912464843,
+              67227429047460189,
+              451623366697933930,
+              58047199166602815,
+              249056295996622982,
+              619376697487496495,
+              35289553841345954,
+              2013225534659399699,
+              2639644628666475872,
+              1657563200663350983,
+              608457110027218981,
+              2452052855269654276,
+              2983635719627470872,
+              1173761073426015365,
+              235284542941306283,
+              2349667705947885197,
+              2816026893485570097,
+              1255825407668898682,
+              4779178783640622113,
+              689901542164397644,
+              627878070976131066,
+              967906519727402650,
+              865874688467549900,
+              1367775314652262544,
+              161562671135046198,
+              4436176070371966354,
+              420100504374356591,
+              370133735928417148,
+              1019425532449420622,
+              539971713899296378,
+              1730863726622638958,
+              3256268418982037787,
+              44572191519424862,
+              71527184954054592,
+              261368185942488471,
+              1112410683266807618,
+              305953200453405747
+            ],
+            "null_density_bucket": 0,
+            "op_skeleton_hash": "31eb3b69906ee450",
+            "row_mass_bucket": 2,
+            "type_mix_token": "num1"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "pandas"
+              ],
+              [
+                "polars",
+                "polars_lazy"
+              ]
+            ],
+            "backend_statuses": {
+              "pandas": "ok",
+              "polars": "error:NameError",
+              "polars_lazy": "error:NameError"
+            },
+            "column_classes": {
+              "csv_long_numeric_roundtrip_mismatch": "bool"
+            },
+            "feature_tokens": [
+              "column:csv_long_numeric_roundtrip_mismatch:bool",
+              "disagree_class:bool",
+              "disagree_pair:pandas|polars",
+              "disagree_pair:pandas|polars_lazy",
+              "group:pandas",
+              "group:polars+polars_lazy",
+              "group_count:2",
+              "mismatch:status",
+              "root:csv_long_numeric_roundtrip",
+              "status:pandas:ok",
+              "status:polars:error:NameError",
+              "status:polars_lazy:error:NameError"
+            ],
+            "mismatch_class": "status",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": false,
+                "left": "polars",
+                "right": "polars_lazy"
+              }
+            ],
+            "primary_root_cause": "csv_long_numeric_roundtrip"
+          },
+          "expected_csv_long_numeric_roundtrip_mismatch": false,
+          "expected_csv_values": [
+            "18446744073709551615",
+            "12345678901234567890",
+            "99999999999999999999",
+            "9007199254740993",
+            "100000000000000000750"
+          ],
+          "generator_profile": "issue_focus",
+          "issue_inspiration": "CSV long numeric identifiers should round-trip without lossy inference",
+          "mixed_generator_profile": "csv_long_numeric_roundtrip",
+          "quality_archive_context": {
+            "archive_axis_reward": 0.7309739404103355,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.6447718643262106,
+              "bd_column_count": 1.6449888285673124,
+              "bd_null_density": 1.645727852480685,
+              "bd_op_skeleton": 1.6463034156454972,
+              "bd_profile": 1.6466191843943943,
+              "bd_row_mass": 1.645219887358294,
+              "bd_target_class": 1.646006671451204,
+              "bd_type_mix": 1.645465918867192
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "csv_long_numeric_roundtrip"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:31eb3b69906ee450"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:0"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num1"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:1"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:1"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:1",
+              "null_density_axis": "null:0",
+              "op_skeleton_axis": "op:31eb3b69906ee450",
+              "profile_axis": "csv_long_numeric_roundtrip",
+              "row_mass_axis": "rows:1",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num1"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=csv_long_numeric_roundtrip|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=csv_long_numeric_roundtrip_probe",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "csv_long_numeric_roundtrip",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 24,
+            "target_keys": [
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "as": "csv_long_numeric_roundtrip_mismatch",
+              "op": "csv_long_numeric_roundtrip_probe",
+              "values": [
+                "18446744073709551615",
+                "12345678901234567890",
+                "99999999999999999999",
+                "9007199254740993",
+                "100000000000000000750"
+              ]
+            }
+          ],
+          "program_id": "prog-00001747-csv-long-numeric-roundtrip",
+          "seed": 1747
+        },
+        "seed": 1747,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "probe_id",
+                "nullable": false,
+                "type": "int"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "probe_id": 0
+              }
+            ]
+          }
+        ]
+      },
+      "case_index": 44,
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [],
+        "effective_guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": false,
+        "generator_profile": "issue_focus",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.5,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [],
+        "semantic_focus_signals": [],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "",
+        "strategy_snapshot_path": "",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "elapsed_s": 910.526697,
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'polars': 'error', 'polars_lazy': 'error'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-1ccab94bdd003141",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "csv_long_numeric_roundtrip",
+          "severity": "high",
+          "signature": "1ccab94bdd003141",
+          "source_issue": "",
+          "suspicious_backends": [
+            "polars",
+            "polars_lazy"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "csv_long_numeric_roundtrip_mismatch"
+          ],
+          "comparison_key": "{\"columns\":[\"csv_long_numeric_roundtrip_mismatch\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false]\"]",
+          "row_count": 1,
+          "rows": [
+            [
+              false
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false]\"]"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        }
+      },
+      "raw_results": {
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 3.147025010548532,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 1.831461995607242,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 2.0815550087718293,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        }
+      },
+      "status": "bug"
+    },
+    {
+      "bug_dir": "/root/datadiff_fuzz_lab/bugs/bug_342547b6ee046401",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "case": {
+        "case_id": "case-00001872-issue-focus-pyarrow-list-flatten-parent-indices-semantics",
+        "metadata": {
+          "case_fingerprint": {
+            "column_count": 1,
+            "feature_tokens": [
+              "fp_op:612035ec8b00f3f1",
+              "fp_type_mix:num1",
+              "fp_null_density:0",
+              "fp_row_mass:2",
+              "fp_column_count:1"
+            ],
+            "minhash_signature": [
+              115357800336098090,
+              1555439874560853020,
+              289685627313298057,
+              50474733849790199,
+              1005625882614503611,
+              2202736671808331776,
+              510210319129344921,
+              752485816394471232,
+              3277052508587818525,
+              506800303511531385,
+              633758677384902911,
+              730712939693564342,
+              151227128292770346,
+              408415670393596432,
+              1074465978445672418,
+              454764480862480113,
+              1171879595419353931,
+              4168100420043631156,
+              160551074702825131,
+              1264371885630764339,
+              6694164866576696258,
+              6135687143972835718,
+              1735548707924472708,
+              2575304759254038033,
+              1413471060855443198,
+              633440231974721503,
+              555630700804639955,
+              1863191935912464843,
+              1728557290274878700,
+              451623366697933930,
+              58047199166602815,
+              2211244006427443159,
+              619376697487496495,
+              35289553841345954,
+              817022688047049099,
+              526777741729921004,
+              1657563200663350983,
+              294233979854251784,
+              2452052855269654276,
+              1785856799038267980,
+              1173761073426015365,
+              235284542941306283,
+              2393845472174469932,
+              911963518240988715,
+              640500667141389033,
+              409088971755130316,
+              689901542164397644,
+              161271153300142868,
+              967906519727402650,
+              865874688467549900,
+              98212798783138030,
+              161562671135046198,
+              3936766431445543351,
+              420100504374356591,
+              4914560863212705422,
+              1019425532449420622,
+              391003732769326674,
+              1730863726622638958,
+              1151650134561263961,
+              44572191519424862,
+              71527184954054592,
+              1054768117031177326,
+              582550469551970380,
+              305953200453405747
+            ],
+            "null_density_bucket": 0,
+            "op_skeleton_hash": "612035ec8b00f3f1",
+            "row_mass_bucket": 2,
+            "type_mix_token": "num1"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "pandas"
+              ],
+              [
+                "polars",
+                "polars_lazy"
+              ]
+            ],
+            "backend_statuses": {
+              "pandas": "ok",
+              "polars": "error:NameError",
+              "polars_lazy": "error:NameError"
+            },
+            "column_classes": {
+              "list_flatten_parent_indices_mismatch": "bool"
+            },
+            "feature_tokens": [
+              "column:list_flatten_parent_indices_mismatch:bool",
+              "disagree_class:bool",
+              "disagree_pair:pandas|polars",
+              "disagree_pair:pandas|polars_lazy",
+              "group:pandas",
+              "group:polars+polars_lazy",
+              "group_count:2",
+              "mismatch:status",
+              "root:pyarrow_list_flatten_parent_indices_semantics",
+              "status:pandas:ok",
+              "status:polars:error:NameError",
+              "status:polars_lazy:error:NameError"
+            ],
+            "mismatch_class": "status",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": false,
+                "left": "polars",
+                "right": "polars_lazy"
+              }
+            ],
+            "primary_root_cause": "pyarrow_list_flatten_parent_indices_semantics"
+          },
+          "expected_list_flatten_parent_indices_mismatch": false,
+          "expected_list_flatten_values": [
+            1,
+            2,
+            null,
+            3
+          ],
+          "expected_list_parent_indices": [
+            0,
+            0,
+            3,
+            3
+          ],
+          "generator_profile": "issue_focus",
+          "mixed_generator_profile": "pyarrow_list_flatten_parent_indices_semantics",
+          "quality_archive_context": {
+            "archive_axis_reward": 0.6527968960691809,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.5872041198254756,
+              "bd_column_count": 1.5874073106743687,
+              "bd_null_density": 1.5880972357647867,
+              "bd_op_skeleton": 1.5886323865594916,
+              "bd_profile": 1.5889252294709488,
+              "bd_row_mass": 1.5876233728901727,
+              "bd_target_class": 1.588356705026161,
+              "bd_type_mix": 1.5878530770987398
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "pyarrow_list_flatten_parent_indices_semantics"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:612035ec8b00f3f1"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:0"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num1"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:1"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:1"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:1",
+              "null_density_axis": "null:0",
+              "op_skeleton_axis": "op:612035ec8b00f3f1",
+              "profile_axis": "pyarrow_list_flatten_parent_indices_semantics",
+              "row_mass_axis": "rows:1",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num1"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=pyarrow_list_flatten_parent_indices_semantics|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=list_flatten_parent_indices_probe",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "pyarrow_list_flatten_parent_indices_semantics",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 24,
+            "target_keys": [
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "as": "list_flatten_parent_indices_mismatch",
+              "op": "list_flatten_parent_indices_probe"
+            }
+          ],
+          "program_id": "prog-00001872-pyarrow-list-flatten-parent-indices-semantics",
+          "seed": 1872
+        },
+        "seed": 1872,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "probe_id",
+                "nullable": false,
+                "type": "int"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "probe_id": 0
+              }
+            ]
+          }
+        ]
+      },
+      "case_index": 51,
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [],
+        "effective_guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": false,
+        "generator_profile": "issue_focus",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.5,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [],
+        "semantic_focus_signals": [],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "",
+        "strategy_snapshot_path": "",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "elapsed_s": 958.764841,
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'polars': 'error', 'polars_lazy': 'error'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-342547b6ee046401",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "pyarrow_list_flatten_parent_indices_semantics",
+          "severity": "high",
+          "signature": "342547b6ee046401",
+          "source_issue": "",
+          "suspicious_backends": [
+            "polars",
+            "polars_lazy"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "list_flatten_parent_indices_mismatch"
+          ],
+          "comparison_key": "{\"columns\":[\"list_flatten_parent_indices_mismatch\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false]\"]",
+          "row_count": 1,
+          "rows": [
+            [
+              false
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false]\"]"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        }
+      },
+      "raw_results": {
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 1.9717940012924373,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 0.23887700808700174,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 0.19439500465523452,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        }
+      },
+      "status": "bug"
+    },
+    {
+      "bug_dir": "",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "case": {
+        "case_id": "case-00004668-issue-focus-pyarrow-list-flatten-parent-indices-semantics",
+        "metadata": {
+          "case_fingerprint": {
+            "column_count": 1,
+            "feature_tokens": [
+              "fp_op:612035ec8b00f3f1",
+              "fp_type_mix:num1",
+              "fp_null_density:0",
+              "fp_row_mass:2",
+              "fp_column_count:1"
+            ],
+            "minhash_signature": [
+              115357800336098090,
+              1555439874560853020,
+              289685627313298057,
+              50474733849790199,
+              1005625882614503611,
+              2202736671808331776,
+              510210319129344921,
+              752485816394471232,
+              3277052508587818525,
+              506800303511531385,
+              633758677384902911,
+              730712939693564342,
+              151227128292770346,
+              408415670393596432,
+              1074465978445672418,
+              454764480862480113,
+              1171879595419353931,
+              4168100420043631156,
+              160551074702825131,
+              1264371885630764339,
+              6694164866576696258,
+              6135687143972835718,
+              1735548707924472708,
+              2575304759254038033,
+              1413471060855443198,
+              633440231974721503,
+              555630700804639955,
+              1863191935912464843,
+              1728557290274878700,
+              451623366697933930,
+              58047199166602815,
+              2211244006427443159,
+              619376697487496495,
+              35289553841345954,
+              817022688047049099,
+              526777741729921004,
+              1657563200663350983,
+              294233979854251784,
+              2452052855269654276,
+              1785856799038267980,
+              1173761073426015365,
+              235284542941306283,
+              2393845472174469932,
+              911963518240988715,
+              640500667141389033,
+              409088971755130316,
+              689901542164397644,
+              161271153300142868,
+              967906519727402650,
+              865874688467549900,
+              98212798783138030,
+              161562671135046198,
+              3936766431445543351,
+              420100504374356591,
+              4914560863212705422,
+              1019425532449420622,
+              391003732769326674,
+              1730863726622638958,
+              1151650134561263961,
+              44572191519424862,
+              71527184954054592,
+              1054768117031177326,
+              582550469551970380,
+              305953200453405747
+            ],
+            "null_density_bucket": 0,
+            "op_skeleton_hash": "612035ec8b00f3f1",
+            "row_mass_bucket": 2,
+            "type_mix_token": "num1"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "pandas"
+              ],
+              [
+                "polars",
+                "polars_lazy"
+              ]
+            ],
+            "backend_statuses": {
+              "pandas": "ok",
+              "polars": "error:NameError",
+              "polars_lazy": "error:NameError"
+            },
+            "column_classes": {
+              "list_flatten_parent_indices_mismatch": "bool"
+            },
+            "feature_tokens": [
+              "column:list_flatten_parent_indices_mismatch:bool",
+              "disagree_class:bool",
+              "disagree_pair:pandas|polars",
+              "disagree_pair:pandas|polars_lazy",
+              "group:pandas",
+              "group:polars+polars_lazy",
+              "group_count:2",
+              "mismatch:status",
+              "root:pyarrow_list_flatten_parent_indices_semantics",
+              "status:pandas:ok",
+              "status:polars:error:NameError",
+              "status:polars_lazy:error:NameError"
+            ],
+            "mismatch_class": "status",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": false,
+                "left": "polars",
+                "right": "polars_lazy"
+              }
+            ],
+            "primary_root_cause": "pyarrow_list_flatten_parent_indices_semantics"
+          },
+          "expected_list_flatten_parent_indices_mismatch": false,
+          "expected_list_flatten_values": [
+            1,
+            2,
+            null,
+            3
+          ],
+          "expected_list_parent_indices": [
+            0,
+            0,
+            3,
+            3
+          ],
+          "generator_profile": "issue_focus",
+          "mixed_generator_profile": "pyarrow_list_flatten_parent_indices_semantics",
+          "quality_archive_context": {
+            "archive_axis_reward": 0.42901451012230907,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.4091604762370913,
+              "bd_column_count": 1.4092331906642437,
+              "bd_null_density": 1.4094522140444896,
+              "bd_op_skeleton": 1.4095954811291773,
+              "bd_profile": 1.4096649917589126,
+              "bd_row_mass": 1.4093062546705364,
+              "bd_target_class": 1.409524393286894,
+              "bd_type_mix": 1.4093793742376213
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "pyarrow_list_flatten_parent_indices_semantics"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:612035ec8b00f3f1"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:0"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num1"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:1"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:1"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:1",
+              "null_density_axis": "null:0",
+              "op_skeleton_axis": "op:612035ec8b00f3f1",
+              "profile_axis": "pyarrow_list_flatten_parent_indices_semantics",
+              "row_mass_axis": "rows:1",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num1"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=pyarrow_list_flatten_parent_indices_semantics|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=list_flatten_parent_indices_probe",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "pyarrow_list_flatten_parent_indices_semantics",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 24,
+            "target_keys": [
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "as": "list_flatten_parent_indices_mismatch",
+              "op": "list_flatten_parent_indices_probe"
+            }
+          ],
+          "program_id": "prog-00004668-pyarrow-list-flatten-parent-indices-semantics",
+          "seed": 4668
+        },
+        "seed": 4668,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "probe_id",
+                "nullable": false,
+                "type": "int"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "probe_id": 0
+              }
+            ]
+          }
+        ]
+      },
+      "case_index": 214,
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [],
+        "effective_guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": false,
+        "generator_profile": "issue_focus",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.5,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [],
+        "semantic_focus_signals": [],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "",
+        "strategy_snapshot_path": "",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "elapsed_s": 7033.170343,
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'polars': 'error', 'polars_lazy': 'error'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-342547b6ee046401",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "pyarrow_list_flatten_parent_indices_semantics",
+          "severity": "high",
+          "signature": "342547b6ee046401",
+          "source_issue": "",
+          "suspicious_backends": [
+            "polars",
+            "polars_lazy"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "list_flatten_parent_indices_mismatch"
+          ],
+          "comparison_key": "{\"columns\":[\"list_flatten_parent_indices_mismatch\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false]\"]",
+          "row_count": 1,
+          "rows": [
+            [
+              false
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false]\"]"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        }
+      },
+      "raw_results": {
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 1.7551439959788695,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 0.24523700994905084,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 0.19533801241777837,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        }
+      },
+      "status": "bug"
+    }
+  ],
+  "fresh_candidate_bug_families": {
+    "csv_long_numeric_roundtrip@polars,polars_lazy": 4,
+    "ordering_or_limit@pandas": 23,
+    "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy": 3
+  },
+  "generated_at": "2026-06-07T04:11:58Z",
+  "generated_by": "datadiff discovery-run",
+  "schema_version": "discovery-run-fresh-candidates-v1",
+  "source_run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz"
+}

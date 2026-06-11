@@ -62,9 +62,20 @@ def aggregate_candidate_pipeline_summary(items: list[dict[str, Any]]) -> dict[st
         if not summary:
             continue
         pipeline_count += 1
+        candidate_count = int(summary.get("candidate_count", 0) or 0)
+        skipped_duplicate_count = int(summary.get("skipped_duplicate_candidate_count", 0) or 0)
+        processed_candidate_count = int(
+            summary.get(
+                "processed_candidate_count",
+                max(0, candidate_count - skipped_duplicate_count),
+            )
+            or 0
+        )
         aggregate.update(
             {
-                "candidate_count": int(summary.get("candidate_count", 0) or 0),
+                "candidate_count": candidate_count,
+                "processed_candidate_count": processed_candidate_count,
+                "skipped_duplicate_candidate_count": skipped_duplicate_count,
                 "rechecked_count": int(summary.get("rechecked_count", 0) or 0),
                 "reproduced_count": int(summary.get("reproduced_count", 0) or 0),
                 "reduced_count": int(summary.get("reduced_count", 0) or 0),

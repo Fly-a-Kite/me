@@ -1,0 +1,415 @@
+{
+  "events": [
+    {
+      "candidate_id": "ordering_or_limit-polars-polars_lazy-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-m",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "primary_family": "ordering_or_limit@polars,polars_lazy",
+      "recorded_at": "2026-06-07T04:57:02Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-polars-polars_lazy-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "primary_family": "ordering_or_limit@polars,polars_lazy",
+      "recorded_at": "2026-06-07T05:00:06Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-polars-polars_lazy-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "primary_family": "ordering_or_limit@polars,polars_lazy",
+      "recorded_at": "2026-06-07T05:03:06Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-polars-polars_lazy-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "primary_family": "ordering_or_limit@polars,polars_lazy",
+      "recorded_at": "2026-06-07T05:04:53Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-polars-polars_lazy-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "primary_family": "ordering_or_limit@polars,polars_lazy",
+      "recorded_at": "2026-06-07T05:06:42Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-polars-polars_lazy-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "primary_family": "ordering_or_limit@polars,polars_lazy",
+      "recorded_at": "2026-06-07T05:08:33Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-polars-polars_lazy-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "primary_family": "ordering_or_limit@polars,polars_lazy",
+      "recorded_at": "2026-06-07T05:10:37Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-polars_lazy-case-00008335-discovery-fresh",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "primary_family": "running_sum_precision@polars_lazy",
+      "recorded_at": "2026-06-07T05:11:13Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_case_when_idempotence",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "polars_lazy"
+      ],
+      "triage_verdict": "not_reproduced"
+    },
+    {
+      "candidate_id": "ordering_or_limit-polars-polars_lazy-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "primary_family": "ordering_or_limit@polars,polars_lazy",
+      "recorded_at": "2026-06-07T05:13:20Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-polars-polars_lazy-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "primary_family": "ordering_or_limit@polars,polars_lazy",
+      "recorded_at": "2026-06-07T05:16:05Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-polars-polars_lazy-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "primary_family": "ordering_or_limit@polars,polars_lazy",
+      "recorded_at": "2026-06-07T05:17:51Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-polars-polars_lazy-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "primary_family": "ordering_or_limit@polars,polars_lazy",
+      "recorded_at": "2026-06-07T05:20:13Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-polars-polars_lazy-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "primary_family": "ordering_or_limit@polars,polars_lazy",
+      "recorded_at": "2026-06-07T05:22:26Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-polars_lazy-case-00008624-discovery-fresh",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "primary_family": "running_sum_precision@polars_lazy",
+      "recorded_at": "2026-06-07T05:23:01Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-polars-polars_lazy-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "primary_family": "ordering_or_limit@polars,polars_lazy",
+      "recorded_at": "2026-06-07T05:25:19Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "ordering_or_limit-polars-polars_lazy-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-m",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "primary_family": "ordering_or_limit@polars,polars_lazy",
+      "recorded_at": "2026-06-07T05:27:20Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "ordering_or_limit@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "ordering_or_limit"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-longhaul-20260607T0325CST-batch0000-polars_lazy-seed7102-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T014955-1780796995255133765.jsonl.gz",
+      "suspicious_backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    }
+  ],
+  "schema_version": "dynamic-strategy-learning-v1"
+}

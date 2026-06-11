@@ -23,6 +23,8 @@ from datadiff.mutator import (
     _append_struct_distinct_probe,
     _append_bit_compare_probe,
     _append_round_even_probe,
+    _append_float_literal_precision_probe,
+    _append_timestamp_precision_filter_probe,
     _append_series_rtruediv_probe,
     _append_uint64_isin_probe,
     _append_tuple_anti_null_probe,
@@ -52,11 +54,13 @@ from datadiff.mutator import (
     _append_arrow_timestamp_loc_slice_probe,
     _append_arrow_timestamp_index_attr_probe,
     _append_eval_inplace_alias_probe,
+    _append_arrow_bool_groupby_reduction_probe,
     _append_dataset_isin_all_match_probe,
     _append_large_string_partition_probe,
     _append_hash_pivot_wider_probe,
     _append_list_flatten_parent_indices_probe,
     _append_rolling_mean_by_null_count_probe,
+    _append_csv_long_numeric_roundtrip_probe,
     _append_boolean_predicate_filter_probe,
     _append_grouped_topk_probe,
     _append_order_projection_probe,
@@ -1863,6 +1867,8 @@ def test_mutation_operator_registry_covers_row_value_and_operation_mutations():
     assert "append_struct_distinct_probe" in MUTATION_OPERATOR_NAMES
     assert "append_bit_compare_probe" in MUTATION_OPERATOR_NAMES
     assert "append_round_even_probe" in MUTATION_OPERATOR_NAMES
+    assert "append_float_literal_precision_probe" in MUTATION_OPERATOR_NAMES
+    assert "append_timestamp_precision_filter_probe" in MUTATION_OPERATOR_NAMES
 
 
 def test_specialized_discovery_mutation_operator_alias_matches_compatibility_name():
@@ -1880,11 +1886,13 @@ def test_specialized_discovery_mutation_operator_alias_matches_compatibility_nam
     assert "append_arrow_timestamp_loc_slice_probe" in MUTATION_OPERATOR_NAMES
     assert "append_arrow_timestamp_index_attr_probe" in MUTATION_OPERATOR_NAMES
     assert "append_eval_inplace_alias_probe" in MUTATION_OPERATOR_NAMES
+    assert "append_arrow_bool_groupby_reduction_probe" in MUTATION_OPERATOR_NAMES
     assert "append_dataset_isin_all_match_probe" in MUTATION_OPERATOR_NAMES
     assert "append_large_string_partition_probe" in MUTATION_OPERATOR_NAMES
     assert "append_hash_pivot_wider_probe" in MUTATION_OPERATOR_NAMES
     assert "append_list_flatten_parent_indices_probe" in MUTATION_OPERATOR_NAMES
     assert "append_rolling_mean_by_null_count_probe" in MUTATION_OPERATOR_NAMES
+    assert "append_csv_long_numeric_roundtrip_probe" in MUTATION_OPERATOR_NAMES
     assert "append_grouped_topk" in MUTATION_OPERATOR_NAMES
     assert "append_groupby_fractional_membership_filter" in MUTATION_OPERATOR_NAMES
     assert "append_groupby_fractional_membership_filter" in DISCOVERY_MUTATION_OPERATOR_NAMES
@@ -2212,6 +2220,58 @@ def test_append_round_even_probe_mutation_stays_valid():
     assert validate_case_program(case) == []
 
 
+def test_append_float_literal_precision_probe_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("x", "float")],
+        [{"id": 0, "x": 0.1}],
+    )
+    operations = [{"op": "select", "columns": ["id"]}]
+
+    detail = _append_float_literal_precision_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_float_literal_precision_probe:")
+    assert operations[-1]["op"] == "float_literal_precision_probe"
+    assert operations[-1]["as"] == "float_literal_precision_mismatch"
+    assert operations[-1]["literal"] in {
+        "0.10000000000000001",
+        "0.29999999999999999",
+        "1.2345678901234567",
+        "9007199254740993.0",
+    }
+    case = Case(
+        "case-mut-float-literal-precision",
+        1,
+        [table],
+        Program("prog-mut-float-literal-precision", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
+def test_append_timestamp_precision_filter_probe_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("ts", "str")],
+        [{"id": 0, "ts": "2024-01-01T00:00:00.000000001"}],
+    )
+    operations = [{"op": "select", "columns": ["ts"]}]
+
+    detail = _append_timestamp_precision_filter_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_timestamp_precision_filter_probe:")
+    assert operations[-1] == {
+        "op": "timestamp_precision_filter_probe",
+        "as": "timestamp_precision_filter_mismatch",
+    }
+    case = Case(
+        "case-mut-timestamp-precision-filter",
+        1,
+        [table],
+        Program("prog-mut-timestamp-precision-filter", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
 def test_append_series_rtruediv_probe_mutation_stays_valid():
     table = TableData(
         "t0",
@@ -2434,6 +2494,30 @@ def test_append_arrow_timestamp_index_attr_probe_mutation_stays_valid():
     assert validate_case_program(case) == []
 
 
+def test_append_arrow_bool_groupby_reduction_probe_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("flag", "bool")],
+        [{"id": 0, "flag": True}, {"id": 1, "flag": None}],
+    )
+    operations = [{"op": "select", "columns": ["flag"]}]
+
+    detail = _append_arrow_bool_groupby_reduction_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_arrow_bool_groupby_reduction_probe:")
+    assert operations[-1] == {
+        "op": "arrow_bool_groupby_reduction_probe",
+        "as": "arrow_bool_groupby_reduction_mismatch",
+    }
+    case = Case(
+        "case-mut-arrow-bool-groupby-reduction",
+        1,
+        [table],
+        Program("prog-mut-arrow-bool-groupby-reduction", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
 def test_append_dataset_isin_all_match_probe_mutation_stays_valid():
     table = TableData(
         "t0",
@@ -2574,6 +2658,30 @@ def test_append_rolling_mean_by_null_count_probe_mutation_stays_valid():
         1,
         [table],
         Program("prog-mut-rolling-mean-by-null-count", 1, operations),
+    )
+    assert validate_case_program(case) == []
+
+
+def test_append_csv_long_numeric_roundtrip_probe_mutation_stays_valid():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("raw", "str")],
+        [{"id": 0, "raw": "9007199254740993"}],
+    )
+    operations = [{"op": "select", "columns": ["raw"]}]
+
+    detail = _append_csv_long_numeric_roundtrip_probe([table], operations, random.Random(1))
+
+    assert detail.startswith("append_csv_long_numeric_roundtrip_probe:")
+    assert operations[-1]["op"] == "csv_long_numeric_roundtrip_probe"
+    assert operations[-1]["as"] == "csv_long_numeric_roundtrip_mismatch"
+    assert 3 <= len(operations[-1]["values"]) <= 6
+    assert all(isinstance(value, str) and value.isdigit() for value in operations[-1]["values"])
+    case = Case(
+        "case-mut-csv-long-numeric-roundtrip",
+        1,
+        [table],
+        Program("prog-mut-csv-long-numeric-roundtrip", 1, operations),
     )
     assert validate_case_program(case) == []
 

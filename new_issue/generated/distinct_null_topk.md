@@ -4,7 +4,7 @@
 
 | Item | Value |
 | --- | --- |
-| Discovery time | 2026-05-26T23:21:17Z |
+| Discovery time | 2026-06-06T17:10:11Z |
 | Discovery command | `datadiff bug-audit --probes datafusion_distinct_null_topk` |
 | Evidence mode | `deterministic_probe` |
 | Probe id | `datafusion_distinct_null_topk` |
@@ -191,7 +191,7 @@
 - datafusion: `53.0.0`
 - duckdb: `1.5.3`
 - pandas: `3.0.3`
-- platform: `Linux-6.17.0-29-generic-x86_64-with-glibc2.39`
+- platform: `Linux-6.17.0-35-generic-x86_64-with-glibc2.39`
 - polars: `1.41.0`
 - pyarrow: `24.0.0`
 - pysqlite3_binary: `0.5.4.post2`

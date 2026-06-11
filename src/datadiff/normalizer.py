@@ -145,9 +145,32 @@ def normalized_results_from_mapping(
 
 
 def _norm_value(v: Any, *, preserve_float_precision: bool = False) -> Any:
+    if v is None:
+        return None
+    if isinstance(v, str):
+        return unicodedata.normalize("NFC", v)
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, int):
+        return v
+    if isinstance(v, float):
+        return _norm_float(v, preserve_float_precision=preserve_float_precision)
+    if hasattr(v, "item"):
+        try:
+            return _norm_value(v.item(), preserve_float_precision=preserve_float_precision)
+        except Exception:
+            pass
     try:
         import pandas as pd
-        if pd.isna(v):
+        missing = pd.isna(v)
+        if isinstance(missing, bool):
+            if missing:
+                # In the default common subset, missing values are normalized to
+                # SQL-style NULL. Real NaN semantics should be studied in a
+                # dedicated experiment because several engines erase the
+                # distinction when nullable numeric columns are materialized.
+                return None
+        elif bool(missing):
             # In the default common subset, missing values are normalized to
             # SQL-style NULL. Real NaN semantics should be studied in a
             # dedicated experiment because several engines erase the
@@ -155,28 +178,23 @@ def _norm_value(v: Any, *, preserve_float_precision: bool = False) -> Any:
             return None
     except Exception:
         pass
-    if isinstance(v, float):
-        value = float(v)
-        if math.isnan(value):
-            return {"kind": "nan"}
-        if math.isinf(value):
-            return {"kind": "inf", "sign": 1 if value > 0 else -1}
-        if value.is_integer() and abs(value) < 2**53:
-            return int(value)
-        if preserve_float_precision:
-            return value
-        rounded = float(round(value, 10))
-        if rounded.is_integer() and abs(rounded) < 2**53:
-            return int(rounded)
-        return rounded
-    if isinstance(v, str):
-        return unicodedata.normalize("NFC", v)
-    if hasattr(v, "item"):
-        try:
-            return _norm_value(v.item(), preserve_float_precision=preserve_float_precision)
-        except Exception:
-            pass
     return v
+
+
+def _norm_float(value: float, *, preserve_float_precision: bool = False) -> Any:
+    value = float(value)
+    if math.isnan(value):
+        return None
+    if math.isinf(value):
+        return {"kind": "inf", "sign": 1 if value > 0 else -1}
+    if value.is_integer() and abs(value) < 2**53:
+        return int(value)
+    if preserve_float_precision:
+        return value
+    rounded = float(round(value, 10))
+    if rounded.is_integer() and abs(rounded) < 2**53:
+        return int(rounded)
+    return rounded
 
 
 def _to_pandas(data: Any):

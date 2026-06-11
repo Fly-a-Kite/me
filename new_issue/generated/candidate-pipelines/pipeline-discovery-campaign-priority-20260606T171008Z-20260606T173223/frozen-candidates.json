@@ -1,0 +1,1934 @@
+{
+  "bug_discovery_system": {
+    "objective": "maximize externally reproducible fresh implementation bug yield per unit budget",
+    "schema_version": "bug-discovery-system-v1",
+    "stages": [
+      "generate_or_mutate_candidate",
+      "score_by_acquisition",
+      "execute_differential_oracles",
+      "filter_rewardable_fresh_candidates",
+      "recheck_reproducibility",
+      "reduce_preserving_root_cause",
+      "write_reproducer_and_issue_draft"
+    ],
+    "theory": {
+      "budget": "Boltzmann allocation over acquisition free energy",
+      "candidate_priority": "multi-objective proof/reproducibility/dedup utility",
+      "exploration": "UCB optimism under sparse lane samples",
+      "novelty": "Good-Turing unseen-family probability"
+    }
+  },
+  "candidate_count": 1,
+  "candidates": [
+    {
+      "bug_dir": "/root/datadiff_fuzz_lab/bugs/bug_907b8db166e0872f",
+      "candidate_acquisition": {
+        "acquisition_score": 5.534375,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "running_sum_precision@duckdb"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.9475,
+        "recheck_prior": 0.85,
+        "reduction_potential": 1.0,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9960668549274264
+      },
+      "candidate_id": "running_sum_precision-duckdb-case-00000610-discovery-fresh",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@duckdb:value"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 7,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@duckdb:value"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 2,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@duckdb:value"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "semantic_output_mismatch:running_sum_precision@duckdb:value"
+        ]
+      },
+      "case": {
+        "case_id": "case-00000610-discovery-fresh",
+        "metadata": {
+          "case_fingerprint": {
+            "column_count": 1,
+            "feature_tokens": [
+              "fp_op:b48dbaf5f59b5092",
+              "fp_type_mix:num7_str3_bool4",
+              "fp_null_density:0",
+              "fp_row_mass:6",
+              "fp_column_count:1"
+            ],
+            "minhash_signature": [
+              1208454444922545081,
+              95009781605776900,
+              1031248402849900075,
+              471595940790868959,
+              453721134318571834,
+              768704632612738432,
+              516358098186668898,
+              675837148373225443,
+              914591667459008366,
+              339564399370873144,
+              401987006885207492,
+              188439851123032491,
+              562708791306003126,
+              250439476360276814,
+              2013446548710029616,
+              176592686791719405,
+              201972786666200230,
+              1005211345213836233,
+              1109521942230450386,
+              145492135374919264,
+              268222965839740683,
+              280517845367717635,
+              95245969055013093,
+              513796351634054518,
+              190098792960417417,
+              523104045616452573,
+              20789801317216848,
+              274610446790591062,
+              1060499423079954911,
+              545240564434985032,
+              198278835625315105,
+              1023894908343911003,
+              1693110691864517090,
+              35289553841345954,
+              981162689181119635,
+              1007552690418196096,
+              240768225162960093,
+              607154589870432980,
+              227046475333035480,
+              153590349930592429,
+              509198312879258245,
+              977866761529632,
+              964517630258471070,
+              470722466634959318,
+              495326276900186511,
+              248948211648462558,
+              689901542164397644,
+              143230276752494843,
+              355051120035686147,
+              1109012530375959998,
+              202850371293399910,
+              953476248260037163,
+              643439515383128614,
+              420100504374356591,
+              618106285301151374,
+              183866993952149159,
+              319365497400503946,
+              183054423228773156,
+              515187288546232745,
+              221816199072685761,
+              71527184954054592,
+              12396727006621830,
+              401170636432279493,
+              123168576046300258
+            ],
+            "null_density_bucket": 0,
+            "op_skeleton_hash": "b48dbaf5f59b5092",
+            "row_mass_bucket": 6,
+            "type_mix_token": "num7_str3_bool4"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "duckdb"
+              ],
+              [
+                "pandas",
+                "sqlite"
+              ]
+            ],
+            "backend_statuses": {
+              "duckdb": "ok",
+              "pandas": "ok",
+              "sqlite": "ok"
+            },
+            "column_classes": {
+              "nunique_j": "numeric"
+            },
+            "feature_tokens": [
+              "column:nunique_j:numeric",
+              "disagree_class:numeric",
+              "disagree_pair:duckdb|pandas",
+              "disagree_pair:duckdb|sqlite",
+              "group:duckdb",
+              "group:pandas+sqlite",
+              "group_count:2",
+              "mismatch:value",
+              "root:running_sum_precision",
+              "status:duckdb:ok",
+              "status:pandas:ok",
+              "status:sqlite:ok"
+            ],
+            "mismatch_class": "value",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": true,
+                "left": "duckdb",
+                "right": "pandas"
+              },
+              {
+                "disagrees": true,
+                "left": "duckdb",
+                "right": "sqlite"
+              },
+              {
+                "disagrees": false,
+                "left": "pandas",
+                "right": "sqlite"
+              }
+            ],
+            "primary_root_cause": "running_sum_precision"
+          },
+          "lhs_schema_spec": {
+            "column_count": 7,
+            "null_density": 0.0890625,
+            "row_count": 72,
+            "type_mix": [
+              "datetime",
+              "bool",
+              "bool",
+              "decimal",
+              "string",
+              "decimal",
+              "decimal"
+            ]
+          },
+          "quality_archive_context": {
+            "archive_axis_reward": 0.09300113928022152,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.181198986224719,
+              "bd_column_count": 1.1812041793352268,
+              "bd_null_density": 1.1812218778006713,
+              "bd_op_skeleton": 1.1812356671691584,
+              "bd_profile": 1.1812432329327596,
+              "bd_row_mass": 1.1812097114769442,
+              "bd_target_class": 1.1812285574489148,
+              "bd_type_mix": 1.1812156035926118
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "generic"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:b48dbaf5f59b5092"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:0"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num7_str3_bool4"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:6"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:4"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:4",
+              "null_density_axis": "null:0",
+              "op_skeleton_axis": "op:b48dbaf5f59b5092",
+              "profile_axis": "generic",
+              "row_mass_axis": "rows:6",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num7_str3_bool4"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=generic|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=join>mutate>case_when>filter>row_number_filter>running_sum>more2",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 24,
+            "target_keys": [
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "how": "left",
+              "left_on": "b1",
+              "op": "join",
+              "right_on": "b1",
+              "table": "t1"
+            },
+            {
+              "column": "m_0",
+              "expr": {
+                "kind": "string_replace",
+                "new": "-",
+                "old": "_",
+                "source": "tag"
+              },
+              "op": "mutate"
+            },
+            {
+              "as": "cw_0",
+              "condition": {
+                "cmp": "is_null",
+                "column": "m_0",
+                "value": null
+              },
+              "else": false,
+              "op": "case_when",
+              "then": true
+            },
+            {
+              "cmp": "==",
+              "column": "cw_0",
+              "op": "filter",
+              "value": false
+            },
+            {
+              "cmp": "==",
+              "op": "row_number_filter",
+              "order_by": [
+                {
+                  "ascending": true,
+                  "column": "cw_0",
+                  "nulls": "first"
+                },
+                {
+                  "ascending": true,
+                  "column": "f6",
+                  "nulls": "first"
+                }
+              ],
+              "partition_by": [
+                "m_0",
+                "cw_0"
+              ],
+              "value": 3
+            },
+            {
+              "column": "run_f6",
+              "input_dtype": "float32",
+              "op": "running_sum",
+              "order_by": [
+                {
+                  "ascending": true,
+                  "column": "cw_0",
+                  "nulls": "first"
+                },
+                {
+                  "ascending": false,
+                  "column": "z",
+                  "nulls": "last"
+                }
+              ],
+              "partition_by": [
+                "id"
+              ],
+              "source": "f6"
+            },
+            {
+              "aggs": [
+                {
+                  "as": "nunique_j",
+                  "column": "j",
+                  "func": "nunique"
+                },
+                {
+                  "as": "nunique_id",
+                  "column": "id",
+                  "func": "nunique"
+                }
+              ],
+              "keys": [
+                "b2"
+              ],
+              "op": "groupby"
+            },
+            {
+              "columns": [
+                "nunique_j"
+              ],
+              "op": "select"
+            }
+          ],
+          "program_id": "prog-00000610",
+          "seed": 610
+        },
+        "seed": 610,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "b1",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "b2",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "f3",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "s4",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "f5",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "f6",
+                "nullable": true,
+                "type": "float"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "b1": true,
+                "b2": true,
+                "f3": -0.5,
+                "f5": -0.5,
+                "f6": 0.5,
+                "id": 1,
+                "s4": "A"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 30.427,
+                "f5": 1.0,
+                "f6": -0.5,
+                "id": 0,
+                "s4": "gamma"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "f3": 1.0,
+                "f5": -0.5,
+                "f6": 1.0,
+                "id": 1,
+                "s4": "space value"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 0.0,
+                "f5": -1.0,
+                "f6": -0.5,
+                "id": 1,
+                "s4": "中文"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "f3": -1.0,
+                "f5": 1.0,
+                "f6": 0.0,
+                "id": 0,
+                "s4": "A"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": -1.0,
+                "f5": -1.0,
+                "f6": -1.0,
+                "id": 1,
+                "s4": "gamma"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 49.484,
+                "f5": 0.5,
+                "f6": 0.0,
+                "id": 1,
+                "s4": "beta"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": -0.5,
+                "f5": 1.0,
+                "f6": -1.0,
+                "id": 0,
+                "s4": "δelta"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "f3": -0.5,
+                "f5": -1.0,
+                "f6": -1.0,
+                "id": 3,
+                "s4": "alpha"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 1.0,
+                "f5": 0.0,
+                "f6": 0.0,
+                "id": 9,
+                "s4": "alpha"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": -11.715,
+                "f5": 0.0,
+                "f6": -1.0,
+                "id": 1,
+                "s4": "beta"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": -0.5,
+                "f5": -6.157,
+                "f6": 2.172,
+                "id": 1,
+                "s4": "中文"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 0.5,
+                "f5": 0.0,
+                "f6": 0.0,
+                "id": 12,
+                "s4": "gXuVm"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 0.0,
+                "f5": -0.5,
+                "f6": -0.5,
+                "id": 0,
+                "s4": "中文"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "f3": 0.5,
+                "f5": -0.5,
+                "f6": -0.5,
+                "id": 1,
+                "s4": "JuvsDRKl"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 0.0,
+                "f5": -29.572,
+                "f6": 1.0,
+                "id": 0,
+                "s4": "space value"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": 1.0,
+                "f5": 1.0,
+                "f6": 0.5,
+                "id": 0,
+                "s4": "l"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 1.0,
+                "f5": -0.5,
+                "f6": -1.0,
+                "id": 2,
+                "s4": "a"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "f3": -0.5,
+                "f5": -1.0,
+                "f6": 0.5,
+                "id": 1,
+                "s4": "JqVLLXR"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "f3": -1.0,
+                "f5": -0.5,
+                "f6": 1.0,
+                "id": 0,
+                "s4": "space value"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "f3": 0.0,
+                "f5": 1.0,
+                "f6": 0.0,
+                "id": 0,
+                "s4": "a"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": 24.722,
+                "f5": -44.708,
+                "f6": 0.5,
+                "id": 0,
+                "s4": "δelta"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": 1.0,
+                "f5": -0.5,
+                "f6": 40.652,
+                "id": 2,
+                "s4": "SJXUxIX"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "f3": 0.401,
+                "f5": -6.029,
+                "f6": 0.0,
+                "id": 3,
+                "s4": "space value"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "f3": -1.0,
+                "f5": -1.0,
+                "f6": 43.402,
+                "id": 24,
+                "s4": "gamma"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": -0.5,
+                "f5": 0.0,
+                "f6": -1.0,
+                "id": 25,
+                "s4": "MNEz"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 37.715,
+                "f5": 0.5,
+                "f6": 1.0,
+                "id": 1,
+                "s4": "A"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 0.5,
+                "f5": -0.5,
+                "f6": 0.0,
+                "id": 27,
+                "s4": "KuEpPT"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 0.5,
+                "f5": -3.831,
+                "f6": 0.0,
+                "id": 1,
+                "s4": "VfR"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "f3": 0.5,
+                "f5": 1.0,
+                "f6": -1.0,
+                "id": 29,
+                "s4": "中文"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 0.0,
+                "f5": 1.0,
+                "f6": 0.5,
+                "id": 0,
+                "s4": "a"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "f3": -0.5,
+                "f5": -0.5,
+                "f6": 1.0,
+                "id": 0,
+                "s4": "beta"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": -0.5,
+                "f5": -0.5,
+                "f6": -0.5,
+                "id": 1,
+                "s4": "inov"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "f3": null,
+                "f5": -1.0,
+                "f6": 14.034,
+                "id": 1,
+                "s4": ""
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "f3": -0.5,
+                "f5": -1.0,
+                "f6": -1.0,
+                "id": 0,
+                "s4": "M"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "f3": -0.5,
+                "f5": 1.0,
+                "f6": 0.0,
+                "id": 1,
+                "s4": "gibnOU"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 0.0,
+                "f5": 1.0,
+                "f6": 44.347,
+                "id": 0,
+                "s4": "A"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "f3": 0.5,
+                "f5": 0.5,
+                "f6": 0.0,
+                "id": 2,
+                "s4": "δelta"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "f3": 0.0,
+                "f5": -1.0,
+                "f6": 1.0,
+                "id": 1,
+                "s4": "space value"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "f3": -0.5,
+                "f5": -0.5,
+                "f6": 0.0,
+                "id": 39,
+                "s4": "I"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": 1.0,
+                "f5": 0.0,
+                "f6": -1.0,
+                "id": 0,
+                "s4": "A"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "f3": -1.0,
+                "f5": 1.0,
+                "f6": 0.0,
+                "id": 1,
+                "s4": "alpha"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "f3": -1.0,
+                "f5": -0.5,
+                "f6": 24.672,
+                "id": 1,
+                "s4": "a"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "f3": -0.5,
+                "f5": 0.5,
+                "f6": 33.651,
+                "id": 3,
+                "s4": "A"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "f3": -1.0,
+                "f5": -0.5,
+                "f6": 1.0,
+                "id": 44,
+                "s4": "δelta"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "f3": -0.5,
+                "f5": 0.0,
+                "f6": -0.69,
+                "id": 45,
+                "s4": "中文"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "f3": 0.0,
+                "f5": -1.0,
+                "f6": 0.5,
+                "id": 1,
+                "s4": "alpha"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": 29.808,
+                "f5": 1.0,
+                "f6": -1.0,
+                "id": 2,
+                "s4": "alpha"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "f3": 0.0,
+                "f5": 0.5,
+                "f6": -1.0,
+                "id": 1,
+                "s4": ""
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 23.848,
+                "f5": -0.5,
+                "f6": 0.0,
+                "id": 49,
+                "s4": "space value"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": -0.5,
+                "f5": -1.0,
+                "f6": 0.0,
+                "id": 0,
+                "s4": "gamma"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 43.156,
+                "f5": 1.0,
+                "f6": 20.142,
+                "id": 51,
+                "s4": "A"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "f3": -0.5,
+                "f5": -1.0,
+                "f6": null,
+                "id": 52,
+                "s4": "beta"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": -1.0,
+                "f5": -0.5,
+                "f6": 9.224,
+                "id": 3,
+                "s4": "FWlGvYsE"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 0.0,
+                "f5": -1.0,
+                "f6": 1.0,
+                "id": 54,
+                "s4": "alpha"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": -38.211,
+                "f5": 0.5,
+                "f6": -0.5,
+                "id": 55,
+                "s4": "alpha"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": 0.0,
+                "f5": 0.5,
+                "f6": 0.5,
+                "id": 56,
+                "s4": "a"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": -0.5,
+                "f5": 0.5,
+                "f6": 0.5,
+                "id": 1,
+                "s4": "BmwjQ"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": -1.0,
+                "f5": 0.5,
+                "f6": -1.0,
+                "id": 58,
+                "s4": "alpha"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": 0.5,
+                "f5": -1.0,
+                "f6": 1.0,
+                "id": 4,
+                "s4": "ht"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 20.775,
+                "f5": -0.5,
+                "f6": 0.5,
+                "id": 0,
+                "s4": "C"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": -1.0,
+                "f5": 0.5,
+                "f6": 1.0,
+                "id": 1,
+                "s4": "gamma"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "f3": -34.342,
+                "f5": -1.0,
+                "f6": 0.0,
+                "id": 2,
+                "s4": ""
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": -0.5,
+                "f5": 1.0,
+                "f6": -1.0,
+                "id": 63,
+                "s4": "space value"
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "f3": 0.0,
+                "f5": 0.5,
+                "f6": -1.0,
+                "id": 4,
+                "s4": "A"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 1.0,
+                "f5": 36.605,
+                "f6": 1.0,
+                "id": 0,
+                "s4": "O"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": -1.0,
+                "f5": 1.0,
+                "f6": 0.5,
+                "id": 1,
+                "s4": "gamma"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": 0.0,
+                "f5": 1.0,
+                "f6": -6.494,
+                "id": 0,
+                "s4": "jImQG"
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "f3": 1.0,
+                "f5": 0.5,
+                "f6": 0.0,
+                "id": 0,
+                "s4": ""
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": 0.0,
+                "f5": -1.0,
+                "f6": 0.0,
+                "id": 1,
+                "s4": "jZrPjC"
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "f3": -0.5,
+                "f5": 0.5,
+                "f6": -1.0,
+                "id": 0,
+                "s4": "中文"
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "f3": -1.0,
+                "f5": 0.5,
+                "f6": -1.0,
+                "id": 71,
+                "s4": "beta"
+              }
+            ]
+          },
+          {
+            "columns": [
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "j",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "z",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "tag",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "b1",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "b2",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "s4",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t1",
+            "rows": [
+              {
+                "b1": false,
+                "b2": true,
+                "id": 0,
+                "j": 71,
+                "s4": "gamma",
+                "tag": "中文",
+                "z": -0.5
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "id": 1,
+                "j": 2,
+                "s4": "space value",
+                "tag": "space value",
+                "z": 0.5
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "id": 0,
+                "j": 2,
+                "s4": "δelta",
+                "tag": "space value",
+                "z": 0.5
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "id": 3,
+                "j": null,
+                "s4": "FWlGvYsE",
+                "tag": "",
+                "z": 0.5
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "id": 2,
+                "j": null,
+                "s4": "",
+                "tag": null,
+                "z": 0.5
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "id": 1,
+                "j": 1,
+                "s4": "beta",
+                "tag": "a",
+                "z": 0.0
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "id": 1,
+                "j": null,
+                "s4": "中文",
+                "tag": "beta",
+                "z": null
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "id": 1,
+                "j": -1,
+                "s4": "JuvsDRKl",
+                "tag": "alpha",
+                "z": -0.5
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "id": 0,
+                "j": null,
+                "s4": "δelta",
+                "tag": "beta",
+                "z": -33.165
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "id": 2,
+                "j": -8,
+                "s4": "",
+                "tag": "中文",
+                "z": -1.0
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "id": 1,
+                "j": -1,
+                "s4": "VfR",
+                "tag": "btG",
+                "z": 0.0
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "id": 1,
+                "j": 2,
+                "s4": "inov",
+                "tag": "APIxCL",
+                "z": 1.0
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "id": 0,
+                "j": null,
+                "s4": "A",
+                "tag": "A",
+                "z": 1.0
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "id": 4,
+                "j": 4,
+                "s4": "ht",
+                "tag": "tag_4",
+                "z": 4.0
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "id": 9,
+                "j": 9,
+                "s4": "alpha",
+                "tag": "tag_9",
+                "z": 9.0
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "id": 12,
+                "j": 12,
+                "s4": "gXuVm",
+                "tag": "tag_12",
+                "z": 12.0
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "id": 24,
+                "j": 24,
+                "s4": "gamma",
+                "tag": "tag_24",
+                "z": 24.0
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "id": 25,
+                "j": 25,
+                "s4": "MNEz",
+                "tag": "tag_25",
+                "z": 25.0
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "id": 27,
+                "j": 27,
+                "s4": "KuEpPT",
+                "tag": "tag_27",
+                "z": 27.0
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "id": 29,
+                "j": 29,
+                "s4": "中文",
+                "tag": "tag_29",
+                "z": 29.0
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "id": 39,
+                "j": 39,
+                "s4": "I",
+                "tag": "tag_39",
+                "z": 39.0
+              },
+              {
+                "b1": true,
+                "b2": true,
+                "id": 44,
+                "j": 44,
+                "s4": "δelta",
+                "tag": "tag_44",
+                "z": 44.0
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "id": 45,
+                "j": 45,
+                "s4": "中文",
+                "tag": "tag_45",
+                "z": 45.0
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "id": 49,
+                "j": 49,
+                "s4": "space value",
+                "tag": "tag_49",
+                "z": 49.0
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "id": 51,
+                "j": 51,
+                "s4": "A",
+                "tag": "tag_51",
+                "z": 51.0
+              },
+              {
+                "b1": true,
+                "b2": false,
+                "id": 52,
+                "j": 52,
+                "s4": "beta",
+                "tag": "tag_52",
+                "z": 52.0
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "id": 54,
+                "j": 54,
+                "s4": "alpha",
+                "tag": "tag_54",
+                "z": 54.0
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "id": 55,
+                "j": 55,
+                "s4": "alpha",
+                "tag": "tag_55",
+                "z": 55.0
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "id": 56,
+                "j": 56,
+                "s4": "a",
+                "tag": "tag_56",
+                "z": 56.0
+              },
+              {
+                "b1": false,
+                "b2": false,
+                "id": 58,
+                "j": 58,
+                "s4": "alpha",
+                "tag": "tag_58",
+                "z": 58.0
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "id": 63,
+                "j": 63,
+                "s4": "space value",
+                "tag": "tag_63",
+                "z": 63.0
+              },
+              {
+                "b1": false,
+                "b2": true,
+                "id": 71,
+                "j": 71,
+                "s4": "beta",
+                "tag": "tag_71",
+                "z": 71.0
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [
+          {
+            "candidate_pool_bonus": 0.0,
+            "contribution_bonus": 0.15,
+            "feature_prefixes": [
+              "join:",
+              "group_key_type:",
+              "sort:"
+            ],
+            "keep_in_pool": false,
+            "novelty_bonus": 0.1,
+            "score_bonus": 0.3,
+            "targets": [
+              "row_value_absence_filter",
+              "groupby_sorted_input"
+            ]
+          }
+        ],
+        "effective_guidance_targets": [
+          "common_workflow",
+          "operation_combo",
+          "join",
+          "filter",
+          "truth_filter",
+          "mutate",
+          "groupby",
+          "groupby_sorted_input",
+          "strings",
+          "numeric",
+          "casts",
+          "nulls",
+          "aggregation",
+          "global_aggregation",
+          "sort_limit",
+          "topk",
+          "set_membership_filter",
+          "sql_distinct_null_topk",
+          "coalesced_distinct_topk",
+          "left_join_coalesce_membership",
+          "join_coalesce_membership",
+          "case_when_membership",
+          "union_coalesce_distinct_topk",
+          "left_join_case_membership",
+          "left_join_null_predicate_aggregation",
+          "coalesce_case_distinct_aggregation",
+          "numeric_text_cast_membership",
+          "multi_key_membership_aggregation",
+          "semi_anti_join_rewrite",
+          "boolean_membership_case_aggregation",
+          "left_join_boolean_case_aggregation",
+          "boolean_coalesce_case_aggregation",
+          "left_join_boolean_coalesce_aggregation",
+          "boolean_coalesce_filter_aggregation",
+          "left_join_boolean_coalesce_filter_aggregation",
+          "embedded_sql_rewrite",
+          "duckdb_sql_rewrite",
+          "sqlite_sql_rewrite",
+          "null_predicate_filter",
+          "boolean_predicate_filter",
+          "post_topk_range_filter",
+          "tuple_absence_filter",
+          "row_value_absence_filter",
+          "running_sum_precision",
+          "running_sum",
+          "partitioned_running_sum",
+          "running_sum_partitioned",
+          "path_basename_keyed_pick",
+          "path_projection",
+          "keyed_row_pick",
+          "sortedness_null_placement",
+          "sortedness",
+          "simple_case_random_subject",
+          "random_case_probe",
+          "scalar_subquery_double_parentheses",
+          "scalar_subquery_probe",
+          "window_avg_rows_frame",
+          "window_avg_probe",
+          "struct_distinct_unnest",
+          "struct_distinct_probe",
+          "bit_compare_unequal_length",
+          "bit_compare_probe",
+          "round_even_float_scale",
+          "round_even_probe",
+          "duckdb_float_literal_precision",
+          "float_literal_precision_probe",
+          "expressions",
+          "semantic_family:join_membership",
+          "semantic_family:stateful_ordering",
+          "semantic_signal:row_value_absence_filter",
+          "semantic_signal:groupby_sorted_input"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": true,
+        "generator_profile": "discovery_fresh",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "common_workflow",
+          "operation_combo",
+          "join",
+          "filter",
+          "truth_filter",
+          "mutate",
+          "groupby",
+          "groupby_sorted_input",
+          "strings",
+          "numeric",
+          "casts",
+          "nulls",
+          "aggregation",
+          "global_aggregation",
+          "sort_limit",
+          "topk",
+          "set_membership_filter",
+          "sql_distinct_null_topk",
+          "coalesced_distinct_topk",
+          "left_join_coalesce_membership",
+          "join_coalesce_membership",
+          "case_when_membership",
+          "union_coalesce_distinct_topk",
+          "left_join_case_membership",
+          "left_join_null_predicate_aggregation",
+          "coalesce_case_distinct_aggregation",
+          "numeric_text_cast_membership",
+          "multi_key_membership_aggregation",
+          "semi_anti_join_rewrite",
+          "boolean_membership_case_aggregation",
+          "left_join_boolean_case_aggregation",
+          "boolean_coalesce_case_aggregation",
+          "left_join_boolean_coalesce_aggregation",
+          "boolean_coalesce_filter_aggregation",
+          "left_join_boolean_coalesce_filter_aggregation",
+          "embedded_sql_rewrite",
+          "duckdb_sql_rewrite",
+          "sqlite_sql_rewrite",
+          "null_predicate_filter",
+          "boolean_predicate_filter",
+          "post_topk_range_filter",
+          "tuple_absence_filter",
+          "row_value_absence_filter",
+          "running_sum_precision",
+          "running_sum",
+          "partitioned_running_sum",
+          "running_sum_partitioned",
+          "path_basename_keyed_pick",
+          "path_projection",
+          "keyed_row_pick",
+          "sortedness_null_placement",
+          "sortedness",
+          "simple_case_random_subject",
+          "random_case_probe",
+          "scalar_subquery_double_parentheses",
+          "scalar_subquery_probe",
+          "window_avg_rows_frame",
+          "window_avg_probe",
+          "struct_distinct_unnest",
+          "struct_distinct_probe",
+          "bit_compare_unequal_length",
+          "bit_compare_probe",
+          "round_even_float_scale",
+          "round_even_probe",
+          "duckdb_float_literal_precision",
+          "float_literal_precision_probe",
+          "expressions"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.45,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [
+          "join_membership",
+          "stateful_ordering"
+        ],
+        "semantic_focus_signals": [
+          "row_value_absence_filter",
+          "groupby_sorted_input"
+        ],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "/root/datadiff_fuzz_lab/new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-priority-20260606T171008Z-20260606T173223/strategy-learning/candidate-pipeline-learning.json",
+        "strategy_snapshot_path": "/root/datadiff_fuzz_lab/new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-priority-20260606T171008Z-20260606T173223/strategy-snapshot.json",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "families": [
+        "running_sum_precision@duckdb"
+      ],
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Backends returned different canonical tables; mismatch_class=value; shapes={'pandas': (2, 1), 'duckdb': (2, 1), 'sqlite': (2, 1)}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-907b8db166e0872f",
+          "kind": "semantic_output_mismatch",
+          "mismatch_class": "value",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "running_sum_precision",
+          "severity": "critical",
+          "signature": "907b8db166e0872f",
+          "source_issue": "",
+          "suspicious_backends": [
+            "duckdb"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas', 'sqlite'] and disagrees with ['duckdb'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "duckdb": {
+          "backend": "duckdb",
+          "columns": [
+            "nunique_j"
+          ],
+          "comparison_key": "{\"columns\":[\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[9]\\\",\\\"[14]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[9]\",\"[14]\"]",
+          "row_count": 2,
+          "rows": [
+            [
+              9
+            ],
+            [
+              14
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[14]\",\"[9]\"]"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "nunique_j"
+          ],
+          "comparison_key": "{\"columns\":[\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[16]\\\",\\\"[7]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[16]\",\"[7]\"]",
+          "row_count": 2,
+          "rows": [
+            [
+              16
+            ],
+            [
+              7
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[16]\",\"[7]\"]"
+        },
+        "sqlite": {
+          "backend": "sqlite",
+          "columns": [
+            "nunique_j"
+          ],
+          "comparison_key": "{\"columns\":[\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[16]\\\",\\\"[7]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[16]\",\"[7]\"]",
+          "row_count": 2,
+          "rows": [
+            [
+              16
+            ],
+            [
+              7
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[16]\",\"[7]\"]"
+        }
+      },
+      "raw_results": {
+        "duckdb": {
+          "backend": "duckdb",
+          "duration_ms": 70.07253199844854,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 60.406645003240556,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "sqlite": {
+          "backend": "sqlite",
+          "duration_ms": 18.52158200199483,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        }
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed501-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T172152-1780766512875628479.jsonl.gz"
+    }
+  ],
+  "evidence_files": [
+    "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed501-fresh-candidates.json"
+  ],
+  "generated_at": "2026-06-06T17:38:23Z",
+  "generated_by": "datadiff candidate-pipeline",
+  "manifest_file": "new_issue/generated/discovery-campaign-priority-20260606T171008Z.json",
+  "schema_version": "candidate-freeze-v1",
+  "strategy_snapshot_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-priority-20260606T171008Z-20260606T173223/strategy-snapshot.json"
+}

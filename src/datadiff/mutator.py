@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 from contextlib import contextmanager
 from contextvars import ContextVar
+from functools import lru_cache
 import math
 import random
 from itertools import combinations
@@ -53,6 +54,8 @@ BOOLEAN_PROBE_OUTPUT_PREFIXES = (
     "struct_distinct_mismatch",
     "bit_compare_mismatch",
     "round_even_mismatch",
+    "float_literal_precision_mismatch",
+    "timestamp_precision_filter_mismatch",
     "series_rtruediv_mismatch",
     "uint64_isin_mismatch",
     "tuple_anti_null_mismatch",
@@ -63,16 +66,20 @@ BOOLEAN_PROBE_OUTPUT_PREFIXES = (
     "index_bool_mismatch",
     "empty_literal_groupby_mismatch",
     "arrow_string_eq_sum_mismatch",
+    "arrow_string_contains_na_mismatch",
     "arrow_timestamp_loc_slice_mismatch",
     "arrow_timestamp_index_attr_mismatch",
     "eval_inplace_alias_mismatch",
     "bool_reduction_skipna_mismatch",
+    "arrow_bool_groupby_reduction_mismatch",
+    "polars_timezone_filter_mismatch",
     "dataset_isin_all_match_mismatch",
     "run_end_null_compute_mismatch",
     "large_string_partition_mismatch",
     "hash_pivot_wider_mismatch",
     "list_flatten_parent_indices_mismatch",
     "rolling_mean_by_null_count_mismatch",
+    "csv_long_numeric_roundtrip_mismatch",
 )
 BOOLEAN_PROBE_OUTPUT_PREFIX_SET = frozenset(BOOLEAN_PROBE_OUTPUT_PREFIXES)
 BOOLEAN_PROBE_OUTPUT_UNDERSCORE_PREFIXES = tuple(f"{prefix}_" for prefix in BOOLEAN_PROBE_OUTPUT_PREFIXES)
@@ -170,6 +177,7 @@ class _MutationStateCache:
     context_by_key: dict[tuple[Any, ...], "MutationOperationContext | None"] = field(default_factory=dict)
     table_key_by_identity: dict[int, tuple[Any, ...]] = field(default_factory=dict)
     operation_key_by_identity: dict[int, tuple[Any, Any]] = field(default_factory=dict)
+    column_types_by_table_key: dict[tuple[Any, ...], dict[str, str]] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -212,6 +220,7 @@ class MutationPlanStep:
     replay_seed: int
     repair_changed: bool = False
     fallback_used: bool = False
+    value_catalog_entries: list[dict[str, Any]] = field(default_factory=list, repr=False)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -241,6 +250,9 @@ class MutationPlan:
     top_operators: list[dict[str, Any]] = field(default_factory=list)
     annealing_temperature: float = 0.0
     changed: bool = False
+    final_tables: list[TableData] | None = field(default=None, repr=False)
+    final_operations: list[dict[str, Any]] | None = field(default=None, repr=False)
+    value_catalog_entries: list[dict[str, Any]] = field(default_factory=list, repr=False)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -427,6 +439,7 @@ def mutate_case_with_metadata(
         enable_ir_rewrite_mutations=enable_ir_rewrite_mutations,
         enable_shrink_mutations=enable_shrink_mutations,
     )
+    disagreement_descriptor = _coerce_disagreement_descriptor(disagreement)
     plan = _build_mutation_plan(
         case,
         seed,
@@ -434,7 +447,7 @@ def mutate_case_with_metadata(
         operator_scores=operator_scores,
         target_keys=target_keys,
         plan_depth=plan_depth,
-        disagreement=disagreement,
+        disagreement=disagreement_descriptor,
         operator_pulls=operator_pulls,
         recent_operator_pulls=recent_operator_pulls,
         enable_divergence_conditioned_mutations=enable_divergence_conditioned_mutations,
@@ -444,17 +457,9 @@ def mutate_case_with_metadata(
     )
     if not plan.steps:
         raise RuntimeError("mutation operator pool is empty")
-    disagreement_descriptor = _coerce_disagreement_descriptor(disagreement)
-    value_catalog_context = (
-        _ValueCatalogMutationContext(
-            descriptor=disagreement_descriptor,
-            entry_scores=value_catalog_scores,
-            collect_usage=True,
-        )
-        if enable_value_catalog
-        else None
-    )
-    with _activate_value_catalog_context(value_catalog_context):
+    if plan.final_tables is not None and plan.final_operations is not None:
+        tables, operations = plan.final_tables, plan.final_operations
+    else:
         tables, operations = _apply_mutation_plan(case, seed, operator_pool=operator_pool, plan=plan)
     primary_step = plan.steps[0]
     choice = primary_step.operator
@@ -484,9 +489,7 @@ def mutate_case_with_metadata(
                 "plan_depth": plan.planned_depth,
                 "executed_steps": plan.executed_depth,
                 "multi_step": plan.executed_depth > 1,
-                "value_catalog_entries": list(value_catalog_context.used_entries)
-                if value_catalog_context is not None
-                else [],
+                "value_catalog_entries": list(plan.value_catalog_entries),
             },
             "mutation_selection": _mutation_selection_metadata(
                 choice,
@@ -553,6 +556,18 @@ def _build_mutation_plan(
     operator_score_map = dict(operator_scores or {})
     target_context = _mutation_target_context(target_keys)
     disagreement_descriptor = _coerce_disagreement_descriptor(disagreement)
+    target_affinities = {
+        operator.name: _mutation_target_affinity(operator, target_context)
+        for operator in operator_pool
+    }
+    divergence_affinities = (
+        {
+            operator.name: _mutation_divergence_affinity(operator, disagreement_descriptor)
+            for operator in operator_pool
+        }
+        if enable_divergence_conditioned_mutations
+        else {}
+    )
     original_tables = case.tables
     original_ops = case.program.operations
     current_tables = _clone_tables(case.tables)
@@ -575,8 +590,12 @@ def _build_mutation_plan(
                 attempt_order,
                 operator_score_map,
             )
-        candidates: list[tuple[list[TableData], list[dict[str, Any]], MutationPlanStep]] = []
+        selected_tables: list[TableData] | None = None
+        selected_operations: list[dict[str, Any]] | None = None
+        selected_step: MutationPlanStep | None = None
+        selected_key: tuple[Any, ...] | None = None
         candidate_rank = 1
+        candidate_count = 0
         candidate_budget = _mutation_plan_candidate_budget(
             operator_pulls=operator_pulls,
             recent_operator_pulls=recent_operator_pulls,
@@ -591,7 +610,7 @@ def _build_mutation_plan(
                 enable_per_operator_energy=enable_per_operator_energy,
             )
             for _ in range(width):
-                if len(candidates) >= candidate_budget:
+                if candidate_count >= candidate_budget:
                     break
                 trial_tables, trial_operations, step = _simulate_mutation_step(
                     current_tables,
@@ -606,27 +625,25 @@ def _build_mutation_plan(
                     target_context=target_context,
                     disagreement=disagreement_descriptor,
                     enable_divergence_conditioned_mutations=enable_divergence_conditioned_mutations,
+                    target_affinity=target_affinities.get(operator.name, 0.0),
+                    divergence_affinity=divergence_affinities.get(operator.name, 0.0),
                     enable_value_catalog=enable_value_catalog,
                     value_catalog_scores=value_catalog_scores,
                     prior_steps=executed_steps,
                     state_cache=state_cache,
                 )
-                candidates.append((trial_tables, trial_operations, step))
+                candidate_key = _mutation_candidate_selection_key(step, trial_operations)
+                if selected_key is None or candidate_key > selected_key:
+                    selected_tables = trial_tables
+                    selected_operations = trial_operations
+                    selected_step = step
+                    selected_key = candidate_key
                 candidate_rank += 1
-            if len(candidates) >= candidate_budget:
+                candidate_count += 1
+            if candidate_count >= candidate_budget:
                 break
-        if not candidates:
+        if selected_step is None or selected_tables is None or selected_operations is None:
             break
-        selected_tables, selected_operations, selected_step = max(
-            candidates,
-            key=lambda item: (
-                item[2].productive,
-                item[2].changed,
-                item[2].heuristic_score,
-                -len(item[1]),
-                item[2].operator,
-            ),
-        )
         if not selected_step.changed:
             if not executed_steps:
                 executed_steps.append(selected_step)
@@ -650,6 +667,9 @@ def _build_mutation_plan(
         top_operators=top_operators[:8],
         annealing_temperature=annealing_temperature,
         changed=changed,
+        final_tables=current_tables,
+        final_operations=current_operations,
+        value_catalog_entries=_mutation_plan_value_catalog_entries(executed_steps),
     )
 
 
@@ -703,13 +723,15 @@ def _simulate_mutation_step(
     candidate_rank: int,
     candidate_width: int,
     operator_scores: Mapping[str, float] | None,
-    target_context: dict[str, set[str]],
+    target_context: Mapping[str, frozenset[str]] | None,
     disagreement: DisagreementDescriptor | None,
     enable_divergence_conditioned_mutations: bool,
     enable_value_catalog: bool,
     value_catalog_scores: Mapping[str, float] | None,
     prior_steps: Sequence[MutationPlanStep],
     state_cache: _MutationStateCache | None = None,
+    target_affinity: float | None = None,
+    divergence_affinity: float | None = None,
 ) -> tuple[list[TableData], list[dict[str, Any]], MutationPlanStep]:
     preserves_tables = _operator_preserves_tables(operator)
     preserves_operations = _operator_preserves_operations(operator)
@@ -738,7 +760,7 @@ def _simulate_mutation_step(
         _ValueCatalogMutationContext(
             descriptor=disagreement,
             entry_scores=value_catalog_scores,
-            collect_usage=False,
+            collect_usage=True,
         )
         if enable_value_catalog
         else None
@@ -766,9 +788,15 @@ def _simulate_mutation_step(
         changed = trial_tables != current_tables or trial_operations != current_operations
     productive = changed and not detail_unproductive
     operator_score = _mutation_operator_score(operator.name, operator_scores)
-    target_affinity = _mutation_target_affinity(operator, target_context)
-    divergence_affinity = (
-        _mutation_divergence_affinity(operator, disagreement)
+    resolved_target_affinity = (
+        float(target_affinity)
+        if target_affinity is not None
+        else _mutation_target_affinity(operator, target_context or {})
+    )
+    resolved_divergence_affinity = (
+        float(divergence_affinity)
+        if divergence_affinity is not None
+        else _mutation_divergence_affinity(operator, disagreement)
         if enable_divergence_conditioned_mutations
         else 0.0
     )
@@ -779,12 +807,13 @@ def _simulate_mutation_step(
         changed=changed,
         productive=productive,
         operator_score=operator_score,
-        target_affinity=target_affinity,
-        divergence_affinity=divergence_affinity,
+        target_affinity=resolved_target_affinity,
+        divergence_affinity=resolved_divergence_affinity,
         novelty_bonus=novelty_bonus,
         resulting_operation_count=len(trial_operations),
         prior_steps=prior_steps,
     )
+    value_catalog_entries = list(value_context.used_entries) if value_context is not None else []
     return trial_tables, trial_operations, MutationPlanStep(
         operator=operator.name,
         detail=detail,
@@ -792,13 +821,38 @@ def _simulate_mutation_step(
         productive=productive,
         heuristic_score=heuristic_score,
         operator_score=operator_score,
-        target_affinity=target_affinity,
-        divergence_affinity=divergence_affinity,
-        novelty_bonus=novelty_bonus + divergence_affinity,
+        target_affinity=resolved_target_affinity,
+        divergence_affinity=resolved_divergence_affinity,
+        novelty_bonus=novelty_bonus + resolved_divergence_affinity,
         candidate_width=max(1, int(candidate_width)),
         resulting_operation_count=len(trial_operations),
         replay_seed=replay_seed,
+        value_catalog_entries=value_catalog_entries,
     )
+
+
+def _mutation_candidate_selection_key(
+    step: MutationPlanStep,
+    operations: Sequence[Any],
+) -> tuple[Any, ...]:
+    return (
+        step.productive,
+        step.changed,
+        step.heuristic_score,
+        -len(operations),
+        step.operator,
+    )
+
+
+def _mutation_plan_value_catalog_entries(
+    steps: Sequence[MutationPlanStep],
+) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for step in steps:
+        for entry in step.value_catalog_entries:
+            if entry not in entries:
+                entries.append(dict(entry))
+    return entries
 
 
 def _operator_preserves_tables(operator: MutationOperator) -> bool:
@@ -852,13 +906,18 @@ def _resolve_mutation_plan_depth(
     return max(1, min(MUTATION_PLAN_MAX_STEPS, depth))
 
 
-def _mutation_target_context(target_keys: Sequence[str] | None) -> dict[str, set[str]]:
-    context = {
+def _mutation_target_context(target_keys: Sequence[str] | None) -> dict[str, frozenset[str]]:
+    return dict(_mutation_target_context_cached(tuple(str(target) for target in (target_keys or ()))))
+
+
+@lru_cache(maxsize=2048)
+def _mutation_target_context_cached(target_keys: tuple[str, ...]) -> dict[str, frozenset[str]]:
+    context: dict[str, set[str]] = {
         "semantic_family": set(),
         "semantic_signal": set(),
         "exploration_objective": set(),
     }
-    for target in target_keys or ():
+    for target in target_keys:
         text = str(target).strip()
         if not text:
             continue
@@ -868,27 +927,32 @@ def _mutation_target_context(target_keys: Sequence[str] | None) -> dict[str, set
             context["semantic_signal"].add(text.removeprefix("semantic_signal:").strip())
         elif text.startswith("exploration_objective:"):
             context["exploration_objective"].add(text.removeprefix("exploration_objective:").strip())
-    return context
+    return {key: frozenset(values) for key, values in context.items()}
 
 
 def _mutation_target_affinity(
     operator: MutationOperator,
-    target_context: Mapping[str, set[str]],
+    target_context: Mapping[str, frozenset[str]],
 ) -> float:
     bonus = 0.0
     family_targets = target_context.get("semantic_family", set())
     signal_targets = target_context.get("semantic_signal", set())
     objective_targets = target_context.get("exploration_objective", set())
     if family_targets:
-        family_hits = family_targets & set(operator.semantic_family_affinity)
+        family_hits = family_targets & _operator_affinity_set(operator.semantic_family_affinity)
         bonus += 0.18 * len(family_hits)
     if signal_targets:
-        signal_hits = signal_targets & set(operator.semantic_signal_affinity)
+        signal_hits = signal_targets & _operator_affinity_set(operator.semantic_signal_affinity)
         bonus += 0.22 * len(signal_hits)
     if objective_targets:
-        objective_hits = objective_targets & set(operator.exploration_objective_affinity)
+        objective_hits = objective_targets & _operator_affinity_set(operator.exploration_objective_affinity)
         bonus += 0.16 * len(objective_hits)
     return min(0.75, bonus)
+
+
+@lru_cache(maxsize=512)
+def _operator_affinity_set(values: tuple[str, ...]) -> frozenset[str]:
+    return frozenset(values)
 
 
 def _coerce_disagreement_descriptor(
@@ -984,8 +1048,13 @@ def _mutation_step_seed(seed: int, case_seed: int, step_index: int) -> int:
 
 
 def _mutation_candidate_seed(seed: int, case_seed: int, step_index: int, candidate_rank: int, operator_name: str) -> int:
-    operator_hash = sum((index + 1) * ord(char) for index, char in enumerate(operator_name))
+    operator_hash = _mutation_operator_name_hash(str(operator_name))
     return _mutation_step_seed(seed, case_seed, step_index) + (candidate_rank * 811) + operator_hash
+
+
+@lru_cache(maxsize=512)
+def _mutation_operator_name_hash(operator_name: str) -> int:
+    return sum((index + 1) * ord(char) for index, char in enumerate(operator_name))
 
 
 def _mutation_operator_score(operator_name: str, operator_scores: Mapping[str, float] | None) -> float:
@@ -1738,6 +1807,37 @@ def _append_round_even_probe(tables: list[TableData], operations: list[dict[str,
     return f"append_round_even_probe:out={alias}"
 
 
+def _append_float_literal_precision_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
+    if not tables:
+        return "append_float_literal_precision_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("float_literal_precision_mismatch", used=set(available))
+    literal = rnd.choice(
+        [
+            "0.10000000000000001",
+            "0.29999999999999999",
+            "1.2345678901234567",
+            "9007199254740993.0",
+        ]
+    )
+    operations.append({"op": "float_literal_precision_probe", "as": alias, "literal": literal})
+    return f"append_float_literal_precision_probe:{literal}:out={alias}"
+
+
+def _append_timestamp_precision_filter_probe(
+    tables: list[TableData],
+    operations: list[dict[str, Any]],
+    rnd: random.Random,
+) -> str:
+    del rnd
+    if not tables:
+        return "append_timestamp_precision_filter_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("timestamp_precision_filter_mismatch", used=set(available))
+    operations.append({"op": "timestamp_precision_filter_probe", "as": alias})
+    return f"append_timestamp_precision_filter_probe:out={alias}"
+
+
 def _append_series_rtruediv_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
     if not tables:
         return "append_series_rtruediv_probe:none"
@@ -1834,6 +1934,18 @@ def _append_arrow_string_eq_sum_probe(
     return f"append_arrow_string_eq_sum_probe:out={alias}"
 
 
+def _append_arrow_string_contains_na_probe(
+    tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random
+) -> str:
+    del rnd
+    if not tables:
+        return "append_arrow_string_contains_na_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("arrow_string_contains_na_mismatch", used=set(available))
+    operations.append({"op": "arrow_string_contains_na_probe", "as": alias})
+    return f"append_arrow_string_contains_na_probe:out={alias}"
+
+
 def _append_arrow_timestamp_loc_slice_probe(
     tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random
 ) -> str:
@@ -1876,6 +1988,34 @@ def _append_bool_reduction_skipna_probe(
     alias = make_safe_output_name("bool_reduction_skipna_mismatch", used=set(available))
     operations.append({"op": "bool_reduction_skipna_probe", "as": alias})
     return f"append_bool_reduction_skipna_probe:out={alias}"
+
+
+def _append_polars_timezone_filter_probe(
+    tables: list[TableData],
+    operations: list[dict[str, Any]],
+    rnd: random.Random,
+) -> str:
+    del rnd
+    if not tables:
+        return "append_polars_timezone_filter_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("polars_timezone_filter_mismatch", used=set(available))
+    operations.append({"op": "polars_timezone_filter_probe", "as": alias})
+    return f"append_polars_timezone_filter_probe:out={alias}"
+
+
+def _append_arrow_bool_groupby_reduction_probe(
+    tables: list[TableData],
+    operations: list[dict[str, Any]],
+    rnd: random.Random,
+) -> str:
+    del rnd
+    if not tables:
+        return "append_arrow_bool_groupby_reduction_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("arrow_bool_groupby_reduction_mismatch", used=set(available))
+    operations.append({"op": "arrow_bool_groupby_reduction_probe", "as": alias})
+    return f"append_arrow_bool_groupby_reduction_probe:out={alias}"
 
 
 def _append_dataset_isin_all_match_probe(
@@ -1944,6 +2084,33 @@ def _append_rolling_mean_by_null_count_probe(
     return f"append_rolling_mean_by_null_count_probe:out={alias}"
 
 
+def _append_csv_long_numeric_roundtrip_probe(
+    tables: list[TableData],
+    operations: list[dict[str, Any]],
+    rnd: random.Random,
+) -> str:
+    if not tables:
+        return "append_csv_long_numeric_roundtrip_probe:none"
+    available = _available_columns(tables, operations)
+    alias = make_safe_output_name("csv_long_numeric_roundtrip_mismatch", used=set(available))
+    values = _csv_long_numeric_probe_values(rnd)
+    operations.append({"op": "csv_long_numeric_roundtrip_probe", "as": alias, "values": values})
+    return f"append_csv_long_numeric_roundtrip_probe:{len(values)}:out={alias}"
+
+
+def _csv_long_numeric_probe_values(rnd: random.Random) -> list[str]:
+    base_values = [
+        "12345678901234567890",
+        "9007199254740993",
+        "18446744073709551615",
+        "100000000000000000001",
+        "31415926535897932384",
+        "27182818284590452353",
+    ]
+    width = rnd.randint(3, min(6, len(base_values)))
+    return sorted(rnd.sample(base_values, width))
+
+
 def _append_grouped_topk_probe(tables: list[TableData], operations: list[dict[str, Any]], rnd: random.Random) -> str:
     if not tables:
         return "append_grouped_topk:none"
@@ -2009,13 +2176,7 @@ def _append_groupby_fractional_membership_filter(
     if not candidates:
         return "append_groupby_fractional_membership_filter:no-int-aggregate"
     alias, source = rnd.choice(candidates)
-    source_values = [
-        int(row[source])
-        for table in tables
-        for row in table.rows
-        if source in row and isinstance(row.get(source), int) and not isinstance(row.get(source), bool)
-    ]
-    non_negative_values = [value for value in unique_preserve_order(source_values) if value >= 0]
+    non_negative_values = _unique_non_negative_integer_values(tables, source)
     if not non_negative_values:
         return "append_groupby_fractional_membership_filter:no-nonnegative-value"
     target = rnd.choice(non_negative_values)
@@ -2028,6 +2189,24 @@ def _append_groupby_fractional_membership_filter(
         }
     )
     return f"append_groupby_fractional_membership_filter:{alias}:{target}"
+
+
+def _unique_non_negative_integer_values(tables: list[TableData], source: str) -> list[int]:
+    values: list[int] = []
+    seen: set[int] = set()
+    for table in tables:
+        for row in table.rows:
+            value = row.get(source)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+                or value in seen
+            ):
+                continue
+            seen.add(value)
+            values.append(value)
+    return values
 
 
 def _append_normalized_string_membership(
@@ -3887,11 +4066,30 @@ def _available_columns(tables: list[TableData], operations: list[dict[str, Any]]
 
 
 def _column_type(tables: list[TableData], name: str) -> str:
+    cache = _ACTIVE_MUTATION_STATE_CACHE.get()
+    if cache is not None:
+        for table in tables:
+            table_key = _mutation_table_cache_key_cached(table, cache=cache)
+            column_types = cache.column_types_by_table_key.get(table_key)
+            if column_types is None:
+                column_types = _table_column_type_map(table)
+                cache.column_types_by_table_key[table_key] = column_types
+            column_type = column_types.get(name)
+            if column_type is not None:
+                return column_type
+        return _fallback_column_type(name)
     for table in tables:
         for column in table.columns:
             if column.name == name:
                 return column.type
     return _fallback_column_type(name)
+
+
+def _table_column_type_map(table: TableData) -> dict[str, str]:
+    column_types: dict[str, str] = {}
+    for column in table.columns:
+        column_types.setdefault(column.name, column.type)
+    return column_types
 
 
 def _column_has_null(tables: list[TableData], name: str) -> bool:
@@ -4000,6 +4198,20 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
         divergence_affinity=("disagree_class:numeric", "mismatch:value"),
     ),
     MutationOperator(
+        "append_float_literal_precision_probe",
+        _append_float_literal_precision_probe,
+        semantic_family_affinity=("type_coercion", "backend_specific_semantics"),
+        semantic_signal_affinity=("duckdb_float_literal_precision", "float_literal_precision"),
+        divergence_affinity=("disagree_class:numeric", "mismatch:value"),
+    ),
+    MutationOperator(
+        "append_timestamp_precision_filter_probe",
+        _append_timestamp_precision_filter_probe,
+        semantic_family_affinity=("backend_specific_semantics", "stateful_ordering"),
+        semantic_signal_affinity=("polars_timestamp_precision_filter", "timestamp_precision_filter"),
+        divergence_affinity=("disagree_class:string", "mismatch:value"),
+    ),
+    MutationOperator(
         "append_series_rtruediv_probe",
         _append_series_rtruediv_probe,
         divergence_affinity=("disagree_class:numeric", "mismatch:value"),
@@ -4057,6 +4269,16 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
         _append_bool_reduction_skipna_probe,
         divergence_affinity=("disagree_class:bool", "mismatch:value"),
     ),
+    MutationOperator(
+        "append_arrow_bool_groupby_reduction_probe",
+        _append_arrow_bool_groupby_reduction_probe,
+        semantic_family_affinity=("backend_specific_semantics", "boolean_logic", "aggregation_cardinality"),
+        semantic_signal_affinity=(
+            "pandas_arrow_bool_groupby_reduction_semantics",
+            "arrow_bool_groupby_reduction",
+        ),
+        divergence_affinity=("disagree_class:bool", "mismatch:value"),
+    ),
     MutationOperator("append_dataset_isin_all_match_probe", _append_dataset_isin_all_match_probe),
     MutationOperator(
         "append_run_end_null_compute_probe",
@@ -4071,6 +4293,13 @@ MUTATION_OPERATORS: tuple[MutationOperator, ...] = (
     MutationOperator("append_hash_pivot_wider_probe", _append_hash_pivot_wider_probe),
     MutationOperator("append_list_flatten_parent_indices_probe", _append_list_flatten_parent_indices_probe),
     MutationOperator("append_rolling_mean_by_null_count_probe", _append_rolling_mean_by_null_count_probe),
+    MutationOperator(
+        "append_csv_long_numeric_roundtrip_probe",
+        _append_csv_long_numeric_roundtrip_probe,
+        semantic_family_affinity=("backend_specific_semantics", "type_coercion", "string_semantics"),
+        semantic_signal_affinity=("csv_long_numeric_roundtrip",),
+        divergence_affinity=("disagree_class:numeric", "disagree_class:string", "mismatch:value"),
+    ),
     MutationOperator("append_grouped_topk", _append_grouped_topk_probe),
     MutationOperator(
         "append_groupby_fractional_membership_filter",

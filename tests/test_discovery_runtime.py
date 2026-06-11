@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from datadiff.discovery_runtime import write_discovery_run_fresh_candidate_evidence
+from datadiff.discovery_runtime import aggregate_candidate_pipeline_summary, write_discovery_run_fresh_candidate_evidence
 from datadiff.finding_outcomes import candidate_issue_family_key
 from datadiff.run_summaries import _classified_candidate_rows_for_run
 from datadiff.util import append_jsonl
@@ -173,3 +173,28 @@ def test_classified_candidate_rows_for_run_honors_refreshed_findings(tmp_path: P
     assert rows[0]["findings"][0]["triage_verdict"] == "candidate_implementation_bug"
     assert rows[0]["findings"][0]["root_cause"] == "running_sum_precision"
     assert rows[0]["findings"][0]["suspicious_backends"] == ["pandas"]
+
+
+def test_aggregate_candidate_pipeline_summary_keeps_duplicate_skip_metrics():
+    summary = aggregate_candidate_pipeline_summary(
+        [
+            {
+                "summary": {
+                    "candidate_count": 5,
+                    "processed_candidate_count": 2,
+                    "skipped_duplicate_candidate_count": 3,
+                    "rechecked_count": 2,
+                    "reproduced_count": 1,
+                    "reduced_count": 1,
+                    "candidate_bug_verdict_count": 1,
+                    "issue_draft_count": 1,
+                }
+            }
+        ]
+    )
+
+    assert summary["pipeline_count"] == 1
+    assert summary["candidate_count"] == 5
+    assert summary["processed_candidate_count"] == 2
+    assert summary["skipped_duplicate_candidate_count"] == 3
+    assert summary["rechecked_count"] == 2

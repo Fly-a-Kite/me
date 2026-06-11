@@ -1,0 +1,33 @@
+{
+  "events": [
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-pyarrow-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "conditional_expression@datafusion,duckdb,pyarrow,sqlite"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb,pyarrow,sqlite",
+      "recorded_at": "2026-06-07T07:09:11Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb,pyarrow,sqlite"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-smoke-arrow-bool-groupby-deep_probe_rotation-seed84-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T070803-1780816083949406957.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas",
+        "pyarrow",
+        "sqlite"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    }
+  ],
+  "schema_version": "dynamic-strategy-learning-v1"
+}

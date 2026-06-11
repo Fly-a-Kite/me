@@ -1,0 +1,1765 @@
+{
+  "candidate_row_count": 1,
+  "candidate_rows": [
+    {
+      "bug_dir": "",
+      "candidate_bug_families": {
+        "conditional_expression@duckdb": 1
+      },
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 0,
+            "reproduced_keys": []
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": []
+          },
+          {
+            "attempt": 3,
+            "finding_count": 0,
+            "reproduced_keys": []
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [
+          "semantic_output_mismatch:conditional_expression@duckdb:row_order"
+        ],
+        "reproduced_keys": []
+      },
+      "case": {
+        "case_id": "case-00045505-discovery-fresh-mut-1535",
+        "metadata": {
+          "candidate_source": "feedback_mutation",
+          "case_fingerprint": {
+            "column_count": 2,
+            "feature_tokens": [
+              "fp_op:57787e92da8129f7",
+              "fp_type_mix:num7_str5_bool2",
+              "fp_null_density:1",
+              "fp_row_mass:6",
+              "fp_column_count:2"
+            ],
+            "minhash_signature": [
+              202175660613589916,
+              86357019632231555,
+              1288434358126282088,
+              471595940790868959,
+              356515647635534516,
+              768704632612738432,
+              516358098186668898,
+              1159396852027067544,
+              762459420012244574,
+              697025014187729750,
+              485560623043668761,
+              58046562693877278,
+              562708791306003126,
+              256341244903577202,
+              788397070392817256,
+              1083940328993453473,
+              2531353098079619506,
+              250933887475542911,
+              1835671942392361950,
+              22853859876117928,
+              1368089732704950410,
+              1394530663458215605,
+              95245969055013093,
+              155830290991095775,
+              110101257550885354,
+              1792652338164796009,
+              20789801317216848,
+              724082729877371744,
+              2732398773699926591,
+              495370651296743093,
+              198278835625315105,
+              630065874228790498,
+              127623428916853231,
+              381797691681816234,
+              121701089237567278,
+              754676155636969107,
+              3678120962152584316,
+              1021937192336741610,
+              181068797009396664,
+              805342361943315533,
+              478725821371851879,
+              422536817112700401,
+              556157563149058442,
+              470722466634959318,
+              392487222418642341,
+              419693565933602534,
+              767238095338451233,
+              184687615724556098,
+              395648288636071908,
+              1109012530375959998,
+              2221016829856130920,
+              366804087672969856,
+              949513945790618730,
+              420100504374356591,
+              165527811568299920,
+              307948055604760274,
+              404191470620041628,
+              15548454899478553,
+              1319910474358583103,
+              221816199072685761,
+              162550869647751519,
+              1569518886972768058,
+              713515579932943490,
+              655771393054111560
+            ],
+            "null_density_bucket": 1,
+            "op_skeleton_hash": "57787e92da8129f7",
+            "row_mass_bucket": 6,
+            "type_mix_token": "num7_str5_bool2"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "duckdb"
+              ],
+              [
+                "pandas",
+                "pyarrow"
+              ]
+            ],
+            "backend_statuses": {
+              "duckdb": "ok",
+              "pandas": "ok",
+              "pyarrow": "ok"
+            },
+            "column_classes": {
+              "m_0": "string",
+              "sum_x": "numeric"
+            },
+            "feature_tokens": [
+              "column:m_0:string",
+              "column:sum_x:numeric",
+              "disagree_class:numeric",
+              "disagree_class:string",
+              "disagree_pair:duckdb|pandas",
+              "disagree_pair:duckdb|pyarrow",
+              "group:duckdb",
+              "group:pandas+pyarrow",
+              "group_count:2",
+              "mismatch:row_order",
+              "root:conditional_expression",
+              "status:duckdb:ok",
+              "status:pandas:ok",
+              "status:pyarrow:ok"
+            ],
+            "mismatch_class": "row_order",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": true,
+                "left": "duckdb",
+                "right": "pandas"
+              },
+              {
+                "disagrees": true,
+                "left": "duckdb",
+                "right": "pyarrow"
+              },
+              {
+                "disagrees": false,
+                "left": "pandas",
+                "right": "pyarrow"
+              }
+            ],
+            "primary_root_cause": "conditional_expression"
+          },
+          "feedback_decision": {
+            "attempt": 1,
+            "cluster_key": "profile=generic|targets=champion_family_metamorphic_filter_tautology_insertion_duckdb|ops=join>mutate>case_when>row_number_filter>groupby",
+            "cluster_novelty_score": 0.175,
+            "cluster_reward": 0.0,
+            "exploration_objective_targets": [],
+            "frontier_head": [
+              {
+                "case_id": "case-00001359-issue-focus-filter-null-agg-topk",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.16163816345928633,
+                "index": 19,
+                "reward_prior": 1.0,
+                "schedule_score": 1.8805030976056967,
+                "seed_energy": 3,
+                "target_novelty_score": 0.4292200854700855
+              },
+              {
+                "case_id": "case-00239680-discovery-fresh",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.06544269361010796,
+                "index": 0,
+                "reward_prior": 3.175,
+                "schedule_score": 1.0347356218197832,
+                "seed_energy": 3,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00000484-issue-focus-null-agg-topk",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.11101790428446068,
+                "index": 15,
+                "reward_prior": 0.925,
+                "schedule_score": 0.9749174944934549,
+                "seed_energy": 3,
+                "target_novelty_score": 0.2470862470862471
+              },
+              {
+                "case_id": "case-00000442-issue-focus-join-filter-groupby",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.12435319897046988,
+                "index": 13,
+                "reward_prior": 0.925,
+                "schedule_score": 0.6522529100003461,
+                "seed_energy": 2,
+                "target_novelty_score": 0.3304195804195804
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.20000000000000004,
+                "index": 5,
+                "reward_prior": 3.45,
+                "schedule_score": 0.3736097741955979,
+                "seed_energy": 4,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00045505-discovery-fresh",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.06566385747582536,
+                "index": 1,
+                "reward_prior": 3.25,
+                "schedule_score": 0.3734506871854016,
+                "seed_energy": 3,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.15106742963068462,
+                "index": 3,
+                "reward_prior": 3.31,
+                "schedule_score": 0.34092098284573163,
+                "seed_energy": 3,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00044054-discovery-fresh",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.08454536630690931,
+                "index": 2,
+                "reward_prior": 3.205,
+                "schedule_score": 0.32352516483103655,
+                "seed_energy": 3,
+                "target_novelty_score": 0.125
+              }
+            ],
+            "frontier_rank": 6,
+            "frontier_size": 20,
+            "mutation_plan": {
+              "annealing_temperature": 0.0692206303644417,
+              "changed": true,
+              "executed_depth": 1,
+              "planned_depth": 1,
+              "steps": [
+                {
+                  "candidate_width": 3,
+                  "changed": true,
+                  "detail": "drop:join",
+                  "divergence_affinity": 0.0,
+                  "fallback_used": false,
+                  "heuristic_score": 1.9544549212835691,
+                  "novelty_bonus": 0.18,
+                  "operator": "drop_op",
+                  "operator_score": 0.27445492128356924,
+                  "productive": true,
+                  "repair_changed": false,
+                  "replay_seed": 752646395,
+                  "resulting_operation_count": 4,
+                  "target_affinity": 0.0
+                }
+              ],
+              "strategy": "single_step_ranking",
+              "top_operators": [
+                {
+                  "operator": "drop_op",
+                  "score": 0.27445492128356924
+                },
+                {
+                  "operator": "ir_fold_redundant_op",
+                  "score": 0.2739194446908545
+                },
+                {
+                  "operator": "ir_pushdown_filter",
+                  "score": 0.27437133367485234
+                },
+                {
+                  "operator": "ir_pull_filter_above_groupby",
+                  "score": 0.2743292910621588
+                },
+                {
+                  "operator": "shrink_merge_adjacent_filters",
+                  "score": 0.2736349807767802
+                },
+                {
+                  "operator": "shrink_inline_single_use_mutate",
+                  "score": 0.2740475647745842
+                },
+                {
+                  "operator": "append_multi_key_membership_case_aggregate",
+                  "score": 0.2739951678536913
+                },
+                {
+                  "operator": "shrink_fold_redundant_op",
+                  "score": 0.27379478916102884
+                }
+              ]
+            },
+            "mutation_pulls": 21,
+            "mutation_seed": 1535,
+            "operator_score_count": 39,
+            "operator_score_top": [
+              {
+                "mean_reward": 0.27445492128356924,
+                "operator": "drop_op"
+              },
+              {
+                "mean_reward": 0.27437133367485234,
+                "operator": "ir_pushdown_filter"
+              },
+              {
+                "mean_reward": 0.2743292910621588,
+                "operator": "ir_pull_filter_above_groupby"
+              },
+              {
+                "mean_reward": 0.2740475647745842,
+                "operator": "shrink_inline_single_use_mutate"
+              },
+              {
+                "mean_reward": 0.2739951678536913,
+                "operator": "append_multi_key_membership_case_aggregate"
+              },
+              {
+                "mean_reward": 0.2739194446908545,
+                "operator": "ir_fold_redundant_op"
+              },
+              {
+                "mean_reward": 0.27379478916102884,
+                "operator": "shrink_fold_redundant_op"
+              },
+              {
+                "mean_reward": 0.27371710806135763,
+                "operator": "append_left_join_boolean_coalesce_case_aggregate"
+              }
+            ],
+            "parent_case_id": "case-00045505-discovery-fresh",
+            "parent_index": 1,
+            "planned_mutation_depth": 1,
+            "quality_archive_cluster_reward": 0.0,
+            "quality_archive_elite_bonus": 0.25,
+            "quality_archive_elite_indexes": [
+              1
+            ],
+            "quality_archive_health_penalty": 0.0,
+            "recent_cluster_pulls": 1,
+            "recent_operator_pulls": 1,
+            "recent_parent_pulls": 1,
+            "retention_utility": 8.7,
+            "schedule_base_reward": 3.25,
+            "schedule_feedback_count": 0,
+            "schedule_feedback_reward": 0.0,
+            "schedule_reward": 3.25,
+            "schedule_score": 0.3734506871854016,
+            "seed_energy": 3,
+            "seed_energy_tier": "low",
+            "seed_energy_tier_context": [
+              "seed_pulls:saturated",
+              "seed_feedback:none",
+              "cluster_outcomes:none",
+              "recent_pull_rate:light",
+              "target_key_count:few",
+              "schedule_reward:high",
+              "cluster:profile=generic|targets=champion_family_metamorphic_filter_tautology_insertion_duckdb|ops=join>mutate>case_when>row_number_filter>groupby",
+              "target:champion_family:metamorphic_filter_tautology_insertion@duckdb"
+            ],
+            "selected_operator": "drop_op",
+            "selected_operator_score": 0.27445492128356924,
+            "semantic_family_targets": [],
+            "semantic_signal_targets": [],
+            "swarm_particle_id": 1,
+            "target_key_count": 1,
+            "target_keys": [
+              "champion_family:metamorphic_filter_tautology_insertion@duckdb"
+            ],
+            "target_novelty_score": 0.125,
+            "value_catalog_entry_count": 0
+          },
+          "feedback_selection": {
+            "attempt": 1,
+            "cluster_key": "profile=generic|targets=champion_family_metamorphic_filter_tautology_insertion_duckdb|ops=join>mutate>case_when>row_number_filter>groupby",
+            "cluster_novelty_score": 0.175,
+            "cluster_reward": 0.0,
+            "exploration_objective_targets": [],
+            "frontier_head": [
+              {
+                "case_id": "case-00001359-issue-focus-filter-null-agg-topk",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.16163816345928633,
+                "index": 19,
+                "reward_prior": 1.0,
+                "schedule_score": 1.8805030976056967,
+                "seed_energy": 3,
+                "target_novelty_score": 0.4292200854700855
+              },
+              {
+                "case_id": "case-00239680-discovery-fresh",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.06544269361010796,
+                "index": 0,
+                "reward_prior": 3.175,
+                "schedule_score": 1.0347356218197832,
+                "seed_energy": 3,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00000484-issue-focus-null-agg-topk",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.11101790428446068,
+                "index": 15,
+                "reward_prior": 0.925,
+                "schedule_score": 0.9749174944934549,
+                "seed_energy": 3,
+                "target_novelty_score": 0.2470862470862471
+              },
+              {
+                "case_id": "case-00000442-issue-focus-join-filter-groupby",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.12435319897046988,
+                "index": 13,
+                "reward_prior": 0.925,
+                "schedule_score": 0.6522529100003461,
+                "seed_energy": 2,
+                "target_novelty_score": 0.3304195804195804
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.20000000000000004,
+                "index": 5,
+                "reward_prior": 3.45,
+                "schedule_score": 0.3736097741955979,
+                "seed_energy": 4,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00045505-discovery-fresh",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.06566385747582536,
+                "index": 1,
+                "reward_prior": 3.25,
+                "schedule_score": 0.3734506871854016,
+                "seed_energy": 3,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.15106742963068462,
+                "index": 3,
+                "reward_prior": 3.31,
+                "schedule_score": 0.34092098284573163,
+                "seed_energy": 3,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00044054-discovery-fresh",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.08454536630690931,
+                "index": 2,
+                "reward_prior": 3.205,
+                "schedule_score": 0.32352516483103655,
+                "seed_energy": 3,
+                "target_novelty_score": 0.125
+              }
+            ],
+            "frontier_rank": 6,
+            "frontier_size": 20,
+            "mutation_plan": {
+              "annealing_temperature": 0.0692206303644417,
+              "changed": true,
+              "executed_depth": 1,
+              "planned_depth": 1,
+              "steps": [
+                {
+                  "candidate_width": 3,
+                  "changed": true,
+                  "detail": "drop:join",
+                  "divergence_affinity": 0.0,
+                  "fallback_used": false,
+                  "heuristic_score": 1.9544549212835691,
+                  "novelty_bonus": 0.18,
+                  "operator": "drop_op",
+                  "operator_score": 0.27445492128356924,
+                  "productive": true,
+                  "repair_changed": false,
+                  "replay_seed": 752646395,
+                  "resulting_operation_count": 4,
+                  "target_affinity": 0.0
+                }
+              ],
+              "strategy": "single_step_ranking",
+              "top_operators": [
+                {
+                  "operator": "drop_op",
+                  "score": 0.27445492128356924
+                },
+                {
+                  "operator": "ir_fold_redundant_op",
+                  "score": 0.2739194446908545
+                },
+                {
+                  "operator": "ir_pushdown_filter",
+                  "score": 0.27437133367485234
+                },
+                {
+                  "operator": "ir_pull_filter_above_groupby",
+                  "score": 0.2743292910621588
+                },
+                {
+                  "operator": "shrink_merge_adjacent_filters",
+                  "score": 0.2736349807767802
+                },
+                {
+                  "operator": "shrink_inline_single_use_mutate",
+                  "score": 0.2740475647745842
+                },
+                {
+                  "operator": "append_multi_key_membership_case_aggregate",
+                  "score": 0.2739951678536913
+                },
+                {
+                  "operator": "shrink_fold_redundant_op",
+                  "score": 0.27379478916102884
+                }
+              ]
+            },
+            "mutation_pulls": 21,
+            "mutation_seed": 1535,
+            "operator_score_count": 39,
+            "operator_score_top": [
+              {
+                "mean_reward": 0.27445492128356924,
+                "operator": "drop_op"
+              },
+              {
+                "mean_reward": 0.27437133367485234,
+                "operator": "ir_pushdown_filter"
+              },
+              {
+                "mean_reward": 0.2743292910621588,
+                "operator": "ir_pull_filter_above_groupby"
+              },
+              {
+                "mean_reward": 0.2740475647745842,
+                "operator": "shrink_inline_single_use_mutate"
+              },
+              {
+                "mean_reward": 0.2739951678536913,
+                "operator": "append_multi_key_membership_case_aggregate"
+              },
+              {
+                "mean_reward": 0.2739194446908545,
+                "operator": "ir_fold_redundant_op"
+              },
+              {
+                "mean_reward": 0.27379478916102884,
+                "operator": "shrink_fold_redundant_op"
+              },
+              {
+                "mean_reward": 0.27371710806135763,
+                "operator": "append_left_join_boolean_coalesce_case_aggregate"
+              }
+            ],
+            "parent_case_id": "case-00045505-discovery-fresh",
+            "parent_index": 1,
+            "planned_mutation_depth": 1,
+            "quality_archive_cluster_reward": 0.0,
+            "quality_archive_elite_bonus": 0.25,
+            "quality_archive_elite_indexes": [
+              1
+            ],
+            "quality_archive_health_penalty": 0.0,
+            "recent_cluster_pulls": 1,
+            "recent_operator_pulls": 1,
+            "recent_parent_pulls": 1,
+            "retention_utility": 8.7,
+            "schedule_base_reward": 3.25,
+            "schedule_feedback_count": 0,
+            "schedule_feedback_reward": 0.0,
+            "schedule_reward": 3.25,
+            "schedule_score": 0.3734506871854016,
+            "seed_energy": 3,
+            "seed_energy_tier": "low",
+            "seed_energy_tier_context": [
+              "seed_pulls:saturated",
+              "seed_feedback:none",
+              "cluster_outcomes:none",
+              "recent_pull_rate:light",
+              "target_key_count:few",
+              "schedule_reward:high",
+              "cluster:profile=generic|targets=champion_family_metamorphic_filter_tautology_insertion_duckdb|ops=join>mutate>case_when>row_number_filter>groupby",
+              "target:champion_family:metamorphic_filter_tautology_insertion@duckdb"
+            ],
+            "selected_operator": "drop_op",
+            "selected_operator_score": 0.27445492128356924,
+            "semantic_family_targets": [],
+            "semantic_signal_targets": [],
+            "swarm_particle_id": 1,
+            "target_key_count": 1,
+            "target_keys": [
+              "champion_family:metamorphic_filter_tautology_insertion@duckdb"
+            ],
+            "target_novelty_score": 0.125,
+            "value_catalog_entry_count": 0
+          },
+          "mutation": {
+            "changed": true,
+            "detail": "drop:join",
+            "detail_sequence": [
+              "drop:join"
+            ],
+            "executed_steps": 1,
+            "multi_step": false,
+            "operator": "drop_op",
+            "operator_sequence": [
+              "drop_op"
+            ],
+            "plan_depth": 1,
+            "value_catalog_entries": []
+          },
+          "mutation_plan": {
+            "annealing_temperature": 0.0692206303644417,
+            "changed": true,
+            "executed_depth": 1,
+            "planned_depth": 1,
+            "steps": [
+              {
+                "candidate_width": 3,
+                "changed": true,
+                "detail": "drop:join",
+                "divergence_affinity": 0.0,
+                "fallback_used": false,
+                "heuristic_score": 1.9544549212835691,
+                "novelty_bonus": 0.18,
+                "operator": "drop_op",
+                "operator_score": 0.27445492128356924,
+                "productive": true,
+                "repair_changed": false,
+                "replay_seed": 752646395,
+                "resulting_operation_count": 4,
+                "target_affinity": 0.0
+              }
+            ],
+            "strategy": "single_step_ranking",
+            "top_operators": [
+              {
+                "operator": "drop_op",
+                "score": 0.27445492128356924
+              },
+              {
+                "operator": "ir_fold_redundant_op",
+                "score": 0.2739194446908545
+              },
+              {
+                "operator": "ir_pushdown_filter",
+                "score": 0.27437133367485234
+              },
+              {
+                "operator": "ir_pull_filter_above_groupby",
+                "score": 0.2743292910621588
+              },
+              {
+                "operator": "shrink_merge_adjacent_filters",
+                "score": 0.2736349807767802
+              },
+              {
+                "operator": "shrink_inline_single_use_mutate",
+                "score": 0.2740475647745842
+              },
+              {
+                "operator": "append_multi_key_membership_case_aggregate",
+                "score": 0.2739951678536913
+              },
+              {
+                "operator": "shrink_fold_redundant_op",
+                "score": 0.27379478916102884
+              }
+            ]
+          },
+          "mutation_selection": {
+            "annealing_decay": 0.85,
+            "annealing_temperature": 0.0692206303644417,
+            "candidate_count": 1,
+            "executed_depth": 1,
+            "multi_step": false,
+            "plan": {
+              "annealing_temperature": 0.0692206303644417,
+              "changed": true,
+              "executed_depth": 1,
+              "planned_depth": 1,
+              "steps": [
+                {
+                  "candidate_width": 3,
+                  "changed": true,
+                  "detail": "drop:join",
+                  "divergence_affinity": 0.0,
+                  "fallback_used": false,
+                  "heuristic_score": 1.9544549212835691,
+                  "novelty_bonus": 0.18,
+                  "operator": "drop_op",
+                  "operator_score": 0.27445492128356924,
+                  "productive": true,
+                  "repair_changed": false,
+                  "replay_seed": 752646395,
+                  "resulting_operation_count": 4,
+                  "target_affinity": 0.0
+                }
+              ],
+              "strategy": "single_step_ranking",
+              "top_operators": [
+                {
+                  "operator": "drop_op",
+                  "score": 0.27445492128356924
+                },
+                {
+                  "operator": "ir_fold_redundant_op",
+                  "score": 0.2739194446908545
+                },
+                {
+                  "operator": "ir_pushdown_filter",
+                  "score": 0.27437133367485234
+                },
+                {
+                  "operator": "ir_pull_filter_above_groupby",
+                  "score": 0.2743292910621588
+                },
+                {
+                  "operator": "shrink_merge_adjacent_filters",
+                  "score": 0.2736349807767802
+                },
+                {
+                  "operator": "shrink_inline_single_use_mutate",
+                  "score": 0.2740475647745842
+                },
+                {
+                  "operator": "append_multi_key_membership_case_aggregate",
+                  "score": 0.2739951678536913
+                },
+                {
+                  "operator": "shrink_fold_redundant_op",
+                  "score": 0.27379478916102884
+                }
+              ]
+            },
+            "planned_depth": 1,
+            "selected_operator": "drop_op",
+            "selected_operator_score": 0.27445492128356924,
+            "selected_score_rank": 1,
+            "strategy": "feedback_score_with_annealed_tail",
+            "top_operators": [
+              {
+                "operator": "drop_op",
+                "score": 0.27445492128356924
+              },
+              {
+                "operator": "ir_fold_redundant_op",
+                "score": 0.2739194446908545
+              },
+              {
+                "operator": "ir_pushdown_filter",
+                "score": 0.27437133367485234
+              },
+              {
+                "operator": "ir_pull_filter_above_groupby",
+                "score": 0.2743292910621588
+              },
+              {
+                "operator": "shrink_merge_adjacent_filters",
+                "score": 0.2736349807767802
+              },
+              {
+                "operator": "shrink_inline_single_use_mutate",
+                "score": 0.2740475647745842
+              },
+              {
+                "operator": "append_multi_key_membership_case_aggregate",
+                "score": 0.2739951678536913
+              },
+              {
+                "operator": "shrink_fold_redundant_op",
+                "score": 0.27379478916102884
+              }
+            ]
+          },
+          "quality_archive_context": {
+            "archive_axis_reward": 0.16826548640134767,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.2692693813554738,
+              "bd_column_count": 1.2693322994939753,
+              "bd_null_density": 1.2695507624041986,
+              "bd_op_skeleton": 1.2697250784707763,
+              "bd_profile": 1.2698221757356636,
+              "bd_row_mass": 1.2693999269619158,
+              "bd_target_class": 1.2696347669752122,
+              "bd_type_mix": 1.2694726200668123
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "generic"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:57787e92da8129f7"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:1"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num7_str5_bool2"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:6"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:4"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:4",
+              "null_density_axis": "null:1",
+              "op_skeleton_axis": "op:57787e92da8129f7",
+              "profile_axis": "generic",
+              "row_mass_axis": "rows:6",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num7_str5_bool2"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=generic|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=mutate>case_when>row_number_filter>groupby",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 25,
+            "target_keys": [
+              "champion_family:metamorphic_filter_tautology_insertion@duckdb",
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          },
+          "seed_lineage": {
+            "depth": 1,
+            "mutation_seed": 1535,
+            "parent_case_id": "case-00045505-discovery-fresh",
+            "parent_index": 1,
+            "parent_seed": 45505,
+            "root_seed": 45505
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "column": "m_0",
+              "expr": {
+                "kind": "cast",
+                "source": "x",
+                "to": "str"
+              },
+              "op": "mutate"
+            },
+            {
+              "as": "cw_0",
+              "condition": {
+                "cmp": "!=",
+                "column": "m_0",
+                "value": "missing"
+              },
+              "else": "no",
+              "op": "case_when",
+              "then": "yes"
+            },
+            {
+              "cmp": "==",
+              "op": "row_number_filter",
+              "order_by": [
+                {
+                  "ascending": true,
+                  "column": "cw_0",
+                  "nulls": "first"
+                },
+                {
+                  "ascending": true,
+                  "column": "g",
+                  "nulls": "first"
+                }
+              ],
+              "partition_by": [
+                "s",
+                "cw_0"
+              ],
+              "value": 3
+            },
+            {
+              "aggs": [
+                {
+                  "as": "sum_x",
+                  "column": "x",
+                  "func": "sum"
+                }
+              ],
+              "keys": [
+                "m_0"
+              ],
+              "op": "groupby"
+            }
+          ],
+          "program_id": "prog-00045505-mut-1535",
+          "seed": 1535
+        },
+        "seed": 1535,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "g",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "x",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "y",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "flag",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "s",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "flag": false,
+                "g": "gamma",
+                "id": 1,
+                "s": "a",
+                "x": -1,
+                "y": 14.651
+              },
+              {
+                "flag": true,
+                "g": "space value",
+                "id": 1,
+                "s": "",
+                "x": null,
+                "y": -40.532
+              },
+              {
+                "flag": true,
+                "g": "beta",
+                "id": 1,
+                "s": null,
+                "x": null,
+                "y": 5.159
+              },
+              {
+                "flag": false,
+                "g": "aXe",
+                "id": 3,
+                "s": null,
+                "x": -32,
+                "y": 40.137
+              },
+              {
+                "flag": null,
+                "g": "RsHs",
+                "id": 1,
+                "s": "Qb",
+                "x": 1,
+                "y": -1.0
+              },
+              {
+                "flag": false,
+                "g": "uvaHa",
+                "id": 1,
+                "s": "ydFnd",
+                "x": -2,
+                "y": 1.0
+              },
+              {
+                "flag": false,
+                "g": "gamma",
+                "id": 0,
+                "s": "G",
+                "x": 2,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "ILyKvm",
+                "id": 1,
+                "s": "space value",
+                "x": -2,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "yvpAxx",
+                "id": 0,
+                "s": "Xe",
+                "x": 2,
+                "y": 1.0
+              },
+              {
+                "flag": false,
+                "g": null,
+                "id": 1,
+                "s": "space value",
+                "x": 1,
+                "y": -0.5
+              },
+              {
+                "flag": true,
+                "g": null,
+                "id": 1,
+                "s": "a",
+                "x": -10,
+                "y": null
+              },
+              {
+                "flag": false,
+                "g": "alpha",
+                "id": 2,
+                "s": "MBToG",
+                "x": -74,
+                "y": null
+              },
+              {
+                "flag": true,
+                "g": "space value",
+                "id": 0,
+                "s": "space value",
+                "x": -1,
+                "y": -27.466
+              },
+              {
+                "flag": true,
+                "g": "alpha",
+                "id": 1,
+                "s": "δelta",
+                "x": 10,
+                "y": -0.5
+              },
+              {
+                "flag": null,
+                "g": "beta",
+                "id": 2,
+                "s": "Pe",
+                "x": -1,
+                "y": null
+              },
+              {
+                "flag": null,
+                "g": "δelta",
+                "id": 0,
+                "s": null,
+                "x": 97,
+                "y": -1.0
+              },
+              {
+                "flag": null,
+                "g": "alpha",
+                "id": 16,
+                "s": "中文",
+                "x": -1,
+                "y": null
+              },
+              {
+                "flag": null,
+                "g": "space value",
+                "id": 1,
+                "s": "beta",
+                "x": 0,
+                "y": 1.0
+              },
+              {
+                "flag": true,
+                "g": "gamma",
+                "id": 0,
+                "s": null,
+                "x": -1,
+                "y": null
+              },
+              {
+                "flag": true,
+                "g": "A",
+                "id": 1,
+                "s": "",
+                "x": null,
+                "y": -1.0
+              },
+              {
+                "flag": false,
+                "g": null,
+                "id": 2,
+                "s": "HpoLMT",
+                "x": null,
+                "y": 30.803
+              }
+            ]
+          },
+          {
+            "columns": [
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "j",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "z",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "tag",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "g",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "x",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "flag",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "s",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t1",
+            "rows": [
+              {
+                "flag": false,
+                "g": "gamma",
+                "id": 0,
+                "j": -99,
+                "s": "G",
+                "tag": "VT",
+                "x": 2,
+                "z": null
+              },
+              {
+                "flag": true,
+                "g": "space value",
+                "id": 1,
+                "j": -1,
+                "s": "",
+                "tag": "QeP",
+                "x": null,
+                "z": 0.0
+              },
+              {
+                "flag": false,
+                "g": null,
+                "id": 2,
+                "j": null,
+                "s": "HpoLMT",
+                "tag": "beta",
+                "x": null,
+                "z": null
+              },
+              {
+                "flag": null,
+                "g": "δelta",
+                "id": 0,
+                "j": -80,
+                "s": null,
+                "tag": "DXDBaM",
+                "x": 97,
+                "z": 1.0
+              },
+              {
+                "flag": null,
+                "g": "RsHs",
+                "id": 4,
+                "j": 0,
+                "s": "Qb",
+                "tag": "zizbTE",
+                "x": 1,
+                "z": 0.0
+              },
+              {
+                "flag": false,
+                "g": "gamma",
+                "id": 0,
+                "j": 1,
+                "s": "G",
+                "tag": "中文",
+                "x": 2,
+                "z": -1.0
+              },
+              {
+                "flag": false,
+                "g": null,
+                "id": 1,
+                "j": -10,
+                "s": "space value",
+                "tag": "space value",
+                "x": 1,
+                "z": 0.5
+              },
+              {
+                "flag": null,
+                "g": "beta",
+                "id": 2,
+                "j": 2,
+                "s": "Pe",
+                "tag": "δelta",
+                "x": -1,
+                "z": 1.0
+              },
+              {
+                "flag": false,
+                "g": "aXe",
+                "id": 3,
+                "j": 73,
+                "s": null,
+                "tag": "alpha",
+                "x": -32,
+                "z": 1.0
+              },
+              {
+                "flag": true,
+                "g": "gamma",
+                "id": 0,
+                "j": 1,
+                "s": null,
+                "tag": "space value",
+                "x": -1,
+                "z": 0.5
+              },
+              {
+                "flag": null,
+                "g": "beta",
+                "id": 2,
+                "j": 1,
+                "s": "Pe",
+                "tag": "lzVoOi",
+                "x": -1,
+                "z": 0.0
+              },
+              {
+                "flag": false,
+                "g": "yvpAxx",
+                "id": 0,
+                "j": -1,
+                "s": "Xe",
+                "tag": "beta",
+                "x": 2,
+                "z": -1.0
+              },
+              {
+                "flag": true,
+                "g": "space value",
+                "id": 0,
+                "j": -27,
+                "s": "space value",
+                "tag": "alpha",
+                "x": -1,
+                "z": 0.056
+              },
+              {
+                "flag": true,
+                "g": "alpha",
+                "id": 13,
+                "j": -2,
+                "s": "δelta",
+                "tag": null,
+                "x": 10,
+                "z": 0.0
+              },
+              {
+                "flag": null,
+                "g": "beta",
+                "id": 14,
+                "j": null,
+                "s": "Pe",
+                "tag": "alpha",
+                "x": -1,
+                "z": null
+              },
+              {
+                "flag": false,
+                "g": "gamma",
+                "id": 0,
+                "j": null,
+                "s": "G",
+                "tag": "Nsol",
+                "x": 2,
+                "z": 1.0
+              },
+              {
+                "flag": false,
+                "g": "ILyKvm",
+                "id": 1,
+                "j": 10,
+                "s": "space value",
+                "tag": "",
+                "x": -2,
+                "z": null
+              },
+              {
+                "flag": null,
+                "g": "alpha",
+                "id": 16,
+                "j": 16,
+                "s": "中文",
+                "tag": "tag_16",
+                "x": -1,
+                "z": 16.0
+              }
+            ]
+          }
+        ]
+      },
+      "case_index": 91,
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [],
+        "effective_guidance_targets": [
+          "operation_combo",
+          "filter",
+          "groupby",
+          "aggregation",
+          "sort_limit",
+          "topk",
+          "strings",
+          "casts",
+          "nulls",
+          "expressions",
+          "string_count_groupby",
+          "unique_count_groupby",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "pyarrow_groupby_filter_cast_membership",
+          "global_null_aggregate",
+          "null_predicate_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": false,
+        "generator_profile": "issue_focus",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "operation_combo",
+          "filter",
+          "groupby",
+          "aggregation",
+          "sort_limit",
+          "topk",
+          "strings",
+          "casts",
+          "nulls",
+          "expressions",
+          "string_count_groupby",
+          "unique_count_groupby",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "pyarrow_groupby_filter_cast_membership",
+          "global_null_aggregate",
+          "null_predicate_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.5,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 6,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [],
+        "semantic_focus_signals": [],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "",
+        "strategy_snapshot_path": "",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "elapsed_s": 92.348622,
+      "findings": [
+        {
+          "adjudication": {},
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Backends returned different canonical tables; mismatch_class=row_order; shapes={'pandas': (2, 2), 'duckdb': (2, 2), 'pyarrow': (2, 2)}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-a1f4026a64d2214c",
+          "kind": "semantic_output_mismatch",
+          "mismatch_class": "row_order",
+          "oracle": "differential",
+          "paper_status": "unclassified",
+          "recommendation": [],
+          "root_cause": "conditional_expression",
+          "severity": "critical",
+          "signature": "a1f4026a64d2214c",
+          "source_issue": "",
+          "suspicious_backends": [
+            "duckdb"
+          ],
+          "triage_confidence": "low",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas', 'pyarrow'] and disagrees with ['duckdb'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "duckdb": {
+          "backend": "duckdb",
+          "columns": [
+            "m_0",
+            "sum_x"
+          ],
+          "comparison_key": "{\"columns\":[\"m_0\",\"sum_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"97\\\\\\\",97]\\\",\\\"[\\\\\\\"-1\\\\\\\",-1]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[\\\"97\\\",97]\",\"[\\\"-1\\\",-1]\"]",
+          "row_count": 2,
+          "rows": [
+            [
+              "97",
+              97
+            ],
+            [
+              "-1",
+              -1
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[\\\"-1\\\",-1]\",\"[\\\"97\\\",97]\"]"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "m_0",
+            "sum_x"
+          ],
+          "comparison_key": "{\"columns\":[\"m_0\",\"sum_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"-1\\\\\\\",-1]\\\",\\\"[\\\\\\\"97\\\\\\\",97]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[\\\"-1\\\",-1]\",\"[\\\"97\\\",97]\"]",
+          "row_count": 2,
+          "rows": [
+            [
+              "-1",
+              -1
+            ],
+            [
+              "97",
+              97
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[\\\"-1\\\",-1]\",\"[\\\"97\\\",97]\"]"
+        },
+        "pyarrow": {
+          "backend": "pyarrow",
+          "columns": [
+            "m_0",
+            "sum_x"
+          ],
+          "comparison_key": "{\"columns\":[\"m_0\",\"sum_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"-1\\\\\\\",-1]\\\",\\\"[\\\\\\\"97\\\\\\\",97]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[\\\"-1\\\",-1]\",\"[\\\"97\\\",97]\"]",
+          "row_count": 2,
+          "rows": [
+            [
+              "-1",
+              -1
+            ],
+            [
+              "97",
+              97
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[\\\"-1\\\",-1]\",\"[\\\"97\\\",97]\"]"
+        }
+      },
+      "raw_results": {
+        "duckdb": {
+          "backend": "duckdb",
+          "duration_ms": 25.91341100196587,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 8.825206001347397,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "pyarrow": {
+          "backend": "pyarrow",
+          "duration_ms": 6.747095001628622,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        }
+      },
+      "status": "ok"
+    }
+  ],
+  "fresh_candidate_bug_families": {
+    "conditional_expression@duckdb": 1
+  },
+  "generated_at": "2026-06-06T17:33:15Z",
+  "generated_by": "datadiff discovery-run",
+  "refresh_classification": true,
+  "schema_version": "discovery-run-fresh-candidates-v1",
+  "source_run_file": "runs/run-20260606T171300-1780765980790959578.jsonl.gz"
+}

@@ -103,6 +103,7 @@ def _pandas_bool_probe_handlers(pd: Any, op: dict[str, Any]) -> dict[str, Any]:
         "sparse_mask_probe": lambda: _pandas_sparse_mask_probe_mismatch(pd),
         "index_bool_probe": lambda: _pandas_index_bool_probe_mismatch(pd),
         "arrow_string_eq_sum_probe": lambda: _pandas_arrow_string_eq_sum_mismatch(pd),
+        "arrow_string_contains_na_probe": lambda: _pandas_arrow_string_contains_na_mismatch(pd),
         "arrow_timestamp_loc_slice_probe": lambda: _pandas_arrow_timestamp_loc_slice_mismatch(pd),
         "arrow_timestamp_index_attr_probe": lambda: _pandas_arrow_timestamp_index_attr_mismatch(pd),
         "eval_inplace_alias_probe": lambda: _pandas_eval_inplace_alias_mismatch(pd),
@@ -442,6 +443,16 @@ def _pandas_arrow_string_eq_sum_mismatch(pd) -> bool:
     except AttributeError:
         return True
     return int(observed) != 1
+
+
+def _pandas_arrow_string_contains_na_mismatch(pd) -> bool:
+    values = pd.Series(["alpha", pd.NA, "BETA", ""], dtype="string[pyarrow]")
+    try:
+        contains = values.str.contains("a", case=False, regex=False, na=False)
+        starts = values.str.startswith("a", na=False)
+    except (AttributeError, TypeError, ValueError):
+        return True
+    return contains.tolist() != [True, False, True, False] or starts.tolist() != [True, False, False, False]
 
 
 def _pandas_arrow_timestamp_loc_slice_mismatch(pd) -> bool:

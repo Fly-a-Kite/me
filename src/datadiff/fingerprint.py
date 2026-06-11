@@ -9,7 +9,7 @@ from datadiff.canonicalization import short_canonical_hash
 from datadiff.dsl import Case
 from datadiff.normalizer import NormalizedResult
 from datadiff.operation_semantics import operation_names
-from datadiff.rust_kernel import compute_minhash, stable_rows
+from datadiff.rust_kernel import compute_minhash
 
 MINHASH_SIGNATURE_SIZE = 64
 
@@ -157,7 +157,7 @@ def _fingerprint_tokens(
         tokens.append(f"anchor_error:{anchor.error_type}")
     for column in anchor.columns:
         tokens.append(f"output_col:{column}")
-    for row_key in sorted(stable_rows(anchor.rows)):
+    for row_key in sorted(anchor.stable_row_keys):
         tokens.append(f"row:{row_key}")
     return tokens
 

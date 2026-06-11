@@ -1,0 +1,232 @@
+{
+  "bug_audit": {
+    "skipped": true
+  },
+  "cases_per_lane_seed": 1,
+  "completed_at": "2026-06-07T07:13:03Z",
+  "duration": null,
+  "generated_at": "2026-06-07T07:13:03Z",
+  "generated_by": "datadiff discovery-campaign",
+  "health_stop_reason": "",
+  "lane_ids": [
+    "deep_probe_rotation"
+  ],
+  "lanes": [
+    {
+      "default": false,
+      "discovery_biases": [],
+      "id": "deep_probe_rotation",
+      "preset": "live_deep_probe_rotation_metamorphic",
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "target_suite": "latest_all_engines",
+      "theme": "Deterministic deep probe rotation for audit/seed calibration; known probe families remain separated from fresh discovery counts"
+    }
+  ],
+  "progress": {
+    "completed_run_count": 1,
+    "current_lane_id": "",
+    "current_seed": "",
+    "planned_run_count": 1,
+    "remaining_run_count": 0
+  },
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "pyarrow",
+        "polars",
+        "polars_lazy",
+        "duckdb",
+        "sqlite",
+        "datafusion"
+      ],
+      "candidate_pipeline": {},
+      "cases": 1,
+      "classification": {
+        "candidate_bug_families": {},
+        "examples": {},
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {},
+        "refresh": false,
+        "run_file": "runs/run-20260607T071301-1780816381813624988.jsonl.gz",
+        "triage_verdicts": {},
+        "unsaturated_candidate_bug_families": {}
+      },
+      "completed_at": "2026-06-07T07:13:03Z",
+      "csv": "reports/findings-run-20260607T071301-1780816381813624988.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-smoke-arrow-bool-groupby-rotation-deep_probe_rotation-seed21-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "health": {
+        "bytes": 6359,
+        "candidate_bug_families": {},
+        "examples": [],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 1,
+        "run_file": "runs/run-20260607T071301-1780816381813624988.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 1.4076539689995116,
+          "evidence_bytes_per_case": 6359.0,
+          "executed_cases": 1,
+          "meta_file": "runs/run-20260607T071301-1780816381813624988.meta.json",
+          "next_seed": 30,
+          "run_log_bytes": 6359,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 757.3395939980401,
+              "generate_mutate_ms": 38.68249600054696,
+              "logging_artifact_ms": 0.014192002709023654,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 100.85792100289837,
+              "scheduler_feedback_ms": 14.705884008435532,
+              "total_case_wall_ms": 911.60008701263
+            },
+            "case_count": 1,
+            "share_of_total": {
+              "backend_execution_ms": 0.8307805196463823,
+              "generate_mutate_ms": 0.04243362473484607,
+              "logging_artifact_ms": 1.5568233166290855e-05,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.11063834069324854,
+              "scheduler_feedback_ms": 0.016131946692356763,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.7104018615531975
+        },
+        "statuses": {
+          "ok": 1
+        }
+      },
+      "lane_id": "deep_probe_rotation",
+      "preset": "live_deep_probe_rotation_metamorphic",
+      "report": "reports/report-run-20260607T071301-1780816381813624988.md",
+      "run_file": "runs/run-20260607T071301-1780816381813624988.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 1.0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 0.0,
+        "priority_rank": 1,
+        "score": 2.2798345101319635,
+        "yield_rate": 0.0
+      },
+      "seed": 21,
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "started_at": "2026-06-07T07:13:01Z",
+      "status": "completed",
+      "target_suite": "latest_all_engines",
+      "theme": "Deterministic deep probe rotation for audit/seed calibration; known probe families remain separated from fresh discovery counts"
+    }
+  ],
+  "scheduler": {
+    "bug_discovery_system": {
+      "objective": "maximize externally reproducible fresh implementation bug yield per unit budget",
+      "schema_version": "bug-discovery-system-v1",
+      "stages": [
+        "generate_or_mutate_candidate",
+        "score_by_acquisition",
+        "execute_differential_oracles",
+        "filter_rewardable_fresh_candidates",
+        "recheck_reproducibility",
+        "reduce_preserving_root_cause",
+        "write_reproducer_and_issue_draft"
+      ],
+      "theory": {
+        "budget": "Boltzmann allocation over acquisition free energy",
+        "candidate_priority": "multi-objective proof/reproducibility/dedup utility",
+        "exploration": "UCB optimism under sparse lane samples",
+        "novelty": "Good-Turing unseen-family probability"
+      }
+    },
+    "generated_at": "2026-06-07T07:13:03Z",
+    "history_manifest_count": 8,
+    "history_window": 8,
+    "lanes": [
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 1.0,
+        "candidate_total": 0,
+        "completed_runs": 1,
+        "current_runs": 1,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "deep_probe_rotation",
+        "novelty_rate": 0.0,
+        "pending_runs": 0,
+        "preset": "live_deep_probe_rotation_metamorphic",
+        "priority_rank": 1,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.124649575020964,
+        "target_suite": "latest_all_engines",
+        "theme": "Deterministic deep probe rotation for audit/seed calibration; known probe families remain separated from fresh discovery counts",
+        "ucb_bonus": 0.37464957502096397,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      }
+    ],
+    "score_weights": {
+      "boltzmann_temperature": 0.85,
+      "entropy_weight": 0.2,
+      "false_positive_penalty": 1.25,
+      "issue_inspired_weight": 0.2,
+      "novelty_rate": 0.75,
+      "proof_weight": 0.6,
+      "saturation_penalty": 0.75,
+      "uncertainty_weight": 0.45,
+      "yield_rate": 1.0
+    },
+    "strategy": "true_bug_acquisition_good_turing_ucb_boltzmann"
+  },
+  "schema_version": "discovery-campaign-v1",
+  "seeds": [
+    21
+  ],
+  "started_at": "2026-06-07T07:13:01Z",
+  "status": "completed",
+  "stopped_by_health": false,
+  "summary": {
+    "candidate_pipeline": {
+      "pipeline_count": 0
+    },
+    "fresh_candidate_bug_families": {},
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {},
+    "run_count": 1,
+    "triage_verdicts": {}
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "guided_discovery_campaign",
+    "true_bug_acquisition_scheduler",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence",
+    "candidate_pipeline"
+  ]
+}

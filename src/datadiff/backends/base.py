@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any
 
 from datadiff.dsl import ColumnSpec, Program, TableData
@@ -53,7 +53,23 @@ class BackendResult:
     duration_ms: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        return {
+            "backend": self.backend,
+            "status": self.status,
+            "data": self.data,
+            "error_type": self.error_type,
+            "error": self.error,
+            "duration_ms": self.duration_ms,
+        }
+
+    def summary_dict(self) -> dict[str, Any]:
+        return {
+            "backend": self.backend,
+            "status": self.status,
+            "error_type": self.error_type,
+            "error": self.error,
+            "duration_ms": self.duration_ms,
+        }
 
 
 class Backend:

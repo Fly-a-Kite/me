@@ -1,0 +1,1122 @@
+{
+  "events": [
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-31",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T17:50:12Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-31",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T17:53:07Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-31",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T17:56:11Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-310",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T17:59:38Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-310",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:03:00Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-310",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:06:25Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-263",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:09:18Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-263-mut-270",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:12:27Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-31",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:15:43Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-3",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:18:54Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-263-mut-311",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:22:08Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-30",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:25:44Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-310",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:29:23Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-263-mut-352",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:32:19Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-30",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:35:45Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-310",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:39:05Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-3",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:41:59Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-30",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:45:11Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-31",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:48:14Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-30",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:51:04Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-3",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:53:53Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-310",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:56:43Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-263-mut-589",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T18:59:36Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-3",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:02:24Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-3",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:05:34Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-3",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:08:16Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-263-mut-731",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:11:12Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-30",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:14:49Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-3",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:18:07Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-31",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:21:32Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-310",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:25:00Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-3",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:27:57Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-310",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:30:29Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-310",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:33:04Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-310",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:36:22Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-31",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:39:43Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-30",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:43:01Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-310",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:46:43Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-30",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:50:06Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-31",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:53:35Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "conditional_expression-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-31",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "primary_family": "conditional_expression@datafusion,duckdb",
+      "recorded_at": "2026-06-06T19:56:56Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "conditional_expression@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "conditional_expression",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-263-mut-1108",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T20:00:16Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb",
+        "pandas"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-datafusion-duckdb-case-00000773-common-api-workflow-mut-789",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "primary_family": "running_sum_precision@datafusion,duckdb",
+      "recorded_at": "2026-06-06T20:00:36Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@datafusion,duckdb"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-fixed-coverage_fast-20260606T172423Z-datafusion_common_api-seed11-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T173911-1780767551769134060.jsonl.gz",
+      "suspicious_backends": [
+        "datafusion",
+        "duckdb"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    }
+  ],
+  "schema_version": "dynamic-strategy-learning-v1"
+}

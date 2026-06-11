@@ -1,0 +1,214 @@
+{
+  "events": [
+    {
+      "candidate_id": "running_sum_precision-polars_lazy-case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-164-cha",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "primary_family": "running_sum_precision@polars_lazy",
+      "recorded_at": "2026-06-06T20:52:01Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-polars-20260606T171300Z-polars_lazy-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T174405-1780767845475761516.jsonl.gz",
+      "suspicious_backends": [
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-polars_lazy-case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-164-cha",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "primary_family": "running_sum_precision@polars_lazy",
+      "recorded_at": "2026-06-06T20:52:04Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_filter_idempotence_immediate",
+        "metamorphic_string_lower_normalized_column"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-polars-20260606T171300Z-polars_lazy-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T174405-1780767845475761516.jsonl.gz",
+      "suspicious_backends": [
+        "polars_lazy"
+      ],
+      "triage_verdict": "not_reproduced"
+    },
+    {
+      "candidate_id": "running_sum_precision-polars_lazy-case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-164-cha",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "primary_family": "running_sum_precision@polars_lazy",
+      "recorded_at": "2026-06-06T20:52:08Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_filter_idempotence_immediate",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-polars-20260606T171300Z-polars_lazy-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T174405-1780767845475761516.jsonl.gz",
+      "suspicious_backends": [
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-polars_lazy-case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-164-cha",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "primary_family": "running_sum_precision@polars_lazy",
+      "recorded_at": "2026-06-06T20:52:11Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_union_all_empty_append",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-polars-20260606T171300Z-polars_lazy-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T174405-1780767845475761516.jsonl.gz",
+      "suspicious_backends": [
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "groupby_aggregation-polars_lazy-case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-164-champ",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "groupby_aggregation@polars_lazy"
+      ],
+      "primary_family": "groupby_aggregation@polars_lazy",
+      "recorded_at": "2026-06-06T20:52:12Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "groupby_aggregation@polars_lazy"
+      ],
+      "reproduced_roots": [
+        "groupby_aggregation",
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-polars-20260606T171300Z-polars_lazy-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T174405-1780767845475761516.jsonl.gz",
+      "suspicious_backends": [
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "running_sum_precision-polars_lazy-case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-164-cha",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "primary_family": "running_sum_precision@polars_lazy",
+      "recorded_at": "2026-06-06T20:52:15Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-polars-20260606T171300Z-polars_lazy-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T174405-1780767845475761516.jsonl.gz",
+      "suspicious_backends": [
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "groupby_aggregation-polars_lazy-case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-164-champ",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "groupby_aggregation@polars_lazy"
+      ],
+      "primary_family": "groupby_aggregation@polars_lazy",
+      "recorded_at": "2026-06-06T20:52:17Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "groupby_aggregation@polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_string_lower_normalized_column",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-polars-20260606T171300Z-polars_lazy-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T174405-1780767845475761516.jsonl.gz",
+      "suspicious_backends": [
+        "polars_lazy"
+      ],
+      "triage_verdict": "not_reproduced"
+    },
+    {
+      "candidate_id": "groupby_aggregation-polars_lazy-case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-164-champ",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "groupby_aggregation@polars_lazy"
+      ],
+      "primary_family": "groupby_aggregation@polars_lazy",
+      "recorded_at": "2026-06-06T20:52:18Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "groupby_aggregation@polars_lazy"
+      ],
+      "reproduced_roots": [
+        "groupby_aggregation",
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-polars-20260606T171300Z-polars_lazy-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T174405-1780767845475761516.jsonl.gz",
+      "suspicious_backends": [
+        "polars_lazy"
+      ],
+      "triage_verdict": "semantic_divergence_needs_confirmation"
+    },
+    {
+      "candidate_id": "groupby_aggregation-polars_lazy-case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-164-champ",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "groupby_aggregation@polars_lazy"
+      ],
+      "primary_family": "groupby_aggregation@polars_lazy",
+      "recorded_at": "2026-06-06T20:52:19Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "groupby_aggregation@polars_lazy"
+      ],
+      "reproduced_roots": [
+        "metamorphic_union_all_empty_append"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-polars-20260606T171300Z-polars_lazy-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T174405-1780767845475761516.jsonl.gz",
+      "suspicious_backends": [
+        "polars_lazy"
+      ],
+      "triage_verdict": "not_reproduced"
+    }
+  ],
+  "schema_version": "dynamic-strategy-learning-v1"
+}

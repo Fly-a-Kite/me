@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import copy
+import gzip
 import hashlib
+import json
 import random
+import re
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -10,10 +14,16 @@ from typing import Any, Iterable, Mapping
 from datadiff import util as _util
 from datadiff.datagen import repair_operations
 from datadiff.dsl import Case, Program
-from datadiff.util import JsonlWriter, append_jsonl, iter_jsonl, utc_now
+from datadiff.util import JsonlWriter, append_jsonl, utc_now
 
 CHAMPION_CORPUS_SCHEMA_VERSION = "champion-corpus-v1"
 DEFAULT_CHAMPION_CORPUS_PATH = _util.RUNS_DIR / "champion_corpus.jsonl"
+_CHAMPION_CASE_ID_RE = re.compile(r'"case_id":\s*("(?:(?:\\.)|[^"\\])*")')
+_CHAMPION_VERSION_ID_RE = re.compile(r'"version_id":\s*("(?:(?:\\.)|[^"\\])*")')
+_CHAMPION_PROMOTED_AT_RE = re.compile(r'"promoted_at":\s*("(?:(?:\\.)|[^"\\])*")')
+_CHAMPION_STABILITY_RE = re.compile(r'"stability":\s*(-?\d+)')
+_CHAMPION_BUG_FAMILY_KEYS_RE = re.compile(r'"bug_family_keys":\s*(\[[^\]]*\])')
+_CHAMPION_STRING_ARRAY_ITEM_RE = re.compile(r'"([^"\\]*)"')
 
 
 def default_champion_corpus_path() -> Path:
@@ -70,6 +80,20 @@ class ChampionSeed:
         }
         case.metadata = metadata
         return case
+
+    def identity_key(self) -> tuple[str, str, tuple[str, ...]]:
+        return (self.version_id, self.case_id, self.bug_family_keys)
+
+
+@dataclass(frozen=True, slots=True)
+class _ChampionSeedStub:
+    case_id: str
+    version_id: str
+    bug_family_keys: tuple[str, ...]
+    promoted_at: str
+    stability: int
+    has_case_payload: bool
+    row_text: str
 
     def identity_key(self) -> tuple[str, str, tuple[str, ...]]:
         return (self.version_id, self.case_id, self.bug_family_keys)
@@ -139,26 +163,104 @@ class ChampionRegistry:
         cached = self._cache_by_version.get(cache_key)
         if cached is not None:
             return list(cached)
-        champions = []
-        for champion in self._read_all():
-            if not champion.case_id or not champion.case_payload:
-                continue
-            if resolved_version and not include_same_version and champion.version_id == resolved_version:
-                continue
-            champions.append(champion)
-        champions.sort(
-            key=lambda item: (
-                item.stability,
-                len(item.bug_family_keys),
-                item.promoted_at,
-                item.case_id,
-            ),
-            reverse=True,
-        )
         if resolved_limit is not None:
-            champions = champions[:resolved_limit]
+            broader = self._cached_broader_version_query(
+                signature,
+                resolved_version,
+                include_same_version=include_same_version,
+                limit=resolved_limit,
+            )
+            if broader is not None:
+                champions = broader[:resolved_limit]
+                self._cache_by_version[cache_key] = champions
+                return list(champions)
+        if (
+            resolved_limit is not None
+            and signature is not None
+            and not (self._cache_signature == signature and self._cache_champions is not None)
+        ):
+            champions = self._read_limited_for_version(
+                resolved_version,
+                include_same_version=include_same_version,
+                limit=resolved_limit,
+            )
+        else:
+            champions = []
+            for champion in self._read_all():
+                if not champion.case_id or not champion.case_payload:
+                    continue
+                if resolved_version and not include_same_version and champion.version_id == resolved_version:
+                    continue
+                champions.append(champion)
+            champions.sort(key=_champion_sort_key, reverse=True)
+            if resolved_limit is not None:
+                champions = champions[:resolved_limit]
         self._cache_by_version[cache_key] = champions
         return list(champions)
+
+    def _cached_broader_version_query(
+        self,
+        signature: tuple[int, int] | None,
+        version_id: str,
+        *,
+        include_same_version: bool,
+        limit: int,
+    ) -> list[ChampionSeed] | None:
+        best_limit: int | None = None
+        best: list[ChampionSeed] | None = None
+        for (
+            cached_signature,
+            cached_version,
+            cached_include_same_version,
+            cached_limit,
+        ), champions in self._cache_by_version.items():
+            if (
+                cached_signature != signature
+                or cached_version != version_id
+                or cached_include_same_version != bool(include_same_version)
+                or cached_limit is None
+                or cached_limit < limit
+            ):
+                continue
+            if best_limit is None or cached_limit < best_limit:
+                best_limit = cached_limit
+                best = champions
+        return list(best) if best is not None else None
+
+    def _read_limited_for_version(
+        self,
+        version_id: str,
+        *,
+        include_same_version: bool,
+        limit: int,
+    ) -> list[ChampionSeed]:
+        if limit <= 0:
+            return []
+        stubs: dict[tuple[str, str, tuple[str, ...]], _ChampionSeedStub] = {}
+        for text in _iter_jsonl_text_lenient(self.path):
+            stub = _champion_seed_stub_from_json_text(text)
+            if stub is None or not stub.case_id or not stub.has_case_payload:
+                continue
+            if version_id and not include_same_version and stub.version_id == version_id:
+                continue
+            key = stub.identity_key()
+            stored = stubs.get(key)
+            if stored is None or stub.stability > stored.stability:
+                stubs[key] = stub
+        selected = sorted(stubs.values(), key=_champion_stub_sort_key, reverse=True)[:limit]
+        champions: list[ChampionSeed] = []
+        for stub in selected:
+            try:
+                champion = ChampionSeed.from_dict(json.loads(stub.row_text))
+            except (TypeError, json.JSONDecodeError, ValueError):
+                continue
+            if not champion.case_id or not champion.case_payload:
+                continue
+            if version_id and not include_same_version and champion.version_id == version_id:
+                continue
+            champions.append(champion)
+        champions.sort(key=_champion_sort_key, reverse=True)
+        return champions[:limit]
 
     def graft_subtree(self, host: Case, donor: ChampionSeed, rnd: random.Random) -> Case:
         host_tables = copy.deepcopy(host.tables)
@@ -207,7 +309,7 @@ class ChampionRegistry:
         if self._cache_signature == signature and self._cache_champions is not None:
             return list(self._cache_champions)
         champions: dict[tuple[str, str, tuple[str, ...]], ChampionSeed] = {}
-        for row in iter_jsonl(self.path):
+        for row in _iter_jsonl_lenient(self.path):
             if not isinstance(row, dict):
                 continue
             try:
@@ -271,6 +373,24 @@ def champion_signature(champion: ChampionSeed) -> str:
     return f"champion:{digest}"
 
 
+def _champion_sort_key(champion: ChampionSeed) -> tuple[int, int, str, str]:
+    return (
+        champion.stability,
+        len(champion.bug_family_keys),
+        champion.promoted_at,
+        champion.case_id,
+    )
+
+
+def _champion_stub_sort_key(stub: _ChampionSeedStub) -> tuple[int, int, str, str]:
+    return (
+        stub.stability,
+        len(stub.bug_family_keys),
+        stub.promoted_at,
+        stub.case_id,
+    )
+
+
 def _case_minhash_signature(case: Case) -> tuple[int, ...]:
     metadata = case.metadata if isinstance(case.metadata, dict) else {}
     fingerprint = metadata.get("case_fingerprint", {})
@@ -300,3 +420,110 @@ def _looks_int(value: Any) -> bool:
     except (TypeError, ValueError):
         return False
     return True
+
+
+def _champion_seed_stub_from_json_text(text: str) -> _ChampionSeedStub | None:
+    stub = _champion_seed_stub_from_json_text_fast(text)
+    if stub is not None:
+        return stub
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, Mapping):
+        return None
+    case_payload = data.get("case_payload", {}) or {}
+    try:
+        stability = max(0, int(data.get("stability", 0) or 0))
+    except (TypeError, ValueError):
+        stability = 0
+    return _ChampionSeedStub(
+        case_id=str(data.get("case_id", "") or ""),
+        version_id=str(data.get("version_id", "") or ""),
+        bug_family_keys=tuple(_unique_strings(data.get("bug_family_keys", []) or [])),
+        promoted_at=str(data.get("promoted_at", "") or ""),
+        stability=stability,
+        has_case_payload=isinstance(case_payload, Mapping) and bool(case_payload),
+        row_text=text,
+    )
+
+
+def _champion_seed_stub_from_json_text_fast(text: str) -> _ChampionSeedStub | None:
+    if '"case_payload":' not in text:
+        return None
+    case_id = _json_string_match(text, _CHAMPION_CASE_ID_RE)
+    version_id = _json_string_match(text, _CHAMPION_VERSION_ID_RE)
+    promoted_at = _json_string_match(text, _CHAMPION_PROMOTED_AT_RE)
+    family_match = _CHAMPION_BUG_FAMILY_KEYS_RE.search(text)
+    stability_match = _CHAMPION_STABILITY_RE.search(text)
+    if case_id is None or version_id is None or family_match is None or stability_match is None:
+        return None
+    bug_family_keys = _json_string_array_match(family_match.group(1))
+    if bug_family_keys is None:
+        return None
+    try:
+        stability = max(0, int(stability_match.group(1)))
+    except (TypeError, ValueError):
+        stability = 0
+    return _ChampionSeedStub(
+        case_id=case_id,
+        version_id=version_id,
+        bug_family_keys=bug_family_keys,
+        promoted_at=promoted_at or "",
+        stability=stability,
+        has_case_payload=True,
+        row_text=text,
+    )
+
+
+def _json_string_match(text: str, pattern: re.Pattern[str]) -> str | None:
+    match = pattern.search(text)
+    if match is None:
+        return None
+    raw = match.group(1)
+    if "\\" not in raw:
+        return raw[1:-1]
+    try:
+        return str(json.loads(raw))
+    except (TypeError, json.JSONDecodeError):
+        return None
+
+
+def _json_string_array_match(raw: str) -> tuple[str, ...] | None:
+    if "\\" not in raw:
+        values = _CHAMPION_STRING_ARRAY_ITEM_RE.findall(raw)
+        remainder = _CHAMPION_STRING_ARRAY_ITEM_RE.sub("", raw)
+        if all(char in "[], \t\r\n" for char in remainder):
+            return tuple(_unique_strings(values))
+    try:
+        decoded = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(decoded, list):
+        return None
+    return tuple(_unique_strings(decoded))
+
+
+def _iter_jsonl_lenient(path: Path):
+    for text in _iter_jsonl_text_lenient(path):
+        try:
+            yield json.loads(text)
+        except json.JSONDecodeError:
+            continue
+
+
+def iter_jsonl(path: Path):
+    yield from _iter_jsonl_lenient(path)
+
+
+def _iter_jsonl_text_lenient(path: Path):
+    opener = gzip.open if path.suffix == ".gz" else open
+    try:
+        with opener(path, "rt", encoding="utf-8") as handle:
+            for line in handle:
+                text = line.strip()
+                if not text:
+                    continue
+                yield text
+    except (EOFError, OSError, UnicodeDecodeError, zlib.error):
+        return

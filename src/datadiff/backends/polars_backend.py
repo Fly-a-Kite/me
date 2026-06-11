@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import math
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from datadiff.backends.base import Backend, BackendResult, PreparedTable, prepare_table
 from datadiff.backends.dataframe_semantics import running_sum_plan, tuple_absence_plan
@@ -54,6 +56,7 @@ def _polars_probe_handlers(
         ),
         "series_rtruediv_probe": lambda: _polars_series_rtruediv_mismatch(pl) if not lazy else False,
         "float_wrap_probe": lambda: _polars_float_wrap_mismatch(pl, lazy=lazy),
+        "polars_timezone_filter_probe": lambda: _polars_timezone_filter_mismatch(pl, lazy=lazy),
         "empty_literal_groupby_probe": lambda: _polars_empty_literal_groupby_mismatch(pl, lazy=lazy),
         "rolling_mean_by_null_count_probe": lambda: _polars_rolling_mean_by_null_count_mismatch(pl, lazy=lazy),
         "csv_long_numeric_roundtrip_probe": (
@@ -418,6 +421,28 @@ def _polars_timestamp_precision_filter_mismatch(pl, collect=None) -> bool:
         result = frame.filter(predicate)
     else:
         result = collect(frame.lazy().filter(predicate))
+    return result.height != 1
+
+
+def _polars_timezone_filter_mismatch(pl, *, lazy: bool) -> bool:
+    london = ZoneInfo("Europe/London")
+    frame = pl.DataFrame(
+        {
+            "ts": [
+                datetime(2024, 6, 1, 0, 30, tzinfo=ZoneInfo("UTC")),
+                datetime(2024, 5, 31, 22, 30, tzinfo=ZoneInfo("UTC")),
+            ]
+        }
+    )
+    if lazy:
+        frame = frame.lazy()
+    result = frame.with_columns(
+        local=pl.col("ts").dt.convert_time_zone("Europe/London")
+    ).filter(
+        pl.col("local") >= pl.lit(datetime(2024, 6, 1, 0, 0, tzinfo=london))
+    )
+    if lazy:
+        result = result.collect()
     return result.height != 1
 
 

@@ -1,0 +1,2957 @@
+{
+  "bug_audit": {
+    "candidate_bug_families": [
+      "distinct_null_topk@datafusion",
+      "datafusion_limit_idempotence@datafusion",
+      "polars_reflected_arithmetic_operand_order@polars",
+      "polars_vector_division_rounding@polars",
+      "pyarrow_sliced_bool_groupby_any_all@pyarrow"
+    ],
+    "environment": {
+      "datadiff_fuzz_lab": "0.1.0",
+      "datafusion": "53.0.0",
+      "duckdb": "1.5.3",
+      "pandas": "3.0.3",
+      "platform": "Linux-6.17.0-35-generic-x86_64-with-glibc2.39",
+      "polars": "1.41.0",
+      "pyarrow": "24.0.0",
+      "pysqlite3_binary": "0.5.4.post2",
+      "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+      "sqlite": "3.51.1",
+      "sqlite_runtime": "pysqlite3"
+    },
+    "generated_at": "2026-06-06T17:10:11Z",
+    "issue_files": [
+      "new_issue/generated/distinct_null_topk.md",
+      "new_issue/generated/datafusion_limit_idempotence.md",
+      "new_issue/generated/polars_reflected_arithmetic_operand_order.md",
+      "new_issue/generated/polars_vector_division_rounding.md",
+      "new_issue/generated/pyarrow_sliced_bool_groupby_any_all.md"
+    ],
+    "output_json": "reports/bug-audit-20260606T171011.json",
+    "output_markdown": "reports/bug-audit-20260606T171011.md",
+    "results": [
+      {
+        "candidate_bug": true,
+        "details": {
+          "checked_cases": 16,
+          "first_mismatch": {
+            "base_sql": "SELECT DISTINCT v FROM t0 ORDER BY v ASC NULLS FIRST",
+            "direction": "asc",
+            "expected_first_row": [
+              {
+                "v": null
+              }
+            ],
+            "nulls": "first",
+            "observed_limit_row": [
+              {
+                "v": ""
+              }
+            ],
+            "topk_sql": "SELECT DISTINCT v FROM t0 ORDER BY v ASC NULLS FIRST LIMIT 1",
+            "type": "utf8"
+          },
+          "mismatch_count": 6,
+          "sample_mismatches": [
+            {
+              "base_sql": "SELECT DISTINCT v FROM t0 ORDER BY v ASC NULLS FIRST",
+              "direction": "asc",
+              "expected_first_row": [
+                {
+                  "v": null
+                }
+              ],
+              "nulls": "first",
+              "observed_limit_row": [
+                {
+                  "v": ""
+                }
+              ],
+              "topk_sql": "SELECT DISTINCT v FROM t0 ORDER BY v ASC NULLS FIRST LIMIT 1",
+              "type": "utf8"
+            },
+            {
+              "base_sql": "SELECT DISTINCT v FROM t0 ORDER BY v DESC NULLS FIRST",
+              "direction": "desc",
+              "expected_first_row": [
+                {
+                  "v": null
+                }
+              ],
+              "nulls": "first",
+              "observed_limit_row": [
+                {
+                  "v": "a"
+                }
+              ],
+              "topk_sql": "SELECT DISTINCT v FROM t0 ORDER BY v DESC NULLS FIRST LIMIT 1",
+              "type": "utf8"
+            },
+            {
+              "base_sql": "SELECT DISTINCT v FROM t0 ORDER BY v ASC NULLS FIRST",
+              "direction": "asc",
+              "expected_first_row": [
+                {
+                  "v": null
+                }
+              ],
+              "nulls": "first",
+              "observed_limit_row": [
+                {
+                  "v": -1
+                }
+              ],
+              "topk_sql": "SELECT DISTINCT v FROM t0 ORDER BY v ASC NULLS FIRST LIMIT 1",
+              "type": "int64"
+            },
+            {
+              "base_sql": "SELECT DISTINCT v FROM t0 ORDER BY v DESC NULLS FIRST",
+              "direction": "desc",
+              "expected_first_row": [
+                {
+                  "v": null
+                }
+              ],
+              "nulls": "first",
+              "observed_limit_row": [
+                {
+                  "v": 0
+                }
+              ],
+              "topk_sql": "SELECT DISTINCT v FROM t0 ORDER BY v DESC NULLS FIRST LIMIT 1",
+              "type": "int64"
+            },
+            {
+              "base_sql": "SELECT DISTINCT v FROM t0 ORDER BY v ASC NULLS FIRST",
+              "direction": "asc",
+              "expected_first_row": [
+                {
+                  "v": null
+                }
+              ],
+              "nulls": "first",
+              "observed_limit_row": [
+                {
+                  "v": -1.0
+                }
+              ],
+              "topk_sql": "SELECT DISTINCT v FROM t0 ORDER BY v ASC NULLS FIRST LIMIT 1",
+              "type": "float64"
+            },
+            {
+              "base_sql": "SELECT DISTINCT v FROM t0 ORDER BY v DESC NULLS FIRST",
+              "direction": "desc",
+              "expected_first_row": [
+                {
+                  "v": null
+                }
+              ],
+              "nulls": "first",
+              "observed_limit_row": [
+                {
+                  "v": 0.0
+                }
+              ],
+              "topk_sql": "SELECT DISTINCT v FROM t0 ORDER BY v DESC NULLS FIRST LIMIT 1",
+              "type": "float64"
+            }
+          ],
+          "sweep": "datafusion_distinct_order_by_nulls_limit_equivalence"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "For SELECT DISTINCT ... ORDER BY ... NULLS FIRST LIMIT 1, the top-1 result should equal the first row of the same ordered DISTINCT query without LIMIT; checked cases=16, mismatches=6.",
+        "expected": {
+          "mismatch_count": 0,
+          "relation": "LIMIT 1 must equal the first row of the full ordered DISTINCT result"
+        },
+        "family": "distinct_null_topk",
+        "invariant": "LIMIT 1 over an ordered DISTINCT result must return the first row of that full ordered DISTINCT result.",
+        "observed": {
+          "first_mismatch": {
+            "base_sql": "SELECT DISTINCT v FROM t0 ORDER BY v ASC NULLS FIRST",
+            "direction": "asc",
+            "expected_first_row": [
+              {
+                "v": null
+              }
+            ],
+            "nulls": "first",
+            "observed_limit_row": [
+              {
+                "v": ""
+              }
+            ],
+            "topk_sql": "SELECT DISTINCT v FROM t0 ORDER BY v ASC NULLS FIRST LIMIT 1",
+            "type": "utf8"
+          },
+          "mismatch_count": 6
+        },
+        "probe_id": "datafusion_distinct_null_topk",
+        "status": "candidate_implementation_bug",
+        "target_backend": "datafusion",
+        "title": "DataFusion DISTINCT ORDER BY NULLS FIRST LIMIT",
+        "version": "53.0.0"
+      },
+      {
+        "candidate_bug": true,
+        "details": {
+          "base_sql": "SELECT * FROM (\n  SELECT * FROM (\n    SELECT * FROM t0 ORDER BY s ASC NULLS FIRST, id ASC NULLS LAST LIMIT 5\n  ) q ORDER BY x DESC NULLS FIRST, id ASC NULLS LAST OFFSET 2\n) q ORDER BY x DESC NULLS FIRST, id ASC NULLS LAST",
+          "discovered_by": "datadiff discovery-run --cases 1200 --seed 998001 --target-suite latest_all_engines --preset live_cross_family_metamorphic",
+          "duplicate_limit_sql": "SELECT * FROM (\n  SELECT * FROM (\n    SELECT * FROM (\n      SELECT * FROM t0 ORDER BY s ASC NULLS FIRST, id ASC NULLS LAST LIMIT 5\n    ) q ORDER BY s ASC NULLS FIRST, id ASC NULLS LAST LIMIT 5\n  ) q ORDER BY x DESC NULLS FIRST, id ASC NULLS LAST OFFSET 2\n) q ORDER BY x DESC NULLS FIRST, id ASC NULLS LAST",
+          "fresh_family": "metamorphic_limit_idempotence@datafusion"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "DataFusion should treat an immediately repeated identical ordered LIMIT as idempotent; base rows=3, duplicate-limit rows=1.",
+        "expected": {
+          "base_rows": [
+            {
+              "g": "c",
+              "id": 8,
+              "s": "A",
+              "x": 0,
+              "z": 0
+            },
+            {
+              "g": "a",
+              "id": 12,
+              "s": "",
+              "x": -2,
+              "z": -3
+            },
+            {
+              "g": "c",
+              "id": 2,
+              "s": "",
+              "x": -10,
+              "z": -3
+            }
+          ],
+          "relation": "duplicate_limit_sql should return the same rows as base_sql"
+        },
+        "family": "datafusion_limit_idempotence",
+        "invariant": "Repeating the same ordered LIMIT over the same subquery must not change query results.",
+        "observed": {
+          "base_row_count": 3,
+          "duplicate_limit_row_count": 1,
+          "duplicate_limit_rows": [
+            {
+              "g": "a",
+              "id": 12,
+              "s": "",
+              "x": -2,
+              "z": -3
+            }
+          ]
+        },
+        "probe_id": "datafusion_limit_idempotence",
+        "status": "candidate_implementation_bug",
+        "target_backend": "datafusion",
+        "title": "DataFusion duplicate ordered LIMIT idempotence",
+        "version": "53.0.0"
+      },
+      {
+        "candidate_bug": false,
+        "details": {
+          "checked_queries": 3,
+          "first_mismatch": null,
+          "mismatch_count": 0,
+          "sample_mismatches": [],
+          "sweep": "duckdb_cte_inline_equivalence"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "Reading a non-recursive, deterministic query through an inline subquery and through an explicit WITH CTE must yield identical result rows; checked queries=3, mismatches=0.",
+        "expected": {
+          "mismatch_count": 0,
+          "relation": "inline subquery ≡ named CTE"
+        },
+        "family": "duckdb_cte_inline_equivalence",
+        "invariant": "Reading a deterministic, non-recursive query through an inline subquery and through an explicit WITH CTE must yield identical result rows.",
+        "observed": {
+          "first_mismatch": null,
+          "mismatch_count": 0
+        },
+        "probe_id": "duckdb_cte_inline_equivalence",
+        "status": "no_bug_detected",
+        "target_backend": "duckdb",
+        "title": "DuckDB inline subquery vs explicit CTE equivalence",
+        "version": "1.5.3"
+      },
+      {
+        "candidate_bug": false,
+        "details": {
+          "checked_queries": 2,
+          "first_mismatch": null,
+          "mismatch_count": 0,
+          "sample_mismatches": [],
+          "sweep": "duckdb_left_anti_join_equivalence"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "ANTI JOIN and LEFT JOIN + IS NULL filter are standard SQL equivalents; any divergence indicates a planner or null-handling bug. Checked queries=2, mismatches=0.",
+        "expected": {
+          "mismatch_count": 0,
+          "relation": "ANTI JOIN ≡ LEFT JOIN ... WHERE right.key IS NULL (mixed NULLs on both sides)"
+        },
+        "family": "duckdb_left_anti_join_equivalence",
+        "invariant": "ANTI JOIN must produce the same rows as LEFT JOIN ... WHERE right.key IS NULL for any predicate combination over NULLable join keys.",
+        "observed": {
+          "first_mismatch": null,
+          "mismatch_count": 0
+        },
+        "probe_id": "duckdb_left_anti_join_equivalence",
+        "status": "no_bug_detected",
+        "target_backend": "duckdb",
+        "title": "DuckDB ANTI JOIN vs LEFT JOIN IS NULL equivalence",
+        "version": "1.5.3"
+      },
+      {
+        "candidate_bug": false,
+        "details": {
+          "checked_frames": 2,
+          "first_mismatch": null,
+          "mismatch_count": 0,
+          "sample_mismatches": [],
+          "sweep": "pandas_arrow_groupby_size_count"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "For Arrow-backed pandas extension dtypes, the sum of groupby.size() values must equal the input row count regardless of null handling on the grouping key; checked frames=2, mismatches=0.",
+        "expected": {
+          "mismatch_count": 0,
+          "relation": "sum(groupby.size()) == n_rows"
+        },
+        "family": "pandas_arrow_groupby_size_count",
+        "invariant": "For Arrow-backed extension dtypes, sum(groupby.size()) must equal the input row count regardless of null handling on the grouping key.",
+        "observed": {
+          "first_mismatch": null,
+          "mismatch_count": 0
+        },
+        "probe_id": "pandas_arrow_groupby_size_count",
+        "status": "no_bug_detected",
+        "target_backend": "pandas",
+        "title": "pandas Arrow-backed groupby.size() row-count consistency",
+        "version": "3.0.3"
+      },
+      {
+        "candidate_bug": false,
+        "details": {
+          "checked_frames": 2,
+          "first_mismatch": null,
+          "mismatch_count": 0,
+          "sample_mismatches": [],
+          "sweep": "polars_concat_select_pushdown"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "Selecting columns after concat must equal selecting the same columns from each frame and concatenating; this catches projection-pushdown ordering and null-handling bugs. Checked frames=2, mismatches=0.",
+        "expected": {
+          "mismatch_count": 0,
+          "relation": "concat∘select ≡ select-each∘concat for shared columns"
+        },
+        "family": "polars_concat_select_pushdown",
+        "invariant": "concat(frames).select(cols) must equal concat(frame.select(cols) for frame in frames) for any column subset shared across frames.",
+        "observed": {
+          "first_mismatch": null,
+          "mismatch_count": 0
+        },
+        "probe_id": "polars_concat_select_pushdown",
+        "status": "no_bug_detected",
+        "target_backend": "polars",
+        "title": "Polars concat-select projection pushdown equivalence",
+        "version": "1.41.0"
+      },
+      {
+        "candidate_bug": false,
+        "details": {
+          "checked_queries": 3,
+          "first_mismatch": null,
+          "mismatch_count": 0,
+          "sample_mismatches": [],
+          "sweep": "polars_lazy_eager_equivalence"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "Polars eager and lazy execution paths share the same logical plan; any divergence on pure (no-IO) pipelines indicates a planner-vs-evaluator bug. Checked queries=3, mismatches=0.",
+        "expected": {
+          "mismatch_count": 0,
+          "relation": "eager(query) ≡ lazy(query).collect() for pure pipelines"
+        },
+        "family": "polars_lazy_eager_equivalence",
+        "invariant": "For pure (no-IO) Polars pipelines, df.lazy().pipeline().collect() must equal df.pipeline() exactly.",
+        "observed": {
+          "first_mismatch": null,
+          "mismatch_count": 0
+        },
+        "probe_id": "polars_lazy_eager_equivalence",
+        "status": "no_bug_detected",
+        "target_backend": "polars",
+        "title": "Polars lazy.collect() vs eager pipeline equivalence",
+        "version": "1.41.0"
+      },
+      {
+        "candidate_bug": true,
+        "details": {
+          "methods_checked": [
+            "__rfloordiv__",
+            "__rmod__",
+            "__rpow__",
+            "__rsub__",
+            "__rtruediv__"
+          ],
+          "mismatched_methods": [
+            "__rsub__",
+            "__rtruediv__",
+            "__rfloordiv__",
+            "__rmod__",
+            "__rpow__"
+          ],
+          "scope": "Series-vs-Series reflected arithmetic; Polars Expr reflected arithmetic is checked separately by normal expression semantics."
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "Reflected Series methods with mismatched result or exception: ['__rsub__', '__rtruediv__', '__rfloordiv__', '__rmod__', '__rpow__']",
+        "expected": {
+          "__rfloordiv__": [
+            2,
+            2,
+            2
+          ],
+          "__rmod__": [
+            1,
+            1,
+            1
+          ],
+          "__rpow__": [
+            25,
+            343,
+            6561
+          ],
+          "__rsub__": [
+            3,
+            4,
+            5
+          ],
+          "__rtruediv__": [
+            2.5,
+            2.3333333333333335,
+            2.25
+          ]
+        },
+        "family": "polars_reflected_arithmetic_operand_order",
+        "invariant": "Series reflected arithmetic lhs.__rop__(rhs) must evaluate rhs op lhs.",
+        "observed": {
+          "__rfloordiv__": [
+            0,
+            0,
+            0
+          ],
+          "__rmod__": [
+            2,
+            3,
+            4
+          ],
+          "__rpow__": {
+            "error": "unable to find column \"lhs\"; valid columns: [\"rhs\"]",
+            "error_type": "ColumnNotFoundError"
+          },
+          "__rsub__": [
+            -3,
+            -4,
+            -5
+          ],
+          "__rtruediv__": [
+            0.4,
+            0.42857142857142855,
+            0.4444444444444444
+          ]
+        },
+        "probe_id": "polars_reflected_arithmetic",
+        "status": "candidate_implementation_bug",
+        "target_backend": "polars",
+        "title": "Polars Series reflected arithmetic operand order",
+        "version": "1.41.0"
+      },
+      {
+        "candidate_bug": false,
+        "details": {
+          "checked_comparisons": 2880,
+          "first_mismatch": null,
+          "mismatch_count": 0,
+          "sample_mismatches": [],
+          "sweep": "polars_slice_chunk_lazy_equivalence"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "Sliced, multi-chunk, rebuilt, and lazy Polars tables should agree for the same group/filter/sort operations; deterministic comparisons=2880, mismatches=0.",
+        "expected": {
+          "mismatch_count": 0
+        },
+        "family": "polars_slice_chunk_lazy_equivalence",
+        "invariant": "Equivalent Polars layouts and execution modes must return identical operation results.",
+        "observed": {
+          "first_mismatch": null,
+          "mismatch_count": 0
+        },
+        "probe_id": "polars_slice_chunk_lazy_equivalence",
+        "status": "no_bug_detected",
+        "target_backend": "polars",
+        "title": "Polars sliced/chunked/lazy operation equivalence",
+        "version": "1.41.0"
+      },
+      {
+        "candidate_bug": true,
+        "details": {
+          "checked_cases": 440,
+          "first_mismatch": {
+            "denominator": 3,
+            "expected": -6.666666666666667,
+            "expected_bits": "0xc01aaaaaaaaaaaab",
+            "numerator": -20,
+            "vector": [
+              -6.666666666666666,
+              -6.666666666666666
+            ],
+            "vector_bits": [
+              "0xc01aaaaaaaaaaaaa",
+              "0xc01aaaaaaaaaaaaa"
+            ]
+          },
+          "mismatch_count": 94,
+          "sample_mismatches": [
+            {
+              "denominator": 3,
+              "expected": -6.666666666666667,
+              "expected_bits": "0xc01aaaaaaaaaaaab",
+              "numerator": -20,
+              "vector": [
+                -6.666666666666666,
+                -6.666666666666666
+              ],
+              "vector_bits": [
+                "0xc01aaaaaaaaaaaaa",
+                "0xc01aaaaaaaaaaaaa"
+              ]
+            },
+            {
+              "denominator": 6,
+              "expected": -3.3333333333333335,
+              "expected_bits": "0xc00aaaaaaaaaaaab",
+              "numerator": -20,
+              "vector": [
+                -3.333333333333333,
+                -3.333333333333333
+              ],
+              "vector_bits": [
+                "0xc00aaaaaaaaaaaaa",
+                "0xc00aaaaaaaaaaaaa"
+              ]
+            },
+            {
+              "denominator": 7,
+              "expected": -2.857142857142857,
+              "expected_bits": "0xc006db6db6db6db7",
+              "numerator": -20,
+              "vector": [
+                -2.8571428571428568,
+                -2.8571428571428568
+              ],
+              "vector_bits": [
+                "0xc006db6db6db6db6",
+                "0xc006db6db6db6db6"
+              ]
+            },
+            {
+              "denominator": 11,
+              "expected": -1.8181818181818181,
+              "expected_bits": "0xbffd1745d1745d17",
+              "numerator": -20,
+              "vector": [
+                -1.8181818181818183,
+                -1.8181818181818183
+              ],
+              "vector_bits": [
+                "0xbffd1745d1745d18",
+                "0xbffd1745d1745d18"
+              ]
+            },
+            {
+              "denominator": 12,
+              "expected": -1.6666666666666667,
+              "expected_bits": "0xbffaaaaaaaaaaaab",
+              "numerator": -20,
+              "vector": [
+                -1.6666666666666665,
+                -1.6666666666666665
+              ],
+              "vector_bits": [
+                "0xbffaaaaaaaaaaaaa",
+                "0xbffaaaaaaaaaaaaa"
+              ]
+            },
+            {
+              "denominator": 5,
+              "expected": -3.8,
+              "expected_bits": "0xc00e666666666666",
+              "numerator": -19,
+              "vector": [
+                -3.8000000000000003,
+                -3.8000000000000003
+              ],
+              "vector_bits": [
+                "0xc00e666666666667",
+                "0xc00e666666666667"
+              ]
+            },
+            {
+              "denominator": 7,
+              "expected": -2.7142857142857144,
+              "expected_bits": "0xc005b6db6db6db6e",
+              "numerator": -19,
+              "vector": [
+                -2.714285714285714,
+                -2.714285714285714
+              ],
+              "vector_bits": [
+                "0xc005b6db6db6db6d",
+                "0xc005b6db6db6db6d"
+              ]
+            },
+            {
+              "denominator": 10,
+              "expected": -1.9,
+              "expected_bits": "0xbffe666666666666",
+              "numerator": -19,
+              "vector": [
+                -1.9000000000000001,
+                -1.9000000000000001
+              ],
+              "vector_bits": [
+                "0xbffe666666666667",
+                "0xbffe666666666667"
+              ]
+            },
+            {
+              "denominator": 7,
+              "expected": -2.5714285714285716,
+              "expected_bits": "0xc004924924924925",
+              "numerator": -18,
+              "vector": [
+                -2.571428571428571,
+                -2.571428571428571
+              ],
+              "vector_bits": [
+                "0xc004924924924924",
+                "0xc004924924924924"
+              ]
+            },
+            {
+              "denominator": 3,
+              "expected": -5.666666666666667,
+              "expected_bits": "0xc016aaaaaaaaaaab",
+              "numerator": -17,
+              "vector": [
+                -5.666666666666666,
+                -5.666666666666666
+              ],
+              "vector_bits": [
+                "0xc016aaaaaaaaaaaa",
+                "0xc016aaaaaaaaaaaa"
+              ]
+            }
+          ],
+          "sweep": "polars_int_column_scalar_division_single_vs_vector"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "Vectorized expression division should match the single-row/Python rounded double for 7 / 5; deterministic sweep mismatches=94.",
+        "expected": {
+          "bits": "0x3ff6666666666666",
+          "single_path": [
+            1.4
+          ],
+          "vector_path": [
+            1.4,
+            1.4
+          ]
+        },
+        "family": "polars_vector_division_rounding",
+        "invariant": "Vectorized column/scalar division must produce the same IEEE-754 double as the single-row path.",
+        "observed": {
+          "single_bits": [
+            "0x3ff6666666666666"
+          ],
+          "single_path": [
+            1.4
+          ],
+          "vector_bits": [
+            "0x3ff6666666666667",
+            "0x3ff6666666666667"
+          ],
+          "vector_path": [
+            1.4000000000000001,
+            1.4000000000000001
+          ]
+        },
+        "probe_id": "polars_vector_division_rounding",
+        "status": "candidate_implementation_bug",
+        "target_backend": "polars",
+        "title": "Polars vectorized expression division rounding",
+        "version": "1.41.0"
+      },
+      {
+        "candidate_bug": true,
+        "details": {
+          "checked_cases": 2880,
+          "first_mismatch": {
+            "aggregation": "any",
+            "flags": [
+              false,
+              null
+            ],
+            "groups": [
+              10,
+              10
+            ],
+            "offset": 1,
+            "rebuilt": [
+              {
+                "flag_any": false,
+                "g": 10
+              }
+            ],
+            "sliced": [
+              {
+                "flag_any": true,
+                "g": 10
+              }
+            ]
+          },
+          "mismatch_aggregations": [
+            "all",
+            "any"
+          ],
+          "mismatch_count": 1056,
+          "sample_mismatches": [
+            {
+              "aggregation": "any",
+              "flags": [
+                false,
+                null
+              ],
+              "groups": [
+                10,
+                10
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_any": false,
+                  "g": 10
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_any": true,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "all",
+              "flags": [
+                false,
+                null
+              ],
+              "groups": [
+                10,
+                10
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_all": false,
+                  "g": 10
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_all": true,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "any",
+              "flags": [
+                false,
+                null
+              ],
+              "groups": [
+                10,
+                11
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_any": false,
+                  "g": 10
+                },
+                {
+                  "flag_any": null,
+                  "g": 11
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_any": null,
+                  "g": 11
+                },
+                {
+                  "flag_any": true,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "all",
+              "flags": [
+                false,
+                null
+              ],
+              "groups": [
+                10,
+                11
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_all": false,
+                  "g": 10
+                },
+                {
+                  "flag_all": null,
+                  "g": 11
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_all": null,
+                  "g": 11
+                },
+                {
+                  "flag_all": true,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "any",
+              "flags": [
+                false,
+                null
+              ],
+              "groups": [
+                10,
+                null
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_any": false,
+                  "g": 10
+                },
+                {
+                  "flag_any": null,
+                  "g": null
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_any": null,
+                  "g": null
+                },
+                {
+                  "flag_any": true,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "all",
+              "flags": [
+                false,
+                null
+              ],
+              "groups": [
+                10,
+                null
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_all": false,
+                  "g": 10
+                },
+                {
+                  "flag_all": null,
+                  "g": null
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_all": null,
+                  "g": null
+                },
+                {
+                  "flag_all": true,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "any",
+              "flags": [
+                null,
+                true
+              ],
+              "groups": [
+                10,
+                10
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_any": true,
+                  "g": 10
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_any": false,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "all",
+              "flags": [
+                null,
+                true
+              ],
+              "groups": [
+                10,
+                10
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_all": true,
+                  "g": 10
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_all": false,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "any",
+              "flags": [
+                null,
+                true
+              ],
+              "groups": [
+                10,
+                11
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_any": null,
+                  "g": 10
+                },
+                {
+                  "flag_any": true,
+                  "g": 11
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_any": false,
+                  "g": 11
+                },
+                {
+                  "flag_any": null,
+                  "g": 10
+                }
+              ]
+            },
+            {
+              "aggregation": "all",
+              "flags": [
+                null,
+                true
+              ],
+              "groups": [
+                10,
+                11
+              ],
+              "offset": 1,
+              "rebuilt": [
+                {
+                  "flag_all": null,
+                  "g": 10
+                },
+                {
+                  "flag_all": true,
+                  "g": 11
+                }
+              ],
+              "sliced": [
+                {
+                  "flag_all": false,
+                  "g": 11
+                },
+                {
+                  "flag_all": null,
+                  "g": 10
+                }
+              ]
+            }
+          ],
+          "sweep": "pyarrow_sliced_bool_table_groupby_zero_offset_equivalence"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "Sliced table group_by boolean aggregates should match an equivalent zero-offset rebuilt table; mismatched aggregations: ['any', 'all']; sliced flag offset=1; deterministic sweep mismatches=1056.",
+        "expected": {
+          "all": [
+            {
+              "flag_all": false,
+              "g": 10
+            }
+          ],
+          "any": [
+            {
+              "flag_any": false,
+              "g": 10
+            }
+          ]
+        },
+        "family": "pyarrow_sliced_bool_groupby_any_all",
+        "invariant": "A sliced Arrow table must group/aggregate like an equivalent zero-offset rebuilt table.",
+        "observed": {
+          "all": [
+            {
+              "flag_all": true,
+              "g": 10
+            }
+          ],
+          "any": [
+            {
+              "flag_any": true,
+              "g": 10
+            }
+          ]
+        },
+        "probe_id": "pyarrow_sliced_bool_groupby",
+        "status": "candidate_implementation_bug",
+        "target_backend": "pyarrow",
+        "title": "PyArrow sliced Boolean group_by any/all",
+        "version": "24.0.0"
+      },
+      {
+        "candidate_bug": false,
+        "details": {
+          "checked_cases": 4356,
+          "first_mismatch": null,
+          "mismatch_count": 0,
+          "sample_mismatches": [],
+          "sweep": "pyarrow_sliced_table_filter_sort_take_zero_offset_equivalence"
+        },
+        "error": "",
+        "error_type": "",
+        "evidence": "Sliced Arrow tables and zero-offset rebuilt tables should agree for Boolean filter/sort/take operations; checked cases=4356, mismatches=0.",
+        "expected": {
+          "mismatch_count": 0
+        },
+        "family": "pyarrow_sliced_transform_equivalence",
+        "invariant": "A sliced Arrow table must filter, sort, and take like an equivalent zero-offset rebuilt table.",
+        "observed": {
+          "first_mismatch": null,
+          "mismatch_count": 0
+        },
+        "probe_id": "pyarrow_sliced_transform_equivalence",
+        "status": "no_bug_detected",
+        "target_backend": "pyarrow",
+        "title": "PyArrow sliced Boolean transform equivalence",
+        "version": "24.0.0"
+      }
+    ],
+    "skipped": false
+  },
+  "cases_per_lane_seed": 300,
+  "completed_at": "",
+  "duration": null,
+  "generated_at": "2026-06-07T03:49:13Z",
+  "generated_by": "datadiff discovery-campaign",
+  "health_stop_reason": "",
+  "lane_ids": [
+    "common_api_workflow",
+    "arrow_layout",
+    "polars_lazy",
+    "polars_streaming",
+    "datafusion_optimizer",
+    "datafusion_common_api",
+    "embedded_sql",
+    "duckdb_storage",
+    "cross_family",
+    "deep_probe_rotation",
+    "arrow_probe_stress",
+    "polars_probe_stress",
+    "duckdb_probe_stress"
+  ],
+  "lanes": [
+    {
+      "default": true,
+      "discovery_biases": [
+        {
+          "candidate_pool_bonus": 0.1,
+          "contribution_bonus": 0.2,
+          "feature_prefixes": [
+            "common_api_template:",
+            "materialization:",
+            "expr:string_",
+            "semantic_signal:",
+            "combo_risk:"
+          ],
+          "keep_in_pool": true,
+          "novelty_bonus": 0.25,
+          "score_bonus": 0.5,
+          "targets": [
+            "common_api_workflow",
+            "filter_input_materialization",
+            "distinct_input_materialization",
+            "case_when_membership",
+            "string_pattern_case_when"
+          ]
+        }
+      ],
+      "id": "common_api_workflow",
+      "preset": "live_common_api_workflow_metamorphic",
+      "semantic_focus_families": [
+        "materialization_boundary",
+        "string_semantics",
+        "join_membership",
+        "set_semantics"
+      ],
+      "semantic_focus_signals": [
+        "common_api_workflow",
+        "filter_input_materialization",
+        "distinct_input_materialization",
+        "case_when_membership",
+        "string_pattern_case_when"
+      ],
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, string clean/replace/slice/concat/pattern flags, ISO date-part extraction, int/float/string casts, nullable boolean not/reductions, drop-null, mutate, union-all, semi/anti join, fill-null/coalesce, case-when, distinct, join, groupby, sort, and slice"
+    },
+    {
+      "default": true,
+      "discovery_biases": [
+        {
+          "candidate_pool_bonus": 0.05,
+          "contribution_bonus": 0.1,
+          "feature_prefixes": [
+            "op:",
+            "pattern:"
+          ],
+          "keep_in_pool": true,
+          "novelty_bonus": 0.15,
+          "score_bonus": 0.35,
+          "targets": [
+            "pyarrow_list_flatten_parent_indices_semantics",
+            "pyarrow_hash_pivot_wider_order_semantics"
+          ]
+        }
+      ],
+      "id": "arrow_layout",
+      "preset": "live_arrow_deep_organic_metamorphic",
+      "semantic_focus_families": [
+        "null_semantics",
+        "type_coercion",
+        "backend_specific_semantics"
+      ],
+      "semantic_focus_signals": [
+        "pyarrow_list_flatten_parent_indices_semantics",
+        "pyarrow_hash_pivot_wider_order_semantics"
+      ],
+      "target_suite": "arrow_cross",
+      "theme": "Organic Arrow table/list layout, nullable aggregation, string/cast, and compute equivalence"
+    },
+    {
+      "default": true,
+      "discovery_biases": [
+        {
+          "candidate_pool_bonus": 0.0,
+          "contribution_bonus": 0.1,
+          "feature_prefixes": [
+            "expr:",
+            "pattern:"
+          ],
+          "keep_in_pool": true,
+          "novelty_bonus": 0.1,
+          "score_bonus": 0.3,
+          "targets": [
+            "polars_reverse_division_columns",
+            "polars_rolling_mean_by_null_count_semantics"
+          ]
+        }
+      ],
+      "id": "polars_lazy",
+      "preset": "live_polars_deep_organic_metamorphic",
+      "semantic_focus_families": [
+        "stateful_ordering",
+        "backend_specific_semantics"
+      ],
+      "semantic_focus_signals": [
+        "polars_reverse_division_columns",
+        "polars_rolling_mean_by_null_count_semantics"
+      ],
+      "target_suite": "polars_cross",
+      "theme": "Organic Polars eager/lazy state, sortedness, nullable dtype, and expression equivalence"
+    },
+    {
+      "default": true,
+      "discovery_biases": [
+        {
+          "candidate_pool_bonus": 0.0,
+          "contribution_bonus": 0.15,
+          "feature_prefixes": [
+            "running:",
+            "sort:"
+          ],
+          "keep_in_pool": false,
+          "novelty_bonus": 0.1,
+          "score_bonus": 0.25,
+          "targets": [
+            "partitioned_running_sum",
+            "groupby_sorted_input"
+          ]
+        }
+      ],
+      "id": "polars_streaming",
+      "preset": "live_polars_streaming_deep_organic_metamorphic",
+      "semantic_focus_families": [
+        "stateful_ordering",
+        "topk_ordering"
+      ],
+      "semantic_focus_signals": [
+        "partitioned_running_sum",
+        "groupby_sorted_input"
+      ],
+      "target_suite": "polars_streaming_cross",
+      "theme": "Organic Polars lazy versus streaming execution state equivalence"
+    },
+    {
+      "default": true,
+      "discovery_biases": [
+        {
+          "candidate_pool_bonus": 0.1,
+          "contribution_bonus": 0.2,
+          "feature_prefixes": [
+            "join:",
+            "filter:",
+            "pattern:"
+          ],
+          "keep_in_pool": true,
+          "novelty_bonus": 0.2,
+          "score_bonus": 0.45,
+          "targets": [
+            "row_value_absence_filter",
+            "normalized_string_join",
+            "negative_set_membership_filter"
+          ]
+        }
+      ],
+      "id": "datafusion_optimizer",
+      "preset": "live_datafusion_deep_organic_metamorphic",
+      "semantic_focus_families": [
+        "join_membership",
+        "string_semantics",
+        "topk_ordering"
+      ],
+      "semantic_focus_signals": [
+        "row_value_absence_filter",
+        "normalized_string_join",
+        "negative_set_membership_filter"
+      ],
+      "target_suite": "datafusion_cross",
+      "theme": "Organic DataFusion optimizer, join/filter/projection, and SQL metamorphic equivalence"
+    },
+    {
+      "default": true,
+      "discovery_biases": [
+        {
+          "candidate_pool_bonus": 0.0,
+          "contribution_bonus": 0.15,
+          "feature_prefixes": [
+            "common_api_template:",
+            "materialization:",
+            "semantic_signal:",
+            "combo_risk:"
+          ],
+          "keep_in_pool": true,
+          "novelty_bonus": 0.2,
+          "score_bonus": 0.4,
+          "targets": [
+            "distinct_null_topk",
+            "boolean_aggregation",
+            "multi_key_membership_aggregation"
+          ]
+        }
+      ],
+      "id": "datafusion_common_api",
+      "preset": "live_datafusion_common_api_metamorphic",
+      "semantic_focus_families": [
+        "materialization_boundary",
+        "set_semantics",
+        "join_membership"
+      ],
+      "semantic_focus_signals": [
+        "distinct_null_topk",
+        "boolean_aggregation",
+        "multi_key_membership_aggregation"
+      ],
+      "target_suite": "datafusion_cross",
+      "theme": "DataFusion daily low-complexity SQL/DataFrame workflows, including nullable DISTINCT top-k"
+    },
+    {
+      "default": true,
+      "discovery_biases": [
+        {
+          "candidate_pool_bonus": 0.0,
+          "contribution_bonus": 0.15,
+          "feature_prefixes": [
+            "join:",
+            "group_key_type:",
+            "sort:"
+          ],
+          "keep_in_pool": false,
+          "novelty_bonus": 0.1,
+          "score_bonus": 0.3,
+          "targets": [
+            "row_value_absence_filter",
+            "groupby_sorted_input"
+          ]
+        }
+      ],
+      "id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "semantic_focus_families": [
+        "join_membership",
+        "stateful_ordering"
+      ],
+      "semantic_focus_signals": [
+        "row_value_absence_filter",
+        "groupby_sorted_input"
+      ],
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    },
+    {
+      "default": true,
+      "discovery_biases": [
+        {
+          "candidate_pool_bonus": 0.0,
+          "contribution_bonus": 0.15,
+          "feature_prefixes": [
+            "sort:",
+            "join:",
+            "materialization:"
+          ],
+          "keep_in_pool": false,
+          "novelty_bonus": 0.1,
+          "score_bonus": 0.3,
+          "targets": [
+            "storage_offset",
+            "join_null_sort"
+          ]
+        }
+      ],
+      "id": "duckdb_storage",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "semantic_focus_families": [
+        "stateful_ordering",
+        "join_membership",
+        "materialization_boundary"
+      ],
+      "semantic_focus_signals": [
+        "storage_offset",
+        "join_null_sort"
+      ],
+      "target_suite": "duckdb_storage_cross",
+      "theme": "DuckDB persistent database execution path versus pandas references, including storage-backed joins, aggregation, sort, and projection"
+    },
+    {
+      "default": true,
+      "discovery_biases": [
+        {
+          "candidate_pool_bonus": 0.0,
+          "contribution_bonus": 0.2,
+          "feature_prefixes": [
+            "pattern:",
+            "expr:",
+            "join:"
+          ],
+          "keep_in_pool": true,
+          "novelty_bonus": 0.15,
+          "score_bonus": 0.35,
+          "targets": [
+            "groupby_sorted_input",
+            "running_sum_precision",
+            "normalized_string_membership"
+          ]
+        }
+      ],
+      "id": "cross_family",
+      "preset": "live_deep_organic_metamorphic",
+      "semantic_focus_families": [
+        "stateful_ordering",
+        "join_membership",
+        "string_semantics"
+      ],
+      "semantic_focus_signals": [
+        "groupby_sorted_input",
+        "running_sum_precision",
+        "normalized_string_membership"
+      ],
+      "target_suite": "latest_no_datafusion",
+      "theme": "Organic cross-family Python API, Arrow, DataFrame, and embedded SQL semantics without DataFusion saturation"
+    },
+    {
+      "default": false,
+      "discovery_biases": [],
+      "id": "deep_probe_rotation",
+      "preset": "live_deep_probe_rotation_metamorphic",
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "target_suite": "latest_all_engines",
+      "theme": "Deterministic deep probe rotation for audit/seed calibration; known probe families remain separated from fresh discovery counts"
+    },
+    {
+      "default": false,
+      "discovery_biases": [],
+      "id": "arrow_probe_stress",
+      "preset": "live_arrow_issue_focus_metamorphic",
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "target_suite": "arrow_cross",
+      "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts"
+    },
+    {
+      "default": false,
+      "discovery_biases": [],
+      "id": "polars_probe_stress",
+      "preset": "live_polars_issue_focus_metamorphic",
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "target_suite": "polars_cross",
+      "theme": "Polars probe stress lane; issue-inspired sources remain separated from fresh counts"
+    },
+    {
+      "default": false,
+      "discovery_biases": [],
+      "id": "duckdb_probe_stress",
+      "preset": "live_duckdb_issue_focus_metamorphic",
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "target_suite": "embedded_sql_cross",
+      "theme": "DuckDB/SQLite probe stress lane; issue-inspired sources remain separated from fresh counts"
+    }
+  ],
+  "progress": {
+    "completed_run_count": 3,
+    "current_lane_id": "embedded_sql",
+    "current_seed": 1501,
+    "planned_run_count": 52,
+    "remaining_run_count": 49
+  },
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "sqlite"
+      ],
+      "candidate_pipeline": {},
+      "cases": 300,
+      "classification": {
+        "candidate_bug_families": {
+          "running_sum_precision@duckdb,pandas,sqlite": 3,
+          "running_sum_precision@pandas": 1
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000167-discovery-fresh",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 167,
+              "signature": "6b1cd49b992cad97",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00000266-discovery-fresh",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 266,
+              "signature": "ea7a26e9cb63c70f",
+              "suspicious": [
+                "duckdb",
+                "pandas",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00000981-discovery-fresh",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 981,
+              "signature": "c254909bf4ce0e20",
+              "suspicious": [
+                "duckdb",
+                "pandas",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00001025-discovery-fresh",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1025,
+              "signature": "1089d69848d8a723",
+              "suspicious": [
+                "duckdb",
+                "pandas",
+                "sqlite"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-28",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 28,
+              "signature": "ff02500e434b2c07",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-65",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 65,
+              "signature": "ae6e01a89cb256e2",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00000079-discovery-fresh",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 79,
+              "signature": "d796af1c0eb8a57c",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00000081-discovery-fresh",
+              "evidence": "Backends differ only in full-precision floating-point arithmetic or aggregate ordering; the relaxed numeric row multisets agree.",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 81,
+              "signature": "1da0396887150dbc",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-96",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 96,
+              "signature": "ab7627dc3265c728",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "running_sum_precision@duckdb,pandas,sqlite": 3,
+          "running_sum_precision@pandas": 1
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 4,
+          "semantic_divergence": 69
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260606T171011-1780765811598566410.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 4,
+          "expected_semantic_divergence": 69
+        },
+        "unsaturated_candidate_bug_families": {
+          "running_sum_precision@duckdb,pandas,sqlite": 3,
+          "running_sum_precision@pandas": 1
+        }
+      },
+      "completed_at": "2026-06-06T17:21:52Z",
+      "csv": "reports/findings-run-20260606T171011-1780765811598566410.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "health": {
+        "bytes": 3612452,
+        "candidate_bug_families": {
+          "running_sum_precision@duckdb,sqlite": 4
+        },
+        "examples": [
+          {
+            "case_id": "case-00000167-discovery-fresh",
+            "kind": "semantic_output_mismatch",
+            "root": "running_sum_precision",
+            "seed": 167,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00000266-discovery-fresh",
+            "kind": "semantic_output_mismatch",
+            "root": "running_sum_precision",
+            "seed": 266,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00000981-discovery-fresh",
+            "kind": "semantic_output_mismatch",
+            "root": "running_sum_precision",
+            "seed": 981,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00001025-discovery-fresh",
+            "kind": "semantic_output_mismatch",
+            "root": "running_sum_precision",
+            "seed": 1025,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          }
+        ],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "running_sum_precision@duckdb,sqlite": 4
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 300,
+        "run_file": "runs/run-20260606T171011-1780765811598566410.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 699.2657045899978,
+          "evidence_bytes_per_case": 12041.506666666666,
+          "executed_cases": 300,
+          "meta_file": "runs/run-20260606T171011-1780765811598566410.meta.json",
+          "next_seed": 3103,
+          "run_log_bytes": 3612452,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 38.10540612338324,
+              "generate_mutate_ms": 2010.0159011266555,
+              "logging_artifact_ms": 0.03979557652201038,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 237.2025933733918,
+              "scheduler_feedback_ms": 35.13124586638393,
+              "total_case_wall_ms": 2320.4949420663365
+            },
+            "case_count": 300,
+            "share_of_total": {
+              "backend_execution_ms": 0.016421240758857862,
+              "generate_mutate_ms": 0.8662013713922565,
+              "logging_artifact_ms": 1.7149607094843965e-05,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.1022206896784569,
+              "scheduler_feedback_ms": 0.015139548563333875,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.42902146927954915
+        },
+        "statuses": {
+          "bug": 4,
+          "ok": 296
+        }
+      },
+      "lane_id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "report": "reports/report-run-20260606T171011-1780765811598566410.md",
+      "run_file": "runs/run-20260606T171011-1780765811598566410.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 2.5,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "history_runs": 1,
+        "novelty_rate": 1.0,
+        "priority_rank": 1,
+        "score": 6.063493676942861,
+        "yield_rate": 3.0
+      },
+      "seed": 1,
+      "semantic_focus_families": [
+        "join_membership",
+        "stateful_ordering"
+      ],
+      "semantic_focus_signals": [
+        "row_value_absence_filter",
+        "groupby_sorted_input"
+      ],
+      "started_at": "2026-06-06T17:10:11Z",
+      "status": "completed",
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "sqlite"
+      ],
+      "candidate_pipeline": {
+        "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-priority-20260606T171008Z-20260606T173223/manifest.json",
+        "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-priority-20260606T171008Z-20260606T173223/manifest.md",
+        "status": "ok",
+        "summary": {
+          "already_submitted_or_confirmed_count": 0,
+          "artifact_created_count": 0,
+          "candidate_bug_verdict_count": 1,
+          "candidate_count": 1,
+          "issue_draft_count": 1,
+          "local_duplicate_candidate_count": 0,
+          "needs_dedup_check_count": 1,
+          "needs_reproducer_or_evidence_count": 0,
+          "not_latest_reproducible_count": 0,
+          "ready_to_submit_count": 0,
+          "recheck_pass_rate": 1.0,
+          "rechecked_count": 1,
+          "reduced_count": 1,
+          "reproduced_count": 1,
+          "submission_group_count": 1,
+          "unique_family_count": 1
+        }
+      },
+      "cases": 300,
+      "classification": {
+        "candidate_bug_families": {
+          "running_sum_precision@duckdb": 1,
+          "running_sum_precision@duckdb,pandas,sqlite": 2
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000610-discovery-fresh",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'sqlite'] and disagrees with ['duckdb'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 610,
+              "signature": "907b8db166e0872f",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00002037-discovery-fresh",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 2037,
+              "signature": "dfcef84ac1157c9b",
+              "suspicious": [
+                "duckdb",
+                "pandas",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00002346-discovery-fresh",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 2346,
+              "signature": "53dc6cc48d2a1190",
+              "suspicious": [
+                "duckdb",
+                "pandas",
+                "sqlite"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-520",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 520,
+              "signature": "e62f27dfb40707ad",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00000528-discovery-fresh",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 528,
+              "signature": "8944b90f18ab45c8",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00000546-discovery-fresh",
+              "evidence": "Backends differ only in full-precision floating-point arithmetic or aggregate ordering; the relaxed numeric row multisets agree.",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 546,
+              "signature": "ee5153ab05c011c0",
+              "suspicious": [
+                "duckdb",
+                "pandas",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-mut-583",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 583,
+              "signature": "3821863014853fc3",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00000637-discovery-fresh",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 637,
+              "signature": "3829c7a9616314a2",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "running_sum_precision@duckdb": 1,
+          "running_sum_precision@duckdb,pandas,sqlite": 2
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 3,
+          "semantic_divergence": 233
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260606T172152-1780766512875628479.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 3,
+          "expected_semantic_divergence": 233
+        },
+        "unsaturated_candidate_bug_families": {
+          "running_sum_precision@duckdb": 1,
+          "running_sum_precision@duckdb,pandas,sqlite": 2
+        }
+      },
+      "completed_at": "2026-06-06T17:38:25Z",
+      "csv": "reports/findings-run-20260606T172152-1780766512875628479.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed501-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 1,
+      "health": {
+        "bytes": 8921682,
+        "candidate_bug_families": {
+          "metamorphic_join_inner_left_equivalence@duckdb": 29,
+          "metamorphic_join_inner_left_equivalence@sqlite": 29,
+          "running_sum_precision@duckdb": 1,
+          "running_sum_precision@duckdb,sqlite": 2
+        },
+        "examples": [
+          {
+            "case_id": "case-00000610-discovery-fresh",
+            "kind": "semantic_output_mismatch",
+            "root": "running_sum_precision",
+            "seed": 610,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 1263,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 1263,
+            "status": "bug",
+            "suspicious": [
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1518",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 1518,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1518",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 1518,
+            "status": "bug",
+            "suspicious": [
+              "sqlite"
+            ]
+          }
+        ],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "metamorphic_join_inner_left_equivalence@duckdb": 29,
+          "metamorphic_join_inner_left_equivalence@sqlite": 29,
+          "running_sum_precision@duckdb": 1,
+          "running_sum_precision@duckdb,sqlite": 2
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 300,
+        "run_file": "runs/run-20260606T172152-1780766512875628479.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 626.2222780610027,
+          "evidence_bytes_per_case": 29738.94,
+          "executed_cases": 300,
+          "meta_file": "runs/run-20260606T172152-1780766512875628479.meta.json",
+          "next_seed": 2901,
+          "run_log_bytes": 8921682,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 46.12735156331231,
+              "generate_mutate_ms": 1651.3817941000646,
+              "logging_artifact_ms": 0.29966106337572757,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 331.9473975699414,
+              "scheduler_feedback_ms": 42.32980199633554,
+              "total_case_wall_ms": 2072.0860062930296
+            },
+            "case_count": 300,
+            "share_of_total": {
+              "backend_execution_ms": 0.02226131126952318,
+              "generate_mutate_ms": 0.796965854257369,
+              "logging_artifact_ms": 0.00014461806240939894,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.16019962325974907,
+              "scheduler_feedback_ms": 0.020428593150949234,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.47906312264856193
+        },
+        "statuses": {
+          "bug": 32,
+          "ok": 268
+        }
+      },
+      "lane_id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "report": "reports/report-run-20260606T172152-1780766512875628479.md",
+      "run_file": "runs/run-20260606T172152-1780766512875628479.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 2.5,
+        "current_runs": 1,
+        "false_positive_rate": 0.0,
+        "history_runs": 1,
+        "novelty_rate": 1.0,
+        "priority_rank": 1,
+        "score": 6.000363818331547,
+        "yield_rate": 3.0
+      },
+      "seed": 501,
+      "semantic_focus_families": [
+        "join_membership",
+        "stateful_ordering"
+      ],
+      "semantic_focus_signals": [
+        "row_value_absence_filter",
+        "groupby_sorted_input"
+      ],
+      "started_at": "2026-06-06T17:21:52Z",
+      "status": "completed",
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "sqlite"
+      ],
+      "candidate_pipeline": {
+        "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-priority-20260606T171008Z-20260606T180115/manifest.json",
+        "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-priority-20260606T171008Z-20260606T180115/manifest.md",
+        "status": "ok",
+        "summary": {
+          "already_submitted_or_confirmed_count": 0,
+          "artifact_created_count": 123,
+          "candidate_bug_verdict_count": 1,
+          "candidate_count": 138,
+          "issue_draft_count": 1,
+          "local_duplicate_candidate_count": 135,
+          "needs_dedup_check_count": 1,
+          "needs_reproducer_or_evidence_count": 0,
+          "not_latest_reproducible_count": 0,
+          "ready_to_submit_count": 0,
+          "recheck_pass_rate": 0.9927536231884058,
+          "rechecked_count": 138,
+          "reduced_count": 137,
+          "reproduced_count": 137,
+          "submission_group_count": 1,
+          "unique_family_count": 3
+        }
+      },
+      "cases": 300,
+      "classification": {
+        "candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 33,
+          "groupby_aggregation@duckdb,pandas,sqlite": 5,
+          "grouped_topk_null_sort_key@duckdb,sqlite": 11,
+          "running_sum_precision@duckdb,pandas,sqlite": 1,
+          "running_sum_precision@duckdb,sqlite": 92,
+          "running_sum_precision@pandas": 1
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-3043-mut-1012",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "grouped_topk_null_sort_key",
+              "seed": 1012,
+              "signature": "c5741c4473e2cd88",
+              "suspicious": [
+                "duckdb",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-3043-mut-1012-mut-1020",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1020,
+              "signature": "2f450abe6ca7a731",
+              "suspicious": [
+                "duckdb",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3133-mut-3240-mut-1027",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1027,
+              "signature": "f02c7e3780eb20f2",
+              "suspicious": [
+                "duckdb",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1037",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1037,
+              "signature": "364cf8412c44a666",
+              "suspicious": [
+                "duckdb",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1063",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "conditional_expression",
+              "seed": 1063,
+              "signature": "d3e2b63e84c8c5bc",
+              "suspicious": [
+                "duckdb",
+                "sqlite"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-1098",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1098,
+              "signature": "edac5efe6e7fe45f",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-1098-mut-1104",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families; filter compares against NULL; engines intentionally differ on NULL predicate semantics",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1104,
+              "signature": "8261a6a02e54e560",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-677-champion-mut-806-mut-1127",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1127,
+              "signature": "0d52c212171cbf61",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-1130",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1130,
+              "signature": "edac5efe6e7fe45f",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-677-champion-mut-806-mut-1141",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1141,
+              "signature": "edac5efe6e7fe45f",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ],
+          "generator_false_positive": [
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-3043-mut-1012-mut-2504-mut-2762",
+              "evidence": "All backends rejected with schema/name/type errors, indicating an invalid generated DSL program.",
+              "kind": "exception_mismatch",
+              "root": "exception_taxonomy",
+              "seed": 2762,
+              "signature": "dcf431f640386922",
+              "suspicious": [
+                "pandas",
+                "duckdb",
+                "sqlite"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {
+          "all_backends_rejected_generated_case": 1
+        },
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 33,
+          "groupby_aggregation@duckdb,pandas,sqlite": 5,
+          "grouped_topk_null_sort_key@duckdb,sqlite": 11,
+          "running_sum_precision@duckdb,pandas,sqlite": 1,
+          "running_sum_precision@duckdb,sqlite": 92,
+          "running_sum_precision@pandas": 1
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "false_positive": 1,
+          "new_bug": 143,
+          "semantic_divergence": 87
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260606T173825-1780767505895944235.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 143,
+          "expected_semantic_divergence": 87,
+          "generator_false_positive": 1
+        },
+        "unsaturated_candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 33,
+          "groupby_aggregation@duckdb,pandas,sqlite": 5,
+          "grouped_topk_null_sort_key@duckdb,sqlite": 11,
+          "running_sum_precision@duckdb,pandas,sqlite": 1,
+          "running_sum_precision@duckdb,sqlite": 92,
+          "running_sum_precision@pandas": 1
+        }
+      },
+      "completed_at": "2026-06-07T03:49:13Z",
+      "csv": "reports/findings-run-20260606T173825-1780767505895944235.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1001-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 138,
+      "health": {
+        "bytes": 9784667,
+        "candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 33,
+          "groupby_aggregation@duckdb,sqlite": 5,
+          "grouped_topk_null_sort_key@duckdb,sqlite": 11,
+          "metamorphic_join_inner_left_equivalence@duckdb": 42,
+          "metamorphic_join_inner_left_equivalence@sqlite": 42,
+          "running_sum_precision@duckdb,sqlite": 94
+        },
+        "examples": [
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-3043-mut-1012",
+            "kind": "accept_reject_mismatch",
+            "root": "grouped_topk_null_sort_key",
+            "seed": 1012,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-3043-mut-1012-mut-1020",
+            "kind": "accept_reject_mismatch",
+            "root": "running_sum_precision",
+            "seed": 1020,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3133-mut-3240-mut-1027",
+            "kind": "accept_reject_mismatch",
+            "root": "running_sum_precision",
+            "seed": 1027,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-2173-mut-1037",
+            "kind": "accept_reject_mismatch",
+            "root": "running_sum_precision",
+            "seed": 1037,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1063",
+            "kind": "accept_reject_mismatch",
+            "root": "conditional_expression",
+            "seed": 1063,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          }
+        ],
+        "false_positive_reasons": {
+          "all_backends_rejected_generated_case": 2
+        },
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 33,
+          "groupby_aggregation@duckdb,sqlite": 5,
+          "grouped_topk_null_sort_key@duckdb,sqlite": 11,
+          "metamorphic_join_inner_left_equivalence@duckdb": 42,
+          "metamorphic_join_inner_left_equivalence@sqlite": 42,
+          "running_sum_precision@duckdb,sqlite": 94
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 300,
+        "run_file": "runs/run-20260606T173825-1780767505895944235.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 1361.6565010080012,
+          "evidence_bytes_per_case": 32615.556666666667,
+          "executed_cases": 300,
+          "meta_file": "runs/run-20260606T173825-1780767505895944235.meta.json",
+          "next_seed": 3569,
+          "run_log_bytes": 9784667,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 50.849990293354494,
+              "generate_mutate_ms": 3347.1610785265043,
+              "logging_artifact_ms": 0.4136550499970326,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 1035.9446242533159,
+              "scheduler_feedback_ms": 79.79268258706725,
+              "total_case_wall_ms": 4514.1620307102385
+            },
+            "case_count": 300,
+            "share_of_total": {
+              "backend_execution_ms": 0.011264546985114306,
+              "generate_mutate_ms": 0.7414800478484102,
+              "logging_artifact_ms": 9.16349584226045e-05,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.2294876916702799,
+              "scheduler_feedback_ms": 0.017676078537773046,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.22031988227421329
+        },
+        "statuses": {
+          "bug": 185,
+          "ok": 115
+        }
+      },
+      "lane_id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "report": "reports/report-run-20260606T173825-1780767505895944235.md",
+      "run_file": "runs/run-20260606T173825-1780767505895944235.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 2.5,
+        "current_runs": 2,
+        "false_positive_rate": 0.0,
+        "history_runs": 1,
+        "novelty_rate": 1.0,
+        "priority_rank": 1,
+        "score": 5.944837405677332,
+        "yield_rate": 3.0
+      },
+      "seed": 1001,
+      "semantic_focus_families": [
+        "join_membership",
+        "stateful_ordering"
+      ],
+      "semantic_focus_signals": [
+        "row_value_absence_filter",
+        "groupby_sorted_input"
+      ],
+      "started_at": "2026-06-06T17:38:25Z",
+      "status": "completed",
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 300,
+      "duration": null,
+      "lane_id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "scheduler": {
+        "budget_multiplier": 2.5,
+        "current_runs": 3,
+        "false_positive_rate": 0.006493506493506494,
+        "history_runs": 1,
+        "novelty_rate": 1.0,
+        "priority_rank": 1,
+        "score": 5.848226187398824,
+        "yield_rate": 3.0
+      },
+      "seed": 1501,
+      "semantic_focus_families": [
+        "join_membership",
+        "stateful_ordering"
+      ],
+      "semantic_focus_signals": [
+        "row_value_absence_filter",
+        "groupby_sorted_input"
+      ],
+      "started_at": "2026-06-07T03:49:13Z",
+      "status": "running",
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    }
+  ],
+  "scheduler": {
+    "bug_discovery_system": {
+      "objective": "maximize externally reproducible fresh implementation bug yield per unit budget",
+      "schema_version": "bug-discovery-system-v1",
+      "stages": [
+        "generate_or_mutate_candidate",
+        "score_by_acquisition",
+        "execute_differential_oracles",
+        "filter_rewardable_fresh_candidates",
+        "recheck_reproducibility",
+        "reduce_preserving_root_cause",
+        "write_reproducer_and_issue_draft"
+      ],
+      "theory": {
+        "budget": "Boltzmann allocation over acquisition free energy",
+        "candidate_priority": "multi-objective proof/reproducibility/dedup utility",
+        "exploration": "UCB optimism under sparse lane samples",
+        "novelty": "Good-Turing unseen-family probability"
+      }
+    },
+    "generated_at": "2026-06-07T03:49:13Z",
+    "history_manifest_count": 8,
+    "history_window": 8,
+    "lanes": [
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.9018198615613455,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "arrow_layout",
+        "novelty_rate": 0.0,
+        "pending_runs": 4,
+        "preset": "live_arrow_deep_organic_metamorphic",
+        "priority_rank": 1,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.637746366011938,
+        "target_suite": "arrow_cross",
+        "theme": "Organic Arrow table/list layout, nullable aggregation, string/cast, and compute equivalence",
+        "ucb_bonus": 0.887746366011938,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.9018198615613455,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "polars_lazy",
+        "novelty_rate": 0.0,
+        "pending_runs": 4,
+        "preset": "live_polars_deep_organic_metamorphic",
+        "priority_rank": 2,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.637746366011938,
+        "target_suite": "polars_cross",
+        "theme": "Organic Polars eager/lazy state, sortedness, nullable dtype, and expression equivalence",
+        "ucb_bonus": 0.887746366011938,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.9018198615613455,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "polars_streaming",
+        "novelty_rate": 0.0,
+        "pending_runs": 4,
+        "preset": "live_polars_streaming_deep_organic_metamorphic",
+        "priority_rank": 3,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.637746366011938,
+        "target_suite": "polars_streaming_cross",
+        "theme": "Organic Polars lazy versus streaming execution state equivalence",
+        "ucb_bonus": 0.887746366011938,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.9018198615613455,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "datafusion_optimizer",
+        "novelty_rate": 0.0,
+        "pending_runs": 4,
+        "preset": "live_datafusion_deep_organic_metamorphic",
+        "priority_rank": 4,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.637746366011938,
+        "target_suite": "datafusion_cross",
+        "theme": "Organic DataFusion optimizer, join/filter/projection, and SQL metamorphic equivalence",
+        "ucb_bonus": 0.887746366011938,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.9018198615613455,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "datafusion_common_api",
+        "novelty_rate": 0.0,
+        "pending_runs": 4,
+        "preset": "live_datafusion_common_api_metamorphic",
+        "priority_rank": 5,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.637746366011938,
+        "target_suite": "datafusion_cross",
+        "theme": "DataFusion daily low-complexity SQL/DataFrame workflows, including nullable DISTINCT top-k",
+        "ucb_bonus": 0.887746366011938,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.9018198615613455,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "duckdb_storage",
+        "novelty_rate": 0.0,
+        "pending_runs": 4,
+        "preset": "live_embedded_sql_deep_organic_metamorphic",
+        "priority_rank": 6,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.637746366011938,
+        "target_suite": "duckdb_storage_cross",
+        "theme": "DuckDB persistent database execution path versus pandas references, including storage-backed joins, aggregation, sort, and projection",
+        "ucb_bonus": 0.887746366011938,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.9018198615613455,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "cross_family",
+        "novelty_rate": 0.0,
+        "pending_runs": 4,
+        "preset": "live_deep_organic_metamorphic",
+        "priority_rank": 7,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.637746366011938,
+        "target_suite": "latest_no_datafusion",
+        "theme": "Organic cross-family Python API, Arrow, DataFrame, and embedded SQL semantics without DataFusion saturation",
+        "ucb_bonus": 0.887746366011938,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.9018198615613455,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "deep_probe_rotation",
+        "novelty_rate": 0.0,
+        "pending_runs": 4,
+        "preset": "live_deep_probe_rotation_metamorphic",
+        "priority_rank": 8,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.637746366011938,
+        "target_suite": "latest_all_engines",
+        "theme": "Deterministic deep probe rotation for audit/seed calibration; known probe families remain separated from fresh discovery counts",
+        "ucb_bonus": 0.887746366011938,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.9018198615613455,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "arrow_probe_stress",
+        "novelty_rate": 0.0,
+        "pending_runs": 4,
+        "preset": "live_arrow_issue_focus_metamorphic",
+        "priority_rank": 9,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.637746366011938,
+        "target_suite": "arrow_cross",
+        "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts",
+        "ucb_bonus": 0.887746366011938,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.9018198615613455,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "polars_probe_stress",
+        "novelty_rate": 0.0,
+        "pending_runs": 4,
+        "preset": "live_polars_issue_focus_metamorphic",
+        "priority_rank": 10,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.637746366011938,
+        "target_suite": "polars_cross",
+        "theme": "Polars probe stress lane; issue-inspired sources remain separated from fresh counts",
+        "ucb_bonus": 0.887746366011938,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.9018198615613455,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "duckdb_probe_stress",
+        "novelty_rate": 0.0,
+        "pending_runs": 4,
+        "preset": "live_duckdb_issue_focus_metamorphic",
+        "priority_rank": 11,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.637746366011938,
+        "target_suite": "embedded_sql_cross",
+        "theme": "DuckDB/SQLite probe stress lane; issue-inspired sources remain separated from fresh counts",
+        "ucb_bonus": 0.887746366011938,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.5799815228252007,
+        "candidate_total": 0,
+        "completed_runs": 2,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 2,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "common_api_workflow",
+        "novelty_rate": 0.0,
+        "pending_runs": 4,
+        "preset": "live_common_api_workflow_metamorphic",
+        "priority_rank": 12,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.2625406033891045,
+        "target_suite": "latest_no_datafusion",
+        "theme": "Organic low-complexity daily DataFrame/Arrow/embedded SQL workflows: filter, string clean/replace/slice/concat/pattern flags, ISO date-part extraction, int/float/string casts, nullable boolean not/reductions, drop-null, mutate, union-all, semi/anti join, fill-null/coalesce, case-when, distinct, join, groupby, sort, and slice",
+        "ucb_bonus": 0.5125406033891046,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 2.5,
+        "candidate_total": 153,
+        "completed_runs": 4,
+        "current_runs": 3,
+        "false_positive_rate": 0.006493506493506494,
+        "false_positive_total": 1,
+        "family_entropy": 0.5661346508779517,
+        "first_seen_family_count": 9,
+        "free_energy": -5.44309706004572,
+        "fresh_candidate_total": 153,
+        "good_turing_unseen_probability": 0.013071895424836602,
+        "history_runs": 1,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "embedded_sql",
+        "novelty_rate": 1.0,
+        "pending_runs": 0,
+        "preset": "live_embedded_sql_deep_organic_metamorphic",
+        "priority_rank": 13,
+        "proof_yield": 0.9935064935064936,
+        "saturation_rate": 0.0,
+        "score": 5.848226187398824,
+        "target_suite": "embedded_sql_cross",
+        "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references",
+        "ucb_bonus": 0.3970122442362205,
+        "unique_fresh_family_count": 9,
+        "yield_rate": 3.0
+      }
+    ],
+    "score_weights": {
+      "boltzmann_temperature": 0.85,
+      "entropy_weight": 0.2,
+      "false_positive_penalty": 1.25,
+      "issue_inspired_weight": 0.2,
+      "novelty_rate": 0.75,
+      "proof_weight": 0.6,
+      "saturation_penalty": 0.75,
+      "uncertainty_weight": 0.45,
+      "yield_rate": 1.0
+    },
+    "strategy": "true_bug_acquisition_good_turing_ucb_boltzmann"
+  },
+  "schema_version": "discovery-campaign-v1",
+  "seeds": [
+    1,
+    501,
+    1001,
+    1501
+  ],
+  "started_at": "2026-06-06T17:10:11Z",
+  "status": "running",
+  "stopped_by_health": false,
+  "summary": {
+    "candidate_pipeline": {
+      "already_submitted_or_confirmed_count": 0,
+      "candidate_bug_verdict_count": 2,
+      "candidate_count": 139,
+      "issue_draft_count": 2,
+      "needs_dedup_check_count": 2,
+      "pipeline_count": 2,
+      "rechecked_count": 139,
+      "reduced_count": 138,
+      "reproduced_count": 138
+    },
+    "fresh_candidate_bug_families": {
+      "conditional_expression@duckdb,sqlite": 33,
+      "groupby_aggregation@duckdb,pandas,sqlite": 5,
+      "grouped_topk_null_sort_key@duckdb,sqlite": 11,
+      "running_sum_precision@duckdb": 1,
+      "running_sum_precision@duckdb,pandas,sqlite": 6,
+      "running_sum_precision@duckdb,sqlite": 92,
+      "running_sum_precision@pandas": 2
+    },
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {},
+    "run_count": 3,
+    "triage_verdicts": {
+      "candidate_implementation_bug": 150,
+      "expected_semantic_divergence": 389,
+      "generator_false_positive": 1
+    }
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "guided_discovery_campaign",
+    "true_bug_acquisition_scheduler",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence",
+    "candidate_pipeline"
+  ]
+}

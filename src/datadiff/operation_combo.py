@@ -56,10 +56,12 @@ CANONICAL_OPERATION_ORDER = (
     "index_bool_probe",
     "empty_literal_groupby_probe",
     "arrow_string_eq_sum_probe",
+    "arrow_string_contains_na_probe",
     "arrow_timestamp_loc_slice_probe",
     "arrow_timestamp_index_attr_probe",
     "eval_inplace_alias_probe",
     "bool_reduction_skipna_probe",
+    "polars_timezone_filter_probe",
     "dataset_isin_all_match_probe",
     "run_end_null_compute_probe",
     "large_string_partition_probe",
@@ -622,6 +624,8 @@ def _semantic_signals(operations: list[dict[str, Any]] | list[Any], sequence: li
         signals.append("polars_empty_literal_groupby_semantics")
     if "arrow_string_eq_sum_probe" in op_set:
         signals.append("pandas_arrow_string_eq_sum_semantics")
+    if "arrow_string_contains_na_probe" in op_set:
+        signals.append("pandas_arrow_string_contains_na_semantics")
     if "arrow_timestamp_loc_slice_probe" in op_set:
         signals.append("pandas_arrow_timestamp_loc_slice_semantics")
     if "arrow_timestamp_index_attr_probe" in op_set:
@@ -630,6 +634,8 @@ def _semantic_signals(operations: list[dict[str, Any]] | list[Any], sequence: li
         signals.append("pandas_eval_inplace_aliasing_semantics")
     if "bool_reduction_skipna_probe" in op_set:
         signals.append("pandas_bool_reduction_skipna_semantics")
+    if "polars_timezone_filter_probe" in op_set:
+        signals.append("polars_timezone_filter_semantics")
     if "dataset_isin_all_match_probe" in op_set:
         signals.append("pyarrow_dataset_isin_all_match_semantics")
     if "run_end_null_compute_probe" in op_set:

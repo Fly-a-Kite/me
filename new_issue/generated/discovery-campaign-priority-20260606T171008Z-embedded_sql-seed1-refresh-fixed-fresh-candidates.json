@@ -1,0 +1,13 @@
+{
+  "candidate_row_count": 0,
+  "candidate_rows": [],
+  "fresh_candidate_bug_families": {
+    "running_sum_precision@duckdb,pandas,sqlite": 3,
+    "running_sum_precision@pandas": 1
+  },
+  "generated_at": "2026-06-06T17:32:32Z",
+  "generated_by": "datadiff discovery-run",
+  "refresh_classification": true,
+  "schema_version": "discovery-run-fresh-candidates-v1",
+  "source_run_file": "runs/run-20260606T171011-1780765811598566410.jsonl.gz"
+}

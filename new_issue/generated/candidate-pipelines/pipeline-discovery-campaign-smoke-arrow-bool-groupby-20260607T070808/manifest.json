@@ -1,0 +1,244 @@
+{
+  "bug_discovery_system": {
+    "objective": "maximize externally reproducible fresh implementation bug yield per unit budget",
+    "schema_version": "bug-discovery-system-v1",
+    "stages": [
+      "generate_or_mutate_candidate",
+      "score_by_acquisition",
+      "execute_differential_oracles",
+      "filter_rewardable_fresh_candidates",
+      "recheck_reproducibility",
+      "reduce_preserving_root_cause",
+      "write_reproducer_and_issue_draft"
+    ],
+    "theory": {
+      "budget": "Boltzmann allocation over acquisition free energy",
+      "candidate_priority": "multi-objective proof/reproducibility/dedup utility",
+      "exploration": "UCB optimism under sparse lane samples",
+      "novelty": "Good-Turing unseen-family probability"
+    }
+  },
+  "candidates": [
+    {
+      "artifact_created": false,
+      "bug_dir": "bugs/bug_4be91de69a497228",
+      "candidate_acquisition": {
+        "acquisition_score": 5.534375,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "conditional_expression@datafusion,duckdb,pyarrow,sqlite"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.9475,
+        "recheck_prior": 0.85,
+        "reduction_potential": 1.0,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9960668549274264
+      },
+      "candidate_id": "conditional_expression-datafusion-duckdb-pyarrow-sqlite-case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-",
+      "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1215-mut-1295-mut-810-mut-799-mut-3145-mut-3339-mut-684-mut-690-mut-1622-mut-1627-mut-1686-mut-713-mut-5456-mut-7023-mut-7274-mut-7423-mut-7469-mut-98",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "",
+        "status": "needs_final_upstream_dedup"
+      },
+      "families": [
+        "conditional_expression@datafusion,duckdb,pyarrow,sqlite"
+      ],
+      "initial_candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 2,
+            "reproduced_keys": [
+              "accept_reject_mismatch:conditional_expression@datafusion,duckdb,pyarrow,sqlite:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 1,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:conditional_expression@datafusion,duckdb,pyarrow,sqlite:accept_reject"
+        ]
+      },
+      "issue_draft": {},
+      "issue_readiness": {},
+      "primary_family": "conditional_expression@datafusion,duckdb,pyarrow,sqlite",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [
+              "conditional_expression@datafusion,duckdb,pyarrow,sqlite"
+            ],
+            "finding_count": 2,
+            "matched_families": [
+              "conditional_expression@datafusion,duckdb,pyarrow,sqlite"
+            ],
+            "status": "bug"
+          }
+        ],
+        "attempts": 1,
+        "reproduced": true,
+        "reproduced_families": [
+          "conditional_expression@datafusion,duckdb,pyarrow,sqlite"
+        ]
+      },
+      "reduction": {
+        "original_operations": 12,
+        "original_rows": 135,
+        "performed": true,
+        "reduced_case_path": "bugs/bug_4be91de69a497228/reduced_case.json",
+        "reduced_operations": 1,
+        "reduced_reproducer_path": "bugs/bug_4be91de69a497228/reproduce_reduced.py",
+        "reduced_rows": 1,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-smoke-arrow-bool-groupby-deep_probe_rotation-seed84-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T070803-1780816083949406957.jsonl.gz",
+      "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-smoke-arrow-bool-groupby-20260607T070808/strategy-learning/candidate-pipeline-learning.json",
+      "triage": {
+        "paper_status": "valid_finding_not_confirmed_bug",
+        "reproduced_roots": [
+          "conditional_expression",
+          "metamorphic_string_lower_normalized_column",
+          "metamorphic_union_all_empty_append"
+        ],
+        "suspicious_backends": [
+          "datafusion",
+          "duckdb",
+          "pandas",
+          "pyarrow",
+          "sqlite"
+        ],
+        "triage_confidence": "medium",
+        "triage_json": "bugs/bug_4be91de69a497228/triage.json",
+        "triage_markdown": "bugs/bug_4be91de69a497228/triage.md",
+        "verdict": "semantic_divergence_needs_confirmation"
+      }
+    }
+  ],
+  "existing_issue_readiness_summary": {
+    "already_submitted_or_confirmed_count": 15,
+    "already_submitted_or_confirmed_family_count": 10,
+    "confirmed_count_eligible_count": 13,
+    "confirmed_count_eligible_families": [
+      "datafusion_limit_idempotence@datafusion",
+      "distinct_null_topk@datafusion",
+      "groupby_aggregation@datafusion",
+      "groupby_aggregation@polars,polars_lazy",
+      "grouped_topk_null_sort_key@datafusion",
+      "negative_zero_comparison@datafusion",
+      "polars_reflected_arithmetic_operand_order@polars",
+      "pyarrow_sliced_bool_groupby_any_all@pyarrow"
+    ],
+    "confirmed_count_eligible_family_count": 8,
+    "duplicate_family_draft_count": 0,
+    "duplicate_family_draft_groups": {},
+    "issue_document_count": 20,
+    "needs_dedup_check": [],
+    "needs_dedup_check_count": 0,
+    "needs_dedup_check_families": [],
+    "needs_dedup_check_family_count": 0,
+    "needs_reproducer_or_evidence": [
+      "new_issue/datafusion_22554_followup_comment.md",
+      "new_issue/datafusion_null_group_key_candidate.md",
+      "new_issue/duckdb_groupby_neutral_mutation_not_upstream.md",
+      "new_issue/generated/polars_vector_division_rounding.md"
+    ],
+    "needs_reproducer_or_evidence_count": 4,
+    "needs_reproducer_or_evidence_family_count": 4,
+    "not_latest_reproducible_count": 1,
+    "not_latest_reproducible_family_count": 1,
+    "ready_to_submit": [],
+    "ready_to_submit_count": 0,
+    "ready_to_submit_families": [],
+    "ready_to_submit_family_count": 0,
+    "submission_group_count": 0,
+    "submission_group_families": [],
+    "submission_groups_needs_dedup_count": 0,
+    "submission_groups_ready_to_submit_count": 0,
+    "top_priority": [
+      "new_issue/generated/polars_vector_division_rounding.md",
+      "new_issue/datafusion_null_group_key_candidate.md",
+      "new_issue/duckdb_groupby_neutral_mutation_not_upstream.md",
+      "new_issue/datafusion_22554_followup_comment.md",
+      "new_issue/datafusion_limit_idempotence.md"
+    ]
+  },
+  "frozen_candidates_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-smoke-arrow-bool-groupby-20260607T070808/frozen-candidates.json",
+  "generated_at": "2026-06-07T07:09:39Z",
+  "generated_by": "datadiff candidate-pipeline",
+  "inputs": {
+    "evidence_files": [
+      "new_issue/generated/discovery-campaign-smoke-arrow-bool-groupby-deep_probe_rotation-seed84-fresh-candidates.json"
+    ],
+    "generated_issue_dir": "new_issue/generated",
+    "manifest_file": "new_issue/generated/discovery-campaign-smoke-arrow-bool-groupby.json",
+    "new_issue_dir": "new_issue",
+    "old_issue_dir": "old_issue",
+    "output_dir": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-smoke-arrow-bool-groupby-20260607T070808",
+    "recheck_attempts": 1,
+    "reduce_artifacts": true,
+    "standalone_reproducer": true
+  },
+  "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-smoke-arrow-bool-groupby-20260607T070808/manifest.json",
+  "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-smoke-arrow-bool-groupby-20260607T070808/manifest.md",
+  "pipeline_issue_readiness_summary": {
+    "already_submitted_or_confirmed_count": 0,
+    "already_submitted_or_confirmed_family_count": 0,
+    "confirmed_count_eligible_count": 0,
+    "confirmed_count_eligible_families": [],
+    "confirmed_count_eligible_family_count": 0,
+    "duplicate_family_draft_count": 0,
+    "duplicate_family_draft_groups": {},
+    "issue_document_count": 0,
+    "needs_dedup_check": [],
+    "needs_dedup_check_count": 0,
+    "needs_dedup_check_families": [],
+    "needs_dedup_check_family_count": 0,
+    "needs_reproducer_or_evidence": [],
+    "needs_reproducer_or_evidence_count": 0,
+    "needs_reproducer_or_evidence_family_count": 0,
+    "not_latest_reproducible_count": 0,
+    "not_latest_reproducible_family_count": 0,
+    "ready_to_submit": [],
+    "ready_to_submit_count": 0,
+    "ready_to_submit_families": [],
+    "ready_to_submit_family_count": 0,
+    "submission_group_count": 0,
+    "submission_group_families": [],
+    "submission_groups_needs_dedup_count": 0,
+    "submission_groups_ready_to_submit_count": 0,
+    "top_priority": []
+  },
+  "schema_version": "candidate-pipeline-v1",
+  "strategy_snapshot_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-smoke-arrow-bool-groupby-20260607T070808/strategy-snapshot.json",
+  "submission_groups": [],
+  "summary": {
+    "already_submitted_or_confirmed_count": 0,
+    "artifact_created_count": 0,
+    "candidate_bug_verdict_count": 0,
+    "candidate_count": 1,
+    "issue_draft_count": 0,
+    "local_duplicate_candidate_count": 0,
+    "needs_dedup_check_count": 0,
+    "needs_reproducer_or_evidence_count": 0,
+    "not_latest_reproducible_count": 0,
+    "ready_to_submit_count": 0,
+    "recheck_pass_rate": 1.0,
+    "rechecked_count": 1,
+    "reduced_count": 1,
+    "reproduced_count": 1,
+    "submission_group_count": 0,
+    "unique_family_count": 1
+  }
+}

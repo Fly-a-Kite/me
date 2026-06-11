@@ -1,0 +1,1986 @@
+{
+  "bug_audit": {
+    "skipped": true
+  },
+  "cases_per_lane_seed": 220,
+  "completed_at": "",
+  "duration": null,
+  "generated_at": "2026-06-07T04:12:41Z",
+  "generated_by": "datadiff discovery-campaign",
+  "health_stop_reason": "",
+  "lane_ids": [
+    "arrow_probe_stress",
+    "polars_probe_stress",
+    "duckdb_probe_stress"
+  ],
+  "lanes": [
+    {
+      "default": false,
+      "discovery_biases": [],
+      "id": "arrow_probe_stress",
+      "preset": "live_arrow_issue_focus_metamorphic",
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "target_suite": "arrow_cross",
+      "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts"
+    },
+    {
+      "default": false,
+      "discovery_biases": [],
+      "id": "polars_probe_stress",
+      "preset": "live_polars_issue_focus_metamorphic",
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "target_suite": "polars_cross",
+      "theme": "Polars probe stress lane; issue-inspired sources remain separated from fresh counts"
+    },
+    {
+      "default": false,
+      "discovery_biases": [],
+      "id": "duckdb_probe_stress",
+      "preset": "live_duckdb_issue_focus_metamorphic",
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "target_suite": "embedded_sql_cross",
+      "theme": "DuckDB/SQLite probe stress lane; issue-inspired sources remain separated from fresh counts"
+    }
+  ],
+  "progress": {
+    "completed_run_count": 6,
+    "current_lane_id": "duckdb_probe_stress",
+    "current_seed": 1,
+    "planned_run_count": 9,
+    "remaining_run_count": 3
+  },
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "pyarrow"
+      ],
+      "candidate_pipeline": {},
+      "cases": 220,
+      "classification": {
+        "candidate_bug_families": {
+          "conditional_expression@duckdb": 1
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00045505-discovery-fresh-mut-1535",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'pyarrow'] and disagrees with ['duckdb'].",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 1535,
+              "signature": "a1f4026a64d2214c",
+              "suspicious": [
+                "duckdb"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00044054-discovery-fresh-mut-266",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 266,
+              "signature": "7c7f6ee61cf6cb38",
+              "suspicious": [
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00044054-discovery-fresh-mut-274",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 274,
+              "signature": "b706efcb61adede4",
+              "suspicious": [
+                "duckdb",
+                "pandas",
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00044054-discovery-fresh-mut-348",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 348,
+              "signature": "c5fdda78eaae7749",
+              "suspicious": [
+                "duckdb",
+                "pandas",
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-399",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 399,
+              "signature": "9a69cf227ee2acfa",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-575",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 575,
+              "signature": "8180adcf4207b40f",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb": 1
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 1,
+          "semantic_divergence": 41
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260606T171300-1780765980790959578.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 1,
+          "expected_semantic_divergence": 41
+        },
+        "unsaturated_candidate_bug_families": {
+          "conditional_expression@duckdb": 1
+        }
+      },
+      "completed_at": "2026-06-06T17:19:36Z",
+      "csv": "reports/findings-run-20260606T171300-1780765980790959578.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-arrow_probe_stress-seed1-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "health": {
+        "bytes": 2350870,
+        "candidate_bug_families": {},
+        "examples": [],
+        "false_positive_reasons": {
+          "candidate_not_reproduced_on_immediate_recheck": 1
+        },
+        "fresh_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 220,
+        "run_file": "runs/run-20260606T171300-1780765980790959578.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 394.3263481889953,
+          "evidence_bytes_per_case": 10685.772727272728,
+          "executed_cases": 220,
+          "meta_file": "runs/run-20260606T171300-1780765980790959578.meta.json",
+          "next_seed": 3706,
+          "run_log_bytes": 2350870,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 31.55709865922373,
+              "generate_mutate_ms": 1577.8184126819476,
+              "logging_artifact_ms": 0.004502254292178391,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 154.43138414091,
+              "scheduler_feedback_ms": 20.629580750425124,
+              "total_case_wall_ms": 1784.4409784867987
+            },
+            "case_count": 220,
+            "share_of_total": {
+              "backend_execution_ms": 0.017684585278905703,
+              "generate_mutate_ms": 0.8842087979956241,
+              "logging_artifact_ms": 2.5230614777723225e-06,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.08654328498545659,
+              "scheduler_feedback_ms": 0.011560808678535815,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.5579135175987706
+        },
+        "statuses": {
+          "ok": 220
+        }
+      },
+      "lane_id": "arrow_probe_stress",
+      "preset": "live_arrow_issue_focus_metamorphic",
+      "report": "reports/report-run-20260606T171300-1780765980790959578.md",
+      "run_file": "runs/run-20260606T171300-1780765980790959578.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 1.0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 0.0,
+        "priority_rank": 1,
+        "score": 2.2798345101319635,
+        "yield_rate": 0.0
+      },
+      "seed": 1,
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "started_at": "2026-06-06T17:13:00Z",
+      "status": "completed",
+      "target_suite": "arrow_cross",
+      "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "pyarrow"
+      ],
+      "candidate_pipeline": {},
+      "cases": 220,
+      "classification": {
+        "candidate_bug_families": {
+          "csv_long_numeric_roundtrip@pandas": 1
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00001241-issue-focus-csv-long-numeric-roundtrip",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'pyarrow'].",
+              "kind": "semantic_output_mismatch",
+              "root": "csv_long_numeric_roundtrip",
+              "seed": 1241,
+              "signature": "9ed093f30df9d0f3",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-552",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 552,
+              "signature": "8180adcf4207b40f",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-683",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 683,
+              "signature": "e2e2023040076e97",
+              "suspicious": [
+                "duckdb",
+                "pandas",
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-778",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 778,
+              "signature": "686afcff69bfa016",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-887",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 887,
+              "signature": "0d299d7d91989a6f",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-930",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 930,
+              "signature": "9a69cf227ee2acfa",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "csv_long_numeric_roundtrip@pandas": 1
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 1,
+          "semantic_divergence": 49
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260606T171936-1780766376199710700.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 1,
+          "expected_semantic_divergence": 49
+        },
+        "unsaturated_candidate_bug_families": {
+          "csv_long_numeric_roundtrip@pandas": 1
+        }
+      },
+      "completed_at": "2026-06-06T17:30:27Z",
+      "csv": "reports/findings-run-20260606T171936-1780766376199710700.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-arrow_probe_stress-seed501-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 0,
+      "health": {
+        "bytes": 2332606,
+        "candidate_bug_families": {
+          "csv_long_numeric_roundtrip@duckdb,pyarrow": 1
+        },
+        "examples": [
+          {
+            "case_id": "case-00001241-issue-focus-csv-long-numeric-roundtrip",
+            "kind": "semantic_output_mismatch",
+            "root": "csv_long_numeric_roundtrip",
+            "seed": 1241,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "pyarrow"
+            ]
+          }
+        ],
+        "false_positive_reasons": {
+          "candidate_not_reproduced_on_immediate_recheck": 3
+        },
+        "fresh_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {
+          "csv_long_numeric_roundtrip@duckdb,pyarrow": 1
+        },
+        "partial": false,
+        "rows": 220,
+        "run_file": "runs/run-20260606T171936-1780766376199710700.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 649.5137892040002,
+          "evidence_bytes_per_case": 10602.754545454545,
+          "executed_cases": 220,
+          "meta_file": "runs/run-20260606T171936-1780766376199710700.meta.json",
+          "next_seed": 4189,
+          "run_log_bytes": 2332606,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 30.558483054483077,
+              "generate_mutate_ms": 2738.1572188587925,
+              "logging_artifact_ms": 0.016965136654272846,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 156.4275821451619,
+              "scheduler_feedback_ms": 19.185994391062362,
+              "total_case_wall_ms": 2944.3462435861543
+            },
+            "case_count": 220,
+            "share_of_total": {
+              "backend_execution_ms": 0.01037869887790896,
+              "generate_mutate_ms": 0.9299712032249889,
+              "logging_artifact_ms": 5.7619366917967e-06,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.05312812054150135,
+              "scheduler_feedback_ms": 0.00651621541890882,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.33871490283465266
+        },
+        "statuses": {
+          "bug": 1,
+          "ok": 219
+        }
+      },
+      "lane_id": "arrow_probe_stress",
+      "preset": "live_arrow_issue_focus_metamorphic",
+      "report": "reports/report-run-20260606T171936-1780766376199710700.md",
+      "run_file": "runs/run-20260606T171936-1780766376199710700.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 1.9999999999999998,
+        "current_runs": 1,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 1.0,
+        "priority_rank": 1,
+        "score": 3.724649575020964,
+        "yield_rate": 1.0
+      },
+      "seed": 501,
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "started_at": "2026-06-06T17:19:36Z",
+      "status": "completed",
+      "target_suite": "arrow_cross",
+      "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "pyarrow"
+      ],
+      "candidate_pipeline": {
+        "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260606T174443/manifest.json",
+        "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260606T174443/manifest.md",
+        "status": "ok",
+        "summary": {
+          "already_submitted_or_confirmed_count": 0,
+          "artifact_created_count": 97,
+          "candidate_bug_verdict_count": 1,
+          "candidate_count": 116,
+          "issue_draft_count": 1,
+          "local_duplicate_candidate_count": 108,
+          "needs_dedup_check_count": 1,
+          "needs_reproducer_or_evidence_count": 0,
+          "not_latest_reproducible_count": 0,
+          "ready_to_submit_count": 0,
+          "recheck_pass_rate": 0.9224137931034483,
+          "rechecked_count": 116,
+          "reduced_count": 107,
+          "reproduced_count": 107,
+          "submission_group_count": 1,
+          "unique_family_count": 8
+        }
+      },
+      "cases": 220,
+      "classification": {
+        "candidate_bug_families": {
+          "conditional_expression@duckdb": 5,
+          "conditional_expression@duckdb,pyarrow": 34,
+          "groupby_aggregation@duckdb": 1,
+          "grouped_topk_null_sort_key@duckdb": 14,
+          "grouped_topk_null_sort_key@duckdb,pyarrow": 46,
+          "ordering_or_limit@duckdb": 2,
+          "running_sum_precision@duckdb": 14,
+          "running_sum_precision@duckdb,pyarrow": 9
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-champion-mut-1041",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'pyarrow'] and disagrees with ['duckdb'].",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 1041,
+              "signature": "f7c8cd367dad1328",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-mut-894-champion-mut-1134",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'pyarrow'] and disagrees with ['duckdb'].",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 1134,
+              "signature": "1fd789414865329e",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-164-champion-mut-320-champion-mut-1308",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'pyarrow'] and disagrees with ['duckdb'].",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 1308,
+              "signature": "12fd6fc06d8fac4b",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-1496",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'pyarrow'].",
+              "kind": "accept_reject_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1496,
+              "signature": "3725763da5e45384",
+              "suspicious": [
+                "duckdb",
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00001620-discovery-fresh-mut-3693-mut-3689-mut-1538",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'pyarrow'] and disagrees with ['duckdb'].",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 1538,
+              "signature": "1ad40de8b147cede",
+              "suspicious": [
+                "duckdb"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-659-mut-1101",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "grouped_topk_null_sort_key",
+              "seed": 1101,
+              "signature": "11f1e7302daa031b",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-659-mut-1108",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 1108,
+              "signature": "320afe7c6a3e49b6",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-1194",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 1194,
+              "signature": "21a76bbd7b247f00",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-1194-mut-1203",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 1203,
+              "signature": "8623d61127542d2c",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-659-champion-mut-1253",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 1253,
+              "signature": "726c0d17262c95d7",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ],
+          "generator_false_positive": [
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-3654-mut-3849-mut-3867",
+              "evidence": "All backends rejected with schema/name/type errors, indicating an invalid generated DSL program.",
+              "kind": "exception_mismatch",
+              "root": "exception_taxonomy",
+              "seed": 3867,
+              "signature": "fbc94b4de83afd1e",
+              "suspicious": [
+                "pandas",
+                "duckdb",
+                "pyarrow"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-3654-mut-3752-mut-3943",
+              "evidence": "All backends rejected with schema/name/type errors, indicating an invalid generated DSL program.",
+              "kind": "exception_mismatch",
+              "root": "exception_taxonomy",
+              "seed": 3943,
+              "signature": "b338b1c797c34b0f",
+              "suspicious": [
+                "pandas",
+                "duckdb",
+                "pyarrow"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {
+          "all_backends_rejected_generated_case": 2
+        },
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb": 5,
+          "conditional_expression@duckdb,pyarrow": 34,
+          "groupby_aggregation@duckdb": 1,
+          "grouped_topk_null_sort_key@duckdb": 14,
+          "grouped_topk_null_sort_key@duckdb,pyarrow": 46,
+          "ordering_or_limit@duckdb": 2,
+          "running_sum_precision@duckdb": 14,
+          "running_sum_precision@duckdb,pyarrow": 9
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "false_positive": 2,
+          "new_bug": 125,
+          "semantic_divergence": 16
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260606T173027-1780767027056738263.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 125,
+          "expected_semantic_divergence": 16,
+          "generator_false_positive": 2
+        },
+        "unsaturated_candidate_bug_families": {
+          "conditional_expression@duckdb": 5,
+          "conditional_expression@duckdb,pyarrow": 34,
+          "groupby_aggregation@duckdb": 1,
+          "grouped_topk_null_sort_key@duckdb": 14,
+          "grouped_topk_null_sort_key@duckdb,pyarrow": 46,
+          "ordering_or_limit@duckdb": 2,
+          "running_sum_precision@duckdb": 14,
+          "running_sum_precision@duckdb,pyarrow": 9
+        }
+      },
+      "completed_at": "2026-06-06T23:48:12Z",
+      "csv": "reports/findings-run-20260606T173027-1780767027056738263.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-arrow_probe_stress-seed1001-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 116,
+      "health": {
+        "bytes": 6465230,
+        "candidate_bug_families": {
+          "conditional_expression@duckdb": 5,
+          "conditional_expression@duckdb,pyarrow": 34,
+          "groupby_aggregation@duckdb": 1,
+          "grouped_topk_null_sort_key@duckdb": 8,
+          "grouped_topk_null_sort_key@duckdb,pyarrow": 46,
+          "metamorphic_join_inner_left_equivalence@duckdb": 1,
+          "metamorphic_join_inner_left_equivalence@pyarrow": 1,
+          "ordering_or_limit@duckdb": 2,
+          "running_sum_precision@duckdb": 11,
+          "running_sum_precision@duckdb,pyarrow": 9
+        },
+        "examples": [
+          {
+            "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-champion-mut-1041",
+            "kind": "semantic_output_mismatch",
+            "root": "conditional_expression",
+            "seed": 1041,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          },
+          {
+            "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-mut-894-champion-mut-1134",
+            "kind": "semantic_output_mismatch",
+            "root": "conditional_expression",
+            "seed": 1134,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-1194",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 1194,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-1194",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 1194,
+            "status": "bug",
+            "suspicious": [
+              "pyarrow"
+            ]
+          },
+          {
+            "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-champion-mut-164-champion-mut-320-champion-mut-1308",
+            "kind": "semantic_output_mismatch",
+            "root": "conditional_expression",
+            "seed": 1308,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          }
+        ],
+        "false_positive_reasons": {
+          "all_backends_rejected_generated_case": 3,
+          "candidate_not_reproduced_on_immediate_recheck": 9
+        },
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb": 5,
+          "conditional_expression@duckdb,pyarrow": 34,
+          "groupby_aggregation@duckdb": 1,
+          "grouped_topk_null_sort_key@duckdb": 8,
+          "grouped_topk_null_sort_key@duckdb,pyarrow": 46,
+          "metamorphic_join_inner_left_equivalence@duckdb": 1,
+          "metamorphic_join_inner_left_equivalence@pyarrow": 1,
+          "ordering_or_limit@duckdb": 2,
+          "running_sum_precision@duckdb": 11,
+          "running_sum_precision@duckdb,pyarrow": 9
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 220,
+        "run_file": "runs/run-20260606T173027-1780767027056738263.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 852.4424813359947,
+          "evidence_bytes_per_case": 29387.409090909092,
+          "executed_cases": 220,
+          "meta_file": "runs/run-20260606T173027-1780767027056738263.meta.json",
+          "next_seed": 4733,
+          "run_log_bytes": 6465230,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 48.18824872262749,
+              "generate_mutate_ms": 2957.8174651274976,
+              "logging_artifact_ms": 0.49635248628460843,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 775.3890130639775,
+              "scheduler_feedback_ms": 71.33472561753561,
+              "total_case_wall_ms": 3853.2258050179225
+            },
+            "case_count": 220,
+            "share_of_total": {
+              "backend_execution_ms": 0.012505949861509182,
+              "generate_mutate_ms": 0.7676211088578392,
+              "logging_artifact_ms": 0.0001288147934746585,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.2012311378311168,
+              "scheduler_feedback_ms": 0.018512988656060297,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.25808192906482547
+        },
+        "statuses": {
+          "bug": 117,
+          "ok": 103
+        }
+      },
+      "lane_id": "arrow_probe_stress",
+      "preset": "live_arrow_issue_focus_metamorphic",
+      "report": "reports/report-run-20260606T173027-1780767027056738263.md",
+      "run_file": "runs/run-20260606T173027-1780767027056738263.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 1.9999999999999998,
+        "current_runs": 2,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 1.0,
+        "priority_rank": 1,
+        "score": 3.935113825991998,
+        "yield_rate": 1.0
+      },
+      "seed": 1001,
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "started_at": "2026-06-06T17:30:27Z",
+      "status": "completed",
+      "target_suite": "arrow_cross",
+      "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts"
+    },
+    {
+      "backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "candidate_pipeline": {
+        "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T002643/manifest.json",
+        "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T002643/manifest.md",
+        "status": "ok",
+        "summary": {
+          "already_submitted_or_confirmed_count": 0,
+          "artifact_created_count": 0,
+          "candidate_bug_verdict_count": 4,
+          "candidate_count": 5,
+          "issue_draft_count": 4,
+          "local_duplicate_candidate_count": 3,
+          "needs_dedup_check_count": 4,
+          "needs_reproducer_or_evidence_count": 0,
+          "not_latest_reproducible_count": 0,
+          "ready_to_submit_count": 0,
+          "recheck_pass_rate": 1.0,
+          "rechecked_count": 5,
+          "reduced_count": 5,
+          "reproduced_count": 5,
+          "submission_group_count": 1,
+          "unique_family_count": 2
+        }
+      },
+      "cases": 220,
+      "classification": {
+        "candidate_bug_families": {
+          "csv_long_numeric_roundtrip@polars,polars_lazy": 4,
+          "running_sum_precision@polars_lazy": 1
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000252-issue-focus-csv-long-numeric-roundtrip",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "accept_reject_mismatch",
+              "root": "csv_long_numeric_roundtrip",
+              "seed": 252,
+              "signature": "1ccab94bdd003141",
+              "suspicious": [
+                "polars",
+                "polars_lazy"
+              ]
+            },
+            {
+              "case_id": "case-00000321-issue-focus-csv-long-numeric-roundtrip",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "accept_reject_mismatch",
+              "root": "csv_long_numeric_roundtrip",
+              "seed": 321,
+              "signature": "1ccab94bdd003141",
+              "suspicious": [
+                "polars",
+                "polars_lazy"
+              ]
+            },
+            {
+              "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-mut-894-mut-5548-mut-5294-mut-6032-mut-2965-mut-914",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'polars'] and disagrees with ['polars_lazy'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 914,
+              "signature": "7e7f1522ee515f08",
+              "suspicious": [
+                "polars_lazy"
+              ]
+            },
+            {
+              "case_id": "case-00001839-issue-focus-csv-long-numeric-roundtrip",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "accept_reject_mismatch",
+              "root": "csv_long_numeric_roundtrip",
+              "seed": 1839,
+              "signature": "1ccab94bdd003141",
+              "suspicious": [
+                "polars",
+                "polars_lazy"
+              ]
+            },
+            {
+              "case_id": "case-00002046-issue-focus-csv-long-numeric-roundtrip",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "accept_reject_mismatch",
+              "root": "csv_long_numeric_roundtrip",
+              "seed": 2046,
+              "signature": "1ccab94bdd003141",
+              "suspicious": [
+                "polars",
+                "polars_lazy"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-94",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 94,
+              "signature": "066116c49dc50215",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-644",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families; case changes case for non-ASCII text; Unicode case mapping support differs across engines",
+              "kind": "semantic_output_mismatch",
+              "root": "unicode_case_mapping",
+              "seed": 644,
+              "signature": "496ebb1b13e5caeb",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-931",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families; filter compares against NULL; engines intentionally differ on NULL predicate semantics",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 931,
+              "signature": "acced955c76af329",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157-mut-972",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 972,
+              "signature": "4bb232c4945f22ee",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157-mut-972-mut-987",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families; filter compares against NULL; engines intentionally differ on NULL predicate semantics",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 987,
+              "signature": "34c9e5c9e34c42ef",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "csv_long_numeric_roundtrip@polars,polars_lazy": 4,
+          "running_sum_precision@polars_lazy": 1
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 5,
+          "semantic_divergence": 53
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260606T234812-1780789692235394704.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 5,
+          "expected_semantic_divergence": 53
+        },
+        "unsaturated_candidate_bug_families": {
+          "csv_long_numeric_roundtrip@polars,polars_lazy": 4,
+          "running_sum_precision@polars_lazy": 1
+        }
+      },
+      "completed_at": "2026-06-07T00:27:26Z",
+      "csv": "reports/findings-run-20260606T234812-1780789692235394704.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 5,
+      "health": {
+        "bytes": 5712730,
+        "candidate_bug_families": {
+          "csv_long_numeric_roundtrip@polars,polars_lazy": 4,
+          "metamorphic_join_inner_left_equivalence@polars": 27,
+          "metamorphic_join_inner_left_equivalence@polars_lazy": 27,
+          "running_sum_precision@polars_lazy": 1
+        },
+        "examples": [
+          {
+            "case_id": "case-00000252-issue-focus-csv-long-numeric-roundtrip",
+            "kind": "accept_reject_mismatch",
+            "root": "csv_long_numeric_roundtrip",
+            "seed": 252,
+            "status": "bug",
+            "suspicious": [
+              "polars",
+              "polars_lazy"
+            ]
+          },
+          {
+            "case_id": "case-00000321-issue-focus-csv-long-numeric-roundtrip",
+            "kind": "accept_reject_mismatch",
+            "root": "csv_long_numeric_roundtrip",
+            "seed": 321,
+            "status": "bug",
+            "suspicious": [
+              "polars",
+              "polars_lazy"
+            ]
+          },
+          {
+            "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-mut-894-mut-5548-mut-5294-mut-6032-mut-2965-mut-914",
+            "kind": "semantic_output_mismatch",
+            "root": "running_sum_precision",
+            "seed": 914,
+            "status": "bug",
+            "suspicious": [
+              "polars_lazy"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-931",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 931,
+            "status": "bug",
+            "suspicious": [
+              "polars"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-931",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 931,
+            "status": "bug",
+            "suspicious": [
+              "polars_lazy"
+            ]
+          }
+        ],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "csv_long_numeric_roundtrip@polars,polars_lazy": 4,
+          "metamorphic_join_inner_left_equivalence@polars": 27,
+          "metamorphic_join_inner_left_equivalence@polars_lazy": 27,
+          "running_sum_precision@polars_lazy": 1
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 220,
+        "run_file": "runs/run-20260606T234812-1780789692235394704.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 2307.5609891839995,
+          "evidence_bytes_per_case": 25966.954545454544,
+          "executed_cases": 220,
+          "meta_file": "runs/run-20260606T234812-1780789692235394704.meta.json",
+          "next_seed": 3714,
+          "run_log_bytes": 5712730,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 39.99064485529247,
+              "generate_mutate_ms": 10022.771159700502,
+              "logging_artifact_ms": 0.5510476771054197,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 338.7496836322746,
+              "scheduler_feedback_ms": 62.333490881693166,
+              "total_case_wall_ms": 10464.396026746866
+            },
+            "case_count": 220,
+            "share_of_total": {
+              "backend_execution_ms": 0.0038215913037959264,
+              "generate_mutate_ms": 0.9577973859248466,
+              "logging_artifact_ms": 5.265929115229858e-05,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.032371642163239484,
+              "scheduler_feedback_ms": 0.005956721316965598,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.09533875855554157
+        },
+        "statuses": {
+          "bug": 32,
+          "ok": 188
+        }
+      },
+      "lane_id": "polars_probe_stress",
+      "preset": "live_polars_issue_focus_metamorphic",
+      "report": "reports/report-run-20260606T234812-1780789692235394704.md",
+      "run_file": "runs/run-20260606T234812-1780789692235394704.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 0.5,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 0.0,
+        "priority_rank": 1,
+        "score": 2.499299150041928,
+        "yield_rate": 0.0
+      },
+      "seed": 1,
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "started_at": "2026-06-06T23:48:12Z",
+      "status": "completed",
+      "target_suite": "polars_cross",
+      "theme": "Polars probe stress lane; issue-inspired sources remain separated from fresh counts"
+    },
+    {
+      "backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "candidate_pipeline": {
+        "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T021359/manifest.json",
+        "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T021359/manifest.md",
+        "status": "ok",
+        "summary": {
+          "already_submitted_or_confirmed_count": 0,
+          "artifact_created_count": 0,
+          "candidate_bug_verdict_count": 4,
+          "candidate_count": 4,
+          "issue_draft_count": 4,
+          "local_duplicate_candidate_count": 3,
+          "needs_dedup_check_count": 4,
+          "needs_reproducer_or_evidence_count": 0,
+          "not_latest_reproducible_count": 0,
+          "ready_to_submit_count": 0,
+          "recheck_pass_rate": 1.0,
+          "rechecked_count": 4,
+          "reduced_count": 4,
+          "reproduced_count": 4,
+          "submission_group_count": 1,
+          "unique_family_count": 1
+        }
+      },
+      "cases": 220,
+      "classification": {
+        "candidate_bug_families": {
+          "csv_long_numeric_roundtrip@polars,polars_lazy": 4
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000735-issue-focus-csv-long-numeric-roundtrip",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "accept_reject_mismatch",
+              "root": "csv_long_numeric_roundtrip",
+              "seed": 735,
+              "signature": "1ccab94bdd003141",
+              "suspicious": [
+                "polars",
+                "polars_lazy"
+              ]
+            },
+            {
+              "case_id": "case-00000801-issue-focus-csv-long-numeric-roundtrip",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "accept_reject_mismatch",
+              "root": "csv_long_numeric_roundtrip",
+              "seed": 801,
+              "signature": "1ccab94bdd003141",
+              "suspicious": [
+                "polars",
+                "polars_lazy"
+              ]
+            },
+            {
+              "case_id": "case-00001333-issue-focus-csv-long-numeric-roundtrip",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "accept_reject_mismatch",
+              "root": "csv_long_numeric_roundtrip",
+              "seed": 1333,
+              "signature": "1ccab94bdd003141",
+              "suspicious": [
+                "polars",
+                "polars_lazy"
+              ]
+            },
+            {
+              "case_id": "case-00001517-issue-focus-csv-long-numeric-roundtrip",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "accept_reject_mismatch",
+              "root": "csv_long_numeric_roundtrip",
+              "seed": 1517,
+              "signature": "1ccab94bdd003141",
+              "suspicious": [
+                "polars",
+                "polars_lazy"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157-mut-1015-mut-570",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 570,
+              "signature": "710b964b02f6f002",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157-mut-1015-mut-1032",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "tuple_absence_null_filter",
+              "seed": 1032,
+              "signature": "054df04c11cd849f",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711-mut-3143-mut-1123",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1123,
+              "signature": "48f6d317b33938b1",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157-mut-1015-mut-3671-mut-3930-champion-mut-1129",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1129,
+              "signature": "00c874e0204f2c38",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-3361-mut-3389-mut-1193",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1193,
+              "signature": "af3d7b2b94f9f67d",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "csv_long_numeric_roundtrip@polars,polars_lazy": 4
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 4,
+          "semantic_divergence": 74
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260607T002726-1780792046283706436.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 4,
+          "expected_semantic_divergence": 74
+        },
+        "unsaturated_candidate_bug_families": {
+          "csv_long_numeric_roundtrip@polars,polars_lazy": 4
+        }
+      },
+      "completed_at": "2026-06-07T02:14:39Z",
+      "csv": "reports/findings-run-20260607T002726-1780792046283706436.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed501-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 4,
+      "health": {
+        "bytes": 6074595,
+        "candidate_bug_families": {
+          "csv_long_numeric_roundtrip@polars,polars_lazy": 4,
+          "metamorphic_join_inner_left_equivalence@polars": 50,
+          "metamorphic_join_inner_left_equivalence@polars_lazy": 50
+        },
+        "examples": [
+          {
+            "case_id": "case-00000735-issue-focus-csv-long-numeric-roundtrip",
+            "kind": "accept_reject_mismatch",
+            "root": "csv_long_numeric_roundtrip",
+            "seed": 735,
+            "status": "bug",
+            "suspicious": [
+              "polars",
+              "polars_lazy"
+            ]
+          },
+          {
+            "case_id": "case-00000801-issue-focus-csv-long-numeric-roundtrip",
+            "kind": "accept_reject_mismatch",
+            "root": "csv_long_numeric_roundtrip",
+            "seed": 801,
+            "status": "bug",
+            "suspicious": [
+              "polars",
+              "polars_lazy"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157-mut-1015-mut-3671-mut-3930-champion-mut-1129",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 1129,
+            "status": "bug",
+            "suspicious": [
+              "polars"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157-mut-1015-mut-3671-mut-3930-champion-mut-1129",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 1129,
+            "status": "bug",
+            "suspicious": [
+              "polars_lazy"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-3361-mut-3389-mut-1193",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 1193,
+            "status": "bug",
+            "suspicious": [
+              "polars"
+            ]
+          }
+        ],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "csv_long_numeric_roundtrip@polars,polars_lazy": 4,
+          "metamorphic_join_inner_left_equivalence@polars": 50,
+          "metamorphic_join_inner_left_equivalence@polars_lazy": 50
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 220,
+        "run_file": "runs/run-20260607T002726-1780792046283706436.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 6388.161294653997,
+          "evidence_bytes_per_case": 27611.795454545456,
+          "executed_cases": 220,
+          "meta_file": "runs/run-20260607T002726-1780792046283706436.meta.json",
+          "next_seed": 4209,
+          "run_log_bytes": 6074595,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 37.986706482413204,
+              "generate_mutate_ms": 28493.70197785954,
+              "logging_artifact_ms": 0.5557568827167746,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 417.8479858638391,
+              "scheduler_feedback_ms": 61.3844875768171,
+              "total_case_wall_ms": 29011.476914665323
+            },
+            "case_count": 220,
+            "share_of_total": {
+              "backend_execution_ms": 0.0013093682405121159,
+              "generate_mutate_ms": 0.9821527549828376,
+              "logging_artifact_ms": 1.9156449164979913e-05,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.014402851226530167,
+              "scheduler_feedback_ms": 0.0021158691009552566,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.03443870463698363
+        },
+        "statuses": {
+          "bug": 54,
+          "ok": 166
+        }
+      },
+      "lane_id": "polars_probe_stress",
+      "preset": "live_polars_issue_focus_metamorphic",
+      "report": "reports/report-run-20260607T002726-1780792046283706436.md",
+      "run_file": "runs/run-20260607T002726-1780792046283706436.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 1.3871900109529423,
+        "current_runs": 1,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 1.0,
+        "priority_rank": 1,
+        "score": 6.065271927508256,
+        "yield_rate": 3.0
+      },
+      "seed": 501,
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "started_at": "2026-06-07T00:27:26Z",
+      "status": "completed",
+      "target_suite": "polars_cross",
+      "theme": "Polars probe stress lane; issue-inspired sources remain separated from fresh counts"
+    },
+    {
+      "backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ],
+      "candidate_pipeline": {
+        "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/manifest.json",
+        "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T041158/manifest.md",
+        "status": "ok",
+        "summary": {
+          "already_submitted_or_confirmed_count": 0,
+          "artifact_created_count": 1,
+          "candidate_bug_verdict_count": 7,
+          "candidate_count": 7,
+          "issue_draft_count": 7,
+          "local_duplicate_candidate_count": 5,
+          "needs_dedup_check_count": 7,
+          "needs_reproducer_or_evidence_count": 0,
+          "not_latest_reproducible_count": 0,
+          "ready_to_submit_count": 0,
+          "recheck_pass_rate": 1.0,
+          "rechecked_count": 7,
+          "reduced_count": 7,
+          "reproduced_count": 7,
+          "submission_group_count": 2,
+          "unique_family_count": 2
+        }
+      },
+      "cases": 220,
+      "classification": {
+        "candidate_bug_families": {
+          "csv_long_numeric_roundtrip@polars,polars_lazy": 4,
+          "ordering_or_limit@pandas": 23,
+          "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy": 3,
+          "reverse_division_operand_order@polars": 4
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-1058",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "semantic_output_mismatch",
+              "root": "ordering_or_limit",
+              "seed": 1058,
+              "signature": "9eb733dcc44794af",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-1058-mut-1073",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "semantic_output_mismatch",
+              "root": "ordering_or_limit",
+              "seed": 1073,
+              "signature": "bdfa85636bc96372",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-1058-mut-1073-mut-1214",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "semantic_output_mismatch",
+              "root": "ordering_or_limit",
+              "seed": 1214,
+              "signature": "17fe720575e494ef",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-1058-mut-1073-mut-1283",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "semantic_output_mismatch",
+              "root": "ordering_or_limit",
+              "seed": 1283,
+              "signature": "0ef71313d8719d07",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-1058-mut-1073-mut-1367",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+              "kind": "semantic_output_mismatch",
+              "root": "ordering_or_limit",
+              "seed": 1367,
+              "signature": "17fe720575e494ef",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-3361-mut-3389-mut-1193-mut-1204-champion-mut-7261-mut-1114",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 1114,
+              "signature": "09c5303150640a51",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157-mut-1015-mut-3671-mut-3930-mut-1573-mut-1766-champion-mut-1116",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1116,
+              "signature": "435e5ac5ceb2bfd5",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-3361-mut-3389-mut-1193-mut-1204-mut-1173",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1173,
+              "signature": "349d55345693588c",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-605-mut-5810-mut-5936-mut-3361-mut-3389-mut-1193-mut-1204-champion-mut-1250",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1250,
+              "signature": "5c06f8da1015f225",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157-mut-1015-mut-3671-mut-3930-mut-1573-mut-1766-champion-mut-1116-mut-1310",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1310,
+              "signature": "1ff2c2b21ec85871",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "csv_long_numeric_roundtrip@polars,polars_lazy": 4,
+          "ordering_or_limit@pandas": 23,
+          "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy": 3
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {
+          "reverse_division_operand_order@polars": 4
+        },
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "known_bug": 4,
+          "new_bug": 30,
+          "semantic_divergence": 122
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 34,
+          "expected_semantic_divergence": 122
+        },
+        "unsaturated_candidate_bug_families": {
+          "csv_long_numeric_roundtrip@polars,polars_lazy": 4,
+          "ordering_or_limit@pandas": 23,
+          "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy": 3
+        }
+      },
+      "completed_at": "2026-06-07T04:12:41Z",
+      "csv": "reports/findings-run-20260607T021439-1780798479224195303.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 7,
+      "health": {
+        "bytes": 7189363,
+        "candidate_bug_families": {
+          "csv_long_numeric_roundtrip@polars,polars_lazy": 4,
+          "metamorphic_join_inner_left_equivalence@polars": 80,
+          "metamorphic_join_inner_left_equivalence@polars_lazy": 80,
+          "ordering_or_limit@polars,polars_lazy": 23,
+          "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy": 3,
+          "reverse_division_operand_order@polars": 4
+        },
+        "examples": [
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-1058",
+            "kind": "semantic_output_mismatch",
+            "root": "ordering_or_limit",
+            "seed": 1058,
+            "status": "bug",
+            "suspicious": [
+              "polars",
+              "polars_lazy"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-1058-mut-1073",
+            "kind": "semantic_output_mismatch",
+            "root": "ordering_or_limit",
+            "seed": 1073,
+            "status": "bug",
+            "suspicious": [
+              "polars",
+              "polars_lazy"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157-mut-1015-mut-3671-mut-3930-mut-1573-mut-1766-champion-mut-1116",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 1116,
+            "status": "bug",
+            "suspicious": [
+              "polars"
+            ]
+          },
+          {
+            "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157-mut-1015-mut-3671-mut-3930-mut-1573-mut-1766-champion-mut-1116",
+            "kind": "metamorphic_join_inner_left_equivalence_violation",
+            "root": "metamorphic_join_inner_left_equivalence",
+            "seed": 1116,
+            "status": "bug",
+            "suspicious": [
+              "polars_lazy"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-3571-mut-3572-mut-5020-mut-5485-mut-1488-mut-1615-mut-4583-mut-1058-mut-1073-mut-1214",
+            "kind": "semantic_output_mismatch",
+            "root": "ordering_or_limit",
+            "seed": 1214,
+            "status": "bug",
+            "suspicious": [
+              "polars",
+              "polars_lazy"
+            ]
+          }
+        ],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "csv_long_numeric_roundtrip@polars,polars_lazy": 4,
+          "metamorphic_join_inner_left_equivalence@polars": 80,
+          "metamorphic_join_inner_left_equivalence@polars_lazy": 80,
+          "ordering_or_limit@polars,polars_lazy": 23,
+          "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy": 3
+        },
+        "known_saturated_candidate_bug_families": {
+          "reverse_division_operand_order@polars": 4
+        },
+        "partial": false,
+        "rows": 220,
+        "run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 7034.164240762009,
+          "evidence_bytes_per_case": 32678.922727272726,
+          "executed_cases": 220,
+          "meta_file": "runs/run-20260607T021439-1780798479224195303.meta.json",
+          "next_seed": 4763,
+          "run_log_bytes": 7189363,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 27.422595441021258,
+              "generate_mutate_ms": 31385.35746006817,
+              "logging_artifact_ms": 0.741593317798106,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 484.6315814410363,
+              "scheduler_feedback_ms": 51.742740527036155,
+              "total_case_wall_ms": 31949.895970795063
+            },
+            "case_count": 220,
+            "share_of_total": {
+              "backend_execution_ms": 0.0008582999915269789,
+              "generate_mutate_ms": 0.982330505512665,
+              "logging_artifact_ms": 2.3211134035490625e-05,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.015168486992384295,
+              "scheduler_feedback_ms": 0.00161949636938829,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.03127592596219611
+        },
+        "statuses": {
+          "bug": 114,
+          "ok": 106
+        }
+      },
+      "lane_id": "polars_probe_stress",
+      "preset": "live_polars_issue_focus_metamorphic",
+      "report": "reports/report-run-20260607T021439-1780798479224195303.md",
+      "run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 1.2810831564808796,
+        "current_runs": 2,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 1.0,
+        "priority_rank": 1,
+        "score": 5.9424722931449905,
+        "yield_rate": 3.0
+      },
+      "seed": 1001,
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "started_at": "2026-06-07T02:14:39Z",
+      "status": "completed",
+      "target_suite": "polars_cross",
+      "theme": "Polars probe stress lane; issue-inspired sources remain separated from fresh counts"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 220,
+      "duration": null,
+      "lane_id": "duckdb_probe_stress",
+      "preset": "live_duckdb_issue_focus_metamorphic",
+      "scheduler": {
+        "budget_multiplier": 0.5,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 0.0,
+        "priority_rank": 1,
+        "score": 2.637746366011938,
+        "yield_rate": 0.0
+      },
+      "seed": 1,
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "started_at": "2026-06-07T04:12:41Z",
+      "status": "running",
+      "target_suite": "embedded_sql_cross",
+      "theme": "DuckDB/SQLite probe stress lane; issue-inspired sources remain separated from fresh counts"
+    }
+  ],
+  "scheduler": {
+    "bug_discovery_system": {
+      "objective": "maximize externally reproducible fresh implementation bug yield per unit budget",
+      "schema_version": "bug-discovery-system-v1",
+      "stages": [
+        "generate_or_mutate_candidate",
+        "score_by_acquisition",
+        "execute_differential_oracles",
+        "filter_rewardable_fresh_candidates",
+        "recheck_reproducibility",
+        "reduce_preserving_root_cause",
+        "write_reproducer_and_issue_draft"
+      ],
+      "theory": {
+        "budget": "Boltzmann allocation over acquisition free energy",
+        "candidate_priority": "multi-objective proof/reproducibility/dedup utility",
+        "exploration": "UCB optimism under sparse lane samples",
+        "novelty": "Good-Turing unseen-family probability"
+      }
+    },
+    "generated_at": "2026-06-07T04:12:41Z",
+    "history_manifest_count": 8,
+    "history_window": 8,
+    "lanes": [
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.5,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "duckdb_probe_stress",
+        "novelty_rate": 0.0,
+        "pending_runs": 2,
+        "preset": "live_duckdb_issue_focus_metamorphic",
+        "priority_rank": 1,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.637746366011938,
+        "target_suite": "embedded_sql_cross",
+        "theme": "DuckDB/SQLite probe stress lane; issue-inspired sources remain separated from fresh counts",
+        "ucb_bonus": 0.887746366011938,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 1.3311908455846397,
+        "candidate_total": 127,
+        "completed_runs": 3,
+        "current_runs": 3,
+        "false_positive_rate": 0.015503875968992248,
+        "false_positive_total": 2,
+        "family_entropy": 0.7647174907425258,
+        "first_seen_family_count": 9,
+        "free_energy": -5.4548814826446295,
+        "fresh_candidate_total": 127,
+        "good_turing_unseen_probability": 0.015748031496062992,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "arrow_probe_stress",
+        "novelty_rate": 1.0,
+        "pending_runs": 0,
+        "preset": "live_arrow_issue_focus_metamorphic",
+        "priority_rank": 2,
+        "proof_yield": 0.9844961240310077,
+        "saturation_rate": 0.0,
+        "score": 5.918134510611838,
+        "target_suite": "arrow_cross",
+        "theme": "Arrow probe stress lane; issue-inspired sources remain separated from fresh counts",
+        "ucb_bonus": 0.443873183005969,
+        "unique_fresh_family_count": 9,
+        "yield_rate": 3.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 1.16880915441536,
+        "candidate_total": 43,
+        "completed_runs": 3,
+        "current_runs": 3,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.6963374876346032,
+        "first_seen_family_count": 4,
+        "free_energy": -5.293918660317618,
+        "fresh_candidate_total": 39,
+        "good_turing_unseen_probability": 0.02564102564102564,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 4,
+        "lane_id": "polars_probe_stress",
+        "novelty_rate": 1.0,
+        "pending_runs": 0,
+        "preset": "live_polars_issue_focus_metamorphic",
+        "priority_rank": 3,
+        "proof_yield": 0.9069767441860465,
+        "saturation_rate": 0.09302325581395349,
+        "score": 5.807559285184053,
+        "target_suite": "polars_cross",
+        "theme": "Polars probe stress lane; issue-inspired sources remain separated from fresh counts",
+        "ucb_bonus": 0.443873183005969,
+        "unique_fresh_family_count": 4,
+        "yield_rate": 3.0
+      }
+    ],
+    "score_weights": {
+      "boltzmann_temperature": 0.85,
+      "entropy_weight": 0.2,
+      "false_positive_penalty": 1.25,
+      "issue_inspired_weight": 0.2,
+      "novelty_rate": 0.75,
+      "proof_weight": 0.6,
+      "saturation_penalty": 0.75,
+      "uncertainty_weight": 0.45,
+      "yield_rate": 1.0
+    },
+    "strategy": "true_bug_acquisition_good_turing_ucb_boltzmann"
+  },
+  "schema_version": "discovery-campaign-v1",
+  "seeds": [
+    1,
+    501,
+    1001
+  ],
+  "started_at": "2026-06-06T17:13:00Z",
+  "status": "running",
+  "stopped_by_health": false,
+  "summary": {
+    "candidate_pipeline": {
+      "already_submitted_or_confirmed_count": 0,
+      "candidate_bug_verdict_count": 16,
+      "candidate_count": 132,
+      "issue_draft_count": 16,
+      "needs_dedup_check_count": 16,
+      "pipeline_count": 4,
+      "rechecked_count": 132,
+      "reduced_count": 123,
+      "reproduced_count": 123
+    },
+    "fresh_candidate_bug_families": {
+      "conditional_expression@duckdb": 6,
+      "conditional_expression@duckdb,pyarrow": 34,
+      "csv_long_numeric_roundtrip@pandas": 1,
+      "csv_long_numeric_roundtrip@polars,polars_lazy": 12,
+      "groupby_aggregation@duckdb": 1,
+      "grouped_topk_null_sort_key@duckdb": 14,
+      "grouped_topk_null_sort_key@duckdb,pyarrow": 46,
+      "ordering_or_limit@duckdb": 2,
+      "ordering_or_limit@pandas": 23,
+      "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy": 3,
+      "running_sum_precision@duckdb": 14,
+      "running_sum_precision@duckdb,pyarrow": 9,
+      "running_sum_precision@polars_lazy": 1
+    },
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {
+      "reverse_division_operand_order@polars": 4
+    },
+    "run_count": 6,
+    "triage_verdicts": {
+      "candidate_implementation_bug": 170,
+      "expected_semantic_divergence": 355,
+      "generator_false_positive": 2
+    }
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "guided_discovery_campaign",
+    "true_bug_acquisition_scheduler",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence",
+    "candidate_pipeline"
+  ]
+}

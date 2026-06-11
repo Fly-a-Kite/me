@@ -1,0 +1,27 @@
+{
+  "events": [
+    {
+      "candidate_id": "running_sum_precision-duckdb-case-00000610-discovery-fresh",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "running_sum_precision@duckdb"
+      ],
+      "primary_family": "running_sum_precision@duckdb",
+      "recorded_at": "2026-06-06T17:35:52Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "running_sum_precision@duckdb"
+      ],
+      "reproduced_roots": [
+        "running_sum_precision"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed501-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T171300-1780765980786771442.jsonl.gz",
+      "suspicious_backends": [
+        "duckdb"
+      ],
+      "triage_verdict": "candidate_implementation_bug"
+    }
+  ],
+  "schema_version": "dynamic-strategy-learning-v1"
+}

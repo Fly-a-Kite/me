@@ -1,0 +1,4333 @@
+{
+  "bug_discovery_system": {
+    "objective": "maximize externally reproducible fresh implementation bug yield per unit budget",
+    "schema_version": "bug-discovery-system-v1",
+    "stages": [
+      "generate_or_mutate_candidate",
+      "score_by_acquisition",
+      "execute_differential_oracles",
+      "filter_rewardable_fresh_candidates",
+      "recheck_reproducibility",
+      "reduce_preserving_root_cause",
+      "write_reproducer_and_issue_draft"
+    ],
+    "theory": {
+      "budget": "Boltzmann allocation over acquisition free energy",
+      "candidate_priority": "multi-objective proof/reproducibility/dedup utility",
+      "exploration": "UCB optimism under sparse lane samples",
+      "novelty": "Good-Turing unseen-family probability"
+    }
+  },
+  "candidate_count": 5,
+  "candidates": [
+    {
+      "bug_dir": "/root/datadiff_fuzz_lab/bugs/bug_7e7f1522ee515f08",
+      "candidate_acquisition": {
+        "acquisition_score": 5.406875,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "running_sum_precision@polars_lazy"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.9175,
+        "recheck_prior": 0.85,
+        "reduction_potential": 0.7999999999999999,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9955343951337484
+      },
+      "candidate_id": "running_sum_precision-polars_lazy-case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-mut-",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 6,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 6,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 6,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "semantic_output_mismatch:running_sum_precision@polars_lazy:row_order"
+        ]
+      },
+      "case": {
+        "case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-mut-894-mut-5548-mut-5294-mut-6032-mut-2965-mut-914",
+        "metadata": {
+          "candidate_source": "feedback_mutation",
+          "case_fingerprint": {
+            "column_count": 4,
+            "feature_tokens": [
+              "fp_op:a17ada83c25983d2",
+              "fp_type_mix:num3_str2_bool1",
+              "fp_null_density:0",
+              "fp_row_mass:4",
+              "fp_column_count:4"
+            ],
+            "minhash_signature": [
+              786861518696403830,
+              95009781605776900,
+              925645084085927820,
+              854420912048912435,
+              270199694845797533,
+              745835717413286791,
+              1341571189341028,
+              466733993438179391,
+              605153291548978567,
+              620671894950942518,
+              485560623043668761,
+              58046562693877278,
+              562708791306003126,
+              250439476360276814,
+              922864812386934626,
+              224111668583644937,
+              3739041041402514868,
+              543390983374175910,
+              1835671942392361950,
+              22853859876117928,
+              268222965839740683,
+              523028675763797805,
+              95245969055013093,
+              155830290991095775,
+              394890646110825599,
+              523104045616452573,
+              32129629116285925,
+              274610446790591062,
+              25508369965028687,
+              548545460078021960,
+              1560497885807957867,
+              448952717208322671,
+              127623428916853231,
+              35289553841345954,
+              981162689181119635,
+              616913900393299200,
+              743842626167672494,
+              551237258481434139,
+              181068797009396664,
+              359819570608969282,
+              88638113323350089,
+              977866761529632,
+              556157563149058442,
+              2128643287177627120,
+              495326276900186511,
+              179290654320969741,
+              767238095338451233,
+              184687615724556098,
+              557759553612758810,
+              691995487910136014,
+              358599456188301274,
+              410963538004671928,
+              2025304333069177479,
+              420100504374356591,
+              165527811568299920,
+              1244599279482443290,
+              45718652867041873,
+              183054423228773156,
+              699595265887995287,
+              606266077938818418,
+              162550869647751519,
+              1299826311313769036,
+              713515579932943490,
+              123168576046300258
+            ],
+            "null_density_bucket": 0,
+            "op_skeleton_hash": "a17ada83c25983d2",
+            "row_mass_bucket": 4,
+            "type_mix_token": "num3_str2_bool1"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "pandas",
+                "polars"
+              ],
+              [
+                "polars_lazy"
+              ]
+            ],
+            "backend_statuses": {
+              "pandas": "ok",
+              "polars": "ok",
+              "polars_lazy": "ok"
+            },
+            "column_classes": {
+              "cw_0": "bool",
+              "m_0": "string",
+              "nunique_flag": "numeric",
+              "s": "string"
+            },
+            "feature_tokens": [
+              "column:cw_0:bool",
+              "column:m_0:string",
+              "column:nunique_flag:numeric",
+              "column:s:string",
+              "disagree_class:bool",
+              "disagree_class:numeric",
+              "disagree_class:string",
+              "disagree_pair:pandas|polars_lazy",
+              "disagree_pair:polars|polars_lazy",
+              "group:pandas+polars",
+              "group:polars_lazy",
+              "group_count:2",
+              "mismatch:row_order",
+              "root:running_sum_precision",
+              "status:pandas:ok",
+              "status:polars:ok",
+              "status:polars_lazy:ok"
+            ],
+            "mismatch_class": "row_order",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": false,
+                "left": "pandas",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": true,
+                "left": "polars",
+                "right": "polars_lazy"
+              }
+            ],
+            "primary_root_cause": "running_sum_precision"
+          },
+          "feedback_decision": {
+            "attempt": 9,
+            "cluster_key": "profile=generic|targets=champion_family_conditional_expression_polars_lazy|ops=mutate>case_when>row_number_filter>groupby>case_when>filter;rep=case_when2",
+            "cluster_novelty_score": 0.175,
+            "cluster_reward": 0.44999999999999996,
+            "exploration_objective_targets": [],
+            "frontier_head": [
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.3173516866204026,
+                "index": 13,
+                "reward_prior": 3.175,
+                "schedule_score": 1.5981267540670747,
+                "seed_energy": 5,
+                "target_novelty_score": 0.05
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.32503430833268104,
+                "index": 15,
+                "reward_prior": 3.25,
+                "schedule_score": 1.588878719542979,
+                "seed_energy": 5,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.29234605666035346,
+                "index": 4,
+                "reward_prior": 3.25,
+                "schedule_score": 1.5593681683283733,
+                "seed_energy": 5,
+                "target_novelty_score": 0.0625
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711-mut-1476",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.36216250774694686,
+                "index": 11,
+                "reward_prior": 3.25,
+                "schedule_score": 1.4789021272466145,
+                "seed_energy": 5,
+                "target_novelty_score": 0.0625
+              },
+              {
+                "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-5160",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.8110377240277417,
+                "index": 6,
+                "reward_prior": 4.033333333333333,
+                "schedule_score": 1.3925325095954066,
+                "seed_energy": 7,
+                "target_novelty_score": 0.08333333333333333
+              },
+              {
+                "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-3043-mut-1012-mut-2094-mut-4534-mut-4705-mut-6014-mut-6520",
+                "cluster_novelty_score": 0.11666666666666665,
+                "cluster_reward": 0.7528571878425491,
+                "index": 9,
+                "reward_prior": 3.6,
+                "schedule_score": 1.2119069088896108,
+                "seed_energy": 7,
+                "target_novelty_score": 0.08333333333333333
+              },
+              {
+                "case_id": "case-00000005-issue-focus-global-null-aggregate",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": -0.03211420628305927,
+                "index": 16,
+                "reward_prior": 0.8811278124459133,
+                "schedule_score": 1.169285261049637,
+                "seed_energy": 5,
+                "target_novelty_score": 0.75
+              },
+              {
+                "case_id": "case-00000145-issue-focus-ordered-groupby-sort",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.38227592860826193,
+                "index": 18,
+                "reward_prior": 1.2971804688852167,
+                "schedule_score": 1.078556592582948,
+                "seed_energy": 5,
+                "target_novelty_score": 0.7291666666666666
+              }
+            ],
+            "frontier_rank": 19,
+            "frontier_size": 19,
+            "mutation_plan": {
+              "annealing_temperature": 0.0801974751729609,
+              "changed": true,
+              "executed_depth": 1,
+              "planned_depth": 1,
+              "steps": [
+                {
+                  "candidate_width": 1,
+                  "changed": true,
+                  "detail": "ir_wrap_with_window:1:running_sum",
+                  "divergence_affinity": 0.0,
+                  "fallback_used": false,
+                  "heuristic_score": 2.0608068414356455,
+                  "novelty_bonus": 0.18,
+                  "operator": "ir_wrap_with_window",
+                  "operator_score": 0.38080684143564564,
+                  "productive": true,
+                  "repair_changed": false,
+                  "replay_seed": 134314368,
+                  "resulting_operation_count": 7,
+                  "target_affinity": 0.0
+                }
+              ],
+              "strategy": "single_step_ranking",
+              "top_operators": [
+                {
+                  "operator": "append_groupby_fractional_membership_filter",
+                  "score": 0.5139299641472305
+                },
+                {
+                  "operator": "ir_pull_filter_above_groupby",
+                  "score": 0.3018091203420844
+                },
+                {
+                  "operator": "ir_wrap_with_window",
+                  "score": 0.38080684143564564
+                },
+                {
+                  "operator": "append_boolean_membership_case_aggregate",
+                  "score": 0.30210469640008913
+                },
+                {
+                  "operator": "append_left_join_boolean_case_aggregate",
+                  "score": 0.30250922464857966
+                },
+                {
+                  "operator": "append_numeric_text_boolean_antijoin_case_aggregate",
+                  "score": 0.3022427593679059
+                },
+                {
+                  "operator": "shrink_inline_single_use_mutate",
+                  "score": 0.30222449733317364
+                },
+                {
+                  "operator": "shrink_fold_redundant_op",
+                  "score": 0.30203957311643914
+                }
+              ]
+            },
+            "mutation_pulls": 27,
+            "mutation_seed": 914,
+            "operator_score_count": 39,
+            "operator_score_top": [
+              {
+                "mean_reward": 0.5139299641472305,
+                "operator": "append_groupby_fractional_membership_filter"
+              },
+              {
+                "mean_reward": 0.38080684143564564,
+                "operator": "ir_wrap_with_window"
+              },
+              {
+                "mean_reward": 0.30250922464857966,
+                "operator": "append_left_join_boolean_case_aggregate"
+              },
+              {
+                "mean_reward": 0.3022427593679059,
+                "operator": "append_numeric_text_boolean_antijoin_case_aggregate"
+              },
+              {
+                "mean_reward": 0.30222449733317364,
+                "operator": "shrink_inline_single_use_mutate"
+              },
+              {
+                "mean_reward": 0.30210469640008913,
+                "operator": "append_boolean_membership_case_aggregate"
+              },
+              {
+                "mean_reward": 0.30203957311643914,
+                "operator": "shrink_fold_redundant_op"
+              },
+              {
+                "mean_reward": 0.30203242460887664,
+                "operator": "append_boolean_antijoin_case_aggregate"
+              }
+            ],
+            "parent_case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-mut-894-mut-5548-mut-5294-mut-6032-mut-2965",
+            "parent_index": 8,
+            "planned_mutation_depth": 1,
+            "quality_archive_cluster_reward": 0.44999999999999996,
+            "quality_archive_elite_bonus": 0.25,
+            "quality_archive_elite_indexes": [
+              8
+            ],
+            "quality_archive_health_penalty": 0.0,
+            "recent_cluster_pulls": 7,
+            "recent_operator_pulls": 6,
+            "recent_parent_pulls": 7,
+            "retention_utility": 8.100000000000001,
+            "schedule_base_reward": 3.25,
+            "schedule_feedback_count": 1,
+            "schedule_feedback_reward": 0.44999999999999996,
+            "schedule_reward": 3.7,
+            "schedule_score": 0.035522800541020985,
+            "seed_energy": 5,
+            "seed_energy_tier": "high",
+            "seed_energy_tier_context": [
+              "seed_pulls:saturated",
+              "seed_feedback:few",
+              "cluster_outcomes:few",
+              "recent_pull_rate:hot",
+              "target_key_count:few",
+              "schedule_reward:high",
+              "cluster:profile=generic|targets=champion_family_conditional_expression_polars_lazy|ops=mutate>case_when>row_number_filter>groupby>case_when>filter;rep=case_when2",
+              "target:champion_family:conditional_expression@polars_lazy"
+            ],
+            "selected_operator": "ir_wrap_with_window",
+            "selected_operator_score": 0.38080684143564564,
+            "semantic_family_targets": [],
+            "semantic_signal_targets": [],
+            "swarm_particle_id": 6,
+            "target_key_count": 1,
+            "target_keys": [
+              "champion_family:conditional_expression@polars_lazy"
+            ],
+            "target_novelty_score": 0.125,
+            "value_catalog_entry_count": 0
+          },
+          "feedback_selection": {
+            "attempt": 9,
+            "cluster_key": "profile=generic|targets=champion_family_conditional_expression_polars_lazy|ops=mutate>case_when>row_number_filter>groupby>case_when>filter;rep=case_when2",
+            "cluster_novelty_score": 0.175,
+            "cluster_reward": 0.44999999999999996,
+            "exploration_objective_targets": [],
+            "frontier_head": [
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.3173516866204026,
+                "index": 13,
+                "reward_prior": 3.175,
+                "schedule_score": 1.5981267540670747,
+                "seed_energy": 5,
+                "target_novelty_score": 0.05
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.32503430833268104,
+                "index": 15,
+                "reward_prior": 3.25,
+                "schedule_score": 1.588878719542979,
+                "seed_energy": 5,
+                "target_novelty_score": 0.125
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-5240-mut-5320-mut-5069-champion-mut-3683-mut-6157",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.29234605666035346,
+                "index": 4,
+                "reward_prior": 3.25,
+                "schedule_score": 1.5593681683283733,
+                "seed_energy": 5,
+                "target_novelty_score": 0.0625
+              },
+              {
+                "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-3341-mut-1294-mut-1241-mut-601-mut-1711-mut-1476",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.36216250774694686,
+                "index": 11,
+                "reward_prior": 3.25,
+                "schedule_score": 1.4789021272466145,
+                "seed_energy": 5,
+                "target_novelty_score": 0.0625
+              },
+              {
+                "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-5160",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.8110377240277417,
+                "index": 6,
+                "reward_prior": 4.033333333333333,
+                "schedule_score": 1.3925325095954066,
+                "seed_energy": 7,
+                "target_novelty_score": 0.08333333333333333
+              },
+              {
+                "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1704-mut-3043-mut-1012-mut-2094-mut-4534-mut-4705-mut-6014-mut-6520",
+                "cluster_novelty_score": 0.11666666666666665,
+                "cluster_reward": 0.7528571878425491,
+                "index": 9,
+                "reward_prior": 3.6,
+                "schedule_score": 1.2119069088896108,
+                "seed_energy": 7,
+                "target_novelty_score": 0.08333333333333333
+              },
+              {
+                "case_id": "case-00000005-issue-focus-global-null-aggregate",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": -0.03211420628305927,
+                "index": 16,
+                "reward_prior": 0.8811278124459133,
+                "schedule_score": 1.169285261049637,
+                "seed_energy": 5,
+                "target_novelty_score": 0.75
+              },
+              {
+                "case_id": "case-00000145-issue-focus-ordered-groupby-sort",
+                "cluster_novelty_score": 0.175,
+                "cluster_reward": 0.38227592860826193,
+                "index": 18,
+                "reward_prior": 1.2971804688852167,
+                "schedule_score": 1.078556592582948,
+                "seed_energy": 5,
+                "target_novelty_score": 0.7291666666666666
+              }
+            ],
+            "frontier_rank": 19,
+            "frontier_size": 19,
+            "mutation_plan": {
+              "annealing_temperature": 0.0801974751729609,
+              "changed": true,
+              "executed_depth": 1,
+              "planned_depth": 1,
+              "steps": [
+                {
+                  "candidate_width": 1,
+                  "changed": true,
+                  "detail": "ir_wrap_with_window:1:running_sum",
+                  "divergence_affinity": 0.0,
+                  "fallback_used": false,
+                  "heuristic_score": 2.0608068414356455,
+                  "novelty_bonus": 0.18,
+                  "operator": "ir_wrap_with_window",
+                  "operator_score": 0.38080684143564564,
+                  "productive": true,
+                  "repair_changed": false,
+                  "replay_seed": 134314368,
+                  "resulting_operation_count": 7,
+                  "target_affinity": 0.0
+                }
+              ],
+              "strategy": "single_step_ranking",
+              "top_operators": [
+                {
+                  "operator": "append_groupby_fractional_membership_filter",
+                  "score": 0.5139299641472305
+                },
+                {
+                  "operator": "ir_pull_filter_above_groupby",
+                  "score": 0.3018091203420844
+                },
+                {
+                  "operator": "ir_wrap_with_window",
+                  "score": 0.38080684143564564
+                },
+                {
+                  "operator": "append_boolean_membership_case_aggregate",
+                  "score": 0.30210469640008913
+                },
+                {
+                  "operator": "append_left_join_boolean_case_aggregate",
+                  "score": 0.30250922464857966
+                },
+                {
+                  "operator": "append_numeric_text_boolean_antijoin_case_aggregate",
+                  "score": 0.3022427593679059
+                },
+                {
+                  "operator": "shrink_inline_single_use_mutate",
+                  "score": 0.30222449733317364
+                },
+                {
+                  "operator": "shrink_fold_redundant_op",
+                  "score": 0.30203957311643914
+                }
+              ]
+            },
+            "mutation_pulls": 27,
+            "mutation_seed": 914,
+            "operator_score_count": 39,
+            "operator_score_top": [
+              {
+                "mean_reward": 0.5139299641472305,
+                "operator": "append_groupby_fractional_membership_filter"
+              },
+              {
+                "mean_reward": 0.38080684143564564,
+                "operator": "ir_wrap_with_window"
+              },
+              {
+                "mean_reward": 0.30250922464857966,
+                "operator": "append_left_join_boolean_case_aggregate"
+              },
+              {
+                "mean_reward": 0.3022427593679059,
+                "operator": "append_numeric_text_boolean_antijoin_case_aggregate"
+              },
+              {
+                "mean_reward": 0.30222449733317364,
+                "operator": "shrink_inline_single_use_mutate"
+              },
+              {
+                "mean_reward": 0.30210469640008913,
+                "operator": "append_boolean_membership_case_aggregate"
+              },
+              {
+                "mean_reward": 0.30203957311643914,
+                "operator": "shrink_fold_redundant_op"
+              },
+              {
+                "mean_reward": 0.30203242460887664,
+                "operator": "append_boolean_antijoin_case_aggregate"
+              }
+            ],
+            "parent_case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-mut-894-mut-5548-mut-5294-mut-6032-mut-2965",
+            "parent_index": 8,
+            "planned_mutation_depth": 1,
+            "quality_archive_cluster_reward": 0.44999999999999996,
+            "quality_archive_elite_bonus": 0.25,
+            "quality_archive_elite_indexes": [
+              8
+            ],
+            "quality_archive_health_penalty": 0.0,
+            "recent_cluster_pulls": 7,
+            "recent_operator_pulls": 6,
+            "recent_parent_pulls": 7,
+            "retention_utility": 8.100000000000001,
+            "schedule_base_reward": 3.25,
+            "schedule_feedback_count": 1,
+            "schedule_feedback_reward": 0.44999999999999996,
+            "schedule_reward": 3.7,
+            "schedule_score": 0.035522800541020985,
+            "seed_energy": 5,
+            "seed_energy_tier": "high",
+            "seed_energy_tier_context": [
+              "seed_pulls:saturated",
+              "seed_feedback:few",
+              "cluster_outcomes:few",
+              "recent_pull_rate:hot",
+              "target_key_count:few",
+              "schedule_reward:high",
+              "cluster:profile=generic|targets=champion_family_conditional_expression_polars_lazy|ops=mutate>case_when>row_number_filter>groupby>case_when>filter;rep=case_when2",
+              "target:champion_family:conditional_expression@polars_lazy"
+            ],
+            "selected_operator": "ir_wrap_with_window",
+            "selected_operator_score": 0.38080684143564564,
+            "semantic_family_targets": [],
+            "semantic_signal_targets": [],
+            "swarm_particle_id": 6,
+            "target_key_count": 1,
+            "target_keys": [
+              "champion_family:conditional_expression@polars_lazy"
+            ],
+            "target_novelty_score": 0.125,
+            "value_catalog_entry_count": 0
+          },
+          "mutation": {
+            "changed": true,
+            "detail": "ir_wrap_with_window:1:running_sum",
+            "detail_sequence": [
+              "ir_wrap_with_window:1:running_sum"
+            ],
+            "executed_steps": 1,
+            "multi_step": false,
+            "operator": "ir_wrap_with_window",
+            "operator_sequence": [
+              "ir_wrap_with_window"
+            ],
+            "plan_depth": 1,
+            "value_catalog_entries": []
+          },
+          "mutation_plan": {
+            "annealing_temperature": 0.0801974751729609,
+            "changed": true,
+            "executed_depth": 1,
+            "planned_depth": 1,
+            "steps": [
+              {
+                "candidate_width": 1,
+                "changed": true,
+                "detail": "ir_wrap_with_window:1:running_sum",
+                "divergence_affinity": 0.0,
+                "fallback_used": false,
+                "heuristic_score": 2.0608068414356455,
+                "novelty_bonus": 0.18,
+                "operator": "ir_wrap_with_window",
+                "operator_score": 0.38080684143564564,
+                "productive": true,
+                "repair_changed": false,
+                "replay_seed": 134314368,
+                "resulting_operation_count": 7,
+                "target_affinity": 0.0
+              }
+            ],
+            "strategy": "single_step_ranking",
+            "top_operators": [
+              {
+                "operator": "append_groupby_fractional_membership_filter",
+                "score": 0.5139299641472305
+              },
+              {
+                "operator": "ir_pull_filter_above_groupby",
+                "score": 0.3018091203420844
+              },
+              {
+                "operator": "ir_wrap_with_window",
+                "score": 0.38080684143564564
+              },
+              {
+                "operator": "append_boolean_membership_case_aggregate",
+                "score": 0.30210469640008913
+              },
+              {
+                "operator": "append_left_join_boolean_case_aggregate",
+                "score": 0.30250922464857966
+              },
+              {
+                "operator": "append_numeric_text_boolean_antijoin_case_aggregate",
+                "score": 0.3022427593679059
+              },
+              {
+                "operator": "shrink_inline_single_use_mutate",
+                "score": 0.30222449733317364
+              },
+              {
+                "operator": "shrink_fold_redundant_op",
+                "score": 0.30203957311643914
+              }
+            ]
+          },
+          "mutation_selection": {
+            "annealing_decay": 0.85,
+            "annealing_temperature": 0.0801974751729609,
+            "candidate_count": 1,
+            "executed_depth": 1,
+            "multi_step": false,
+            "plan": {
+              "annealing_temperature": 0.0801974751729609,
+              "changed": true,
+              "executed_depth": 1,
+              "planned_depth": 1,
+              "steps": [
+                {
+                  "candidate_width": 1,
+                  "changed": true,
+                  "detail": "ir_wrap_with_window:1:running_sum",
+                  "divergence_affinity": 0.0,
+                  "fallback_used": false,
+                  "heuristic_score": 2.0608068414356455,
+                  "novelty_bonus": 0.18,
+                  "operator": "ir_wrap_with_window",
+                  "operator_score": 0.38080684143564564,
+                  "productive": true,
+                  "repair_changed": false,
+                  "replay_seed": 134314368,
+                  "resulting_operation_count": 7,
+                  "target_affinity": 0.0
+                }
+              ],
+              "strategy": "single_step_ranking",
+              "top_operators": [
+                {
+                  "operator": "append_groupby_fractional_membership_filter",
+                  "score": 0.5139299641472305
+                },
+                {
+                  "operator": "ir_pull_filter_above_groupby",
+                  "score": 0.3018091203420844
+                },
+                {
+                  "operator": "ir_wrap_with_window",
+                  "score": 0.38080684143564564
+                },
+                {
+                  "operator": "append_boolean_membership_case_aggregate",
+                  "score": 0.30210469640008913
+                },
+                {
+                  "operator": "append_left_join_boolean_case_aggregate",
+                  "score": 0.30250922464857966
+                },
+                {
+                  "operator": "append_numeric_text_boolean_antijoin_case_aggregate",
+                  "score": 0.3022427593679059
+                },
+                {
+                  "operator": "shrink_inline_single_use_mutate",
+                  "score": 0.30222449733317364
+                },
+                {
+                  "operator": "shrink_fold_redundant_op",
+                  "score": 0.30203957311643914
+                }
+              ]
+            },
+            "planned_depth": 1,
+            "selected_operator": "ir_wrap_with_window",
+            "selected_operator_score": 0.38080684143564564,
+            "selected_score_rank": 1,
+            "strategy": "feedback_score_with_annealed_tail",
+            "top_operators": [
+              {
+                "operator": "append_groupby_fractional_membership_filter",
+                "score": 0.5139299641472305
+              },
+              {
+                "operator": "ir_pull_filter_above_groupby",
+                "score": 0.3018091203420844
+              },
+              {
+                "operator": "ir_wrap_with_window",
+                "score": 0.38080684143564564
+              },
+              {
+                "operator": "append_boolean_membership_case_aggregate",
+                "score": 0.30210469640008913
+              },
+              {
+                "operator": "append_left_join_boolean_case_aggregate",
+                "score": 0.30250922464857966
+              },
+              {
+                "operator": "append_numeric_text_boolean_antijoin_case_aggregate",
+                "score": 0.3022427593679059
+              },
+              {
+                "operator": "shrink_inline_single_use_mutate",
+                "score": 0.30222449733317364
+              },
+              {
+                "operator": "shrink_fold_redundant_op",
+                "score": 0.30203957311643914
+              }
+            ]
+          },
+          "quality_archive_context": {
+            "archive_axis_reward": 0.4284063357833178,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.3846622431054572,
+              "bd_column_count": 1.3847832818722203,
+              "bd_null_density": 1.3851954235570805,
+              "bd_op_skeleton": 1.3855163250852185,
+              "bd_profile": 1.3856923713141573,
+              "bd_row_mass": 1.384912159306265,
+              "bd_target_class": 1.3853508818578044,
+              "bd_type_mix": 1.3850493664342824
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "generic"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:a17ada83c25983d2"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:0"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num3_str2_bool1"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:4"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:3"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:3",
+              "null_density_axis": "null:0",
+              "op_skeleton_axis": "op:a17ada83c25983d2",
+              "profile_axis": "generic",
+              "row_mass_axis": "rows:4",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num3_str2_bool1"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=generic|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=mutate>running_sum>case_when>row_number_filter>groupby>case_when>more1;rep=case_when2",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 25,
+            "target_keys": [
+              "champion_family:conditional_expression@polars_lazy",
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          },
+          "seed_lineage": {
+            "depth": 1,
+            "mutation_seed": 914,
+            "parent_case_id": "case-00000882-discovery-fresh-champion-mut-2708-champion-mut-2758-mut-353-mut-447-mut-894-mut-5548-mut-5294-mut-6032-mut-2965",
+            "parent_index": 8,
+            "parent_seed": 2965,
+            "root_seed": 2965
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "column": "m_0",
+              "expr": {
+                "kind": "cast",
+                "source": "id",
+                "to": "str"
+              },
+              "op": "mutate"
+            },
+            {
+              "column": "run_x",
+              "input_dtype": "float64",
+              "op": "running_sum",
+              "order_by": [
+                {
+                  "ascending": false,
+                  "column": "x",
+                  "nulls": "last"
+                },
+                {
+                  "ascending": true,
+                  "column": "flag",
+                  "nulls": "first"
+                }
+              ],
+              "partition_by": [
+                "s"
+              ],
+              "source": "x"
+            },
+            {
+              "as": "cw_0",
+              "condition": {
+                "cmp": "is_null",
+                "column": "m_0",
+                "value": null
+              },
+              "else": false,
+              "op": "case_when",
+              "then": true
+            },
+            {
+              "cmp": "==",
+              "op": "row_number_filter",
+              "order_by": [
+                {
+                  "ascending": true,
+                  "column": "y",
+                  "nulls": "last"
+                },
+                {
+                  "ascending": false,
+                  "column": "id",
+                  "nulls": "first"
+                },
+                {
+                  "ascending": false,
+                  "column": "g",
+                  "nulls": "first"
+                }
+              ],
+              "partition_by": [
+                "x"
+              ],
+              "value": 1
+            },
+            {
+              "aggs": [
+                {
+                  "as": "nunique_flag",
+                  "column": "flag",
+                  "func": "nunique"
+                }
+              ],
+              "keys": [
+                "m_0",
+                "s"
+              ],
+              "op": "groupby"
+            },
+            {
+              "as": "cw_0",
+              "condition": {
+                "cmp": "is_null",
+                "column": "m_0",
+                "value": null
+              },
+              "else": false,
+              "op": "case_when",
+              "then": true
+            },
+            {
+              "cmp": "ge_is_not_true",
+              "column": "nunique_flag",
+              "op": "filter",
+              "value": 1000000
+            }
+          ],
+          "program_id": "prog-00000882-champion-graft-champion-graft-mut-353-mut-447-mut-894-mut-5548-mut-5294-mut-6032-mut-2965-mut-914",
+          "seed": 914
+        },
+        "seed": 914,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "id",
+                "nullable": false,
+                "type": "int"
+              },
+              {
+                "name": "g",
+                "nullable": true,
+                "type": "str"
+              },
+              {
+                "name": "x",
+                "nullable": true,
+                "type": "int"
+              },
+              {
+                "name": "y",
+                "nullable": true,
+                "type": "float"
+              },
+              {
+                "name": "flag",
+                "nullable": true,
+                "type": "bool"
+              },
+              {
+                "name": "s",
+                "nullable": true,
+                "type": "str"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "flag": false,
+                "g": "OOI",
+                "id": 0,
+                "s": "δelta",
+                "x": -10,
+                "y": 0.5
+              },
+              {
+                "flag": false,
+                "g": "beta",
+                "id": 1,
+                "s": "中文",
+                "x": 10,
+                "y": 0.5
+              },
+              {
+                "flag": false,
+                "g": "space value",
+                "id": 2,
+                "s": null,
+                "x": 10,
+                "y": 1.0
+              },
+              {
+                "flag": true,
+                "g": "δelta",
+                "id": 1,
+                "s": "a",
+                "x": null,
+                "y": null
+              },
+              {
+                "flag": true,
+                "g": null,
+                "id": 1,
+                "s": "a",
+                "x": -1,
+                "y": 0.5
+              },
+              {
+                "flag": false,
+                "g": "a",
+                "id": 5,
+                "s": "gamma",
+                "x": 68,
+                "y": 0.5
+              },
+              {
+                "flag": true,
+                "g": "space value",
+                "id": 1,
+                "s": "XZULm",
+                "x": -1,
+                "y": null
+              },
+              {
+                "flag": true,
+                "g": "",
+                "id": 1,
+                "s": "Z",
+                "x": 0,
+                "y": 1.0
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [],
+        "effective_guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": true,
+        "generator_profile": "issue_focus",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.5,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [],
+        "semantic_focus_signals": [],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "/root/datadiff_fuzz_lab/new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T002643/strategy-learning/candidate-pipeline-learning.json",
+        "strategy_snapshot_path": "/root/datadiff_fuzz_lab/new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T002643/strategy-snapshot.json",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "families": [
+        "running_sum_precision@polars_lazy"
+      ],
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Backends returned different canonical tables; mismatch_class=row_order; shapes={'pandas': (5, 4), 'polars': (5, 4), 'polars_lazy': (5, 4)}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-7e7f1522ee515f08",
+          "kind": "semantic_output_mismatch",
+          "mismatch_class": "row_order",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "running_sum_precision",
+          "severity": "critical",
+          "signature": "7e7f1522ee515f08",
+          "source_issue": "",
+          "suspicious_backends": [
+            "polars_lazy"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas', 'polars'] and disagrees with ['polars_lazy'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "cw_0",
+            "m_0",
+            "nunique_flag",
+            "s"
+          ],
+          "comparison_key": "{\"columns\":[\"cw_0\",\"m_0\",\"nunique_flag\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,\\\\\\\"0\\\\\\\",1,\\\\\\\"δelta\\\\\\\"]\\\",\\\"[false,\\\\\\\"1\\\\\\\",1,\\\\\\\"a\\\\\\\"]\\\",\\\"[false,\\\\\\\"1\\\\\\\",1,\\\\\\\"Z\\\\\\\"]\\\",\\\"[false,\\\\\\\"1\\\\\\\",1,\\\\\\\"中文\\\\\\\"]\\\",\\\"[false,\\\\\\\"5\\\\\\\",1,\\\\\\\"gamma\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false,\\\"0\\\",1,\\\"δelta\\\"]\",\"[false,\\\"1\\\",1,\\\"a\\\"]\",\"[false,\\\"1\\\",1,\\\"Z\\\"]\",\"[false,\\\"1\\\",1,\\\"中文\\\"]\",\"[false,\\\"5\\\",1,\\\"gamma\\\"]\"]",
+          "row_count": 5,
+          "rows": [
+            [
+              false,
+              "0",
+              1,
+              "δelta"
+            ],
+            [
+              false,
+              "1",
+              1,
+              "a"
+            ],
+            [
+              false,
+              "1",
+              1,
+              "Z"
+            ],
+            [
+              false,
+              "1",
+              1,
+              "中文"
+            ],
+            [
+              false,
+              "5",
+              1,
+              "gamma"
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false,\\\"0\\\",1,\\\"δelta\\\"]\",\"[false,\\\"1\\\",1,\\\"Z\\\"]\",\"[false,\\\"1\\\",1,\\\"a\\\"]\",\"[false,\\\"1\\\",1,\\\"中文\\\"]\",\"[false,\\\"5\\\",1,\\\"gamma\\\"]\"]"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [
+            "cw_0",
+            "m_0",
+            "nunique_flag",
+            "s"
+          ],
+          "comparison_key": "{\"columns\":[\"cw_0\",\"m_0\",\"nunique_flag\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,\\\\\\\"0\\\\\\\",1,\\\\\\\"δelta\\\\\\\"]\\\",\\\"[false,\\\\\\\"1\\\\\\\",1,\\\\\\\"a\\\\\\\"]\\\",\\\"[false,\\\\\\\"1\\\\\\\",1,\\\\\\\"Z\\\\\\\"]\\\",\\\"[false,\\\\\\\"1\\\\\\\",1,\\\\\\\"中文\\\\\\\"]\\\",\\\"[false,\\\\\\\"5\\\\\\\",1,\\\\\\\"gamma\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false,\\\"0\\\",1,\\\"δelta\\\"]\",\"[false,\\\"1\\\",1,\\\"a\\\"]\",\"[false,\\\"1\\\",1,\\\"Z\\\"]\",\"[false,\\\"1\\\",1,\\\"中文\\\"]\",\"[false,\\\"5\\\",1,\\\"gamma\\\"]\"]",
+          "row_count": 5,
+          "rows": [
+            [
+              false,
+              "0",
+              1,
+              "δelta"
+            ],
+            [
+              false,
+              "1",
+              1,
+              "a"
+            ],
+            [
+              false,
+              "1",
+              1,
+              "Z"
+            ],
+            [
+              false,
+              "1",
+              1,
+              "中文"
+            ],
+            [
+              false,
+              "5",
+              1,
+              "gamma"
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false,\\\"0\\\",1,\\\"δelta\\\"]\",\"[false,\\\"1\\\",1,\\\"Z\\\"]\",\"[false,\\\"1\\\",1,\\\"a\\\"]\",\"[false,\\\"1\\\",1,\\\"中文\\\"]\",\"[false,\\\"5\\\",1,\\\"gamma\\\"]\"]"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [
+            "cw_0",
+            "m_0",
+            "nunique_flag",
+            "s"
+          ],
+          "comparison_key": "{\"columns\":[\"cw_0\",\"m_0\",\"nunique_flag\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,\\\\\\\"1\\\\\\\",1,\\\\\\\"Z\\\\\\\"]\\\",\\\"[false,\\\\\\\"1\\\\\\\",1,\\\\\\\"a\\\\\\\"]\\\",\\\"[false,\\\\\\\"5\\\\\\\",1,\\\\\\\"gamma\\\\\\\"]\\\",\\\"[false,\\\\\\\"1\\\\\\\",1,\\\\\\\"中文\\\\\\\"]\\\",\\\"[false,\\\\\\\"0\\\\\\\",1,\\\\\\\"δelta\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false,\\\"1\\\",1,\\\"Z\\\"]\",\"[false,\\\"1\\\",1,\\\"a\\\"]\",\"[false,\\\"5\\\",1,\\\"gamma\\\"]\",\"[false,\\\"1\\\",1,\\\"中文\\\"]\",\"[false,\\\"0\\\",1,\\\"δelta\\\"]\"]",
+          "row_count": 5,
+          "rows": [
+            [
+              false,
+              "1",
+              1,
+              "Z"
+            ],
+            [
+              false,
+              "1",
+              1,
+              "a"
+            ],
+            [
+              false,
+              "5",
+              1,
+              "gamma"
+            ],
+            [
+              false,
+              "1",
+              1,
+              "中文"
+            ],
+            [
+              false,
+              "0",
+              1,
+              "δelta"
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false,\\\"0\\\",1,\\\"δelta\\\"]\",\"[false,\\\"1\\\",1,\\\"Z\\\"]\",\"[false,\\\"1\\\",1,\\\"a\\\"]\",\"[false,\\\"1\\\",1,\\\"中文\\\"]\",\"[false,\\\"5\\\",1,\\\"gamma\\\"]\"]"
+        }
+      },
+      "raw_results": {
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 18.522116995882243,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 19.88693099701777,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 14.816230002907105,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        }
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T234812-1780789692235394704.jsonl.gz"
+    },
+    {
+      "bug_dir": "/root/datadiff_fuzz_lab/bugs/bug_1ccab94bdd003141",
+      "candidate_acquisition": {
+        "acquisition_score": 5.098957718841947,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "csv_long_numeric_roundtrip@polars,polars_lazy"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.8450488750216346,
+        "recheck_prior": 0.85,
+        "reduction_potential": 0.3169925001442312,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9939339175322763
+      },
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00000252-issue-focus-csv-long-numeric-roundtrip",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "case": {
+        "case_id": "case-00000252-issue-focus-csv-long-numeric-roundtrip",
+        "metadata": {
+          "case_fingerprint": {
+            "column_count": 1,
+            "feature_tokens": [
+              "fp_op:31eb3b69906ee450",
+              "fp_type_mix:num1",
+              "fp_null_density:0",
+              "fp_row_mass:2",
+              "fp_column_count:1"
+            ],
+            "minhash_signature": [
+              109828634809894621,
+              53941965423571634,
+              289685627313298057,
+              98994334173035537,
+              253636995463446780,
+              940137593733003780,
+              510210319129344921,
+              752485816394471232,
+              3277052508587818525,
+              506800303511531385,
+              633758677384902911,
+              266125185907639289,
+              151227128292770346,
+              505510530341821903,
+              3103656666576039516,
+              3654527288822437618,
+              1171879595419353931,
+              691904893375809793,
+              2915886146647342375,
+              947012612454253156,
+              6694164866576696258,
+              804714251351317012,
+              1735548707924472708,
+              2575304759254038033,
+              2514598823958886235,
+              4198050785584519307,
+              555630700804639955,
+              1863191935912464843,
+              67227429047460189,
+              451623366697933930,
+              58047199166602815,
+              249056295996622982,
+              619376697487496495,
+              35289553841345954,
+              2013225534659399699,
+              2639644628666475872,
+              1657563200663350983,
+              608457110027218981,
+              2452052855269654276,
+              2983635719627470872,
+              1173761073426015365,
+              235284542941306283,
+              2349667705947885197,
+              2816026893485570097,
+              1255825407668898682,
+              4779178783640622113,
+              689901542164397644,
+              627878070976131066,
+              967906519727402650,
+              865874688467549900,
+              1367775314652262544,
+              161562671135046198,
+              4436176070371966354,
+              420100504374356591,
+              370133735928417148,
+              1019425532449420622,
+              539971713899296378,
+              1730863726622638958,
+              3256268418982037787,
+              44572191519424862,
+              71527184954054592,
+              261368185942488471,
+              1112410683266807618,
+              305953200453405747
+            ],
+            "null_density_bucket": 0,
+            "op_skeleton_hash": "31eb3b69906ee450",
+            "row_mass_bucket": 2,
+            "type_mix_token": "num1"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "pandas"
+              ],
+              [
+                "polars",
+                "polars_lazy"
+              ]
+            ],
+            "backend_statuses": {
+              "pandas": "ok",
+              "polars": "error:NameError",
+              "polars_lazy": "error:NameError"
+            },
+            "column_classes": {
+              "csv_long_numeric_roundtrip_mismatch": "bool"
+            },
+            "feature_tokens": [
+              "column:csv_long_numeric_roundtrip_mismatch:bool",
+              "disagree_class:bool",
+              "disagree_pair:pandas|polars",
+              "disagree_pair:pandas|polars_lazy",
+              "group:pandas",
+              "group:polars+polars_lazy",
+              "group_count:2",
+              "mismatch:status",
+              "root:csv_long_numeric_roundtrip",
+              "status:pandas:ok",
+              "status:polars:error:NameError",
+              "status:polars_lazy:error:NameError"
+            ],
+            "mismatch_class": "status",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": false,
+                "left": "polars",
+                "right": "polars_lazy"
+              }
+            ],
+            "primary_root_cause": "csv_long_numeric_roundtrip"
+          },
+          "expected_csv_long_numeric_roundtrip_mismatch": false,
+          "expected_csv_values": [
+            "12345678901234567890",
+            "99999999999999999999",
+            "9007199254740993",
+            "18446744073709551615"
+          ],
+          "generator_profile": "issue_focus",
+          "issue_inspiration": "CSV long numeric identifiers should round-trip without lossy inference",
+          "mixed_generator_profile": "csv_long_numeric_roundtrip",
+          "quality_archive_context": {
+            "archive_axis_reward": 0.7483099004040761,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.4721478671549333,
+              "bd_column_count": 1.4722866082691453,
+              "bd_null_density": 1.4727719118020888,
+              "bd_op_skeleton": 1.473162501355471,
+              "bd_profile": 1.4733811612273784,
+              "bd_row_mass": 1.4724362776345292,
+              "bd_target_class": 1.4729598067543344,
+              "bd_type_mix": 1.4725977359749183
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "csv_long_numeric_roundtrip"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:31eb3b69906ee450"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:0"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num1"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:1"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:1"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:1",
+              "null_density_axis": "null:0",
+              "op_skeleton_axis": "op:31eb3b69906ee450",
+              "profile_axis": "csv_long_numeric_roundtrip",
+              "row_mass_axis": "rows:1",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num1"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=csv_long_numeric_roundtrip|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=csv_long_numeric_roundtrip_probe",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "csv_long_numeric_roundtrip",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 24,
+            "target_keys": [
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "as": "csv_long_numeric_roundtrip_mismatch",
+              "op": "csv_long_numeric_roundtrip_probe",
+              "values": [
+                "12345678901234567890",
+                "99999999999999999999",
+                "9007199254740993",
+                "18446744073709551615"
+              ]
+            }
+          ],
+          "program_id": "prog-00000252-csv-long-numeric-roundtrip",
+          "seed": 252
+        },
+        "seed": 252,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "probe_id",
+                "nullable": false,
+                "type": "int"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "probe_id": 0
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [],
+        "effective_guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": true,
+        "generator_profile": "issue_focus",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.5,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [],
+        "semantic_focus_signals": [],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "/root/datadiff_fuzz_lab/new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T002643/strategy-learning/candidate-pipeline-learning.json",
+        "strategy_snapshot_path": "/root/datadiff_fuzz_lab/new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T002643/strategy-snapshot.json",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'polars': 'error', 'polars_lazy': 'error'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-1ccab94bdd003141",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "csv_long_numeric_roundtrip",
+          "severity": "high",
+          "signature": "1ccab94bdd003141",
+          "source_issue": "",
+          "suspicious_backends": [
+            "polars",
+            "polars_lazy"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "csv_long_numeric_roundtrip_mismatch"
+          ],
+          "comparison_key": "{\"columns\":[\"csv_long_numeric_roundtrip_mismatch\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false]\"]",
+          "row_count": 1,
+          "rows": [
+            [
+              false
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false]\"]"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        }
+      },
+      "raw_results": {
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 15.374223003163934,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 8.756736002396792,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 14.303902993560769,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        }
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T234812-1780789692235394704.jsonl.gz"
+    },
+    {
+      "bug_dir": "/root/datadiff_fuzz_lab/bugs/bug_1ccab94bdd003141",
+      "candidate_acquisition": {
+        "acquisition_score": 5.098957718841947,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "csv_long_numeric_roundtrip@polars,polars_lazy"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.8450488750216346,
+        "recheck_prior": 0.85,
+        "reduction_potential": 0.3169925001442312,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9939339175322763
+      },
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00000321-issue-focus-csv-long-numeric-roundtrip",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "case": {
+        "case_id": "case-00000321-issue-focus-csv-long-numeric-roundtrip",
+        "metadata": {
+          "case_fingerprint": {
+            "column_count": 1,
+            "feature_tokens": [
+              "fp_op:31eb3b69906ee450",
+              "fp_type_mix:num1",
+              "fp_null_density:0",
+              "fp_row_mass:2",
+              "fp_column_count:1"
+            ],
+            "minhash_signature": [
+              109828634809894621,
+              53941965423571634,
+              289685627313298057,
+              98994334173035537,
+              253636995463446780,
+              940137593733003780,
+              510210319129344921,
+              752485816394471232,
+              3277052508587818525,
+              506800303511531385,
+              633758677384902911,
+              266125185907639289,
+              151227128292770346,
+              505510530341821903,
+              3103656666576039516,
+              3654527288822437618,
+              1171879595419353931,
+              691904893375809793,
+              2915886146647342375,
+              947012612454253156,
+              6694164866576696258,
+              804714251351317012,
+              1735548707924472708,
+              2575304759254038033,
+              2514598823958886235,
+              4198050785584519307,
+              555630700804639955,
+              1863191935912464843,
+              67227429047460189,
+              451623366697933930,
+              58047199166602815,
+              249056295996622982,
+              619376697487496495,
+              35289553841345954,
+              2013225534659399699,
+              2639644628666475872,
+              1657563200663350983,
+              608457110027218981,
+              2452052855269654276,
+              2983635719627470872,
+              1173761073426015365,
+              235284542941306283,
+              2349667705947885197,
+              2816026893485570097,
+              1255825407668898682,
+              4779178783640622113,
+              689901542164397644,
+              627878070976131066,
+              967906519727402650,
+              865874688467549900,
+              1367775314652262544,
+              161562671135046198,
+              4436176070371966354,
+              420100504374356591,
+              370133735928417148,
+              1019425532449420622,
+              539971713899296378,
+              1730863726622638958,
+              3256268418982037787,
+              44572191519424862,
+              71527184954054592,
+              261368185942488471,
+              1112410683266807618,
+              305953200453405747
+            ],
+            "null_density_bucket": 0,
+            "op_skeleton_hash": "31eb3b69906ee450",
+            "row_mass_bucket": 2,
+            "type_mix_token": "num1"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "pandas"
+              ],
+              [
+                "polars",
+                "polars_lazy"
+              ]
+            ],
+            "backend_statuses": {
+              "pandas": "ok",
+              "polars": "error:NameError",
+              "polars_lazy": "error:NameError"
+            },
+            "column_classes": {
+              "csv_long_numeric_roundtrip_mismatch": "bool"
+            },
+            "feature_tokens": [
+              "column:csv_long_numeric_roundtrip_mismatch:bool",
+              "disagree_class:bool",
+              "disagree_pair:pandas|polars",
+              "disagree_pair:pandas|polars_lazy",
+              "group:pandas",
+              "group:polars+polars_lazy",
+              "group_count:2",
+              "mismatch:status",
+              "root:csv_long_numeric_roundtrip",
+              "status:pandas:ok",
+              "status:polars:error:NameError",
+              "status:polars_lazy:error:NameError"
+            ],
+            "mismatch_class": "status",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": false,
+                "left": "polars",
+                "right": "polars_lazy"
+              }
+            ],
+            "primary_root_cause": "csv_long_numeric_roundtrip"
+          },
+          "expected_csv_long_numeric_roundtrip_mismatch": false,
+          "expected_csv_values": [
+            "99999999999999999999",
+            "9007199254740993",
+            "18446744073709551615",
+            "12345678901234567890",
+            "100000000000000000321"
+          ],
+          "generator_profile": "issue_focus",
+          "issue_inspiration": "CSV long numeric identifiers should round-trip without lossy inference",
+          "mixed_generator_profile": "csv_long_numeric_roundtrip",
+          "quality_archive_context": {
+            "archive_axis_reward": 0.7483099004040761,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.4721478671549333,
+              "bd_column_count": 1.4722866082691453,
+              "bd_null_density": 1.4727719118020888,
+              "bd_op_skeleton": 1.473162501355471,
+              "bd_profile": 1.4733811612273784,
+              "bd_row_mass": 1.4724362776345292,
+              "bd_target_class": 1.4729598067543344,
+              "bd_type_mix": 1.4725977359749183
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "csv_long_numeric_roundtrip"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:31eb3b69906ee450"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:0"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num1"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:1"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:1"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:1",
+              "null_density_axis": "null:0",
+              "op_skeleton_axis": "op:31eb3b69906ee450",
+              "profile_axis": "csv_long_numeric_roundtrip",
+              "row_mass_axis": "rows:1",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num1"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=csv_long_numeric_roundtrip|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=csv_long_numeric_roundtrip_probe",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "csv_long_numeric_roundtrip",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 24,
+            "target_keys": [
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "as": "csv_long_numeric_roundtrip_mismatch",
+              "op": "csv_long_numeric_roundtrip_probe",
+              "values": [
+                "99999999999999999999",
+                "9007199254740993",
+                "18446744073709551615",
+                "12345678901234567890",
+                "100000000000000000321"
+              ]
+            }
+          ],
+          "program_id": "prog-00000321-csv-long-numeric-roundtrip",
+          "seed": 321
+        },
+        "seed": 321,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "probe_id",
+                "nullable": false,
+                "type": "int"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "probe_id": 0
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [],
+        "effective_guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": true,
+        "generator_profile": "issue_focus",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.5,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [],
+        "semantic_focus_signals": [],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "/root/datadiff_fuzz_lab/new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T002643/strategy-learning/candidate-pipeline-learning.json",
+        "strategy_snapshot_path": "/root/datadiff_fuzz_lab/new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T002643/strategy-snapshot.json",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'polars': 'error', 'polars_lazy': 'error'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-1ccab94bdd003141",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "csv_long_numeric_roundtrip",
+          "severity": "high",
+          "signature": "1ccab94bdd003141",
+          "source_issue": "",
+          "suspicious_backends": [
+            "polars",
+            "polars_lazy"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "csv_long_numeric_roundtrip_mismatch"
+          ],
+          "comparison_key": "{\"columns\":[\"csv_long_numeric_roundtrip_mismatch\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false]\"]",
+          "row_count": 1,
+          "rows": [
+            [
+              false
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false]\"]"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        }
+      },
+      "raw_results": {
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 5.600276999757625,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 2.4036420072661713,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 4.634254000848159,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        }
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T234812-1780789692235394704.jsonl.gz"
+    },
+    {
+      "bug_dir": "/root/datadiff_fuzz_lab/bugs/bug_1ccab94bdd003141",
+      "candidate_acquisition": {
+        "acquisition_score": 5.098957718841947,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "csv_long_numeric_roundtrip@polars,polars_lazy"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.8450488750216346,
+        "recheck_prior": 0.85,
+        "reduction_potential": 0.3169925001442312,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9939339175322763
+      },
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00001839-issue-focus-csv-long-numeric-roundtrip",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "case": {
+        "case_id": "case-00001839-issue-focus-csv-long-numeric-roundtrip",
+        "metadata": {
+          "case_fingerprint": {
+            "column_count": 1,
+            "feature_tokens": [
+              "fp_op:31eb3b69906ee450",
+              "fp_type_mix:num1",
+              "fp_null_density:0",
+              "fp_row_mass:2",
+              "fp_column_count:1"
+            ],
+            "minhash_signature": [
+              109828634809894621,
+              53941965423571634,
+              289685627313298057,
+              98994334173035537,
+              253636995463446780,
+              940137593733003780,
+              510210319129344921,
+              752485816394471232,
+              3277052508587818525,
+              506800303511531385,
+              633758677384902911,
+              266125185907639289,
+              151227128292770346,
+              505510530341821903,
+              3103656666576039516,
+              3654527288822437618,
+              1171879595419353931,
+              691904893375809793,
+              2915886146647342375,
+              947012612454253156,
+              6694164866576696258,
+              804714251351317012,
+              1735548707924472708,
+              2575304759254038033,
+              2514598823958886235,
+              4198050785584519307,
+              555630700804639955,
+              1863191935912464843,
+              67227429047460189,
+              451623366697933930,
+              58047199166602815,
+              249056295996622982,
+              619376697487496495,
+              35289553841345954,
+              2013225534659399699,
+              2639644628666475872,
+              1657563200663350983,
+              608457110027218981,
+              2452052855269654276,
+              2983635719627470872,
+              1173761073426015365,
+              235284542941306283,
+              2349667705947885197,
+              2816026893485570097,
+              1255825407668898682,
+              4779178783640622113,
+              689901542164397644,
+              627878070976131066,
+              967906519727402650,
+              865874688467549900,
+              1367775314652262544,
+              161562671135046198,
+              4436176070371966354,
+              420100504374356591,
+              370133735928417148,
+              1019425532449420622,
+              539971713899296378,
+              1730863726622638958,
+              3256268418982037787,
+              44572191519424862,
+              71527184954054592,
+              261368185942488471,
+              1112410683266807618,
+              305953200453405747
+            ],
+            "null_density_bucket": 0,
+            "op_skeleton_hash": "31eb3b69906ee450",
+            "row_mass_bucket": 2,
+            "type_mix_token": "num1"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "pandas"
+              ],
+              [
+                "polars",
+                "polars_lazy"
+              ]
+            ],
+            "backend_statuses": {
+              "pandas": "ok",
+              "polars": "error:NameError",
+              "polars_lazy": "error:NameError"
+            },
+            "column_classes": {
+              "csv_long_numeric_roundtrip_mismatch": "bool"
+            },
+            "feature_tokens": [
+              "column:csv_long_numeric_roundtrip_mismatch:bool",
+              "disagree_class:bool",
+              "disagree_pair:pandas|polars",
+              "disagree_pair:pandas|polars_lazy",
+              "group:pandas",
+              "group:polars+polars_lazy",
+              "group_count:2",
+              "mismatch:status",
+              "root:csv_long_numeric_roundtrip",
+              "status:pandas:ok",
+              "status:polars:error:NameError",
+              "status:polars_lazy:error:NameError"
+            ],
+            "mismatch_class": "status",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": false,
+                "left": "polars",
+                "right": "polars_lazy"
+              }
+            ],
+            "primary_root_cause": "csv_long_numeric_roundtrip"
+          },
+          "expected_csv_long_numeric_roundtrip_mismatch": false,
+          "expected_csv_values": [
+            "18446744073709551615",
+            "12345678901234567890",
+            "99999999999999999999",
+            "9007199254740993",
+            "100000000000000000842"
+          ],
+          "generator_profile": "issue_focus",
+          "issue_inspiration": "CSV long numeric identifiers should round-trip without lossy inference",
+          "mixed_generator_profile": "csv_long_numeric_roundtrip",
+          "quality_archive_context": {
+            "archive_axis_reward": 0.513750355314419,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.3464695331795253,
+              "bd_column_count": 1.346569165266156,
+              "bd_null_density": 1.3468907868775768,
+              "bd_op_skeleton": 1.3471241592151377,
+              "bd_profile": 1.3472464317278825,
+              "bd_row_mass": 1.3466725717581873,
+              "bd_target_class": 1.3470055919669697,
+              "bd_type_mix": 1.3467797764399905
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "csv_long_numeric_roundtrip"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:31eb3b69906ee450"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:0"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num1"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:1"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:1"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:1",
+              "null_density_axis": "null:0",
+              "op_skeleton_axis": "op:31eb3b69906ee450",
+              "profile_axis": "csv_long_numeric_roundtrip",
+              "row_mass_axis": "rows:1",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num1"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=csv_long_numeric_roundtrip|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=csv_long_numeric_roundtrip_probe",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "csv_long_numeric_roundtrip",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 24,
+            "target_keys": [
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "as": "csv_long_numeric_roundtrip_mismatch",
+              "op": "csv_long_numeric_roundtrip_probe",
+              "values": [
+                "18446744073709551615",
+                "12345678901234567890",
+                "99999999999999999999",
+                "9007199254740993",
+                "100000000000000000842"
+              ]
+            }
+          ],
+          "program_id": "prog-00001839-csv-long-numeric-roundtrip",
+          "seed": 1839
+        },
+        "seed": 1839,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "probe_id",
+                "nullable": false,
+                "type": "int"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "probe_id": 0
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [],
+        "effective_guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": true,
+        "generator_profile": "issue_focus",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.5,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [],
+        "semantic_focus_signals": [],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "/root/datadiff_fuzz_lab/new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T002643/strategy-learning/candidate-pipeline-learning.json",
+        "strategy_snapshot_path": "/root/datadiff_fuzz_lab/new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T002643/strategy-snapshot.json",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'polars': 'error', 'polars_lazy': 'error'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-1ccab94bdd003141",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "csv_long_numeric_roundtrip",
+          "severity": "high",
+          "signature": "1ccab94bdd003141",
+          "source_issue": "",
+          "suspicious_backends": [
+            "polars",
+            "polars_lazy"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "csv_long_numeric_roundtrip_mismatch"
+          ],
+          "comparison_key": "{\"columns\":[\"csv_long_numeric_roundtrip_mismatch\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false]\"]",
+          "row_count": 1,
+          "rows": [
+            [
+              false
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false]\"]"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        }
+      },
+      "raw_results": {
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 14.118938997853547,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 13.915981005993672,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 18.54792100493796,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        }
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T234812-1780789692235394704.jsonl.gz"
+    },
+    {
+      "bug_dir": "/root/datadiff_fuzz_lab/bugs/bug_1ccab94bdd003141",
+      "candidate_acquisition": {
+        "acquisition_score": 5.098957718841947,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "csv_long_numeric_roundtrip@polars,polars_lazy"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.8450488750216346,
+        "recheck_prior": 0.85,
+        "reduction_potential": 0.3169925001442312,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9939339175322763
+      },
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00002046-issue-focus-csv-long-numeric-roundtrip",
+      "candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 1,
+            "reproduced_keys": [
+              "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "accept_reject_mismatch:csv_long_numeric_roundtrip@polars,polars_lazy:accept_reject"
+        ]
+      },
+      "case": {
+        "case_id": "case-00002046-issue-focus-csv-long-numeric-roundtrip",
+        "metadata": {
+          "case_fingerprint": {
+            "column_count": 1,
+            "feature_tokens": [
+              "fp_op:31eb3b69906ee450",
+              "fp_type_mix:num1",
+              "fp_null_density:0",
+              "fp_row_mass:2",
+              "fp_column_count:1"
+            ],
+            "minhash_signature": [
+              109828634809894621,
+              53941965423571634,
+              289685627313298057,
+              98994334173035537,
+              253636995463446780,
+              940137593733003780,
+              510210319129344921,
+              752485816394471232,
+              3277052508587818525,
+              506800303511531385,
+              633758677384902911,
+              266125185907639289,
+              151227128292770346,
+              505510530341821903,
+              3103656666576039516,
+              3654527288822437618,
+              1171879595419353931,
+              691904893375809793,
+              2915886146647342375,
+              947012612454253156,
+              6694164866576696258,
+              804714251351317012,
+              1735548707924472708,
+              2575304759254038033,
+              2514598823958886235,
+              4198050785584519307,
+              555630700804639955,
+              1863191935912464843,
+              67227429047460189,
+              451623366697933930,
+              58047199166602815,
+              249056295996622982,
+              619376697487496495,
+              35289553841345954,
+              2013225534659399699,
+              2639644628666475872,
+              1657563200663350983,
+              608457110027218981,
+              2452052855269654276,
+              2983635719627470872,
+              1173761073426015365,
+              235284542941306283,
+              2349667705947885197,
+              2816026893485570097,
+              1255825407668898682,
+              4779178783640622113,
+              689901542164397644,
+              627878070976131066,
+              967906519727402650,
+              865874688467549900,
+              1367775314652262544,
+              161562671135046198,
+              4436176070371966354,
+              420100504374356591,
+              370133735928417148,
+              1019425532449420622,
+              539971713899296378,
+              1730863726622638958,
+              3256268418982037787,
+              44572191519424862,
+              71527184954054592,
+              261368185942488471,
+              1112410683266807618,
+              305953200453405747
+            ],
+            "null_density_bucket": 0,
+            "op_skeleton_hash": "31eb3b69906ee450",
+            "row_mass_bucket": 2,
+            "type_mix_token": "num1"
+          },
+          "disagreement_descriptor": {
+            "backend_groups": [
+              [
+                "pandas"
+              ],
+              [
+                "polars",
+                "polars_lazy"
+              ]
+            ],
+            "backend_statuses": {
+              "pandas": "ok",
+              "polars": "error:NameError",
+              "polars_lazy": "error:NameError"
+            },
+            "column_classes": {
+              "csv_long_numeric_roundtrip_mismatch": "bool"
+            },
+            "feature_tokens": [
+              "column:csv_long_numeric_roundtrip_mismatch:bool",
+              "disagree_class:bool",
+              "disagree_pair:pandas|polars",
+              "disagree_pair:pandas|polars_lazy",
+              "group:pandas",
+              "group:polars+polars_lazy",
+              "group_count:2",
+              "mismatch:status",
+              "root:csv_long_numeric_roundtrip",
+              "status:pandas:ok",
+              "status:polars:error:NameError",
+              "status:polars_lazy:error:NameError"
+            ],
+            "mismatch_class": "status",
+            "pair_count": 2,
+            "pair_disagrees": [
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars"
+              },
+              {
+                "disagrees": true,
+                "left": "pandas",
+                "right": "polars_lazy"
+              },
+              {
+                "disagrees": false,
+                "left": "polars",
+                "right": "polars_lazy"
+              }
+            ],
+            "primary_root_cause": "csv_long_numeric_roundtrip"
+          },
+          "expected_csv_long_numeric_roundtrip_mismatch": false,
+          "expected_csv_values": [
+            "9007199254740993",
+            "18446744073709551615",
+            "12345678901234567890",
+            "99999999999999999999"
+          ],
+          "generator_profile": "issue_focus",
+          "issue_inspiration": "CSV long numeric identifiers should round-trip without lossy inference",
+          "mixed_generator_profile": "csv_long_numeric_roundtrip",
+          "quality_archive_context": {
+            "archive_axis_reward": 0.4858647361357319,
+            "archive_axis_weights": {
+              "bd_backend_disagreement": 1.3164342859655362,
+              "bd_column_count": 1.3165204943156652,
+              "bd_null_density": 1.316793917547655,
+              "bd_op_skeleton": 1.316987426652045,
+              "bd_profile": 1.3170870660615195,
+              "bd_row_mass": 1.3166092255654624,
+              "bd_target_class": 1.3168896460253239,
+              "bd_type_mix": 1.316700400878354
+            },
+            "archive_cluster_reward": 0.0,
+            "archive_elite_indexes": [],
+            "archive_enabled": true,
+            "archive_health_penalty": 0.0,
+            "archive_known": false,
+            "archive_outcome_count": 0,
+            "archive_seed_count": 0,
+            "behavioral_descriptor": {
+              "axis_tuples": [
+                [
+                  "bd_profile",
+                  "csv_long_numeric_roundtrip"
+                ],
+                [
+                  "bd_op_skeleton",
+                  "op:31eb3b69906ee450"
+                ],
+                [
+                  "bd_target_class",
+                  "target:capability_agg_all"
+                ],
+                [
+                  "bd_null_density",
+                  "null:0"
+                ],
+                [
+                  "bd_type_mix",
+                  "type:num1"
+                ],
+                [
+                  "bd_row_mass",
+                  "rows:1"
+                ],
+                [
+                  "bd_column_count",
+                  "cols:1"
+                ],
+                [
+                  "bd_backend_disagreement",
+                  "pair:none"
+                ]
+              ],
+              "backend_disagreement_axis": "pair:none",
+              "column_count_axis": "cols:1",
+              "null_density_axis": "null:0",
+              "op_skeleton_axis": "op:31eb3b69906ee450",
+              "profile_axis": "csv_long_numeric_roundtrip",
+              "row_mass_axis": "rows:1",
+              "target_class_axis": "target:capability_agg_all",
+              "type_mix_axis": "type:num1"
+            },
+            "cluster_count": 0,
+            "cluster_feedback_count": 0,
+            "cluster_feedback_reward": 0.0,
+            "cluster_key": "profile=csv_long_numeric_roundtrip|targets=capability_agg_all+capability_agg_any+capability_agg_count|ops=csv_long_numeric_roundtrip_probe",
+            "cluster_novelty_score": 0.35,
+            "profile_key": "csv_long_numeric_roundtrip",
+            "recent_cluster_pulls": 0,
+            "target_key_count": 24,
+            "target_keys": [
+              "capability:agg:all",
+              "capability:agg:any",
+              "capability:agg:count",
+              "capability:agg:max",
+              "capability:agg:mean",
+              "capability:agg:min",
+              "capability:agg:nunique",
+              "capability:agg:sum",
+              "capability:expr:abs",
+              "capability:expr:add_const",
+              "capability:expr:arith_const",
+              "capability:expr:bool_not",
+              "capability:expr:cast",
+              "capability:expr:clip",
+              "capability:expr:date_part",
+              "capability:expr:reverse_division_columns",
+              "capability:expr:string_basename",
+              "capability:expr:string_concat",
+              "capability:expr:string_contains",
+              "capability:expr:string_ends_with",
+              "capability:expr:string_length",
+              "capability:expr:string_lower",
+              "capability:expr:string_null_if_empty",
+              "capability:expr:string_replace"
+            ]
+          }
+        },
+        "program": {
+          "operations": [
+            {
+              "as": "csv_long_numeric_roundtrip_mismatch",
+              "op": "csv_long_numeric_roundtrip_probe",
+              "values": [
+                "9007199254740993",
+                "18446744073709551615",
+                "12345678901234567890",
+                "99999999999999999999"
+              ]
+            }
+          ],
+          "program_id": "prog-00002046-csv-long-numeric-roundtrip",
+          "seed": 2046
+        },
+        "seed": 2046,
+        "tables": [
+          {
+            "columns": [
+              {
+                "name": "probe_id",
+                "nullable": false,
+                "type": "int"
+              }
+            ],
+            "name": "t0",
+            "rows": [
+              {
+                "probe_id": 0
+              }
+            ]
+          }
+        ]
+      },
+      "config": {
+        "artifact_limit": 20,
+        "backend_pair_learning_weight": 0.0,
+        "backend_pair_priority_limit": 3,
+        "candidate_recheck_count": 3,
+        "compress_run_log": true,
+        "discovery_biases": [],
+        "effective_guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "enable_artifact": true,
+        "enable_backend_pair_learning": true,
+        "enable_bayesian_exploration": true,
+        "enable_bd_axis_bandit": true,
+        "enable_champion_corpus": true,
+        "enable_champion_graft_donor_bandit": true,
+        "enable_differential_oracle": true,
+        "enable_disagreement_bd_axis": true,
+        "enable_divergence_conditioned_mutations": true,
+        "enable_family_saturation": true,
+        "enable_feedback": true,
+        "enable_generator_profile_learning": true,
+        "enable_hierarchical_archive": true,
+        "enable_ir_rewrite_mutations": true,
+        "enable_lhs_seeding": true,
+        "enable_lineage_rarity": true,
+        "enable_local_source_scheduler": true,
+        "enable_metamorphic_oracle": true,
+        "enable_metamorphic_relation_learning": true,
+        "enable_minhash_dedup": true,
+        "enable_mutation_operator_learning": true,
+        "enable_normalizer": true,
+        "enable_operator_swarm": true,
+        "enable_parallel_backend_execution": true,
+        "enable_per_operator_energy": true,
+        "enable_preflight_repair": true,
+        "enable_preflight_validation": true,
+        "enable_profile_capability_filter": true,
+        "enable_quality_archive": true,
+        "enable_reducer": false,
+        "enable_replay_bug": false,
+        "enable_seed_energy_batch": true,
+        "enable_seed_energy_tier_bandit": true,
+        "enable_seed_quota": true,
+        "enable_semantic_objective_learning": true,
+        "enable_shrink_mutations": true,
+        "enable_type_aware_generation": true,
+        "enable_value_catalog": true,
+        "exploration_objective_rules": [],
+        "family_saturation_penalty": 6.0,
+        "family_saturation_threshold": 4,
+        "feedback_max_cases_per_profile": 6,
+        "feedback_persist_limit": 4096,
+        "fixed_version": "",
+        "freeze_strategy_snapshot": true,
+        "generator_profile": "issue_focus",
+        "generator_profile_learning_weight": 0.0,
+        "generator_profile_pool": [],
+        "guidance_candidate_pool": 8,
+        "guidance_strategy": "guided",
+        "guidance_targets": [
+          "operation_combo",
+          "filter",
+          "mutate",
+          "groupby",
+          "sort_limit",
+          "topk",
+          "nulls",
+          "numeric",
+          "casts",
+          "expressions",
+          "empty_filter_groupby",
+          "ordered_groupby_sort",
+          "topk_resort",
+          "global_null_aggregate",
+          "bool_null_groupby_agg",
+          "large_int_filter_groupby",
+          "large_integer",
+          "boolean_aggregation",
+          "bool_any_all",
+          "set_membership_filter",
+          "row_value_absence_filter",
+          "row_value_absence",
+          "polars_reverse_division_columns",
+          "reverse_division",
+          "csv_long_numeric_roundtrip",
+          "csv_long_numeric_roundtrip_probe",
+          "csv_numeric_inference"
+        ],
+        "issue_inspired_source_saturation_penalty": 1.25,
+        "issue_inspired_source_saturation_threshold": 3,
+        "issue_replay_global_saturation_penalty": 2.0,
+        "issue_replay_global_saturation_threshold": 2,
+        "issue_replay_saturation_penalty": 1.0,
+        "issue_replay_saturation_threshold": 1,
+        "known_saturated_bug_families": [
+          "csv_long_numeric_roundtrip@duckdb",
+          "csv_long_numeric_roundtrip@pyarrow",
+          "distinct_null_topk@datafusion",
+          "groupby_aggregation@datafusion",
+          "grouped_topk_null_sort_key@datafusion",
+          "datafusion_limit_idempotence@datafusion",
+          "metamorphic_limit_idempotence@datafusion",
+          "joined_order_offset_projection@datafusion",
+          "negative_zero_comparison@datafusion",
+          "ordered_topk_projection@datafusion",
+          "outer_join_truth_filter@datafusion",
+          "pandas_arrow_timestamp_index_attr_semantics@pandas",
+          "path_projection_keyed_pick@duckdb",
+          "polars_reflected_arithmetic_operand_order@polars",
+          "polars_vector_division_rounding@polars",
+          "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+          "pyarrow_sliced_bool_groupby_any_all@pyarrow",
+          "topk_filter_pushdown@datafusion",
+          "reverse_division_operand_order@polars",
+          "tuple_absence_null_filter@duckdb"
+        ],
+        "local_source_exploration_weight": 0.5,
+        "log_level": "compact",
+        "metamorphic_relation_learning_weight": 0.0,
+        "metamorphic_relation_order": [],
+        "metamorphic_variant_limit": 8,
+        "oracle_mode": "both",
+        "persist_feedback_corpus": false,
+        "replay_bug_source_issues": [
+          "https://github.com/apache/arrow/issues/32171",
+          "https://github.com/apache/arrow/issues/36149",
+          "https://github.com/apache/arrow/issues/42231",
+          "https://github.com/apache/arrow/issues/46183",
+          "https://github.com/apache/arrow/issues/47177",
+          "https://github.com/apache/arrow/issues/48679",
+          "https://github.com/apache/arrow/issues/49889",
+          "https://github.com/apache/datafusion/issues/12955",
+          "https://github.com/apache/datafusion/issues/12956",
+          "https://github.com/apache/datafusion/issues/22190",
+          "https://github.com/apache/datafusion/issues/22441",
+          "https://github.com/apache/datafusion/issues/22489",
+          "https://github.com/apache/datafusion/issues/22554",
+          "https://github.com/duckdb/duckdb/issues/3015",
+          "https://github.com/duckdb/duckdb/issues/4978",
+          "https://github.com/duckdb/duckdb/issues/11261",
+          "https://github.com/duckdb/duckdb/issues/17278",
+          "https://github.com/duckdb/duckdb/issues/19491",
+          "https://github.com/duckdb/duckdb/issues/19851",
+          "https://github.com/duckdb/duckdb/issues/20366",
+          "https://github.com/duckdb/duckdb/issues/22075",
+          "https://github.com/duckdb/duckdb/issues/22418",
+          "https://github.com/duckdb/duckdb/issues/22527",
+          "https://github.com/duckdb/duckdb/issues/22576",
+          "https://github.com/duckdb/duckdb/issues/22656",
+          "https://github.com/duckdb/duckdb/issues/22676",
+          "https://github.com/duckdb/duckdb/issues/22750",
+          "https://github.com/duckdb/duckdb/issues/22837",
+          "https://github.com/duckdb/duckdb/issues/22849",
+          "https://github.com/pandas-dev/pandas/issues/43767",
+          "https://github.com/pandas-dev/pandas/issues/45284",
+          "https://github.com/pandas-dev/pandas/issues/59609",
+          "https://github.com/pandas-dev/pandas/issues/62766",
+          "https://github.com/pandas-dev/pandas/issues/63458",
+          "https://github.com/pandas-dev/pandas/issues/63526",
+          "https://github.com/pandas-dev/pandas/issues/63527",
+          "https://github.com/pandas-dev/pandas/issues/65664",
+          "https://github.com/pandas-dev/pandas/issues/65710",
+          "https://github.com/pola-rs/polars/issues/8516",
+          "https://github.com/pola-rs/polars/issues/17760",
+          "https://github.com/pola-rs/polars/issues/18546",
+          "https://github.com/pola-rs/polars/issues/22149",
+          "https://github.com/pola-rs/polars/issues/23870",
+          "https://github.com/pola-rs/polars/issues/25888",
+          "https://github.com/pola-rs/polars/issues/26065",
+          "https://github.com/pola-rs/polars/issues/26671",
+          "https://github.com/pola-rs/polars/issues/26800",
+          "https://github.com/pola-rs/polars/issues/26803",
+          "https://github.com/pola-rs/polars/issues/26993",
+          "https://github.com/pola-rs/polars/issues/27661",
+          "https://github.com/pola-rs/polars/issues/27662",
+          "https://github.com/pola-rs/polars/issues/27726"
+        ],
+        "saturated_family_reward": 0.0,
+        "semantic_focus_families": [],
+        "semantic_focus_signals": [],
+        "semantic_objective_learning_weight": 0.0,
+        "strategy_learning_path": "/root/datadiff_fuzz_lab/new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T002643/strategy-learning/candidate-pipeline-learning.json",
+        "strategy_snapshot_path": "/root/datadiff_fuzz_lab/new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T002643/strategy-snapshot.json",
+        "target_version": "",
+        "version_pair_learning_weight": 0.0,
+        "version_pair_pool": []
+      },
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "findings": [
+        {
+          "adjudication": {
+            "attribution_gate": "backend_candidate_bug",
+            "boundary_rule_ids": [],
+            "countable_as_bug_evidence": true,
+            "countable_as_valid_finding": true,
+            "documentation_support": "not_used",
+            "documented_rule_ids": [],
+            "exclusion_reason": "",
+            "metamorphic_support": "not_observed",
+            "needs_external_confirmation": true,
+            "needs_manual_review": false,
+            "oracle_complex": {
+              "corroborated_backends": [],
+              "corroborating_relations": [],
+              "cross_validated": false,
+              "needs_recheck": true
+            },
+            "recheck_status": "needed",
+            "reference_support": "reference_majority_support",
+            "semantic_gate": "common_subset_or_backend_specific",
+            "validity_gate": "valid_case",
+            "verdict": "candidate_implementation_bug"
+          },
+          "confidence": "high",
+          "discovery_origin": "organic",
+          "documentation_refs": [],
+          "evidence": "Some backends accepted while others rejected: {'pandas': 'ok', 'polars': 'error', 'polars_lazy': 'error'}",
+          "false_positive": false,
+          "false_positive_reason": "",
+          "finding_id": "finding-1ccab94bdd003141",
+          "kind": "accept_reject_mismatch",
+          "mismatch_class": "accept_reject",
+          "oracle": "differential",
+          "paper_status": "candidate_bug_needs_external_confirmation",
+          "recommendation": [
+            "Minimize the case and include the DSL reference output in the artifact.",
+            "Treat as confirmed only after backend documentation or maintainers establish the expected behavior."
+          ],
+          "root_cause": "csv_long_numeric_roundtrip",
+          "severity": "high",
+          "signature": "1ccab94bdd003141",
+          "source_issue": "",
+          "suspicious_backends": [
+            "polars",
+            "polars_lazy"
+          ],
+          "triage_confidence": "high",
+          "triage_evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['polars', 'polars_lazy'].",
+          "triage_verdict": "candidate_implementation_bug"
+        }
+      ],
+      "normalized": {
+        "pandas": {
+          "backend": "pandas",
+          "columns": [
+            "csv_long_numeric_roundtrip_mismatch"
+          ],
+          "comparison_key": "{\"columns\":[\"csv_long_numeric_roundtrip_mismatch\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false]\\\"]\",\"status\":\"ok\"}",
+          "error": "",
+          "error_type": "",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[\"[false]\"]",
+          "row_count": 1,
+          "rows": [
+            [
+              false
+            ]
+          ],
+          "status": "ok",
+          "unordered_row_signature": "[\"[false]\"]"
+        },
+        "polars": {
+          "backend": "polars",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "columns": [],
+          "comparison_key": "{\"columns\":[],\"error_type\":\"NameError\",\"row_signature\":\"[]\",\"status\":\"error\"}",
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "has_duplicate_rows": false,
+          "ordered_row_signature": "[]",
+          "row_count": 0,
+          "rows": [],
+          "status": "error",
+          "unordered_row_signature": "[]"
+        }
+      },
+      "raw_results": {
+        "pandas": {
+          "backend": "pandas",
+          "duration_ms": 7.546648004790768,
+          "error": "",
+          "error_type": "",
+          "status": "ok"
+        },
+        "polars": {
+          "backend": "polars",
+          "duration_ms": 3.648754005553201,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        },
+        "polars_lazy": {
+          "backend": "polars_lazy",
+          "duration_ms": 4.668929002946243,
+          "error": "name 'op_output_alias' is not defined",
+          "error_type": "NameError",
+          "status": "error"
+        }
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T234812-1780789692235394704.jsonl.gz"
+    }
+  ],
+  "evidence_files": [
+    "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1-fresh-candidates.json"
+  ],
+  "generated_at": "2026-06-07T00:27:08Z",
+  "generated_by": "datadiff candidate-pipeline",
+  "manifest_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z.json",
+  "schema_version": "candidate-freeze-v1",
+  "strategy_snapshot_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-probe_stress-20260606T171300Z-20260607T002643/strategy-snapshot.json"
+}

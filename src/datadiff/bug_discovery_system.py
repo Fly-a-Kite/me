@@ -24,6 +24,8 @@ class BugDiscoveryAcquisitionWeights:
     false_positive_penalty: float = 1.25
     uncertainty_weight: float = 0.45
     proof_weight: float = 0.60
+    pipeline_actionable_weight: float = 0.55
+    duplicate_waste_penalty: float = 0.40
     entropy_weight: float = 0.20
     saturation_penalty: float = 0.75
     issue_inspired_weight: float = 0.20
@@ -104,6 +106,27 @@ def lane_true_bug_acquisition(
     first_seen_count = _nonnegative_int(lane_metrics.get("first_seen_family_count", 0), 0)
     unique_fresh_count = _nonnegative_int(lane_metrics.get("unique_fresh_family_count", 0), 0)
     family_counts = _counter_from_mapping(lane_metrics.get("fresh_family_counts", {}))
+    pipeline_candidate_total = _nonnegative_int(lane_metrics.get("pipeline_candidate_count", 0), 0)
+    pipeline_skipped_duplicates = _nonnegative_int(
+        lane_metrics.get("pipeline_skipped_duplicate_candidate_count", 0),
+        0,
+    )
+    pipeline_processed_total = _nonnegative_int(
+        lane_metrics.get(
+            "pipeline_processed_candidate_count",
+            max(0, pipeline_candidate_total - pipeline_skipped_duplicates),
+        ),
+        0,
+    )
+    pipeline_bug_verdict_total = _nonnegative_int(
+        lane_metrics.get("pipeline_candidate_bug_verdict_count", 0),
+        0,
+    )
+    pipeline_issue_draft_total = _nonnegative_int(lane_metrics.get("pipeline_issue_draft_count", 0), 0)
+    pipeline_needs_dedup_total = _nonnegative_int(
+        lane_metrics.get("pipeline_needs_dedup_check_count", 0),
+        0,
+    )
 
     yield_rate = min(3.0, fresh_total / completed_runs) if completed_runs else 0.0
     novelty_rate = min(1.0, first_seen_count / unique_fresh_count) if unique_fresh_count else 0.0
@@ -117,6 +140,21 @@ def lane_true_bug_acquisition(
     issue_inspired_rate = issue_inspired_total / completed_runs if completed_runs else 0.0
     unseen_probability = good_turing_unseen_probability(family_counts)
     entropy = normalized_entropy(family_counts)
+    pipeline_actionable_total = max(
+        pipeline_bug_verdict_total,
+        pipeline_issue_draft_total,
+        pipeline_needs_dedup_total,
+    )
+    pipeline_actionable_rate = (
+        min(1.0, pipeline_actionable_total / pipeline_processed_total)
+        if pipeline_processed_total > 0
+        else 0.0
+    )
+    pipeline_duplicate_waste_rate = (
+        min(1.0, pipeline_skipped_duplicates / pipeline_candidate_total)
+        if pipeline_candidate_total > 0
+        else 0.0
+    )
     ucb_bonus = resolved_weights.uncertainty_weight * math.sqrt(
         (2.0 * math.log(max(2, _nonnegative_int(total_completed_runs, 0) + 1))) / (completed_runs + 1.0)
     )
@@ -127,13 +165,16 @@ def lane_true_bug_acquisition(
         + resolved_weights.novelty_rate * max(novelty_rate, unseen_probability)
         + resolved_weights.issue_inspired_weight * issue_inspired_rate
         + resolved_weights.proof_weight * proof_yield
+        + resolved_weights.pipeline_actionable_weight * pipeline_actionable_rate
         - resolved_weights.false_positive_penalty * false_positive_rate
         - resolved_weights.saturation_penalty * saturation_rate
+        - resolved_weights.duplicate_waste_penalty * pipeline_duplicate_waste_rate
     )
     free_energy = (
         -exploitation
         + resolved_weights.false_positive_penalty * false_positive_rate
         + resolved_weights.saturation_penalty * saturation_rate
+        + resolved_weights.duplicate_waste_penalty * pipeline_duplicate_waste_rate
         - resolved_weights.entropy_weight * entropy
     )
     acquisition_score = max(
@@ -151,6 +192,11 @@ def lane_true_bug_acquisition(
         "saturation_rate": saturation_rate,
         "issue_inspired_rate": issue_inspired_rate,
         "proof_yield": proof_yield,
+        "pipeline_actionable_rate": pipeline_actionable_rate,
+        "pipeline_duplicate_waste_rate": pipeline_duplicate_waste_rate,
+        "pipeline_processed_candidate_count": float(pipeline_processed_total),
+        "pipeline_candidate_bug_verdict_count": float(pipeline_bug_verdict_total),
+        "pipeline_issue_draft_count": float(pipeline_issue_draft_total),
         "free_energy": free_energy,
     }
 

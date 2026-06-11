@@ -59,11 +59,7 @@ class BackendExecutor:
     ) -> tuple[dict[str, Any], Any]:
         backend = self._backend_for_name(backend_name)
         result = backend.run(prepared_tables, case.program)
-        raw_row = {
-            key: value
-            for key, value in result.to_dict().items()
-            if key != "data"
-        }
+        raw_row = result.summary_dict()
         normalized_row = normalize_result(
             result,
             case.program,

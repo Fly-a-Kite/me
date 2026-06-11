@@ -1,0 +1,963 @@
+{
+  "bug_audit": {
+    "skipped": true
+  },
+  "cases_per_lane_seed": 300,
+  "completed_at": "",
+  "duration": null,
+  "generated_at": "2026-06-07T05:54:21Z",
+  "generated_by": "datadiff discovery-campaign",
+  "health_stop_reason": "",
+  "lane_ids": [
+    "embedded_sql",
+    "duckdb_storage"
+  ],
+  "lanes": [
+    {
+      "default": true,
+      "discovery_biases": [
+        {
+          "candidate_pool_bonus": 0.0,
+          "contribution_bonus": 0.15,
+          "feature_prefixes": [
+            "join:",
+            "group_key_type:",
+            "sort:"
+          ],
+          "keep_in_pool": false,
+          "novelty_bonus": 0.1,
+          "score_bonus": 0.3,
+          "targets": [
+            "row_value_absence_filter",
+            "groupby_sorted_input"
+          ]
+        }
+      ],
+      "id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "semantic_focus_families": [
+        "join_membership",
+        "stateful_ordering"
+      ],
+      "semantic_focus_signals": [
+        "row_value_absence_filter",
+        "groupby_sorted_input"
+      ],
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    },
+    {
+      "default": true,
+      "discovery_biases": [
+        {
+          "candidate_pool_bonus": 0.0,
+          "contribution_bonus": 0.15,
+          "feature_prefixes": [
+            "sort:",
+            "join:",
+            "materialization:"
+          ],
+          "keep_in_pool": false,
+          "novelty_bonus": 0.1,
+          "score_bonus": 0.3,
+          "targets": [
+            "storage_offset",
+            "join_null_sort"
+          ]
+        }
+      ],
+      "id": "duckdb_storage",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "semantic_focus_families": [
+        "stateful_ordering",
+        "join_membership",
+        "materialization_boundary"
+      ],
+      "semantic_focus_signals": [
+        "storage_offset",
+        "join_null_sort"
+      ],
+      "target_suite": "duckdb_storage_cross",
+      "theme": "DuckDB persistent database execution path versus pandas references, including storage-backed joins, aggregation, sort, and projection"
+    }
+  ],
+  "progress": {
+    "completed_run_count": 2,
+    "current_lane_id": "embedded_sql",
+    "current_seed": 1501,
+    "planned_run_count": 8,
+    "remaining_run_count": 6
+  },
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "sqlite"
+      ],
+      "candidate_pipeline": {
+        "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-duckdb_embedded-20260606T171300Z-20260606T173010/manifest.json",
+        "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-duckdb_embedded-20260606T171300Z-20260606T173010/manifest.md",
+        "status": "ok",
+        "summary": {
+          "already_submitted_or_confirmed_count": 0,
+          "artifact_created_count": 0,
+          "candidate_bug_verdict_count": 1,
+          "candidate_count": 1,
+          "issue_draft_count": 1,
+          "local_duplicate_candidate_count": 0,
+          "needs_dedup_check_count": 1,
+          "needs_reproducer_or_evidence_count": 0,
+          "not_latest_reproducible_count": 0,
+          "ready_to_submit_count": 0,
+          "recheck_pass_rate": 1.0,
+          "rechecked_count": 1,
+          "reduced_count": 1,
+          "reproduced_count": 1,
+          "submission_group_count": 1,
+          "unique_family_count": 1
+        }
+      },
+      "cases": 300,
+      "classification": {
+        "candidate_bug_families": {
+          "conditional_expression@duckdb,pandas,sqlite": 6,
+          "running_sum_precision@duckdb": 1,
+          "running_sum_precision@duckdb,pandas,sqlite": 5,
+          "running_sum_precision@pandas": 2
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000610-discovery-fresh",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'sqlite'] and disagrees with ['duckdb'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 610,
+              "signature": "907b8db166e0872f",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00000981-discovery-fresh",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 981,
+              "signature": "d1518e9a0f1cd4dc",
+              "suspicious": [
+                "duckdb",
+                "pandas",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00001136-discovery-fresh",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1136,
+              "signature": "fd345d28caf47ba8",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00001158-discovery-fresh",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1158,
+              "signature": "b89ceb1d289f7bfa",
+              "suspicious": [
+                "duckdb",
+                "pandas",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00001410-discovery-fresh",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1410,
+              "signature": "89dd7cd7ca03e17f",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-520",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 520,
+              "signature": "e62f27dfb40707ad",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00000528-discovery-fresh",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 528,
+              "signature": "a6ad80cb19f952fa",
+              "suspicious": [
+                "duckdb"
+              ]
+            },
+            {
+              "case_id": "case-00000546-discovery-fresh",
+              "evidence": "Backends differ only in full-precision floating-point arithmetic or aggregate ordering; the relaxed numeric row multisets agree.",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 546,
+              "signature": "84b9b6ae11d579b0",
+              "suspicious": [
+                "duckdb",
+                "pandas",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-615",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "conditional_expression",
+              "seed": 615,
+              "signature": "4b246094a4ad1300",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00000637-discovery-fresh",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 637,
+              "signature": "3829c7a9616314a2",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb,pandas,sqlite": 6,
+          "running_sum_precision@duckdb": 1,
+          "running_sum_precision@duckdb,pandas,sqlite": 5,
+          "running_sum_precision@pandas": 2
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 14,
+          "semantic_divergence": 98
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260606T171300-1780765980786771442.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 14,
+          "expected_semantic_divergence": 98
+        },
+        "unsaturated_candidate_bug_families": {
+          "conditional_expression@duckdb,pandas,sqlite": 6,
+          "running_sum_precision@duckdb": 1,
+          "running_sum_precision@duckdb,pandas,sqlite": 5,
+          "running_sum_precision@pandas": 2
+        }
+      },
+      "completed_at": "2026-06-06T17:35:53Z",
+      "csv": "reports/findings-run-20260606T171300-1780765980786771442.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed501-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 1,
+      "health": {
+        "bytes": 4189367,
+        "candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 6,
+          "running_sum_precision@duckdb": 1,
+          "running_sum_precision@duckdb,sqlite": 6
+        },
+        "examples": [
+          {
+            "case_id": "case-00000610-discovery-fresh",
+            "kind": "semantic_output_mismatch",
+            "root": "running_sum_precision",
+            "seed": 610,
+            "status": "bug",
+            "suspicious": [
+              "duckdb"
+            ]
+          },
+          {
+            "case_id": "case-00000981-discovery-fresh",
+            "kind": "semantic_output_mismatch",
+            "root": "running_sum_precision",
+            "seed": 981,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00001158-discovery-fresh",
+            "kind": "semantic_output_mismatch",
+            "root": "running_sum_precision",
+            "seed": 1158,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00001410-discovery-fresh",
+            "kind": "semantic_output_mismatch",
+            "root": "running_sum_precision",
+            "seed": 1410,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00001620-discovery-fresh",
+            "kind": "semantic_output_mismatch",
+            "root": "conditional_expression",
+            "seed": 1620,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          }
+        ],
+        "false_positive_reasons": {
+          "candidate_not_reproduced_on_immediate_recheck": 1
+        },
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 6,
+          "running_sum_precision@duckdb": 1,
+          "running_sum_precision@duckdb,sqlite": 6
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 300,
+        "run_file": "runs/run-20260606T171300-1780765980786771442.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 1027.2004258009983,
+          "evidence_bytes_per_case": 13964.556666666667,
+          "executed_cases": 300,
+          "meta_file": "runs/run-20260606T171300-1780765980786771442.meta.json",
+          "next_seed": 3940,
+          "run_log_bytes": 4189367,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 40.78903275670503,
+              "generate_mutate_ms": 3064.378315436626,
+              "logging_artifact_ms": 0.16854690671607386,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 266.16984810995444,
+              "scheduler_feedback_ms": 39.69694491948758,
+              "total_case_wall_ms": 3411.202688129489
+            },
+            "case_count": 300,
+            "share_of_total": {
+              "backend_execution_ms": 0.011957375883480977,
+              "generate_mutate_ms": 0.8983278320283448,
+              "logging_artifact_ms": 4.9409818801619044e-05,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.07802815383447852,
+              "scheduler_feedback_ms": 0.01163722843489407,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.2920559537015998
+        },
+        "statuses": {
+          "bug": 13,
+          "ok": 287
+        }
+      },
+      "lane_id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "report": "reports/report-run-20260606T171300-1780765980786771442.md",
+      "run_file": "runs/run-20260606T171300-1780765980786771442.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 1.5,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "history_runs": 1,
+        "novelty_rate": 1.0,
+        "priority_rank": 1,
+        "score": 5.908308741831862,
+        "yield_rate": 3.0
+      },
+      "seed": 501,
+      "semantic_focus_families": [
+        "join_membership",
+        "stateful_ordering"
+      ],
+      "semantic_focus_signals": [
+        "row_value_absence_filter",
+        "groupby_sorted_input"
+      ],
+      "started_at": "2026-06-06T17:13:00Z",
+      "status": "completed",
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "sqlite"
+      ],
+      "candidate_pipeline": {
+        "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-duckdb_embedded-20260606T171300Z-20260606T211337/manifest.json",
+        "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-duckdb_embedded-20260606T171300Z-20260606T211337/manifest.md",
+        "status": "ok",
+        "summary": {
+          "already_submitted_or_confirmed_count": 0,
+          "artifact_created_count": 102,
+          "candidate_bug_verdict_count": 2,
+          "candidate_count": 122,
+          "issue_draft_count": 2,
+          "local_duplicate_candidate_count": 117,
+          "needs_dedup_check_count": 2,
+          "needs_reproducer_or_evidence_count": 0,
+          "not_latest_reproducible_count": 0,
+          "ready_to_submit_count": 0,
+          "recheck_pass_rate": 1.0,
+          "rechecked_count": 122,
+          "reduced_count": 122,
+          "reproduced_count": 122,
+          "submission_group_count": 1,
+          "unique_family_count": 5
+        }
+      },
+      "cases": 300,
+      "classification": {
+        "candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 28,
+          "grouped_topk_null_sort_key@duckdb,sqlite": 61,
+          "ordering_or_limit@duckdb,sqlite": 20,
+          "running_sum_precision@duckdb,pandas,sqlite": 4,
+          "running_sum_precision@duckdb,sqlite": 7,
+          "running_sum_precision@pandas": 1,
+          "topk_filter_pushdown@duckdb,sqlite": 2
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "conditional_expression",
+              "seed": 1042,
+              "signature": "2b9d29f9807306e1",
+              "suspicious": [
+                "duckdb",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1055",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "conditional_expression",
+              "seed": 1055,
+              "signature": "f777b384d4a23e44",
+              "suspicious": [
+                "duckdb",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-1063",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1063,
+              "signature": "44ce01edb3b8cc24",
+              "suspicious": [
+                "duckdb",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "conditional_expression",
+              "seed": 1066,
+              "signature": "2959f924037b4c67",
+              "suspicious": [
+                "duckdb",
+                "sqlite"
+              ]
+            },
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1083",
+              "evidence": "Independent DSL reference agrees with ['pandas'] and disagrees with ['duckdb', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "conditional_expression",
+              "seed": 1083,
+              "signature": "964c5ae64db79a54",
+              "suspicious": [
+                "duckdb",
+                "sqlite"
+              ]
+            }
+          ],
+          "expected_semantic_divergence": [
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-677-champion-mut-806-mut-1118",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "running_sum_precision",
+              "seed": 1118,
+              "signature": "69b6ad20ffeaeda8",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-1198",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1198,
+              "signature": "4273a463eb0c4633",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-963-mut-1329-mut-1194",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "joined_order_offset_projection",
+              "seed": 1194,
+              "signature": "afa7ef5e81af34d7",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-677-champion-mut-806-mut-1494",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1494,
+              "signature": "edac5efe6e7fe45f",
+              "suspicious": [
+                "pandas"
+              ]
+            },
+            {
+              "case_id": "case-00022783-discovery-fresh-mut-1601-champion-mut-1263-champion-mut-1571-mut-835-mut-677-champion-mut-806-mut-1494-mut-1500",
+              "evidence": "join key contains NULL values; NULL join semantics differ across target families",
+              "kind": "semantic_output_mismatch",
+              "root": "groupby_aggregation",
+              "seed": 1500,
+              "signature": "edac5efe6e7fe45f",
+              "suspicious": [
+                "pandas"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 28,
+          "grouped_topk_null_sort_key@duckdb,sqlite": 61,
+          "ordering_or_limit@duckdb,sqlite": 20,
+          "running_sum_precision@duckdb,pandas,sqlite": 4,
+          "running_sum_precision@duckdb,sqlite": 7,
+          "running_sum_precision@pandas": 1,
+          "topk_filter_pushdown@duckdb,sqlite": 2
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 123,
+          "semantic_divergence": 100
+        },
+        "refresh": true,
+        "run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 123,
+          "expected_semantic_divergence": 100
+        },
+        "unsaturated_candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 28,
+          "grouped_topk_null_sort_key@duckdb,sqlite": 61,
+          "ordering_or_limit@duckdb,sqlite": 20,
+          "running_sum_precision@duckdb,pandas,sqlite": 4,
+          "running_sum_precision@duckdb,sqlite": 7,
+          "running_sum_precision@pandas": 1,
+          "topk_filter_pushdown@duckdb,sqlite": 2
+        }
+      },
+      "completed_at": "2026-06-07T05:54:21Z",
+      "csv": "reports/findings-run-20260606T173553-1780767353671296266.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-duckdb_embedded-20260606T171300Z-embedded_sql-seed1001-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 122,
+      "health": {
+        "bytes": 9213402,
+        "candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 28,
+          "grouped_topk_null_sort_key@duckdb,sqlite": 61,
+          "metamorphic_join_inner_left_equivalence@duckdb": 60,
+          "metamorphic_join_inner_left_equivalence@sqlite": 60,
+          "ordering_or_limit@duckdb,sqlite": 20,
+          "running_sum_precision@duckdb,sqlite": 11,
+          "topk_filter_pushdown@duckdb,sqlite": 2
+        },
+        "examples": [
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042",
+            "kind": "accept_reject_mismatch",
+            "root": "conditional_expression",
+            "seed": 1042,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-601-mut-1042-mut-1055",
+            "kind": "accept_reject_mismatch",
+            "root": "conditional_expression",
+            "seed": 1055,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-1063",
+            "kind": "accept_reject_mismatch",
+            "root": "running_sum_precision",
+            "seed": 1063,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066",
+            "kind": "accept_reject_mismatch",
+            "root": "conditional_expression",
+            "seed": 1066,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          },
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-1066-mut-1083",
+            "kind": "accept_reject_mismatch",
+            "root": "conditional_expression",
+            "seed": 1083,
+            "status": "bug",
+            "suspicious": [
+              "duckdb",
+              "sqlite"
+            ]
+          }
+        ],
+        "false_positive_reasons": {
+          "candidate_not_reproduced_on_immediate_recheck": 1
+        },
+        "fresh_candidate_bug_families": {
+          "conditional_expression@duckdb,sqlite": 28,
+          "grouped_topk_null_sort_key@duckdb,sqlite": 61,
+          "metamorphic_join_inner_left_equivalence@duckdb": 60,
+          "metamorphic_join_inner_left_equivalence@sqlite": 60,
+          "ordering_or_limit@duckdb,sqlite": 20,
+          "running_sum_precision@duckdb,sqlite": 11,
+          "topk_filter_pushdown@duckdb,sqlite": 2
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 301,
+        "run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 13056.647751684002,
+          "evidence_bytes_per_case": 30711.34,
+          "executed_cases": 300,
+          "meta_file": "runs/run-20260606T173553-1780767353671296266.meta.json",
+          "next_seed": 4248,
+          "run_log_bytes": 9213402,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 53.33309830981307,
+              "generate_mutate_ms": 42289.152309313125,
+              "logging_artifact_ms": 0.4297064366498186,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 1058.966355423375,
+              "scheduler_feedback_ms": 78.93040988351761,
+              "total_case_wall_ms": 43480.81187936648
+            },
+            "case_count": 300,
+            "share_of_total": {
+              "backend_execution_ms": 0.0012265892931755931,
+              "generate_mutate_ms": 0.972593437920168,
+              "logging_artifact_ms": 9.882668194926986e-06,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.024354797200231218,
+              "scheduler_feedback_ms": 0.0018152929182302941,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.022976801220765643
+        },
+        "statuses": {
+          "bug": 182,
+          "ok": 118,
+          "unknown": 1
+        }
+      },
+      "lane_id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "report": "reports/report-run-20260606T173553-1780767353671296266.md",
+      "run_file": "runs/run-20260606T173553-1780767353671296266.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 1.5,
+        "current_runs": 1,
+        "false_positive_rate": 0.0,
+        "history_runs": 1,
+        "novelty_rate": 1.0,
+        "priority_rank": 1,
+        "score": 5.909732141648702,
+        "yield_rate": 3.0
+      },
+      "seed": 1001,
+      "semantic_focus_families": [
+        "join_membership",
+        "stateful_ordering"
+      ],
+      "semantic_focus_signals": [
+        "row_value_absence_filter",
+        "groupby_sorted_input"
+      ],
+      "started_at": "2026-06-06T17:35:53Z",
+      "status": "completed",
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    },
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "sqlite"
+      ],
+      "cases": 300,
+      "duration": null,
+      "lane_id": "embedded_sql",
+      "preset": "live_embedded_sql_deep_organic_metamorphic",
+      "scheduler": {
+        "budget_multiplier": 1.5,
+        "current_runs": 2,
+        "false_positive_rate": 0.0,
+        "history_runs": 1,
+        "novelty_rate": 1.0,
+        "priority_rank": 1,
+        "score": 5.866223068210977,
+        "yield_rate": 3.0
+      },
+      "seed": 1501,
+      "semantic_focus_families": [
+        "join_membership",
+        "stateful_ordering"
+      ],
+      "semantic_focus_signals": [
+        "row_value_absence_filter",
+        "groupby_sorted_input"
+      ],
+      "started_at": "2026-06-07T05:54:21Z",
+      "status": "running",
+      "target_suite": "embedded_sql_cross",
+      "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references"
+    }
+  ],
+  "scheduler": {
+    "bug_discovery_system": {
+      "objective": "maximize externally reproducible fresh implementation bug yield per unit budget",
+      "schema_version": "bug-discovery-system-v1",
+      "stages": [
+        "generate_or_mutate_candidate",
+        "score_by_acquisition",
+        "execute_differential_oracles",
+        "filter_rewardable_fresh_candidates",
+        "recheck_reproducibility",
+        "reduce_preserving_root_cause",
+        "write_reproducer_and_issue_draft"
+      ],
+      "theory": {
+        "budget": "Boltzmann allocation over acquisition free energy",
+        "candidate_priority": "multi-objective proof/reproducibility/dedup utility",
+        "exploration": "UCB optimism under sparse lane samples",
+        "novelty": "Good-Turing unseen-family probability"
+      }
+    },
+    "generated_at": "2026-06-07T05:54:21Z",
+    "history_manifest_count": 8,
+    "history_window": 8,
+    "lanes": [
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 1.5,
+        "candidate_total": 140,
+        "completed_runs": 3,
+        "current_runs": 2,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.7078674659500659,
+        "first_seen_family_count": 11,
+        "free_energy": -5.491573493190013,
+        "fresh_candidate_total": 140,
+        "good_turing_unseen_probability": 0.014285714285714285,
+        "history_runs": 1,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "embedded_sql",
+        "novelty_rate": 1.0,
+        "pending_runs": 1,
+        "preset": "live_embedded_sql_deep_organic_metamorphic",
+        "priority_rank": 1,
+        "proof_yield": 1.0,
+        "saturation_rate": 0.0,
+        "score": 5.866223068210977,
+        "target_suite": "embedded_sql_cross",
+        "theme": "Organic DuckDB/SQLite lightweight SQL semantics compared with DataFrame references",
+        "ucb_bonus": 0.37464957502096397,
+        "unique_fresh_family_count": 11,
+        "yield_rate": 3.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 0.5,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "duckdb_storage",
+        "novelty_rate": 0.0,
+        "pending_runs": 4,
+        "preset": "live_embedded_sql_deep_organic_metamorphic",
+        "priority_rank": 2,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.499299150041928,
+        "target_suite": "duckdb_storage_cross",
+        "theme": "DuckDB persistent database execution path versus pandas references, including storage-backed joins, aggregation, sort, and projection",
+        "ucb_bonus": 0.7492991500419279,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      }
+    ],
+    "score_weights": {
+      "boltzmann_temperature": 0.85,
+      "entropy_weight": 0.2,
+      "false_positive_penalty": 1.25,
+      "issue_inspired_weight": 0.2,
+      "novelty_rate": 0.75,
+      "proof_weight": 0.6,
+      "saturation_penalty": 0.75,
+      "uncertainty_weight": 0.45,
+      "yield_rate": 1.0
+    },
+    "strategy": "true_bug_acquisition_good_turing_ucb_boltzmann"
+  },
+  "schema_version": "discovery-campaign-v1",
+  "seeds": [
+    501,
+    1001,
+    1501,
+    2001
+  ],
+  "started_at": "2026-06-06T17:13:00Z",
+  "status": "running",
+  "stopped_by_health": false,
+  "summary": {
+    "candidate_pipeline": {
+      "already_submitted_or_confirmed_count": 0,
+      "candidate_bug_verdict_count": 3,
+      "candidate_count": 123,
+      "issue_draft_count": 3,
+      "needs_dedup_check_count": 3,
+      "pipeline_count": 2,
+      "rechecked_count": 123,
+      "reduced_count": 123,
+      "reproduced_count": 123
+    },
+    "fresh_candidate_bug_families": {
+      "conditional_expression@duckdb,pandas,sqlite": 6,
+      "conditional_expression@duckdb,sqlite": 28,
+      "grouped_topk_null_sort_key@duckdb,sqlite": 61,
+      "ordering_or_limit@duckdb,sqlite": 20,
+      "running_sum_precision@duckdb": 1,
+      "running_sum_precision@duckdb,pandas,sqlite": 9,
+      "running_sum_precision@duckdb,sqlite": 7,
+      "running_sum_precision@pandas": 3,
+      "topk_filter_pushdown@duckdb,sqlite": 2
+    },
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {},
+    "run_count": 2,
+    "triage_verdicts": {
+      "candidate_implementation_bug": 137,
+      "expected_semantic_divergence": 198
+    }
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "guided_discovery_campaign",
+    "true_bug_acquisition_scheduler",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence",
+    "candidate_pipeline"
+  ]
+}

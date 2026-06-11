@@ -1,0 +1,583 @@
+{
+  "bug_discovery_system": {
+    "objective": "maximize externally reproducible fresh implementation bug yield per unit budget",
+    "schema_version": "bug-discovery-system-v1",
+    "stages": [
+      "generate_or_mutate_candidate",
+      "score_by_acquisition",
+      "execute_differential_oracles",
+      "filter_rewardable_fresh_candidates",
+      "recheck_reproducibility",
+      "reduce_preserving_root_cause",
+      "write_reproducer_and_issue_draft"
+    ],
+    "theory": {
+      "budget": "Boltzmann allocation over acquisition free energy",
+      "candidate_priority": "multi-objective proof/reproducibility/dedup utility",
+      "exploration": "UCB optimism under sparse lane samples",
+      "novelty": "Good-Turing unseen-family probability"
+    }
+  },
+  "candidates": [
+    {
+      "artifact_created": false,
+      "bug_dir": "bugs/bug_6b1cd49b992cad97",
+      "candidate_acquisition": {
+        "acquisition_score": 5.534375,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "running_sum_precision@duckdb,sqlite"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.9475,
+        "recheck_prior": 0.85,
+        "reduction_potential": 1.0,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9960668549274264
+      },
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00000167-discovery-fresh",
+      "case_id": "case-00000167-discovery-fresh",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "",
+        "status": "needs_final_upstream_dedup"
+      },
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "initial_candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 2,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 3,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 3,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+        ]
+      },
+      "issue_draft": {},
+      "issue_readiness": {},
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [],
+            "finding_count": 0,
+            "matched_families": [],
+            "status": "ok"
+          }
+        ],
+        "attempts": 1,
+        "reproduced": false,
+        "reproduced_families": []
+      },
+      "reduction": {
+        "performed": false,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T171011-1780765811598566410.jsonl.gz",
+      "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-reclassified-evidence-20260606T173000Z/pipeline-discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fre-20260606T173353/strategy-learning/candidate-pipeline-learning.json",
+      "triage": {}
+    },
+    {
+      "artifact_created": false,
+      "bug_dir": "bugs/bug_1089d69848d8a723",
+      "candidate_acquisition": {
+        "acquisition_score": 5.456895471404292,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "running_sum_precision@duckdb,sqlite"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.9292695226833628,
+        "recheck_prior": 0.85,
+        "reduction_potential": 0.8784634845557521,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9957513465266703
+      },
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00001025-discovery-fresh",
+      "case_id": "case-00001025-discovery-fresh",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "running_sum_precision-duckdb-sqlite-case-00000167-discovery-fresh",
+        "status": "duplicate_pipeline_family"
+      },
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "initial_candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 7,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 7,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 7,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+        ]
+      },
+      "issue_draft": {},
+      "issue_readiness": {},
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [],
+            "finding_count": 0,
+            "matched_families": [],
+            "status": "ok"
+          }
+        ],
+        "attempts": 1,
+        "reproduced": false,
+        "reproduced_families": []
+      },
+      "reduction": {
+        "performed": false,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T171011-1780765811598566410.jsonl.gz",
+      "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-reclassified-evidence-20260606T173000Z/pipeline-discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fre-20260606T173353/strategy-learning/candidate-pipeline-learning.json",
+      "triage": {}
+    },
+    {
+      "artifact_created": false,
+      "bug_dir": "bugs/bug_c254909bf4ce0e20",
+      "candidate_acquisition": {
+        "acquisition_score": 5.447920832098139,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "running_sum_precision@duckdb,sqlite"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.9271578428466208,
+        "recheck_prior": 0.85,
+        "reduction_potential": 0.8643856189774725,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.995713208970695
+      },
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00000981-discovery-fresh",
+      "case_id": "case-00000981-discovery-fresh",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "running_sum_precision-duckdb-sqlite-case-00000167-discovery-fresh",
+        "status": "duplicate_pipeline_family"
+      },
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "initial_candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 5,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 5,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 5,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+        ]
+      },
+      "issue_draft": {},
+      "issue_readiness": {},
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [],
+            "finding_count": 0,
+            "matched_families": [],
+            "status": "ok"
+          }
+        ],
+        "attempts": 1,
+        "reproduced": false,
+        "reproduced_families": []
+      },
+      "reduction": {
+        "performed": false,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T171011-1780765811598566410.jsonl.gz",
+      "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-reclassified-evidence-20260606T173000Z/pipeline-discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fre-20260606T173353/strategy-learning/candidate-pipeline-learning.json",
+      "triage": {}
+    },
+    {
+      "artifact_created": false,
+      "bug_dir": "bugs/bug_ea7a26e9cb63c70f",
+      "candidate_acquisition": {
+        "acquisition_score": 5.3950035509400855,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "running_sum_precision@duckdb,sqlite"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.9147067178682555,
+        "recheck_prior": 0.85,
+        "reduction_potential": 0.7813781191217037,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9954813069903214
+      },
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00000266-discovery-fresh",
+      "case_id": "case-00000266-discovery-fresh",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "running_sum_precision-duckdb-sqlite-case-00000167-discovery-fresh",
+        "status": "duplicate_pipeline_family"
+      },
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "initial_candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 3,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+            ]
+          },
+          {
+            "attempt": 2,
+            "finding_count": 3,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+            ]
+          },
+          {
+            "attempt": 3,
+            "finding_count": 3,
+            "reproduced_keys": [
+              "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+            ]
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [],
+        "reproduced_keys": [
+          "semantic_output_mismatch:running_sum_precision@duckdb,sqlite:row_order"
+        ]
+      },
+      "issue_draft": {},
+      "issue_readiness": {},
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [],
+            "finding_count": 0,
+            "matched_families": [],
+            "status": "ok"
+          }
+        ],
+        "attempts": 1,
+        "reproduced": false,
+        "reproduced_families": []
+      },
+      "reduction": {
+        "performed": false,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T171011-1780765811598566410.jsonl.gz",
+      "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-reclassified-evidence-20260606T173000Z/pipeline-discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fre-20260606T173353/strategy-learning/candidate-pipeline-learning.json",
+      "triage": {}
+    },
+    {
+      "artifact_created": true,
+      "bug_dir": "bugs/bug_a1f4026a64d2214c",
+      "candidate_acquisition": {
+        "acquisition_score": 5.20625,
+        "confirmed_latest_family_count": 0,
+        "duplicate_family_count": 0,
+        "evidence_completeness": 1.0,
+        "false_positive_finding_count": 0,
+        "families": [
+          "conditional_expression@duckdb"
+        ],
+        "issue_replay_finding_count": 0,
+        "novelty_probability": 1.0,
+        "proof_potential": 0.685,
+        "recheck_prior": 0.1,
+        "reduction_potential": 1.0,
+        "rewardable_candidate_finding_count": 1,
+        "schema_version": "bug-discovery-system-v1",
+        "source_issue_finding_count": 0,
+        "true_bug_probability": 0.9945476971642888
+      },
+      "candidate_id": "conditional_expression-duckdb-case-00045505-discovery-fresh-mut-1535",
+      "case_id": "case-00045505-discovery-fresh-mut-1535",
+      "dedup": {
+        "confirmed_latest_family": false,
+        "local_duplicate_paths": [],
+        "pipeline_duplicate_of": "",
+        "status": "needs_final_upstream_dedup"
+      },
+      "families": [
+        "conditional_expression@duckdb"
+      ],
+      "initial_candidate_recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "finding_count": 0,
+            "reproduced_keys": []
+          },
+          {
+            "attempt": 2,
+            "finding_count": 1,
+            "reproduced_keys": []
+          },
+          {
+            "attempt": 3,
+            "finding_count": 0,
+            "reproduced_keys": []
+          }
+        ],
+        "attempts": 3,
+        "enabled": true,
+        "non_reproduced_keys": [
+          "semantic_output_mismatch:conditional_expression@duckdb:row_order"
+        ],
+        "reproduced_keys": []
+      },
+      "issue_draft": {},
+      "issue_readiness": {},
+      "primary_family": "conditional_expression@duckdb",
+      "recheck": {
+        "attempt_summaries": [
+          {
+            "attempt": 1,
+            "candidate_families": [],
+            "finding_count": 0,
+            "matched_families": [],
+            "status": "ok"
+          }
+        ],
+        "attempts": 1,
+        "reproduced": false,
+        "reproduced_families": []
+      },
+      "reduction": {
+        "performed": false,
+        "requested": true
+      },
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-arrow_probe_stress-seed1-reclassified-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T171300-1780765980790959578.jsonl.gz",
+      "strategy_learning_path": "new_issue/generated/candidate-pipelines/pipeline-reclassified-evidence-20260606T173000Z/pipeline-discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fre-20260606T173353/strategy-learning/candidate-pipeline-learning.json",
+      "triage": {}
+    }
+  ],
+  "existing_issue_readiness_summary": {
+    "already_submitted_or_confirmed_count": 15,
+    "already_submitted_or_confirmed_family_count": 10,
+    "confirmed_count_eligible_count": 13,
+    "confirmed_count_eligible_families": [
+      "datafusion_limit_idempotence@datafusion",
+      "distinct_null_topk@datafusion",
+      "groupby_aggregation@datafusion",
+      "groupby_aggregation@polars,polars_lazy",
+      "grouped_topk_null_sort_key@datafusion",
+      "negative_zero_comparison@datafusion",
+      "polars_reflected_arithmetic_operand_order@polars",
+      "pyarrow_sliced_bool_groupby_any_all@pyarrow"
+    ],
+    "confirmed_count_eligible_family_count": 8,
+    "duplicate_family_draft_count": 0,
+    "duplicate_family_draft_groups": {},
+    "issue_document_count": 20,
+    "needs_dedup_check": [],
+    "needs_dedup_check_count": 0,
+    "needs_dedup_check_families": [],
+    "needs_dedup_check_family_count": 0,
+    "needs_reproducer_or_evidence": [
+      "new_issue/datafusion_22554_followup_comment.md",
+      "new_issue/datafusion_null_group_key_candidate.md",
+      "new_issue/duckdb_groupby_neutral_mutation_not_upstream.md",
+      "new_issue/generated/polars_vector_division_rounding.md"
+    ],
+    "needs_reproducer_or_evidence_count": 4,
+    "needs_reproducer_or_evidence_family_count": 4,
+    "not_latest_reproducible_count": 1,
+    "not_latest_reproducible_family_count": 1,
+    "ready_to_submit": [],
+    "ready_to_submit_count": 0,
+    "ready_to_submit_families": [],
+    "ready_to_submit_family_count": 0,
+    "submission_group_count": 0,
+    "submission_group_families": [],
+    "submission_groups_needs_dedup_count": 0,
+    "submission_groups_ready_to_submit_count": 0,
+    "top_priority": [
+      "new_issue/generated/polars_vector_division_rounding.md",
+      "new_issue/datafusion_null_group_key_candidate.md",
+      "new_issue/duckdb_groupby_neutral_mutation_not_upstream.md",
+      "new_issue/datafusion_22554_followup_comment.md",
+      "new_issue/datafusion_limit_idempotence.md"
+    ]
+  },
+  "frozen_candidates_path": "new_issue/generated/candidate-pipelines/pipeline-reclassified-evidence-20260606T173000Z/pipeline-discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fre-20260606T173353/frozen-candidates.json",
+  "generated_at": "2026-06-06T17:33:54Z",
+  "generated_by": "datadiff candidate-pipeline",
+  "inputs": {
+    "evidence_files": [
+      "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fresh-candidates.json",
+      "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-arrow_probe_stress-seed1-reclassified-fresh-candidates.json"
+    ],
+    "generated_issue_dir": "new_issue/generated",
+    "manifest_file": "",
+    "new_issue_dir": "new_issue",
+    "old_issue_dir": "old_issue",
+    "output_dir": "new_issue/generated/candidate-pipelines/pipeline-reclassified-evidence-20260606T173000Z/pipeline-discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fre-20260606T173353",
+    "recheck_attempts": 1,
+    "reduce_artifacts": true,
+    "standalone_reproducer": true
+  },
+  "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-reclassified-evidence-20260606T173000Z/pipeline-discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fre-20260606T173353/manifest.json",
+  "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-reclassified-evidence-20260606T173000Z/pipeline-discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fre-20260606T173353/manifest.md",
+  "pipeline_issue_readiness_summary": {
+    "already_submitted_or_confirmed_count": 0,
+    "already_submitted_or_confirmed_family_count": 0,
+    "confirmed_count_eligible_count": 0,
+    "confirmed_count_eligible_families": [],
+    "confirmed_count_eligible_family_count": 0,
+    "duplicate_family_draft_count": 0,
+    "duplicate_family_draft_groups": {},
+    "issue_document_count": 0,
+    "needs_dedup_check": [],
+    "needs_dedup_check_count": 0,
+    "needs_dedup_check_families": [],
+    "needs_dedup_check_family_count": 0,
+    "needs_reproducer_or_evidence": [],
+    "needs_reproducer_or_evidence_count": 0,
+    "needs_reproducer_or_evidence_family_count": 0,
+    "not_latest_reproducible_count": 0,
+    "not_latest_reproducible_family_count": 0,
+    "ready_to_submit": [],
+    "ready_to_submit_count": 0,
+    "ready_to_submit_families": [],
+    "ready_to_submit_family_count": 0,
+    "submission_group_count": 0,
+    "submission_group_families": [],
+    "submission_groups_needs_dedup_count": 0,
+    "submission_groups_ready_to_submit_count": 0,
+    "top_priority": []
+  },
+  "schema_version": "candidate-pipeline-v1",
+  "strategy_snapshot_path": "new_issue/generated/candidate-pipelines/pipeline-reclassified-evidence-20260606T173000Z/pipeline-discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fre-20260606T173353/strategy-snapshot.json",
+  "submission_groups": [],
+  "summary": {
+    "already_submitted_or_confirmed_count": 0,
+    "artifact_created_count": 1,
+    "candidate_bug_verdict_count": 0,
+    "candidate_count": 5,
+    "issue_draft_count": 0,
+    "local_duplicate_candidate_count": 3,
+    "needs_dedup_check_count": 0,
+    "needs_reproducer_or_evidence_count": 0,
+    "not_latest_reproducible_count": 0,
+    "ready_to_submit_count": 0,
+    "recheck_pass_rate": 0.0,
+    "rechecked_count": 5,
+    "reduced_count": 0,
+    "reproduced_count": 0,
+    "submission_group_count": 0,
+    "unique_family_count": 2
+  }
+}

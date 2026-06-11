@@ -583,6 +583,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "pandas_arrow_string_eq_sum_semantics": {"pattern:pandas_arrow_string_eq_sum_semantics"},
     "arrow_string_eq_sum_probe": {"op:arrow_string_eq_sum_probe"},
     "arrow_string_reduction": {"pandas:arrow-string-eq-sum", "arrow:string-bool-reduction"},
+    "pandas_arrow_string_contains_na_semantics": {"pattern:pandas_arrow_string_contains_na_semantics"},
+    "arrow_string_contains_na_probe": {"op:arrow_string_contains_na_probe"},
+    "arrow_string_missing_predicate": {"pandas:arrow-string-contains-na", "arrow:string-missing-predicate"},
     "pandas_arrow_timestamp_loc_slice_semantics": {"pattern:pandas_arrow_timestamp_loc_slice_semantics"},
     "arrow_timestamp_loc_slice_probe": {"op:arrow_timestamp_loc_slice_probe"},
     "arrow_timestamp_indexing": {"pandas:arrow-timestamp-loc-slice", "arrow:timestamp-index-slice"},
@@ -595,6 +598,9 @@ TARGET_ALIASES: dict[str, set[str]] = {
     "pandas_bool_reduction_skipna_semantics": {"pattern:pandas_bool_reduction_skipna_semantics"},
     "bool_reduction_skipna_probe": {"op:bool_reduction_skipna_probe"},
     "bool_reduction_skipna": {"pandas:bool-reduction-skipna", "nullable-bool:reduction"},
+    "polars_timezone_filter_semantics": {"pattern:polars_timezone_filter_semantics"},
+    "polars_timezone_filter_probe": {"op:polars_timezone_filter_probe"},
+    "timezone_filter": {"polars:timezone-filter", "timestamp:timezone-conversion-filter"},
     "pandas_arrow_bool_groupby_reduction_semantics": {
         "pattern:pandas_arrow_bool_groupby_reduction_semantics"
     },
@@ -903,11 +909,13 @@ _CASE_FEATURE_FLAG_NAMES = (
     "has_index_bool_probe",
     "has_empty_literal_groupby_probe",
     "has_arrow_string_eq_sum_probe",
+    "has_arrow_string_contains_na_probe",
     "has_arrow_timestamp_loc_slice_probe",
     "has_arrow_timestamp_index_attr_probe",
     "has_eval_inplace_alias_probe",
     "has_bool_reduction_skipna_probe",
     "has_arrow_bool_groupby_reduction_probe",
+    "has_polars_timezone_filter_probe",
     "has_dataset_isin_all_match_probe",
     "has_run_end_null_compute_probe",
     "has_large_string_partition_probe",
@@ -1352,6 +1360,13 @@ def _apply_case_feature_operation(
         state.available_types = {op_output_alias(op, "derived"): "bool"}
         available_types = state.available_types
         flags["has_arrow_string_eq_sum_probe"] = True
+    elif kind == "arrow_string_contains_na_probe":
+        features.add("pandas:arrow-string-contains-na")
+        features.add("arrow:string-missing-predicate")
+        features.add("string:missing-predicate")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_arrow_string_contains_na_probe"] = True
     elif kind == "arrow_timestamp_loc_slice_probe":
         features.add("pandas:arrow-timestamp-loc-slice")
         features.add("arrow:timestamp-index-slice")
@@ -1376,6 +1391,13 @@ def _apply_case_feature_operation(
         state.available_types = {op_output_alias(op, "derived"): "bool"}
         available_types = state.available_types
         flags["has_bool_reduction_skipna_probe"] = True
+    elif kind == "polars_timezone_filter_probe":
+        features.add("polars:timezone-filter")
+        features.add("timestamp:timezone-conversion-filter")
+        features.add("timestamp:timezone")
+        state.available_types = {op_output_alias(op, "derived"): "bool"}
+        available_types = state.available_types
+        flags["has_polars_timezone_filter_probe"] = True
     elif kind == "arrow_bool_groupby_reduction_probe":
         features.add("pandas:arrow-bool-groupby-reduction")
         features.add("arrow:boolean-groupby")
@@ -1768,6 +1790,8 @@ def _materialize_case_features(
         features.add("pattern:polars_empty_literal_groupby_semantics")
     if state.flags["has_arrow_string_eq_sum_probe"]:
         features.add("pattern:pandas_arrow_string_eq_sum_semantics")
+    if state.flags["has_arrow_string_contains_na_probe"]:
+        features.add("pattern:pandas_arrow_string_contains_na_semantics")
     if state.flags["has_arrow_timestamp_loc_slice_probe"]:
         features.add("pattern:pandas_arrow_timestamp_loc_slice_semantics")
     if state.flags["has_arrow_timestamp_index_attr_probe"]:
@@ -1776,6 +1800,8 @@ def _materialize_case_features(
         features.add("pattern:pandas_eval_inplace_aliasing_semantics")
     if state.flags["has_bool_reduction_skipna_probe"]:
         features.add("pattern:pandas_bool_reduction_skipna_semantics")
+    if state.flags["has_polars_timezone_filter_probe"]:
+        features.add("pattern:polars_timezone_filter_semantics")
     if state.flags["has_arrow_bool_groupby_reduction_probe"]:
         features.add("pattern:pandas_arrow_bool_groupby_reduction_semantics")
     if state.flags["has_dataset_isin_all_match_probe"]:
@@ -4852,6 +4878,16 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "float_literal_precision_probe":
+            score, op_buckets, samples = _float_literal_precision_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
+        elif kind == "timestamp_precision_filter_probe":
+            score, op_buckets, samples = _timestamp_precision_filter_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "series_rtruediv_probe":
             score, op_buckets, samples = _series_rtruediv_frontier_score(op)
             scores.append(score)
@@ -4902,6 +4938,11 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
+        elif kind == "arrow_string_contains_na_probe":
+            score, op_buckets, samples = _arrow_string_contains_na_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
         elif kind == "arrow_timestamp_loc_slice_probe":
             score, op_buckets, samples = _arrow_timestamp_loc_slice_frontier_score(op)
             scores.append(score)
@@ -4919,6 +4960,16 @@ def _frontier_signature(case: Case) -> tuple[float, list[str]]:
             last_sort_op = None
         elif kind == "bool_reduction_skipna_probe":
             score, op_buckets, samples = _bool_reduction_skipna_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
+        elif kind == "polars_timezone_filter_probe":
+            score, op_buckets, samples = _polars_timezone_filter_frontier_score(op)
+            scores.append(score)
+            buckets.extend(op_buckets)
+            last_sort_op = None
+        elif kind == "arrow_bool_groupby_reduction_probe":
+            score, op_buckets, samples = _arrow_bool_groupby_reduction_frontier_score(op)
             scores.append(score)
             buckets.extend(op_buckets)
             last_sort_op = None
@@ -5474,6 +5525,26 @@ def _round_even_frontier_score(op: Any) -> tuple[float, list[str], dict[str, lis
     return 0.90, buckets, {alias: [False]} if alias else {}
 
 
+def _float_literal_precision_frontier_score(op: Any) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = op_output_alias(op)
+    literal = str(op_literal(op) or "")
+    digits = sum(1 for char in literal if char.isdigit())
+    buckets = [
+        "duckdb:float-literal-precision",
+        "float:literal-cast-consistency",
+        _bucket("float_literal_digits", digits, [(16, "double"), (19, "wide")], "huge"),
+    ]
+    if "9007199254740993" in literal:
+        buckets.append("float:integer-precision-boundary")
+    return 0.92, buckets, {alias: [False]} if alias else {}
+
+
+def _timestamp_precision_filter_frontier_score(op: Any) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = op_output_alias(op)
+    buckets = ["polars:timestamp-precision-filter", "timestamp:precision-filter", "timestamp:ns-us-boundary"]
+    return 0.92, buckets, {alias: [False]} if alias else {}
+
+
 def _series_rtruediv_frontier_score(op: Any) -> tuple[float, list[str], dict[str, list[Any]]]:
     alias = op_output_alias(op)
     buckets = ["series:reverse-division", "arithmetic:operand-order"]
@@ -5540,6 +5611,12 @@ def _arrow_string_eq_sum_frontier_score(op: Any) -> tuple[float, list[str], dict
     return 0.90, buckets, {alias: [False]} if alias else {}
 
 
+def _arrow_string_contains_na_frontier_score(op: Any) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = op_output_alias(op)
+    buckets = ["pandas:arrow-string-contains-na", "arrow:string-missing-predicate", "string:missing-predicate"]
+    return 0.92, buckets, {alias: [False]} if alias else {}
+
+
 def _arrow_timestamp_loc_slice_frontier_score(op: Any) -> tuple[float, list[str], dict[str, list[Any]]]:
     alias = op_output_alias(op)
     buckets = ["pandas:arrow-timestamp-loc-slice", "arrow:timestamp-index-slice"]
@@ -5562,6 +5639,18 @@ def _bool_reduction_skipna_frontier_score(op: Any) -> tuple[float, list[str], di
     alias = op_output_alias(op)
     buckets = ["pandas:bool-reduction-skipna", "nullable-bool:reduction"]
     return 0.90, buckets, {alias: [False]} if alias else {}
+
+
+def _polars_timezone_filter_frontier_score(op: Any) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = op_output_alias(op)
+    buckets = ["polars:timezone-filter", "timestamp:timezone-conversion-filter", "timestamp:timezone"]
+    return 0.92, buckets, {alias: [False]} if alias else {}
+
+
+def _arrow_bool_groupby_reduction_frontier_score(op: Any) -> tuple[float, list[str], dict[str, list[Any]]]:
+    alias = op_output_alias(op)
+    buckets = ["pandas:arrow-bool-groupby-reduction", "arrow:bool-groupby", "nullable-bool:reduction"]
+    return 0.92, buckets, {alias: [False]} if alias else {}
 
 
 def _dataset_isin_all_match_frontier_score(op: Any) -> tuple[float, list[str], dict[str, list[Any]]]:
@@ -5948,6 +6037,11 @@ def _predicted_roots(features: set[str]) -> set[str]:
     if "pattern:pandas_arrow_string_eq_sum_semantics" in features or "op:arrow_string_eq_sum_probe" in features:
         roots.add("pandas_arrow_string_eq_sum_semantics")
     if (
+        "pattern:pandas_arrow_string_contains_na_semantics" in features
+        or "op:arrow_string_contains_na_probe" in features
+    ):
+        roots.add("pandas_arrow_string_contains_na_semantics")
+    if (
         "pattern:pandas_arrow_timestamp_loc_slice_semantics" in features
         or "op:arrow_timestamp_loc_slice_probe" in features
     ):
@@ -5961,6 +6055,8 @@ def _predicted_roots(features: set[str]) -> set[str]:
         roots.add("pandas_eval_inplace_aliasing_semantics")
     if "pattern:pandas_bool_reduction_skipna_semantics" in features or "op:bool_reduction_skipna_probe" in features:
         roots.add("pandas_bool_reduction_skipna_semantics")
+    if "pattern:polars_timezone_filter_semantics" in features or "op:polars_timezone_filter_probe" in features:
+        roots.add("polars_timezone_filter_semantics")
     if (
         "pattern:pandas_arrow_bool_groupby_reduction_semantics" in features
         or "op:arrow_bool_groupby_reduction_probe" in features

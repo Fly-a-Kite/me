@@ -36,6 +36,7 @@ from datadiff.util import PROJECT_ROOT, dump_json, load_json, slugify, utc_now
 
 CANDIDATE_PIPELINE_SCHEMA_VERSION = "candidate-pipeline-v1"
 DEFAULT_CANDIDATE_PIPELINE_DIR = PROJECT_ROOT / "new_issue" / "generated" / "candidate-pipelines"
+CANDIDATE_PIPELINE_MAX_EXPENSIVE_ROWS_PER_FAMILY = 5
 save_bug_artifact = save_issue_artifact
 
 
@@ -99,6 +100,8 @@ def build_candidate_pipeline(
 
     candidates: list[dict[str, Any]] = []
     family_seen_in_pipeline: dict[str, str] = {}
+    family_processed_counts: Counter[str] = Counter()
+    family_actionable_representatives: set[str] = set()
     for evidence_index, evidence in enumerate(evidence_payloads):
         source_run_file = str(evidence.get("source_run_file", ""))
         for row_index, row in enumerate(evidence.get("candidate_rows", [])):
@@ -144,20 +147,45 @@ def build_candidate_pipeline(
         existing_by_family=existing_by_family,
     )
     for frozen_row in frozen_rows:
-        candidates.append(
-            _process_candidate(
-                candidate_id=str(frozen_row.get("candidate_id", "")),
-                row=frozen_row,
-                pipeline_dir=pipeline_dir,
-                issue_drafts_dir=issue_drafts_dir,
-                recheck_attempts=max(0, int(recheck_attempts)),
-                reduce_artifacts=reduce_artifacts,
-                standalone_reproducer=standalone_reproducer,
-                confirmed_latest_families=confirmed_latest_families,
-                existing_by_family=existing_by_family,
-                family_seen_in_pipeline=family_seen_in_pipeline,
-            )
+        candidate_id = str(frozen_row.get("candidate_id", ""))
+        primary_family = _primary_family_from_row(frozen_row)
+        pipeline_duplicate_of = family_seen_in_pipeline.get(primary_family, "")
+        skip_reason = _duplicate_processing_skip_reason(
+            primary_family=primary_family,
+            pipeline_duplicate_of=pipeline_duplicate_of,
+            family_processed_count=family_processed_counts.get(primary_family, 0),
+            family_actionable_representatives=family_actionable_representatives,
         )
+        if skip_reason:
+            candidates.append(
+                _skipped_pipeline_duplicate_candidate(
+                    candidate_id=candidate_id,
+                    row=frozen_row,
+                    pipeline_duplicate_of=pipeline_duplicate_of,
+                    skip_reason=skip_reason,
+                    existing_by_family=existing_by_family,
+                    confirmed_latest_families=confirmed_latest_families,
+                )
+            )
+            continue
+        candidate = _process_candidate(
+            candidate_id=candidate_id,
+            row=frozen_row,
+            pipeline_dir=pipeline_dir,
+            issue_drafts_dir=issue_drafts_dir,
+            recheck_attempts=max(0, int(recheck_attempts)),
+            reduce_artifacts=reduce_artifacts,
+            standalone_reproducer=standalone_reproducer,
+            confirmed_latest_families=confirmed_latest_families,
+            existing_by_family=existing_by_family,
+            family_seen_in_pipeline=family_seen_in_pipeline,
+        )
+        candidates.append(candidate)
+        if primary_family:
+            family_seen_in_pipeline.setdefault(primary_family, candidate_id)
+            family_processed_counts[primary_family] += 1
+            if _candidate_has_actionable_representative(candidate):
+                family_actionable_representatives.add(primary_family)
 
     frozen_manifest = {
         "schema_version": "candidate-freeze-v1",
@@ -230,6 +258,7 @@ def render_candidate_pipeline_markdown(manifest: dict[str, Any]) -> str:
         f"- Rechecked candidates: `{summary.get('rechecked_count', 0)}`",
         f"- Reproduced candidates: `{summary.get('reproduced_count', 0)}`",
         f"- Reduced artifacts: `{summary.get('reduced_count', 0)}`",
+        f"- Skipped duplicate candidates: `{summary.get('skipped_duplicate_candidate_count', 0)}`",
         f"- Candidate-bug triage verdicts: `{summary.get('candidate_bug_verdict_count', 0)}`",
         f"- Semantic-contract candidates: `{summary.get('semantic_contract_candidate_count', 0)}`; "
         f"boundary axes: `{', '.join(summary.get('semantic_contract_boundary_axes', [])) or 'none'}`",
@@ -377,7 +406,12 @@ def _process_candidate(
             for path in existing_by_family.get(family, [])
         }
     )
-    pipeline_duplicate_of = family_seen_in_pipeline.get(primary_family, "")
+    existing_pipeline_representative = family_seen_in_pipeline.get(primary_family, "")
+    pipeline_duplicate_of = (
+        existing_pipeline_representative
+        if existing_pipeline_representative and existing_pipeline_representative != candidate_id
+        else ""
+    )
     if primary_family and primary_family not in family_seen_in_pipeline:
         family_seen_in_pipeline[primary_family] = candidate_id
     dedup = {
@@ -456,6 +490,116 @@ def _process_candidate(
         "dedup": dedup,
         "issue_draft": issue_draft,
         "strategy_learning_path": _project_display_path(learning_event),
+        "issue_readiness": {},
+    }
+
+
+def _primary_family_from_row(row: dict[str, Any]) -> str:
+    families = list(row.get("families", []) or [])
+    return str(families[0]) if families else "unknown"
+
+
+def _duplicate_processing_skip_reason(
+    *,
+    primary_family: str,
+    pipeline_duplicate_of: str,
+    family_processed_count: int,
+    family_actionable_representatives: set[str],
+) -> str:
+    if not primary_family or primary_family == "unknown" or not pipeline_duplicate_of:
+        return ""
+    if primary_family in family_actionable_representatives:
+        return "actionable_family_representative_exists"
+    if family_processed_count >= CANDIDATE_PIPELINE_MAX_EXPENSIVE_ROWS_PER_FAMILY:
+        return "family_expensive_processing_cap_reached"
+    return ""
+
+
+def _candidate_has_actionable_representative(candidate: dict[str, Any]) -> bool:
+    if str(candidate.get("issue_draft", {}).get("path", "")).strip():
+        return True
+    return str(candidate.get("triage", {}).get("verdict", "")) == "candidate_implementation_bug"
+
+
+def _skipped_pipeline_duplicate_candidate(
+    *,
+    candidate_id: str,
+    row: dict[str, Any],
+    pipeline_duplicate_of: str,
+    skip_reason: str,
+    existing_by_family: dict[str, list[str]],
+    confirmed_latest_families: set[str],
+) -> dict[str, Any]:
+    families = list(row.get("families", []) or [])
+    primary_family = _primary_family_from_row(row)
+    semantic_contract_evidence = (
+        dict(row.get("semantic_contract_evidence", {}))
+        if isinstance(row.get("semantic_contract_evidence", {}), dict)
+        else {}
+    )
+    ir_rewrite_evidence = (
+        dict(row.get("ir_rewrite_evidence", {}))
+        if isinstance(row.get("ir_rewrite_evidence", {}), dict)
+        else {}
+    )
+    local_duplicate_paths = sorted(
+        {
+            path
+            for family in families
+            for path in existing_by_family.get(family, [])
+        }
+    )
+    dedup = {
+        "status": _dedup_status(
+            families,
+            local_duplicate_paths=local_duplicate_paths,
+            pipeline_duplicate_of=pipeline_duplicate_of,
+            confirmed_latest_families=confirmed_latest_families,
+        ),
+        "local_duplicate_paths": local_duplicate_paths,
+        "pipeline_duplicate_of": pipeline_duplicate_of,
+        "confirmed_latest_family": any(family in confirmed_latest_families for family in families),
+    }
+    return {
+        "candidate_id": candidate_id,
+        "primary_family": primary_family,
+        "families": families,
+        "candidate_acquisition": dict(row.get("candidate_acquisition", {}) or {}),
+        "source_evidence_file": str(row.get("source_evidence_file", "")),
+        "source_run_file": str(row.get("source_run_file", "")),
+        "case_id": row.get("case", {}).get("case_id", ""),
+        "semantic_contract_evidence": semantic_contract_evidence,
+        "ir_rewrite_evidence": ir_rewrite_evidence,
+        "bug_dir": str(row.get("bug_dir", "") or ""),
+        "artifact_created": False,
+        "initial_candidate_recheck": dict(row.get("candidate_recheck", {}) or {}),
+        "pipeline_processing": {
+            "status": "skipped_duplicate_family",
+            "reason": skip_reason,
+            "pipeline_duplicate_of": pipeline_duplicate_of,
+        },
+        "recheck": {
+            "attempts": 0,
+            "reproduced": False,
+            "reproduced_families": [],
+            "attempt_summaries": [],
+            "skipped": True,
+            "skip_reason": skip_reason,
+        },
+        "reduction": {
+            "requested": False,
+            "performed": False,
+            "skipped": True,
+            "skip_reason": skip_reason,
+        },
+        "triage": {
+            "verdict": "skipped_duplicate_family",
+            "paper_status": "duplicate_pipeline_family",
+            "triage_confidence": "n/a",
+        },
+        "dedup": dedup,
+        "issue_draft": {},
+        "strategy_learning_path": "",
         "issue_readiness": {},
     }
 
@@ -887,6 +1031,12 @@ def _candidate_pipeline_summary(candidates: list[dict[str, Any]], queue: dict[st
     )
     reproduced_count = sum(1 for candidate in candidates if candidate.get("recheck", {}).get("reproduced"))
     reduced_count = sum(1 for candidate in candidates if candidate.get("reduction", {}).get("performed"))
+    skipped_duplicate_count = sum(
+        1
+        for candidate in candidates
+        if candidate.get("pipeline_processing", {}).get("status") == "skipped_duplicate_family"
+    )
+    processed_count = len(candidates) - skipped_duplicate_count
     local_duplicate_count = sum(
         1
         for candidate in candidates
@@ -897,9 +1047,11 @@ def _candidate_pipeline_summary(candidates: list[dict[str, Any]], queue: dict[st
     return {
         "candidate_count": len(candidates),
         "unique_family_count": len({candidate.get("primary_family", "") for candidate in candidates if candidate.get("primary_family")}),
+        "processed_candidate_count": processed_count,
+        "skipped_duplicate_candidate_count": skipped_duplicate_count,
         "rechecked_count": sum(1 for candidate in candidates if candidate.get("recheck", {}).get("attempts", 0) > 0),
         "reproduced_count": reproduced_count,
-        "recheck_pass_rate": reproduced_count / len(candidates) if candidates else 0.0,
+        "recheck_pass_rate": reproduced_count / processed_count if processed_count else 0.0,
         "reduced_count": reduced_count,
         "artifact_created_count": sum(1 for candidate in candidates if candidate.get("artifact_created")),
         "candidate_bug_verdict_count": sum(

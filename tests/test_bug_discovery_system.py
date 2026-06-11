@@ -93,6 +93,43 @@ def test_lane_acquisition_rewards_true_bug_yield_and_explores_sparse_lanes():
     assert 0.0 <= productive["good_turing_unseen_probability"] <= 1.0
 
 
+def test_lane_acquisition_rewards_pipeline_conversion_and_penalizes_duplicate_waste():
+    convertible = lane_true_bug_acquisition(
+        {
+            "completed_runs": 4,
+            "fresh_candidate_total": 4,
+            "candidate_total": 4,
+            "first_seen_family_count": 2,
+            "unique_fresh_family_count": 2,
+            "fresh_family_counts": {"fresh_a@duckdb": 2, "fresh_b@pyarrow": 2},
+            "pipeline_candidate_count": 4,
+            "pipeline_processed_candidate_count": 4,
+            "pipeline_candidate_bug_verdict_count": 3,
+            "pipeline_issue_draft_count": 2,
+        },
+        total_completed_runs=8,
+    )
+    duplicate_heavy = lane_true_bug_acquisition(
+        {
+            "completed_runs": 4,
+            "fresh_candidate_total": 4,
+            "candidate_total": 4,
+            "first_seen_family_count": 1,
+            "unique_fresh_family_count": 1,
+            "fresh_family_counts": {"same_family@duckdb": 4},
+            "pipeline_candidate_count": 4,
+            "pipeline_processed_candidate_count": 1,
+            "pipeline_skipped_duplicate_candidate_count": 3,
+            "pipeline_candidate_bug_verdict_count": 0,
+        },
+        total_completed_runs=8,
+    )
+
+    assert convertible["pipeline_actionable_rate"] == pytest.approx(3 / 4)
+    assert duplicate_heavy["pipeline_duplicate_waste_rate"] == pytest.approx(3 / 4)
+    assert convertible["acquisition_score"] > duplicate_heavy["acquisition_score"]
+
+
 def test_boltzmann_budget_multipliers_preserve_budget_with_bounds():
     multipliers = boltzmann_budget_multipliers([5.0, 2.0, 1.0], temperature=0.7)
 
@@ -272,3 +309,67 @@ def test_discovery_campaign_lane_rows_use_true_bug_acquisition_and_boltzmann_bud
     assert by_lane["productive"]["good_turing_unseen_probability"] > 0.0
     assert by_lane["noisy"]["false_positive_rate"] > by_lane["productive"]["false_positive_rate"]
     assert by_lane["productive"]["acquisition_strategy"] == "true_bug_acquisition_good_turing_ucb_boltzmann"
+
+
+def test_discovery_campaign_lane_rows_feed_pipeline_signal_into_acquisition():
+    lanes = [
+        {
+            "id": "convertible",
+            "theme": "Convertible",
+            "target_suite": "latest",
+            "preset": "live_convertible",
+        },
+        {
+            "id": "duplicate_heavy",
+            "theme": "Duplicate heavy",
+            "target_suite": "latest",
+            "preset": "live_duplicate_heavy",
+        },
+    ]
+    base_classification = {
+        "fresh_candidate_bug_families": {"fresh_family@duckdb": 1},
+        "candidate_bug_families": {"fresh_family@duckdb": 1},
+        "false_positive_reasons": {},
+    }
+
+    rows = _discovery_campaign_lane_rows(
+        lanes,
+        history_manifests=[],
+        current_runs=[
+            {
+                "lane_id": "convertible",
+                "status": "completed",
+                "completed_at": "2026-06-01T00:10:00Z",
+                "classification": base_classification,
+                "candidate_pipeline": {
+                    "summary": {
+                        "candidate_count": 4,
+                        "processed_candidate_count": 4,
+                        "candidate_bug_verdict_count": 3,
+                        "issue_draft_count": 2,
+                    }
+                },
+            },
+            {
+                "lane_id": "duplicate_heavy",
+                "status": "completed",
+                "completed_at": "2026-06-01T00:20:00Z",
+                "classification": base_classification,
+                "candidate_pipeline": {
+                    "summary": {
+                        "candidate_count": 4,
+                        "processed_candidate_count": 1,
+                        "skipped_duplicate_candidate_count": 3,
+                    }
+                },
+            },
+        ],
+        pending_by_lane={"convertible": [1], "duplicate_heavy": [1]},
+        score_weights=DEFAULT_DISCOVERY_CAMPAIGN_SCORE_WEIGHTS,
+    )
+    by_lane = {row["lane_id"]: row for row in rows}
+
+    assert by_lane["convertible"]["pipeline_actionable_rate"] == pytest.approx(3 / 4)
+    assert by_lane["duplicate_heavy"]["pipeline_duplicate_waste_rate"] == pytest.approx(3 / 4)
+    assert by_lane["convertible"]["score"] > by_lane["duplicate_heavy"]["score"]
+    assert rows[0]["lane_id"] == "convertible"

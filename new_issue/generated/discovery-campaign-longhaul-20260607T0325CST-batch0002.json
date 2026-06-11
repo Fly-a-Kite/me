@@ -1,0 +1,262 @@
+{
+  "bug_audit": {
+    "skipped": true
+  },
+  "cases_per_lane_seed": 220,
+  "completed_at": "",
+  "duration": null,
+  "generated_at": "2026-06-07T05:57:13Z",
+  "generated_by": "datadiff discovery-campaign",
+  "health_stop_reason": "",
+  "lane_ids": [
+    "datafusion_common_api",
+    "datafusion_optimizer"
+  ],
+  "lanes": [
+    {
+      "default": true,
+      "discovery_biases": [
+        {
+          "candidate_pool_bonus": 0.0,
+          "contribution_bonus": 0.15,
+          "feature_prefixes": [
+            "common_api_template:",
+            "materialization:",
+            "semantic_signal:",
+            "combo_risk:"
+          ],
+          "keep_in_pool": true,
+          "novelty_bonus": 0.2,
+          "score_bonus": 0.4,
+          "targets": [
+            "distinct_null_topk",
+            "boolean_aggregation",
+            "multi_key_membership_aggregation"
+          ]
+        }
+      ],
+      "id": "datafusion_common_api",
+      "preset": "live_datafusion_common_api_metamorphic",
+      "semantic_focus_families": [
+        "materialization_boundary",
+        "set_semantics",
+        "join_membership"
+      ],
+      "semantic_focus_signals": [
+        "distinct_null_topk",
+        "boolean_aggregation",
+        "multi_key_membership_aggregation"
+      ],
+      "target_suite": "datafusion_cross",
+      "theme": "DataFusion daily low-complexity SQL/DataFrame workflows, including nullable DISTINCT top-k"
+    },
+    {
+      "default": true,
+      "discovery_biases": [
+        {
+          "candidate_pool_bonus": 0.1,
+          "contribution_bonus": 0.2,
+          "feature_prefixes": [
+            "join:",
+            "filter:",
+            "pattern:"
+          ],
+          "keep_in_pool": true,
+          "novelty_bonus": 0.2,
+          "score_bonus": 0.45,
+          "targets": [
+            "row_value_absence_filter",
+            "normalized_string_join",
+            "negative_set_membership_filter"
+          ]
+        }
+      ],
+      "id": "datafusion_optimizer",
+      "preset": "live_datafusion_deep_organic_metamorphic",
+      "semantic_focus_families": [
+        "join_membership",
+        "string_semantics",
+        "topk_ordering"
+      ],
+      "semantic_focus_signals": [
+        "row_value_absence_filter",
+        "normalized_string_join",
+        "negative_set_membership_filter"
+      ],
+      "target_suite": "datafusion_cross",
+      "theme": "Organic DataFusion optimizer, join/filter/projection, and SQL metamorphic equivalence"
+    }
+  ],
+  "progress": {
+    "completed_run_count": 0,
+    "current_lane_id": "datafusion_common_api",
+    "current_seed": 7401,
+    "planned_run_count": 4,
+    "remaining_run_count": 4
+  },
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "duckdb",
+        "datafusion"
+      ],
+      "cases": 220,
+      "duration": null,
+      "lane_id": "datafusion_common_api",
+      "preset": "live_datafusion_common_api_metamorphic",
+      "scheduler": {
+        "budget_multiplier": 1.0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 0.0,
+        "priority_rank": 1,
+        "score": 2.2798345101319635,
+        "yield_rate": 0.0
+      },
+      "seed": 7401,
+      "semantic_focus_families": [
+        "materialization_boundary",
+        "set_semantics",
+        "join_membership"
+      ],
+      "semantic_focus_signals": [
+        "distinct_null_topk",
+        "boolean_aggregation",
+        "multi_key_membership_aggregation"
+      ],
+      "started_at": "2026-06-07T05:57:13Z",
+      "status": "running",
+      "target_suite": "datafusion_cross",
+      "theme": "DataFusion daily low-complexity SQL/DataFrame workflows, including nullable DISTINCT top-k"
+    }
+  ],
+  "scheduler": {
+    "bug_discovery_system": {
+      "objective": "maximize externally reproducible fresh implementation bug yield per unit budget",
+      "schema_version": "bug-discovery-system-v1",
+      "stages": [
+        "generate_or_mutate_candidate",
+        "score_by_acquisition",
+        "execute_differential_oracles",
+        "filter_rewardable_fresh_candidates",
+        "recheck_reproducibility",
+        "reduce_preserving_root_cause",
+        "write_reproducer_and_issue_draft"
+      ],
+      "theory": {
+        "budget": "Boltzmann allocation over acquisition free energy",
+        "candidate_priority": "multi-objective proof/reproducibility/dedup utility",
+        "exploration": "UCB optimism under sparse lane samples",
+        "novelty": "Good-Turing unseen-family probability"
+      }
+    },
+    "generated_at": "2026-06-07T05:57:13Z",
+    "history_manifest_count": 8,
+    "history_window": 8,
+    "lanes": [
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 1.0,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "datafusion_common_api",
+        "novelty_rate": 0.0,
+        "pending_runs": 1,
+        "preset": "live_datafusion_common_api_metamorphic",
+        "priority_rank": 1,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.2798345101319635,
+        "target_suite": "datafusion_cross",
+        "theme": "DataFusion daily low-complexity SQL/DataFrame workflows, including nullable DISTINCT top-k",
+        "ucb_bonus": 0.5298345101319636,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      },
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 1.0,
+        "candidate_total": 0,
+        "completed_runs": 0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 0,
+        "free_energy": -1.75,
+        "fresh_candidate_total": 0,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "datafusion_optimizer",
+        "novelty_rate": 0.0,
+        "pending_runs": 2,
+        "preset": "live_datafusion_deep_organic_metamorphic",
+        "priority_rank": 2,
+        "proof_yield": 0.0,
+        "saturation_rate": 0.0,
+        "score": 2.2798345101319635,
+        "target_suite": "datafusion_cross",
+        "theme": "Organic DataFusion optimizer, join/filter/projection, and SQL metamorphic equivalence",
+        "ucb_bonus": 0.5298345101319636,
+        "unique_fresh_family_count": 0,
+        "yield_rate": 0.0
+      }
+    ],
+    "score_weights": {
+      "boltzmann_temperature": 0.85,
+      "entropy_weight": 0.2,
+      "false_positive_penalty": 1.25,
+      "issue_inspired_weight": 0.2,
+      "novelty_rate": 0.75,
+      "proof_weight": 0.6,
+      "saturation_penalty": 0.75,
+      "uncertainty_weight": 0.45,
+      "yield_rate": 1.0
+    },
+    "strategy": "true_bug_acquisition_good_turing_ucb_boltzmann"
+  },
+  "schema_version": "discovery-campaign-v1",
+  "seeds": [
+    7401,
+    7502
+  ],
+  "started_at": "2026-06-07T05:57:13Z",
+  "status": "running",
+  "stopped_by_health": false,
+  "summary": {
+    "candidate_pipeline": {
+      "pipeline_count": 0
+    },
+    "fresh_candidate_bug_families": {},
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {},
+    "run_count": 0,
+    "triage_verdicts": {}
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "guided_discovery_campaign",
+    "true_bug_acquisition_scheduler",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence",
+    "candidate_pipeline"
+  ]
+}

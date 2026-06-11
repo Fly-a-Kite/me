@@ -1,0 +1,85 @@
+{
+  "events": [
+    {
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00000167-discovery-fresh",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recorded_at": "2026-06-06T17:33:54Z",
+      "reproduced": false,
+      "reproduced_families": [],
+      "reproduced_roots": [],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T171011-1780765811598566410.jsonl.gz",
+      "suspicious_backends": [],
+      "triage_verdict": ""
+    },
+    {
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00001025-discovery-fresh",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recorded_at": "2026-06-06T17:33:54Z",
+      "reproduced": false,
+      "reproduced_families": [],
+      "reproduced_roots": [],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T171011-1780765811598566410.jsonl.gz",
+      "suspicious_backends": [],
+      "triage_verdict": ""
+    },
+    {
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00000981-discovery-fresh",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recorded_at": "2026-06-06T17:33:54Z",
+      "reproduced": false,
+      "reproduced_families": [],
+      "reproduced_roots": [],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T171011-1780765811598566410.jsonl.gz",
+      "suspicious_backends": [],
+      "triage_verdict": ""
+    },
+    {
+      "candidate_id": "running_sum_precision-duckdb-sqlite-case-00000266-discovery-fresh",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "running_sum_precision@duckdb,sqlite"
+      ],
+      "primary_family": "running_sum_precision@duckdb,sqlite",
+      "recorded_at": "2026-06-06T17:33:54Z",
+      "reproduced": false,
+      "reproduced_families": [],
+      "reproduced_roots": [],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-priority-20260606T171008Z-embedded_sql-seed1-reclassified-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T171011-1780765811598566410.jsonl.gz",
+      "suspicious_backends": [],
+      "triage_verdict": ""
+    },
+    {
+      "candidate_id": "conditional_expression-duckdb-case-00045505-discovery-fresh-mut-1535",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "conditional_expression@duckdb"
+      ],
+      "primary_family": "conditional_expression@duckdb",
+      "recorded_at": "2026-06-06T17:33:54Z",
+      "reproduced": false,
+      "reproduced_families": [],
+      "reproduced_roots": [],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-arrow_probe_stress-seed1-reclassified-fresh-candidates.json",
+      "source_run_file": "runs/run-20260606T171300-1780765980790959578.jsonl.gz",
+      "suspicious_backends": [],
+      "triage_verdict": ""
+    }
+  ],
+  "schema_version": "dynamic-strategy-learning-v1"
+}

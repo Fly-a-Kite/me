@@ -1,0 +1,312 @@
+{
+  "bug_audit": {
+    "skipped": true
+  },
+  "cases_per_lane_seed": 2,
+  "completed_at": "2026-06-07T07:09:39Z",
+  "duration": null,
+  "generated_at": "2026-06-07T07:09:39Z",
+  "generated_by": "datadiff discovery-campaign",
+  "health_stop_reason": "",
+  "lane_ids": [
+    "deep_probe_rotation"
+  ],
+  "lanes": [
+    {
+      "default": false,
+      "discovery_biases": [],
+      "id": "deep_probe_rotation",
+      "preset": "live_deep_probe_rotation_metamorphic",
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "target_suite": "latest_all_engines",
+      "theme": "Deterministic deep probe rotation for audit/seed calibration; known probe families remain separated from fresh discovery counts"
+    }
+  ],
+  "progress": {
+    "completed_run_count": 1,
+    "current_lane_id": "",
+    "current_seed": "",
+    "planned_run_count": 1,
+    "remaining_run_count": 0
+  },
+  "runs": [
+    {
+      "backends": [
+        "pandas",
+        "pyarrow",
+        "polars",
+        "polars_lazy",
+        "duckdb",
+        "sqlite",
+        "datafusion"
+      ],
+      "candidate_pipeline": {
+        "manifest_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-smoke-arrow-bool-groupby-20260607T070808/manifest.json",
+        "markdown_path": "new_issue/generated/candidate-pipelines/pipeline-discovery-campaign-smoke-arrow-bool-groupby-20260607T070808/manifest.md",
+        "status": "ok",
+        "summary": {
+          "already_submitted_or_confirmed_count": 0,
+          "artifact_created_count": 0,
+          "candidate_bug_verdict_count": 0,
+          "candidate_count": 1,
+          "issue_draft_count": 0,
+          "local_duplicate_candidate_count": 0,
+          "needs_dedup_check_count": 0,
+          "needs_reproducer_or_evidence_count": 0,
+          "not_latest_reproducible_count": 0,
+          "ready_to_submit_count": 0,
+          "recheck_pass_rate": 1.0,
+          "rechecked_count": 1,
+          "reduced_count": 1,
+          "reproduced_count": 1,
+          "submission_group_count": 0,
+          "unique_family_count": 1
+        }
+      },
+      "cases": 2,
+      "classification": {
+        "candidate_bug_families": {
+          "conditional_expression@datafusion,duckdb,pyarrow,sqlite": 1
+        },
+        "examples": {
+          "candidate_implementation_bug": [
+            {
+              "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1215-mut-1295-mut-810-mut-799-mut-3145-mut-3339-mut-684-mut-690-mut-1622-mut-1627-mut-1686-mut-713-mut-5456-mut-7023-mut-7274-mut-7423-mut-7469-mut-98",
+              "evidence": "Independent DSL reference agrees with ['pandas', 'polars', 'polars_lazy'] and disagrees with ['datafusion', 'duckdb', 'pyarrow', 'sqlite'].",
+              "kind": "accept_reject_mismatch",
+              "root": "conditional_expression",
+              "seed": 98,
+              "signature": "4be91de69a497228",
+              "suspicious": [
+                "datafusion",
+                "duckdb",
+                "pyarrow",
+                "sqlite"
+              ]
+            }
+          ]
+        },
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "conditional_expression@datafusion,duckdb,pyarrow,sqlite": 1
+        },
+        "issue_inspired_unsaturated_candidate_bug_families": {},
+        "known_saturated_candidate_bug_families": {},
+        "known_saturated_reference_count": 20,
+        "offline_buckets": {
+          "new_bug": 1
+        },
+        "refresh": false,
+        "run_file": "runs/run-20260607T070803-1780816083949406957.jsonl.gz",
+        "triage_verdicts": {
+          "candidate_implementation_bug": 1
+        },
+        "unsaturated_candidate_bug_families": {
+          "conditional_expression@datafusion,duckdb,pyarrow,sqlite": 1
+        }
+      },
+      "completed_at": "2026-06-07T07:09:39Z",
+      "csv": "reports/findings-run-20260607T070803-1780816083949406957.csv",
+      "duration": null,
+      "fresh_candidate_evidence": "new_issue/generated/discovery-campaign-smoke-arrow-bool-groupby-deep_probe_rotation-seed84-fresh-candidates.json",
+      "fresh_candidate_evidence_rows": 1,
+      "health": {
+        "bytes": 31238,
+        "candidate_bug_families": {
+          "conditional_expression@datafusion,duckdb,pyarrow,sqlite": 1
+        },
+        "examples": [
+          {
+            "case_id": "case-00000752-discovery-fresh-mut-1044-mut-1058-mut-559-mut-579-mut-3019-mut-3104-mut-184-mut-4586-mut-1095-mut-4904-mut-1072-mut-1133-mut-1215-mut-1295-mut-810-mut-799-mut-3145-mut-3339-mut-684-mut-690-mut-1622-mut-1627-mut-1686-mut-713-mut-5456-mut-7023-mut-7274-mut-7423-mut-7469-mut-98",
+            "kind": "accept_reject_mismatch",
+            "root": "conditional_expression",
+            "seed": 98,
+            "status": "bug",
+            "suspicious": [
+              "datafusion",
+              "duckdb",
+              "pyarrow",
+              "sqlite"
+            ]
+          }
+        ],
+        "false_positive_reasons": {},
+        "fresh_candidate_bug_families": {
+          "conditional_expression@datafusion,duckdb,pyarrow,sqlite": 1
+        },
+        "known_saturated_candidate_bug_families": {},
+        "partial": false,
+        "rows": 2,
+        "run_file": "runs/run-20260607T070803-1780816083949406957.jsonl.gz",
+        "runtime": {
+          "checkpoint_file": "",
+          "closed_loop_state_bytes": 0,
+          "closed_loop_state_file": "",
+          "closed_loop_state_summary": {},
+          "elapsed_s": 4.19062632600253,
+          "evidence_bytes_per_case": 15619.0,
+          "executed_cases": 2,
+          "meta_file": "runs/run-20260607T070803-1780816083949406957.meta.json",
+          "next_seed": 125,
+          "run_log_bytes": 31238,
+          "stage_profile": {
+            "avg_ms_per_case": {
+              "backend_execution_ms": 433.2000924987369,
+              "generate_mutate_ms": 1221.4659545061295,
+              "logging_artifact_ms": 4.0290909964824095,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 161.92037099972367,
+              "scheduler_feedback_ms": 21.51705549476901,
+              "total_case_wall_ms": 1842.1325644958415
+            },
+            "case_count": 2,
+            "share_of_total": {
+              "backend_execution_ms": 0.23516227922353458,
+              "generate_mutate_ms": 0.663071690956412,
+              "logging_artifact_ms": 0.002187188410941044,
+              "normalize_ms": 0.0,
+              "oracle_classification_ms": 0.08789832725422687,
+              "scheduler_feedback_ms": 0.011680514154885396,
+              "total_case_wall_ms": 1.0
+            }
+          },
+          "status": "completed",
+          "throughput_cases_s": 0.47725562825541046
+        },
+        "statuses": {
+          "bug": 1,
+          "ok": 1
+        }
+      },
+      "lane_id": "deep_probe_rotation",
+      "preset": "live_deep_probe_rotation_metamorphic",
+      "report": "reports/report-run-20260607T070803-1780816083949406957.md",
+      "run_file": "runs/run-20260607T070803-1780816083949406957.jsonl.gz",
+      "scheduler": {
+        "budget_multiplier": 1.0,
+        "current_runs": 0,
+        "false_positive_rate": 0.0,
+        "history_runs": 0,
+        "novelty_rate": 0.0,
+        "priority_rank": 1,
+        "score": 2.2798345101319635,
+        "yield_rate": 0.0
+      },
+      "seed": 84,
+      "semantic_focus_families": [],
+      "semantic_focus_signals": [],
+      "started_at": "2026-06-07T07:08:03Z",
+      "status": "completed",
+      "target_suite": "latest_all_engines",
+      "theme": "Deterministic deep probe rotation for audit/seed calibration; known probe families remain separated from fresh discovery counts"
+    }
+  ],
+  "scheduler": {
+    "bug_discovery_system": {
+      "objective": "maximize externally reproducible fresh implementation bug yield per unit budget",
+      "schema_version": "bug-discovery-system-v1",
+      "stages": [
+        "generate_or_mutate_candidate",
+        "score_by_acquisition",
+        "execute_differential_oracles",
+        "filter_rewardable_fresh_candidates",
+        "recheck_reproducibility",
+        "reduce_preserving_root_cause",
+        "write_reproducer_and_issue_draft"
+      ],
+      "theory": {
+        "budget": "Boltzmann allocation over acquisition free energy",
+        "candidate_priority": "multi-objective proof/reproducibility/dedup utility",
+        "exploration": "UCB optimism under sparse lane samples",
+        "novelty": "Good-Turing unseen-family probability"
+      }
+    },
+    "generated_at": "2026-06-07T07:09:39Z",
+    "history_manifest_count": 8,
+    "history_window": 8,
+    "lanes": [
+      {
+        "acquisition_strategy": "true_bug_acquisition_good_turing_ucb_boltzmann",
+        "budget_multiplier": 1.0,
+        "candidate_total": 1,
+        "completed_runs": 1,
+        "current_runs": 1,
+        "false_positive_rate": 0.0,
+        "false_positive_total": 0,
+        "family_entropy": 0.0,
+        "first_seen_family_count": 1,
+        "free_energy": -3.35,
+        "fresh_candidate_total": 1,
+        "good_turing_unseen_probability": 1.0,
+        "history_runs": 0,
+        "issue_inspired_rate": 0.0,
+        "issue_inspired_total": 0,
+        "known_saturated_total": 0,
+        "lane_id": "deep_probe_rotation",
+        "novelty_rate": 1.0,
+        "pending_runs": 0,
+        "preset": "live_deep_probe_rotation_metamorphic",
+        "priority_rank": 1,
+        "proof_yield": 1.0,
+        "saturation_rate": 0.0,
+        "score": 3.724649575020964,
+        "target_suite": "latest_all_engines",
+        "theme": "Deterministic deep probe rotation for audit/seed calibration; known probe families remain separated from fresh discovery counts",
+        "ucb_bonus": 0.37464957502096397,
+        "unique_fresh_family_count": 1,
+        "yield_rate": 1.0
+      }
+    ],
+    "score_weights": {
+      "boltzmann_temperature": 0.85,
+      "entropy_weight": 0.2,
+      "false_positive_penalty": 1.25,
+      "issue_inspired_weight": 0.2,
+      "novelty_rate": 0.75,
+      "proof_weight": 0.6,
+      "saturation_penalty": 0.75,
+      "uncertainty_weight": 0.45,
+      "yield_rate": 1.0
+    },
+    "strategy": "true_bug_acquisition_good_turing_ucb_boltzmann"
+  },
+  "schema_version": "discovery-campaign-v1",
+  "seeds": [
+    84
+  ],
+  "started_at": "2026-06-07T07:08:03Z",
+  "status": "completed",
+  "stopped_by_health": false,
+  "summary": {
+    "candidate_pipeline": {
+      "already_submitted_or_confirmed_count": 0,
+      "candidate_bug_verdict_count": 0,
+      "candidate_count": 1,
+      "issue_draft_count": 0,
+      "needs_dedup_check_count": 0,
+      "pipeline_count": 1,
+      "rechecked_count": 1,
+      "reduced_count": 1,
+      "reproduced_count": 1
+    },
+    "fresh_candidate_bug_families": {
+      "conditional_expression@datafusion,duckdb,pyarrow,sqlite": 1
+    },
+    "issue_inspired_unsaturated_candidate_bug_families": {},
+    "known_saturated_candidate_bug_families": {},
+    "run_count": 1,
+    "triage_verdicts": {
+      "candidate_implementation_bug": 1
+    }
+  },
+  "workflow": [
+    "deterministic_bug_audit",
+    "guided_discovery_campaign",
+    "true_bug_acquisition_scheduler",
+    "run_report",
+    "candidate_classification",
+    "fresh_candidate_evidence",
+    "candidate_pipeline"
+  ]
+}

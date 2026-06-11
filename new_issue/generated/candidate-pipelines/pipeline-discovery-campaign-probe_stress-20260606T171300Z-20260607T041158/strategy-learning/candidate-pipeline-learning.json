@@ -1,0 +1,166 @@
+{
+  "events": [
+    {
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00001609-issue-focus-csv-long-numeric-roundtrip",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "primary_family": "csv_long_numeric_roundtrip@polars,polars_lazy",
+      "recorded_at": "2026-06-07T04:12:19Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "csv_long_numeric_roundtrip"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+      "suspicious_backends": [
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "candidate_implementation_bug"
+    },
+    {
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00001632-issue-focus-csv-long-numeric-roundtrip",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "primary_family": "csv_long_numeric_roundtrip@polars,polars_lazy",
+      "recorded_at": "2026-06-07T04:12:19Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "csv_long_numeric_roundtrip"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+      "suspicious_backends": [
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "candidate_implementation_bug"
+    },
+    {
+      "candidate_id": "pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001639-issue-focus-pyarrow-list-flatten-parent-i",
+      "dedup_status": "needs_final_upstream_dedup",
+      "families": [
+        "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+      ],
+      "primary_family": "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy",
+      "recorded_at": "2026-06-07T04:12:19Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "pyarrow_list_flatten_parent_indices_semantics"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+      "suspicious_backends": [
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "candidate_implementation_bug"
+    },
+    {
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00001701-issue-focus-csv-long-numeric-roundtrip",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "primary_family": "csv_long_numeric_roundtrip@polars,polars_lazy",
+      "recorded_at": "2026-06-07T04:12:19Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "csv_long_numeric_roundtrip"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+      "suspicious_backends": [
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "candidate_implementation_bug"
+    },
+    {
+      "candidate_id": "csv_long_numeric_roundtrip-polars-polars_lazy-case-00001747-issue-focus-csv-long-numeric-roundtrip",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "primary_family": "csv_long_numeric_roundtrip@polars,polars_lazy",
+      "recorded_at": "2026-06-07T04:12:19Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "csv_long_numeric_roundtrip@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "csv_long_numeric_roundtrip"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+      "suspicious_backends": [
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "candidate_implementation_bug"
+    },
+    {
+      "candidate_id": "pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00001872-issue-focus-pyarrow-list-flatten-parent-i",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+      ],
+      "primary_family": "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy",
+      "recorded_at": "2026-06-07T04:12:20Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "pyarrow_list_flatten_parent_indices_semantics"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+      "suspicious_backends": [
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "candidate_implementation_bug"
+    },
+    {
+      "candidate_id": "pyarrow_list_flatten_parent_indices_semantics-polars-polars_lazy-case-00004668-issue-focus-pyarrow-list-flatten-parent-i",
+      "dedup_status": "duplicate_pipeline_family",
+      "families": [
+        "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+      ],
+      "primary_family": "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy",
+      "recorded_at": "2026-06-07T04:12:20Z",
+      "reproduced": true,
+      "reproduced_families": [
+        "pyarrow_list_flatten_parent_indices_semantics@polars,polars_lazy"
+      ],
+      "reproduced_roots": [
+        "pyarrow_list_flatten_parent_indices_semantics"
+      ],
+      "source_evidence_file": "new_issue/generated/discovery-campaign-probe_stress-20260606T171300Z-polars_probe_stress-seed1001-fresh-candidates.json",
+      "source_run_file": "runs/run-20260607T021439-1780798479224195303.jsonl.gz",
+      "suspicious_backends": [
+        "polars",
+        "polars_lazy"
+      ],
+      "triage_verdict": "candidate_implementation_bug"
+    }
+  ],
+  "schema_version": "dynamic-strategy-learning-v1"
+}

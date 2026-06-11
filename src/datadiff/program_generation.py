@@ -1577,6 +1577,17 @@ def repair_operations(
             strings = set()
             order_pending = False
             pending_order_columns = set()
+        elif kind == "arrow_string_contains_na_probe":
+            alias = op_output_alias(op)
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "arrow_string_contains_na_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
         elif kind == "arrow_timestamp_loc_slice_probe":
             alias = op_output_alias(op)
             if not alias or is_reserved_output_name(alias):
@@ -1615,6 +1626,17 @@ def repair_operations(
             if not alias or is_reserved_output_name(alias):
                 continue
             repaired.append({"op": "bool_reduction_skipna_probe", "as": alias})
+            available = {alias}
+            col_types = {alias: "bool"}
+            numeric = set()
+            strings = set()
+            order_pending = False
+            pending_order_columns = set()
+        elif kind == "polars_timezone_filter_probe":
+            alias = op_output_alias(op)
+            if not alias or is_reserved_output_name(alias):
+                continue
+            repaired.append({"op": "polars_timezone_filter_probe", "as": alias})
             available = {alias}
             col_types = {alias: "bool"}
             numeric = set()

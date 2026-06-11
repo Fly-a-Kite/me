@@ -24,6 +24,8 @@ DEFAULT_DISCOVERY_CAMPAIGN_SCORE_WEIGHTS = {
     "false_positive_penalty": _DEFAULT_DISCOVERY_ACQUISITION_WEIGHTS.false_positive_penalty,
     "uncertainty_weight": _DEFAULT_DISCOVERY_ACQUISITION_WEIGHTS.uncertainty_weight,
     "proof_weight": _DEFAULT_DISCOVERY_ACQUISITION_WEIGHTS.proof_weight,
+    "pipeline_actionable_weight": _DEFAULT_DISCOVERY_ACQUISITION_WEIGHTS.pipeline_actionable_weight,
+    "duplicate_waste_penalty": _DEFAULT_DISCOVERY_ACQUISITION_WEIGHTS.duplicate_waste_penalty,
     "entropy_weight": _DEFAULT_DISCOVERY_ACQUISITION_WEIGHTS.entropy_weight,
     "saturation_penalty": _DEFAULT_DISCOVERY_ACQUISITION_WEIGHTS.saturation_penalty,
     "issue_inspired_weight": _DEFAULT_DISCOVERY_ACQUISITION_WEIGHTS.issue_inspired_weight,
@@ -33,6 +35,8 @@ DISCOVERY_CAMPAIGN_SCHEDULER_STRATEGY = "true_bug_acquisition_good_turing_ucb_bo
 _PIPELINE_COUNT_FIELDS = {
     "pipeline_count",
     "candidate_count",
+    "processed_candidate_count",
+    "skipped_duplicate_candidate_count",
     "rechecked_count",
     "reproduced_count",
     "reduced_count",
@@ -148,6 +152,7 @@ def _discovery_campaign_lane_rows(
             "unique_fresh_families": set(),
             "first_seen_families": set(),
             "fresh_family_counts": Counter(),
+            "candidate_pipeline": Counter(),
         }
         for lane in selected_lanes
     }
@@ -177,6 +182,13 @@ def _discovery_campaign_lane_rows(
         row["false_positive_total"] += sum(false_positive.values())
         row["unique_fresh_families"].update(fresh)
         row["fresh_family_counts"].update(fresh)
+        candidate_pipeline = run.get("candidate_pipeline", {}) if isinstance(run.get("candidate_pipeline"), dict) else {}
+        pipeline_summary = (
+            candidate_pipeline.get("summary", {})
+            if isinstance(candidate_pipeline.get("summary", {}), dict)
+            else {}
+        )
+        _update_pipeline_counts(row["candidate_pipeline"], pipeline_summary)
         events.append(
             {
                 "lane_id": lane_id,
@@ -215,6 +227,7 @@ def _discovery_campaign_lane_rows(
         completed_runs = int(row["completed_runs"])
         unique_fresh_family_count = len(row["unique_fresh_families"])
         first_seen_family_count = len(row["first_seen_families"])
+        pipeline_summary = row["candidate_pipeline"]
         acquisition = lane_true_bug_acquisition(
             {
                 "completed_runs": completed_runs,
@@ -226,6 +239,15 @@ def _discovery_campaign_lane_rows(
                 "first_seen_family_count": first_seen_family_count,
                 "unique_fresh_family_count": unique_fresh_family_count,
                 "fresh_family_counts": row["fresh_family_counts"],
+                "pipeline_candidate_count": pipeline_summary.get("candidate_count", 0),
+                "pipeline_processed_candidate_count": pipeline_summary.get("processed_candidate_count", 0),
+                "pipeline_skipped_duplicate_candidate_count": pipeline_summary.get(
+                    "skipped_duplicate_candidate_count",
+                    0,
+                ),
+                "pipeline_candidate_bug_verdict_count": pipeline_summary.get("candidate_bug_verdict_count", 0),
+                "pipeline_issue_draft_count": pipeline_summary.get("issue_draft_count", 0),
+                "pipeline_needs_dedup_check_count": pipeline_summary.get("needs_dedup_check_count", 0),
             },
             total_completed_runs=total_completed_runs,
             weights=weights,
@@ -247,6 +269,15 @@ def _discovery_campaign_lane_rows(
                 "known_saturated_total": int(row["known_saturated_total"]),
                 "candidate_total": int(row["candidate_total"]),
                 "false_positive_total": int(row["false_positive_total"]),
+                "pipeline_candidate_count": int(pipeline_summary.get("candidate_count", 0)),
+                "pipeline_processed_candidate_count": int(pipeline_summary.get("processed_candidate_count", 0)),
+                "pipeline_skipped_duplicate_candidate_count": int(
+                    pipeline_summary.get("skipped_duplicate_candidate_count", 0)
+                ),
+                "pipeline_candidate_bug_verdict_count": int(
+                    pipeline_summary.get("candidate_bug_verdict_count", 0)
+                ),
+                "pipeline_issue_draft_count": int(pipeline_summary.get("issue_draft_count", 0)),
                 "yield_rate": acquisition["yield_rate"],
                 "novelty_rate": acquisition["novelty_rate"],
                 "false_positive_rate": acquisition["false_positive_rate"],
@@ -258,6 +289,8 @@ def _discovery_campaign_lane_rows(
                 "saturation_rate": acquisition["saturation_rate"],
                 "issue_inspired_rate": acquisition["issue_inspired_rate"],
                 "proof_yield": acquisition["proof_yield"],
+                "pipeline_actionable_rate": acquisition["pipeline_actionable_rate"],
+                "pipeline_duplicate_waste_rate": acquisition["pipeline_duplicate_waste_rate"],
                 "free_energy": acquisition["free_energy"],
             }
         )
@@ -681,6 +714,8 @@ def _resolved_discovery_campaign_score_weights(score_weights: dict[str, float]) 
         "false_positive_penalty": weights.false_positive_penalty,
         "uncertainty_weight": weights.uncertainty_weight,
         "proof_weight": weights.proof_weight,
+        "pipeline_actionable_weight": weights.pipeline_actionable_weight,
+        "duplicate_waste_penalty": weights.duplicate_waste_penalty,
         "entropy_weight": weights.entropy_weight,
         "saturation_penalty": weights.saturation_penalty,
         "issue_inspired_weight": weights.issue_inspired_weight,
@@ -705,6 +740,12 @@ def _positive_counter(value: Any) -> Counter[str]:
 def _update_pipeline_counts(counter: Counter[str], value: Any) -> None:
     if not isinstance(value, dict):
         return
+    if "processed_candidate_count" not in value:
+        candidate_count = _non_negative_int(value.get("candidate_count"))
+        skipped_duplicate_count = _non_negative_int(value.get("skipped_duplicate_candidate_count"))
+        processed_candidate_count = max(0, candidate_count - skipped_duplicate_count)
+        if processed_candidate_count > 0:
+            counter["processed_candidate_count"] += processed_candidate_count
     for key, raw_count in value.items():
         if str(key) not in _PIPELINE_COUNT_FIELDS:
             continue
