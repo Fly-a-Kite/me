@@ -75,6 +75,7 @@ def _args(**overrides):
         "log_level": "compact",
         "include_pending_historical": False,
         "skip_run_reports": True,
+        "skip_paper_journal": False,
         "strategy_snapshot": "",
         "reset_strategy_snapshot": False,
         "ledger_run_files": "",
@@ -236,6 +237,21 @@ def test_live_campaign_filter_rejects_unknown_campaign():
         assert "unknown live campaign" in str(exc)
     else:
         raise AssertionError("expected unknown live campaign to fail")
+
+
+def test_live_campaign_filter_can_skip_paper_journal_for_sharded_runs():
+    module = _module()
+
+    commands = module.build_plan(
+        _args(
+            track="live",
+            live_campaign=["arrow_cross:live_arrow"],
+            skip_paper_journal=True,
+        )
+    )
+
+    assert len(commands) == 1
+    assert "--skip-paper-journal" in commands[0].command
 
 
 def test_validation_command_gates_short_before_long_runs():

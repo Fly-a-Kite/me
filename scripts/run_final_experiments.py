@@ -728,6 +728,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--include-pending-historical", action="store_true")
     parser.add_argument("--skip-run-reports", action="store_true", default=True)
     parser.add_argument(
+        "--skip-paper-journal",
+        action="store_true",
+        help=(
+            "pass --skip-paper-journal to sharded live commands; import completed "
+            "manifests later with --import-manifest to populate the paper journal"
+        ),
+    )
+    parser.add_argument(
         "--strategy-snapshot",
         default="",
         help=(
@@ -1026,6 +1034,8 @@ def live_discovery_commands(args: argparse.Namespace, *, strategy_snapshot: str)
         _append_continual_learning_args(cmd, args)
         if args.skip_run_reports:
             cmd.append("--skip-run-reports")
+        if bool(getattr(args, "skip_paper_journal", False)):
+            cmd.append("--skip-paper-journal")
         cmd.extend(max_parallel_cost_args(getattr(args, "max_parallel_cost", None)))
         _append_strategy_snapshot_args(cmd, strategy_snapshot=strategy_snapshot)
         experiment_meta = FINAL_LIVE_DISCOVERY_MATRIX.command_experiment_meta_for_campaign(campaign)

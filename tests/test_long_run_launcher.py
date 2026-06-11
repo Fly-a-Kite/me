@@ -16,6 +16,9 @@ AUTHORITY_24H_SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "s
 DISCOVERY_LONGHAUL_SCRIPT_PATH = (
     Path(__file__).resolve().parents[1] / "scripts" / "start_discovery_longhaul_tmux.sh"
 )
+FINAL_LIVE_SCRIPT_PATH = (
+    Path(__file__).resolve().parents[1] / "scripts" / "start_final_live_campaigns_tmux.sh"
+)
 
 
 def _read_status(path: Path) -> dict[str, str]:
@@ -184,6 +187,79 @@ def test_discovery_longhaul_launcher_targets_high_yield_campaign_batches():
     assert "duration=12h" in printed.stdout
     assert "candidate_pipeline_recheck_attempts=3" in printed.stdout
     assert "lane_groups=polars_lazy,arrow_probe_stress;" in printed.stdout
+
+
+def test_final_live_launcher_shards_campaigns_with_authority_provenance():
+    text = FINAL_LIVE_SCRIPT_PATH.read_text(encoding="utf-8")
+
+    for token in [
+        "--live-campaign",
+        "--skip-paper-journal",
+        "--reset-manifest-index",
+        "DATADIFF_RUN_PROVENANCE_AUTHORITY=1",
+        "DATADIFF_RUN_PROVENANCE_FREEZE_INTENT=1",
+        "DATADIFF_RUN_PROVENANCE_LATEST_CODE_CLAIM=1",
+        "latest_live_authority_24h",
+        "reports/final-live-indexes",
+        "reports/final-live-provenance",
+    ]:
+        assert token in text
+
+    printed = subprocess.run(
+        ["bash", str(FINAL_LIVE_SCRIPT_PATH), "--print-config"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "duration=24h" in printed.stdout
+    assert "campaigns=" in printed.stdout
+    assert "embedded_sql_cross:live_duckdb_issue_focus" in printed.stdout
+
+
+def test_final_live_launcher_dry_run_writes_importable_campaign_artifacts(tmp_path: Path):
+    project_root = tmp_path / "project-root"
+    project_root.mkdir(parents=True)
+    _init_git_repo(project_root)
+    snapshot = project_root / "strategy-snapshot.json"
+    snapshot.write_text("{}\n", encoding="utf-8")
+    run_id = f"testrun-{os.getpid()}"
+    env = os.environ.copy()
+    env.update(
+        {
+            "DATADIFF_ROOT_DIR": str(project_root),
+            "DATADIFF_PYTHON": sys.executable,
+            "DATADIFF_FINAL_LIVE_CAMPAIGNS": "arrow_cross:live_arrow",
+            "DATADIFF_FINAL_LIVE_RUN_ID": run_id,
+            "DATADIFF_FINAL_LIVE_STRATEGY_SNAPSHOT": str(snapshot),
+            "DATADIFF_FINAL_LIVE_REQUIRE_CLEAN_WORKTREE": "0",
+        }
+    )
+
+    dry_run = subprocess.run(
+        ["bash", str(FINAL_LIVE_SCRIPT_PATH), "--dry-run"],
+        cwd=project_root,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "dry-run: tmux new-session" in dry_run.stdout
+    provenance_dir = project_root / "reports" / "final-live-provenance"
+    freeze_manifest = provenance_dir / f"final-live-{run_id}-freeze-manifest.json"
+    campaign_table = provenance_dir / f"final-live-{run_id}-campaigns.tsv"
+    campaign_script = provenance_dir / f"final-live-{run_id}-arrow-cross-live-arrow.sh"
+    payload = json.loads(freeze_manifest.read_text(encoding="utf-8"))
+
+    assert payload["campaigns"] == ["arrow_cross:live_arrow"]
+    assert payload["run_id"] == run_id
+    assert payload["duration"] == "24h"
+    assert payload["git_commit"]
+    assert "arrow_cross:live_arrow" in campaign_table.read_text(encoding="utf-8")
+    campaign_script_text = campaign_script.read_text(encoding="utf-8")
+    assert "--live-campaign arrow_cross:live_arrow" in campaign_script_text
+    assert "--skip-paper-journal" in campaign_script_text
+    assert "--reset-manifest-index" in campaign_script_text
 
 
 @pytest.mark.skipif(shutil.which("tmux") is None, reason="tmux is not installed")
