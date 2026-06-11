@@ -695,6 +695,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--validation-cases", type=int, default=200, help="cases per short validation run")
     parser.add_argument("--validation-seeds", default="1,101", help="short validation seeds")
     parser.add_argument("--live-seeds", default="1,1001,2001", help="comma-separated live discovery seeds")
+    parser.add_argument(
+        "--live-campaign",
+        action="append",
+        default=[],
+        help=(
+            "restrict --track live/live_discovery to one or more campaign names of the "
+            "form target_suite:preset; useful for parallel 24h sessions with independent indexes"
+        ),
+    )
     parser.add_argument("--historical-seeds", default=None, help="override historical replay seeds")
     parser.add_argument("--seeded-cases", type=int, default=5000, help="cases per seeded sensitivity run")
     parser.add_argument("--seeded-seeds", default="1,1001,2001,3001,4001", help="seeded sensitivity seeds")
@@ -970,8 +979,11 @@ def short_validation_command(args: argparse.Namespace, *, strategy_snapshot: str
 def live_discovery_commands(args: argparse.Namespace, *, strategy_snapshot: str) -> list[FinalCommand]:
     commands = []
     replay_sources = replay_source_issues()
+    selected_campaigns = _selected_live_campaigns(args)
     for campaign in FINAL_LIVE_DISCOVERY_MATRIX.campaigns:
         suite, preset, purpose = campaign.suite, campaign.preset, campaign.purpose
+        if selected_campaigns and f"{suite}:{preset}" not in selected_campaigns:
+            continue
         cmd = [
             str(DATADIFF),
             "experiment",
@@ -1042,6 +1054,28 @@ def live_discovery_commands(args: argparse.Namespace, *, strategy_snapshot: str)
             )
         )
     return commands
+
+
+def _selected_live_campaigns(args: argparse.Namespace) -> set[str]:
+    selected: set[str] = set()
+    raw_values = getattr(args, "live_campaign", []) or []
+    if isinstance(raw_values, str):
+        raw_values = [raw_values]
+    valid = {
+        f"{campaign.suite}:{campaign.preset}"
+        for campaign in FINAL_LIVE_DISCOVERY_MATRIX.campaigns
+    }
+    for raw_value in raw_values:
+        for item in str(raw_value or "").split(","):
+            name = item.strip()
+            if not name:
+                continue
+            if name not in valid:
+                raise SystemExit(
+                    f"unknown live campaign {name!r}; expected one of: {', '.join(sorted(valid))}"
+                )
+            selected.add(name)
+    return selected
 
 
 def historical_replay_commands(args: argparse.Namespace, *, strategy_snapshot: str) -> list[FinalCommand]:

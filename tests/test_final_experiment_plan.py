@@ -62,6 +62,7 @@ def _args(**overrides):
         "validation_cases": 200,
         "validation_seeds": "1,101",
         "live_seeds": "1,1001,2001",
+        "live_campaign": [],
         "historical_seeds": None,
         "seeded_cases": 5000,
         "seeded_seeds": "1,1001,2001,3001,4001",
@@ -184,6 +185,57 @@ def test_live_and_seeded_commands_record_evidence_mode():
     assert "--evidence-mode" in by_track["seeded"].command
     assert "seeded" in by_track["seeded"].command
     assert "--run-theme" in by_track["seeded"].command
+
+
+def test_live_campaign_filter_selects_specific_campaigns():
+    module = _module()
+
+    commands = module.build_plan(
+        _args(
+            track="live",
+            live_campaign=[
+                "arrow_cross:live_arrow",
+                "latest_no_datafusion:live_issue_focus",
+            ],
+        )
+    )
+
+    assert [command.name for command in commands] == [
+        "arrow_cross:live_arrow",
+        "latest_no_datafusion:live_issue_focus",
+    ]
+    assert all(command.track == "live" for command in commands)
+    assert _flag_value(commands[0].command, "--target-suite") == "arrow_cross"
+    assert _flag_value(commands[0].command, "--presets") == "live_arrow"
+    assert _flag_value(commands[1].command, "--target-suite") == "latest_no_datafusion"
+    assert _flag_value(commands[1].command, "--presets") == "live_issue_focus"
+
+
+def test_live_campaign_filter_accepts_comma_separated_values():
+    module = _module()
+
+    commands = module.build_plan(
+        _args(
+            track="live_discovery",
+            live_campaign="arrow_cross:live_arrow,embedded_sql:live_embedded_sql",
+        )
+    )
+
+    assert [command.name for command in commands] == [
+        "arrow_cross:live_arrow",
+        "embedded_sql:live_embedded_sql",
+    ]
+
+
+def test_live_campaign_filter_rejects_unknown_campaign():
+    module = _module()
+
+    try:
+        module.build_plan(_args(track="live", live_campaign=["missing:campaign"]))
+    except SystemExit as exc:
+        assert "unknown live campaign" in str(exc)
+    else:
+        raise AssertionError("expected unknown live campaign to fail")
 
 
 def test_validation_command_gates_short_before_long_runs():
