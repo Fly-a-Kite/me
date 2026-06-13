@@ -11,6 +11,10 @@ reports/
 corpus/
 study/
 logs/
+plan/
+
+FINAL_GOAL.md
+NEXT_SESSION_TODO.md
 
 .env
 
