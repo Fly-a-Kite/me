@@ -26,10 +26,6 @@ def _known_replay_source_filter_reason(case_item: Case, config: ExperimentConfig
         replay_bug_source_issues=config.replay_bug_source_issues,
     )
 
-
-_replay_bug_filter_reason = _known_replay_source_filter_reason
-
-
 @dataclass(slots=True)
 class CandidateBatch:
     candidates: list[Case]
@@ -271,8 +267,7 @@ def _append_candidate(
         "generated_seed": case_seed,
         "seed_lineage": metadata.get("seed_lineage", {}),
         "mutation": metadata.get("mutation", {}),
-        "feedback_selection": metadata.get("feedback_selection", metadata.get("feedback_decision", {})),
-        "feedback_decision": metadata.get("feedback_decision", metadata.get("feedback_selection", {})),
+        "feedback_decision": metadata.get("feedback_decision", {}),
         "quality_archive_context": quality_archive_context,
         "generator_profile_selection": profile_selection,
         "preflight": preflight.to_dict(),
@@ -367,7 +362,7 @@ def _select_feedback_candidate(
         )
         selected = selected_batch[0] if selected_batch else generated
     else:
-        feedback_selector = getattr(feedback, "select_case", None) or getattr(feedback, "choose_case")
+        feedback_selector = getattr(feedback, "select_case")
         selected = feedback_selector(case_seed, generated)
     source = getattr(feedback, "last_candidate_source", "generated")
     metadata = (

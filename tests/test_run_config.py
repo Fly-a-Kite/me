@@ -54,6 +54,7 @@ def test_experiment_config_from_payload_ignores_derived_report_fields():
         {
             "generator_profile": "discovery_fresh",
             "guidance_targets": ["join"],
+            "enable_witness_oracle": True,
             "effective_guidance_targets": ["join"],
             "unknown_future_field": True,
         }
@@ -61,6 +62,9 @@ def test_experiment_config_from_payload_ignores_derived_report_fields():
 
     assert config.generator_profile == "discovery_fresh"
     assert config.guidance_targets == ["join"]
+    assert config.enable_witness_oracle is True
+    assert config.oracle.enable_witness is True
+    assert config.to_dict()["enable_witness_oracle"] is True
 
 
 def test_runner_reexports_run_config_helpers_for_compatibility():

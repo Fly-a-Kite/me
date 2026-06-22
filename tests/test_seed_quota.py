@@ -1,8 +1,8 @@
-from datadiff.seed_quota import SeedQuotaManager
+from datadiff.seed_quota import SeedEvictionPolicy
 
 
 def test_seed_quota_evicts_from_overfull_incoming_cluster_before_rare_singleton():
-    quota = SeedQuotaManager()
+    quota = SeedEvictionPolicy()
 
     index = quota.evict_candidate(
         case_cluster_keys=["common", "rare", "common"],
@@ -17,7 +17,7 @@ def test_seed_quota_evicts_from_overfull_incoming_cluster_before_rare_singleton(
 
 
 def test_seed_quota_uses_global_weakest_when_capacity_cannot_cover_all_cells():
-    quota = SeedQuotaManager()
+    quota = SeedEvictionPolicy()
 
     index = quota.evict_candidate(
         case_cluster_keys=["a", "b", "c"],
@@ -32,9 +32,9 @@ def test_seed_quota_uses_global_weakest_when_capacity_cannot_cover_all_cells():
 
 
 def test_seed_quota_round_trips_config():
-    quota = SeedQuotaManager(enabled=False, min_quota_per_active_cell=2, pull_decay=0.5)
+    quota = SeedEvictionPolicy(enabled=False, min_quota_per_active_cell=2, pull_decay=0.5)
 
-    restored = SeedQuotaManager.from_state_dict(quota.to_state_dict())
+    restored = SeedEvictionPolicy.from_state_dict(quota.to_state_dict())
 
     assert restored.enabled is False
     assert restored.min_quota_per_active_cell == 2

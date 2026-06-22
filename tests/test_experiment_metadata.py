@@ -1,25 +1,22 @@
 import pytest
 
 from datadiff.experiment_metadata import (
-    compat_contrast_variant_id,
-    compat_targeted_variant_id,
+    component_focus,
     canonical_comparison_role,
     experiment_row_group_id,
     experiment_row_variant_id,
     experiment_row_variant_key,
     experiment_row_variant_label,
     is_contrast_experiment_row,
-    is_contrast_variant_compat,
     is_contrast_variant,
     is_ablation_experiment_row,
     is_reference_experiment_row,
     is_reference_variant,
-    legacy_contrast_variant_id,
-    legacy_targeted_variant_id,
     manifest_experiment_meta,
     merge_experiment_meta,
     normalize_experiment_meta,
     parse_experiment_meta,
+    contrast_variant_id_for_suite,
     reference_row_for_group,
     resolved_run_semantics,
 )
@@ -71,6 +68,10 @@ def test_resolved_run_semantics_ignores_empty_explicit_variant_overlay() -> None
     assert run_semantics["oracle_profile"] == "differential"
     assert run_semantics["canonical_comparison_role"] == "baseline"
     assert run_semantics["factors"] == {"type_aware_generation": True}
+
+
+def test_component_focus_recognizes_witness_oracle_factor() -> None:
+    assert component_focus({"factors": {"witness_oracle": True}}) == "witness_oracle"
 
 
 def test_parse_experiment_meta_rejects_non_object_json() -> None:
@@ -480,7 +481,7 @@ def test_experiment_row_accessors_prefer_structured_variant_identity() -> None:
     )
 
 
-def test_reference_and_contrast_helpers_keep_compatibility_semantics() -> None:
+def test_reference_and_contrast_helpers_keep_canonical_semantics() -> None:
     reference_row = {
         "target_suite": "seeded_join",
         "comparison_group": "seeded_sensitivity",
@@ -502,7 +503,5 @@ def test_reference_and_contrast_helpers_keep_compatibility_semantics() -> None:
     assert is_reference_experiment_row(reference_row) is True
     assert is_contrast_variant(contrast_row) is True
     assert is_contrast_experiment_row(contrast_row) is True
-    assert is_contrast_variant_compat(contrast_row) is True
     assert reference_row_for_group([contrast_row, reference_row]) == reference_row
-    assert compat_targeted_variant_id("seeded_join") == compat_contrast_variant_id("seeded_join")
-    assert legacy_targeted_variant_id("seeded_join") == legacy_contrast_variant_id("seeded_join")
+    assert contrast_variant_id_for_suite("seeded_join") == "guided_join"

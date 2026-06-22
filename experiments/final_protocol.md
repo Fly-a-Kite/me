@@ -1,6 +1,6 @@
 # Final Experiment Protocol
 
-Read `FINAL_GOAL.md` first. This file expands the protocol details for that goal.
+This file is the paper-facing experiment protocol for the final harness.
 
 This protocol is the paper-facing plan. It separates evidence for new latest-version bugs from historical replay and seeded sensitivity. Do not tune generator, oracle, normalizer, guidance, or triage code after starting the final runs.
 

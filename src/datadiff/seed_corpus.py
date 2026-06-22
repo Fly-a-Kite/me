@@ -21,7 +21,7 @@ class SeedCorpusRecord:
 
 
 @dataclass(slots=True)
-class SeedCorpus:
+class SeedPool:
     max_corpus: int
     cases: list[Case]
     utilities: list[float]
@@ -40,7 +40,7 @@ class SeedCorpus:
     stored_cluster_keys: Counter[str]
     quality_archive: Any | None = None
     lineage: Any | None = None
-    quota_manager: Any | None = None
+    seed_eviction_policy: Any | None = None
 
     def append_seed(self, record: SeedCorpusRecord) -> int:
         index = len(self.cases)
@@ -131,9 +131,9 @@ class SeedCorpus:
     def evict_seed_index(self, *, incoming_cluster_key: str, incoming_utility: float) -> int | None:
         if not self.cases or self.max_corpus <= 0:
             return None
-        if self.quota_manager is None:
+        if self.seed_eviction_policy is None:
             return self.least_useful_seed_index()
-        return self.quota_manager.evict_candidate(
+        return self.seed_eviction_policy.evict_candidate(
             case_cluster_keys=self.cluster_keys,
             case_utilities=self.utilities,
             case_mutation_pulls=self.mutation_pulls,

@@ -4,7 +4,7 @@
 
 This audit tracks naming alignment work for the final harness without breaking:
 
-- `FINAL_GOAL.md`
+- temporary session handoff files
 - `experiments/final_protocol.md`
 - paper-facing reproducibility and evidence-chain contracts
 - freeze-time backward compatibility for existing manifests, reports, and tests

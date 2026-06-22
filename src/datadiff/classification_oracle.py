@@ -319,8 +319,12 @@ def classify_finding(
                 semantic_gate="out_of_scope",
                 attribution_gate="ordering_underconstrained",
                 exclusion_reason="sort_tie_order_underconstrained",
-            ),
-        )
+                ),
+            )
+
+    if str(_get(finding, "oracle", "") or "") == "witness":
+        adjudication = build_adjudication("candidate_implementation_bug", validity_gate="valid_case", semantic_gate="witness_contract", attribution_gate="backend_candidate_bug", reference_support="witness_contract", countable_as_bug_evidence=True, countable_as_valid_finding=True, needs_manual_review=False, needs_external_confirmation=True)
+        return _classification("candidate_implementation_bug", "candidate_bug_needs_external_confirmation", "medium", evidence="Witness-level local contract failed; upstream confirmation is still required.", recommendation=["Minimize around the witness row/group and verify the target backend semantics."], adjudication=adjudication)
 
     documented_matches = _documented_semantic_matches(case, finding, config)
     if documented_matches:

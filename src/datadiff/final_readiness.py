@@ -67,6 +67,12 @@ ADAPTIVE_LIVE_EVIDENCE_COMPONENTS = frozenset(
         "scheduler_annealing",
     }
 )
+ADAPTIVE_LIVE_OPTIONAL_EVIDENCE_COMPONENTS = frozenset(
+    {
+        "champion_graft_donor",
+        "continual_learning",
+    }
+)
 CONFIRMED_LATEST_UPSTREAM_STATUSES = frozenset(
     {
         "upstream_labeled_bug",
@@ -259,7 +265,7 @@ def build_final_readiness(
     historical_runs = [run for run in runs if run["evidence_mode"] == "historical"]
     seeded_runs = [run for run in runs if run["evidence_mode"] == "seeded"]
     ablation_runs = [run for run in runs if _is_module_ablation_run(run)]
-    comparison_runs = [run for run in runs if _is_contrast_scope_run(run)]
+    comparison_runs = [run for run in runs if _is_final_baseline_scope_comparison_run(run)]
     module_ablation_comparison = _support_track_comparison_summary(ablation_runs)
     baseline_comparison = _support_track_comparison_summary(comparison_runs)
     adaptive_component_ablation = _adaptive_component_ablation_summary(runs)
@@ -1781,6 +1787,7 @@ def _closed_loop_state_persistence_summary(runs: list[dict[str, Any]]) -> dict[s
 def _adaptive_live_component_evidence_summary(runs: list[dict[str, Any]]) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     missing: list[str] = []
+    optional_missing: list[str] = []
     declared_components: Counter[str] = Counter()
     proven_components: Counter[str] = Counter()
     enabled_run_count = 0
@@ -1795,17 +1802,35 @@ def _adaptive_live_component_evidence_summary(runs: list[dict[str, Any]]) -> dic
         row = _adaptive_live_component_evidence_row(run, components)
         rows.append(row)
         proven_components.update(row["proven_components"])
+    aggregate_proven_components = set(proven_components)
+    for row in rows:
         label = str(row["label"])
         for component in row["missing_components"]:
+            if component in aggregate_proven_components:
+                continue
+            if component in ADAPTIVE_LIVE_OPTIONAL_EVIDENCE_COMPONENTS:
+                optional_missing.append(f"{label}:{component}")
+                continue
             missing.append(f"{label}:{component}")
         if int(row.get("adaptive_selection_total_count", 0) or 0) <= 0:
             missing.append(f"{label}:adaptive_selection_telemetry")
+    unproven_declared_components = sorted(set(declared_components) - aggregate_proven_components)
+    unproven_optional_components = sorted(
+        set(unproven_declared_components) & ADAPTIVE_LIVE_OPTIONAL_EVIDENCE_COMPONENTS
+    )
+    unproven_required_components = sorted(
+        set(unproven_declared_components) - ADAPTIVE_LIVE_OPTIONAL_EVIDENCE_COMPONENTS
+    )
     return {
         "declared_run_count": len(rows),
         "enabled_run_count": enabled_run_count,
         "declared_components": sorted(declared_components),
         "proven_components": sorted(proven_components),
+        "unproven_declared_components": unproven_declared_components,
+        "unproven_required_components": unproven_required_components,
+        "unproven_optional_components": unproven_optional_components,
         "missing": sorted(set(missing)),
+        "optional_missing": sorted(set(optional_missing)),
         "run_labels": sorted(str(row["label"]) for row in rows),
         "scheduler_learning_total_pulls": sum(int(row.get("scheduler_learning_pulls", 0) or 0) for row in rows),
         "reward_model_update_count": sum(int(row.get("reward_model_update_count", 0) or 0) for row in rows),
@@ -2465,6 +2490,18 @@ def _is_contrast_scope_run(run: dict[str, Any]) -> bool:
     return is_comparison_experiment_row(run) and str(run.get("evidence_mode") or "") == "comparison"
 
 
+def _is_final_baseline_scope_comparison_run(run: dict[str, Any]) -> bool:
+    if not _is_contrast_scope_run(run):
+        return False
+    role = str(run.get("canonical_comparison_role", "") or "").strip()
+    return (
+        str(run.get("matrix_id", "") or "").strip() == FINAL_COMPARISON_MATRIX.id
+        and str(run.get("comparison_group", "") or "").strip() == FINAL_COMPARISON_MATRIX.comparison_group
+        and str(run.get("target_suite", "") or "").strip() in FINAL_COMPARISON_MATRIX.target_suites
+        and role in {"baseline", "contrast"}
+    )
+
+
 def _is_postprocess_evidence_run(run: dict[str, Any]) -> bool:
     return str(run.get("evidence_kind", "") or "").strip() == "postprocess_ledger"
 
@@ -2473,8 +2510,6 @@ def _is_baseline_scope_comparison_run(run: dict[str, Any]) -> bool:
     return _is_contrast_scope_run(run)
 
 
-_is_reference_scope_comparison_run = _is_contrast_scope_run
-_is_comparison_scope_reference_run = _is_contrast_scope_run
 
 
 def _readiness_gates(
@@ -2771,7 +2806,20 @@ def _readiness_gates(
             enabled_run_count=adaptive_live_component_evidence.get("enabled_run_count", 0),
             declared_components=adaptive_live_component_evidence.get("declared_components", []),
             proven_components=adaptive_live_component_evidence.get("proven_components", []),
+            unproven_declared_components=adaptive_live_component_evidence.get(
+                "unproven_declared_components",
+                [],
+            ),
+            unproven_required_components=adaptive_live_component_evidence.get(
+                "unproven_required_components",
+                [],
+            ),
+            unproven_optional_components=adaptive_live_component_evidence.get(
+                "unproven_optional_components",
+                [],
+            ),
             missing=adaptive_live_component_evidence.get("missing", []),
+            optional_missing=adaptive_live_component_evidence.get("optional_missing", []),
             run_labels=adaptive_live_component_evidence.get("run_labels", []),
             scheduler_learning_total_pulls=adaptive_live_component_evidence.get("scheduler_learning_total_pulls", 0),
             reward_model_update_count=adaptive_live_component_evidence.get("reward_model_update_count", 0),
@@ -3193,6 +3241,9 @@ def _scheduler_feedback_share_rows(
             continue
         label = f"{run['evidence_mode']}:{run['target_suite']}:{run['preset']}"
         cases = int(run.get("cases", 0) or 0)
+        if _is_reducer_module_ablation_run(run):
+            skipped.append(f"{label}:scheduler_feedback_share_exempt:reducer_ablation")
+            continue
         if cases < min_cases:
             skipped.append(f"{label}:cases_below_scheduler_share_min:{cases}/{min_cases}")
             continue
@@ -3202,6 +3253,18 @@ def _scheduler_feedback_share_rows(
             continue
         rows.append({"label": label, "cases": cases, "share": float(share)})
     return rows, sorted(set(skipped))
+
+
+def _is_reducer_module_ablation_run(run: dict[str, Any]) -> bool:
+    return (
+        _is_module_ablation_run(run)
+        and str(run.get("canonical_comparison_role", "") or "").strip() == "contrast"
+        and (
+            str(run.get("component_focus", "") or "").strip() == "reducer"
+            or str(run.get("variant_id", "") or "").strip() == "reducer"
+            or str(run.get("preset", "") or "").strip() == "reducer"
+        )
+    )
 
 
 def _runtime_efficiency_issues(
@@ -3429,6 +3492,3 @@ def _render_markdown(audit: dict[str, Any]) -> str:
     lines.append("")
     return "\n".join(lines)
 
-
-_structured_identity_missing = _structured_identity_issues
-_stage_profile_missing = _stage_profile_issues

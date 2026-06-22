@@ -8,7 +8,7 @@
 | First automated signal | 2026-05-28 CST, `discovery-campaign-operator-cooldown-s46010` |
 | Artifact | `bugs/bug_1d25bb8cd42bf069` |
 | How found | DataDiffFuzz generated a boolean membership workflow. The metamorphic oracle rewrote a `semi_join` as an equivalent distinct-key `INNER JOIN`; pandas and SQLite matched, while DuckDB returned an empty result for the rewritten query. |
-| Current status | Submitted upstream as [duckdb/duckdb#22924](https://github.com/duckdb/duckdb/issues/22924); upstream issue is open with `needs triage`. The local repeated reproducer was previously flaky on DuckDB 1.5.3, so keep it out of confirmed paper counts until upstream triage or stable local replay confirms it. |
+| Current status | Submitted upstream as [duckdb/duckdb#22924](https://github.com/duckdb/duckdb/issues/22924); fixed upstream by merged PR [duckdb/duckdb#22963](https://github.com/duckdb/duckdb/pull/22963), which explicitly says `Fixes #22924` and adds regression coverage for `ORDER BY ... OFFSET` / `LIMIT` join-filter-pushdown shapes. Counts as `fixed_upstream`. |
 
 ## Title
 

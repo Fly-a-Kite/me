@@ -3,8 +3,8 @@ from collections import Counter
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.lineage import LineageDAG
 from datadiff.quality_archive import QualityDiversityArchive
-from datadiff.seed_corpus import SeedCorpus, SeedCorpusRecord
-from datadiff.seed_quota import SeedQuotaManager
+from datadiff.seed_corpus import SeedCorpusRecord, SeedPool
+from datadiff.seed_quota import SeedEvictionPolicy
 
 
 def _case(seed: int) -> Case:
@@ -38,8 +38,8 @@ def _record(
     )
 
 
-def _corpus(*, quota_manager=None) -> SeedCorpus:
-    return SeedCorpus(
+def _corpus(*, seed_eviction_policy=None) -> SeedPool:
+    return SeedPool(
         max_corpus=2,
         cases=[],
         utilities=[],
@@ -58,7 +58,7 @@ def _corpus(*, quota_manager=None) -> SeedCorpus:
         stored_cluster_keys=Counter(),
         quality_archive=QualityDiversityArchive(),
         lineage=LineageDAG(),
-        quota_manager=quota_manager,
+        seed_eviction_policy=seed_eviction_policy,
     )
 
 
@@ -104,7 +104,7 @@ def test_seed_corpus_replace_decrements_old_counters_and_resets_schedule_state()
     assert corpus.quality_archive.seed_count("cluster-new") == 1
 
 
-def test_seed_corpus_evicts_least_useful_without_quota_manager():
+def test_seed_pool_evicts_least_useful_without_seed_eviction_policy():
     corpus = _corpus()
     corpus.append_seed(_record(1, utility=3.0))
     corpus.append_seed(_record(2, utility=1.0))
@@ -112,9 +112,9 @@ def test_seed_corpus_evicts_least_useful_without_quota_manager():
     assert corpus.evict_seed_index(incoming_cluster_key="cluster-new", incoming_utility=2.0) == 1
 
 
-def test_seed_corpus_delegates_eviction_to_quota_manager_when_enabled():
-    quota = SeedQuotaManager()
-    corpus = _corpus(quota_manager=quota)
+def test_seed_pool_delegates_eviction_to_seed_eviction_policy_when_enabled():
+    policy = SeedEvictionPolicy()
+    corpus = _corpus(seed_eviction_policy=policy)
     corpus.append_seed(_record(1, cluster_key="common", utility=1.0))
     corpus.append_seed(_record(2, cluster_key="rare", utility=0.5))
     corpus.record_stored_counters(_record(1, cluster_key="common", utility=1.0))

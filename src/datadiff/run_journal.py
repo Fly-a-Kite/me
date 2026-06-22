@@ -123,6 +123,7 @@ def build_run_journal_entry(run_file: Path, context: dict[str, Any] | None = Non
             "type_aware_generation": config.get("enable_type_aware_generation"),
             "differential_oracle": config.get("enable_differential_oracle"),
             "metamorphic_oracle": config.get("enable_metamorphic_oracle"),
+            "witness_oracle": config.get("enable_witness_oracle"),
             "metamorphic_variant_limit": config.get("metamorphic_variant_limit"),
             "feedback": config.get("enable_feedback"),
             "enable_replay_bug": config.get("enable_replay_bug"),

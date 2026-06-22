@@ -51,8 +51,9 @@ def synthesize_program(
                 step_weights.update(weights)
         else:
             step_weights = weights
+        resolved_weights = _adaptive_step_weights(state, step_weights)
         try:
-            operation, state = grammar.synthesize_step(rnd, state, context, weights=step_weights)
+            operation, state = grammar.synthesize_step(rnd, state, context, weights=resolved_weights)
         except ValueError:
             break
         operations.append(operation)
@@ -79,6 +80,27 @@ def default_grammar_registry() -> GrammarRegistry:
             ProductionRule("join", 0.75, lambda state: bool(state.compatible_join_tables()), _gen_join, transition_by_program_state),
         ]
     )
+
+
+def _adaptive_step_weights(
+    state: TypedProgramState,
+    weights: Mapping[str, float] | None,
+) -> dict[str, float] | None:
+    resolved = dict(weights or {})
+    if state.validity_score < 0.55:
+        resolved["join"] = resolved.get("join", 1.0) * 0.55
+        resolved["groupby"] = resolved.get("groupby", 1.0) * 0.70
+    if state.expandability_score < 0.25:
+        resolved["limit"] = resolved.get("limit", 1.0) * 0.60
+        resolved["offset"] = resolved.get("offset", 1.0) * 0.60
+        resolved["select"] = resolved.get("select", 1.0) * 0.75
+    if "aggregation_boundary" not in state.structural_risk_tags:
+        resolved["groupby"] = resolved.get("groupby", 1.0) * 1.20
+    if "join_cardinality" not in state.structural_risk_tags and state.compatible_join_tables():
+        resolved["join"] = resolved.get("join", 1.0) * 1.20
+    if "shape:ordered" not in state.coverage_axes:
+        resolved["sort"] = resolved.get("sort", 1.0) * 1.15
+    return resolved or None
 
 
 def _gen_filter(rnd: random.Random, state: TypedProgramState, context: SynthesisContext) -> dict[str, Any]:

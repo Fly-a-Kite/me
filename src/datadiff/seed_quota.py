@@ -9,8 +9,8 @@ UNKNOWN_CLUSTER_KEY = "__unknown__"
 
 
 @dataclass(slots=True)
-class SeedQuotaManager:
-    """Quota-aware corpus eviction over behavioral cluster cells."""
+class SeedEvictionPolicy:
+    """Quota-aware eviction policy over long-lived seed pool cells."""
 
     enabled: bool = True
     min_quota_per_active_cell: int = 1
@@ -155,7 +155,7 @@ class SeedQuotaManager:
         }
 
     @classmethod
-    def from_state_dict(cls, data: Mapping[str, Any] | None) -> "SeedQuotaManager":
+    def from_state_dict(cls, data: Mapping[str, Any] | None) -> "SeedEvictionPolicy":
         if not isinstance(data, Mapping):
             return cls()
         return cls(
@@ -164,7 +164,6 @@ class SeedQuotaManager:
             pull_decay=max(0.0, float(data.get("pull_decay", 1.0) or 0.0)),
             elite_protection_bonus=max(0.0, float(data.get("elite_protection_bonus", 0.35) or 0.0)),
         )
-
 
 def _cell_scores(
     case_cluster_keys: Sequence[str],

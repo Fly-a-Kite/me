@@ -3,14 +3,13 @@
 Last updated: 2026-05-27 15:38:57 CST (+0800)
 
 This file is a handoff note for the next Codex session. At the start of a new
-session, read this file together with `FINAL_GOAL.md` and
-`experiments/final_protocol.md`, then continue from the "Next Actions" section.
+session, read this file together with `experiments/final_protocol.md`, then
+continue from the "Next Actions" section.
 
 ## 2026-05-27 Continuation Update
 
-Use `NEXT_SESSION_TODO.md` as the most current operational handoff. The older
-PID section below is historical: the six `final-live-depth-required` PIDs listed
-there are no longer running.
+The older PID section below is historical: the six
+`final-live-depth-required` PIDs listed there are no longer running.
 
 2026-05-28 update: `datafusion_limit_idempotence@datafusion` is now recorded as
 upstream-confirmed latest evidence via

@@ -162,6 +162,7 @@ def test_methodology_fresh_and_replay_share_case_policy_gate():
 def test_methodology_experiment_config_exposes_layered_views_without_breaking_flat_payloads():
     config = ExperimentConfig(
         enable_metamorphic_oracle=True,
+        enable_witness_oracle=True,
         oracle_mode="both",
         metamorphic_variant_limit=7,
         enable_feedback=True,
@@ -193,6 +194,7 @@ def test_methodology_experiment_config_exposes_layered_views_without_breaking_fl
     assert nested["generation"]["generator_profile"] == "common"
     assert nested["oracle"]["mode"] == "both"
     assert nested["oracle"]["enable_metamorphic"] is True
+    assert nested["oracle"]["enable_witness"] is True
     assert nested["oracle"]["metamorphic_variant_limit"] == 7
     assert nested["feedback"]["persist_corpus"] is True
     assert nested["feedback"]["persist_limit"] == 11
@@ -402,8 +404,8 @@ def test_methodology_runner_delegates_decision_and_execution_boundaries():
     assert "class CandidateScorer" in scorer_source
     assert "class DenseCandidateScore" in scorer_source
     assert "datadiff.guidance" not in scorer_source
-    assert "from datadiff.seed_corpus import SeedCorpus, SeedCorpusRecord" in feedback_source
-    assert "class SeedCorpus" in seed_corpus_source
+    assert "from datadiff.seed_corpus import SeedCorpusRecord, SeedPool" in feedback_source
+    assert "class SeedPool" in seed_corpus_source
     assert "class SeedCorpusRecord" in seed_corpus_source
     assert "datadiff.feedback" not in seed_corpus_source
     assert "def _select_adaptive_action" in bandit_selection_source

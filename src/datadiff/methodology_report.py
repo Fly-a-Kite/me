@@ -515,10 +515,6 @@ def _reference_variant_comparisons(rows: list[dict[str, str]]) -> list[dict[str,
         )
     return comparisons
 
-
-_reference_comparisons = _reference_variant_comparisons
-
-
 def _csv_union(rows: list[dict[str, str]], key: str, *, delimiter: str = ",") -> set[str]:
     values: set[str] = set()
     for row in rows:
@@ -543,16 +539,8 @@ def _tag_set(row: dict[str, str], key: str = "analysis_tags") -> set[str]:
 def _is_reference_row(row: dict[str, str]) -> bool:
     return is_reference_variant(row)
 
-
-def _is_reference_row_compat(row: dict[str, str]) -> bool:
-    return _is_reference_row(row)
-
-
 def _is_ablation_row(row: dict[str, str]) -> bool:
     return is_ablation_contrast(row)
-
-
-_is_baseline_row = _is_reference_row_compat
 
 
 def _expected_ablation_modules(manifest: dict[str, Any], rows: list[dict[str, str]]) -> list[str]:
@@ -2052,10 +2040,6 @@ def _known_saturated_families_for_run(run_path: Path) -> list[str]:
     meta = load_json(meta_path)
     config = meta.get("config", {}) if isinstance(meta.get("config", {}), dict) else {}
     return list(config.get("known_saturated_bug_families", []) or [])
-
-
-_run_known_saturated_bug_families = _known_saturated_families_for_run
-
 
 def _artifact_reproducibility_from_dirs(artifact_case_count: int, artifact_dirs: dict[str, Path]) -> dict[str, Any]:
     existing_dirs = [path for path in artifact_dirs.values() if path.is_dir()]

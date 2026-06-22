@@ -27,13 +27,14 @@
       "issue_url": "https://github.com/apache/datafusion/issues/22489",
       "issue_title": "DataFusion drops grouped row after inner ORDER BY/LIMIT and outer ORDER BY/OFFSET",
       "upstream_status": "upstream_labeled_bug",
-      "state": "open",
+      "state": "closed",
       "labels": [
-        "bug"
+        "bug",
+        "regression"
       ],
       "assignee": "kumarUjjawal",
-      "checked_at": "2026-05-26T23:21:21+08:00",
-      "notes": "GitHub issue is open, labeled bug, and assigned upstream. The issue was submitted by Fly-a-Kite from DataDiffFuzz evidence."
+      "checked_at": "2026-06-14T19:18:00+08:00",
+      "notes": "GitHub issue is closed with state_reason=completed, labeled bug/regression, and assigned upstream. The issue was submitted by Fly-a-Kite from DataDiffFuzz evidence."
     },
     {
       "family": "negative_zero_comparison@datafusion",
@@ -44,13 +45,13 @@
       "issue_url": "https://github.com/apache/datafusion/issues/22490",
       "issue_title": "DataFusion evaluates -0.0 >= 0.0 as false",
       "upstream_status": "upstream_labeled_bug",
-      "state": "open",
+      "state": "closed",
       "labels": [
         "bug"
       ],
-      "assignee": "raman20",
-      "checked_at": "2026-05-26T23:21:21+08:00",
-      "notes": "GitHub issue is open, labeled bug, and assigned upstream. The issue was submitted by Fly-a-Kite from DataDiffFuzz evidence."
+      "assignee": "sweb",
+      "checked_at": "2026-06-14T19:18:00+08:00",
+      "notes": "GitHub issue is closed with state_reason=completed, labeled bug, and assigned upstream. The issue was submitted by Fly-a-Kite from DataDiffFuzz evidence."
     },
     {
       "family": "distinct_null_topk@datafusion",
@@ -61,13 +62,14 @@
       "issue_url": "https://github.com/apache/datafusion/issues/22554",
       "issue_title": "DISTINCT ORDER BY NULLS FIRST LIMIT returns the wrong top row",
       "upstream_status": "upstream_labeled_bug",
-      "state": "open",
+      "state": "closed",
       "labels": [
-        "bug"
+        "bug",
+        "regression"
       ],
-      "assignee": "",
-      "checked_at": "2026-05-27T12:41:28+08:00",
-      "notes": "GitHub issue is open and labeled bug. It was submitted by Fly-a-Kite from DataDiffFuzz evidence. At this check, the issue body had the Output and Expected behavior snippets reversed; the local draft and reproducer remain correct and a follow-up correction comment is needed."
+      "assignee": "kumarUjjawal",
+      "checked_at": "2026-06-14T19:18:00+08:00",
+      "notes": "GitHub issue is closed with state_reason=completed, labeled bug/regression, and assigned upstream. It was submitted by Fly-a-Kite from DataDiffFuzz evidence. At an earlier check, the issue body had the Output and Expected behavior snippets reversed; the local draft and reproducer remain correct."
     },
     {
       "family": "datafusion_limit_idempotence@datafusion",
@@ -78,13 +80,13 @@
       "issue_url": "https://github.com/apache/datafusion/issues/22541",
       "issue_title": "Repeating the same ordered LIMIT over a subquery changes the result",
       "upstream_status": "upstream_labeled_bug",
-      "state": "open",
+      "state": "closed",
       "labels": [
         "bug"
       ],
-      "assignee": "raman20",
-      "checked_at": "2026-05-28T20:10:59+08:00",
-      "notes": "GitHub issue is open, labeled bug, and assigned upstream. It was submitted by Fly-a-Kite from DataDiffFuzz deterministic audit and metamorphic limit-idempotence evidence."
+      "assignee": "hadrian-reppas",
+      "checked_at": "2026-06-14T19:18:00+08:00",
+      "notes": "GitHub issue is closed with state_reason=completed, labeled bug, and assigned upstream. It was submitted by Fly-a-Kite from DataDiffFuzz deterministic audit and metamorphic limit-idempotence evidence."
     },
     {
       "family": "groupby_aggregation@polars,polars_lazy",
@@ -135,14 +137,33 @@
       "issue_url": "https://github.com/apache/arrow/issues/50043",
       "issue_title": "[Python] Table.group_by(...).aggregate([(\"flag\", \"any\")])` returns incorrect `True` on a sliced Boolean array with nulls",
       "upstream_status": "upstream_labeled_bug",
-      "state": "open",
+      "state": "closed",
       "labels": [
         "Type: bug",
+        "Component: C++",
         "Component: Python"
       ],
+      "assignee": "fenfeng9",
+      "checked_at": "2026-06-14T19:18:00+08:00",
+      "notes": "GitHub issue was submitted by Fly-a-Kite from DataDiffFuzz sliced-Boolean group_by evidence. It is closed with state_reason=completed, assigned upstream, and labeled Type: bug plus Component: C++/Python."
+    },
+    {
+      "family": "metamorphic_semi_anti_join_rewrite@duckdb",
+      "root_cause": "metamorphic_semi_anti_join_rewrite",
+      "suspicious_backends": [
+        "duckdb"
+      ],
+      "issue_url": "https://github.com/duckdb/duckdb/issues/22924",
+      "issue_title": "CTE boolean INNER JOIN returns no rows while equivalent EXISTS and materialized join match",
+      "upstream_status": "fixed_upstream",
+      "state": "closed",
+      "labels": [
+        "PR submitted"
+      ],
       "assignee": "",
-      "checked_at": "2026-05-30T23:39:02+08:00",
-      "notes": "GitHub issue was submitted by Fly-a-Kite from DataDiffFuzz sliced-Boolean group_by evidence and is labeled Type: bug upstream."
+      "checked_at": "2026-06-14T18:55:00+08:00",
+      "fixed_by": "https://github.com/duckdb/duckdb/pull/22963",
+      "notes": "GitHub issue was submitted by Fly-a-Kite from DataDiffFuzz metamorphic semi/anti join rewrite evidence. The issue is closed as completed, and upstream PR #22963, titled \"Avoid join filter pushdown below limits\", was merged into duckdb:main with body text \"Fixes #22924\" and a regression test for ORDER BY ... OFFSET/LIMIT shapes."
     }
   ]
 }

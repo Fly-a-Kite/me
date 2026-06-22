@@ -48,7 +48,7 @@ def _selected_meta(case: Case) -> dict:
         "source": "generated",
         "seed_lineage": {"root_seed": case.seed, "depth": 0},
         "mutation": {"operator": "generated"},
-        "feedback_selection": {"target_keys": ["target:select"]},
+        "feedback_decision": {"target_keys": ["target:select"]},
         "feedback_decision": {},
         "quality_archive_context": {"archive_candidate": True},
         "generator_profile_selection": {"strategy": "fixed", "profile": "common"},

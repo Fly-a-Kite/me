@@ -9,7 +9,7 @@
 | Second confirming live shape | 2026-05-25 15:51:34 CST (`arrow_cross`, case index `14067`) |
 | Manual isolation date | 2026-05-26 CST |
 | How found | 24h fresh live differential test: pandas/DuckDB agreed while PyArrow returned a different Boolean aggregate; prefix execution located the first divergence at `groupby`, followed by an adapter-free native reproducer |
-| Status | Submitted upstream as [apache/arrow#50043](https://github.com/apache/arrow/issues/50043); upstream issue is open and labeled `Type: bug` and `Component: Python`. |
+| Status | Submitted upstream as [apache/arrow#50043](https://github.com/apache/arrow/issues/50043); upstream issue is closed/completed and labeled `Type: bug`, `Component: C++`, and `Component: Python`. |
 
 The two live family labels above reduce to the same likely root cause and must
 not be counted as two independent bugs.

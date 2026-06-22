@@ -122,6 +122,7 @@ def test_build_run_journal_entry_records_paper_facing_summary(tmp_path):
                 "common_capabilities": ["sort", "limit"],
                 "config": {
                     "generator_profile": "null_agg_topk",
+                    "enable_witness_oracle": True,
                     "enable_replay_bug": False,
                     "replay_bug_source_issues": [
                         "https://github.com/apache/datafusion/issues/22190",
@@ -201,6 +202,7 @@ def test_build_run_journal_entry_records_paper_facing_summary(tmp_path):
     assert entry["result_summary"]["signal_new_behavior_rate"] == 0.0
     assert entry["result_summary"]["first_candidate_bug_elapsed_s"] == 1.25
     assert entry["config_summary"]["enable_replay_bug"] is False
+    assert entry["config_summary"]["witness_oracle"] is True
     assert entry["replay_bug_policy"] == {
         "enable_replay_bug": False,
         "source_issue_count": 2,

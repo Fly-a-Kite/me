@@ -4,13 +4,6 @@ from datadiff import artifact, candidate_pipeline, case_policy, feedback
 
 
 def test_canonical_naming_aliases_remain_equivalent() -> None:
-    assert experiment_metadata.is_reference_experiment_row is experiment_metadata.is_baseline_row
-    assert experiment_metadata.is_contrast_variant_compat is experiment_metadata.is_targeted_variant
-    assert (
-        experiment_metadata.compat_contrast_variant_id_legacy
-        is experiment_metadata.compat_targeted_variant_id
-    )
-    assert experiment_metadata.legacy_contrast_variant_id is experiment_metadata.legacy_targeted_variant_id
     assert guidance._contrast_decision_key is guidance._targeted_decision_key
     assert guidance._decision_hits_family_diversity_guard is guidance._decision_has_family_saturation
     assert (
@@ -71,9 +64,7 @@ def test_canonical_naming_aliases_remain_equivalent() -> None:
     assert case_policy.issue_source_key is case_policy.canonical_source_issue_key
     assert case_policy.uses_issue_replay_ops is case_policy.uses_replay_probe_operations
     assert case_policy.replay_bug_filter_reason is case_policy.known_replay_source_filter_reason
-    assert feedback.FeedbackState._feedback_selection_snapshot is feedback.FeedbackState._feedback_decision_snapshot
     assert reward._feedback_selection_summary is reward._feedback_decision_summary
-    assert experiment_metadata.baseline_row_for_group is experiment_metadata.reference_row_for_group_compat
     assert final_readiness._is_reference_scope_comparison_run is final_readiness._is_contrast_scope_run
     assert final_readiness._is_comparison_scope_reference_run is final_readiness._is_contrast_scope_run
     assert cli._candidate_bug_family_key is cli._candidate_issue_family_key

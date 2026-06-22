@@ -20,7 +20,6 @@ def _selected_candidate_metadata(
         "generated_seed": case.seed,
         "seed_lineage": generated_metadata["seed_lineage"],
         "mutation": generated_metadata["mutation"],
-        "feedback_selection": {},
         "feedback_decision": {},
         "quality_archive_context": {},
         "operation_combo": describe_operation_combo(case.program.operations),
@@ -60,7 +59,6 @@ def _generated_candidate_metadata(case: Case) -> dict[str, Any]:
             "detail": "generated",
             "changed": False,
         },
-        "feedback_selection": {},
         "feedback_decision": {},
     }
 
@@ -70,7 +68,7 @@ def _candidate_target_keys_from_metadata(metadata: dict[str, Any]) -> list[str]:
     seen: set[str] = set()
     if not isinstance(metadata, dict):
         return out
-    for section_name in ("feedback_decision", "feedback_selection"):
+    for section_name in ("feedback_decision",):
         section = metadata.get(section_name)
         if not isinstance(section, dict):
             continue

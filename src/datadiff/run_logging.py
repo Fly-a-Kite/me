@@ -39,14 +39,7 @@ def _case_log_row(
         "candidate_source": selected_meta["source"],
         "seed_lineage": selected_meta["seed_lineage"],
         "mutation": selected_meta["mutation"],
-        "feedback_selection": selected_meta.get(
-            "feedback_selection",
-            selected_meta.get("feedback_decision", {}),
-        ),
-        "feedback_decision": selected_meta.get(
-            "feedback_decision",
-            selected_meta.get("feedback_selection", {}),
-        ),
+        "feedback_decision": selected_meta.get("feedback_decision", {}),
         "quality_archive_context": selected_meta.get("quality_archive_context", {}),
         "generator_profile_selection": selected_meta.get("generator_profile_selection", {}),
         "semantic_objective_selection": selected_meta.get("semantic_objective_selection", {}),
@@ -461,7 +454,6 @@ def _compact_log_row(row: dict[str, Any], log_level: str) -> dict[str, Any]:
         "candidate_source": row.get("candidate_source", "generated"),
         "seed_lineage": row.get("seed_lineage", {}),
         "mutation": row.get("mutation", {}),
-        "feedback_selection": row.get("feedback_selection", row.get("feedback_decision", {})),
         "feedback_decision": row.get("feedback_decision", {}),
         "quality_archive_context": row.get("quality_archive_context", {}),
         "generator_profile_selection": row.get("generator_profile_selection", {}),

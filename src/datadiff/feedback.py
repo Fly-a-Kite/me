@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections import Counter, deque
 from dataclasses import dataclass, field
 from functools import lru_cache
-import heapq
 import math
 from typing import Any, Mapping
 
@@ -21,12 +20,24 @@ from datadiff.mutator import (
     mutate_case_with_metadata,
     mutation_operator_profiles,
 )
+from datadiff.multi_objective import (
+    CostVector,
+    ObjectiveVector,
+    OPERATOR_OBJECTIVE_SPEC,
+    SEED_FRONTIER_OBJECTIVE_SPEC,
+    bounded_ratio,
+    constrained_objective_score,
+    multiplicative_cost_modifier,
+    novelty_decay,
+)
 from datadiff.mutator_swarm import OperatorSwarm
 from datadiff.operation_semantics import operation_names
 from datadiff.quality_archive import QualityDiversityArchive
-from datadiff.seed_corpus import SeedCorpus, SeedCorpusRecord
+from datadiff.seed_corpus import SeedCorpusRecord, SeedPool
+from datadiff.seed_budget import SEED_ENERGY_TIERS, SeedBudgetAllocator
+from datadiff.seed_frontier import SeedFrontier
 from datadiff.source_scheduler import LocalSourceScheduler
-from datadiff.seed_quota import SeedQuotaManager
+from datadiff.seed_quota import SeedEvictionPolicy
 from datadiff.semantic_signal import (
     CANONICAL_SEMANTIC_SIGNAL_PREFIX,
     canonical_target_key,
@@ -43,12 +54,6 @@ SEED_ENERGY_TIER_SCOPE = "seed_energy_tier"
 CHAMPION_GRAFT_DONOR_SCOPE = "champion_graft_donor"
 BD_AXIS_WEIGHT_BONUS = 0.35
 DISCOVERY_EXPLORATION_BASE_WEIGHT = 0.45
-SEED_ENERGY_TIERS = ("low", "med", "high")
-SEED_ENERGY_TIER_MULTIPLIERS = {
-    "low": 0.75,
-    "med": 1.0,
-    "high": 1.35,
-}
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,7 +144,7 @@ class FeedbackState:
     enable_disagreement_bd_axis: bool = True
     enable_champion_corpus: bool = True
     enable_champion_graft_donor_bandit: bool = True
-    quota_manager: SeedQuotaManager = field(default_factory=SeedQuotaManager)
+    seed_eviction_policy: SeedEvictionPolicy = field(default_factory=SeedEvictionPolicy)
     champion_registry: ChampionRegistry | None = None
     champion_version_id: str = ""
     champion_promotion_threshold: int = 3
@@ -154,6 +159,8 @@ class FeedbackState:
     last_candidate_batch_sources: list[str] = field(default_factory=list)
     pending_candidate_batch: deque[_SelectedCandidate] = field(default_factory=deque, repr=False)
     last_source_reward: float | None = None
+    seed_frontier: SeedFrontier = field(init=False, repr=False)
+    seed_budget_allocator: SeedBudgetAllocator = field(init=False, repr=False)
     seed_frontier_heap: list[tuple[float, float, float, int, int, int]] = field(default_factory=list, repr=False)
     seed_frontier_dirty: bool = field(default=True, repr=False)
     seed_metadata_aligned_count: int = field(default=-1, repr=False)
@@ -167,8 +174,18 @@ class FeedbackState:
         self.enable_seed_energy_tier_bandit = bool(self.enable_seed_energy_tier_bandit)
         self.enable_champion_graft_donor_bandit = bool(self.enable_champion_graft_donor_bandit)
         self.quality_archive.enable_hierarchical = bool(self.enable_hierarchical_archive)
-        self.quota_manager.enabled = bool(self.enable_seed_quota and self.quota_manager.enabled)
+        self.seed_frontier = SeedFrontier(
+            priority_builder=self._seed_frontier_priority,
+            row_builder=self._seed_frontier_row,
+        )
+        self.seed_budget_allocator = SeedBudgetAllocator(
+            tier_selector=self._choose_seed_energy_tier,
+        )
+        self.seed_eviction_policy.enabled = bool(
+            self.enable_seed_quota and self.seed_eviction_policy.enabled
+        )
         self.operator_swarm.ensure_operators(self._mutation_operator_profiles())
+        self._sync_seed_frontier_component_state()
 
     def _mutation_operator_profiles(self):
         return mutation_operator_profiles(
@@ -212,9 +229,6 @@ class FeedbackState:
             return None
         return self._commit_selected_candidate(self.pending_candidate_batch.popleft())
 
-    def choose_case(self, seed: int, generated: Case) -> Case:
-        return self.select_case(seed, generated)
-
     def activate_selected_candidate(self, case: Case, metadata: dict[str, Any]) -> None:
         resolved_metadata = dict(metadata or {})
         source = str(resolved_metadata.get("source", "generated") or "generated")
@@ -230,7 +244,6 @@ class FeedbackState:
             return
         decision = (
             resolved_metadata.get("feedback_decision")
-            or resolved_metadata.get("feedback_selection")
             or {}
         )
         if not isinstance(decision, dict):
@@ -306,6 +319,7 @@ class FeedbackState:
         attempt: int,
         champion_donors: list[ChampionSeed] | None = None,
     ) -> _SelectedCandidate | None:
+        self._align_seed_metadata_lengths()
         base = self.interesting_cases[base_index]
         parent_target_keys = self.case_target_keys[base_index] if base_index < len(self.case_target_keys) else []
         swarm_particle_id = self._choose_mutation_swarm_particle_id(
@@ -369,7 +383,6 @@ class FeedbackState:
         seed_lineage["parent_index"] = base_index
         result.metadata["seed_lineage"] = seed_lineage
         metadata = dict(result.metadata)
-        metadata["feedback_selection"] = dict(decision)
         metadata["feedback_decision"] = dict(decision)
         if result.case is not base:
             result.case.metadata = metadata
@@ -473,7 +486,7 @@ class FeedbackState:
         self.last_feedback_operator = selected.operator
         self.last_feedback_swarm_particle_id = selected.swarm_particle_id
         self.last_feedback_decision = dict(
-            selected.metadata.get("feedback_decision", selected.metadata.get("feedback_selection", {})) or {}
+            selected.metadata.get("feedback_decision", {}) or {}
         )
         return selected
 
@@ -557,14 +570,6 @@ class FeedbackState:
             "recent_cluster_pulls": int(recent_cluster_pulls),
         }
 
-    @property
-    def last_feedback_selection(self) -> dict[str, Any]:
-        return self.last_feedback_decision
-
-    @last_feedback_selection.setter
-    def last_feedback_selection(self, value: dict[str, Any]) -> None:
-        self.last_feedback_decision = dict(value or {})
-
     def _apply_discovery_exploration_weight(self) -> None:
         exploration_weight = (
             self.discovery_rate_estimator.adaptive_exploration_weight(
@@ -643,7 +648,7 @@ class FeedbackState:
             schedule_delta=schedule_delta,
         )
         if len(self.interesting_cases) < self.max_corpus:
-            self._seed_corpus_view().append_seed(record)
+            self._seed_pool_view().append_seed(record)
         elif has_finding:
             replace_index = self._evict_seed_index(
                 incoming_cluster_key=cluster_key,
@@ -684,7 +689,7 @@ class FeedbackState:
                 utility=utility,
                 schedule_delta=schedule_delta,
             )
-        self._seed_corpus_view().record_stored_counters(record)
+        self._seed_pool_view().record_stored_counters(record)
         self.seed_metadata_aligned_count = len(self.interesting_cases)
         if has_finding:
             self._record_champion_family_hits(case, family_keys)
@@ -744,7 +749,7 @@ class FeedbackState:
             if utility is not None
             else _case_seed_utility(case, has_finding=has_finding, family_keys=family_keys)
         )
-        self._seed_corpus_view().replace_seed(
+        self._seed_pool_view().replace_seed(
             index,
             self._seed_corpus_record(
                 case,
@@ -761,15 +766,20 @@ class FeedbackState:
         self._mark_seed_frontier_dirty()
 
     def _least_useful_seed_index(self) -> int | None:
-        return self._seed_corpus_view().least_useful_seed_index()
+        return self._seed_pool_view().least_useful_seed_index()
 
     def _evict_seed_index(self, *, incoming_cluster_key: str, incoming_utility: float) -> int | None:
         if not self.interesting_cases or self.max_corpus <= 0:
             return None
         self._align_seed_metadata_lengths()
-        return self._seed_corpus_view().evict_seed_index(
+        return self.seed_eviction_policy.evict_candidate(
+            case_cluster_keys=self.case_cluster_keys,
+            case_utilities=self.case_utilities,
+            case_mutation_pulls=self.case_mutation_pulls,
             incoming_cluster_key=incoming_cluster_key,
             incoming_utility=incoming_utility,
+            max_corpus=int(self.max_corpus),
+            archive=self.quality_archive if self.enable_quality_archive else None,
         )
 
     def _seed_corpus_record(
@@ -801,8 +811,8 @@ class FeedbackState:
             parent_index=_lineage_parent_index(case),
         )
 
-    def _seed_corpus_view(self) -> SeedCorpus:
-        return SeedCorpus(
+    def _seed_pool_view(self) -> SeedPool:
+        return SeedPool(
             max_corpus=self.max_corpus,
             cases=self.interesting_cases,
             utilities=self.case_utilities,
@@ -821,12 +831,16 @@ class FeedbackState:
             stored_cluster_keys=self.stored_cluster_keys,
             quality_archive=self.quality_archive if self.enable_quality_archive else None,
             lineage=self.lineage,
-            quota_manager=(
-                self.quota_manager
+            seed_eviction_policy=(
+                self.seed_eviction_policy
                 if self.enable_seed_quota
                 else None
             ),
         )
+
+    @property
+    def seed_pool(self) -> SeedPool:
+        return self._seed_pool_view()
 
     def _record_champion_family_hits(self, case: Case, family_keys: list[str]) -> None:
         if not family_keys:
@@ -927,23 +941,57 @@ class FeedbackState:
             else 0.0
         )
         family_reuse_penalty = self._case_family_reuse_penalty(index)
-        pull_penalty = (1.0 + self.case_mutation_pulls[index]) ** 0.5
-        recent_penalty = 1.0 + self._recent_parent_pull_count(index)
-        recent_cluster_penalty = 1.0 + (0.50 * self._recent_cluster_pull_count(cluster_key))
-        score = (
-            1.0
-            + reward_prior
-            + target_novelty
-            + cluster_reward
-            + cluster_novelty
-            + elite_bonus
-            + (0.35 * lineage_rarity)
-        ) / (
-            pull_penalty
-            * recent_penalty
-            * recent_cluster_penalty
-            * (1.0 + archive_health_penalty)
-            * family_reuse_penalty
+        mutation_pulls = self.case_mutation_pulls[index]
+        recent_parent_pulls = self._recent_parent_pull_count(index)
+        recent_cluster_pulls = self._recent_cluster_pull_count(cluster_key)
+        discovery_signal = min(
+            1.75,
+            bounded_ratio(reward_prior, 4.0, upper=1.5)
+            + 0.55 * bounded_ratio(cluster_reward, 1.5)
+            + 0.30 * bounded_ratio(cluster_novelty, 1.25)
+            + 0.25 * bounded_ratio(lineage_rarity, 1.5),
+        )
+        semantic_signal = min(1.35, target_novelty)
+        behavior_signal = min(
+            1.10,
+            0.45 * bounded_ratio(cluster_reward, 1.5)
+            + 0.40 * bounded_ratio(elite_bonus, 1.0)
+            + 0.25 * bounded_ratio(reward_prior, 4.0),
+        )
+        structural_signal = min(
+            1.25,
+            0.50 * bounded_ratio(cluster_novelty, 1.25)
+            + 0.30 * bounded_ratio(elite_bonus, 1.0)
+            + 0.30 * bounded_ratio(lineage_rarity, 1.5)
+            + 0.20 * bounded_ratio(self._case_seed_energy(index), 4.0),
+        )
+        vector = ObjectiveVector(
+            discovery=discovery_signal,
+            semantic=semantic_signal,
+            novelty=min(1.0, 0.70 * bounded_ratio(cluster_novelty, 1.25) + 0.30 * bounded_ratio(target_novelty, 1.35)),
+            expandability=min(1.0, 0.60 * bounded_ratio(self._case_seed_energy(index), 4.0) + 0.25 * bounded_ratio(lineage_rarity, 1.5)),
+            structural_risk=structural_signal,
+            coverage_gain=min(1.0, 0.55 * bounded_ratio(cluster_reward, 1.5) + 0.45 * bounded_ratio(elite_bonus, 1.0)),
+        )
+        cost = CostVector(
+            invalidity=archive_health_penalty,
+            redundancy=(
+                bounded_ratio(float(mutation_pulls), 8.0)
+                + bounded_ratio(float(recent_parent_pulls), 4.0)
+                + bounded_ratio(float(recent_cluster_pulls), 4.0)
+                + bounded_ratio(max(0.0, family_reuse_penalty - 1.0), 1.0)
+            ),
+            target_miss=0.0 if target_novelty > 0.0 else 0.18,
+        )
+        score = max(
+            0.05,
+            constrained_objective_score(
+                vector,
+                cost=cost,
+                spec=SEED_FRONTIER_OBJECTIVE_SPEC,
+                validity=1.0 - cost.invalidity,
+                false_positive_risk=0.0,
+            ),
         )
         energy_multiplier = 1.0 + (0.04 * max(0, self._case_seed_energy(index) - 1))
         return score * energy_multiplier
@@ -989,16 +1037,14 @@ class FeedbackState:
             if index < len(self.case_schedule_feedback_counts)
             else 0
         )
-        base_energy = seed_energy(
+        return self.seed_budget_allocator.energy_for_seed(
+            index,
             pulls=pulls,
             mean_reward=self._case_seed_schedule_reward(index),
             family_breadth=family_breadth,
             cluster_outcome_count=cluster_outcome_count,
             since_last_finding_pulls=max(0, pulls - feedback_count),
         )
-        tier = self._choose_seed_energy_tier(index)
-        multiplier = SEED_ENERGY_TIER_MULTIPLIERS.get(tier, 1.0)
-        return _bounded_seed_energy(int(round(float(base_energy) * multiplier)))
 
     def _choose_seed_energy_tier(self, index: int) -> str:
         if not (
@@ -1076,8 +1122,14 @@ class FeedbackState:
         target_keys = self.case_target_keys[index]
         if not target_keys:
             return 0.0
-        novelty = sum(1.0 / (1.0 + self.stored_target_keys[target]) for target in target_keys[:8])
-        return min(1.5, 0.25 * novelty)
+        novelty = 0.0
+        for target in _contextual_target_descriptors(target_keys[:8]):
+            novelty += target.weight * novelty_decay(
+                self.stored_target_keys[target.key],
+                scale=0.32,
+                floor=0.02,
+            )
+        return min(1.5, novelty)
 
     def _case_cluster_key_at(self, index: int) -> str:
         self._align_seed_metadata_lengths()
@@ -1322,12 +1374,93 @@ class FeedbackState:
                 if self.enable_operator_swarm and swarm_particle_id is not None
                 else 0.0
             )
+            discovery_signal = min(
+                1.75,
+                bounded_ratio(mean_reward + exploration_bonus, 1.5, upper=1.5)
+                + 0.25 * bounded_ratio(learning_bonus, 0.25)
+                + 0.15 * bounded_ratio(swarm_bonus, 0.20),
+            )
+            semantic_signal = min(
+                1.50,
+                bounded_ratio(target_affinity_bonus, 0.75)
+                + 0.65 * bounded_ratio(structural_affinity_bonus, 0.55),
+            )
+            structural_signal = min(
+                1.20,
+                0.50 * bounded_ratio(structural_affinity_bonus, 0.55)
+                + 0.25 * bounded_ratio(energy_bonus, 0.12)
+                + 0.20 * bounded_ratio(learning_bonus, 0.25)
+                + 0.15 * bounded_ratio(swarm_bonus, 0.20),
+            )
+            profile = operator_profiles.get(operator)
+            structural_tag_count = (
+                len(getattr(profile, "structural_risk_tags", ()))
+                if profile is not None
+                else 0
+            )
+            coverage_axis_count = (
+                len(getattr(profile, "coverage_axes", ()))
+                if profile is not None
+                else 0
+            )
+            expandability_bias = (
+                float(getattr(profile, "expandability_bias", 0.0) or 0.0)
+                if profile is not None
+                else 0.0
+            )
+            validity_floor = (
+                float(getattr(profile, "validity_floor", 1.0) or 1.0)
+                if profile is not None
+                else 1.0
+            )
+            vector = ObjectiveVector(
+                discovery=discovery_signal,
+                semantic=semantic_signal,
+                novelty=exploration_bonus,
+                expandability=min(
+                    1.0,
+                    0.45 * bounded_ratio(energy_bonus, 0.12)
+                    + 0.25 * bounded_ratio(learning_bonus, 0.25)
+                    + max(0.0, expandability_bias),
+                ),
+                structural_risk=min(1.0, structural_signal + (0.08 * structural_tag_count)),
+                coverage_gain=min(
+                    1.0,
+                    0.50 * bounded_ratio(structural_affinity_bonus, 0.55)
+                    + 0.25 * bounded_ratio(swarm_bonus, 0.20)
+                    + 0.04 * min(4, coverage_axis_count),
+                ),
+            )
+            if pulls > 0:
+                vector = ObjectiveVector(
+                    discovery=min(1.75, vector.discovery + (0.20 * bounded_ratio(mean_reward, 2.0, upper=1.0))),
+                    semantic=vector.semantic,
+                    novelty=vector.novelty,
+                    expandability=vector.expandability,
+                    structural_risk=vector.structural_risk,
+                    coverage_gain=vector.coverage_gain,
+                )
+            modifier = multiplicative_cost_modifier(
+                CostVector(
+                    redundancy=bounded_ratio(float(recent_operator_counts[operator]), 4.0)
+                    + bounded_ratio(float(pulls), 24.0, upper=0.5),
+                ),
+                weights=OPERATOR_OBJECTIVE_SPEC.cost,
+                min_modifier=0.20,
+                max_modifier=1.10,
+            )
             scores[operator] = (
-                mean_reward
-                + exploration_bonus
+                (
+                    constrained_objective_score(
+                        vector,
+                        cost=CostVector(),
+                        spec=OPERATOR_OBJECTIVE_SPEC,
+                        validity=validity_floor,
+                        false_positive_risk=0.0,
+                    )
+                    * modifier
+                )
                 - recent_penalty
-                + target_affinity_bonus
-                + structural_affinity_bonus
                 + learning_bonus
                 + energy_bonus
                 + swarm_bonus
@@ -1907,8 +2040,6 @@ class FeedbackState:
             ],
         }
 
-    _feedback_selection_snapshot = _feedback_decision_snapshot
-
     @staticmethod
     def _decrement_counter_values(counter: Counter[str], values: list[str]) -> None:
         for value in values:
@@ -1957,33 +2088,6 @@ class FeedbackState:
             false_positive=false_positive,
         )
         return reward
-
-    def record_candidate_result(
-        self,
-        candidate_source: str,
-        *,
-        has_finding: bool,
-        is_new_behavior: bool,
-        preflight: dict[str, Any],
-        candidate_bug: bool = False,
-        semantic_divergence: bool = False,
-        false_positive: bool = False,
-        candidate_bug_families: list[str] | None = None,
-        candidate_bug_signatures: list[str] | None = None,
-        reward_adjustment: float = 0.0,
-    ) -> float | None:
-        return self.record_candidate_outcome(
-            candidate_source,
-            has_finding=has_finding,
-            is_new_behavior=is_new_behavior,
-            preflight=preflight,
-            candidate_bug=candidate_bug,
-            semantic_divergence=semantic_divergence,
-            false_positive=false_positive,
-            candidate_bug_families=candidate_bug_families,
-            candidate_bug_signatures=candidate_bug_signatures,
-            reward_adjustment=reward_adjustment,
-        )
 
     def record_feedback_outcome_reward(
         self,
@@ -2340,8 +2444,7 @@ class FeedbackState:
             "enable_disagreement_bd_axis": self.enable_disagreement_bd_axis,
             "enable_champion_corpus": self.enable_champion_corpus,
             "enable_champion_graft_donor_bandit": self.enable_champion_graft_donor_bandit,
-            "seed_quota": self.quota_manager.to_state_dict(),
-            "last_feedback_selection": dict(self.last_feedback_decision),
+            "seed_eviction_policy": self.seed_eviction_policy.to_state_dict(),
             "last_feedback_decision": dict(self.last_feedback_decision),
             "persisted_count": self.persisted_count,
             "source_scheduler": (
@@ -2593,12 +2696,14 @@ class FeedbackState:
             operator_names=state._mutation_operator_profiles().keys(),
         )
         state.operator_swarm.ensure_operators(state._mutation_operator_profiles())
-        state.quota_manager = SeedQuotaManager.from_state_dict(data.get("seed_quota"))
-        state.quota_manager.enabled = bool(state.enable_seed_quota and state.quota_manager.enabled)
-        state._apply_discovery_exploration_weight()
-        state.last_feedback_decision = dict(
-            data.get("last_feedback_selection", data.get("last_feedback_decision", {})) or {}
+        state.seed_eviction_policy = SeedEvictionPolicy.from_state_dict(
+            data.get("seed_eviction_policy", data.get("seed_quota"))
         )
+        state.seed_eviction_policy.enabled = bool(
+            state.enable_seed_quota and state.seed_eviction_policy.enabled
+        )
+        state._apply_discovery_exploration_weight()
+        state.last_feedback_decision = dict(data.get("last_feedback_decision", {}) or {})
         state.persisted_count = int(data.get("persisted_count", 0) or 0)
         state._sync_recent_parent_counts()
         state._sync_recent_cluster_counts()
@@ -2612,7 +2717,8 @@ class FeedbackState:
         return state
 
     def _mark_seed_frontier_dirty(self) -> None:
-        self.seed_frontier_dirty = True
+        self.seed_frontier.mark_dirty()
+        self._sync_seed_frontier_component_state()
 
     def _seed_frontier_snapshot(
         self,
@@ -2620,37 +2726,26 @@ class FeedbackState:
         limit: int,
         excluded_indexes: set[int] | None = None,
     ) -> list[dict[str, Any]]:
-        self._ensure_seed_frontier()
-        excluded = excluded_indexes or set()
-        rows: list[dict[str, Any]] = []
-        for priority in heapq.nsmallest(max(0, limit) + len(excluded), self.seed_frontier_heap):
-            index = int(priority[-1])
-            if index in excluded:
-                continue
-            rows.append(self._seed_frontier_row(index))
-            if len(rows) >= limit:
-                break
-        return rows
+        return self.seed_frontier.snapshot(
+            indexes=range(len(self.interesting_cases)),
+            limit=limit,
+            excluded_indexes=excluded_indexes,
+        )
 
     def _seed_frontier_rank(self, index: int) -> int:
-        self._ensure_seed_frontier()
-        selected = next(
-            (priority for priority in self.seed_frontier_heap if int(priority[-1]) == int(index)),
-            None,
+        return self.seed_frontier.rank(
+            indexes=range(len(self.interesting_cases)),
+            index=index,
         )
-        if selected is None:
-            return 0
-        return 1 + sum(1 for priority in self.seed_frontier_heap if priority < selected)
 
     def _ensure_seed_frontier(self) -> None:
-        if not self.seed_frontier_dirty:
-            return
         self._align_seed_metadata_lengths()
-        heap: list[tuple[float, float, float, int, int, int]] = []
-        for index in range(len(self.interesting_cases)):
-            heapq.heappush(heap, self._seed_frontier_priority(index))
-        self.seed_frontier_heap = heap
-        self.seed_frontier_dirty = False
+        self.seed_frontier.ensure(range(len(self.interesting_cases)))
+        self._sync_seed_frontier_component_state()
+
+    def _sync_seed_frontier_component_state(self) -> None:
+        self.seed_frontier_heap = list(self.seed_frontier.heap)
+        self.seed_frontier_dirty = bool(self.seed_frontier.dirty)
 
     def _seed_frontier_priority(self, index: int) -> tuple[float, float, float, int, int, int]:
         cluster_key = self._case_cluster_key_at(index)
@@ -2762,7 +2857,6 @@ def _generated_candidate_metadata(case: Case) -> dict[str, Any]:
             "detail": "generated",
             "changed": False,
         },
-        "feedback_selection": {},
         "feedback_decision": {},
     }
 

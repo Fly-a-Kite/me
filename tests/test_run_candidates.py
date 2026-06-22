@@ -85,7 +85,7 @@ def test_generate_candidate_batch_uses_feedback_metadata_and_quality_context():
                     "depth": 1,
                 },
                 "mutation": {"operator": "value", "detail": "x", "changed": True},
-                "feedback_selection": {"target_keys": ["semantic_family:cast_semantics"]},
+                "feedback_decision": {"target_keys": ["semantic_family:cast_semantics"]},
             }
             return generated
 
@@ -257,7 +257,7 @@ def test_generate_candidate_batch_falls_back_after_replay_filter_saturation():
     assert meta["replay_filter"]["last_skip_reason"] == "issue_replay_probe"
 
 
-def test_replay_filter_runs_before_feedback_selection_for_generated_candidates():
+def test_replay_filter_runs_before_feedback_decision_for_generated_candidates():
     class FeedbackShouldNotBeCalled:
         def select_case(self, seed, generated):
             raise AssertionError("replay-filtered generated candidates must not enter feedback selection")

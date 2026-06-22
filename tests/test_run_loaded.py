@@ -101,6 +101,8 @@ def test_run_loaded_case_impl_emits_row_shape_metadata_and_signatures():
     assert row["targets"] == [{"name": "left"}, {"name": "right"}]
     assert row["normalized"]["left"]["rows"] == [[1]]
     assert row["metamorphic"] == {}
+    assert row["witness_oracle"]["contract_present"] is False
+    assert row["witness_oracle"]["enabled"] is False
     assert row["candidate_recheck"]["enabled"] is False
     assert row["behavior_signature"]
     assert row["discovery_signature"]
@@ -176,6 +178,83 @@ def test_run_loaded_case_impl_executes_selected_metamorphic_variants_and_cross_v
     assert row["metamorphic_selection"]["executed_relations"] == ["target"]
     assert row["oracle_cross_validation"]["cross_validated_count"] == 1
     assert row["oracle_cross_validation"]["metamorphic_only_count"] == 0
+    assert row["status"] == "bug"
+
+
+def test_run_loaded_case_impl_records_witness_summary_without_counting_when_disabled():
+    case = _case(50)
+    case.metadata["witness_contract"] = {
+        "kind": "row_containment",
+        "row": {"x": 50},
+    }
+
+    row = run_loaded_case_impl(
+        case,
+        ["left", "right"],
+        config=ExperimentConfig(enable_witness_oracle=False),
+        save_artifact=False,
+        target_specs=[],
+        execute_case_fn=lambda *args, **kwargs: (_raw(), _normalized(50, 51)),
+        evaluate_case_fn=lambda case_arg, normalized: [],
+    )
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    assert row["witness_oracle"]["contract_present"] is True
+    assert row["witness_oracle"]["enabled"] is False
+    assert row["witness_oracle"]["failing_backends"] == ["right"]
+
+
+def test_run_loaded_case_impl_counts_witness_finding_when_enabled():
+    case = _case(60)
+    case.metadata["witness_contract"] = {
+        "kind": "row_containment",
+        "row": {"x": 60},
+        "reason": "PQS-style pivot row should remain present",
+    }
+
+    row = run_loaded_case_impl(
+        case,
+        ["left", "right"],
+        config=ExperimentConfig(enable_witness_oracle=True),
+        save_artifact=False,
+        target_specs=[],
+        execute_case_fn=lambda *args, **kwargs: (_raw(), _normalized(60, 61)),
+        evaluate_case_fn=lambda case_arg, normalized: [],
+        annotate_findings_fn=lambda *args, **kwargs: None,
+    )
+
+    assert row["status"] == "bug"
+    assert row["witness_oracle"]["enabled"] is True
+    assert row["witness_oracle"]["failing_backends"] == ["right"]
+    assert [finding["oracle"] for finding in row["findings"]] == ["witness"]
+    assert row["findings"][0]["kind"] == "witness_row_containment_violation"
+    assert row["findings"][0]["suspicious_backends"] == ["right"]
+    assert row["findings"][0]["triage_verdict"] == "candidate_implementation_bug"
+    assert row["findings"][0]["adjudication"]["semantic_gate"] == "witness_contract"
+
+
+def test_run_loaded_case_impl_can_infer_witness_contract_when_enabled():
+    case = Case(
+        "case-infer-witness",
+        70,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 70}])],
+        Program("prog-infer-witness", 70, [{"op": "filter", "column": "x", "cmp": "==", "value": 70}]),
+    )
+
+    row = run_loaded_case_impl(
+        case,
+        ["left", "right"],
+        config=ExperimentConfig(enable_witness_oracle=True),
+        save_artifact=False,
+        target_specs=[],
+        execute_case_fn=lambda *args, **kwargs: (_raw(), _normalized(70, 71)),
+        evaluate_case_fn=lambda case_arg, normalized: [],
+        annotate_findings_fn=lambda *args, **kwargs: None,
+    )
+
+    assert row["witness_oracle"]["contract"]["source"] == "inferred_row_preserving_pipeline"
+    assert row["witness_oracle"]["failing_backends"] == ["right"]
     assert row["status"] == "bug"
 
 

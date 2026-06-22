@@ -18,6 +18,13 @@ from datadiff.dsl import Case, ColumnSpec, IRNode, Program, TableData, normalize
 from datadiff.energy import operator_energy
 from datadiff.identifiers import make_safe_output_name
 from datadiff.join_keys import join_key_arg, join_key_pairs
+from datadiff.multi_objective import (
+    CostVector,
+    ObjectiveVector,
+    PLAN_STEP_OBJECTIVE_SPEC,
+    bounded_ratio,
+    constrained_objective_score,
+)
 from datadiff.mutator_ir import (
     apply_adjacent_independent_swap,
     apply_filter_pushdown,
@@ -212,6 +219,7 @@ class MutationPlanStep:
     productive: bool
     heuristic_score: float
     operator_score: float
+    applicability_score: float
     target_affinity: float
     divergence_affinity: float
     novelty_bonus: float
@@ -232,6 +240,7 @@ class MutationPlanStep:
             "fallback_used": self.fallback_used,
             "heuristic_score": self.heuristic_score,
             "operator_score": self.operator_score,
+            "applicability_score": self.applicability_score,
             "target_affinity": self.target_affinity,
             "divergence_affinity": self.divergence_affinity,
             "novelty_bonus": self.novelty_bonus,
@@ -249,6 +258,7 @@ class MutationPlan:
     steps: list[MutationPlanStep] = field(default_factory=list)
     top_operators: list[dict[str, Any]] = field(default_factory=list)
     annealing_temperature: float = 0.0
+    candidate_count: int = 0
     changed: bool = False
     final_tables: list[TableData] | None = field(default=None, repr=False)
     final_operations: list[dict[str, Any]] | None = field(default=None, repr=False)
@@ -261,6 +271,7 @@ class MutationPlan:
             "executed_depth": self.executed_depth,
             "changed": self.changed,
             "annealing_temperature": self.annealing_temperature,
+            "candidate_count": self.candidate_count,
             "top_operators": [dict(row) for row in self.top_operators],
             "steps": [step.to_dict() for step in self.steps],
         }
@@ -274,6 +285,10 @@ class MutationOperator:
     semantic_signal_affinity: tuple[str, ...]
     exploration_objective_affinity: tuple[str, ...]
     divergence_affinity: tuple[str, ...]
+    structural_risk_tags: tuple[str, ...]
+    coverage_axes: tuple[str, ...]
+    expandability_bias: float
+    validity_floor: float
 
     def __init__(
         self,
@@ -283,6 +298,10 @@ class MutationOperator:
         semantic_signal_affinity: tuple[str, ...] = (),
         exploration_objective_affinity: tuple[str, ...] = (),
         divergence_affinity: tuple[str, ...] = (),
+        structural_risk_tags: tuple[str, ...] = (),
+        coverage_axes: tuple[str, ...] = (),
+        expandability_bias: float = 0.0,
+        validity_floor: float = 0.5,
         *,
         semantic_affinity: tuple[str, ...] | None = None,
     ) -> None:
@@ -297,6 +316,10 @@ class MutationOperator:
             tuple(exploration_objective_affinity),
         )
         object.__setattr__(self, "divergence_affinity", tuple(divergence_affinity))
+        object.__setattr__(self, "structural_risk_tags", tuple(structural_risk_tags))
+        object.__setattr__(self, "coverage_axes", tuple(coverage_axes))
+        object.__setattr__(self, "expandability_bias", float(expandability_bias))
+        object.__setattr__(self, "validity_floor", max(0.0, min(1.0, float(validity_floor))))
 
     @property
     def semantic_affinity(self) -> tuple[str, ...]:
@@ -576,19 +599,31 @@ def _build_mutation_plan(
     executed_steps: list[MutationPlanStep] = []
     top_operators: list[dict[str, Any]] = []
     annealing_temperature = 0.0
+    total_candidate_count = 0
     for step_index in range(planned_depth):
         step_seed = _mutation_step_seed(seed, case.seed, step_index)
         step_rnd = random.Random(step_seed)
+        current_context = _mutation_operation_context(current_tables, current_operations)
+        applicability_scores = _mutation_operator_applicability_snapshot(
+            operator_pool,
+            current_context,
+        )
         attempt_order = _mutation_attempt_order(
             operator_pool,
             step_rnd,
             operator_scores=operator_score_map,
+            applicability_scores=applicability_scores,
         )
         if step_index == 0:
-            top_operators = _ranked_operator_snapshot(attempt_order, operator_score_map)
+            top_operators = _ranked_operator_snapshot(
+                attempt_order,
+                operator_score_map,
+                applicability_scores=applicability_scores,
+            )
             annealing_temperature = _mutation_selection_temperature(
                 attempt_order,
                 operator_score_map,
+                applicability_scores=applicability_scores,
             )
         selected_tables: list[TableData] | None = None
         selected_operations: list[dict[str, Any]] | None = None
@@ -627,6 +662,7 @@ def _build_mutation_plan(
                     enable_divergence_conditioned_mutations=enable_divergence_conditioned_mutations,
                     target_affinity=target_affinities.get(operator.name, 0.0),
                     divergence_affinity=divergence_affinities.get(operator.name, 0.0),
+                    applicability_score=applicability_scores.get(operator.name, 0.0),
                     enable_value_catalog=enable_value_catalog,
                     value_catalog_scores=value_catalog_scores,
                     prior_steps=executed_steps,
@@ -640,6 +676,7 @@ def _build_mutation_plan(
                     selected_key = candidate_key
                 candidate_rank += 1
                 candidate_count += 1
+                total_candidate_count += 1
             if candidate_count >= candidate_budget:
                 break
         if selected_step is None or selected_tables is None or selected_operations is None:
@@ -666,6 +703,7 @@ def _build_mutation_plan(
         steps=executed_steps,
         top_operators=top_operators[:8],
         annealing_temperature=annealing_temperature,
+        candidate_count=total_candidate_count,
         changed=changed,
         final_tables=current_tables,
         final_operations=current_operations,
@@ -732,6 +770,7 @@ def _simulate_mutation_step(
     state_cache: _MutationStateCache | None = None,
     target_affinity: float | None = None,
     divergence_affinity: float | None = None,
+    applicability_score: float = 0.0,
 ) -> tuple[list[TableData], list[dict[str, Any]], MutationPlanStep]:
     preserves_tables = _operator_preserves_tables(operator)
     preserves_operations = _operator_preserves_operations(operator)
@@ -807,6 +846,7 @@ def _simulate_mutation_step(
         changed=changed,
         productive=productive,
         operator_score=operator_score,
+        applicability_score=applicability_score,
         target_affinity=resolved_target_affinity,
         divergence_affinity=resolved_divergence_affinity,
         novelty_bonus=novelty_bonus,
@@ -821,6 +861,7 @@ def _simulate_mutation_step(
         productive=productive,
         heuristic_score=heuristic_score,
         operator_score=operator_score,
+        applicability_score=applicability_score,
         target_affinity=resolved_target_affinity,
         divergence_affinity=resolved_divergence_affinity,
         novelty_bonus=novelty_bonus + resolved_divergence_affinity,
@@ -1019,28 +1060,78 @@ def _mutation_plan_step_score(
     changed: bool,
     productive: bool,
     operator_score: float,
+    applicability_score: float,
     target_affinity: float,
     divergence_affinity: float,
     novelty_bonus: float,
     resulting_operation_count: int,
     prior_steps: Sequence[MutationPlanStep],
 ) -> float:
-    score = operator_score + target_affinity + divergence_affinity + novelty_bonus
-    if changed:
-        score += 0.85
-    else:
-        score -= 1.25
-    if productive:
-        score += 0.65
-    else:
-        score -= 0.25
+    discovery_signal = min(
+        1.75,
+        bounded_ratio(operator_score, 3.0, upper=1.25)
+        + (0.35 * bounded_ratio(applicability_score, 1.0))
+        + (0.65 if changed else 0.0)
+        + (0.45 if productive else 0.0),
+    )
+    semantic_signal = min(
+        1.50,
+        bounded_ratio(target_affinity, 0.75)
+        + bounded_ratio(divergence_affinity, 0.30)
+        + bounded_ratio(novelty_bonus, 0.18),
+    )
+    behavior_signal = 0.35 if productive else (0.10 if changed else 0.0)
+    structural_signal = 0.08 if (
+        detail.startswith("append_") or detail.startswith("join:") or detail.startswith("groupby:")
+    ) else 0.0
+    vector = ObjectiveVector(
+        discovery=discovery_signal,
+        semantic=semantic_signal,
+        novelty=bounded_ratio(novelty_bonus, 0.18),
+        expandability=min(
+            1.0,
+            (0.18 if productive and resulting_operation_count <= 8 else 0.0)
+            + max(0.0, float(operator.expandability_bias))
+            + (0.10 * bounded_ratio(applicability_score, 1.0)),
+        ),
+        structural_risk=min(
+            1.0,
+            structural_signal + (0.08 * len(operator.structural_risk_tags)),
+        ),
+        coverage_gain=min(
+            1.0,
+            (0.10 if changed and operator_score > 0.0 else 0.0)
+            + (0.08 * bounded_ratio(applicability_score, 1.0))
+            + (0.04 * len(operator.coverage_axes[:4])),
+        ),
+    )
     if detail.startswith("append_") or detail.startswith("join:") or detail.startswith("groupby:"):
-        score += 0.10
-    repeated_penalty = 0.0
-    if prior_steps and any(step.operator == operator.name for step in prior_steps):
-        repeated_penalty += 0.20
-    complexity_penalty = max(0.0, resulting_operation_count - 8) * 0.06
-    return score - repeated_penalty - complexity_penalty
+        vector = ObjectiveVector(
+            discovery=vector.discovery,
+            semantic=vector.semantic,
+            novelty=vector.novelty,
+            expandability=vector.expandability,
+            structural_risk=min(1.0, vector.structural_risk + 0.10),
+            coverage_gain=vector.coverage_gain,
+        )
+    cost = CostVector(
+        invalidity=max(0.0, 1.0 - bounded_ratio(applicability_score, 1.0)) if not changed else 0.0,
+        redundancy=0.45 if (prior_steps and any(step.operator == operator.name for step in prior_steps)) else 0.0,
+        runtime_cost=bounded_ratio(max(0.0, resulting_operation_count - 8), 8.0),
+    )
+    score = constrained_objective_score(
+        vector,
+        cost=cost,
+        spec=PLAN_STEP_OBJECTIVE_SPEC,
+        validity=min(
+            bounded_ratio(applicability_score, 1.0),
+            float(operator.validity_floor) if changed else bounded_ratio(applicability_score, 1.0),
+        ),
+        false_positive_risk=0.0,
+    )
+    if not productive:
+        score -= 0.18
+    return score
 
 
 def _mutation_step_seed(seed: int, case_seed: int, step_index: int) -> int:
@@ -1080,11 +1171,14 @@ def _advance_plan_operator_scores(
 def _ranked_operator_snapshot(
     attempt_order: Sequence[MutationOperator],
     operator_scores: Mapping[str, float] | None,
+    *,
+    applicability_scores: Mapping[str, float] | None = None,
 ) -> list[dict[str, Any]]:
     return [
         {
             "operator": operator.name,
             "score": _mutation_operator_score(operator.name, operator_scores),
+            "applicability_score": float((applicability_scores or {}).get(operator.name, 0.0)),
         }
         for operator in attempt_order[:8]
     ]
@@ -1093,6 +1187,8 @@ def _ranked_operator_snapshot(
 def _mutation_selection_temperature(
     attempt_order: Sequence[MutationOperator],
     operator_scores: Mapping[str, float] | None,
+    *,
+    applicability_scores: Mapping[str, float] | None = None,
 ) -> float:
     if not operator_scores:
         return 0.0
@@ -1100,6 +1196,7 @@ def _mutation_selection_temperature(
     return _mutation_annealing_temperature(
         list(attempt_order[1:]),
         operator_scores=operator_scores,
+        applicability_scores=applicability_scores,
         untried_score=untried_score,
     )
 
@@ -1109,6 +1206,7 @@ def _mutation_attempt_order(
     rnd: random.Random,
     *,
     operator_scores: Mapping[str, float] | None = None,
+    applicability_scores: Mapping[str, float] | None = None,
 ) -> list[MutationOperator]:
     order = rnd.sample(list(operator_pool), k=len(operator_pool))
     if not operator_scores:
@@ -1117,6 +1215,7 @@ def _mutation_attempt_order(
     ranked = sorted(
         order,
         key=lambda operator: (
+            float((applicability_scores or {}).get(operator.name, 0.0)),
             float(operator_scores.get(operator.name, untried_score)),
             rnd.random(),
         ),
@@ -1127,6 +1226,7 @@ def _mutation_attempt_order(
     temperature = _mutation_annealing_temperature(
         ranked[1:],
         operator_scores=operator_scores,
+        applicability_scores=applicability_scores,
         untried_score=untried_score,
     )
     return [
@@ -1135,6 +1235,7 @@ def _mutation_attempt_order(
             ranked[1:],
             rnd,
             operator_scores=operator_scores,
+            applicability_scores=applicability_scores,
             untried_score=untried_score,
             temperature=temperature,
         ),
@@ -1146,6 +1247,7 @@ def _annealed_operator_tail(
     rnd: random.Random,
     *,
     operator_scores: Mapping[str, float],
+    applicability_scores: Mapping[str, float] | None,
     untried_score: float,
     temperature: float,
 ) -> list[MutationOperator]:
@@ -1161,9 +1263,15 @@ def _annealed_operator_tail(
         best = remaining[0]
         proposal_index = rnd.randrange(len(remaining))
         proposal = remaining[proposal_index]
-        best_score = float(operator_scores.get(best.name, untried_score))
-        proposal_score = float(operator_scores.get(proposal.name, untried_score))
-        delta = proposal_score - best_score
+        best_score = (
+            float((applicability_scores or {}).get(best.name, 0.0)),
+            float(operator_scores.get(best.name, untried_score)),
+        )
+        proposal_score = (
+            float((applicability_scores or {}).get(proposal.name, 0.0)),
+            float(operator_scores.get(proposal.name, untried_score)),
+        )
+        delta = (proposal_score[0] - best_score[0]) + (proposal_score[1] - best_score[1])
         accept = proposal_index == 0 or delta >= 0.0 or rnd.random() < math.exp(delta / current_temperature)
         selected.append(remaining.pop(proposal_index if accept else 0))
         current_temperature *= MUTATION_OPERATOR_ANNEALING_DECAY
@@ -1174,12 +1282,21 @@ def _mutation_annealing_temperature(
     ranked_tail: list[MutationOperator],
     *,
     operator_scores: Mapping[str, float],
+    applicability_scores: Mapping[str, float] | None,
     untried_score: float,
 ) -> float:
     if len(ranked_tail) <= 1:
         return 0.0
-    scores = [float(operator_scores.get(operator.name, untried_score)) for operator in ranked_tail]
-    spread = max(scores) - min(scores)
+    scores = [
+        (
+            float((applicability_scores or {}).get(operator.name, 0.0)),
+            float(operator_scores.get(operator.name, untried_score)),
+        )
+        for operator in ranked_tail
+    ]
+    best = max(scores)
+    worst = min(scores)
+    spread = (best[0] - worst[0]) + (best[1] - worst[1])
     # Wider score separation means feedback is confident; near-ties keep more exploration.
     return max(
         MUTATION_OPERATOR_ANNEALING_MIN_TEMPERATURE,
@@ -1197,7 +1314,7 @@ def _mutation_selection_metadata(
     if not operator_scores:
         payload = {
             "strategy": "random_operator_shuffle",
-            "candidate_count": len(attempt_order),
+            "candidate_count": plan.candidate_count if plan is not None else len(attempt_order),
             "selected_operator": selected_operator,
         }
         if plan is not None:
@@ -1223,13 +1340,14 @@ def _mutation_selection_metadata(
     tail = [operator for operator in attempt_order if operator.name != ranked[0]["operator"]]
     payload = {
         "strategy": "feedback_score_with_annealed_tail",
-        "candidate_count": len(attempt_order),
+        "candidate_count": plan.candidate_count if plan is not None else len(attempt_order),
         "selected_operator": selected_operator,
         "selected_operator_score": selected_score,
         "selected_score_rank": selected_rank,
         "annealing_temperature": _mutation_annealing_temperature(
             tail,
             operator_scores=operator_scores,
+            applicability_scores=None,
             untried_score=untried_score,
         ),
         "annealing_decay": MUTATION_OPERATOR_ANNEALING_DECAY,
@@ -1296,6 +1414,61 @@ def _mutation_detail_is_unproductive(detail: str) -> bool:
         or first.startswith("not-enough")
         or first in {"too-few-columns", "duplicate-keys"}
     )
+
+
+def _mutation_operator_applicability_snapshot(
+    operator_pool: Sequence[MutationOperator],
+    context: MutationOperationContext | None,
+) -> dict[str, float]:
+    return {
+        operator.name: _mutation_operator_applicability(operator, context)
+        for operator in operator_pool
+    }
+
+
+def _mutation_operator_applicability(
+    operator: MutationOperator,
+    context: MutationOperationContext | None,
+) -> float:
+    if context is None:
+        return 0.0
+    available_count = len(context.available)
+    numeric_count = len(context.numeric)
+    bool_count = len(context.bools)
+    string_count = len(context.strings)
+    membership_pairs = _compatible_membership_key_pairs_for_context(context) if context.extra_tables else []
+    join_pair_count = len(membership_pairs)
+    multi_key_join_pair_count = sum(1 for _, left_columns, _ in membership_pairs if len(left_columns) > 1)
+    aggregate_column_count = sum(
+        1 for column in context.available
+        if column.startswith(NUMERIC_ALIAS_PREFIXES) or column.startswith(BOOLEAN_ALIAS_PREFIXES)
+    )
+    name = operator.name
+    if name in {"append_numeric_text_boolean_antijoin_case_aggregate", "append_boolean_membership_case_aggregate", "append_boolean_antijoin_case_aggregate"}:
+        return min(1.0, 0.35 + (0.45 if bool_count > 0 else 0.0) + (0.20 if numeric_count > 0 or string_count > 0 else 0.0))
+    if name in {"append_left_join_boolean_case_aggregate", "append_left_join_boolean_coalesce_case_aggregate", "append_left_join_boolean_coalesce_filter_aggregate"}:
+        return min(1.0, 0.20 + (0.45 if join_pair_count > 0 else 0.0) + (0.35 if bool_count > 0 else 0.0))
+    if name == "append_multi_key_membership_case_aggregate":
+        return min(1.0, 0.20 + (0.55 if multi_key_join_pair_count > 0 else 0.0) + (0.25 if bool_count > 0 else 0.0))
+    if name == "append_left_join_case_membership":
+        return min(1.0, 0.25 + (0.60 if join_pair_count > 0 else 0.0))
+    if name == "append_left_join_coalesce_membership":
+        return min(1.0, 0.20 + (0.45 if join_pair_count > 0 else 0.0) + (0.25 if string_count > 0 else 0.0))
+    if name == "append_join_filter_groupby_topk":
+        return min(1.0, 0.20 + (0.35 if join_pair_count > 0 else 0.0) + (0.25 if aggregate_column_count > 0 else 0.0) + (0.20 if numeric_count > 0 else 0.0))
+    if name in {"append_sql_distinct_null_topk", "append_sql_union_coalesce_distinct_topk", "append_normalized_string_membership"}:
+        return min(1.0, 0.20 + (0.65 if string_count > 0 else 0.0))
+    if name in {"append_empty_filter_global_aggregate", "append_grouped_topk", "append_running_sum", "append_truth_filter"}:
+        return min(1.0, 0.20 + (0.65 if numeric_count > 0 else 0.0))
+    if name == "append_coalesce_sort_topk":
+        return min(1.0, 0.20 + (0.50 if available_count > 0 else 0.0) + (0.20 if string_count > 0 or numeric_count > 0 else 0.0))
+    if name.startswith("ir_"):
+        return 0.75 if available_count > 0 else 0.0
+    if name.startswith("shrink_"):
+        return 0.65 if available_count > 0 else 0.0
+    if name.startswith("append_"):
+        return 0.50 if available_count > 0 else 0.0
+    return 0.40 if available_count > 0 else 0.0
 
 
 def _mutation_schema(
@@ -4470,18 +4643,34 @@ def _with_inferred_objective_affinity(
 
 
 def _operator_with_inferred_objective_affinity(operator: MutationOperator) -> MutationOperator:
-    if operator.exploration_objective_affinity:
-        return operator
-    inferred = _infer_operator_objective_affinity(operator)
-    if not inferred:
+    inferred_objectives = operator.exploration_objective_affinity or _infer_operator_objective_affinity(operator)
+    inferred_risk_tags = operator.structural_risk_tags or _infer_operator_structural_risk_tags(operator)
+    inferred_coverage_axes = operator.coverage_axes or _infer_operator_coverage_axes(operator)
+    inferred_expandability = (
+        operator.expandability_bias
+        if operator.expandability_bias > 0.0
+        else _infer_operator_expandability_bias(operator)
+    )
+    inferred_validity_floor = min(operator.validity_floor, _infer_operator_validity_floor(operator))
+    if (
+        inferred_objectives == operator.exploration_objective_affinity
+        and inferred_risk_tags == operator.structural_risk_tags
+        and inferred_coverage_axes == operator.coverage_axes
+        and abs(inferred_expandability - operator.expandability_bias) < 1e-12
+        and abs(inferred_validity_floor - operator.validity_floor) < 1e-12
+    ):
         return operator
     return MutationOperator(
         operator.name,
         operator.apply,
         semantic_family_affinity=operator.semantic_family_affinity,
         semantic_signal_affinity=operator.semantic_signal_affinity,
-        exploration_objective_affinity=inferred,
+        exploration_objective_affinity=inferred_objectives,
         divergence_affinity=operator.divergence_affinity,
+        structural_risk_tags=inferred_risk_tags,
+        coverage_axes=inferred_coverage_axes,
+        expandability_bias=inferred_expandability,
+        validity_floor=inferred_validity_floor,
     )
 
 
@@ -4512,6 +4701,90 @@ def _infer_operator_objective_affinity(operator: MutationOperator) -> tuple[str,
     if operator.name in {"append_op", "drop_op", "tweak_op"} or operator.name.endswith("_probe"):
         add("coverage_breadth")
     return tuple(objectives)
+
+
+def _infer_operator_structural_risk_tags(operator: MutationOperator) -> tuple[str, ...]:
+    text = " ".join(
+        (
+            operator.name,
+            *operator.semantic_family_affinity,
+            *operator.semantic_signal_affinity,
+            *operator.exploration_objective_affinity,
+        )
+    )
+    tags: list[str] = []
+
+    def add(*values: str) -> None:
+        for value in values:
+            if value not in tags:
+                tags.append(value)
+
+    if any(fragment in text for fragment in ("join", "membership", "semi", "anti")):
+        add("join_cardinality", "join_null_semantics")
+    if any(fragment in text for fragment in ("groupby", "aggregate", "topk", "distinct")):
+        add("aggregation_boundary")
+    if any(fragment in text for fragment in ("sort", "window", "running", "rolling", "offset", "limit")):
+        add("ordering_boundary")
+    if any(fragment in text for fragment in ("filter", "predicate", "truth", "case", "boolean")):
+        add("predicate_pushdown_boundary")
+    if any(fragment in text for fragment in ("cast", "string", "timestamp", "float", "csv", "arrow", "numeric")):
+        add("type_coercion_boundary")
+    if operator.name.startswith("ir_"):
+        add("rewrite_equivalence")
+    if operator.name.startswith("shrink_"):
+        add("reduction_equivalence")
+    return tuple(tags)
+
+
+def _infer_operator_coverage_axes(operator: MutationOperator) -> tuple[str, ...]:
+    axes: list[str] = []
+
+    def add(*values: str) -> None:
+        for value in values:
+            if value not in axes:
+                axes.append(value)
+
+    for family in operator.semantic_family_affinity:
+        add(f"family:{family}")
+    for signal in operator.semantic_signal_affinity:
+        add(f"signal:{signal}")
+    for objective in operator.exploration_objective_affinity:
+        add(f"objective:{objective}")
+    for tag in operator.structural_risk_tags:
+        add(f"risk:{tag}")
+    if operator.name.startswith("ir_"):
+        add("mutation_kind:rewrite")
+    elif operator.name.startswith("shrink_"):
+        add("mutation_kind:shrink")
+    elif operator.name.startswith("append_"):
+        add("mutation_kind:append")
+    else:
+        add("mutation_kind:base")
+    return tuple(axes)
+
+
+def _infer_operator_expandability_bias(operator: MutationOperator) -> float:
+    score = 0.0
+    if operator.name.startswith("append_"):
+        score += 0.18
+    if operator.name.startswith("ir_"):
+        score += 0.10
+    if operator.name.startswith("shrink_"):
+        score -= 0.12
+    if any(tag in {"join_cardinality", "aggregation_boundary", "ordering_boundary"} for tag in operator.structural_risk_tags):
+        score += 0.12
+    return max(0.0, min(0.5, score))
+
+
+def _infer_operator_validity_floor(operator: MutationOperator) -> float:
+    floor = 0.70
+    if operator.name.startswith("ir_"):
+        floor -= 0.08
+    if operator.name.startswith("shrink_"):
+        floor -= 0.04
+    if any(tag in {"rewrite_equivalence", "reduction_equivalence"} for tag in operator.structural_risk_tags):
+        floor -= 0.06
+    return max(0.35, min(0.90, floor))
 
 
 MUTATION_OPERATORS = _with_inferred_objective_affinity(MUTATION_OPERATORS)

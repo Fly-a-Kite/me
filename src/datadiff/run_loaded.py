@@ -31,6 +31,7 @@ from datadiff.run_signatures import behavior_signature, discovery_signature
 from datadiff.semantic_contracts import semantic_contract_lattice_payload
 from datadiff.targets import describe_targets
 from datadiff.util import utc_now
+from datadiff.witness_oracle import evaluate_witness_contract, finding_from_witness_result
 
 ExecuteCaseFn = Callable[..., tuple[dict[str, dict[str, Any]], dict[str, Any]]]
 FindingEvaluatorFn = Callable[..., list[Finding]]
@@ -153,6 +154,19 @@ def run_loaded_case_impl(
                 "variant_limit": max(0, int(config.metamorphic_variant_limit)),
             }
     findings = [*differential_findings, *metamorphic_findings]
+    witness_result = evaluate_witness_contract(
+        case,
+        normalized,
+        enabled=bool(config.enable_witness_oracle),
+        infer=bool(config.enable_witness_oracle),
+    )
+    witness_finding = (
+        finding_from_witness_result(case, witness_result)
+        if config.enable_witness_oracle
+        else None
+    )
+    if witness_finding is not None:
+        findings.append(witness_finding)
     if findings:
         annotate_findings_fn(
             case,
@@ -201,6 +215,7 @@ def run_loaded_case_impl(
         "normalized": {k: v.to_dict() for k, v in normalized.items()},
         "metamorphic": metamorphic_rows,
         "metamorphic_selection": metamorphic_selection,
+        "witness_oracle": witness_result.to_dict(),
         "oracle_cross_validation": oracle_cross_validation,
         "findings": [f.to_dict() for f in findings],
         "candidate_recheck": recheck,

@@ -339,13 +339,6 @@ def _project_display_path(value: str | Path | None) -> str:
     return _project_display_path_impl(value, project_root=PROJECT_ROOT)
 
 
-available_bug_audit_probe_ids = list_audit_probe_ids
-run_bug_audit = run_probe_audit
-write_bug_audit_outputs = write_probe_audit_outputs
-write_bug_audit_issue_drafts = write_probe_issue_drafts
-_bug_audit_markdown = render_probe_audit_markdown
-
-
 def _bits(value: float) -> str:
     return hex(struct.unpack(">Q", struct.pack(">d", float(value)))[0])
 

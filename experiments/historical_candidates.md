@@ -1,6 +1,7 @@
 # Historical Bug Candidate Intake
 
-Read `FINAL_GOAL.md` first. This document is the intake list for historical bugs that may become replay evidence after isolated validation. It is not the counted historical registry.
+This document is the intake list for historical bugs that may become replay
+evidence after isolated validation. It is not the counted historical registry.
 
 ## Status Meanings
 

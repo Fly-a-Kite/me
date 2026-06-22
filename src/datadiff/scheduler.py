@@ -21,6 +21,13 @@ from datadiff.reward import aggregate_feedback_summaries
 from datadiff.adaptive_learning import AdaptiveLearningState, context_features_from_mapping
 from datadiff.discovery_rate import DiscoveryRateEstimator
 from datadiff.energy import cost_normalized_reward
+from datadiff.multi_objective import (
+    BATCH_OBJECTIVE_SPEC,
+    CostVector,
+    ObjectiveVector,
+    bounded_ratio,
+    constrained_objective_score,
+)
 from datadiff.source_scheduler import LocalSourceScheduler
 from datadiff.util import iter_jsonl, load_json, read_jsonl, run_meta_path
 
@@ -643,7 +650,6 @@ def _batch_reward(
     candidate_rate = observation.candidate_bug_cases / cases
     new_behavior_rate = observation.signal_new_behavior_cases / cases
     rewardable_semantic_rate = observation.rewardable_semantic_divergence_count / findings
-    resolved_semantic_rate = observation.resolved_semantic_divergence_count / findings
     false_positive_rate = observation.false_positive_count / findings
     manual_confirmation_count = max(
         0,
@@ -656,11 +662,6 @@ def _batch_reward(
         new_global_family_count=new_global_family_count,
         new_local_family_count=new_local_family_count,
     )
-    quality_balance = (
-        (float(observation.quality_pass_count) - float(observation.quality_fail_count))
-        / max(1.0, float(observation.quality_oracle_count))
-    )
-    quality_score_rate = float(observation.quality_score_total) / cases
     source_adjustment_rate = _gated_positive_rate(
         float(observation.source_reward_adjustment_total),
         cases,
@@ -694,29 +695,59 @@ def _batch_reward(
     if observation.first_candidate_bug_elapsed_s is not None:
         elapsed = max(float(observation.elapsed_s), float(observation.first_candidate_bug_elapsed_s), 1e-9)
         early_time_bonus = max(0.0, 1.0 - (float(observation.first_candidate_bug_elapsed_s) / elapsed))
-    reward = (
-        10.0 * candidate_rate
-        + 2.0 * new_behavior_rate
-        + 0.35 * rewardable_semantic_rate
-        - 0.25 * resolved_semantic_rate
-        + 1.5 * new_local_family_count
-        + 3.0 * new_global_family_count
-        + 2.0 * early_case_bonus
-        + 1.0 * early_time_bonus
-        + 3.0 * observation.candidate_bug_discovery_auc
-        + 0.2 * throughput_signal
-        + 0.5 * _gated_positive_value(quality_balance, allow_positive=has_rewardable_signal)
-        + 0.05 * _gated_positive_value(quality_score_rate, allow_positive=has_rewardable_signal)
-        + 1.0 * _gated_positive_value(feedback_mutation_productive_rate, allow_positive=has_rewardable_signal)
-        + 0.75 * _gated_positive_value(guidance_productive_rate, allow_positive=has_rewardable_signal)
-        + 0.35 * source_adjustment_rate
-        + 0.25 * guidance_adjustment_rate
-        + 0.40 * seed_schedule_rate
-        - 1.0 * manual_confirmation_rate
-        - 6.0 * false_positive_rate
-        - (_runtime_cost_penalty(observation) if enable_runtime_cost else 0.0)
-        - 0.5 * guidance_target_miss_rate
-        - 0.2 * redundant_feedback_rate
+    discovery_signal = min(
+        2.0,
+        (1.25 * candidate_rate)
+        + (0.55 * min(1.0, float(new_local_family_count)))
+        + (1.00 * min(1.0, float(new_global_family_count)))
+        + (0.40 * float(observation.candidate_bug_discovery_auc)),
+    )
+    semantic_signal = min(1.5, rewardable_semantic_rate + (0.35 * early_case_bonus))
+    behavior_signal = min(
+        1.25,
+        new_behavior_rate
+        + 0.35 * _gated_positive_value(feedback_mutation_productive_rate, allow_positive=has_rewardable_signal)
+        + 0.20 * _gated_positive_value(guidance_productive_rate, allow_positive=has_rewardable_signal),
+    )
+    structural_signal = min(
+        1.0,
+        0.30 * throughput_signal
+        + 0.20 * early_time_bonus
+        + 0.18 * source_adjustment_rate
+        + 0.14 * guidance_adjustment_rate
+        + 0.18 * seed_schedule_rate,
+    )
+    vector = ObjectiveVector(
+        discovery=discovery_signal,
+        semantic=semantic_signal,
+        novelty=min(
+            1.0,
+            0.40 * min(1.0, float(new_local_family_count))
+            + 0.65 * min(1.0, float(new_global_family_count)),
+        ),
+        expandability=min(
+            1.0,
+            0.35 * _gated_positive_value(feedback_mutation_productive_rate, allow_positive=has_rewardable_signal)
+            + 0.20 * seed_schedule_rate,
+        ),
+        structural_risk=structural_signal,
+        coverage_gain=min(1.0, 0.50 * throughput_signal + 0.25 * early_time_bonus + 0.25 * early_case_bonus),
+    )
+    cost = CostVector(
+        invalidity=_runtime_cost_penalty(observation) if enable_runtime_cost else 0.0,
+        false_positive=false_positive_rate,
+        redundancy=redundant_feedback_rate + bounded_ratio(
+            float(observation.resolved_semantic_divergence_count),
+            float(findings),
+        ),
+        target_miss=guidance_target_miss_rate + manual_confirmation_rate,
+    )
+    reward = constrained_objective_score(
+        vector,
+        cost=cost,
+        spec=BATCH_OBJECTIVE_SPEC,
+        validity=1.0 - cost.invalidity,
+        false_positive_risk=cost.false_positive,
     )
     if observation.findings == 0 and observation.signal_new_behavior_cases == 0:
         reward -= 0.25

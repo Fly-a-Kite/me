@@ -43,6 +43,13 @@ from datadiff.finding_outcomes import (
     suspicious_key,
 )
 from datadiff.mutator import mutation_operator_profiles
+from datadiff.multi_objective import (
+    CostVector,
+    ObjectiveVector,
+    SEED_OBJECTIVE_SPEC,
+    bounded_ratio,
+    constrained_objective_score,
+)
 from datadiff.semantic_signal import CANONICAL_SEMANTIC_SIGNAL_PREFIX, canonical_target_key
 
 
@@ -309,22 +316,48 @@ def guidance_reward_adjustment_from_summary(summary: dict[str, Any]) -> float:
 def seed_schedule_delta_from_summary(summary: dict[str, Any]) -> float:
     signal_new_behavior = bool(summary.get("signal_new_behavior", summary.get("is_new_behavior")))
     suppress_positive_signal = _suppress_auxiliary_positive_feedback(summary)
-    auxiliary_positive_delta = 0.0
-    if not suppress_positive_signal:
-        auxiliary_positive_delta = (
-            (0.5 if signal_new_behavior else 0.0)
-            + 0.25 * float(summary.get("quality_pass_count", 0))
-        )
-    delta = (
-        2.5 * float(summary.get("candidate_bug_count", 0))
-        + 0.5 * float(summary.get("semantic_divergence_needs_confirmation_count", 0))
-        + auxiliary_positive_delta
-        - 1.0 * float(summary.get("false_positive_count", 0))
-        - 0.25 * float(summary.get("resolved_semantic_divergence_count", 0))
-        - 0.10 * float(summary.get("quality_fail_count", 0))
+    discovery_signal = min(1.0, 0.70 * float(summary.get("candidate_bug_count", 0)))
+    semantic_signal = min(
+        1.0,
+        0.60 * float(summary.get("semantic_divergence_needs_confirmation_count", 0)),
     )
+    behavior_signal = 0.0 if suppress_positive_signal else (
+        1.0 if signal_new_behavior else 0.10 * float(summary.get("quality_pass_count", 0))
+    )
+    structural_signal = 0.0 if suppress_positive_signal else (
+        0.25 * bool(summary.get("stored_in_feedback_corpus"))
+        + 0.15 * bool(summary.get("feedback_operator_affinity_hit"))
+    )
+    vector = ObjectiveVector(
+        discovery=discovery_signal,
+        semantic=semantic_signal,
+        novelty=0.0,
+        expandability=0.25 * bool(summary.get("stored_in_feedback_corpus")),
+        structural_risk=0.15 * bool(summary.get("feedback_operator_affinity_hit")),
+        coverage_gain=structural_signal,
+    )
+    cost = CostVector(
+        invalidity=1.0 if (
+            not bool(summary.get("preflight_valid", True))
+            or bool(summary.get("preflight_fallback_used", False))
+        ) else 0.0,
+        false_positive=bounded_ratio(float(summary.get("false_positive_count", 0)), 1.0),
+        redundancy=bounded_ratio(float(summary.get("resolved_semantic_divergence_count", 0)), 2.0)
+        + bounded_ratio(float(summary.get("quality_fail_count", 0)), 4.0),
+    )
+    delta = constrained_objective_score(
+        vector,
+        cost=cost,
+        spec=SEED_OBJECTIVE_SPEC,
+        validity=1.0 - cost.invalidity,
+        false_positive_risk=cost.false_positive,
+    )
+    if bool(summary.get("resolved_semantic_divergence_count", 0)) and not bool(summary.get("rewardable_semantic_divergence", False)):
+        delta -= 0.17
+    if bool(summary.get("source_issue_candidate_bug_count", 0)):
+        delta -= 0.05
     if not bool(summary.get("preflight_valid", True)) or bool(summary.get("preflight_fallback_used", False)):
-        delta -= 0.25
+        delta -= 0.20
     return max(-2.0, min(6.0, delta))
 
 
@@ -385,9 +418,7 @@ def _quality_oracle_signals(oracles: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _feedback_decision_summary(row: dict[str, Any]) -> dict[str, Any]:
-    selection = row.get("feedback_selection")
-    if not isinstance(selection, dict):
-        selection = row.get("feedback_decision", {})
+    selection = row.get("feedback_decision", {})
     if not isinstance(selection, dict):
         selection = {}
     target_keys = [_canonical_feedback_target_key(item) for item in selection.get("target_keys", []) or []]

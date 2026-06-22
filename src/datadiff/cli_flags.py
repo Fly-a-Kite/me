@@ -15,6 +15,14 @@ def add_ablation_flags(
     parser.add_argument("--disable-normalizer", action="store_true")
     parser.add_argument("--disable-differential-oracle", action="store_true")
     parser.add_argument("--enable-metamorphic-oracle", action="store_true")
+    parser.add_argument(
+        "--enable-witness-oracle",
+        action="store_true",
+        help=(
+            "enable experimental SQLancer/PQS-inspired witness-contract checking; "
+            "off by default and should be reported as a separate experiment track"
+        ),
+    )
     parser.add_argument("--disable-feedback", action="store_true")
     parser.add_argument(
         "--enable-replay-bug",

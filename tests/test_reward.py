@@ -1,3 +1,4 @@
+import pytest
 from datadiff.reward import (
     analyze_finding_outcomes,
     aggregate_feedback_summaries,
@@ -333,7 +334,7 @@ def test_feedback_summary_suppresses_auxiliary_rewards_for_resolved_semantic_onl
     assert summary["resolved_semantic_divergence_count"] == 1
     assert summary["source_reward_adjustment"] == 0.0
     assert summary["guidance_reward_adjustment"] == 0.0
-    assert summary["seed_schedule_delta"] == -0.25
+    assert summary["seed_schedule_delta"] == -0.19
 
 
 def test_feedback_summary_suppresses_auxiliary_rewards_for_false_positive_only():
@@ -365,7 +366,7 @@ def test_feedback_summary_suppresses_auxiliary_rewards_for_false_positive_only()
     assert summary["false_positive_count"] == 1
     assert summary["source_reward_adjustment"] == 0.0
     assert summary["guidance_reward_adjustment"] == 0.0
-    assert summary["seed_schedule_delta"] == -1.0
+    assert summary["seed_schedule_delta"] == -1.29
 
 
 def test_feedback_summary_suppresses_auxiliary_rewards_for_source_issue_only():
@@ -398,13 +399,13 @@ def test_feedback_summary_suppresses_auxiliary_rewards_for_source_issue_only():
     assert summary["source_issue_candidate_bug_count"] == 1
     assert summary["source_reward_adjustment"] == 0.0
     assert summary["guidance_reward_adjustment"] == 0.0
-    assert summary["seed_schedule_delta"] == 0.0
+    assert summary["seed_schedule_delta"] == pytest.approx(0.01)
 
 
 def test_feedback_summary_tracks_semantic_affinity_hits_and_selected_operator():
     row = {
         "candidate_source": "feedback_mutation",
-        "feedback_selection": {
+        "feedback_decision": {
             "target_keys": [
                 "semantic_family:conditional_semantics",
                 "semantic_signal:left_join_case_when_membership",
@@ -432,7 +433,7 @@ def test_feedback_summary_tracks_semantic_affinity_hits_and_selected_operator():
 def test_aggregate_feedback_summaries_exposes_operator_and_semantic_target_telemetry():
     row = {
         "candidate_source": "feedback_mutation",
-        "feedback_selection": {
+        "feedback_decision": {
             "target_keys": [
                 "semantic_family:conditional_semantics",
                 "semantic_signal:left_join_case_when_membership",

@@ -4256,13 +4256,6 @@ def _profile_saturation(count: int) -> float:
     return min(4.0, math.log1p(count - 3) * 1.15)
 
 
-_targeted_decision_key = _contrast_decision_key
-_decision_hits_family_diversity_guard = _decision_has_family_saturation
-_predicted_family_diversity_guard_penalty = _predicted_family_saturation_penalty
-_family_diversity_guard_penalty = _family_saturation_penalty
-_family_saturation = _family_saturation_penalty
-
-
 def _guidance_reward(
     row: dict[str, Any],
     *,

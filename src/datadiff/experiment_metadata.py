@@ -36,7 +36,6 @@ def _compat_component_focus_by_variant() -> dict[str, str]:
 
 
 CONTRAST_VARIANT_ID_BY_SUITE = _contrast_variant_id_by_suite()
-COMPAT_TARGETED_VARIANT_BY_SUITE = CONTRAST_VARIANT_ID_BY_SUITE
 COMPAT_COMPONENT_FOCUS_BY_VARIANT = _compat_component_focus_by_variant()
 COMPAT_COMPONENT_FOCUS_BY_PRESET = {
     variant.preset: variant.component_focus
@@ -45,9 +44,6 @@ COMPAT_COMPONENT_FOCUS_BY_PRESET = {
     if variant.component_focus
 }
 COMPAT_ABLATION_PRESET_IDS = frozenset(COMPAT_COMPONENT_FOCUS_BY_PRESET)
-LEGACY_TARGETED_VARIANT_BY_SUITE = COMPAT_TARGETED_VARIANT_BY_SUITE
-LEGACY_COMPONENT_FOCUS_BY_VARIANT = COMPAT_COMPONENT_FOCUS_BY_VARIANT
-LEGACY_COMPONENT_FOCUS_BY_PRESET = COMPAT_COMPONENT_FOCUS_BY_PRESET
 
 
 def parse_csv_tags(value: Any) -> set[str]:
@@ -579,25 +575,8 @@ def is_contrast_variant(row: dict[str, Any]) -> bool:
     compat_variant = CONTRAST_VARIANT_ID_BY_SUITE.get(suite, "")
     return variant_id == compat_variant or preset == compat_variant
 
-
-def is_contrast_variant_compat(row: dict[str, Any]) -> bool:
-    return is_contrast_experiment_row(row)
-
-
 def contrast_variant_id_for_suite(target_suite: str) -> str:
     return CONTRAST_VARIANT_ID_BY_SUITE.get(str(target_suite or ""), "")
-
-
-def compat_contrast_variant_id(target_suite: str) -> str:
-    return contrast_variant_id_for_suite(target_suite)
-
-
-def compat_contrast_variant_id_legacy(target_suite: str) -> str:
-    return compat_contrast_variant_id(target_suite)
-
-
-def legacy_contrast_variant_id(target_suite: str) -> str:
-    return compat_contrast_variant_id_legacy(target_suite)
 
 
 def component_focus(row: dict[str, Any]) -> str:
@@ -619,6 +598,7 @@ def component_focus(row: dict[str, Any]) -> str:
         ("feedback_corpus", False),
         ("differential_oracle", False),
         ("metamorphic_oracle", True),
+        ("witness_oracle", True),
         ("reducer", True),
     ):
         if key in factors and factors.get(key) is value:
@@ -628,6 +608,7 @@ def component_focus(row: dict[str, Any]) -> str:
                 "feedback_corpus": "feedback_corpus",
                 "differential_oracle": "differential_oracle",
                 "metamorphic_oracle": "metamorphic_oracle",
+                "witness_oracle": "witness_oracle",
                 "reducer": "reducer",
             }[key]
 
@@ -710,19 +691,3 @@ def reference_row_for_group(
         if str(row.get("preset", "") or "") == fallback_preset:
             return row
     return None
-
-
-def reference_row_for_group_compat(
-    rows: list[dict[str, Any]],
-    group_row: dict[str, Any] | None = None,
-    *,
-    fallback_preset: str = "baseline",
-) -> dict[str, Any] | None:
-    return reference_row_for_group(rows, group_row, fallback_preset=fallback_preset)
-
-
-baseline_row_for_group = reference_row_for_group_compat
-is_baseline_row = is_reference_experiment_row
-is_targeted_variant = is_contrast_variant_compat
-compat_targeted_variant_id = compat_contrast_variant_id_legacy
-legacy_targeted_variant_id = legacy_contrast_variant_id

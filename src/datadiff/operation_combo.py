@@ -207,15 +207,6 @@ def describe_operation_combo(operations: list[dict[str, Any]] | list[Any]) -> di
         "has_sort_limit": "sort" in op_set and bool({"offset", "limit"} & op_set),
     }
 
-
-def classify_operation_combo(operations: list[dict[str, Any]] | list[Any]) -> dict[str, Any]:
-    return describe_operation_combo(operations)
-
-
-summarize_operation_combo = describe_operation_combo
-classify_operation_combo = describe_operation_combo
-
-
 def combo_semantic_signals(combo: dict[str, Any]) -> list[str]:
     values = combo.get("semantic_signal_candidates")
     if isinstance(values, list):

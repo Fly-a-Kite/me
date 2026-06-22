@@ -116,10 +116,7 @@ def apply_feedback_updates(
         candidate_source=selected_meta["source"],
     )
     row["feedback_summary"] = feedback_summary
-    feedback_outcome_recorder = getattr(feedback, "record_candidate_outcome", None) or getattr(
-        feedback,
-        "record_candidate_result",
-    )
+    feedback_outcome_recorder = getattr(feedback, "record_candidate_outcome")
     row["source_reward"] = feedback_outcome_recorder(
         selected_meta["source"],
         has_finding=discovery_signals.feedback_finding,

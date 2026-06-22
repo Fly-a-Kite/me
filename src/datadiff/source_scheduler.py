@@ -6,6 +6,13 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from datadiff.family_novelty import candidate_family_novelty_reward, family_key_matches_known_family
+from datadiff.multi_objective import (
+    CostVector,
+    ObjectiveVector,
+    SOURCE_OBJECTIVE_SPEC,
+    bounded_ratio,
+    constrained_objective_score,
+)
 
 CandidateSource = Literal["generated", "feedback_mutation"]
 
@@ -51,6 +58,10 @@ class LocalSourceScheduler:
     def choose_source(self, *, feedback_available: bool) -> CandidateSource:
         if not feedback_available:
             return "generated"
+        if self.arms["feedback_mutation"].pulls == 0 and self.arms["generated"].pulls > 0:
+            generated_signal = self._arm_reward_signal(self.arms["generated"])
+            if generated_signal <= 0.0:
+                return "feedback_mutation"
         for source in ("generated", "feedback_mutation"):
             if self.arms[source].pulls == 0:
                 return source
@@ -93,16 +104,32 @@ class LocalSourceScheduler:
                     candidate_bug_reward *= 0.5
             else:
                 candidate_bug_reward = 4.0
-        reward = (
-            candidate_bug_reward
-            + (0.20 if rewardable_semantic_divergence else 0.0)
-            + (0.05 if has_finding and not candidate_bug and not semantic_divergence and not false_positive else 0.0)
-            + (0.5 if is_new_behavior else 0.0)
-            - (2.5 if false_positive else 0.0)
+        discovery_signal = min(2.0, float(candidate_bug_reward) / 2.6)
+        semantic_signal = 0.14 if rewardable_semantic_divergence else 0.0
+        behavior_signal = 0.10 if is_new_behavior else 0.0
+        structural_signal = 0.08 if has_finding and not candidate_bug and not false_positive else 0.0
+        vector = ObjectiveVector(
+            discovery=discovery_signal,
+            semantic=semantic_signal,
+            novelty=bounded_ratio(float(candidate_bug_reward), 4.0) if candidate_bug else 0.0,
+            expandability=0.10 if is_new_behavior else 0.0,
+            structural_risk=structural_signal,
+            coverage_gain=0.08 if family_keys else 0.0,
         )
-        if not preflight_valid or fallback_used:
-            reward -= 0.75
-        reward += float(reward_adjustment)
+        cost = CostVector(
+            invalidity=1.0 if (not preflight_valid or fallback_used) else 0.0,
+            false_positive=1.0 if false_positive else 0.0,
+            redundancy=0.35 if family_keys and signature_keys and all(
+                self.candidate_bug_signatures[signature] > 0 for signature in signature_keys
+            ) else 0.0,
+        )
+        reward = constrained_objective_score(
+            vector,
+            cost=cost,
+            spec=SOURCE_OBJECTIVE_SPEC,
+            validity=1.0 - cost.invalidity,
+            false_positive_risk=cost.false_positive,
+        ) + float(reward_adjustment)
         if reward == 0.0:
             reward -= 0.1
         arm = self.arms[source]

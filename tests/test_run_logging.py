@@ -108,7 +108,6 @@ def test_case_log_row_keeps_selected_candidate_metadata_shape():
     assert row["seed"] == 7
     assert row["candidate_pool_size"] == 4
     assert row["candidate_source"] == "feedback_mutation"
-    assert row["feedback_selection"] == {"selected_operator": "value"}
     assert row["feedback_decision"] == {"selected_operator": "value"}
     assert row["backend_pair_pool"] == ["duckdb|pandas"]
     assert row["operation_combo"]["template"] == "select_only"

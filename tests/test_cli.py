@@ -2940,25 +2940,8 @@ def test_cli_parses_analyze_experiment_command():
     assert args.cmd == "analyze-experiment"
     assert args.manifest == "runs/experiment-x.json"
     assert args.reference_preset == "baseline"
-    assert args.baseline_preset is None
     assert args.compare_presets == "guided_filter,guided_join"
     assert args.refresh is True
-
-
-def test_cli_parses_analyze_experiment_legacy_baseline_alias():
-    parser = build_parser()
-    args = parser.parse_args(
-        [
-            "analyze-experiment",
-            "--manifest",
-            "runs/experiment-x.json",
-            "--baseline-preset",
-            "baseline",
-        ]
-    )
-    assert args.cmd == "analyze-experiment"
-    assert args.reference_preset == "baseline"
-    assert args.baseline_preset == "baseline"
 
 
 def test_cli_parses_analyze_seeded_sensitivity_command():
@@ -3674,8 +3657,6 @@ def test_cli_parses_analyze_ablation_audit_command():
             "runs/experiment-ablation.json",
             "--reference-presets",
             "baseline,guided",
-            "--trusted-presets",
-            "baseline,guided",
             "--ablation-presets",
             "no_type_aware,no_normalizer",
             "--refresh",
@@ -3684,7 +3665,6 @@ def test_cli_parses_analyze_ablation_audit_command():
     assert args.cmd == "analyze-ablation-audit"
     assert args.manifest == "runs/experiment-ablation.json"
     assert args.reference_presets == "baseline,guided"
-    assert args.trusted_presets == "baseline,guided"
     assert args.ablation_presets == "no_type_aware,no_normalizer"
     assert args.refresh is True
 
@@ -3696,7 +3676,6 @@ def test_cli_ablation_audit_help_prefers_reference_wording(capsys):
     help_text = capsys.readouterr().out
 
     assert "--reference-presets" in help_text
-    assert "legacy alias for --reference-presets" in help_text
 
 
 def test_cli_parses_analyze_pattern_variants_command():

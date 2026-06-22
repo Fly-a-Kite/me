@@ -279,6 +279,7 @@ def config_from_args(args: argparse.Namespace) -> ExperimentConfig:
         enable_normalizer=not args.disable_normalizer,
         enable_differential_oracle=not args.disable_differential_oracle,
         enable_metamorphic_oracle=args.enable_metamorphic_oracle,
+        enable_witness_oracle=bool(getattr(args, "enable_witness_oracle", False)),
         enable_feedback=not args.disable_feedback,
         enable_replay_bug=bool(getattr(args, "enable_replay_bug", False)),
         enable_reducer=args.enable_reducer,

@@ -137,8 +137,7 @@ def _attach_selection_metadata(row: dict[str, Any], selected_meta: dict[str, Any
     row["candidate_source"] = selected_meta["source"]
     row["seed_lineage"] = selected_meta["seed_lineage"]
     row["mutation"] = selected_meta["mutation"]
-    row["feedback_selection"] = selected_meta.get("feedback_selection", selected_meta.get("feedback_decision", {}))
-    row["feedback_decision"] = selected_meta.get("feedback_decision", selected_meta.get("feedback_selection", {}))
+    row["feedback_decision"] = selected_meta.get("feedback_decision", {})
     row["quality_archive_context"] = selected_meta.get("quality_archive_context", {})
     row["generator_profile_selection"] = selected_meta.get("generator_profile_selection", {})
     row["selected_generator_profile"] = str(row["generator_profile_selection"].get("profile", "") or "")

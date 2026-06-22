@@ -155,6 +155,14 @@ CONFIG_OVERLAYS: dict[str, ConfigOverlay] = {
         updates={"enable_metamorphic_oracle": True, "oracle_mode": "both"},
         notes="Enable metamorphic checking alongside the differential oracle.",
     ),
+    "enable_witness_oracle": ConfigOverlay(
+        overlay_id="enable_witness_oracle",
+        updates={"enable_witness_oracle": True},
+        notes=(
+            "Enable SQLancer/PQS-inspired witness-contract checking as a "
+            "separate experimental oracle track."
+        ),
+    ),
     "disable_differential_oracle": ConfigOverlay(
         overlay_id="disable_differential_oracle",
         updates={"enable_differential_oracle": False},

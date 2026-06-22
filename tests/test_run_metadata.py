@@ -43,8 +43,7 @@ def test_candidate_quality_context_dedupes_metadata_targets_and_capabilities():
 
     case = generate_case(18, profile="common")
     metadata = {
-        "feedback_decision": {"target_keys": ["target:a", "target:a", ""]},
-        "feedback_selection": {"target_keys": ["target:b", "target:a"]},
+        "feedback_decision": {"target_keys": ["target:a", "target:a", "", "target:b"]},
     }
 
     keys = _candidate_target_keys_from_metadata(metadata)

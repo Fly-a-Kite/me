@@ -52,8 +52,6 @@ def analyze_ablation_audit(
     manifest_file: Path | None = None,
     *,
     reference_presets: list[str] | None = None,
-    legacy_reference_presets: list[str] | None = None,
-    trusted_presets: list[str] | None = None,
     ablation_presets: list[str] | None = None,
     refresh: bool = False,
 ) -> tuple[Path, Path]:
@@ -65,8 +63,7 @@ def analyze_ablation_audit(
     aggregate_json = summary_md.with_name(f"{summary_md.stem}-aggregates.json")
     rows = _load_structured_aggregate_rows(aggregate_json, aggregate_csv)
 
-    compat_reference_presets = legacy_reference_presets or trusted_presets
-    reference_selection = _resolve_reference_presets(reference_presets, compat_reference_presets)
+    reference_selection = _resolve_reference_presets(reference_presets)
     ablation_selection = tuple(ablation_presets or DEFAULT_ABLATION_PRESETS)
     audit = _build_family_audit(rows, reference_selection, ablation_selection)
 
@@ -104,9 +101,8 @@ def _load_structured_aggregate_rows(
 
 def _resolve_reference_presets(
     reference_presets: list[str] | None,
-    compat_reference_presets: list[str] | None,
 ) -> tuple[str, ...]:
-    return tuple(reference_presets or compat_reference_presets or DEFAULT_REFERENCE_PRESETS)
+    return tuple(reference_presets or DEFAULT_REFERENCE_PRESETS)
 
 
 def _build_family_audit(

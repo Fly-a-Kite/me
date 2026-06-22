@@ -41,6 +41,10 @@ class TypedProgramState:
     is_grouped: bool = False
     operations_so_far: tuple[str, ...] = ()
     joined_tables: frozenset[str] = frozenset()
+    structural_risk_tags: frozenset[str] = frozenset()
+    coverage_axes: frozenset[str] = frozenset()
+    expandability_score: float = 0.0
+    validity_score: float = 1.0
 
     @classmethod
     def from_table(
@@ -56,6 +60,10 @@ class TypedProgramState:
             nullable_columns=frozenset(base.nullable_columns),
             available_tables=tuple(TableSchema.from_table(table) for table in (extra_tables or ())),
             row_count_estimate=len(table.rows),
+            structural_risk_tags=frozenset({"base_table"}),
+            coverage_axes=frozenset({"shape:base_table", "shape:row_preserving"}),
+            expandability_score=0.35,
+            validity_score=1.0,
         )
 
     @property
@@ -122,6 +130,12 @@ class TypedProgramState:
             if table_name:
                 joined.add(table_name)
         row_count = _estimate_row_count(self.row_count_estimate, kind, operation)
+        structural_risk_tags = set(self.structural_risk_tags)
+        coverage_axes = set(self.coverage_axes)
+        structural_risk_tags.update(_structural_risk_tags_for_operation(kind, operation))
+        coverage_axes.update(_coverage_axes_for_operation(kind, operation))
+        expandability = _next_expandability_score(self.expandability_score, kind)
+        validity = _next_validity_score(self.validity_score, kind)
         return TypedProgramState(
             columns=tuple(mutable.columns),
             column_types=dict(mutable.column_types),
@@ -133,6 +147,10 @@ class TypedProgramState:
             is_grouped=self.is_grouped or kind in {"groupby", "aggregate"},
             operations_so_far=(*self.operations_so_far, kind),
             joined_tables=frozenset(joined),
+            structural_risk_tags=frozenset(structural_risk_tags),
+            coverage_axes=frozenset(coverage_axes),
+            expandability_score=expandability,
+            validity_score=validity,
         )
 
 
@@ -169,3 +187,55 @@ def _estimate_row_count(current: int, kind: str, operation: Mapping[str, Any]) -
     if kind in {"groupby", "aggregate"}:
         return max(1, min(rows, max(1, rows // 3)))
     return rows
+
+
+def _structural_risk_tags_for_operation(kind: str, operation: Mapping[str, Any]) -> tuple[str, ...]:
+    tags: list[str] = []
+    if kind == "join":
+        tags.extend(("join_cardinality", "join_null_semantics"))
+    if kind in {"groupby", "aggregate"}:
+        tags.append("aggregation_boundary")
+    if kind in {"sort", "running_sum", "row_number_filter", "limit", "offset"}:
+        tags.append("ordering_boundary")
+    if kind in {"filter", "drop_nulls"}:
+        tags.append("predicate_boundary")
+    if kind in {"mutate", "coalesce", "case_when", "fill_null"}:
+        tags.append("expression_boundary")
+    return tuple(tags)
+
+
+def _coverage_axes_for_operation(kind: str, operation: Mapping[str, Any]) -> tuple[str, ...]:
+    axes = [f"op:{kind}"]
+    if kind == "join":
+        axes.append("shape:multi_table")
+    if kind in {"groupby", "aggregate"}:
+        axes.append("shape:grouped")
+    if kind in {"sort", "running_sum", "row_number_filter"}:
+        axes.append("shape:ordered")
+    if kind in {"filter", "drop_nulls", "semi_join", "anti_join"}:
+        axes.append("shape:row_reducing")
+    if kind in {"mutate", "coalesce", "case_when", "fill_null"}:
+        axes.append("shape:column_expanding")
+    return tuple(axes)
+
+
+def _next_expandability_score(current: float, kind: str) -> float:
+    score = float(current)
+    if kind in {"mutate", "coalesce", "case_when", "join"}:
+        score += 0.12
+    elif kind in {"groupby", "aggregate", "select", "distinct"}:
+        score -= 0.10
+    elif kind in {"limit", "offset"}:
+        score -= 0.08
+    return max(0.0, min(1.0, score))
+
+
+def _next_validity_score(current: float, kind: str) -> float:
+    score = float(current)
+    if kind == "join":
+        score -= 0.08
+    elif kind in {"groupby", "aggregate"}:
+        score -= 0.06
+    elif kind in {"mutate", "case_when", "coalesce"}:
+        score -= 0.03
+    return max(0.35, min(1.0, score))

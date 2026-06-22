@@ -1872,6 +1872,86 @@ def test_final_readiness_keeps_support_tracks_out_of_live_bug_evidence(tmp_path)
     assert audit["summary"]["ignored_evidence_runs"] == 0
 
 
+def test_final_readiness_keeps_support_comparison_rows_out_of_baseline_gate(tmp_path):
+    manifests = [
+        _write_manifest(
+            tmp_path,
+            name="comparison-baseline-scope",
+            evidence_mode="comparison",
+            target_suite="embedded_sql",
+            preset="baseline",
+            seed=51,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            experiment_meta=FINAL_COMPARISON_MATRIX.command_experiment_meta(
+                target_suites=("embedded_sql",),
+                preset="baseline",
+            ),
+        ),
+        _write_manifest(
+            tmp_path,
+            name="comparison-guided-scope",
+            evidence_mode="comparison",
+            target_suite="embedded_sql",
+            preset="guided",
+            seed=52,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            experiment_meta=FINAL_COMPARISON_MATRIX.command_experiment_meta(
+                target_suites=("embedded_sql",),
+                preset="guided",
+            ),
+        ),
+        _write_manifest(
+            tmp_path,
+            name="comparison-support-cross-version",
+            evidence_mode="comparison",
+            target_suite="datafusion_cross",
+            preset="version_ledger",
+            seed=53,
+            config={"enable_replay_bug": False},
+            replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+            run_updates={
+                "matrix_id": FINAL_COMPARISON_MATRIX.id,
+                "comparison_group": "cross_version_continual_learning",
+                "variant_id": "version_ledger",
+                "comparison_role": "support",
+                "component_focus": "cross_version_continual_learning",
+                "analysis_tags": ["comparison", "support"],
+            },
+        ),
+    ]
+
+    audit = build_final_readiness(
+        manifests,
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_adaptive_component_ablation=False,
+            require_cross_version_ledger=False,
+            require_transferability_scope=False,
+            require_runtime_efficiency=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=(), required_live_families=(), required_final_matrix_ids=()),
+    )
+
+    gate = {gate["name"]: gate for gate in audit["gates"]}["baseline_comparison"]
+    assert gate["passed"] is True
+    assert gate["matrix_ids"] == ["baseline_scope_comparison"]
+    assert gate["reference_run_count"] == 1
+    assert gate["contrast_run_count"] == 1
+    assert gate["missing_reference_groups"] == []
+    assert gate["missing_contrast_groups"] == []
+    assert audit["summary"]["comparison_runs"] == 2
+    assert audit["summary"]["comparison_suites"] == ["embedded_sql"]
+    assert audit["summary"]["baseline_comparison"]["group_count"] == 1
+
+
 def test_final_readiness_run_rows_include_canonical_comparison_role(tmp_path):
     manifest = _write_manifest(
         tmp_path,
@@ -2118,6 +2198,60 @@ def test_final_readiness_skips_scheduler_feedback_share_for_short_smoke_runs(tmp
     assert summary["scheduler_feedback_share_skipped_run_count"] == 1
     assert summary["scheduler_feedback_share_skipped_runs"] == [
         "validation:datafusion_cross:validation_smoke:cases_below_scheduler_share_min:1/10"
+    ]
+
+
+def test_final_readiness_exempts_reducer_ablation_from_scheduler_feedback_share_gate(tmp_path):
+    manifest = _write_manifest(
+        tmp_path,
+        name="reducer-ablation-scheduler-feedback",
+        evidence_mode="ablation",
+        target_suite="core",
+        preset="reducer",
+        seed=182,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        experiment_meta=FINAL_MODULE_ABLATION_MATRIX.command_experiment_meta(
+            target_suites=("core",),
+            preset="reducer",
+        ),
+    )
+    run_file = Path(final_readiness.load_json(manifest)["runs"][0]["run_file"])
+    meta_path = run_meta_path(run_file)
+    meta = final_readiness.load_json(meta_path)
+    meta["executed_cases"] = 100
+    meta["stage_profile"]["totals_ms"]["scheduler_feedback_ms"] = 90.0
+    meta["stage_profile"]["totals_ms"]["total_case_wall_ms"] = 100.0
+    final_readiness.dump_json(meta, meta_path)
+
+    audit = build_final_readiness(
+        [manifest],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_adaptive_component_ablation=False,
+            require_transferability_scope=False,
+            require_cross_version_ledger=False,
+            max_scheduler_feedback_share=0.5,
+            min_scheduler_feedback_cases=1,
+        ),
+        policy=ReadinessPolicy(required_live_suites=(), required_live_families=(), required_final_matrix_ids=()),
+    )
+
+    gates = {gate["name"]: gate for gate in audit["gates"]}
+    assert gates["runtime_efficiency"]["passed"] is True
+    assert gates["runtime_efficiency"]["issues"] == []
+    summary = audit["summary"]["runtime_efficiency"]
+    assert summary["max_scheduler_feedback_share"] == 0.0
+    assert summary["scheduler_feedback_share_run_count"] == 0
+    assert summary["scheduler_feedback_share_skipped_runs"] == [
+        "ablation:core:reducer:scheduler_feedback_share_exempt:reducer_ablation"
     ]
 
 
@@ -2434,8 +2568,6 @@ def test_final_readiness_requires_component_level_adaptive_live_evidence(tmp_pat
         "live:datafusion_cross:live_datafusion:bayesian_exploration",
         "live:datafusion_cross:live_datafusion:bd_axis_bandit",
         "live:datafusion_cross:live_datafusion:champion_corpus",
-        "live:datafusion_cross:live_datafusion:champion_graft_donor",
-        "live:datafusion_cross:live_datafusion:continual_learning",
         "live:datafusion_cross:live_datafusion:hierarchical_archive",
         "live:datafusion_cross:live_datafusion:lhs_seeding",
         "live:datafusion_cross:live_datafusion:online_reward_model",
@@ -2446,6 +2578,15 @@ def test_final_readiness_requires_component_level_adaptive_live_evidence(tmp_pat
         "live:datafusion_cross:live_datafusion:seed_quota",
         "live:datafusion_cross:live_datafusion:value_catalog",
     ]
+    assert gate["optional_missing"] == [
+        "live:datafusion_cross:live_datafusion:champion_graft_donor",
+        "live:datafusion_cross:live_datafusion:continual_learning",
+    ]
+    assert gate["unproven_optional_components"] == [
+        "champion_graft_donor",
+        "continual_learning",
+    ]
+    assert "hierarchical_archive" in gate["unproven_required_components"]
 
     meta["closed_loop_state_summary"]["adaptive_learning_health"].update(
         {
@@ -2518,6 +2659,8 @@ def test_final_readiness_requires_component_level_adaptive_live_evidence(tmp_pat
 
     assert gate["passed"] is True
     assert gate["missing"] == []
+    assert gate["optional_missing"] == []
+    assert gate["unproven_declared_components"] == []
     assert gate["adaptive_selection_total_count"] == 5
     assert gate["adaptive_selection_scopes"] == [
         "backend_pair",
@@ -2591,6 +2734,87 @@ def test_final_readiness_requires_adaptive_selection_telemetry_for_live_adaptive
     assert gate["passed"] is False
     assert "live:datafusion_cross:live_datafusion:adaptive_selection_telemetry" in gate["missing"]
     assert gate["adaptive_selection_total_count"] == 0
+
+
+def test_final_readiness_accepts_live_adaptive_component_proven_by_another_run(tmp_path):
+    adaptive_components = _adaptive_component_flags(
+        local_source_scheduler=True,
+        champion_graft_donor=False,
+        continual_learning=False,
+    )
+    missing_hierarchical = _write_manifest(
+        tmp_path,
+        name="live-adaptive-missing-hierarchical",
+        evidence_mode="live",
+        target_suite="datafusion_cross",
+        preset="live_datafusion",
+        seed=1,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        first_candidate_case_index=0,
+        first_candidate_elapsed_s=0.1,
+        run_updates={
+            "adaptive_components": adaptive_components,
+            "disabled_adaptive_components": [],
+        },
+    )
+    proven_hierarchical = _write_manifest(
+        tmp_path,
+        name="live-adaptive-proven-hierarchical",
+        evidence_mode="live",
+        target_suite="polars_cross",
+        preset="live_datafusion",
+        seed=2,
+        config={"enable_replay_bug": False},
+        replay_filter={"enabled": True, "filtered_candidates": 0, "fallback_candidates": 0},
+        first_candidate_case_index=0,
+        first_candidate_elapsed_s=0.1,
+        run_updates={
+            "adaptive_components": adaptive_components,
+            "disabled_adaptive_components": [],
+        },
+    )
+    run_file = Path(final_readiness.load_json(missing_hierarchical)["runs"][0]["run_file"])
+    meta_path = run_meta_path(run_file)
+    meta = final_readiness.load_json(meta_path)
+    quality = meta["closed_loop_state_summary"]["quality_archive_health"]
+    quality["hierarchical_enabled"] = True
+    quality["child_cell_count"] = 0
+    quality["split_cell_count"] = 0
+    final_readiness.dump_json(meta, meta_path)
+
+    audit = build_final_readiness(
+        [missing_hierarchical, proven_hierarchical],
+        thresholds=ReadinessThresholds(
+            min_live_duration_hours=0.0,
+            min_live_candidate_families=0,
+            min_confirmed_live_families=0,
+            min_historical_confirmed=0,
+            require_validation=False,
+            require_seeded=False,
+            require_ablation=False,
+            require_comparison=False,
+            require_transferability_scope=False,
+            require_adaptive_component_ablation=False,
+            require_cross_version_ledger=False,
+            require_runtime_efficiency=False,
+        ),
+        policy=ReadinessPolicy(required_live_suites=(), required_live_families=(), required_final_matrix_ids=()),
+    )
+
+    gate = {gate["name"]: gate for gate in audit["gates"]}["adaptive_live_component_evidence"]
+    summary = audit["summary"]["adaptive_live_component_evidence"]
+
+    assert gate["passed"] is True
+    assert "hierarchical_archive" in gate["proven_components"]
+    assert not any(item.endswith(":hierarchical_archive") for item in gate["missing"])
+    assert gate["unproven_required_components"] == []
+    assert gate["unproven_optional_components"] == []
+    assert any(
+        "hierarchical_archive" in row["missing_components"]
+        for row in summary["rows"]
+        if row["label"] == "live:datafusion_cross:live_datafusion"
+    )
 
 
 def test_final_readiness_infers_adaptive_selection_requirement_from_run_config(tmp_path):

@@ -33,12 +33,9 @@ def cmd_analyze_experiment_impl(
 ) -> int:
     manifest_file = Path(args.manifest) if args.manifest else None
     compare_presets = parse_presets_func(args.compare_presets) if args.compare_presets else None
-    reference_preset = getattr(args, "reference_preset", None) or getattr(args, "baseline_preset", "baseline")
     md_path, csv_path = analyze_experiment_func(
         manifest_file,
-        reference_preset=reference_preset,
-        legacy_reference_preset=getattr(args, "baseline_preset", None),
-        baseline_preset=getattr(args, "baseline_preset", None),
+        reference_preset=getattr(args, "reference_preset", "baseline"),
         compare_presets=compare_presets,
         refresh=bool(getattr(args, "refresh", False)),
     )
@@ -67,13 +64,10 @@ def cmd_analyze_ablation_audit_impl(
 ) -> int:
     manifest_file = Path(args.manifest) if args.manifest else None
     reference_presets = parse_presets_func(args.reference_presets) if getattr(args, "reference_presets", None) else None
-    trusted_presets = parse_presets_func(args.trusted_presets) if args.trusted_presets else None
     ablation_presets = parse_presets_func(args.ablation_presets) if args.ablation_presets else None
     md_path, csv_path = analyze_ablation_audit_func(
         manifest_file,
         reference_presets=reference_presets,
-        legacy_reference_presets=trusted_presets,
-        trusted_presets=trusted_presets,
         ablation_presets=ablation_presets,
         refresh=bool(getattr(args, "refresh", False)),
     )

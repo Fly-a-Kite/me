@@ -1,3 +1,4 @@
+import pytest
 from pathlib import Path
 
 from datadiff import scheduler as scheduler_module
@@ -77,7 +78,7 @@ def test_local_source_scheduler_discounts_repeated_candidate_bug_family():
         candidate_bug_signatures=["sig-b"],
     )
 
-    assert first_reward == 4.5
+    assert first_reward == 3.805036923076923
     assert 0.0 < repeated_signature_reward < repeated_family_reward < first_reward
     snapshot = {row["source"]: row for row in scheduler.snapshot()}
     assert snapshot["generated"]["candidate_bug_family_count"] == 1
@@ -1314,7 +1315,7 @@ def test_summarize_batch_run_counts_scheduler_signals(tmp_path: Path):
     assert observation.quality_pass_count == 3
     assert observation.source_reward_adjustment_total == 0.5
     assert observation.guidance_reward_adjustment_total == 0.25
-    assert observation.seed_schedule_delta_total == 2.0
+    assert observation.seed_schedule_delta_total == pytest.approx(-0.43)
     assert observation.productive_mutation_cases == 1
     assert observation.feedback_finding_yield_cases == 1
     assert observation.guided_productive_cases == 1

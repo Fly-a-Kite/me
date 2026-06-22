@@ -580,7 +580,3 @@ def _is_pending_issue_status(status: str) -> bool:
 def _extract_upstream_issue_urls(text: str) -> list[str]:
     return re.findall(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/\d+", text)
 
-
-build_bug_status = build_issue_status
-write_bug_status_outputs = write_issue_status_outputs
-render_bug_status_markdown = render_issue_status_markdown

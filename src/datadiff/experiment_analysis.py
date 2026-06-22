@@ -25,20 +25,17 @@ def analyze_experiment(
     manifest_file: Path | None = None,
     *,
     reference_preset: str = "baseline",
-    legacy_reference_preset: str | None = None,
-    baseline_preset: str | None = None,
     compare_presets: list[str] | None = None,
     refresh: bool = False,
 ) -> tuple[Path, Path]:
     ensure_dirs()
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     manifest_file = manifest_file or latest_experiment_manifest_path()
-    effective_reference_preset = legacy_reference_preset or baseline_preset or reference_preset
     summary_md, _ = write_experiment_summary(manifest_file, refresh=refresh)
     aggregate_csv = summary_md.with_name(f"{summary_md.stem}-aggregates.csv")
     aggregate_json = summary_md.with_name(f"{summary_md.stem}-aggregates.json")
     aggregate_rows = _load_aggregate_rows(aggregate_json, aggregate_csv)
-    comparisons = _build_variant_comparisons(aggregate_rows, effective_reference_preset, compare_presets)
+    comparisons = _build_variant_comparisons(aggregate_rows, reference_preset, compare_presets)
 
     md_path = REPORTS_DIR / f"experiment-analysis-{manifest_file.stem}.md"
     csv_path = REPORTS_DIR / f"experiment-analysis-{manifest_file.stem}.csv"
@@ -49,7 +46,7 @@ def analyze_experiment(
         aggregate_json,
         comparisons,
         aggregate_rows,
-        effective_reference_preset,
+        reference_preset,
     )
     _write_analysis_csv(csv_path, comparisons)
     return md_path, csv_path

@@ -262,6 +262,7 @@ class OracleConfig:
     mode: OracleMode = "differential"
     enable_differential: bool = True
     enable_metamorphic: bool = False
+    enable_witness: bool = False
     metamorphic_variant_limit: int = 4
     metamorphic_relation_order: tuple[str, ...] = ()
     candidate_recheck_count: int = 0
@@ -271,6 +272,7 @@ class OracleConfig:
             "mode": self.mode,
             "enable_differential": self.enable_differential,
             "enable_metamorphic": self.enable_metamorphic,
+            "enable_witness": self.enable_witness,
             "metamorphic_variant_limit": self.metamorphic_variant_limit,
             "metamorphic_relation_order": list(self.metamorphic_relation_order),
             "candidate_recheck_count": self.candidate_recheck_count,
@@ -427,6 +429,7 @@ class ExperimentConfig:
     enable_normalizer: bool = True
     enable_differential_oracle: bool = True
     enable_metamorphic_oracle: bool = False
+    enable_witness_oracle: bool = False
     enable_feedback: bool = True
     enable_replay_bug: bool = False
     enable_reducer: bool = False
@@ -532,6 +535,7 @@ class ExperimentConfig:
         self.enable_metamorphic_relation_learning = bool(self.enable_metamorphic_relation_learning)
         self.enable_backend_pair_learning = bool(self.enable_backend_pair_learning)
         self.enable_parallel_backend_execution = bool(self.enable_parallel_backend_execution)
+        self.enable_witness_oracle = bool(self.enable_witness_oracle)
         self.enable_mutation_operator_learning = bool(self.enable_mutation_operator_learning)
         self.enable_operator_swarm = bool(self.enable_operator_swarm)
         self.enable_ir_rewrite_mutations = bool(self.enable_ir_rewrite_mutations)
@@ -579,6 +583,7 @@ class ExperimentConfig:
             mode=self.oracle_mode,
             enable_differential=self.enable_differential_oracle,
             enable_metamorphic=self.enable_metamorphic_oracle,
+            enable_witness=self.enable_witness_oracle,
             metamorphic_variant_limit=self.metamorphic_variant_limit,
             metamorphic_relation_order=tuple(self.metamorphic_relation_order),
             candidate_recheck_count=self.candidate_recheck_count,

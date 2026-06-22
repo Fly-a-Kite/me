@@ -40,11 +40,6 @@ def register(
     p_exp_analysis.add_argument("--manifest", default=None)
     p_exp_analysis.add_argument("--reference-preset", default="baseline")
     p_exp_analysis.add_argument(
-        "--baseline-preset",
-        default=None,
-        help="legacy alias for --reference-preset",
-    )
-    p_exp_analysis.add_argument(
         "--compare-presets",
         default=None,
         help="optional comma-separated preset subset to compare against the reference run",
@@ -72,11 +67,6 @@ def register(
         "--reference-presets",
         default=None,
         help="comma-separated presets treated as the reference soundness boundary",
-    )
-    p_ablation_audit.add_argument(
-        "--trusted-presets",
-        default=None,
-        help="legacy alias for --reference-presets",
     )
     p_ablation_audit.add_argument(
         "--ablation-presets",

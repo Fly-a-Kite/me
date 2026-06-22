@@ -367,10 +367,208 @@
 
 只做 **scope-limited comparison**，不要做全盘“谁更强”。
 
+#### SQLancer/PQS 历史 SOTA 口径
+
+本仓库已保存 OSDI 2020 SQLancer/PQS 论文：
+`papers/related_work/sqlancer_pqs_osdi2020.pdf`。论文 Section 4.2/Table 2/Table 3 的可引用
+口径是：
+
+- 121 个 reported issues；
+- 96 个 previously unknown true bugs；
+- true bugs 分布：SQLite 64、MySQL 24、PostgreSQL 8；
+- bug kind 分布：61 logic、32 internal error、3 crash/segfault；
+- 结果状态：78 code fixes、8 documentation fixes、10 developer confirmed；
+- 非 true bug：25 个，其中 13 个 intended behavior，12 个 duplicate。
+
+论文写作时要把这组数字作为 **历史 SOTA calibration**，不能把它当成本项目
+本地 SQLancer DuckDB baseline 的发现结果。本地 SQLancer bug 数只能来自
+`reports/external-baselines/*.json` manifest、SQLancer failure signal 解析、以及
+和 DataDiffFuzz 相同的 family-level confirmation protocol。
+
 #### 可考虑对象
 
 - SQLancer-style SQL-only baseline
 - FuzzyData-style workflow-only baseline
+
+#### SQLancer 公平执行规则
+
+SQLancer 只能用于和 DataDiffFuzz 的 SQL-oriented scope 对比。公平条件是：
+
+- 相同机器、相同 CPU 线程：DataDiffFuzz `--jobs 1`，SQLancer
+  `--num-threads 1`。
+- 相同 wall-clock 预算：不要用 SQLancer query 数和 DataDiffFuzz case 数做
+  主预算。
+- 相同 seed 集合：例如 `1,1001,2001,3001,4001`；每个 seed 单独给完整时间预算。
+- 相同目标解释：主表只比较 DuckDB/SQL overlap；DataFrame/Arrow/cross-family
+  价值单独成表。
+- 相同计数规则：只数 unique confirmed bug families，不数 raw findings。
+- 相同 DuckDB 目标版本：最终严格 head-to-head 必须让 DataDiffFuzz 的
+  DuckDB backend 与 SQLancer 的 `duckdb_jdbc` 使用同一 DuckDB engine 版本。
+  版本基准按 DataDiffFuzz 当前 latest-version target，而不是按 SQLancer
+  默认依赖降级。若 SQLancer 暂时只能用旧 JDBC 版本，该 run 只能标为
+  pipeline/support pilot，不能作为最终四指标公平结论。
+
+#### SQLancer 最终对比指标
+
+最终不要把 SQLancer 的 `queries` 和 DataDiffFuzz 的 `cases` 当成同一种主
+指标。二者的生成单位、oracle、去重粒度不同。论文中与 SQLancer 的对比应
+分成四层：
+
+1. **主结论指标：真实确认 bug**
+   - `unique confirmed latest-version bug families`，只统计同一确认协议下
+     由 maintainer label、merged fix、closed/completed fix、或明确上游确认
+     支撑的 family。
+   - `confirmed families / wall-clock hour`。
+   - `time to first confirmed family`。
+   - `upstream outcome`：open-labeled bug、fixed/merged、duplicate/invalid。
+
+2. **发现效率指标：候选产出**
+   - SQLancer：successful runs、generated queries、generated databases、
+     query throughput、SQLancer-reported failures。
+   - DataDiffFuzz：executed cases、valid program ratio、candidate bug cases、
+     rewardable candidate families、candidate families/hour、
+     time to first candidate family、case throughput。
+   - 这些只能解释 triage workload 和发现速度，不能直接作为真实 bug 数。
+
+3. **证据质量指标：是否可提交**
+   - minimized/native reproducer 是否生成成功。
+   - immediate recheck 是否稳定。
+   - issue bundle 是否可执行。
+   - family-level deduplication 后还剩多少 unique candidates。
+
+4. **scope/覆盖指标：解释互补性**
+   - DuckDB SQL overlap table：这是唯一可称为 SQLancer head-to-head 的表。
+   - Cross-ecosystem table：统计 DataFrame、Arrow、Polars、PyArrow、
+     DataFusion 等非 SQLancer 覆盖范围的 confirmed/candidate families。
+   - semantic class coverage：join、aggregation、null semantics、top-k、
+     set operation、projection/filter 等。
+
+不要作为主指标比较：
+
+- SQLancer raw query 数 vs DataDiffFuzz raw case 数。
+- SQLancer raw failure 数 vs DataDiffFuzz raw finding 数。
+- DataFrame/Arrow/Polars/PyArrow 的发现数量 vs SQLancer；这些是 scope value，
+  不是公平 head-to-head。
+
+推荐论文表述：
+
+> We use SQLancer as a scope-limited DuckDB SQL baseline under equal
+> wall-clock, seed, and thread budgets. The primary metric is independently
+> confirmed unique bug families; raw queries, cases, and candidate findings are
+> reported only as efficiency and triage-workload indicators.
+
+推荐 related-work / calibration 表述：
+
+> SQLancer/PQS reported 121 issues and classified 96 as true previously
+> unknown bugs across SQLite, MySQL, and PostgreSQL. We use this result as a
+> historical calibration point for DBMS logic testing, while our executable
+> comparison is limited to the DuckDB SQL-overlap scope under equal wall-clock,
+> seed, thread, and confirmation rules.
+
+SQLancer 已验证命令形式：
+
+```bash
+cd experiments/external_tools/sqlancer_duckdb153
+java -jar target/sqlancer-2.0.0.jar \
+  --num-threads 1 \
+  --timeout-seconds 86400 \
+  --log-each-select true \
+  --log-execution-time false \
+  --random-seed 1 \
+  duckdb \
+  --oracle QUERY_PARTITIONING
+```
+
+当前 SQLancer mainline 有一个重要运行限制：不能使用
+`--log-each-select false`。`MainOptions.logExecutionTime()` 在
+`log-each-select=false` 时会触发 `AssertionError`，即使同时传入
+`--log-execution-time false`。因此公平长跑默认保留 statement logging，只关闭
+execution-time logging；长跑前必须检查 `experiments/external_tools/sqlancer_duckdb153/target/logs`
+的磁盘增长。
+
+项目内可复现 runner：
+
+```bash
+python scripts/run_sqlancer_baseline.py \
+  --sqlancer-root experiments/external_tools/sqlancer_duckdb153 \
+  --suite duckdb-query-partitioning \
+  --suite duckdb-norec \
+  --seeds 1,1001,2001 \
+  --num-threads 1 \
+  --timeout-seconds 7200 \
+  --process-timeout-seconds 7500 \
+  --no-log-execution-time \
+  --execute
+```
+
+推荐用计划器生成对等命令，避免把多个 DataDiffFuzz seeds 合并进同一个
+adaptive duration：
+
+```bash
+python scripts/plan_sqlancer_fair_comparison.py \
+  --run-id sqlancer-fair-duckdb153-2h-3seed-20260615 \
+  --sqlancer-root experiments/external_tools/sqlancer_duckdb153 \
+  --duration-seconds 7200 \
+  --seeds 1,1001,2001 \
+  --print-commands
+```
+
+长跑结束后用汇总器合并 SQLancer external baseline manifest 和 DataDiffFuzz
+experiment manifest：
+
+```bash
+python scripts/summarize_sqlancer_fair_comparison.py \
+  --sqlancer-manifest reports/external-baselines/sqlancer-fair-duckdb153-2h-3seed-20260615-duckdb-query-partitioning-7200s.json \
+  --sqlancer-manifest reports/external-baselines/sqlancer-fair-duckdb153-2h-3seed-20260615-duckdb-norec-7200s.json \
+  --datadiff-manifest <datadiff-experiment-manifest-1> \
+  --datadiff-manifest <datadiff-experiment-manifest-2> \
+  --datadiff-manifest <datadiff-experiment-manifest-3> \
+  --output-base sqlancer-fair-duckdb153-2h-3seed-20260615-summary \
+  --refresh-datadiff-summary
+```
+
+DataDiffFuzz 对应执行不要把多个 seeds 放进同一个 adaptive duration 里；
+`--duration` 在 adaptive schedule 下是总 matrix budget。应按 seed 分开：
+
+```bash
+rtk .venv/bin/datadiff experiment \
+  --duration 7200s \
+  --seeds 1 \
+  --presets live_duckdb_issue_focus \
+  --target-suite embedded_sql \
+  --evidence-mode live \
+  --schedule adaptive \
+  --jobs 1 \
+  --artifact-limit 50 \
+  --log-level minimal \
+  --skip-run-reports
+```
+
+当前可引用 artifact：
+
+- 20s fair-comparison smoke 通过，计划文件：
+  `reports/external-baselines/plans/sqlancer-fair-smoke-20260614b.json`。
+- 旧 DuckDB JDBC pilot 已完成，但只作为 pipeline/support 证据：
+  SQLancer DuckDB `QUERY_PARTITIONING` + `NOREC`，3 seeds，6/6 runs 成功，
+  合计 12,808,000 queries，296.418637 queries/s，0 reported failures。
+  对应 manifest：
+  `reports/external-baselines/sqlancer-fair-2h-3seed-20260614-duckdb-query-partitioning-7200s.json`
+  和
+  `reports/external-baselines/sqlancer-fair-2h-3seed-20260614-duckdb-norec-7200s.json`。
+- 当前 SOTA gap 快照已生成：
+  `reports/external-baselines/sota-gap-snapshot-20260615.json`
+  和
+  `reports/external-baselines/sota-gap-snapshot-20260615.md`。其中 DataDiffFuzz
+  当前口径为 9 个 confirmed latest-version families、277 个 rewardable live
+  candidate families、184,459 live cases、1.299321094 cases/s、2 个 DuckDB
+  issue-ready candidates。
+- 严格 DuckDB 1.5.3 SQLancer head-to-head 仍在进行中；截至该 snapshot，
+  strict manifest 为 0/6，因此不能声明 strict head-to-head 胜出。下一步等
+  `sqlancer-fair-duckdb153-2h-3seed-20260615-*.json` 全部产出后重新运行：
+
+```bash
+python scripts/summarize_sota_gap_snapshot.py
+```
 
 #### 最合理写法
 

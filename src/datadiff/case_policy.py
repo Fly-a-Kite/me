@@ -60,7 +60,3 @@ def known_replay_source_filter_reason(
         return "known_replay_source_issue"
     return ""
 
-
-issue_source_key = canonical_source_issue_key
-uses_issue_replay_ops = uses_replay_probe_operations
-replay_bug_filter_reason = known_replay_source_filter_reason
