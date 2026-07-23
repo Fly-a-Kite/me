@@ -1,0 +1,193 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-REAL-EVIDENCE-PRODUCER-CHAIN-R1
+owner: /root
+mode: root_serial_isolated_real_evidence_producer_chain_implementation
+implementation_child_agents: 0
+reviewer_child_agents_created: 0
+objective: >-
+  Implement a narrow private, process-bound producer-chain boundary that can
+  later collect genuine Phase-6 evidence from explicitly authorized commands.
+  This task is limited to code and regression tests for capture, validation,
+  and fail-closed staging. It must not execute any formal Phase-6 workload,
+  materialize a dynamic plan, persist an artifact receipt index, publish a
+  gate authority bundle, or claim any gate credit.
+user_authorization:
+  date: 2026-07-24
+  exact_confirmation: 创建“真实证据生产链实现”合同，并指定允许修改的产品路径与 scoped tests
+  interpreted_scope: >-
+    Create this bounded implementation authority and define its exact product
+    paths and scoped validation. This is not authorization for 100000 exact
+    comparison execution, v3 2200 execution, repository suite execution,
+    six-file combined suite execution, Phase 7, a 2h pilot, a 24h campaign,
+    durable authority artifacts, or a gate-pass claim.
+authority_clone:
+  path: /tmp/phase6_authority_real_evidence_chain_r1.WcCIEK
+  parent_authority_head: 8fc7d9964116af59668e7486344e4cd50b7c0222
+  remote_count_before_contract: 0
+  status_entries_before_contract: 0
+source_handoff_dependency:
+  clean_source_path: /tmp/phase6_clean_source_handoff_r3.onC30x
+  clean_source_head: 8367c0519d2252c3b507703114b67b474aac636c
+  clean_source_tree: 5f7ef425d6eb401e714a3078624695d5d8399cb2
+  source_snapshot_digest: osc-phase6-source-snapshot-a4beb268b3097b194886a7f2e2e63abc8f8f1510ffa76ae0f10a8162fbfa322b
+  status: verified_current_head_no_gate_credit
+verified_preconditions:
+  original_workspace:
+    path: /data1/lbw/xjx/datadiff_fuzz_lab
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    index_staged_paths: 0
+    status_entries: 2908
+  dynamic_plan_boundary:
+    task_contract_sha256: ba7a5fce510fa84855a9d1c282071d681977502aab5edd131ae295b664eadcd1
+    report_sha256: e79514042e4c4dd2937de1b30c59a550b7d7d85e6a93346d5484a4554da2d69a
+    finding: OSC-6-DYNAMIC-PLAN-B1
+    status: open_real_evidence_prerequisites_absent
+  frozen_public_targets:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+required_inputs_read:
+  - docs/codex_multi_agent_development_runbook.md
+  - experiments/final_bug_discovery_protocol_v3/TODO.md
+  - docs/project_architecture.md
+  - docs/fine_grained_discovery_architecture.md
+  - docs/discovery_search_and_parallel_architecture.md
+  - docs/semantic_hypercontract_architecture.md
+  - docs/architecture_credibility_and_alternatives.md
+  - docs/competitive_paper_experiment_blueprint.md
+  - experiments/osc_v1/coordination_20260719_v1/phase6_dynamic_plan_admission_boundary_task_contract.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_dynamic_plan_admission_boundary_report.yaml
+  - src/datadiff_osc/_phase6_gate_authority.py
+  - src/datadiff_osc/runtime/gate_artifacts.py
+  - src/datadiff_osc/runtime/_phase6_real_adapter_execution_sample.py
+  - scripts/osc/build_phase6_gate_authority_bundle.py
+  - scripts/osc/preflight_phase6_gate_authority_bundle.py
+authorization_boundary:
+  allowed_product_write_paths:
+    - src/datadiff_osc/runtime/_phase6_real_evidence_producer_chain.py
+    - scripts/osc/run_phase6_real_evidence_producer_chain.py
+    - tests/osc/test_runtime_phase6_real_evidence_producer_chain.py
+  allowed_authority_write_paths:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_real_evidence_producer_chain_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_real_evidence_producer_chain_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  allowed_test_only_output:
+    - pytest-managed tmp_path only; it must be nonpersistent and cannot be imported as authority evidence
+  durable_output_paths: forbidden_pending_successor_execution_authority
+  all_other_paths: forbidden
+frozen_interfaces:
+  - src/datadiff_osc/_phase6_gate_authority.py
+  - src/datadiff_osc/runtime/gate_artifacts.py
+  - src/datadiff_osc/public_api_freeze.json
+  - all thirteen frozen_public_targets listed above
+  - all public exports and package __init__.py files
+  - existing source snapshot payload and all R2/R3 authority clones
+required_invariants:
+  - >-
+    The implementation may stage only evidence derived from actual typed
+    runtime objects and an observed subprocess transcript. It must reject
+    caller-authored dicts, placeholder digests, synthetic labels, mutable
+    objects, missing result/outcome/task/seed bindings, source mismatch, and
+    uninspectable or unresolved execution context before any receipt staging.
+  - >-
+    The capture boundary must bind command, cwd, executable identity, selected
+    environment allowlist, start/end, exit code, stdout/stderr digests, output
+    digest, isolated clean source digest, and exact typed subject identities.
+    A test-double or dry-run capture is permanently diagnostic-only.
+  - >-
+    The new runner defaults to prepare-only/dry-run behavior and must refuse
+    durable output, dynamic-plan emission, artifact-receipt index emission,
+    authority-bundle publication, or gate calculation without a successor
+    authority that names a clean source snapshot, explicit output directory,
+    workload budget, and command digest.
+  - >-
+    No local code path may claim a producer receipt is valid by itself. Existing
+    Root verifiers remain the sole consumer of persisted records; verifier
+    rejection, incomplete producer sets, and missing typed context remain
+    fail-closed and not_evaluated.
+  - >-
+    The producer chain must preserve four-valued verdicts, exact escalation,
+    seed lineage, task/result/spec/outcome/evidence binding, fresh/regression
+    separation, and worker-count invariance. Candidate state remains
+    non-confirmed and bug_claimed=false.
+  - >-
+    Private schema changes are prohibited in this task. If the frozen verifier
+    cannot validate a genuinely captured record without relaxing a check, stop,
+    record the incompatibility, and request a new narrow authority rather than
+    changing an authority schema or verifier.
+required_negative_coverage:
+  负向复核:
+    - a caller-authored digest, planned identifier, test fixture, or diagnostic sample cannot be emitted as gate-eligible evidence
+    - a subprocess with nonzero exit, source mismatch, changed output, escaped path, or incomplete typed binding is rejected before receipt staging
+    - an incomplete ten-producer set cannot generate a dynamic plan, artifact receipt index, or authority bundle
+  独立反例验证:
+    - the existing one-pair diagnostic sample and all support scripts remain diagnostic/support-only after the new capture boundary is introduced
+    - a source-valid but process-unbound payload has no Phase-6 credit
+  异常输入验证:
+    - malformed typed envelope, duplicate identity, wrong task/result/spec/seed/outcome binding, unordered input, mutable context, synthetic marker, and stale source digest fail closed
+implementation_deliverables:
+  - >-
+    A private runtime capture/staging module with explicit typed inputs,
+    process-transcript binding, canonical immutable serialization, and a
+    fail-closed diagnostic-only result type.
+  - >-
+    A private script that defaults to dry-run/prepare-only and cannot launch a
+    formal workload or persist authority material under this contract.
+  - >-
+    Focused regression tests that exercise the negative, counterexample, and
+    exceptional-input invariants using pytest tmp_path only.
+  - >-
+    A completion report with exact changed paths, pre/post SHA, a single
+    terminal scoped-suite result, no durable output, and unchanged pending
+    formal gates.
+validation:
+  run_only_after_implementation: true
+  maximum_scoped_suite_runs: 1
+  command: >-
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+    tests/osc/test_runtime_phase6_real_evidence_producer_chain.py
+    tests/osc/test_runtime_gate_artifacts.py
+    tests/osc/test_phase6_gate_authority_integration.py
+  expected: >-
+    exit code 0 with complete terminal result; no durable plan/receipt/artifact
+    output, no gate credit, and all frozen/public SHA values exact before and
+    after the one scoped suite.
+prohibited_execution:
+  - tests/osc directory suite, repository suite, six-file combined suite, 100000 parity, v3 2200, Phase 7, 2h pilot, and 24h execution
+  - any dynamic plan JSON, typed artifact receipt index, raw authority artifact, authority bundle, source payload, or gate manifest persistence
+  - public export, public API freeze, frozen file, authority verifier, gate artifact schema, contract/search/parallel core, legacy datadiff, TODO, launcher, or current-worktree modification
+  - candidate confirmation, diagnostic promotion, confirmed status, or bug_claimed=true
+stop_conditions:
+  - any frozen/public SHA mismatch, original worktree/index/HEAD change, clone remote, or authority path outside this contract
+  - any requirement to relax an existing verifier, gate floor, exact binding, source binding, or typed replay check
+  - any planned or actual formal execution, durable authority output, gate credit, or candidate/bug claim
+  - any scope need outside the three allowed product write paths
+barrier_state_before_implementation:
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
+successor_authority_required_for_real_execution: >-
+  After implementation and a fresh clean-source snapshot that includes the
+  new code, a separate authority must name the exact isolated output directory,
+  command digest, clean source commit, target versions, seed exclusion and
+  workload budget before any real evidence workload can start. This contract
+  grants none of those execution permissions.

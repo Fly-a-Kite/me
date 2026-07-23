@@ -1387,6 +1387,33 @@ tasks:
       combined_suite: unauthorized
       phase7_paired_pilot: unauthorized
       twenty_four_hour: unauthorized
+  - task_id: OSC-6-REAL-EVIDENCE-PRODUCER-CHAIN-R1
+    owner: /root
+    mode: root_serial_isolated_real_evidence_producer_chain_implementation
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_phase6_real_evidence_producer_chain.py
+      - scripts/osc/run_phase6_real_evidence_producer_chain.py
+      - tests/osc/test_runtime_phase6_real_evidence_producer_chain.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_real_evidence_producer_chain_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_real_evidence_producer_chain_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    task_contract_sha256: f8e646ebbec6ae1a51e6731b534f904ccb7e696844f6584a3e39382deb2a28e8
+    report_sha256: null
+    status: authorized_pending_implementation_no_product_write_yet
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_real_evidence_producer_chain_task_contract.yaml
+    barrier:
+      phase_6_private_foundation_barrier: pass_unchanged
+      phase_6_contract: pending
+      phase_6_granularity_reachability: pending
+      phase_6_runtime_correctness: pending
+      dynamic_plan: absent_fail_closed
+      artifact_receipt_index: absent_fail_closed
+      gate_credit: false
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
 interface_freeze:
   version: osc-public-api-freeze-v1
   hash: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
@@ -1485,7 +1512,7 @@ open_review_findings:
   - {id: OSC-6-R-B3, severity: blocker, owner: root, status: open_dynamic_plan_typed_receipt_raw_artifact_chain_absent_after_r3_source_snapshot}
   - {id: OSC-6-G-B1, severity: blocker, owner: root, status: open_no_gate_eligible_real_adapter_232_384_502_evidence}
   - {id: OSC-6-SOURCE-HANDOFF-R3-B1, severity: blocker, owner: root, status: remediated_by_clean_current_head_verification_no_gate_credit}
-  - {id: OSC-6-DYNAMIC-PLAN-B1, severity: blocker, owner: root, status: open_requires_explicit_real_execution_authority}
+  - {id: OSC-6-DYNAMIC-PLAN-B1, severity: blocker, owner: root, status: open_implementation_authority_created_real_execution_still_unauthorized}
 gates:
   - name: phase_0_dirty_paths_registered_and_preserved
     threshold: complete snapshot and no existing dirty path overwritten
