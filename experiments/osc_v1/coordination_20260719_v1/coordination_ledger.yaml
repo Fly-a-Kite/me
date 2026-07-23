@@ -1476,6 +1476,35 @@ tasks:
       combined_suite: unauthorized
       phase7_paired_pilot: unauthorized
       twenty_four_hour: unauthorized
+  - task_id: OSC-6-BOUNDED-ARTIFACT-R1A-TEST-ONLY
+    owner: /root
+    mode: root_serial_test_only_remediation
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - tests/osc/test_runtime_phase6_bounded_real_adapter_artifact.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_r1a_test_only_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_r1a_test_only_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    task_contract_sha256: 0519493f2d107bc7ec707874353b593cc73073e6e68b6d2ed086634b4057ef38
+    report_sha256: 82f9103675b07376f000427941b88a346122f3bde6b2a19cd599cdd641d0a303
+    status: complete_scoped_4_passed_test_only_no_adapter_or_reserved_artifact
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_r1a_test_only_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_r1a_test_only_report.yaml
+    remediated_findings:
+      - id: OSC-6-BOUNDED-ARTIFACT-R1-M1
+        disposition: test_only_first_error_and_duplicate_parser_paths_now_complete
+    barrier:
+      phase_6_private_foundation_barrier: pass_unchanged
+      phase_6_contract: pending
+      phase_6_granularity_reachability: pending
+      phase_6_runtime_correctness: pending
+      bounded_real_adapter_writer: scoped_validation_complete_no_gate_credit
+      actual_bounded_execution: unauthorized_until_fresh_source_snapshot_and_successor_authority
+      gate_credit: false
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
 interface_freeze:
   version: osc-public-api-freeze-v1
   hash: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131

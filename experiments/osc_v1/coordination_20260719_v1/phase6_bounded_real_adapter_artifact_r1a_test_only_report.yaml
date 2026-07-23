@@ -1,0 +1,117 @@
+schema_version: osc-phase6-bounded-real-adapter-artifact-r1a-test-only-report-v1
+phase: 6
+task_id: OSC-6-BOUNDED-ARTIFACT-R1A-TEST-ONLY
+status: complete_scoped_4_passed_test_only_no_adapter_or_reserved_artifact
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_r1a_test_only_task_contract.yaml
+  sha256: 0519493f2d107bc7ec707874353b593cc73073e6e68b6d2ed086634b4057ef38
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  writes:
+    - tests/osc/test_runtime_phase6_bounded_real_adapter_artifact.py
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_r1a_test_only_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_r1a_test_only_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  forbidden_paths_modified: []
+  original_workspace:
+    head_before_and_after: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths_before_and_after: 0
+    status_entries_before_and_after: 2908
+  authority_clone:
+    head_before_implementation: 8e4272cb40c5615252be7e3633ab2f930c814535
+    remote_count: 0
+remediation:
+  finding:
+    id: OSC-6-BOUNDED-ARTIFACT-R1-M1
+    prior_severity: medium
+    disposition: remediated_test_only_with_complete_scoped_terminal_result
+  changed_test:
+    path: tests/osc/test_runtime_phase6_bounded_real_adapter_artifact.py
+    pre_sha256: 8609623cb555e557038650a3fd598125e99e582d0750f91cf4997fefa8b47d3d
+    post_sha256: c09f74084b5fdaef99f074339cebcbb33e7c10ef7d5ec4517f6002a2e6dd65a5
+    result: >-
+      The master-seed byte mutation now correctly asserts bounded artifact SHA
+      mismatch using the original expected SHA. The duplicate-key JSON fixture
+      supplies its own matching SHA and correctly asserts duplicate JSON fields.
+  immutable_product_paths_pre_and_post_exact:
+    src/datadiff_osc/runtime/_phase6_bounded_real_adapter_artifact.py: dc2bfb564cda3a2c38f1212d1fc3718431e23f32d64fabe19252a445167fd6e2
+    scripts/osc/run_phase6_bounded_real_adapter_artifact.py: 6a5d33bdf7e3e97515a1801b0b446820f7e56a4be142b70abec886492be00a46
+validation:
+  scoped_suite_runs: 1
+  command: >-
+    cwd=/tmp/phase6_authority_real_evidence_chain_r1.WcCIEK;
+    PYTHONDONTWRITEBYTECODE=1
+    /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python -m pytest -q
+    -p no:cacheprovider tests/osc/test_runtime_phase6_bounded_real_adapter_artifact.py
+  exit_code: 0
+  complete_terminal_result: |-
+    ....                                                                     [100%]
+    4 passed in 7.94s
+  actual_adapter_pair_invocations: 0
+  reserved_external_artifact_writes: 0
+  reserved_output_directory_entries_after_suite: 0
+  untracked_pycache_directories_after_suite: 0
+coverage:
+  负向复核: >-
+    The byte mutation with its old expected SHA now fails first at the integrity
+    boundary, while the duplicate-key payload with its matching SHA reaches the
+    strict parser and fails duplicate JSON fields. Record-order and record-SHA
+    substitutions remain rejected.
+  独立反例验证: >-
+    This was a test-only remediation: the writer and runner hashes remained
+    exact, no capture function was called, and the reserved artifact directory
+    remained empty. It cannot create evidence or gate credit.
+  异常输入验证: >-
+    Relative/wrong-name output paths, malformed source bindings, malformed
+    duplicate JSON, wrong runner/source bindings, and existing output rejection
+    remain covered by the passing scoped tests.
+findings: []
+inherited_open_findings:
+  - id: OSC-6-DYNAMIC-PLAN-B1
+    severity: blocker
+    disposition: open_requires_separate_real_execution_authority
+  - id: OSC-6-R-B3
+    severity: blocker
+    disposition: open_unchanged
+  - id: OSC-6-G-B1
+    severity: blocker
+    disposition: open_unchanged
+counts:
+  blocker_open: 3
+  high_open: 0
+  medium_open: 0
+  scoped_tests_passed: 4
+  scoped_tests_failed: 0
+  actual_adapter_pair_invocations: 0
+  reserved_external_artifact_writes: 0
+  product_writes: 1
+  authority_writes: 3
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  forbidden_paths_modified: []
+frozen_public_targets: 13_of_13_exact_pre_and_post_suite
+barrier:
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  r4_source_snapshot: valid_but_stale_for_new_writer
+  bounded_real_adapter_writer: scoped_validation_complete_no_gate_credit
+  fresh_source_snapshot_for_writer: required_before_actual_execution
+  actual_bounded_execution: unauthorized_until_new_source_snapshot_and_execution_authority
+  dynamic_plan: absent_fail_closed
+  artifact_receipt_index: absent_fail_closed
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
+next_step_requires_new_task_contract: >-
+  Create and verify a new clean source snapshot containing the writer and runner
+  commit. Only then may a separate bounded execution authority invoke exactly
+  one pandas/polars pair at the reserved path; the result remains diagnostic-only
+  and cannot discharge a formal Phase-6 gate.

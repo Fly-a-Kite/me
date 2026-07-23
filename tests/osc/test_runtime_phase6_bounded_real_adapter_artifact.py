@@ -149,7 +149,7 @@ def test_negative_review_rejects_record_seed_and_json_substitutions(tmp_path):
     payload = json.loads(output.read_text())
     payload["master_seed"] = 30
     output.write_text(canonical_json(payload) + "\n")
-    with pytest.raises(ValueError, match="duplicate JSON fields"):
+    with pytest.raises(ValueError, match="bounded artifact SHA mismatch"):
         verify_bounded_real_adapter_artifact(
             artifact_path=output,
             expected_sha256=expected_sha,
@@ -159,7 +159,7 @@ def test_negative_review_rejects_record_seed_and_json_substitutions(tmp_path):
 
     malformed = output_dir / "malformed.json"
     malformed.write_text('{"a":1,"a":2}\n')
-    with pytest.raises(ValueError, match="bounded artifact SHA mismatch"):
+    with pytest.raises(ValueError, match="duplicate JSON fields"):
         verify_bounded_real_adapter_artifact(
             artifact_path=malformed,
             expected_sha256=hashlib.sha256(malformed.read_bytes()).hexdigest(),

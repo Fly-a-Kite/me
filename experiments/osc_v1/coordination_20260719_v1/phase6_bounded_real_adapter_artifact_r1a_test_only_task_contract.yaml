@@ -1,0 +1,95 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-BOUNDED-ARTIFACT-R1A-TEST-ONLY
+owner: /root
+mode: root_serial_test_only_remediation
+implementation_child_agents: 0
+reviewer_child_agents_created: 0
+remediates:
+  - OSC-6-BOUNDED-ARTIFACT-R1-M1
+objective: >-
+  Repair only the failed R1 negative assertion. The test must separately prove
+  that a changed artifact byte with the old expected SHA fails first at SHA
+  binding, and that a duplicate-key JSON artifact with its matching SHA reaches
+  and fails the strict duplicate-field parser. No writer, runner, source
+  snapshot, adapter execution, or durable reserved artifact may change.
+user_authorization:
+  date: 2026-07-24
+  exact_confirmation: 明确授权
+  interpreted_scope: >-
+    The previously authorized bounded evidence workflow continues through the
+    required new test-only remediation contract after R1 consumed its sole
+    scoped suite with finding OSC-6-BOUNDED-ARTIFACT-R1-M1.
+authorization_boundary:
+  authorized_product_writes:
+    - tests/osc/test_runtime_phase6_bounded_real_adapter_artifact.py
+  authorized_authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_r1a_test_only_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_r1a_test_only_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  all_other_paths: forbidden
+verified_preconditions:
+  original_workspace:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    index_staged_paths: 0
+    status_entries_observed: 2908
+  authority_clone:
+    head_before_contract: 8e4272cb40c5615252be7e3633ab2f930c814535
+    status_entries: 0
+    remote_count: 0
+  prior_failure:
+    task_contract_sha256: 69f0c61cf3bf315b7c6da53cd2921363572494171551be3725682cd73922db48
+    report_sha256: 0d71895824503deaf6be19de90ca188080c083a1fe78c09dbfe4d0254953903f
+    finding: OSC-6-BOUNDED-ARTIFACT-R1-M1
+  immutable_product_paths:
+    src/datadiff_osc/runtime/_phase6_bounded_real_adapter_artifact.py: dc2bfb564cda3a2c38f1212d1fc3718431e23f32d64fabe19252a445167fd6e2
+    scripts/osc/run_phase6_bounded_real_adapter_artifact.py: 6a5d33bdf7e3e97515a1801b0b446820f7e56a4be142b70abec886492be00a46
+  authorized_test_path_before: 8609623cb555e557038650a3fd598125e99e582d0750f91cf4997fefa8b47d3d
+  reserved_external_output:
+    path: /tmp/phase6_bounded_real_adapter_artifact_r1.Mhodhy/real-adapter-execution-artifact.json
+    entries_before_contract: 0
+  authority_ledger_sha256_before_contract_write: b0686bbda7a5c20610da189a412ff25f54f5ae94400fa64d52dae8715beec815
+required_invariants:
+  - >-
+    The changed master_seed byte must retain the original expected SHA and
+    assert bounded artifact SHA mismatch before any JSON parser assertion.
+  - >-
+    The duplicate-key artifact must use its own matching external SHA so the
+    strict duplicate-field parser is actually reached and rejected.
+  - >-
+    Tests remain entirely in-memory/pytest-tmp-path with zero calls to the real
+    adapter capture, zero reserved-output writes, zero source snapshot creation,
+    and no public or gate state change.
+negative_review_requirements:
+  负向复核:
+    - byte/SHA mutation and duplicate-key parser failures have distinct asserted first errors
+  独立反例验证:
+    - remediation cannot change writer/runner or convert an in-memory test into actual evidence
+  异常输入验证:
+    - output path, source binding, record order, record digest, and malformed JSON remain fail closed
+forbidden:
+  - writer, runner, public exports, public API freeze, frozen targets, source snapshots, adapter execution, dynamic plan, receipt index, reserved output, gate credit, candidate confirmation, or bug_claimed=true
+  - tests/osc whole directory, six-file combined suite, repository suite, 100000 parity, v3 2200, Phase 7, 2h, or 24h execution
+validation:
+  prior_r1_scoped_suite_rerun: forbidden
+  scoped_suite_runs: exactly_1_after_test_change
+  command: >-
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+    tests/osc/test_runtime_phase6_bounded_real_adapter_artifact.py
+  expected_exit_code: 0
+  actual_adapter_pair_invocations: 0
+  reserved_external_artifact_writes: 0
+stop_conditions:
+  - immutable product/frozen SHA mismatch, any adapter or reserved-output write, failed suite, or accepted first-error substitution
+  - any write outside the four authorized paths
+decision:
+  r1_m1: pending_test_only_remediation
+  bounded_real_adapter_writer: pending_r1a_validation
+  fresh_source_snapshot_for_writer: required_after_r1a_success
+  actual_bounded_execution: unauthorized_until_fresh_source_snapshot_and_successor_authority
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
