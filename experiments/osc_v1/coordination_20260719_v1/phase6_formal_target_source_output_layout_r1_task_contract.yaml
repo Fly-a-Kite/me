@@ -1,0 +1,213 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-FORMAL-TARGET-SOURCE-OUTPUT-LAYOUT-R1
+owner: /root
+role: root
+mode: root_serial_isolated_formal_public_target_source_and_output_layout
+implementation_child_agents: 0
+reviewer_child_agents_created: 0
+grandchildren_allowed: false
+objective: >-
+  Bind the verified formal source snapshot and local environment freeze to one
+  read-only public-version-source audit of the seven declared target
+  distributions, and write one future formal-output layout reservation. The
+  task preserves raw official response bytes and exact hashes but deliberately
+  produces no TargetVersionReceipt or other typed producer evidence.
+user_authorization:
+  date: 2026-07-24
+  exact_confirmation: 继续
+  interpreted_scope: >-
+    Continue the formal-execution preconditions after the verified isolated
+    source/environment freeze. The sole external interaction is bounded
+    read-only retrieval of the seven official PyPI JSON endpoints required to
+    learn whether the already-frozen local environment is current. No package
+    mutation, evidence workload, or formal gate execution is authorized.
+parent_authority:
+  formal_execution_contract_sha256: 73cb3b6cec18c27641b2dfdb818f4ce3895514c7b73ca0bd00bcd292ddb7e700
+  formal_execution_report_sha256: 8df2aa81724894ccc7605bb05dd1b8ef00fbdd2af0481e9ff972228a7780a2f0
+  source_environment_contract_sha256: aa1dbb8a2de7b1247c55987cf76dfda36870b5722728a74db895c2f291d099de
+  source_environment_report_sha256: 0f74bb4d3c381bc82cd3ad84db8f7ae8453f5905cdb3d5bf8169ebc35ee60d5e
+authority_root:
+  directory: /tmp/phase6_formal_execution_authority_r1.Smql7A
+  authority_source_clone: /tmp/phase6_formal_execution_authority_r1.Smql7A/source
+  authority_source_commit_before_contract: 072587f49e2834e56096ba491087848d7cd3f059
+  authority_source_tree_before_contract: 34f77d85b5806f2390b244040173331b58d42b6c
+  snapshot_source_clone: /tmp/phase6_formal_execution_authority_r1.Smql7A/source_snapshot_source
+  verified_snapshot: /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/formal-source-snapshot.json
+  verified_snapshot_sha256: 13134df2cf22758d7b4a71da74826fd3bd02d0f4cbd64ee0ad0479988a77b577
+  verified_source_digest: osc-phase6-source-snapshot-6a7201659596c888a3efedfa9d1207cfadb2eda98f1ffd50a47c3e56405eef38
+  verified_local_environment_audit: /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/local-environment-target-audit.json
+  verified_local_environment_audit_sha256: 26fb86e8d3d349bfd8cb19d1c65599d53c31af82d2b471025afac0567ef68f68
+  public_target_source_root: /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources
+  output_layout_root: /tmp/phase6_formal_execution_authority_r1.Smql7A/formal_output_layout
+  reserved_formal_evidence_root: /tmp/phase6_formal_execution_authority_r1.Smql7A/formal_evidence
+authorization_boundary:
+  authorized_product_writes: []
+  authorized_authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_formal_target_source_output_layout_r1_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_formal_target_source_output_layout_r1_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  authorized_external_writes:
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-pandas.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-polars.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-duckdb.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-pyarrow.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-datafusion.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-chdb.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-pysqlite3-binary.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/target-version-public-source-audit.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/formal_output_layout/formal-output-layout.json
+  all_other_paths: forbidden
+verified_preconditions:
+  original_workspace:
+    path: /data1/lbw/xjx/datadiff_fuzz_lab
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    index_staged_paths: 0
+    status_entries_observed: 2908
+  authority_source_clone:
+    head: 072587f49e2834e56096ba491087848d7cd3f059
+    tree: 34f77d85b5806f2390b244040173331b58d42b6c
+    status_entries: 0
+    remote_count: 0
+  snapshot_source_clone:
+    head: 811ba665966b8773fa1bdd8185f1165f6af2ee97
+    status_entries: 0
+    remote_count: 0
+  source_environment_inputs:
+    source_snapshot_sha256: 13134df2cf22758d7b4a71da74826fd3bd02d0f4cbd64ee0ad0479988a77b577
+    source_digest: osc-phase6-source-snapshot-6a7201659596c888a3efedfa9d1207cfadb2eda98f1ffd50a47c3e56405eef38
+    required_path_count: 409
+    local_environment_audit_sha256: 26fb86e8d3d349bfd8cb19d1c65599d53c31af82d2b471025afac0567ef68f68
+    dependency_lock_sha256: ee4bb79ac41317e3583ec18bdb744d00d3a7470a58e7205cdaba913f5938c087
+  external_paths_before_contract:
+    public_target_source_root: absent
+    output_layout_root: absent
+    reserved_formal_evidence_root: absent
+  target_packages_exact_order:
+    - {distribution: pandas, import_name: pandas, locked_version: 3.0.3, endpoint: https://pypi.org/pypi/pandas/json}
+    - {distribution: polars, import_name: polars, locked_version: 1.42.1, endpoint: https://pypi.org/pypi/polars/json}
+    - {distribution: duckdb, import_name: duckdb, locked_version: 1.5.4, endpoint: https://pypi.org/pypi/duckdb/json}
+    - {distribution: pyarrow, import_name: pyarrow, locked_version: 25.0.0, endpoint: https://pypi.org/pypi/pyarrow/json}
+    - {distribution: datafusion, import_name: datafusion, locked_version: 54.0.0, endpoint: https://pypi.org/pypi/datafusion/json}
+    - {distribution: chdb, import_name: chdb, locked_version: 4.2.1, endpoint: https://pypi.org/pypi/chdb/json}
+    - {distribution: pysqlite3-binary, import_name: sqlite, locked_version: 0.5.4.post2, endpoint: https://pypi.org/pypi/pysqlite3-binary/json}
+  seed_schedule:
+    workload_seeds_used: []
+    excluded_blocks:
+      - 2026071800-2026071805
+      - 30000001-30000113
+      - 30500001-30500102
+      - 30600001-30600102
+  frozen_public_targets:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  authority_ledger_sha256_before_contract_write: 83d46701d0c186d1ab3ff68e5529a660c1d5811490bda96727fc4c095507a9e8
+required_invariants:
+  - >-
+    Exactly seven HTTPS GET requests are permitted, one to each declared
+    https://pypi.org/pypi/<distribution>/json endpoint, with default TLS
+    validation, a 15-second timeout, no redirect, no credential, no upload, and
+    at most 10 MiB raw response bytes per endpoint. All bytes are fetched and
+    validated in memory before any durable output is created.
+  - >-
+    Each raw response must be valid UTF-8 JSON with exactly a nonempty
+    info.name and info.version value. The audit binds its exact endpoint, raw
+    byte SHA-256, returned public distribution name, returned latest version,
+    frozen installed/locked version, and match result; it must not substitute a
+    caller-provided version string for public bytes.
+  - >-
+    The public source audit must cross-bind the verified snapshot SHA/source
+    digest and local environment-audit SHA. A public/installed mismatch is a
+    valid recorded audit outcome but leaves formal execution unauthorized and
+    all Phase-6 gates pending.
+  - >-
+    The output-layout manifest must be canonical JSON and predeclare the
+    absent formal_evidence root, the exact 10 producer raw/receipt locations,
+    dynamic-plan path, receipt-index path, authority-plan path, artifact
+    manifest path, gate-report path, seed exclusions, no-overwrite rule, and
+    no-output-without-a-successor-contract rule. It must not create the
+    formal_evidence root or any listed child path.
+  - >-
+    The two external roots are write-once: both must be absent before the one
+    command, contain exactly the nine authorized files after it, and never be
+    overwritten or regenerated by this task.
+  - >-
+    No TargetVersionReceipt, target-version producer receipt, raw execution
+    artifact, dynamic plan, receipt index, formal gate bundle, candidate
+    confirmation, or bug claim is created from this audit or layout manifest.
+negative_review_requirements:
+  负向复核:
+    - malformed public JSON, missing info.name/info.version, wrong endpoint scheme/host, and a substituted raw SHA must fail closed
+    - layout path escape and an attempt to create a formal_evidence child must fail closed before durable write
+  独立反例验证:
+    - >-
+      Seven official response bytes and an output layout alone cannot become a
+      TargetVersionReceipt, receipt-index entry, dynamic plan, or gate credit.
+  异常输入验证:
+    - >-
+      redirect, non-200/oversized response, response identity mismatch,
+      preexisting output, source/audit drift, package mismatch, output inventory
+      mismatch, network count breach, or noncanonical audit/layout stops the task.
+forbidden:
+  - all product code and tests
+  - src/datadiff_osc/public_api_freeze.json
+  - all thirteen frozen_public_targets
+  - /data1/lbw/xjx/datadiff_fuzz_lab
+  - any package install, upgrade, uninstall, lock mutation, import mutation, upload, credential use, or non-PyPI network request
+  - creation of /tmp/phase6_formal_execution_authority_r1.Smql7A/formal_evidence or any file below it
+  - any TargetVersionReceipt, typed producer receipt, raw execution artifact, dynamic plan, receipt index, coverage event, gate calculation, candidate confirmation, or bug claim
+  - tests/osc, six-file combined suite, repository suite, 100000 parity, v3 2200, Phase 7, 2h, or 24h execution
+validation:
+  test_execution_count: 0
+  formal_workload_execution_count: 0
+  external_public_raw_response_files: 7
+  external_public_audits: 1
+  external_layout_manifests: 1
+  external_output_files_total: 9
+  command_budget:
+    public_https_get_requests: 7
+    public_audit_layout_commands: 1
+    package_mutation_commands: 0
+    formal_workload_commands: 0
+  public_audit_layout_command: >-
+    PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=<snapshot-source>/src
+    /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python -
+    <snapshot-source> <verified-snapshot> <public-target-source-root>
+    <output-layout-root>
+  required_report_contents:
+    - pre/post original/authority/snapshot source SHA, status, remote, and 13-target state
+    - all seven exact endpoints, raw response SHA-256 values, public/latest/installed bindings, and mismatch result
+    - exact audit/layout SHA-256 values, output inventory, command, exit code, complete terminal result, and negative checks
+    - formal_evidence root absent, no formal receipt/evidence/workload, and all gate/candidate/bug flags false
+stop_conditions:
+  - any source snapshot/local audit/frozen/public SHA, Git state, remote, package lock, or path-state mismatch
+  - any network request outside seven declared endpoints; redirect, non-200, bad content type, invalid/oversized raw response, or public response identity mismatch
+  - preexisting/extra output, overwrite attempt, output-count breach, malformed/noncanonical audit/layout, or accepted negative mutation
+  - any product/test/authority path outside authorization_boundary
+  - any formal evidence, gate credit, confirmation, or bug claim
+decision:
+  formal_public_target_source_audit_and_layout: authorized_pending_execution
+  formal_execution_workload_authorized: false
+  TargetVersionReceipt_created: false
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false

@@ -1644,6 +1644,43 @@ tasks:
       combined_suite: unauthorized
       phase7_paired_pilot: unauthorized
       twenty_four_hour: unauthorized
+  - task_id: OSC-6-FORMAL-TARGET-SOURCE-OUTPUT-LAYOUT-R1
+    owner: /root
+    mode: root_serial_isolated_formal_public_target_source_and_output_layout
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_target_source_output_layout_r1_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_target_source_output_layout_r1_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+      - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-pandas.json
+      - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-polars.json
+      - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-duckdb.json
+      - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-pyarrow.json
+      - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-datafusion.json
+      - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-chdb.json
+      - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-pysqlite3-binary.json
+      - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/target-version-public-source-audit.json
+      - /tmp/phase6_formal_execution_authority_r1.Smql7A/formal_output_layout/formal-output-layout.json
+    task_contract_sha256: e622fc69f568967a41c5ed5866711b780da0def5f21339e3f602939ad4629a59
+    report_sha256: pending_not_created
+    status: authorized_pending_public_target_source_and_output_layout
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_target_source_output_layout_r1_task_contract.yaml
+    barrier:
+      phase_6_private_foundation_barrier: pass_unchanged
+      phase_6_contract: pending
+      phase_6_granularity_reachability: pending
+      phase_6_runtime_correctness: pending
+      public_target_source_audit: authorized_not_created
+      formal_output_layout: authorized_not_created
+      formal_evidence_root: absent
+      formal_execution_workload: unauthorized
+      dynamic_plan: absent_fail_closed
+      artifact_receipt_index: absent_fail_closed
+      gate_credit: false
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
 interface_freeze:
   version: osc-public-api-freeze-v1
   hash: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
