@@ -1,0 +1,114 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-SOURCE-SNAPSHOT-AUTHORITY-R5
+owner: /root
+mode: root_serial_isolated_clean_source_snapshot_authority
+implementation_child_agents: 0
+reviewer_child_agents_created: 0
+objective: >-
+  Create and verify one fresh clean source snapshot for the R1A-validated
+  bounded real-adapter writer and runner commit b80dd03db0c54d18fafb3dbed00bfe50fcc9e224.
+  This authority binds executable source only and grants no actual adapter
+  invocation, durable diagnostic artifact, dynamic plan, typed receipt index,
+  coverage event, gate credit, confirmation, or bug claim.
+user_authorization:
+  date: 2026-07-24
+  exact_confirmation: 明确授权
+  interpreted_scope: >-
+    The separately required fresh source snapshot for the bounded writer is
+    authorized before any later bounded execution authority. This task does not
+    itself invoke the writer or reserved output path.
+authorization_boundary:
+  authorized_product_writes: []
+  authorized_authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r5_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r5_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  allowed_external_ephemeral_validation_output:
+    directory_pattern: /tmp/phase6_source_snapshot_r5_validation.*
+    file: source-snapshot.json
+    purpose: exactly one positive source snapshot plus in-memory negative checks
+  all_other_paths: forbidden
+verified_preconditions:
+  original_workspace:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    index_staged_paths: 0
+    status_entries_observed: 2908
+  authority_clone:
+    path: /tmp/phase6_authority_real_evidence_chain_r1.WcCIEK
+    head_before_contract: b80dd03db0c54d18fafb3dbed00bfe50fcc9e224
+    status_entries: 0
+    remote_count: 0
+  r5_isolated_source_clone:
+    path: /tmp/phase6_source_snapshot_r5.jUnpUd/source
+    head: b80dd03db0c54d18fafb3dbed00bfe50fcc9e224
+    parent: 8e4272cb40c5615252be7e3633ab2f930c814535
+    tree: a6a70b5f501a3eb85b1f7eb954d513843c82f0cd
+    status_entries: 0
+    remote_count: 0
+    source_scope_status_entries: 0
+  exact_required_source_surface:
+    discovery: datadiff_osc._phase6_gate_authority._required_source_paths
+    selected_path_count: 408
+    selected_path_manifest_schema: osc-phase6-required-source-paths-v1
+    selected_path_manifest_sha256: cf103500eeda8a6476efe106604bf50d340a64e0de70d869f857c27d40853728
+    selected_content_manifest_schema: osc-phase6-required-source-content-v1
+    selected_content_manifest_sha256: 133bb42a44f10ff6366529a2c9940d2feca1b4e29916d0dfa514afdd41b677ab
+    expected_git_status_digest: osc-git-status-porcelain-v1-29fe7ebfe8adfda597643ec6c8b5176d7963026a145420c6896d75ed113a4423
+    expected_source_digest: osc-phase6-source-snapshot-4a72791b80c05fd3609cd10c88c8f04544df37acb6c6c3bf5dc365cf8ddacd9c
+    new_required_paths:
+      - src/datadiff_osc/runtime/_phase6_bounded_real_adapter_artifact.py
+      - scripts/osc/run_phase6_bounded_real_adapter_artifact.py
+  prior_snapshot_preservation:
+    r4_source_commit: e16380e553072687e76749c2fe9316e0c1703545
+    r4_source_digest: osc-phase6-source-snapshot-2552d88b56ad196f909d6323cf43e7ab156ae8c99181a744b326311ef27955cc
+    r4_status: historically_valid_but_does_not_bind_writer_or_runner
+  authority_ledger_sha256_before_contract_write: 3c1702b00265724c600026d965d69762eaeb5ba48c722c79ac9eba6745ae8422
+required_invariants:
+  - >-
+    The source clone must remain clean, remote-free, and exact at the named
+    commit before and after verification; original, R2, R3, and R4 inputs stay
+    unchanged.
+  - >-
+    The payload must bind all 408 independently discovered paths and exact path/
+    content manifests, including the new writer and runner, Git state, public
+    freeze, dependency lock, and protocol digest.
+  - >-
+    Positive verification must have zero errors. Omitting either new executable
+    path and substituting the expected external snapshot SHA must each fail
+    closed without a valid snapshot.
+  - >-
+    R5 is a prerequisite only. Its source validity cannot supply a raw artifact,
+    producer receipt, plan, coverage, gate credit, candidate confirmation, or
+    bug claim.
+negative_review_requirements:
+  负向复核:
+    - omit writer and runner independently and require exact required-path errors
+    - substitute expected snapshot SHA and require hash mismatch
+  独立反例验证:
+    - R4 cannot bind the newly introduced writer/runner surface
+  异常输入验证:
+    - changed source/status binding must fail closed
+forbidden:
+  - original workspace, prior source snapshots, all product paths, public exports, public API freeze, frozen targets, reserved artifact output, or any unlisted path
+  - actual adapter execution, dynamic plan, typed receipt index, raw artifact, coverage event, gate calculation, candidate confirmation, or bug_claimed=true
+  - tests/osc, six-file combined suite, repository suite, 100000 parity, v3 2200, Phase 7, 2h, or 24h execution
+validation:
+  test_execution_count: 0
+  positive_external_source_snapshot_payloads: 1
+  in_memory_negative_api_checks: 3
+  command_shape: >-
+    PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=<r5-clone>/src
+    /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python - <r5-clone> <temporary-dir>
+stop_conditions:
+  - any source commit/tree/status/remote, frozen/public SHA, original-worktree, or reserved-output mismatch
+  - positive verification failure, accepted negative mutation, or any write outside the three authority paths plus one temporary snapshot file
+decision:
+  r5_source_snapshot_registered: pending_verification
+  bounded_execution: unauthorized_until_separate_execution_authority
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false

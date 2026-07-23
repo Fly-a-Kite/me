@@ -1,0 +1,119 @@
+schema_version: osc-phase6-source-snapshot-authority-r5-report-v1
+phase: 6
+task_id: OSC-6-SOURCE-SNAPSHOT-AUTHORITY-R5
+status: complete_verified_writer_and_runner_source_surface_no_gate_credit
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r5_task_contract.yaml
+  sha256: 75a62b5b6a2e1c2a49e14b24328d5e5d35ef90b20a1c3527dbfc6fe77375ca70
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r5_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r5_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  forbidden_paths_modified: []
+  original_workspace:
+    head_before_and_after: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths_before_and_after: 0
+    status_entries_before_and_after: 2908
+  r5_source_clone:
+    path: /tmp/phase6_source_snapshot_r5.jUnpUd/source
+    commit: b80dd03db0c54d18fafb3dbed00bfe50fcc9e224
+    parent: 8e4272cb40c5615252be7e3633ab2f930c814535
+    tree: a6a70b5f501a3eb85b1f7eb954d513843c82f0cd
+    status_before_and_after: clean
+    remote_count_before_and_after: 0
+source_snapshot:
+  external_temporary_path: /tmp/phase6_source_snapshot_r5_validation.jyT1fn/source-snapshot.json
+  byte_sha256: 6a4f059bfddb73d32b3a1d38405c09ff72dfa43533f7300fb383492bc98af3d2
+  source_digest: osc-phase6-source-snapshot-4a72791b80c05fd3609cd10c88c8f04544df37acb6c6c3bf5dc365cf8ddacd9c
+  git_head: b80dd03db0c54d18fafb3dbed00bfe50fcc9e224
+  git_status_digest: osc-git-status-porcelain-v1-29fe7ebfe8adfda597643ec6c8b5176d7963026a145420c6896d75ed113a4423
+  required_path_count: 408
+  path_manifest_sha256: cf103500eeda8a6476efe106604bf50d340a64e0de70d869f857c27d40853728
+  content_manifest_sha256: 133bb42a44f10ff6366529a2c9940d2feca1b4e29916d0dfa514afdd41b677ab
+  new_required_paths:
+    - src/datadiff_osc/runtime/_phase6_bounded_real_adapter_artifact.py
+    - scripts/osc/run_phase6_bounded_real_adapter_artifact.py
+validation:
+  test_execution_count: 0
+  positive_external_source_snapshot_payloads: 1
+  in_memory_negative_api_checks: 3
+  command: >-
+    cwd=/data1/lbw/xjx/datadiff_fuzz_lab; PYTHONDONTWRITEBYTECODE=1
+    PYTHONPATH=/tmp/phase6_source_snapshot_r5.jUnpUd/source/src
+    /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python -
+    /tmp/phase6_source_snapshot_r5.jUnpUd/source
+    /tmp/phase6_source_snapshot_r5_validation.jyT1fn
+  exit_code: 0
+  complete_result: >-
+    source_snapshot_path=/tmp/phase6_source_snapshot_r5_validation.jyT1fn/source-snapshot.json;
+    snapshot_byte_sha256=6a4f059bfddb73d32b3a1d38405c09ff72dfa43533f7300fb383492bc98af3d2;
+    source_digest=osc-phase6-source-snapshot-4a72791b80c05fd3609cd10c88c8f04544df37acb6c6c3bf5dc365cf8ddacd9c;
+    git_head=b80dd03db0c54d18fafb3dbed00bfe50fcc9e224;
+    required_path_count=408; positive_valid=true; positive_errors=().
+  negative_results:
+    missing_writer: >-
+      source snapshot paths missing:
+      src/datadiff_osc/runtime/_phase6_bounded_real_adapter_artifact.py
+    missing_runner: >-
+      source snapshot paths missing:
+      scripts/osc/run_phase6_bounded_real_adapter_artifact.py
+    substituted_expected_snapshot_sha: [source_snapshot_hash_mismatch]
+frozen_public_targets: 13_of_13_exact_pre_and_post_validation
+coverage:
+  负向复核: >-
+    Omitting the writer or runner independently failed before payload return;
+    a substituted expected snapshot SHA failed at the external byte boundary.
+  独立反例验证: >-
+    R4 remains historical evidence for e16380e but cannot bind the new writer
+    or runner. R5 is required for any later invocation of them.
+  异常输入验证: >-
+    The verifier re-read source bytes, Git head/status, and external snapshot
+    bytes. No malformed or prospective payload was admitted.
+findings:
+  - id: OSC-6-DYNAMIC-PLAN-B1
+    severity: blocker
+    disposition: open_requires_separate_bounded_execution_authority
+  - id: OSC-6-R-B3
+    severity: blocker
+    disposition: open_unchanged
+  - id: OSC-6-G-B1
+    severity: blocker
+    disposition: open_unchanged
+counts:
+  blocker_open: 3
+  high_open: 0
+  medium_open: 0
+  product_writes: 0
+  authority_writes: 3
+  actual_adapter_pair_invocations: 0
+  durable_artifact_writes: 0
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  forbidden_paths_modified: []
+barrier:
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  r5_source_snapshot: verified_current_writer_runner_no_gate_credit
+  reserved_bounded_artifact: absent
+  actual_bounded_execution: requires_separate_authority
+  dynamic_plan: absent_fail_closed
+  artifact_receipt_index: absent_fail_closed
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
+next_step_requires_separate_authority: >-
+  A separate contract must bind this R5 source snapshot, the reserved absolute
+  artifact output, runner SHA, pandas/polars target metadata, master seed 29,
+  and exactly one serial invocation. It remains diagnostic-only and must not
+  create a dynamic plan, receipt index, coverage event, gate result, confirmation,
+  or bug claim.

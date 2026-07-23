@@ -1505,6 +1505,31 @@ tasks:
       combined_suite: unauthorized
       phase7_paired_pilot: unauthorized
       twenty_four_hour: unauthorized
+  - task_id: OSC-6-SOURCE-SNAPSHOT-AUTHORITY-R5
+    owner: /root
+    mode: root_serial_isolated_clean_source_snapshot_authority
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r5_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r5_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    task_contract_sha256: 75a62b5b6a2e1c2a49e14b24328d5e5d35ef90b20a1c3527dbfc6fe77375ca70
+    report_sha256: 25659d3599b140eef51f98f24d1a33afd5bdd3eecf8dfed702e66e04632104b2
+    status: complete_verified_writer_and_runner_source_surface_no_gate_credit
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r5_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r5_report.yaml
+    barrier:
+      phase_6_private_foundation_barrier: pass_unchanged
+      phase_6_contract: pending
+      phase_6_granularity_reachability: pending
+      phase_6_runtime_correctness: pending
+      r5_source_snapshot: verified_current_writer_runner_no_gate_credit
+      bounded_execution: unauthorized_until_separate_execution_authority
+      gate_credit: false
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
 interface_freeze:
   version: osc-public-api-freeze-v1
   hash: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
