@@ -1624,17 +1624,18 @@ tasks:
       - /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/formal-source-snapshot.json
       - /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/local-environment-target-audit.json
     task_contract_sha256: aa1dbb8a2de7b1247c55987cf76dfda36870b5722728a74db895c2f291d099de
-    report_sha256: pending_not_created
-    status: authorized_pending_external_source_environment_freeze
+    report_sha256: 0f74bb4d3c381bc82cd3ad84db8f7ae8453f5905cdb3d5bf8169ebc35ee60d5e
+    status: complete_verified_clean_source_snapshot_and_local_environment_lock_audit_no_formal_workload
     evidence:
       - experiments/osc_v1/coordination_20260719_v1/phase6_formal_source_environment_freeze_r1_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_source_environment_freeze_r1_report.yaml
     barrier:
       phase_6_private_foundation_barrier: pass_unchanged
       phase_6_contract: pending
       phase_6_granularity_reachability: pending
       phase_6_runtime_correctness: pending
-      formal_source_snapshot: authorized_not_created
-      local_environment_lock_audit: authorized_not_created
+      formal_source_snapshot: verified_current_409_path_surface
+      local_environment_lock_audit: verified_7_of_7_local_lock_matches
       public_latest_target_audit: pending_separate_authority
       formal_execution_workload: unauthorized
       dynamic_plan: absent_fail_closed

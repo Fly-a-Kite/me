@@ -1,0 +1,183 @@
+schema_version: osc-phase6-formal-source-environment-freeze-r1-report-v1
+phase: 6
+task_id: OSC-6-FORMAL-SOURCE-ENVIRONMENT-FREEZE-R1
+status: complete_verified_clean_source_snapshot_and_local_environment_lock_audit_no_formal_workload
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_formal_source_environment_freeze_r1_task_contract.yaml
+  sha256: aa1dbb8a2de7b1247c55987cf76dfda36870b5722728a74db895c2f291d099de
+parent_authority:
+  task_contract_sha256: 73cb3b6cec18c27641b2dfdb818f4ce3895514c7b73ca0bd00bcd292ddb7e700
+  report_sha256: 8df2aa81724894ccc7605bb05dd1b8ef00fbdd2af0481e9ff972228a7780a2f0
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  authority_source_before_report:
+    path: /tmp/phase6_formal_execution_authority_r1.Smql7A/source
+    commit: 811ba665966b8773fa1bdd8185f1165f6af2ee97
+    status_before_and_after_external_freeze: clean
+    remote_count_before_and_after_external_freeze: 0
+  snapshot_source_clone:
+    path: /tmp/phase6_formal_execution_authority_r1.Smql7A/source_snapshot_source
+    commit: 811ba665966b8773fa1bdd8185f1165f6af2ee97
+    tree: f06ed0486d4bb5b3c17a7ed616cb082a2d769fbd
+    status_before_and_after: clean
+    remote_count_before_and_after: 0
+    clone_commands: 1
+    git_fsck_exit_code: 0
+  authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_formal_source_environment_freeze_r1_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_formal_source_environment_freeze_r1_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  external_durable_writes:
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/formal-source-snapshot.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/local-environment-target-audit.json
+  forbidden_paths_modified: []
+  original_workspace:
+    path: /data1/lbw/xjx/datadiff_fuzz_lab
+    head_before_and_after: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths_before_and_after: 0
+    status_entries_before_and_after: 2908
+source_snapshot:
+  external_path: /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/formal-source-snapshot.json
+  byte_sha256: 13134df2cf22758d7b4a71da74826fd3bd02d0f4cbd64ee0ad0479988a77b577
+  source_digest: osc-phase6-source-snapshot-6a7201659596c888a3efedfa9d1207cfadb2eda98f1ffd50a47c3e56405eef38
+  git_head: 811ba665966b8773fa1bdd8185f1165f6af2ee97
+  git_status_digest: osc-git-status-porcelain-v1-29fe7ebfe8adfda597643ec6c8b5176d7963026a145420c6896d75ed113a4423
+  required_path_count: 409
+  path_manifest_sha256: fabe8c522e5937196f1ec123621981cc9dd38028bb011ae0761d4a777d5b2d81
+  content_manifest_sha256: ad6fc9d148cfea3ecdc3133085f0a5c27e5984f6a4d6d273c62b2246f083ec9c
+  public_api_freeze_sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  dependency_lock_sha256: ee4bb79ac41317e3583ec18bdb744d00d3a7470a58e7205cdaba913f5938c087
+  protocol_digest: 1ad989d412651f5cc9ae3c3ac5d7d7207176557e0bcdcfb449788f016d607419
+  verification_errors: []
+local_environment_audit:
+  external_path: /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/local-environment-target-audit.json
+  byte_sha256: 26fb86e8d3d349bfd8cb19d1c65599d53c31af82d2b471025afac0567ef68f68
+  canonical_json_verified: true
+  source_snapshot_byte_sha256: 13134df2cf22758d7b4a71da74826fd3bd02d0f4cbd64ee0ad0479988a77b577
+  source_digest: osc-phase6-source-snapshot-6a7201659596c888a3efedfa9d1207cfadb2eda98f1ffd50a47c3e56405eef38
+  interpreter:
+    executable: /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python
+    implementation: cpython
+    cache_tag: cpython-312
+    version: 3.12.3 (main, Jun 19 2026, 12:46:00) [GCC 13.3.0]
+    platform: Linux-6.8.0-45-generic-x86_64-with-glibc2.39
+  dependency_lock_sha256: ee4bb79ac41317e3583ec18bdb744d00d3a7470a58e7205cdaba913f5938c087
+  target_packages:
+    - {distribution: chdb, locked_version: 4.2.1, installed_version: 4.2.1}
+    - {distribution: datafusion, locked_version: 54.0.0, installed_version: 54.0.0}
+    - {distribution: duckdb, locked_version: 1.5.4, installed_version: 1.5.4}
+    - {distribution: pandas, locked_version: 3.0.3, installed_version: 3.0.3}
+    - {distribution: polars, locked_version: 1.42.1, installed_version: 1.42.1}
+    - {distribution: pyarrow, locked_version: 25.0.0, installed_version: 25.0.0}
+    - {distribution: pysqlite3-binary, locked_version: 0.5.4.post2, installed_version: 0.5.4.post2}
+  local_lock_consistency: true
+  network_access: false
+  public_latest_target_audit: not_performed_contract_network_disabled
+  formal_target_version_receipt_created: false
+validation:
+  test_execution_count: 0
+  formal_workload_execution_count: 0
+  external_source_snapshot_payloads: 1
+  external_environment_audits: 1
+  external_source_clones: 1
+  network_commands: 0
+  pre_write_preflight:
+    exit_code: 0
+    complete_result: >-
+      required_path_count=409; frozen_targets=13; original_status_entries=2908;
+      authority source and snapshot source both clean/remote-free; source_freeze
+      and formal_evidence roots absent.
+  source_environment_freeze_command: >-
+    PYTHONDONTWRITEBYTECODE=1
+    PYTHONPATH=/tmp/phase6_formal_execution_authority_r1.Smql7A/source_snapshot_source/src
+    /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python -
+    /tmp/phase6_formal_execution_authority_r1.Smql7A/source_snapshot_source
+    /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze
+  source_environment_freeze_exit_code: 0
+  source_environment_freeze_complete_result: >-
+    source_snapshot_path=/tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/formal-source-snapshot.json;
+    snapshot_byte_sha256=13134df2cf22758d7b4a71da74826fd3bd02d0f4cbd64ee0ad0479988a77b577;
+    source_digest=osc-phase6-source-snapshot-6a7201659596c888a3efedfa9d1207cfadb2eda98f1ffd50a47c3e56405eef38;
+    git_head=811ba665966b8773fa1bdd8185f1165f6af2ee97; required_path_count=409;
+    positive_errors=(); audit_path=/tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/local-environment-target-audit.json;
+    audit_byte_sha256=26fb86e8d3d349bfd8cb19d1c65599d53c31af82d2b471025afac0567ef68f68;
+    local_lock_consistency=true; formal_evidence=false; gate_credit=false;
+    candidate_confirmed=false; bug_claimed=false.
+  post_write_validation:
+    exit_code: 0
+    complete_result: >-
+      snapshot_valid=true; audit_canonical=true; packages=7;
+      source_freeze inventory exactly formal-source-snapshot.json and
+      local-environment-target-audit.json; both clones clean/remote-free;
+      formal_evidence root absent; original workspace unchanged=true.
+  frozen_public_targets: 13_of_13_exact_before_and_after_external_freeze
+negative_results:
+  missing_required_source_path: >-
+    Removing experiments/final_bug_discovery_protocol_v3/TODO.md in memory was
+    refused with source snapshot paths missing before any payload was returned.
+  substituted_snapshot_byte_sha: >-
+    Verification with an all-zero expected SHA returned
+    [source_snapshot_hash_mismatch] and did not admit the snapshot.
+  changed_lock_binding: >-
+    Requiring pandas==0.0.0 against installed pandas==3.0.3 raised a target lock
+    mismatch before the audit write.
+coverage:
+  负向复核: >-
+    Required-path omission, substituted external snapshot SHA, and a changed
+    target lock binding all fail closed; no mutable durable output was altered
+    for the checks because source_freeze is write-once.
+  独立反例验证: >-
+    This verified clean snapshot and seven local lock matches provide only
+    reproducibility input. They cannot constitute a public latest target audit,
+    TargetVersionReceipt, raw producer artifact, receipt index, dynamic plan,
+    gate calculation, candidate confirmation, or bug claim.
+  异常输入验证: >-
+    The contract retained dirty/remote clone, preexisting output, missing
+    package, lock drift, snapshot hash mismatch, malformed audit, and network
+    activity as stop conditions; none was accepted.
+findings:
+  - id: OSC-6-DYNAMIC-PLAN-B1
+    severity: blocker
+    disposition: open_unchanged_real_18_section_execution_plan_and_records_absent
+  - id: OSC-6-R-B3
+    severity: blocker
+    disposition: open_unchanged_formal_typed_producer_raw_artifact_index_absent
+  - id: OSC-6-G-B1
+    severity: blocker
+    disposition: open_unchanged_232_384_502_activation_reachability_mutation_focus_and_runtime_records_absent
+counts:
+  blocker_open: 3
+  high_open: 0
+  medium_open: 0
+  product_writes: 0
+  authority_writes: 3
+  external_durable_writes: 2
+  forbidden_paths_modified: []
+barrier:
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  formal_source_snapshot: verified_current_409_path_surface
+  local_environment_lock_audit: verified_7_of_7_local_lock_matches
+  public_latest_target_audit: pending_separate_authority
+  formal_target_version_receipt: absent_fail_closed
+  formal_execution_workload: unauthorized_pending_successor_contracts
+  formal_evidence_root: absent
+  dynamic_plan: absent_fail_closed
+  artifact_receipt_index: absent_fail_closed
+  gate_credit: false
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+  candidate_confirmed: false
+  bug_claimed: false
+next_step_requires_new_task_contract: >-
+  A separate formal target-version/public-source and output-layout authority
+  must first verify each latest public target source without changing the frozen
+  local environment, reserve empty non-overwritable formal-output roots, and
+  bind this source snapshot. Only then may narrowly scoped real producer or
+  execution contracts be considered; their workloads remain unauthorized here.
