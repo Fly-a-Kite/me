@@ -1332,7 +1332,32 @@ tasks:
       phase_6_contract: pending
       phase_6_granularity_reachability: pending
       phase_6_runtime_correctness: pending
-      source_handoff: pending_new_clean_source_authority
+      source_handoff: remediated_by_osc_6_source_snapshot_clean_handoff_r3_no_gate_credit
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
+  - task_id: OSC-6-SOURCE-SNAPSHOT-CLEAN-HANDOFF-R3
+    owner: /root
+    mode: root_serial_isolated_clean_source_handoff_authority
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_clean_handoff_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_clean_handoff_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    source_snapshot_commit: 8367c0519d2252c3b507703114b67b474aac636c
+    source_snapshot_payload_sha256: ce59034ccf4b2596fc14fa8330f7a93fc7bc00ea29079106148ce524f9779a41
+    task_contract_sha256: 420398f1ebe2b5371af35cc91081b9dbc83016c5cd4fb80328a26854503402a1
+    report_sha256: 0a51e8b3d4545708cba9c86447cd07ba352334f285696587f44ae205825d41ed
+    status: complete_current_head_source_snapshot_reverified_no_gate_credit
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_clean_handoff_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_clean_handoff_report.yaml
+    barrier:
+      phase_6_private_foundation_barrier: pass_unchanged
+      phase_6_contract: pending
+      phase_6_granularity_reachability: pending
+      phase_6_runtime_correctness: pending
+      source_handoff: verified_current_head_no_gate_credit
       combined_suite: unauthorized
       phase7_paired_pilot: unauthorized
       twenty_four_hour: unauthorized
@@ -1433,7 +1458,7 @@ open_review_findings:
   - {id: OSC-6-SOURCE-SNAPSHOT-R2-B1, severity: blocker, owner: root, status: remediated_by_r3_verified_required_source_surface_no_gate_credit}
   - {id: OSC-6-R-B3, severity: blocker, owner: root, status: open_dynamic_plan_typed_receipt_raw_artifact_chain_absent_after_r3_source_snapshot}
   - {id: OSC-6-G-B1, severity: blocker, owner: root, status: open_no_gate_eligible_real_adapter_232_384_502_evidence}
-  - {id: OSC-6-SOURCE-HANDOFF-R3-B1, severity: blocker, owner: root, status: open_new_clean_source_authority_required}
+  - {id: OSC-6-SOURCE-HANDOFF-R3-B1, severity: blocker, owner: root, status: remediated_by_clean_current_head_verification_no_gate_credit}
 gates:
   - name: phase_0_dirty_paths_registered_and_preserved
     threshold: complete snapshot and no existing dirty path overwritten

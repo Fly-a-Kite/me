@@ -1,0 +1,204 @@
+schema_version: osc-phase6-source-snapshot-clean-handoff-report-v1
+phase: 6
+task_id: OSC-6-SOURCE-SNAPSHOT-CLEAN-HANDOFF-R3
+status: complete_current_head_source_snapshot_reverified_no_gate_credit
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_clean_handoff_task_contract.yaml
+  sha256: 420398f1ebe2b5371af35cc91081b9dbc83016c5cd4fb80328a26854503402a1
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  metadata_authority_clone:
+    path: /tmp/phase6_authority_handoff_r3.ZatJGg
+    head_before_authority_record_commit: 22417a2e6d7a99b0877dfc7d6af9b2aeac677b25
+    remote_count: 0
+  clean_source_worktree:
+    path: /tmp/phase6_clean_source_handoff_r3.onC30x
+    head: 8367c0519d2252c3b507703114b67b474aac636c
+    tree: 5f7ef425d6eb401e714a3078624695d5d8399cb2
+    remote_count: 0
+    status_entries_before_and_after_validation: 0
+    repository_file_writes: 0
+  writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_clean_handoff_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_clean_handoff_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  forbidden_paths_modified: []
+source_snapshot_handoff:
+  immutable_payload:
+    path: /tmp/phase6_source_snapshot_r3_validation.KtnGHV/source-snapshot.json
+    byte_sha256: ce59034ccf4b2596fc14fa8330f7a93fc7bc00ea29079106148ce524f9779a41
+    source_digest: osc-phase6-source-snapshot-a4beb268b3097b194886a7f2e2e63abc8f8f1510ffa76ae0f10a8162fbfa322b
+    payload_git_head: 8367c0519d2252c3b507703114b67b474aac636c
+    payload_git_status_digest: osc-git-status-porcelain-v1-29fe7ebfe8adfda597643ec6c8b5176d7963026a145420c6896d75ed113a4423
+    file_binding_count: 404
+  approved_r3_source_identity:
+    selected_path_count: 602
+    selected_path_manifest_sha256: 5e074894a448bc46561ea81dfe05530261ebc9dc203bccd87ad328c86330a744
+    selected_content_manifest_sha256: d907e1ee6fdd0e6844cd78dc63021663c5011c2057f820b0d6b0fd2432937a54
+    source_commit: 8367c0519d2252c3b507703114b67b474aac636c
+    source_tree: 5f7ef425d6eb401e714a3078624695d5d8399cb2
+    binding_basis: >-
+      The prior R3 authority verified the approved 602-path manifests against
+      this immutable commit/tree. This handoff independently re-verifies the
+      same external 404-path verifier payload only in a newly clean worktree
+      at that exact current HEAD.
+  positive_current_head_verification:
+    repo_root: /tmp/phase6_clean_source_handoff_r3.onC30x
+    valid: true
+    verification_errors: []
+    git_head: 8367c0519d2252c3b507703114b67b474aac636c
+    git_status_digest: osc-git-status-porcelain-v1-29fe7ebfe8adfda597643ec6c8b5176d7963026a145420c6896d75ed113a4423
+    byte_sha256: ce59034ccf4b2596fc14fa8330f7a93fc7bc00ea29079106148ce524f9779a41
+    source_digest: osc-phase6-source-snapshot-a4beb268b3097b194886a7f2e2e63abc8f8f1510ffa76ae0f10a8162fbfa322b
+    file_binding_count: 404
+  different_head_negative_verification:
+    repo_root: /tmp/phase6_authority_handoff_r3.ZatJGg
+    actual_repo_head: 22417a2e6d7a99b0877dfc7d6af9b2aeac677b25
+    payload_git_head: 8367c0519d2252c3b507703114b67b474aac636c
+    valid: false
+    verification_errors:
+      - source_snapshot_git_head_mismatch
+    disposition: fail_closed_no_source_snapshot_admission
+validation:
+  current_head_api_and_different_head_negative:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1
+      PYTHONPATH=/tmp/phase6_clean_source_handoff_r3.onC30x/src
+      /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python -
+    exit_code: 0
+    complete_result: >-
+      verify_source_snapshot(clean_source,payload,exact_SHA) returned
+      valid=true, errors=[], git_head=8367c0519d2252c3b507703114b67b474aac636c,
+      git_status_digest=osc-git-status-porcelain-v1-29fe7ebfe8adfda597643ec6c8b5176d7963026a145420c6896d75ed113a4423,
+      byte_sha256=ce59034ccf4b2596fc14fa8330f7a93fc7bc00ea29079106148ce524f9779a41,
+      source_digest=osc-phase6-source-snapshot-a4beb268b3097b194886a7f2e2e63abc8f8f1510ffa76ae0f10a8162fbfa322b,
+      file_binding_count=404. The same payload against the separate metadata
+      clone at 22417a2e6d7a99b0877dfc7d6af9b2aeac677b25 returned valid=false
+      with exactly [source_snapshot_git_head_mismatch].
+  preservation_and_scope:
+    command: >-
+      Read-only git rev-parse/status/remote/ls-tree checks, exact SHA-256
+      checks for all thirteen frozen/public targets in original, clean-source,
+      and metadata clones, exact metadata changed-path check, and git diff
+      --check.
+    exit_code: 0
+    complete_result: >-
+      Original HEAD remains 8d2b68550986dcc3ead41b4122907c7cf66a2232
+      with staged=0 and frozen=13/13. Clean source HEAD/tree/status/remote and
+      frozen=13/13 are exact. Metadata clone source targets are 13/13 exact;
+      its only pre-report authority paths are the contract and ledger, and its
+      diff check passes. R3 and R2 remain clean at 22417a2e6d7a99b0877dfc7d6af9b2aeac677b25
+      and 84dcece5fcedcfcc1f56640304d5208e43afce9e respectively. R2 has zero
+      scripts/osc tree entries while the clean R3 source has nine.
+  tests:
+    test_execution_count: 0
+    tests_not_run:
+      - tests/osc
+      - six-file combined suite
+      - repository suite
+      - 100000 parity
+      - v3 2200
+      - Phase 7
+      - 2h pilot
+      - 24h execution
+frozen_public_targets:
+  original_workspace: 13_of_13_exact
+  clean_source_worktree: 13_of_13_exact
+  metadata_authority_clone: 13_of_13_exact
+source_handoff_decision:
+  OSC-6-SOURCE-HANDOFF-R3-B1: remediated_by_current_head_clean_source_verification_no_gate_credit
+  dynamic_plan_created: false
+  typed_receipt_index_created: false
+  raw_artifact_admitted: false
+  coverage_events_created: false
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
+sha_verification:
+  authority_paths:
+    task_contract:
+      pre: absent
+      post: 420398f1ebe2b5371af35cc91081b9dbc83016c5cd4fb80328a26854503402a1
+    report:
+      pre: absent
+      post: recorded_after_write_in_ledger
+    ledger:
+      before_contract: cdf5ddd76f0a353f1ec750d2385ff5615b4736b6de7b519db5bd3bbb3c0d9a48
+      after_contract_before_report: 06234828af7e8193a571186bd51a4c710f8405186e7464caf1eae2cc5d9cbd62
+      final: recorded_after_report_in_ledger
+coverage:
+  负向复核: >-
+    The metadata authority clone has identical source-file bindings but a
+    different current HEAD. The exact immutable payload is rejected with
+    source_snapshot_git_head_mismatch, so neither ancestry nor matching source
+    digest can substitute for the current-head binding.
+  独立反例验证: >-
+    R2 remains clean and immutable but has zero scripts/osc paths; the clean
+    R3 source has nine. The original R2 source-surface defect stays historical
+    evidence and is not relabeled as a valid source snapshot.
+  异常输入验证: >-
+    No altered payload was written. The prior R3 source authority's exercised
+    substituted expected-SHA input produced source_snapshot_hash_mismatch, and
+    the current verifier's exact JSON/head/status/file-binding checks remain
+    fail closed. This task additionally exercised the different-head input
+    and observed source_snapshot_git_head_mismatch.
+findings:
+  - id: OSC-6-SOURCE-HANDOFF-R3-B1
+    severity: blocker
+    claim: >-
+      The prior prewrite could not represent the external payload as a
+      current-head verification because its authority clone was at 2e9576a.
+      A separate clean worktree at the payload's exact head now verifies it
+      successfully, while the metadata clone remains demonstrably rejected.
+    reproduction: >-
+      positive repo HEAD=payload git_head=8367c0519d2252c3b507703114b67b474aac636c
+      and verify_source_snapshot valid=true. Metadata repo HEAD=22417a2e6d7a99b0877dfc7d6af9b2aeac677b25
+      gives exactly source_snapshot_git_head_mismatch and valid=false.
+    violated_invariant: >-
+      A VerifiedSourceSnapshot must bind the exact current clean source
+      worktree, not an authority-record revision or a source digest alone.
+    required_test: >-
+      Preserve the paired exact-head positive and different-head fail-closed
+      check under every later authority that consumes this payload.
+    disposition: remediated_current_head_clean_source_verification_no_gate_credit
+  - id: OSC-6-R-B3
+    severity: blocker
+    claim: >-
+      Dynamic plan, typed receipt index, raw artifact, and artifact-manifest
+      producer chain remain absent.
+    disposition: open_unchanged
+  - id: OSC-6-G-B1
+    severity: blocker
+    claim: >-
+      No gate-eligible real-adapter 232/384/502 evidence with fresh producer
+      evidence exists.
+    disposition: open_unchanged
+counts:
+  blocker_remediated_scope: 1
+  blocker_open: 2
+  high_open: 0
+  medium_open: 0
+  product_writes: 0
+  authority_writes: 3
+  clean_source_repository_file_writes: 0
+  test_execution_count: 0
+  child_agents: 0
+  forbidden_paths_modified: []
+barrier:
+  r3_clean_source_handoff: verified_current_head_no_gate_credit
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+next_step_requires_new_authority:
+  - >-
+    A separate dynamic-plan construction authority must define and create no
+    more than its explicitly approved plan inputs before any typed receipt,
+    raw artifact, execution, or gate step. This handoff record does not
+    authorize that work.

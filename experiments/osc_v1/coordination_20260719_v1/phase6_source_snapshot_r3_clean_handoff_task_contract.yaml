@@ -1,0 +1,167 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-SOURCE-SNAPSHOT-CLEAN-HANDOFF-R3
+owner: /root
+mode: root_serial_isolated_clean_source_handoff_authority
+implementation_child_agents: 0
+reviewer_child_agents_created: 0
+change_request: CR-OSC-6-004
+objective: >-
+  Re-verify the immutable R3 external source-snapshot payload in a fresh,
+  separate, clean isolated source worktree whose current Git HEAD is exactly
+  8367c0519d2252c3b507703114b67b474aac636c. Record the result only in a
+  separate metadata authority clone so that writing the record cannot change
+  the source worktree that the verifier checks. This resolves only the
+  current-head handoff limitation identified as OSC-6-SOURCE-HANDOFF-R3-B1;
+  it cannot create a dynamic plan, typed receipt index, artifact, gate result,
+  or Phase-6 completion credit.
+user_authorization:
+  date: 2026-07-24
+  exact_confirmation: 继续
+  interpreted_scope: >-
+    Continue only with the immediately preceding, explicitly identified
+    clean-source handoff authority. The original workspace, R2, R3, product
+    files, dynamic-plan inputs, receipts, artifacts, suites, and gates remain
+    out of scope.
+authorization_boundary:
+  authorized_product_writes: []
+  authorized_authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_clean_handoff_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_clean_handoff_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  isolated_source_worktree:
+    path: /tmp/phase6_clean_source_handoff_r3.onC30x
+    write_policy: no_repository_file_writes
+  read_only_external_inputs:
+    - /tmp/phase6_source_snapshot_r3_validation.KtnGHV/source-snapshot.json
+    - /tmp/phase6_authority_snapshot_r3.6HIpoz
+    - /tmp/phase6_authority_snapshot.XcXsTP
+  all_other_paths: forbidden
+verified_preconditions:
+  original_workspace:
+    path: /data1/lbw/xjx/datadiff_fuzz_lab
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    index_staged_paths: 0
+  r2_preservation:
+    path: /tmp/phase6_authority_snapshot.XcXsTP
+    authority_head: 84dcece5fcedcfcc1f56640304d5208e43afce9e
+    status_entries: 0
+  r3_authority_preservation:
+    path: /tmp/phase6_authority_snapshot_r3.6HIpoz
+    authority_head: 22417a2e6d7a99b0877dfc7d6af9b2aeac677b25
+    source_snapshot_commit: 8367c0519d2252c3b507703114b67b474aac636c
+    source_snapshot_tree: 5f7ef425d6eb401e714a3078624695d5d8399cb2
+    status_entries: 0
+  metadata_authority_clone:
+    path: /tmp/phase6_authority_handoff_r3.ZatJGg
+    head_before_contract: 22417a2e6d7a99b0877dfc7d6af9b2aeac677b25
+    remote_count: 0
+    status_entries: 0
+  clean_source_worktree:
+    path: /tmp/phase6_clean_source_handoff_r3.onC30x
+    head: 8367c0519d2252c3b507703114b67b474aac636c
+    tree: 5f7ef425d6eb401e714a3078624695d5d8399cb2
+    remote_count: 0
+    status_entries: 0
+    approved_selected_path_count: 602
+    selected_path_manifest_sha256: 5e074894a448bc46561ea81dfe05530261ebc9dc203bccd87ad328c86330a744
+    selected_content_manifest_sha256: d907e1ee6fdd0e6844cd78dc63021663c5011c2057f820b0d6b0fd2432937a54
+  immutable_external_source_payload:
+    path: /tmp/phase6_source_snapshot_r3_validation.KtnGHV/source-snapshot.json
+    byte_sha256: ce59034ccf4b2596fc14fa8330f7a93fc7bc00ea29079106148ce524f9779a41
+    source_digest: osc-phase6-source-snapshot-a4beb268b3097b194886a7f2e2e63abc8f8f1510ffa76ae0f10a8162fbfa322b
+    payload_git_head: 8367c0519d2252c3b507703114b67b474aac636c
+    payload_git_status_digest: osc-git-status-porcelain-v1-29fe7ebfe8adfda597643ec6c8b5176d7963026a145420c6896d75ed113a4423
+    required_path_count: 404
+  frozen_public_targets:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+required_inputs_read:
+  - docs/codex_multi_agent_development_runbook.md
+  - docs/project_architecture.md
+  - docs/fine_grained_discovery_architecture.md
+  - docs/discovery_search_and_parallel_architecture.md
+  - docs/semantic_hypercontract_architecture.md
+  - docs/architecture_credibility_and_alternatives.md
+  - docs/competitive_paper_experiment_blueprint.md
+  - experiments/final_bug_discovery_protocol_v3/TODO.md
+  - src/datadiff_osc/_phase6_gate_authority.py
+  - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_task_contract.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_report.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_handoff_dynamic_plan_prewrite_task_contract.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_handoff_dynamic_plan_prewrite_report.yaml
+  - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+required_invariants:
+  - >-
+    The positive verification uses the immutable external payload unchanged and
+    a clean isolated source worktree at the payload's exact Git HEAD and exact
+    scoped Git-status digest. No payload is created, copied, or persisted.
+  - >-
+    Authority metadata is intentionally kept in a separate clone. It must
+    never be substituted for the clean source worktree; verification from its
+    different HEAD must fail closed with source_snapshot_git_head_mismatch.
+  - >-
+    The clean source worktree retains the exact R3 commit/tree and approved
+    602-path manifests, has no remote and no dirty paths. R2 and R3 stay
+    untouched and clean.
+  - >-
+    A positive VerifiedSourceSnapshot resolves only the current-head source
+    handoff blocker. It grants no dynamic-plan, receipt, artifact, coverage,
+    contract, granularity, runtime, combined-suite, candidate, or bug credit.
+  - >-
+    All thirteen frozen/public target SHA-256 values remain exact; public
+    exports, public freeze, frozen files, candidate status, and bug claims do
+    not change.
+negative_review_requirements:
+  负向复核:
+    - metadata authority clone at a different Git HEAD rejects the same payload before admission
+    - a source digest string alone cannot substitute for source payload byte/hash/head/status bindings
+  独立反例验证:
+    - R2 remains clean yet lacks the required scripts/osc source surface and stays not gate-compatible
+  异常输入验证:
+    - substituted expected payload SHA and malformed/missing payload bindings remain fail-closed; no altered payload is persisted
+forbidden:
+  - original workspace, R2, R3, clean source worktree, product code, tests, public exports, public API freeze, frozen targets, or source payload modification
+  - dynamic gate plan, typed receipt index, raw artifact, coverage event, producer/provenance record, bundle, preflight, publication, gate calculation, or gate result
+  - tests/osc, six-file combined suite, repository suite, 100000 parity, v3 2200, Phase 7, 2h, or 24h execution
+  - candidate confirmation, diagnostic promotion, confirmed status, or bug_claimed=true
+validation:
+  test_execution_count: 0
+  authorized_read_only_api_validation: >-
+    One PYTHONDONTWRITEBYTECODE=1 invocation may import the verifier from the
+    clean source worktree and call verify_source_snapshot with the immutable
+    external payload once against the clean worktree and once against the
+    separate metadata authority clone. It must record both complete results.
+  allowed_read_only_commands:
+    - JSON/YAML parsing, SHA/commit/tree/status/remote checks, and manifest recomputation
+    - frozen/public SHA checks and exact authority-path scope checks
+  required_report_contents:
+    - positive current-head verification evidence and source/status bindings
+    - negative different-head failure evidence
+    - R2/R3/original preservation evidence
+    - 负向复核, 独立反例验证, 异常输入验证 results and unchanged gate state
+stop_conditions:
+  - any source payload, source/tree/manifest, frozen/public SHA, remote, or original-worktree mismatch
+  - positive source verification failure or accepted different-head verification
+  - any write outside the three metadata authority paths
+  - any claimed gate credit, dynamic plan, receipt, artifact, coverage, candidate confirmation, or bug claim
+decision:
+  r3_clean_source_handoff: pending_verification
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
