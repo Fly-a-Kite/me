@@ -1585,6 +1585,33 @@ tasks:
       combined_suite: unauthorized
       phase7_paired_pilot: unauthorized
       twenty_four_hour: unauthorized
+  - task_id: OSC-6-FORMAL-EXECUTION-AUTHORITY-R1
+    owner: /root
+    mode: root_serial_isolated_formal_phase6_execution_authority_preflight
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_execution_authority_r1_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_execution_authority_r1_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    task_contract_sha256: 73cb3b6cec18c27641b2dfdb818f4ce3895514c7b73ca0bd00bcd292ddb7e700
+    report_sha256: 8df2aa81724894ccc7605bb05dd1b8ef00fbdd2af0481e9ff972228a7780a2f0
+    status: complete_formal_execution_authority_created_preflight_only_no_workload
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_execution_authority_r1_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_execution_authority_r1_report.yaml
+    barrier:
+      phase_6_private_foundation_barrier: pass_unchanged
+      phase_6_contract: pending
+      phase_6_granularity_reachability: pending
+      phase_6_runtime_correctness: pending
+      formal_execution_authority: complete_preflight_only_no_formal_workload
+      source_snapshot_for_formal_evidence: required_not_created
+      dynamic_plan: absent_fail_closed
+      artifact_receipt_index: absent_fail_closed
+      gate_credit: false
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
 interface_freeze:
   version: osc-public-api-freeze-v1
   hash: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131

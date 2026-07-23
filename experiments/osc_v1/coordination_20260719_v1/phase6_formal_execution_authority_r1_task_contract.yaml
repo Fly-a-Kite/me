@@ -1,0 +1,235 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-FORMAL-EXECUTION-AUTHORITY-R1
+owner: /root
+role: root
+mode: root_serial_isolated_formal_phase6_execution_authority_preflight
+implementation_child_agents: 0
+reviewer_child_agents_created: 0
+grandchildren_allowed: false
+objective: >-
+  Establish a new isolated clean-source authority root for the eventual formal
+  Phase-6 evidence-production program. Freeze the source/target/receipt-index
+  admission requirements and name the three independent formal evidence streams
+  that must be executed before any Phase-6 pass claim. This task creates the
+  authority boundary only; it does not generate formal evidence or run a formal
+  workload.
+user_authorization:
+  date: 2026-07-24
+  exact_confirmation: 新创一个目录，新建正式执行 authority
+  interpreted_scope: >-
+    The user authorized a new isolated directory and a formal-execution
+    authority. Because no execution budget, output layout, clean-source
+    snapshot manifest, or product write set has yet been approved, this R1
+    authority freezes and verifies those admission boundaries without starting
+    100000 comparisons, v3-2200, repository tests, combined suites, Phase 7,
+    2h, or 24h work.
+authority_root:
+  directory: /tmp/phase6_formal_execution_authority_r1.Smql7A
+  source_clone: /tmp/phase6_formal_execution_authority_r1.Smql7A/source
+  source_commit_before_authority: 09df5ed4ee5d2b0431de32e2c0e53ff13143a32c
+  source_status_before_authority: clean
+  source_remote_count_before_authority: 0
+  reserved_formal_evidence_root: /tmp/phase6_formal_execution_authority_r1.Smql7A/formal_evidence
+  reserved_formal_evidence_root_state: absent_must_remain_absent_in_this_task
+authorization_boundary:
+  authorized_product_writes: []
+  authorized_authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_formal_execution_authority_r1_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_formal_execution_authority_r1_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  authorized_external_writes: []
+  all_other_paths: forbidden
+verified_preconditions:
+  original_workspace:
+    path: /data1/lbw/xjx/datadiff_fuzz_lab
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    index_staged_paths: 0
+    status_entries_observed: 2908
+  parent_authority_clone:
+    path: /tmp/phase6_authority_real_evidence_chain_r1.WcCIEK
+    source_commit: 09df5ed4ee5d2b0431de32e2c0e53ff13143a32c
+    status: clean
+    remote_count: 0
+    coordination_ledger_sha256: 1fba518d8599fcd1a380af6a565651a348485c8bd44340063d496680a8f57b47
+  new_authority_clone:
+    coordination_ledger_sha256_before_contract: 1fba518d8599fcd1a380af6a565651a348485c8bd44340063d496680a8f57b47
+    staged_paths: 0
+    status_entries: 0
+    remote_count: 0
+  current_private_evidence_boundary:
+    diagnostic_artifact_sha256: 7bce7fd65c9afd2fc3d5fa8f1a446388208111b25818d26e1bdf27a69359058e
+    disposition: >-
+      Revalidated private diagnostic-only context only. It is not a formal raw
+      artifact, typed producer receipt, receipt-index entry, dynamic-plan record,
+      coverage event, gate result, candidate confirmation, or bug claim.
+  frozen_public_targets:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+required_inputs:
+  - docs/codex_multi_agent_development_runbook.md
+  - experiments/final_bug_discovery_protocol_v3/TODO.md
+  - docs/project_architecture.md
+  - docs/fine_grained_discovery_architecture.md
+  - docs/discovery_search_and_parallel_architecture.md
+  - docs/semantic_hypercontract_architecture.md
+  - docs/architecture_credibility_and_alternatives.md
+  - docs/competitive_paper_experiment_blueprint.md
+  - src/datadiff_osc/_phase6_gate_authority.py
+  - src/datadiff_osc/runtime/gate_artifacts.py
+  - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_diagnostic_artifact_revalidation_r1_task_contract.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_diagnostic_artifact_revalidation_r1_report.yaml
+formal_execution_admission:
+  common_preconditions_before_any_formal_execution:
+    - >-
+      A successor authority must create and verify a fresh clean-source snapshot
+      for this exact source commit, including source digest, required path hashes,
+      clean Git status, no remote, interpreter/dependency lock, and latest target
+      package audit. The current dirty user worktree is never paper authority.
+    - >-
+      A successor authority must reserve empty, non-overwritable external output
+      roots; predeclare artifact/index/plan/report locations, canonical schemas,
+      seed exclusions, concurrency, resource limits, stop conditions, and exact
+      commands before it starts real work.
+    - >-
+      Any product implementation needed to emit formal evidence requires its own
+      narrow task contract, frozen-interface review, scoped tests, and a new clean
+      source snapshot before formal execution. No existing private diagnostic
+      artifact may be transformed into formal evidence.
+  contract_receipt_stream:
+    required_real_evidence:
+      - 9_of_9_confirmed_root_exact_recall
+      - approved_false_positive_precision_fixes_100_percent
+      - high_risk_comparator_axis_hyperedge_mutants_100_percent_killed
+      - 100000_exact_vs_staged_result_groups_zero_verdict_discrepancy
+      - compile_match_p95_within_protocol_limit
+      - paired_throughput_regression_within_10_percent
+      - at_least_1000_real_distinct_contract_performance_pairs
+    receipt_index_requirements:
+      producer_kinds_exactly:
+        - contract_exact_replay
+        - coverage_admission_replay
+        - reachability_admission_replay
+        - focus_admission_replay
+        - parallel_authority_replay
+        - v3_typed_run_replay
+        - repository_test_replay
+        - target_version_replay
+        - candidate_classification_replay
+        - performance_paired_replay
+      binding_requirement: >-
+        Every producer receipt and raw artifact must use allowed typed envelopes,
+        exact source/task/result/seed/outcome/artifact bindings, canonical bytes,
+        no synthetic marker, one distinct producer kind, and an index that fails
+        closed for missing/duplicate/extra kinds or digest mismatch.
+  granularity_reachability_stream:
+    required_real_evidence:
+      - declaration_compiler_recomputes_16_fresh_families_232_cells_384_edges_502_obligations
+      - deterministic_construction_activation_232_of_232
+      - deterministic_contrast_activation_384_of_384_edges_both_endpoints
+      - fresh_seed_reachability_232_cells_at_least_twice_16_families_two_seed_blocks
+      - contrast_observation_384_of_384
+      - all_502_backend_obligations_executed_or_frozen_unsupported_evidence
+      - scheduled_activation_overall_at_least_95_percent_and_each_family_at_least_90_percent
+      - target_preserving_mutation_overall_at_least_90_percent_and_each_family_at_least_80_percent
+      - eleven_lanes_focus_signal_at_least_five_each_and_lane_hit_rate_at_least_80_percent
+      - 21_operations_21_expressions_8_aggregates_7_risk_classes_18_pipelines_observed
+  runtime_correctness_stream:
+    required_real_evidence:
+      - worker_1_vs_n_task_set_seed_lineage_and_authority_verdict_exactly_equal
+      - every_approximation_or_pruning_path_has_exact_escalation_and_fault_injection_detection
+      - v3_22_of_22_runs_2200_of_2200_cases_actually_executed
+      - v3_zero_iteration_failures_zero_pipeline_errors_zero_non_ok_backend_results
+      - every_candidate_campaign_3_of_3_and_candidate_pipeline_3_of_3_rechecks
+      - complete_repository_suite_zero_failures
+      - latest_target_audit_matches_frozen_versions
+  final_assembly:
+    - >-
+      Only after all three streams are complete may Root build the exact
+      18-section dynamic plan, then the complete receipt index, then a verified
+      gate bundle/report. Plan/index identities and every per-record producer
+      receipt digest must cross-bind exactly; any omitted result remains pending.
+required_invariants:
+  - >-
+    This authority never mistakes a plan, placeholder, private diagnostic,
+    declared digest, or syntactic JSON shell for executed evidence. Missing exact
+    typed context is fail-closed/not_evaluated.
+  - >-
+    All formal outputs must derive from the future clean-source snapshot and
+    actual bounded commands. No output may overwrite an existing path or include
+    synthetic/caller-authored aggregate evidence.
+  - >-
+    Candidate remains non-confirmed and bug_claimed=false throughout Phase 6;
+    diagnostic references remain diagnostic-only permanently.
+  - >-
+    The private foundation barrier remains pass_unchanged, but the three formal
+    Phase-6 gates remain pending until actual independent evidence and final
+    verification exist.
+negative_review_requirements:
+  负向复核:
+    - >-
+      Verify that one private artifact, an incomplete producer set, a missing
+      source snapshot, or a plan shell cannot enter a formal receipt index or
+      gate report.
+  独立反例验证:
+    - >-
+      Verify that the clean isolated clone alone has no formal-gate credit before
+      real execution, even though its source commit and frozen targets are exact.
+  异常输入验证:
+    - >-
+      Record that source drift, dependency/version drift, nonempty output roots,
+      malformed or synthetic artifacts, duplicate producer kinds, failed scoped
+      tests, or incomplete terminal evidence stop the future program.
+forbidden:
+  - all product code and tests
+  - src/datadiff_osc/public_api_freeze.json
+  - all thirteen frozen_public_targets
+  - /data1/lbw/xjx/datadiff_fuzz_lab
+  - /tmp/phase6_authority_real_evidence_chain_r1.WcCIEK
+  - /tmp/phase6_bounded_real_adapter_artifact_r1.Mhodhy/real-adapter-execution-artifact.json
+  - creation of the reserved formal_evidence root or any artifact, producer receipt, raw gate artifact, receipt index, dynamic plan, coverage event, authority bundle, gate report, candidate confirmation, or bug claim
+  - tests/osc, six-file combined suite, repository suite, 100000 parity, v3 2200, Phase 7, 2h, or 24h execution
+validation:
+  test_execution_count: 0
+  allowed_read_only_commands:
+    - exact source/authority/original Git status, remote, SHA, and path-scope checks
+    - YAML parse and static protocol/verifier admission inspection
+  prohibited_commands:
+    - any test runner, evidence producer, artifact writer, plan/index/gate builder, or workload launcher
+  required_report_contents:
+    - new authority root, source commit, exact frozen SHA state, empty reserved output state
+    - all three formal stream acceptance requirements and unresolved blockers
+    - 负向复核, 独立反例验证, 异常输入验证 results
+stop_conditions:
+  - any source/frozen/public SHA mismatch, dirty/staged/new authority clone drift, remote, or reserved output creation
+  - any product/test/authority path outside authorization_boundary
+  - any attempt to launch a formal workload or create evidence before a successor execution task contract
+  - any gate credit, confirmation, or bug claim
+decision:
+  formal_execution_authority_created: pending_preflight_report
+  formal_execution_workload_authorized: false
+  formal_execution_workload_status: pending_successor_execution_contracts
+  source_snapshot_for_formal_evidence: required_not_created
+  product_implementation_authorized: false
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false

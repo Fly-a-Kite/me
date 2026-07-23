@@ -1,0 +1,168 @@
+schema_version: osc-phase6-formal-execution-authority-r1-report-v1
+phase: 6
+task_id: OSC-6-FORMAL-EXECUTION-AUTHORITY-R1
+status: complete_formal_execution_authority_created_preflight_only_no_workload
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_formal_execution_authority_r1_task_contract.yaml
+  sha256: 73cb3b6cec18c27641b2dfdb818f4ce3895514c7b73ca0bd00bcd292ddb7e700
+authority_root:
+  directory: /tmp/phase6_formal_execution_authority_r1.Smql7A
+  source_clone: /tmp/phase6_formal_execution_authority_r1.Smql7A/source
+  source_commit: 09df5ed4ee5d2b0431de32e2c0e53ff13143a32c
+  source_status_before_authority_writes: clean
+  source_remote_count_before_and_after: 0
+  reserved_formal_evidence_root: /tmp/phase6_formal_execution_authority_r1.Smql7A/formal_evidence
+  reserved_formal_evidence_root_before_and_after: absent
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  product_writes: 0
+  external_durable_writes: 0
+  forbidden_paths_modified: []
+  original_workspace:
+    head_before_and_after: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths_before_and_after: 0
+    status_entries_before_and_after: 2908
+  parent_authority_clone:
+    path: /tmp/phase6_authority_real_evidence_chain_r1.WcCIEK
+    head_before_and_after: 09df5ed4ee5d2b0431de32e2c0e53ff13143a32c
+    status_before_and_after: clean
+    remote_count_before_and_after: 0
+  new_authority_clone_changed_paths:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_formal_execution_authority_r1_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_formal_execution_authority_r1_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+preflight_validation:
+  test_execution_count: 0
+  formal_workload_execution_count: 0
+  command: >-
+    PYTHONDONTWRITEBYTECODE=1
+    PYTHONPATH=/tmp/phase6_formal_execution_authority_r1.Smql7A/source/src
+    /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python -
+  exit_code: 0
+  complete_result: >-
+    New authority source commit is clean and remote-free before authority writes;
+    all 13 frozen/public targets are exact; the reserved formal_evidence root is
+    absent; dynamic plan section count=18; required producer kind count=10;
+    expected target package count=7; and formal_execution_workload_authorized=false.
+  static_admission_inventory:
+    dynamic_plan_sections:
+      - false_positive_fixes
+      - contract_comparison_decisions
+      - scheduled_target_attempts
+      - mutation_attempts
+      - focus_signals
+      - formal_lanes
+      - escalation_faults
+      - v3_runs
+      - v3_cases
+      - v3_executed_cases
+      - v3_backend_tasks
+      - campaign_rechecks
+      - pipeline_rechecks
+      - repository_tests
+      - target_packages
+      - candidate_records
+      - contract_performance_samples
+      - parallel_scaling_samples
+    producer_kinds:
+      - candidate_classification_replay
+      - contract_exact_replay
+      - coverage_admission_replay
+      - focus_admission_replay
+      - parallel_authority_replay
+      - performance_paired_replay
+      - reachability_admission_replay
+      - repository_test_replay
+      - target_version_replay
+      - v3_typed_run_replay
+    expected_target_packages:
+      - chdb
+      - datafusion
+      - duckdb
+      - pandas
+      - polars
+      - pyarrow
+      - pysqlite3-binary
+frozen_public_targets: 13_of_13_exact_before_and_after_preflight
+formal_execution_state:
+  source_snapshot_for_formal_evidence: not_created
+  dependency_lock_and_target_audit: not_created
+  output_root: absent
+  product_implementation_contracts: not_created
+  contract_receipt_stream: not_started
+  granularity_reachability_stream: not_started
+  runtime_correctness_stream: not_started
+  dynamic_plan: absent
+  artifact_receipt_index: absent
+  formal_gate_bundle: absent
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
+coverage:
+  负向复核: >-
+    The current one-artifact private diagnostic boundary, a source commit alone,
+    and an incomplete producer set cannot become a formal receipt index, plan,
+    or gate. The verifier's 10-kind/18-section admission shape and the absent
+    formal output root keep the state fail closed.
+  独立反例验证: >-
+    The new clean isolated clone has exact frozen targets and no remote, but it
+    has zero real formal workload records, zero source snapshot authority, and
+    zero gate credit. Clean source alone is not evidence.
+  异常输入验证: >-
+    This authority records source/dependency drift, nonempty output roots,
+    malformed or synthetic artifacts, duplicate/missing producer kinds, failed
+    scoped tests, and incomplete terminal results as future stop conditions.
+findings:
+  - id: OSC-6-DYNAMIC-PLAN-B1
+    severity: blocker
+    claim: >-
+      The formal 18-section dynamic plan and its real 100000-comparison,
+      22/2200, repository, performance, target-version, and recheck records
+      are not created by an authority preflight.
+    disposition: open_pending_successor_formal_execution_contracts
+  - id: OSC-6-R-B3
+    severity: blocker
+    claim: >-
+      The formal typed producer receipt/raw artifact/index chain is absent;
+      one private diagnostic artifact cannot fill the exact 10-producer set.
+    disposition: open_pending_successor_formal_producer_contracts
+  - id: OSC-6-G-B1
+    severity: blocker
+    claim: >-
+      The 232/384/502, activation, reachability, mutation, focus, dimension,
+      and performance evidence streams have not started.
+    disposition: open_pending_successor_granularity_execution_contract
+counts:
+  blocker_open: 3
+  high_open: 0
+  medium_open: 0
+  product_writes: 0
+  authority_writes: 3
+  external_durable_writes: 0
+  test_execution_count: 0
+  formal_workload_execution_count: 0
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  forbidden_paths_modified: []
+barrier:
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  formal_execution_authority: complete_preflight_only_no_workload
+  formal_execution_workload: unauthorized_pending_successor_contracts
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
+next_step_requires_new_task_contract: >-
+  Start with an isolated clean-source snapshot plus dependency/target-version
+  freeze authority. It must name the exact required source paths, output root,
+  seed exclusions, command budget, and no-overwrite policy. Only after that
+  precondition succeeds may separate formal producer implementation/execution
+  authorities be created for Contract, granularity/reachability, and Runtime.
