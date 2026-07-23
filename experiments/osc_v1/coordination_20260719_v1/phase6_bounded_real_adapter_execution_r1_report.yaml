@@ -1,0 +1,152 @@
+schema_version: osc-phase6-bounded-real-adapter-execution-r1-report-v1
+phase: 6
+task_id: OSC-6-BOUNDED-REAL-ADAPTER-EXECUTION-R1
+status: complete_one_pandas_polars_pair_diagnostic_artifact_no_gate_credit
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_execution_r1_task_contract.yaml
+  sha256: 407dee8f227792212ab16c73f95d969077b25b225b38f2c14ddc422d1d8f85e0
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  writes:
+    - /tmp/phase6_bounded_real_adapter_artifact_r1.Mhodhy/real-adapter-execution-artifact.json
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_execution_r1_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_execution_r1_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  forbidden_paths_modified: []
+  original_workspace:
+    head_before_and_after: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths_before_and_after: 0
+    status_entries_before_and_after: 2908
+  r5_source_clone:
+    path: /tmp/phase6_source_snapshot_r5.jUnpUd/source
+    commit_before_and_after: b80dd03db0c54d18fafb3dbed00bfe50fcc9e224
+    status_before_and_after: clean
+    remote_count_before_and_after: 0
+    untracked_pycache_directories_after: 0
+source_snapshot:
+  path: /tmp/phase6_source_snapshot_r5_validation.jyT1fn/source-snapshot.json
+  byte_sha256: 6a4f059bfddb73d32b3a1d38405c09ff72dfa43533f7300fb383492bc98af3d2
+  source_digest: osc-phase6-source-snapshot-4a72791b80c05fd3609cd10c88c8f04544df37acb6c6c3bf5dc365cf8ddacd9c
+  git_head: b80dd03db0c54d18fafb3dbed00bfe50fcc9e224
+  required_path_count: 408
+execution:
+  runner_invocations: 1
+  actual_adapter_pair_invocations: 1
+  command: >-
+    cwd=/tmp/phase6_source_snapshot_r5.jUnpUd/source;
+    PYTHONDONTWRITEBYTECODE=1
+    /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python
+    /tmp/phase6_source_snapshot_r5.jUnpUd/source/scripts/osc/run_phase6_bounded_real_adapter_artifact.py
+    --repo-root /tmp/phase6_source_snapshot_r5.jUnpUd/source
+    --source-snapshot /tmp/phase6_source_snapshot_r5_validation.jyT1fn/source-snapshot.json
+    --source-snapshot-sha256 6a4f059bfddb73d32b3a1d38405c09ff72dfa43533f7300fb383492bc98af3d2
+    --output /tmp/phase6_bounded_real_adapter_artifact_r1.Mhodhy/real-adapter-execution-artifact.json
+  command_sha256: b60f1702214d10eec273776923c732bfc91f2167fdc8f00c9915ff84d1289540
+  exit_code: 0
+  complete_terminal_result: >-
+    {"artifact_id":"osc-private-bounded-real-adapter-artifact-id-a78c270f8c3d25b6df710a72767a86870f6a5df1551c2b415890f18f7e9bdaa6","artifact_path":"/tmp/phase6_bounded_real_adapter_artifact_r1.Mhodhy/real-adapter-execution-artifact.json","artifact_sha256":"7bce7fd65c9afd2fc3d5fa8f1a446388208111b25818d26e1bdf27a69359058e","bug_claimed":false,"candidate_confirmed":false,"diagnostic_only":true,"gate_credit":false,"source_digest":"osc-phase6-source-snapshot-4a72791b80c05fd3609cd10c88c8f04544df37acb6c6c3bf5dc365cf8ddacd9c"}
+  target:
+    family_id: pandas_nullable_bool_reduction
+    backend_pair: [pandas, polars]
+    master_seed: 29
+    seed_block_id: bounded-real-adapter-seed-block-r1
+    parallel: false
+    retries: 0
+artifact:
+  path: /tmp/phase6_bounded_real_adapter_artifact_r1.Mhodhy/real-adapter-execution-artifact.json
+  sha256: 7bce7fd65c9afd2fc3d5fa8f1a446388208111b25818d26e1bdf27a69359058e
+  artifact_id: osc-private-bounded-real-adapter-artifact-id-a78c270f8c3d25b6df710a72767a86870f6a5df1551c2b415890f18f7e9bdaa6
+  runner_sha256: 6a5d33bdf7e3e97515a1801b0b446820f7e56a4be142b70abec886492be00a46
+  writer_sha256: dc2bfb564cda3a2c38f1212d1fc3718431e23f32d64fabe19252a445167fd6e2
+  source_digest: osc-phase6-source-snapshot-4a72791b80c05fd3609cd10c88c8f04544df37acb6c6c3bf5dc365cf8ddacd9c
+  records_in_exact_order: [pandas, polars]
+  task_ids:
+    - osc-task-id-9b790478bd63a540a82d82492ff2ef389bc5bca3661e184f4aff5f8be15794ac
+    - osc-task-id-6519c88d6c5ef3ce2369f64c0fabfd1e562f386baf241cd772806642369048c6
+  directory_final_entries: [real-adapter-execution-artifact.json]
+  temporary_entries_after_execution: 0
+  post_execution_verification:
+    exit_code: 0
+    result: >-
+      Exact artifact SHA/source/runner bindings reverified; family is
+      pandas_nullable_bool_reduction, backends are pandas,polars, master seed
+      is 29, and diagnostic_only=true/gate_credit=false/confirmed=false/
+      bug_claimed=false.
+diagnostic_only_boundary:
+  authority_eligible: false
+  gate_credit: false
+  dynamic_plan_emitted: false
+  typed_receipt_index_emitted: false
+  coverage_event_created: false
+  candidate_confirmed: false
+  bug_claimed: false
+coverage:
+  负向复核: >-
+    R1A's complete 4-passing scoped suite retains writer-side fail-closed
+    coverage for source/runner/SHA/record/output substitutions. This execution
+    additionally reverified the exact R5 source, command digest, runner SHA,
+    output SHA, and record order before/after its sole invocation.
+  独立反例验证: >-
+    One valid pair is explicitly not a 232/384/502 aggregate, a dynamic plan,
+    receipt index, coverage event, formal gate, confirmation, or bug claim.
+    All diagnostic-only flags were re-read as false for authority/gate/promotion.
+  异常输入验证: >-
+    No nonzero runner result, missing artifact, temporary residue, source drift,
+    or unexpected output was observed. Any such condition remains a stop
+    condition rather than a success interpretation.
+findings:
+  - id: OSC-6-DYNAMIC-PLAN-B1
+    severity: blocker
+    claim: >-
+      One source-bound diagnostic pair exists, but the v3 dynamic plan and its
+      18 real-evidence sections, 100000 comparisons, 22/2200 execution, typed
+      producer receipt set, and receipt index remain absent.
+    disposition: open_formal_chain_absent_after_one_diagnostic_artifact
+  - id: OSC-6-R-B3
+    severity: blocker
+    claim: >-
+      The one diagnostic artifact is not a formal typed receipt/index chain and
+      cannot satisfy producer or gate admission requirements.
+    disposition: open_formal_typed_receipt_chain_absent
+  - id: OSC-6-G-B1
+    severity: blocker
+    claim: >-
+      One pair cannot satisfy the 232/384/502, activation, fresh seed,
+      mutation, focus, dimension, or performance thresholds.
+    disposition: open_no_gate_eligible_aggregate_evidence
+counts:
+  blocker_open: 3
+  high_open: 0
+  medium_open: 0
+  product_writes: 0
+  authority_writes: 3
+  external_diagnostic_artifact_writes: 1
+  actual_adapter_pair_invocations: 1
+  runner_invocations: 1
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  forbidden_paths_modified: []
+frozen_public_targets: 13_of_13_exact_pre_and_post_execution
+barrier:
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  r5_source_snapshot: verified_current_writer_runner_no_gate_credit
+  bounded_diagnostic_artifact: complete_one_pair_no_gate_credit
+  dynamic_plan: absent_fail_closed
+  artifact_receipt_index: absent_fail_closed
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
+next_step_requires_new_task_contract: >-
+  Any transition from this one diagnostic artifact to formal typed producer
+  receipts, a dynamic plan, an artifact receipt index, 232/384/502 aggregates,
+  or formal gate calculation requires a new narrowly scoped authority. No
+  combined suite or larger workload is authorized here.

@@ -1,0 +1,130 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-BOUNDED-REAL-ADAPTER-EXECUTION-R1
+owner: /root
+mode: root_serial_isolated_one_pair_diagnostic_execution
+implementation_child_agents: 0
+reviewer_child_agents_created: 0
+objective: >-
+  Execute exactly one source-bound, direct serial pandas/polars fresh-pair
+  capture through the R5-bound private runner and create exactly one immutable
+  diagnostic artifact at the reserved path. This is not a dynamic plan, typed
+  receipt index, formal artifact receipt, coverage event, gate result,
+  candidate confirmation, or bug claim.
+user_authorization:
+  date: 2026-07-24
+  exact_confirmation: 明确授权
+  interpreted_scope: >-
+    The one-pair bounded real execution follows successful writer validation
+    and R5 source binding. It does not lift 100000 comparison, v3-2200,
+    repository, Phase 7, 2h, or 24h prohibitions.
+authorization_boundary:
+  authorized_product_writes: []
+  authorized_authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_execution_r1_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_execution_r1_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  authorized_external_durable_output:
+    artifact: /tmp/phase6_bounded_real_adapter_artifact_r1.Mhodhy/real-adapter-execution-artifact.json
+    temporary_pattern: /tmp/phase6_bounded_real_adapter_artifact_r1.Mhodhy/.osc-phase6-bounded-artifact-*.tmp
+    pre_execution_entries: 0
+    final_artifact_count: exactly_1
+    final_temporary_count: 0
+  all_other_paths: forbidden
+verified_preconditions:
+  original_workspace:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    index_staged_paths: 0
+    status_entries_observed: 2908
+  authority_clone:
+    head_before_contract: 782277d8a9874ecb4d2a96f5ee1b78ffadfdb7e2
+    status_entries: 0
+    remote_count: 0
+  r5_source_snapshot:
+    source_clone: /tmp/phase6_source_snapshot_r5.jUnpUd/source
+    source_commit: b80dd03db0c54d18fafb3dbed00bfe50fcc9e224
+    source_snapshot_path: /tmp/phase6_source_snapshot_r5_validation.jyT1fn/source-snapshot.json
+    source_snapshot_sha256: 6a4f059bfddb73d32b3a1d38405c09ff72dfa43533f7300fb383492bc98af3d2
+    source_digest: osc-phase6-source-snapshot-4a72791b80c05fd3609cd10c88c8f04544df37acb6c6c3bf5dc365cf8ddacd9c
+    git_status_digest: osc-git-status-porcelain-v1-29fe7ebfe8adfda597643ec6c8b5176d7963026a145420c6896d75ed113a4423
+    status_entries: 0
+    remote_count: 0
+  immutable_writer_runner:
+    writer_path: src/datadiff_osc/runtime/_phase6_bounded_real_adapter_artifact.py
+    writer_sha256: dc2bfb564cda3a2c38f1212d1fc3718431e23f32d64fabe19252a445167fd6e2
+    runner_path: scripts/osc/run_phase6_bounded_real_adapter_artifact.py
+    runner_sha256: 6a5d33bdf7e3e97515a1801b0b446820f7e56a4be142b70abec886492be00a46
+  exact_execution:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python
+      /tmp/phase6_source_snapshot_r5.jUnpUd/source/scripts/osc/run_phase6_bounded_real_adapter_artifact.py
+      --repo-root /tmp/phase6_source_snapshot_r5.jUnpUd/source
+      --source-snapshot /tmp/phase6_source_snapshot_r5_validation.jyT1fn/source-snapshot.json
+      --source-snapshot-sha256 6a4f059bfddb73d32b3a1d38405c09ff72dfa43533f7300fb383492bc98af3d2
+      --output /tmp/phase6_bounded_real_adapter_artifact_r1.Mhodhy/real-adapter-execution-artifact.json
+    command_sha256: b60f1702214d10eec273776923c732bfc91f2167fdc8f00c9915ff84d1289540
+    cwd: /tmp/phase6_source_snapshot_r5.jUnpUd/source
+    family_id: pandas_nullable_bool_reduction
+    backend_pair: [pandas, polars]
+    endpoint_metadata:
+      backend_version: 1.0.0
+      adapter_revision: adapter-v1
+    protocol_digest: phase6-bounded-real-adapter-artifact-r1
+    seed_block_id: bounded-real-adapter-seed-block-r1
+    master_seed: 29
+    exclusions:
+      master_seeds: all_except_29
+      families: all_except_pandas_nullable_bool_reduction
+      backend_pairs: all_except_selected_pandas_polars_fresh_pair
+      parallel: forbidden
+      retries: forbidden
+      candidate_promotion: forbidden
+    budget:
+      runner_invocations: exactly_1
+      adapter_pair_invocations: exactly_1
+      raw_artifacts: exactly_1_diagnostic_only
+      dynamic_plan_records: 0
+      typed_receipt_index_records: 0
+      coverage_events: 0
+required_invariants:
+  - >-
+    Before capture, reverify exact source snapshot, source clone HEAD/status,
+    writer/runner hashes, frozen SHA targets, empty reserved directory, command
+    digest, and no existing output/symlink.
+  - >-
+    The runner must execute exactly the declared target/pair/seed once with
+    parallel=false and no retries, atomically create only the named canonical
+    artifact, then reverify its byte SHA, source binding, runner binding, exact
+    two-record order, and diagnostic-only flags.
+  - >-
+    Artifact validity is strictly diagnostic-only: authority_eligible=false,
+    gate_credit=false, dynamic_plan_emitted=false, typed_receipt_index_emitted=false,
+    coverage_event_created=false, candidate_confirmed=false, bug_claimed=false.
+negative_review_requirements:
+  负向复核:
+    - existing output, source snapshot SHA, runner SHA, source binding, command digest, and record order substitutions fail closed on verification
+  独立反例验证:
+    - one successful pair cannot be represented as 232/384/502, dynamic plan, receipt index, coverage, formal gate, confirmation, or bug claim
+  异常输入验证:
+    - nonzero runner result, missing artifact, temporary residue, malformed artifact, or any unexpected output count leaves barrier pending
+forbidden:
+  - any product code, public export, public API freeze, frozen path, source snapshot mutation, or external path other than authorized output
+  - tests/osc, six-file combined suite, repository suite, 100000 parity, v3 2200, Phase 7, 2h, or 24h execution
+  - dynamic plan, typed receipt index, formal artifact receipt, coverage event, gate calculation, candidate confirmation, or bug_claimed=true
+validation:
+  runner_execution_count: exactly_1
+  post_execution_read_only_verification_count: exactly_1
+  expected_runner_exit_code: 0
+  expected_artifact_count: 1
+  scoped_tests: not_run
+stop_conditions:
+  - any precondition mismatch, nonzero/missing terminal result, nonzero runner exit, source/runner/artifact mismatch, unexpected output, or output already existing
+  - any candidate/gate/plan/receipt/coverage mutation or any unlisted write
+decision:
+  bounded_execution: pending_single_authorized_invocation
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false

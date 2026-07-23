@@ -1530,6 +1530,33 @@ tasks:
       combined_suite: unauthorized
       phase7_paired_pilot: unauthorized
       twenty_four_hour: unauthorized
+  - task_id: OSC-6-BOUNDED-REAL-ADAPTER-EXECUTION-R1
+    owner: /root
+    mode: root_serial_isolated_one_pair_diagnostic_execution
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_execution_r1_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_execution_r1_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+      - /tmp/phase6_bounded_real_adapter_artifact_r1.Mhodhy/real-adapter-execution-artifact.json
+    task_contract_sha256: 407dee8f227792212ab16c73f95d969077b25b225b38f2c14ddc422d1d8f85e0
+    report_sha256: dced4378b43049c4bdfd6dd5e0d15af8806a6143982c31da32ea3382c2bd4043
+    status: complete_one_pandas_polars_pair_diagnostic_artifact_no_gate_credit
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_execution_r1_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_execution_r1_report.yaml
+    barrier:
+      phase_6_private_foundation_barrier: pass_unchanged
+      phase_6_contract: pending
+      phase_6_granularity_reachability: pending
+      phase_6_runtime_correctness: pending
+      bounded_execution: complete_one_pair_diagnostic_only_no_gate_credit
+      dynamic_plan: absent_fail_closed
+      artifact_receipt_index: absent_fail_closed
+      gate_credit: false
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
 interface_freeze:
   version: osc-public-api-freeze-v1
   hash: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
@@ -1625,10 +1652,10 @@ open_review_findings:
   - {id: OSC-6-FOUNDATION-ROOT-R8B-SEARCH-REPORT-001, severity: blocker, owner: root, status: closed_by_fresh_complete_r8c_search_review}
   - {id: OSC-6-FOUNDATION-ROOT-R8B-CONTRACT-REPORT-001, severity: blocker, owner: root, status: closed_by_fresh_complete_r8c_contract_review}
   - {id: OSC-6-SOURCE-SNAPSHOT-R2-B1, severity: blocker, owner: root, status: remediated_by_r3_verified_required_source_surface_no_gate_credit}
-  - {id: OSC-6-R-B3, severity: blocker, owner: root, status: open_dynamic_plan_typed_receipt_raw_artifact_chain_absent_after_r3_source_snapshot}
+  - {id: OSC-6-R-B3, severity: blocker, owner: root, status: open_formal_dynamic_plan_typed_receipt_chain_absent_after_one_diagnostic_artifact}
   - {id: OSC-6-G-B1, severity: blocker, owner: root, status: open_no_gate_eligible_real_adapter_232_384_502_evidence}
   - {id: OSC-6-SOURCE-HANDOFF-R3-B1, severity: blocker, owner: root, status: remediated_by_clean_current_head_verification_no_gate_credit}
-  - {id: OSC-6-DYNAMIC-PLAN-B1, severity: blocker, owner: root, status: open_diagnostic_producer_boundary_implemented_real_execution_still_unauthorized}
+  - {id: OSC-6-DYNAMIC-PLAN-B1, severity: blocker, owner: root, status: open_formal_dynamic_plan_real_evidence_prerequisites_absent_after_one_diagnostic_artifact}
 gates:
   - name: phase_0_dirty_paths_registered_and_preserved
     threshold: complete snapshot and no existing dirty path overwritten
