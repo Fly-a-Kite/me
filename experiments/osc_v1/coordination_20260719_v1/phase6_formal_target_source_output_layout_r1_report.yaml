@@ -1,0 +1,258 @@
+schema_version: osc-phase6-formal-target-source-output-layout-r1-report-v1
+phase: 6
+task_id: OSC-6-FORMAL-TARGET-SOURCE-OUTPUT-LAYOUT-R1
+status: complete_public_target_source_audit_detected_latest_target_drift_no_formal_workload
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_formal_target_source_output_layout_r1_task_contract.yaml
+  sha256: e622fc69f568967a41c5ed5866711b780da0def5f21339e3f602939ad4629a59
+parent_authorities:
+  formal_execution_contract_sha256: 73cb3b6cec18c27641b2dfdb818f4ce3895514c7b73ca0bd00bcd292ddb7e700
+  formal_execution_report_sha256: 8df2aa81724894ccc7605bb05dd1b8ef00fbdd2af0481e9ff972228a7780a2f0
+  source_environment_contract_sha256: aa1dbb8a2de7b1247c55987cf76dfda36870b5722728a74db895c2f291d099de
+  source_environment_report_sha256: 0f74bb4d3c381bc82cd3ad84db8f7ae8453f5905cdb3d5bf8169ebc35ee60d5e
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  authority_source_before_report:
+    path: /tmp/phase6_formal_execution_authority_r1.Smql7A/source
+    commit: 7b083d880470f95a40ca3795ca11fdbbab97bb57
+    status_before_and_after_external_audit: clean
+    remote_count_before_and_after_external_audit: 0
+  snapshot_source_clone:
+    path: /tmp/phase6_formal_execution_authority_r1.Smql7A/source_snapshot_source
+    commit: 811ba665966b8773fa1bdd8185f1165f6af2ee97
+    status_before_and_after: clean
+    remote_count_before_and_after: 0
+  authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_formal_target_source_output_layout_r1_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_formal_target_source_output_layout_r1_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  external_durable_writes:
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-pandas.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-polars.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-duckdb.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-pyarrow.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-datafusion.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-chdb.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/pypi-pysqlite3-binary.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/target-version-public-source-audit.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/formal_output_layout/formal-output-layout.json
+  forbidden_paths_modified: []
+  original_workspace:
+    path: /data1/lbw/xjx/datadiff_fuzz_lab
+    head_before_and_after: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths_before_and_after: 0
+    status_entries_before_and_after: 2908
+source_environment_inputs:
+  source_snapshot_path: /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/formal-source-snapshot.json
+  source_snapshot_sha256: 13134df2cf22758d7b4a71da74826fd3bd02d0f4cbd64ee0ad0479988a77b577
+  source_digest: osc-phase6-source-snapshot-6a7201659596c888a3efedfa9d1207cfadb2eda98f1ffd50a47c3e56405eef38
+  source_snapshot_required_path_count: 409
+  local_environment_audit_path: /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/local-environment-target-audit.json
+  local_environment_audit_sha256: 26fb86e8d3d349bfd8cb19d1c65599d53c31af82d2b471025afac0567ef68f68
+  dependency_lock_sha256: ee4bb79ac41317e3583ec18bdb744d00d3a7470a58e7205cdaba913f5938c087
+public_target_source_audit:
+  path: /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/target-version-public-source-audit.json
+  byte_sha256: ac70bd1744a79f8ee0c92c9996535c8ddfbd69a807ae55c5ff6423849ef55ab1
+  canonical_json_verified: true
+  retrieved_at_utc: 2026-07-23T19:34:07.955640Z
+  network:
+    request_count: 7
+    allowed_host: pypi.org
+    https_only: true
+    redirects_allowed: false
+    uploads_performed: false
+  packages:
+    - distribution: pandas
+      endpoint: https://pypi.org/pypi/pandas/json
+      raw_file: pypi-pandas.json
+      raw_sha256: def430f070766d7d545517b3c2a08afbb59f865c4297281d00fafcc4e25a123f
+      public_name: pandas
+      latest_version: 3.0.5
+      frozen_local_version: 3.0.3
+      matches_frozen_local_environment: false
+    - distribution: polars
+      endpoint: https://pypi.org/pypi/polars/json
+      raw_file: pypi-polars.json
+      raw_sha256: f9e79734733ed9c25f2c0a822a9e2f3bf8d7765201dc507293cd594d1e25e23c
+      public_name: polars
+      latest_version: 1.43.0
+      frozen_local_version: 1.42.1
+      matches_frozen_local_environment: false
+    - distribution: duckdb
+      endpoint: https://pypi.org/pypi/duckdb/json
+      raw_file: pypi-duckdb.json
+      raw_sha256: d2f9d34a9ba3976cae39e4bb69b464227851c907493e9d1395c91710f3a5a721
+      public_name: duckdb
+      latest_version: 1.5.5
+      frozen_local_version: 1.5.4
+      matches_frozen_local_environment: false
+    - distribution: pyarrow
+      endpoint: https://pypi.org/pypi/pyarrow/json
+      raw_file: pypi-pyarrow.json
+      raw_sha256: 752ee190964d03405cf7e53a2ba55c173c9f69a0f87a53383f19cd760cd80982
+      public_name: pyarrow
+      latest_version: 25.0.0
+      frozen_local_version: 25.0.0
+      matches_frozen_local_environment: true
+    - distribution: datafusion
+      endpoint: https://pypi.org/pypi/datafusion/json
+      raw_file: pypi-datafusion.json
+      raw_sha256: 27287ace58a4003d8e4b5373d7c688cb0266a8e01ddc45d7f48ec803c515c42c
+      public_name: datafusion
+      latest_version: 54.0.0
+      frozen_local_version: 54.0.0
+      matches_frozen_local_environment: true
+    - distribution: chdb
+      endpoint: https://pypi.org/pypi/chdb/json
+      raw_file: pypi-chdb.json
+      raw_sha256: 25dfd4a21d3b82d9c83cbbe46c2965f37f9d8f8e89c5c2703dae107afd19a2b9
+      public_name: chdb
+      latest_version: 4.2.1
+      frozen_local_version: 4.2.1
+      matches_frozen_local_environment: true
+    - distribution: pysqlite3-binary
+      endpoint: https://pypi.org/pypi/pysqlite3-binary/json
+      raw_file: pypi-pysqlite3-binary.json
+      raw_sha256: 250725f2b802e5d21db15739aa8ae3f18477dd27cee6803eef8f263594ab6d0c
+      public_name: pysqlite3-binary
+      latest_version: 0.5.4.post2
+      frozen_local_version: 0.5.4.post2
+      matches_frozen_local_environment: true
+  matched_packages: [pyarrow, datafusion, chdb, pysqlite3-binary]
+  mismatched_packages: [pandas, polars, duckdb]
+  all_targets_match_frozen_local_environment: false
+output_layout:
+  path: /tmp/phase6_formal_execution_authority_r1.Smql7A/formal_output_layout/formal-output-layout.json
+  byte_sha256: 989b6f1e199f935aa9903926325c11e7c145c434586190da70bcb30b94ceacda
+  canonical_json_verified: true
+  producer_raw_and_receipt_locations_declared: 10
+  dynamic_plan_sections_declared: 18
+  formal_evidence_root: /tmp/phase6_formal_execution_authority_r1.Smql7A/formal_evidence
+  formal_evidence_root_state: reserved_absent_no_writes_in_this_task
+  no_overwrite: true
+  workload_seeds_used: []
+  excluded_seed_blocks:
+    - 2026071800-2026071805
+    - 30000001-30000113
+    - 30500001-30500102
+    - 30600001-30600102
+validation:
+  test_execution_count: 0
+  formal_workload_execution_count: 0
+  public_https_get_requests: 7
+  package_mutation_commands: 0
+  external_output_files_total: 9
+  pre_write_preflight:
+    exit_code: 0
+    complete_result: >-
+      source_snapshot=valid; local_environment_audit=canonical; targets=7;
+      original workspace unchanged; public source, output-layout, and
+      formal_evidence roots all absent.
+  public_audit_layout_command: >-
+    PYTHONDONTWRITEBYTECODE=1
+    PYTHONPATH=/tmp/phase6_formal_execution_authority_r1.Smql7A/source_snapshot_source/src
+    /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python -
+    /tmp/phase6_formal_execution_authority_r1.Smql7A/source_snapshot_source
+    /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/formal-source-snapshot.json
+    /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/local-environment-target-audit.json
+    /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources
+    /tmp/phase6_formal_execution_authority_r1.Smql7A/formal_output_layout
+  public_audit_layout_exit_code: 0
+  public_audit_layout_complete_result: >-
+    requests_made=7; public_audit_sha256=ac70bd1744a79f8ee0c92c9996535c8ddfbd69a807ae55c5ff6423849ef55ab1;
+    layout_sha256=989b6f1e199f935aa9903926325c11e7c145c434586190da70bcb30b94ceacda;
+    all_targets_match=false; pandas=3.0.5 vs 3.0.3; polars=1.43.0 vs
+    1.42.1; duckdb=1.5.5 vs 1.5.4; pyarrow/datafusion/chdb/pysqlite3-binary
+    match; formal_evidence=false; TargetVersionReceipt=false; gate_credit=false;
+    candidate_confirmed=false; bug_claimed=false.
+  post_write_validation:
+    exit_code: 0
+    complete_result: >-
+      audit/layout canonical; seven raw response SHA bindings exact; output
+      inventory is eight public-source files plus one layout file; ten producer
+      paths and eighteen plan sections declared; formal_evidence absent; both
+      clones clean/remote-free; original workspace unchanged=true.
+  frozen_public_targets: 13_of_13_exact_before_and_after_external_audit
+negative_results:
+  malformed_public_json: public response requires an info object
+  wrong_endpoint_scheme: public endpoint is outside the exact allowed PyPI surface
+  output_layout_path_escape: formal output layout path escapes reserved root
+  substituted_raw_sha: audit record raw binding mismatch
+coverage:
+  负向复核: >-
+    Malformed JSON, a non-HTTPS endpoint, formal-output path escape, and a
+    substituted raw SHA all failed closed before any claim could be admitted.
+  独立反例验证: >-
+    The seven official bytes and the 10-location/18-section layout are only
+    future execution inputs. They are neither a TargetVersionReceipt nor any
+    other typed producer receipt, dynamic plan, receipt index, raw execution
+    artifact, gate calculation, confirmation, or bug claim.
+  异常输入验证: >-
+    The audit rejects redirect/non-JSON/identity/size failures and records the
+    real latest-version mismatch as a fail-closed execution precondition rather
+    than mutating the existing frozen environment or snapshot.
+findings:
+  - id: OSC-6-FORMAL-TARGET-VERSION-R1-B1
+    severity: blocker
+    claim: >-
+      The required latest target audit does not match the frozen local execution
+      environment: pandas is 3.0.3 while public latest is 3.0.5, polars is
+      1.42.1 while public latest is 1.43.0, and duckdb is 1.5.4 while public
+      latest is 1.5.5.
+    reproduction: >-
+      Verify the seven raw files and aggregate audit at the paths above against
+      their SHA-256 values; compare each public info.version to the frozen local
+      installed/locked version. The aggregate all_targets_match value is false.
+    violated_invariant: >-
+      TODO.md requires the latest target audit and current runtime to match
+      package by package before final execution authority; the formal authority
+      also requires latest target audit to match frozen versions.
+    required_test: >-
+      A new explicitly authorized isolated-environment remediation must decide
+      and document the version policy, build a new clean lock/environment and
+      source snapshot if latest versions are adopted, then rerun both local and
+      public target audits before any formal producer/execution contract.
+  - id: OSC-6-DYNAMIC-PLAN-B1
+    severity: blocker
+    disposition: open_unchanged_real_18_section_execution_plan_and_records_absent
+  - id: OSC-6-R-B3
+    severity: blocker
+    disposition: open_unchanged_formal_typed_producer_raw_artifact_index_absent
+  - id: OSC-6-G-B1
+    severity: blocker
+    disposition: open_unchanged_232_384_502_activation_reachability_mutation_focus_and_runtime_records_absent
+counts:
+  blocker_open: 4
+  high_open: 0
+  medium_open: 0
+  product_writes: 0
+  authority_writes: 3
+  external_durable_writes: 9
+  forbidden_paths_modified: []
+barrier:
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  formal_source_snapshot: verified_current_409_path_surface
+  local_environment_lock_audit: verified_7_of_7_local_lock_matches
+  public_target_source_audit: complete_3_of_7_latest_version_mismatch_fail_closed
+  formal_output_layout: complete_metadata_only_formal_evidence_root_absent
+  formal_target_version_receipt: absent_fail_closed
+  formal_execution_workload: blocked_by_OSC-6-FORMAL-TARGET-VERSION-R1-B1
+  dynamic_plan: absent_fail_closed
+  artifact_receipt_index: absent_fail_closed
+  gate_credit: false
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+  candidate_confirmed: false
+  bug_claimed: false
+next_step_requires_explicit_user_authorization: >-
+  Resolving the public/latest target drift requires a material policy choice and
+  a separately isolated environment/lock/source-snapshot remediation. This task
+  neither upgrades packages nor changes the lock or frozen snapshot, so no
+  formal producer or workload authority may follow automatically.

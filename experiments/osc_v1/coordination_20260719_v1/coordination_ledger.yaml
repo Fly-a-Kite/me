@@ -1662,19 +1662,20 @@ tasks:
       - /tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources/target-version-public-source-audit.json
       - /tmp/phase6_formal_execution_authority_r1.Smql7A/formal_output_layout/formal-output-layout.json
     task_contract_sha256: e622fc69f568967a41c5ed5866711b780da0def5f21339e3f602939ad4629a59
-    report_sha256: pending_not_created
-    status: authorized_pending_public_target_source_and_output_layout
+    report_sha256: c7c95a0d889ce5e5c887d04e8c46cd381da896dca2a80118e5b26ee38364c565
+    status: complete_public_target_source_audit_detected_latest_target_drift_no_formal_workload
     evidence:
       - experiments/osc_v1/coordination_20260719_v1/phase6_formal_target_source_output_layout_r1_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_target_source_output_layout_r1_report.yaml
     barrier:
       phase_6_private_foundation_barrier: pass_unchanged
       phase_6_contract: pending
       phase_6_granularity_reachability: pending
       phase_6_runtime_correctness: pending
-      public_target_source_audit: authorized_not_created
-      formal_output_layout: authorized_not_created
+      public_target_source_audit: complete_3_of_7_latest_version_mismatch_fail_closed
+      formal_output_layout: complete_metadata_only_formal_evidence_root_absent
       formal_evidence_root: absent
-      formal_execution_workload: unauthorized
+      formal_execution_workload: blocked_by_OSC-6-FORMAL-TARGET-VERSION-R1-B1
       dynamic_plan: absent_fail_closed
       artifact_receipt_index: absent_fail_closed
       gate_credit: false
@@ -1780,6 +1781,7 @@ open_review_findings:
   - {id: OSC-6-G-B1, severity: blocker, owner: root, status: open_no_gate_eligible_real_adapter_232_384_502_evidence}
   - {id: OSC-6-SOURCE-HANDOFF-R3-B1, severity: blocker, owner: root, status: remediated_by_clean_current_head_verification_no_gate_credit}
   - {id: OSC-6-DYNAMIC-PLAN-B1, severity: blocker, owner: root, status: open_formal_dynamic_plan_real_evidence_prerequisites_absent_after_one_diagnostic_artifact}
+  - {id: OSC-6-FORMAL-TARGET-VERSION-R1-B1, severity: blocker, owner: root, status: open_public_latest_target_drift_blocks_formal_execution}
 gates:
   - name: phase_0_dirty_paths_registered_and_preserved
     threshold: complete snapshot and no existing dirty path overwritten
@@ -2050,11 +2052,19 @@ gates:
       receipt. It therefore contributes no runtime-correctness gate credit.
       Source-R3 supplies a verified source boundary only; dynamic plan, typed
       receipts, artifact chain, parallel evidence, v3 run, and repository
-      receipt remain absent and runtime-correctness stays pending.
+      receipt remain absent and runtime-correctness stays pending. Formal
+      Target-Source/Layout R1 then verified the current 409-path snapshot,
+      seven official PyPI source responses, and an absent formal output root,
+      but pandas (3.0.5 vs 3.0.3), polars (1.43.0 vs 1.42.1), and duckdb
+      (1.5.5 vs 1.5.4) fail the required latest-target match. It adds no typed
+      receipt or execution and blocks formal workload authority under
+      OSC-6-FORMAL-TARGET-VERSION-R1-B1.
     evidence:
       - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_eligibility_task_contract.yaml
       - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_eligibility_report.yaml
       - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_source_environment_freeze_r1_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_target_source_output_layout_r1_report.yaml
     status: pending
   - name: phase_7_paired_pilot
     threshold: phase 6 passed, preregistered equal-budget 2h paired pilot completed
