@@ -1311,6 +1311,31 @@ tasks:
       combined_suite: unauthorized
       phase7_paired_pilot: unauthorized
       twenty_four_hour: unauthorized
+  - task_id: OSC-6-SOURCE-HANDOFF-DYNAMIC-PLAN-PREWRITE-R3
+    owner: /root
+    mode: root_serial_authority_only_source_handoff_dynamic_plan_prewrite
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_handoff_dynamic_plan_prewrite_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_handoff_dynamic_plan_prewrite_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    source_snapshot_commit: 8367c0519d2252c3b507703114b67b474aac636c
+    source_snapshot_payload_sha256: ce59034ccf4b2596fc14fa8330f7a93fc7bc00ea29079106148ce524f9779a41
+    task_contract_sha256: 15b506fafac9b9a9c23f719837cd73af177ec23cce48d3c7734b89916b66a9b3
+    report_sha256: 558a0f9948ef916e00057fcefc8fd1a589494980c2d91082dcab3d414c429295
+    status: complete_read_only_prewrite_no_dynamic_plan_created
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_handoff_dynamic_plan_prewrite_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_handoff_dynamic_plan_prewrite_report.yaml
+    barrier:
+      phase_6_private_foundation_barrier: pass_unchanged
+      phase_6_contract: pending
+      phase_6_granularity_reachability: pending
+      phase_6_runtime_correctness: pending
+      source_handoff: pending_new_clean_source_authority
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
 interface_freeze:
   version: osc-public-api-freeze-v1
   hash: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
@@ -1408,6 +1433,7 @@ open_review_findings:
   - {id: OSC-6-SOURCE-SNAPSHOT-R2-B1, severity: blocker, owner: root, status: remediated_by_r3_verified_required_source_surface_no_gate_credit}
   - {id: OSC-6-R-B3, severity: blocker, owner: root, status: open_dynamic_plan_typed_receipt_raw_artifact_chain_absent_after_r3_source_snapshot}
   - {id: OSC-6-G-B1, severity: blocker, owner: root, status: open_no_gate_eligible_real_adapter_232_384_502_evidence}
+  - {id: OSC-6-SOURCE-HANDOFF-R3-B1, severity: blocker, owner: root, status: open_new_clean_source_authority_required}
 gates:
   - name: phase_0_dirty_paths_registered_and_preserved
     threshold: complete snapshot and no existing dirty path overwritten

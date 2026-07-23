@@ -1,0 +1,128 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-SOURCE-HANDOFF-DYNAMIC-PLAN-PREWRITE-R3
+owner: /root
+mode: root_serial_authority_only_source_handoff_dynamic_plan_prewrite
+implementation_child_agents: 0
+reviewer_child_agents_created: 0
+change_request: CR-OSC-6-004
+objective: >-
+  Produce a read-only handoff and dependency-gap record for the next possible
+  VerifiedDynamicGatePlan authority. Bind the already verified R3 source
+  snapshot identity without creating a new source payload, dynamic plan,
+  typed receipt index, raw artifact, or gate result. The output must state
+  exactly which further authority is needed and must not turn a source-boundary
+  verification into Phase-6 gate credit.
+user_authorization:
+  date: 2026-07-24
+  scope: >-
+    User authorized the previously described authority-only R3 source handoff
+    / dynamic-plan prewrite, with no product code, test, receipt, artifact, or
+    gate execution.
+authorization_boundary:
+  authorized_product_writes: []
+  authorized_authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_handoff_dynamic_plan_prewrite_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_handoff_dynamic_plan_prewrite_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  read_only_external_inputs:
+    - /tmp/phase6_source_snapshot_r3_validation.KtnGHV/source-snapshot.json
+    - /tmp/phase6_authority_snapshot.XcXsTP
+  all_other_paths: forbidden
+verified_preconditions:
+  original_workspace:
+    path: /data1/lbw/xjx/datadiff_fuzz_lab
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    index_staged_paths: 0
+  r3_authority_clone:
+    path: /tmp/phase6_authority_snapshot_r3.6HIpoz
+    head_before_prewrite: 2e9576a4c721c2dee6c2eb7ab154fea47846f10d
+    source_snapshot_commit: 8367c0519d2252c3b507703114b67b474aac636c
+    source_snapshot_tree: 5f7ef425d6eb401e714a3078624695d5d8399cb2
+    authority_task_contract_sha256: bd79a6b26eeb9643419d1d2cb0b56a398bdd975b1604a7a49aa1f4aea4e2c2af
+    authority_report_sha256: abfe0154fde3b16f84d932e2d067670b809b224430f12a1dc2ed754d00c0e8b4
+    authority_ledger_sha256: cdf5ddd76f0a353f1ec750d2385ff5615b4736b6de7b519db5bd3bbb3c0d9a48
+    remote_count: 0
+  r3_external_source_snapshot_payload:
+    path: /tmp/phase6_source_snapshot_r3_validation.KtnGHV/source-snapshot.json
+    byte_sha256: ce59034ccf4b2596fc14fa8330f7a93fc7bc00ea29079106148ce524f9779a41
+    source_digest: osc-phase6-source-snapshot-a4beb268b3097b194886a7f2e2e63abc8f8f1510ffa76ae0f10a8162fbfa322b
+    payload_git_head: 8367c0519d2252c3b507703114b67b474aac636c
+    required_path_count: 404
+  r2_preservation:
+    r2a_authority_head: 84dcece5fcedcfcc1f56640304d5208e43afce9e
+    r2a_worktree_status_entries: 0
+    r2_source_snapshot_commit: bea08cd56f8f3374664a417670bbc227b4eec502
+  frozen_public_targets_exact: 13_of_13
+required_inputs_read:
+  - docs/codex_multi_agent_development_runbook.md
+  - docs/project_architecture.md
+  - docs/fine_grained_discovery_architecture.md
+  - docs/discovery_search_and_parallel_architecture.md
+  - docs/semantic_hypercontract_architecture.md
+  - docs/architecture_credibility_and_alternatives.md
+  - docs/competitive_paper_experiment_blueprint.md
+  - experiments/final_bug_discovery_protocol_v3/TODO.md
+  - src/datadiff_osc/_phase6_gate_authority.py
+  - tests/osc/test_phase6_gate_authority_integration.py
+  - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_task_contract.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_report.yaml
+  - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+required_invariants:
+  - >-
+    The handoff records R3's immutable 602-path source commit and external
+    404-path verifier payload by SHA/digest only; it must not copy, mutate,
+    publish, or relabel that payload as a gate artifact.
+  - >-
+    The prewrite must distinguish the source payload's git_head
+    8367c0519d2252c3b507703114b67b474aac636c from the current authority
+    clone head. It must fail closed on any claim that the payload is currently
+    reverified at a different head without a new clean-source authority.
+  - >-
+    The report must inventory verify_dynamic_gate_plan's exact input and
+    cross-binding requirements, all presently missing plan inputs, and the
+    minimum path/authority boundary for a future implementation contract.
+  - >-
+    R2 remains immutable and not gate-compatible. R3 resolves only the source
+    surface defect; OSC-6-R-B3 and OSC-6-G-B1 remain open unless independently
+    evidenced by a later authorized task.
+  - >-
+    All Phase-6 gates remain pending; candidate_confirmed=false and
+    bug_claimed=false.
+negative_review_requirements:
+  负向复核:
+    - source-payload git-head mismatch at the current authority head is not a valid re-verification
+    - a source digest alone is not a dynamic plan, typed receipt index, raw artifact, or gate result
+  独立反例验证:
+    - R2's absent scripts/osc surface remains insufficient even though its commit is clean
+  异常输入验证:
+    - malformed, stale, incomplete, or source-digest-substituted dynamic-plan shapes remain specified as fail-closed only; none is created or admitted here
+forbidden:
+  - product code, tests, public exports, public API freeze, frozen targets, or R2/R3 source snapshot mutation
+  - source-snapshot payload creation/copy/persistence, dynamic-plan creation, typed receipt index, raw artifact, coverage event, bundle, preflight, publication, or gate calculation
+  - tests/osc, combined suite, repository suite, 100000 parity, v3 2200, Phase 7, 2h, or 24h execution
+  - candidate confirmation, diagnostic promotion, or bug_claimed=true
+validation:
+  test_execution_count: 0
+  allowed_read_only_commands:
+    - JSON/YAML parse and SHA/commit/tree/status checks
+    - static inspection of source-snapshot and dynamic-plan verifier definitions and negative tests
+    - frozen/public SHA and exact authority-path scope checks
+  required_report_contents:
+    - source snapshot handoff descriptor and head/status limitation
+    - dynamic-plan schema/input/cross-binding prerequisite matrix
+    - exact unresolved blockers and proposed next implementation authority boundary
+    - 负向复核, 独立反例验证, 异常输入验证 results
+stop_conditions:
+  - any R2/R3/source snapshot/external-payload/frozen SHA mismatch
+  - any product, source-payload, dynamic-plan, receipt, artifact, or gate write
+  - any attempt to award gate credit or close remaining blockers without evidence
+decision:
+  r3_source_snapshot_handoff: pending_read_only_prewrite
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false

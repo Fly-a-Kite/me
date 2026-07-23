@@ -1,0 +1,233 @@
+schema_version: osc-phase6-source-handoff-dynamic-plan-prewrite-report-v1
+phase: 6
+task_id: OSC-6-SOURCE-HANDOFF-DYNAMIC-PLAN-PREWRITE-R3
+status: complete_read_only_prewrite_no_dynamic_plan_created
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_handoff_dynamic_plan_prewrite_task_contract.yaml
+  sha256: 15b506fafac9b9a9c23f719837cd73af177ec23cce48d3c7734b89916b66a9b3
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_handoff_dynamic_plan_prewrite_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_r3_handoff_dynamic_plan_prewrite_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  forbidden_paths_modified: []
+source_snapshot_handoff:
+  r3_source_snapshot_commit: 8367c0519d2252c3b507703114b67b474aac636c
+  r3_source_snapshot_parent: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  r3_source_snapshot_tree: 5f7ef425d6eb401e714a3078624695d5d8399cb2
+  approved_602_path_manifest_sha256: 5e074894a448bc46561ea81dfe05530261ebc9dc203bccd87ad328c86330a744
+  approved_602_content_manifest_sha256: d907e1ee6fdd0e6844cd78dc63021663c5011c2057f820b0d6b0fd2432937a54
+  external_payload:
+    path: /tmp/phase6_source_snapshot_r3_validation.KtnGHV/source-snapshot.json
+    byte_sha256: ce59034ccf4b2596fc14fa8330f7a93fc7bc00ea29079106148ce524f9779a41
+    schema_version: osc-root-source-snapshot-v1
+    source_digest: osc-phase6-source-snapshot-a4beb268b3097b194886a7f2e2e63abc8f8f1510ffa76ae0f10a8162fbfa322b
+    payload_git_head: 8367c0519d2252c3b507703114b67b474aac636c
+    file_binding_count: 404
+  current_r3_authority_head: 2e9576a4c721c2dee6c2eb7ab154fea47846f10d
+  source_commit_is_ancestor_of_current_authority_head: true
+  payload_head_equals_current_authority_head: false
+  handoff_status: >-
+    Immutable source identity is recorded by commit/tree/manifests and the
+    external payload SHA. It is not a current-head re-verification: the source
+    verifier compares payload git_head to the repository's current HEAD, so a
+    later authority clone at 2e9576a cannot truthfully re-verify the payload
+    bound to 8367c051 without a new clean-source authority.
+dynamic_plan_prewrite:
+  verifier:
+    function: verify_dynamic_gate_plan
+    schema_version: osc-root-phase6-dynamic-plan-v3
+    signature:
+      - plan_path
+      - expected_plan_sha256
+      - expected_source_digest
+    required_top_level_fields:
+      - schema_version
+      - source_digest
+      - producer_receipts_digest
+      - false_positive_fixes
+      - contract_comparison_decisions
+      - scheduled_target_attempts
+      - mutation_attempts
+      - focus_signals
+      - formal_lanes
+      - escalation_faults
+      - v3_runs
+      - v3_cases
+      - v3_executed_cases
+      - v3_backend_tasks
+      - campaign_rechecks
+      - pipeline_rechecks
+      - repository_tests
+      - target_packages
+      - candidate_records
+      - contract_performance_samples
+      - parallel_scaling_samples
+  section_count: 18
+  required_producer_kinds:
+    - contract_exact_replay
+    - coverage_admission_replay
+    - reachability_admission_replay
+    - focus_admission_replay
+    - parallel_authority_replay
+    - v3_typed_run_replay
+    - repository_test_replay
+    - target_version_replay
+    - candidate_classification_replay
+    - performance_paired_replay
+  critical_plan_constraints:
+    - source_digest must equal the R3 source digest and plan byte SHA must equal the caller-supplied SHA
+    - producer_receipts_digest must be a digest and is later cross-bound to the artifact receipt index
+    - contract_comparison_decisions has a floor of 100000
+    - formal_lanes is exactly 11; v3_runs is exactly 22; v3_cases is exactly 2200
+    - every v3 case must be planned/executed exactly once in the required run/lane/seed layout
+    - target_packages is exactly the seven frozen expected package identities
+    - contract_performance_samples has a floor of 1000 with distinct baseline/treatment task/config/result bindings and equal seed lineage
+    - parallel_scaling_samples is nonempty and has equal one/six-worker task-set digests
+    - each candidate has campaign and pipeline rechecks with ordinals exactly 1, 2, and 3
+    - candidate_records requires bug_claimed=false
+  downstream_cross_bindings:
+    - artifact receipt index must bind the same source digest and exact dynamic-plan byte SHA
+    - final gate construction requires a valid VerifiedDynamicGatePlan and valid typed artifact receipt index
+    - every dynamic section is later matched to its required producer kind and typed producer receipt digest
+  current_materialized_inputs:
+    dynamic_plan_file: absent
+    dynamic_plan_sha256: absent
+    plan_records: absent
+    producer_receipt_set: absent
+    typed_artifact_receipt_index: absent
+    raw_artifact: absent
+    gate_credit: false
+validation:
+  source_handoff_and_static_inventory:
+    command: >-
+      Read-only JSON/YAML parse and SHA checks; git ancestry check; static
+      inspection of _DYNAMIC_RECORD_FIELDS, _REQUIRED_PRODUCER_KINDS,
+      _DYNAMIC_SECTION_PRODUCER_KIND, verify_dynamic_gate_plan, and its
+      integration negative tests.
+    exit_code: 0
+    complete_result: >-
+      R3 payload SHA/source digest/file count exact; payload_git_head=8367c051
+      is an ancestor but not equal to current authority HEAD=2e9576a; dynamic
+      schema=v3; 18 sections and 10 producer kinds were enumerated exactly;
+      no dynamic plan or artifact was created.
+  frozen_public_targets:
+    pre_report_result: 13_of_13_exact
+    post_authority_precommit_result: 13_of_13_exact
+  tests:
+    test_execution_count: 0
+    tests_not_run:
+      - tests/osc
+      - six-file combined suite
+      - repository suite
+      - 100000 parity
+      - v3 2200
+      - Phase 7
+      - 2h pilot
+      - 24h execution
+sha_verification:
+  authority_paths:
+    task_contract:
+      pre: absent
+      post: 15b506fafac9b9a9c23f719837cd73af177ec23cce48d3c7734b89916b66a9b3
+    report:
+      pre: absent
+      post: recorded_after_write_in_ledger
+    ledger:
+      before_contract: cdf5ddd76f0a353f1ec750d2385ff5615b4736b6de7b519db5bd3bbb3c0d9a48
+      after_contract_before_report: recorded_in_task_contract_and_ledger
+      final: recorded_after_report_in_ledger
+coverage:
+  负向复核: >-
+    The external payload's git_head differs from the current authority HEAD.
+    Source verification explicitly checks this binding, so treating the
+    ancestor relation as a current re-verification is rejected by invariant.
+    A source digest alone is not a dynamic plan, receipt index, artifact, or
+    gate result.
+  独立反例验证: >-
+    R2 is still unchanged at its separate clean authority head but lacks the
+    required scripts/osc surface; the R3 handoff does not rewrite or relabel
+    R2.
+  异常输入验证: >-
+    Static verifier paths reject plan hash mismatch, invalid JSON, exact-field
+    schema mismatch, old schema, source mismatch, malformed record fields,
+    duplicate/unordered identities, and false bug_claimed. No such dynamic
+    plan was constructed or admitted in this prewrite task.
+findings:
+  - id: OSC-6-SOURCE-HANDOFF-R3-B1
+    severity: blocker
+    claim: >-
+      R3's external source payload remains exact evidence, but it is bound to
+      source commit 8367c051 while the current authority clone HEAD is
+      2e9576a. It cannot be represented as a current-head VerifiedSourceSnapshot
+      without a new clean-source handoff authority.
+    reproduction: >-
+      payload_git_head=8367c0519d2252c3b507703114b67b474aac636c;
+      current_authority_head=2e9576a4c721c2dee6c2eb7ab154fea47846f10d;
+      equality is false although ancestry is true. verify_source_snapshot
+      checks git-head equality.
+    violated_invariant: >-
+      A verified source snapshot must bind the exact current clean source
+      worktree, not merely an ancestor revision or a source digest string.
+    required_test: >-
+      Under a fresh narrowly authorized clean-source handoff contract, create
+      a clean isolated Git worktree rooted at 8367c051, verify the exact
+      payload against it, and prove a different-head re-verification fails
+      closed.
+    disposition: open_new_authority_required
+  - id: OSC-6-R-B3
+    severity: blocker
+    claim: >-
+      No dynamic plan, typed receipt index, raw artifact, or artifact-manifest
+      producer chain exists. The R3 source handoff prewrite identifies these
+      dependencies but does not create them.
+    disposition: unchanged_open
+  - id: OSC-6-G-B1
+    severity: blocker
+    claim: >-
+      No gate-eligible real-adapter 232/384/502 evidence with fresh producer
+      evidence exists.
+    disposition: unchanged_open
+counts:
+  blocker_new: 1
+  blocker_open: 3
+  high_open: 0
+  medium_open: 0
+  product_writes: 0
+  authority_writes: 3
+  test_execution_count: 0
+  child_agents: 0
+  forbidden_paths_modified: []
+barrier:
+  r2_source_snapshot: retained_not_gate_compatible
+  r3_source_snapshot_required_surface: previously_verified_no_gate_credit
+  r3_source_handoff: pending_new_clean_source_authority
+  dynamic_plan_created: false
+  typed_receipt_index_created: false
+  raw_artifact_admitted: false
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+next_step_requires_new_authority:
+  - >-
+    First create a clean-source handoff authority rooted exactly at
+    8367c0519d2252c3b507703114b67b474aac636c. It must preserve R2/R3,
+    re-verify the external payload against that clean root, and persist only
+    explicitly authorized authority evidence; it must not create a dynamic
+    plan or gate result.
+  - >-
+    Only after that handoff is complete may a separate dynamic-plan
+    implementation contract define allowed plan/producer paths and decide
+    whether any plan-only construction is authorized. It must not imply typed
+    receipt, artifact, coverage, or gate credit.
