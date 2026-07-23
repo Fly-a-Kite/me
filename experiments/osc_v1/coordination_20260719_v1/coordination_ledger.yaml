@@ -1612,6 +1612,37 @@ tasks:
       combined_suite: unauthorized
       phase7_paired_pilot: unauthorized
       twenty_four_hour: unauthorized
+  - task_id: OSC-6-FORMAL-SOURCE-ENVIRONMENT-FREEZE-R1
+    owner: /root
+    mode: root_serial_isolated_formal_source_and_local_environment_freeze
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_source_environment_freeze_r1_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_source_environment_freeze_r1_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+      - /tmp/phase6_formal_execution_authority_r1.Smql7A/source_snapshot_source/**
+      - /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/formal-source-snapshot.json
+      - /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/local-environment-target-audit.json
+    task_contract_sha256: aa1dbb8a2de7b1247c55987cf76dfda36870b5722728a74db895c2f291d099de
+    report_sha256: pending_not_created
+    status: authorized_pending_external_source_environment_freeze
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_source_environment_freeze_r1_task_contract.yaml
+    barrier:
+      phase_6_private_foundation_barrier: pass_unchanged
+      phase_6_contract: pending
+      phase_6_granularity_reachability: pending
+      phase_6_runtime_correctness: pending
+      formal_source_snapshot: authorized_not_created
+      local_environment_lock_audit: authorized_not_created
+      public_latest_target_audit: pending_separate_authority
+      formal_execution_workload: unauthorized
+      dynamic_plan: absent_fail_closed
+      artifact_receipt_index: absent_fail_closed
+      gate_credit: false
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
 interface_freeze:
   version: osc-public-api-freeze-v1
   hash: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131

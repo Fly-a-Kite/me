@@ -1,0 +1,190 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-FORMAL-SOURCE-ENVIRONMENT-FREEZE-R1
+owner: /root
+role: root
+mode: root_serial_isolated_formal_source_and_local_environment_freeze
+implementation_child_agents: 0
+reviewer_child_agents_created: 0
+grandchildren_allowed: false
+objective: >-
+  Create exactly one fresh, clean, remote-free source clone and its verified
+  source snapshot, then record one local interpreter/dependency-lock/installed
+  target-package consistency audit. These are reproducibility preconditions for
+  later formal Phase-6 execution only; they are not a formal raw artifact,
+  TargetVersionReceipt, producer receipt, dynamic-plan section, receipt-index
+  entry, coverage event, gate report, candidate confirmation, or bug claim.
+user_authorization:
+  date: 2026-07-24
+  exact_confirmation: 继续
+  interpreted_scope: >-
+    Continue from the completed formal-execution preflight with its explicitly
+    required isolated clean-source snapshot and dependency/target-version freeze
+    step. The authorization is limited to local, offline source and environment
+    reproducibility inputs; it does not authorize a formal evidence workload,
+    a public latest-version lookup, or any gate execution.
+parent_authority:
+  task_contract: experiments/osc_v1/coordination_20260719_v1/phase6_formal_execution_authority_r1_task_contract.yaml
+  task_contract_sha256: 73cb3b6cec18c27641b2dfdb818f4ce3895514c7b73ca0bd00bcd292ddb7e700
+  report: experiments/osc_v1/coordination_20260719_v1/phase6_formal_execution_authority_r1_report.yaml
+  report_sha256: 8df2aa81724894ccc7605bb05dd1b8ef00fbdd2af0481e9ff972228a7780a2f0
+authority_root:
+  directory: /tmp/phase6_formal_execution_authority_r1.Smql7A
+  authority_source_clone: /tmp/phase6_formal_execution_authority_r1.Smql7A/source
+  source_commit_before_contract: 86e2ff511f6129a0fa7027226bff4e8cca4d79a2
+  source_tree_before_contract: f0d10cb219148df50a5b936901c88033bd27dada
+  snapshot_source_clone: /tmp/phase6_formal_execution_authority_r1.Smql7A/source_snapshot_source
+  source_freeze_root: /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze
+  source_snapshot_output: /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/formal-source-snapshot.json
+  local_environment_audit_output: /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/local-environment-target-audit.json
+  reserved_formal_evidence_root: /tmp/phase6_formal_execution_authority_r1.Smql7A/formal_evidence
+authorization_boundary:
+  authorized_product_writes: []
+  authorized_authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_formal_source_environment_freeze_r1_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_formal_source_environment_freeze_r1_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  authorized_external_writes:
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/source_snapshot_source/**
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/formal-source-snapshot.json
+    - /tmp/phase6_formal_execution_authority_r1.Smql7A/source_freeze/local-environment-target-audit.json
+  all_other_paths: forbidden
+verified_preconditions:
+  original_workspace:
+    path: /data1/lbw/xjx/datadiff_fuzz_lab
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    index_staged_paths: 0
+    status_entries_observed: 2908
+  authority_source_clone:
+    head: 86e2ff511f6129a0fa7027226bff4e8cca4d79a2
+    tree: f0d10cb219148df50a5b936901c88033bd27dada
+    status_entries: 0
+    remote_count: 0
+  external_paths_before_contract:
+    snapshot_source_clone: absent
+    source_freeze_root: absent
+    reserved_formal_evidence_root: absent
+  exact_required_source_surface:
+    discovery: datadiff_osc._phase6_gate_authority._required_source_paths
+    selected_path_count: 409
+    selected_path_manifest_schema: osc-phase6-required-source-paths-v1
+    selected_path_manifest_sha256: fabe8c522e5937196f1ec123621981cc9dd38028bb011ae0761d4a777d5b2d81
+    selected_content_manifest_schema: osc-phase6-required-source-content-v1
+    selected_content_manifest_sha256: ad6fc9d148cfea3ecdc3133085f0a5c27e5984f6a4d6d273c62b2246f083ec9c
+    requirements_final_lock_sha256: ee4bb79ac41317e3583ec18bdb744d00d3a7470a58e7205cdaba913f5938c087
+    protocol_todo_sha256: 1ad989d412651f5cc9ae3c3ac5d7d7207176557e0bcdcfb449788f016d607419
+  local_target_lock_bindings:
+    chdb: {locked_version: 4.2.1, installed_version: 4.2.1}
+    datafusion: {locked_version: 54.0.0, installed_version: 54.0.0}
+    duckdb: {locked_version: 1.5.4, installed_version: 1.5.4}
+    pandas: {locked_version: 3.0.3, installed_version: 3.0.3}
+    polars: {locked_version: 1.42.1, installed_version: 1.42.1}
+    pyarrow: {locked_version: 25.0.0, installed_version: 25.0.0}
+    pysqlite3-binary: {locked_version: 0.5.4.post2, installed_version: 0.5.4.post2}
+  frozen_public_targets:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  authority_ledger_sha256_before_contract_write: 96bab6aa49ffa67cb5a71fcbed66bce8ed67269398e9bab250c530cae7dbfca9
+required_invariants:
+  - >-
+    The snapshot source clone must be created once from the committed authority
+    source, must be clean and remote-free, and must match the declared 409-path
+    and content manifests before and after the external snapshot write.
+  - >-
+    The snapshot must be built only with source_snapshot_payload and canonical
+    JSON, externally byte-hash frozen, then verified against the same clone with
+    verify_source_snapshot and zero verification errors.
+  - >-
+    The local environment audit must bind the snapshot byte SHA and source
+    digest, the exact lock SHA, interpreter identity, and all seven installed
+    distribution versions. A missing package, lock mismatch, altered snapshot,
+    or non-canonical/missing audit is fail closed.
+  - >-
+    No network access is allowed. Consequently the audit records only local
+    installed-versus-lock consistency and expressly leaves public latest-version
+    verification and TargetVersionReceipt production pending for a later,
+    separately authorized formal execution contract.
+  - >-
+    The source_freeze root is write-once: it and both named output files must be
+    absent immediately before the one command, present exactly once after it,
+    and never be overwritten or regenerated.
+  - >-
+    The reserved formal_evidence root remains absent. No formal evidence or gate
+    artifact may be inferred from either precondition file.
+negative_review_requirements:
+  负向复核:
+    - omit one required source path in memory and require source snapshot refusal
+    - substitute the snapshot byte SHA and require verification failure
+    - require a nonexistent distribution or changed lock binding to fail the audit builder
+  独立反例验证:
+    - >-
+      A clean clone plus matching local package versions has zero formal gate
+      credit without public latest-version audit, real execution, or typed receipts.
+  异常输入验证:
+    - >-
+      Dirty or remote source clone, preexisting output, snapshot byte mutation,
+      missing package, lock drift, and malformed audit must stop the task.
+forbidden:
+  - all product code and tests
+  - src/datadiff_osc/public_api_freeze.json
+  - all thirteen frozen_public_targets
+  - /data1/lbw/xjx/datadiff_fuzz_lab
+  - /tmp/phase6_authority_real_evidence_chain_r1.WcCIEK
+  - /tmp/phase6_formal_execution_authority_r1.Smql7A/formal_evidence
+  - any network request, package installation, dependency mutation, or public latest-version lookup
+  - any formal raw artifact, typed producer receipt, TargetVersionReceipt, receipt index, dynamic plan, coverage event, gate calculation, candidate confirmation, or bug claim
+  - tests/osc, six-file combined suite, repository suite, 100000 parity, v3 2200, Phase 7, 2h, or 24h execution
+validation:
+  test_execution_count: 0
+  formal_workload_execution_count: 0
+  external_source_snapshot_payloads: 1
+  external_environment_audits: 1
+  external_source_clones: 1
+  command_budget:
+    git_clone_commands: 1
+    source_environment_freeze_commands: 1
+    network_commands: 0
+  source_environment_freeze_command: >-
+    PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=<snapshot-source>/src
+    /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python -
+    <snapshot-source> <source-freeze-root>
+  required_report_contents:
+    - pre/post original and authority source SHA/status/remote state
+    - exact source snapshot byte SHA, source digest, Git head/status, and 409-path manifests
+    - exact local audit byte SHA, interpreter binding, lock SHA, and seven package results
+    - complete command, exit code, complete result, and all three negative checks
+    - explicit no-formal-evidence/gate-credit/candidate-confirmed/bug-claimed state
+stop_conditions:
+  - any original workspace, frozen/public SHA, authority source, selected source manifest, lock, package, clean-status, or remote mismatch
+  - preexisting or unexpected external output; output count other than two; any overwrite attempt
+  - snapshot verification error, accepted negative mutation, malformed audit, any network activity, or command count breach
+  - any product/test/authority path outside authorization_boundary
+  - any formal evidence workload, gate credit, confirmation, or bug claim
+decision:
+  formal_source_environment_freeze: authorized_pending_execution
+  source_snapshot_for_formal_evidence: not_created
+  local_lock_consistency_audit: not_created
+  public_latest_target_audit: pending_separate_authority
+  formal_execution_workload_authorized: false
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
