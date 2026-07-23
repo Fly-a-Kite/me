@@ -1,0 +1,110 @@
+schema_version: osc-remediation-contract-v1
+phase: 6
+round: private_foundation_remediation_r3
+entry_review:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round3_reports.yaml
+  sha256: fbe7bf75ba049254ca9aa0a6956eb2470c2959a3e92f1aae88864546281beb19
+coordination:
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  preserve_dirty_worktree: true
+  public_exports_frozen: true
+  public_api_freeze_sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+global_requirements:
+  - fix only the two evidenced R3 high findings; no unrelated cleanup, public export change, threshold change or authority expansion
+  - use apply_patch for every write and PYTHONDONTWRITEBYTECODE=1 for every Python command
+  - add red-to-green negative tests before claiming closure and preserve every prior scoped test
+  - unknown, incomplete, mutable, uninspectable or non-canonical live context fails closed
+  - diagnostic refs remain diagnostic-only and candidate remains non-confirmed with bug_claimed false
+  - no tests/osc, full repository, parity 100000, v3 2200, 2h or 24h execution
+tasks:
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-SEARCH-R3
+    owner: /root/phase5_consumer_audit
+    finding: OSC-6-FOUNDATION-SEARCH-R3-H1
+    allowed_write_paths:
+      - src/datadiff_osc/search/context_receipts.py
+      - src/datadiff_osc/search/context_replay.py
+      - tests/osc/test_search_context_receipts.py
+      - tests/osc/test_search_gate_crosswalk.py
+    frozen_paths:
+      - path: src/datadiff_osc/search/lane_registry.py
+        sha256: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+      - path: tests/osc/test_search_lane_registry.py
+        sha256: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    before_sha256:
+      src/datadiff_osc/search/context_receipts.py: cc573077433458031661a52b9e540266eb3d9d036f7cd378a2c43f7bd4169b59
+      src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+      tests/osc/test_search_context_receipts.py: e8680db1793945d3e884edb36e092c712412f8f28daad90418b48085eb613aac
+      tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    requirements:
+      - remove cache-state authority from every registry-derived operator identity; recompute the live complete profile or key any cache by that complete immutable fingerprint
+      - bind behavior-affecting callable defaults, keyword defaults, closure cells and referenced globals in addition to code/source/module identity
+      - recursively bind direct callable dependencies needed by the selected operator or fail closed on unsupported, mutable, cyclicly unresolved or uninspectable context
+      - resolve one exact live profile for replay, bind all profile fields, and prove its identity is unchanged before, between and after the two deterministic executions
+      - a registry/profile/callable substitution must reject before its outcome can be accepted under the prior identity
+      - version every changed private digest/schema domain so prior weaker receipts fail closed; do not change public APIs
+      - preserve canonical isolated Case cloning, derived MUTATION seed, fresh Context, target preservation and full MutationOutcome equality
+    required_regressions:
+      - cold and warm identity paths reject same-code global rebinding of _mutate_value
+      - defaults, keyword defaults and closure-cell substitutions change identity or fail closed
+      - every behavior/profile field substitution changes identity even after a prior digest call
+      - swapping the live registry between identity capture and replay or between two replays rejects
+      - exact unmodified selected operators still produce deterministic accepted/repaired/rejected receipts where reachable
+    scoped_test: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py tests/osc/test_search_gate_crosswalk.py
+
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-RUNTIME-R3
+    owner: /root/phase5_evidence_audit
+    finding: OSC-6-FOUNDATION-RUNTIME-R3-H1
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_receipt_producers.py
+      - tests/osc/test_runtime_receipt_producers.py
+    frozen_paths:
+      - path: src/datadiff_osc/runtime/_producer_provenance.py
+        sha256: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+      - path: tests/osc/test_runtime_producer_provenance.py
+        sha256: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    before_sha256:
+      src/datadiff_osc/runtime/_receipt_producers.py: 6a3eedd911096c54923709b59fb4f7ae3c97ecf54bca7cbef53174466f577683
+      tests/osc/test_runtime_receipt_producers.py: 5276f580256c28fb710ea369aa21b5c2e9c4d29bfe684a1f53b5cb3e416dc053
+    requirements:
+      - build one source-plus-campaign-plus-pipeline collection before threshold evaluation
+      - require global uniqueness across all seven executions for task ID, complete TaskSpec digest, result ID and seed-lineage digest
+      - require global uniqueness across all seven evidence envelopes and their exact result/task bindings
+      - reject reuse in either campaign or pipeline before any reproduced count is evaluated
+      - preserve exact typed VIOLATED derivation, 3/3 campaign plus 3/3 pipeline thresholds and all candidate/non-bug boundaries
+      - do not broaden semantic replay, provenance origin policy or admission authority
+    required_regressions:
+      - source result plus source evidence reused in campaign ordinal 1 rejects
+      - the same source reuse in pipeline ordinal 1 rejects
+      - independently collide source task ID, TaskSpec digest, result ID, seed lineage and evidence digest; every collision rejects
+      - the valid seven-distinct-execution fixture still emits a non-confirmed STABLE_SURVIVOR candidate receipt
+    scoped_test: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+
+  - task_id: OSC-6-FOUNDATION-CONTRACT-FROZEN-R3
+    owner: /root/phase5_authority_audit
+    mode: frozen_read_only_sentinel
+    allowed_write_paths: []
+    exact_sha256:
+      src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+      tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    requirements:
+      - verify both hashes once after Search and Runtime owners report stable completion
+      - make no writes and run no tests
+completion_report_requirements:
+  - exact before/after SHA for every allowed path and exact SHA for every frozen path
+  - red counterexample result before the fix and exact rejection after the fix
+  - scoped command, exit code and exact result
+  - forbidden_paths_modified=[], deviations=[], child_agents=0
+  - blocker/high/medium/low residual risk counts and one bounded next step
+exit:
+  - Root independently reproduces both attacks as rejected
+  - Root reruns the combined six-file 88-plus-regressions scoped suite
+  - a new rotated exact-SHA review reports blocker=0, high=0 and medium=0
+execution_authorization:
+  scoped_tests_only: true
+  tests_osc: false
+  full_repository_tests: false
+  parity_100000: false
+  v3_2200: false
+  phase7_pilot_2h: false
+  twenty_four_hour: false

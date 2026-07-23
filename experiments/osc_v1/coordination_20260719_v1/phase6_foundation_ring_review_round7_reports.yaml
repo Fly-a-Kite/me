@@ -1,0 +1,351 @@
+schema_version: osc-review-report-set-v1
+phase: 6
+round: private_foundation_remediation_exact_sha_ring_review_r7
+status: complete_aggregate_pending_new_remediation_contract_and_search_terminal_evidence
+review_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_contracts.yaml
+  sha256: 7f5111e0d2bb4906b1c037441c7c7aa27843664e30b029807eb9464ceacf7a8d
+entry_authority:
+  r5_remediation_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round5_task_contracts.yaml
+    sha256: 706ddd532c0bd756d93340d7c2dc87f662b8330fd88725a9ce22b81a344eb7cf
+  r5_remediation_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round5_reports.yaml
+    sha256: f4f67ed4c3359c7d7f6013f91dbb9594da65d2579fdf3bf5c9876da9ed2ca3fa
+  r5_review_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_contracts.yaml
+    sha256: c1e70ee5663173294545b4c8966d138debb718238b6da2a9c68001ad5680f5fa
+  r5_review_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_reports.yaml
+    sha256: 1bc36fd45b4349dff67438d79afae1c3f753ca3eb08c3dd3c0ce20933c104fbb
+  r6_review_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_contracts.yaml
+    sha256: 8ecbe889ba06cedbe4d23eab95f9b0702a051cd70948eee9bf7084845aa84cdd
+  r6_review_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_reports.yaml
+    sha256: 664d151e31f46a5352cd0d649703f8e4d26e0b3dca56b7055e4798d806f1a1a1
+  r6_search_remediation_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_search_task_contracts.yaml
+    sha256: 2417a53c91e407e17d0bfb689721c070b8c75a828ce472bc312daa221ac84006
+  r6_search_remediation_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_search_reports.yaml
+    sha256: ddb0a23cfa2488068b16cf93cefc69993e83296239cfda1049fea5fe853ea003
+  r6_runtime_remediation_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_runtime_task_contracts.yaml
+    sha256: 3ea22a3856303f8f2b136d7f853fd2012fe43d0a8218c7c9790da05d40ae7b59
+  r6_runtime_remediation_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_runtime_reports.yaml
+    sha256: 968906715399e57c39b7acabefcdf7405614812cb6b99661416e764764338596
+  coordination_ledger_before_r7_report_write:
+    path: experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    sha256: 183817b05318bcacee0c746cd85241c57dd7010f55803d5c3535e63a3e9ecf78
+workspace_after_all_reviewer_reports:
+  head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  staged_paths: 0
+  root_target_sha_reverification: exact_for_all_thirteen_targets
+  preservation_check: >-
+    Root did not modify non-authorized product or frozen paths. The three direct reviewers
+    separately reported writes=0, child_agents=0, and forbidden_paths_modified=[].
+    Non-target pre-existing or concurrent worktree state is preserved and is not treated as
+    a reviewer or Root product write.
+coordination:
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  reviewer_writes_allowed: false
+  reviewer_independence_evidence: >-
+    The three separately spawned direct read-only reviewers returned separate reports to
+    Root. This aggregation records their independent evidence and is not represented as an
+    independent reviewer report.
+  review_language: "负向复核、独立反例验证、异常输入验证"
+reports:
+  - task_id: OSC-6-FOUNDATION-REVIEW-R7-A-SEARCH
+    reviewer: r7_search_reviewer
+    mode: read_only_exact_sha_negative_review
+    status: incomplete_terminal_evidence
+    decision: not_pass_for_r7_aggregation
+    inputs_read_to_eof_count: 19
+    target_sha256:
+      pre_test:
+        src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+        src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+        src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+        tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+        tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+        tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+      post_test_and_validation:
+        src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+        src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+        src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+        tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+        tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+        tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    scoped_test:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py
+        tests/osc/test_search_gate_crosswalk.py
+      execution_count: 1
+      exit_code: unrecoverable
+      complete_terminal_result_available: false
+      partial_observation: >-
+        The one authorized pytest process was observed running through 222 seconds at
+        approximately 99.8 percent CPU and later exited; only partial progress output
+        `............` was retained by the execution session. Its terminal exit code and
+        complete pytest result were not recoverable, so this is not accepted as a pass.
+    review_results:
+      负向复核:
+        r5_seedlineage_global_rebind: pass
+        r6_contextvar_default_active_cold_warm: pass
+        r4_identity_replay_regressions: pass
+        receipt_authority_boundary: pass
+      独立反例验证:
+        r5: >-
+          A derive_stage_lineage clone retained code/source/module/qualname and changed only
+          SeedLineage. The changed policy differed from the receipt policy; stale receipt
+          reconstruction raised `mutation operator application policy mismatch` with
+          reconstruct_registered_mutation_outcome calls=0.
+        r6: >-
+          An independently instantiated ContextVar default=0/active=1 SeedLineage callable
+          changed the cold/warm policy ID and derived MUTATION lineage. The default receipt
+          raised `mutation operator application policy mismatch` after active=1, before
+          reconstruction; reconstruction calls=0.
+        r4: >-
+          Globals/defaults/kwdefaults/closure/recursive direct dependencies and
+          Holder.STATE/module.STATE changed identity. Registry/profile/callable substitutions
+          before capture, between the two reconstructions, and after the second reconstruction
+          were rejected at the revalidation boundary.
+        authority: >-
+          FocusHitReceipt claims for coverage, evidence, candidate, bug, gate, and
+          execution_authorization were all REJECTED, authority_eligible=false, admitted=false.
+      异常输入验证:
+        mutable: fail_closed
+        cyclic: fail_closed
+        unresolved: fail_closed
+        uninspectable: fail_closed
+        dynamic: fail_closed
+        unsupported: fail_closed
+    findings: []
+    counts: {blocker: 0, high: 0, medium: 0, low: 0}
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations:
+      - >-
+        The exactly-once authorized pytest terminal session detached after partial progress
+        output. No second pytest was run; complete exit/result evidence is unavailable.
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R7-B-RUNTIME
+    reviewer: r7_runtime_independent_reviewer
+    mode: read_only_exact_sha_negative_review
+    status: complete_findings_recorded
+    decision: fail_pending_new_remediation_contract
+    inputs_read_to_eof_count: 17
+    authority_sha_verification: pass
+    target_sha256:
+      pre_test:
+        src/datadiff_osc/runtime/_receipt_producers.py: 1c941edd9c28ac196ee7d0e7ab1ceeb4dc235c64a778cad2a9cce549a9328320
+        tests/osc/test_runtime_receipt_producers.py: 63763813a44c669bd1b75c554f6277fb11f85d9db6db3ac5792bbedec0cfe036
+        src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+        tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+      post_test:
+        src/datadiff_osc/runtime/_receipt_producers.py: 1c941edd9c28ac196ee7d0e7ab1ceeb4dc235c64a778cad2a9cce549a9328320
+        tests/osc/test_runtime_receipt_producers.py: 63763813a44c669bd1b75c554f6277fb11f85d9db6db3ac5792bbedec0cfe036
+        src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+        tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    scoped_test:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+      execution_count: 1
+      exit_code: 0
+      result: |-
+        ...............................................................          [100%]
+        63 passed in 0.51s
+    review_results:
+      负向复核:
+        evidence_task_binding_before_source_verdict: >-
+          pass: INCONCLUSIVE/SATISFIED × campaign/pipeline task-misbinding cases retain seven
+          unique task IDs, TaskSpec digests, result IDs, seed lineages, and envelope digests,
+          then first raise candidate evidence/task mismatch.
+        collision_precedence: >-
+          pass: global task-ID, TaskSpec, result-ID, seed-lineage, and envelope-digest
+          collisions reject before verdict, reproduction, or threshold logic.
+        threshold_and_legal_typed_violated: >-
+          pass: insufficient 3/3 reproduction rejects; seven distinct typed VIOLATED
+          executions produce STABLE_SURVIVOR with bug_claimed=false.
+        confirmed_caller_diagnostic_authority: >-
+          pass: confirmed states and bug_claimed=true reject; no caller reproduced field is
+          accepted; DIAGNOSTIC provenance and private authority promotion reject.
+      独立反例验证:
+        result_group_seed_outcome_variants: >-
+          pass: unique result-group, seed, and own-envelope outcome substitutions fail at the
+          exact binding message before a non-VIOLATED source verdict.
+        complete_recheck_typed_context_before_source_verdict: >-
+          fail; see OSC-6-FOUNDATION-RUNTIME-R7-M1.
+      异常输入验证:
+        malformed_provenance: >-
+          pass: malformed typed/raw records, parent swaps, diagnostic origin, forged
+          snapshot/environment/raw bytes, and self-declared authority reject.
+        non_ok_or_wrong_case_recheck: >-
+          partial_fail: these reject with a VIOLATED source, but the INCONCLUSIVE/SATISFIED
+          cross masks their exact error as described by OSC-6-FOUNDATION-RUNTIME-R7-M1.
+    findings:
+      - id: OSC-6-FOUNDATION-RUNTIME-R7-M1
+        severity: medium
+        claim: >-
+          The R6 early precheck validates globally unique identities and
+          EvidenceEnvelope-to-own-result binding, but does not validate each recheck's exact
+          source-case/result-group/OK-outcome/ordinal context before the source verdict. A
+          non-VIOLATED source can therefore mask a malformed typed recheck.
+        reproduction: >-
+          For either source verdict INCONCLUSIVE or SATISFIED and either campaign or pipeline
+          stage, use seven globally unique identities and a recheck with a matching
+          EvidenceEnvelope but non-OK StructuredExecutionOutcome (or wrong source case/result
+          group/ordinal). The first error is candidate source lacks a typed VIOLATED witness,
+          not the recheck's exact typed-context failure.
+        violated_invariant: >-
+          R6 Runtime remediation requires exact source + campaign3 + pipeline3 typed execution
+          and EvidenceEnvelope result/task/spec/result-ID/seed/outcome validation before every
+          source/recheck verdict, reproduced decision, and 3/3+3/3 threshold.
+        required_test: >-
+          Parameterize INCONCLUSIVE/SATISFIED × campaign/pipeline with all seven identities
+          unique and EvidenceEnvelope binding otherwise exact; independently mutate recheck
+          case ID, ResultGroup, non-OK outcome, and ordinal. Each must first raise its exact
+          typed-context failure, never the source VIOLATED-witness error.
+    counts: {blocker: 0, high: 0, medium: 1, low: 0}
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations: []
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R7-C-CONTRACT
+    reviewer: r7_contract_independent_reviewer
+    mode: read_only_exact_sha_negative_review
+    status: complete
+    decision: pass_for_contract_review_only
+    inputs_read_to_eof_count: 16
+    target_sha256:
+      pre_test:
+        src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+        tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+        src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      post_test:
+        src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+        tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+        src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    scoped_test:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_contract_phase6_corpora.py
+      execution_count: 1
+      exit_code: 0
+      result: |-
+        ...................                                                      [100%]
+        19 passed in 0.50s
+    review_results:
+      负向复核:
+        identity_approval: >-
+          pass: arbitrary distinct reviewer identities and repeated structural approvals remain
+          STRUCTURALLY_REVIEWED_CONTEXT_PENDING; self-approval and duplicate reviewed IDs reject.
+        c0_path_resolver: >-
+          pass: all 32 C0 controls, aliases, symlink escape, and forced Path.resolve OSError
+          fail closed before source loading.
+        cross_root_compatibility: >-
+          pass: source/expected-signature binding is root-specific; v1/v2 task payload, seed,
+          protocol, task kind, result, and task identity substitutions reject.
+        false_positive_mutant_generic_evidence: >-
+          pass: global axis/family suppression, generic source-only shells, task substitutions,
+          wrong kill semantics, duplicate, and incomplete evidence reject.
+        public_gate_execution_authority: >-
+          pass: private corpus symbols are absent from public exports/freeze; independently
+          confirmed envelope input cannot create root denominator/gate/execution authority.
+      独立反例验证:
+        cross_root: >-
+          pass: case-source and expected-signature swaps returned their root mismatch errors;
+          foreign-seed v2 replacement raised compatibility seed-lineage mismatch.
+        authority: >-
+          pass: a SATISFIED/VIOLATED v1/v2 pair remains private candidate_material with no
+          root denominator, gate credit, confirmation, or execution authorization.
+      异常输入验证:
+        generic_and_mutant_inputs: >-
+          pass: wrong predicate, generic evidence, duplicate/incomplete evidence, and malformed
+          resolver inputs all fail closed.
+        public_freeze: >-
+          pass: byte-identical; twenty_four_hour_run_authorized=false.
+    findings: []
+    counts: {blocker: 0, high: 0, medium: 0, low: 0}
+    authority_boundaries:
+      diagnostic_refs_authority_eligible: false
+      missing_exact_typed_context: fail_closed_or_not_evaluated
+      candidate_promoted_to_confirmed: false
+      bug_claimed: false
+      public_exports_changed: false
+      public_api_freeze_changed: false
+      execution_authorization_created: false
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations: []
+aggregate_counts: {blocker: 0, high: 0, medium: 1, low: 0}
+review_completion:
+  reports_returned: 3
+  reports_with_complete_scoped_terminal_evidence: 2
+  reviewer_writes_zero: true
+  reviewer_child_agents_zero: true
+  forbidden_paths_modified_empty: true
+  target_sha_exact_for_all_reviewers_and_root: true
+  search_terminal_evidence_complete: false
+root_sha_reverification_after_all_reports:
+  src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+  tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+  src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+  tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+  src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+  tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+  src/datadiff_osc/runtime/_receipt_producers.py: 1c941edd9c28ac196ee7d0e7ab1ceeb4dc235c64a778cad2a9cce549a9328320
+  tests/osc/test_runtime_receipt_producers.py: 63763813a44c669bd1b75c554f6277fb11f85d9db6db3ac5792bbedec0cfe036
+  src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+  tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+  src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+  tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+  src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+combined_scoped_test:
+  status: not_run
+  authorization: false
+  reason:
+    - >-
+      OSC-6-FOUNDATION-RUNTIME-R7-M1 is medium severity, so aggregate
+      blocker=0/high=0/medium=1 does not satisfy the R7 combined-suite precondition.
+    - >-
+      Search reviewer terminal exit code and complete pytest result are unavailable; the
+      required complete terminal evidence is therefore missing.
+    - >-
+      Per the R7 contract, no product code may change for either condition without a new
+      remediation task contract.
+authority_boundaries:
+  diagnostic_refs_authority_eligible: false
+  missing_exact_typed_context: fail_closed_or_not_evaluated
+  candidate_promoted_to_confirmed: false
+  bug_claimed: false
+  fabricated_coverage_or_receipt_or_evidence_authority: false
+  public_api_freeze_changed: false
+  public_exports_changed: false
+  phase7_entry_authorized: false
+  two_hour_run_authorized: false
+  twenty_four_hour_run_authorized: false
+decision:
+  all_three_reports_received: true
+  all_three_complete_terminal_results_received: false
+  aggregate_findings_clear: false
+  combined_scoped_pass: false
+  combined_scoped_test_authorized: false
+  foundation_barrier: pending
+  foundation_barrier_passed: false
+  remediation_required: true
+  new_remediation_contract_required_before_code_change: true
+  tests_osc_authorized: false
+  full_repository_tests_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

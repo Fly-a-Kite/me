@@ -1,0 +1,158 @@
+schema_version: osc-task-contract-v1
+phase: 6
+round: cr002_cr003a_cr004_private_foundations
+mode: three_parallel_disjoint_bounded_writes
+entry_review:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_prewrite_review.yaml
+  sha256: 59589e910600550bfe904b9eb72421ce9f745b32517e57bc331c8fe8ff11c0b1
+coordination:
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  root_owns_shared_integration: true
+  preserve_dirty_worktree: true
+global_forbidden_paths:
+  - src/datadiff_osc/__init__.py
+  - src/datadiff_osc/api.py
+  - src/datadiff_osc/runtime/__init__.py
+  - src/datadiff_osc/public_api_freeze.json
+  - src/datadiff_osc/_phase6_gate_authority.py
+  - src/datadiff_osc/runtime/gates.py
+  - src/datadiff/strategy_registry.py
+  - experiments/canonical_confirmed_bug_corpus/**
+global_requirements:
+  - private types only; add no public exports or public API surface
+  - exact typed reconstruction and constructor invariants are mandatory wherever replay is implemented
+  - absent exact context remains not_evaluated or rejected and never becomes authority
+  - do not create coverage, evidence, candidate, bug, gate, Phase 7 or 24h authority
+  - opaque diagnostic refs remain diagnostic-only
+  - candidate is never promoted to confirmed bug and bug_claimed remains false
+  - use PYTHONDONTWRITEBYTECODE=1 for every Python command
+  - run only the task's bounded scoped tests
+  - preserve all unrelated tracked and untracked user changes
+tasks:
+  - task_id: OSC-6-CR002-CORPUS-FOUNDATION
+    owner: /root/phase5_authority_audit
+    change_request: CR-OSC-6-002
+    mode: bounded_private_implementation
+    objective: >-
+      Implement fail-closed private corpus candidate, source-binding and approval
+      validators without fabricating or approving any missing Phase-6 corpus.
+    verified_inputs:
+      - path: experiments/canonical_confirmed_bug_corpus/v2/manifest.json
+        sha256: 0203ec26781d32828ed9914cb510efbe2f8c7807d25d4addfaf3652a339b47f4
+      - path: src/datadiff_osc/contract_engine/mutations.py
+        sha256: 03172519fe17dd4262739e630630a16a1a093fc104fcc8b9f991c0098ee580b8
+      - path: src/datadiff_osc/public_api_freeze.json
+        sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    allowed_write_paths:
+      - src/datadiff_osc/contract_engine/_phase6_corpora.py
+      - tests/osc/test_contract_phase6_corpora.py
+    forbidden_write_paths:
+      - all_paths_except_allowed_write_paths
+    interface_requirements:
+      - distinguish candidate material, independently approved manifest and Root-bound authority eligibility
+      - freeze corpus kind, entry identity, exact source path/SHA, expected verdict or kill semantics, and approval-record SHA
+      - independently derive the 9 confirmed root identities and exclude every pending root
+      - independently derive exactly 12 comparator, 13 axis and 7 hyperedge mutant identities
+      - reject empty, duplicate, missing, unknown, pending, self-approved, SHA-mismatched or caller-authority records
+      - represent the absent false-positive, compatibility and kill-witness manifests as fail-closed missing input
+      - never assign fix IDs or an approved denominator from the historical running-sum material
+      - perform no gate replay, parity execution, benchmark or corpus file write
+    required_tests:
+      - exact 9 plus excluded 1 root derivation
+      - exact 32 mutant derivation and category separation
+      - false-positive absence cannot pass minimum denominator one
+      - forged approval, duplicate identity, pending root and changed source SHA fail closed
+      - public freeze remains byte-identical
+
+  - task_id: OSC-6-CR003A-SEARCH-FOUNDATION
+    owner: /root/phase5_consumer_audit
+    change_request: CR-OSC-6-003A
+    mode: bounded_private_implementation
+    objective: >-
+      Implement the private declaration-derived formal 11-lane registry and
+      intrinsic Search context receipt/replay foundation while all Runtime-dependent
+      subjects remain context-pending.
+    verified_inputs:
+      - path: src/datadiff/strategy_registry.py
+        sha256: dfba85d3cefb93c9b8732748f15a80987887eb6886d5f91f84f5be924dd29cec
+      - path: src/datadiff_osc/search/semantic_replay.py
+        sha256: af65bd9f1f06a3a2555b33dd2c38d574ed03d0ab70ed5dcee035099e3364b28b
+      - path: src/datadiff_osc/public_api_freeze.json
+        sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    allowed_write_paths:
+      - src/datadiff_osc/search/lane_registry.py
+      - src/datadiff_osc/search/context_receipts.py
+      - src/datadiff_osc/search/context_replay.py
+      - tests/osc/test_search_lane_registry.py
+      - tests/osc/test_search_context_receipts.py
+      - tests/osc/test_search_gate_crosswalk.py
+    forbidden_write_paths:
+      - all_paths_except_allowed_write_paths
+    interface_requirements:
+      - freeze the exact ordered 11-lane selector from the reviewed declaration set
+      - resolve every lane through DISCOVERY_LANES_BY_ID and bind its complete executable declaration digest
+      - derive exactly 37 lane-signal obligations and 20 unique signals without preset inheritance
+      - leave DEFAULT_DISCOVERY_LANE_IDS byte-identical and do not edit legacy files
+      - provide private typed registry, plan, scheduled-attempt, mutation-attempt, observation-context and focus-hit receipts
+      - derive family, cell and focus identities from compiler/registry data rather than caller metadata
+      - reject generator_profile, configured strings or caller-authored focus hits as authority
+      - exact Runtime task/outcome/provenance context is comparison-only here and its absence returns context-required/not_evaluated
+      - do not modify Root dispatch, frozen gate specs or existing semantic replay admissions
+    required_tests:
+      - exact lane order, 37 obligations, 20 unique signals and legacy default count 9
+      - declaration drift, reordered or substituted lanes and forged signal identities fail closed
+      - receipt constructor and canonical round-trip invariants
+      - metadata-only focus and context-only observation cannot be admitted
+      - public freeze remains byte-identical
+
+  - task_id: OSC-6-CR004-RUNTIME-FOUNDATION
+    owner: /root/phase5_evidence_audit
+    change_request: CR-OSC-6-004
+    mode: bounded_private_implementation
+    objective: >-
+      Implement private typed producer provenance and pure auxiliary receipt
+      builders; do not connect legacy execution, Root authority or the V3 runner.
+    verified_inputs:
+      - path: src/datadiff_osc/runtime/_private_receipts.py
+        sha256: 490c7f7f076fb65c75cc577831fab508f6d9dcb0820422170169b274e50af07f
+      - path: src/datadiff_osc/runtime/_semantic_replay.py
+        sha256: 0b5ec02b247d718d4258dada0fb59493081f258cc1e49913c1d294c7c9e062b9
+      - path: src/datadiff_osc/public_api_freeze.json
+        sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_producer_provenance.py
+      - src/datadiff_osc/runtime/_receipt_producers.py
+      - tests/osc/test_runtime_producer_provenance.py
+      - tests/osc/test_runtime_receipt_producers.py
+    forbidden_write_paths:
+      - all_paths_except_allowed_write_paths
+    interface_requirements:
+      - implement typed origin kinds REAL_EXECUTION, ROOT_FROZEN_PUBLIC_SOURCE, ROOT_FROZEN_CONTROL_CORPUS and DIAGNOSTIC
+      - bind source, protocol, plan, canonical command, cwd, allowlisted environment, implementation file SHAs, inputs, raw outputs, typed outputs and structured failures
+      - accept no producer-authored real, eligible, authority or gate boolean
+      - reject DIAGNOSTIC for every authority-required policy and require subject-specific allowed origins
+      - verify implementation bindings against a caller-supplied verified source snapshot and recompute all exact file/record digests
+      - provide pure builders for existing RepositoryTestReceipt, TargetVersionReceipt, CandidateClassificationReceipt and PairedBenchmarkReceipt from immutable typed raw inputs
+      - require explicit campaign ordinals 1,2,3 and pipeline ordinals 1,2,3 for candidate completion
+      - forbid confirmed candidate states and require bug_claimed false
+      - do not build V3RunReceipt, read legacy JSON, modify semantic replay or create an authority artifact
+    required_tests:
+      - forged source, plan, implementation, input/output, environment and provenance bindings fail closed
+      - DIAGNOSTIC and self-declared authority cannot pass a real-execution policy
+      - pure builders independently recompute identities and reject caller aggregate substitutions
+      - candidate 2-of-3, repeated ordinal, confirmed state or bug_claimed true fails closed
+      - public freeze remains byte-identical
+round_exit:
+  - every owner reports exact changed paths and scoped test command/result
+  - Root verifies writes are within the disjoint allowlists
+  - Root runs a serial integration review before authorizing any shared-file edit
+  - no current task can close CR-OSC-6-002, CR-OSC-6-003 or CR-OSC-6-004
+execution_authorization:
+  scoped_tests_only: true
+  tests_osc: false
+  full_repository_tests: false
+  parity_100000: false
+  v3_2200: false
+  phase7_pilot_2h: false
+  twenty_four_hour: false

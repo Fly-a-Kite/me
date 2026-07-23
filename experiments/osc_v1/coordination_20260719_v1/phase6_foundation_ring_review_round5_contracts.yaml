@@ -1,0 +1,242 @@
+schema_version: osc-review-contract-v1
+phase: 6
+round: private_foundation_remediation_exact_sha_ring_review_r5
+mode: three_parallel_read_only_negative_reviews
+status: active_pending_three_reports
+entry_authority:
+  r4_review_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_contracts.yaml
+    sha256: da353826860e85188107714d67007ec60285a987b606cca36d3b04191a7fbe1c
+  r4_review_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_reports.yaml
+    sha256: 793567c5fcb35aaf72fc91fe4edd75dd732948faba80b093c505da2743fee630
+  r4_remediation_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round4_task_contracts.yaml
+    sha256: 8f5a5328d2effdfd9dcc35bde216a6bf1de3d2637f49b64669e9f5cb2b622c13
+  r4_remediation_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round4_reports.yaml
+    sha256: 3eec64e1a89b7df465f581f4733b8a5a23de517d680087bda25e88cd27f9686a
+  coordination_ledger:
+    path: experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    sha256: a18c7d42aba5201adace3ecf57f4d75dc5eb9fc64943c431ff33a894ac74b5ad
+normative_inputs:
+  runbook:
+    path: docs/codex_multi_agent_development_runbook.md
+    sha256: a17a62d7937f5ff4755d8925dc6dd64c25946516a80f82466ddeda1ee8d845f9
+  architecture:
+    path: docs/project_architecture.md
+    sha256: 5fc31c1c2c4bf1241e41cc966f8d56abc890259a8577fe756076b490e3698d9f
+  public_api_freeze:
+    path: src/datadiff_osc/public_api_freeze.json
+    sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+workspace_pre_contract:
+  head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  tracked_modified_paths: 141
+  staged_paths: 0
+  status_short_entries: 24229
+  status_short_sha256: 4551464e5da035fbc320f76f7d2b44634d18ac2ec142094fef12eb04c97ee912
+  status_all_untracked_entries: 24088
+  preservation_rule: existing dirty and untracked work is user work; it must not be deleted, reset, cleaned, checked out, overwritten, or bulk-formatted
+coordination:
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  reviewer_writes_allowed: false
+  reviewer_allowed_write_paths: []
+  reviewer_forbidden_write_paths:
+    - "**"
+  root_only_authority_write_paths:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_contracts.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_reports.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  preserve_dirty_worktree: true
+  review_language: "负向复核、独立反例验证、异常输入验证"
+  reviewer_independence_rule: each report must be a separately executed read-only assessment; Root aggregation is not an independent report
+global_requirements:
+  - hash every assigned target before semantic inspection and again after the one permitted scoped test; any mismatch stops that task
+  - complete the required negative review, independent counterexample validation and abnormal-input validation from causal typed inputs; do not rely on an earlier reviewer conclusion
+  - reviewers must make zero writes, create zero child agents, and report writes=0, child_agents=0, forbidden_paths_modified=[] and deviations=[]
+  - every Python command uses PYTHONDONTWRITEBYTECODE=1
+  - each reviewer executes only its assigned scoped pytest command, exactly once; no tests/osc directory suite, repository suite, parity-100000, v3-2200, Phase 7, 2h, or 24h execution
+  - public exports, public_api_freeze.json, frozen paths, thresholds, denominators, comparator semantics, replay authority, provenance origin, admission authority, and execution authorization are immutable in this review
+  - diagnostic refs remain diagnostic-only; missing exact typed context fails closed or remains not_evaluated; candidate is never promoted to confirmed; bug_claimed=false
+  - receipt, coverage, evidence, candidate, bug, gate, and authorization authority must not be fabricated or promoted by private Search, Runtime, or Contract artifacts
+  - findings are correctness, soundness, reproducibility, authority-boundary, or missing-negative-test findings only; style findings are out of scope
+  - each finding includes id, severity, claim, evidence, reproduction, violated_invariant, minimal_fix_owner, and required_test
+  - a report may pass only when its blocker, high, and medium counts are all zero; low findings remain separately recorded
+tasks:
+  - task_id: OSC-6-FOUNDATION-REVIEW-R5-A-SEARCH
+    task_title: Search 负向复核、独立反例验证、异常输入验证
+    role: reviewer
+    mode: read_only_review
+    reviewer: r5_search_independent_reviewer
+    allowed_write_paths: []
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - docs/project_architecture.md
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round4_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round4_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_contracts.yaml
+      - src/datadiff_osc/search/lane_registry.py
+      - src/datadiff_osc/search/context_receipts.py
+      - src/datadiff_osc/search/context_replay.py
+      - tests/osc/test_search_lane_registry.py
+      - tests/osc/test_search_context_receipts.py
+      - tests/osc/test_search_gate_crosswalk.py
+    target_files:
+      - path: src/datadiff_osc/search/context_receipts.py
+        sha256: b8fa8c7f8e30df35e01d00086a3823b10bf474146d0b578618a3450ef5e948d0
+      - path: src/datadiff_osc/search/context_replay.py
+        sha256: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+      - path: tests/osc/test_search_context_receipts.py
+        sha256: 58afd2c49c3dae0f7cf0d220ecdc7c3255b54d8daf6a980e651e6b01f502e60b
+      - path: tests/osc/test_search_gate_crosswalk.py
+        sha256: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+      - path: src/datadiff_osc/search/lane_registry.py
+        sha256: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+        frozen: true
+      - path: tests/osc/test_search_lane_registry.py
+        sha256: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+        frozen: true
+    required_negative_review:
+      - clone TargetPreservingMutator.mutate while preserving code/source/module/qualname and replace only the MutationOutcome global; policy ID must change or fail closed, and the old ID must reject an attempts=1 replacement outcome
+      - for Holder.STATE.get and module.STATE.get, change the complete callable identity while the terminal descriptor remains unchanged; mutable, cyclic, unresolved, and uninspectable owners must fail closed
+      - validate cold and warm replacement for defaults, kwdefaults, closure, and same-module recursive direct dependencies
+      - validate a cross-module direct callable same-code/global-rebind adjacent counterexample without treating source/code/module static sealing as complete live identity
+      - validate registry/profile/callable substitution before capture, between two replays, and after replay; old identity must not be accepted
+      - confirm a Search receipt cannot become coverage, evidence, candidate, bug, gate, or authorization authority
+    validation:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py
+        tests/osc/test_search_gate_crosswalk.py
+      execution_count: exactly_once
+      expected: exit code 0
+    stop_conditions:
+      - any pre-test or post-test target SHA mismatch
+      - any write, child agent, forbidden-path modification, or authority-boundary violation
+    deliverable: exact pre/post SHA set, one scoped-test result, per-attack results, findings, counts, and zero-write attestation
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R5-B-RUNTIME
+    task_title: Runtime 负向复核、独立反例验证、异常输入验证
+    role: reviewer
+    mode: read_only_review
+    reviewer: r5_runtime_independent_reviewer
+    allowed_write_paths: []
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - docs/project_architecture.md
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round4_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round4_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_contracts.yaml
+      - src/datadiff_osc/runtime/_producer_provenance.py
+      - src/datadiff_osc/runtime/_receipt_producers.py
+      - tests/osc/test_runtime_producer_provenance.py
+      - tests/osc/test_runtime_receipt_producers.py
+    target_files:
+      - path: src/datadiff_osc/runtime/_receipt_producers.py
+        sha256: 922afa81b750905e0aaa6fc096d4b1176be2112269f119da81cc5aa72d09230d
+      - path: tests/osc/test_runtime_receipt_producers.py
+        sha256: 41c15578eebb43f90a244f94562a8473301503a646f4eb5754853a99991c56c6
+      - path: src/datadiff_osc/runtime/_producer_provenance.py
+        sha256: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+        frozen: true
+      - path: tests/osc/test_runtime_producer_provenance.py
+        sha256: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+        frozen: true
+    required_negative_review:
+      - reuse a source result plus EvidenceEnvelope in campaign and pipeline for source verdicts INCONCLUSIVE and SATISFIED; all four combinations must first raise source/campaign/pipeline identities must be globally disjoint
+      - independently collide source and recheck task ID, complete TaskSpec digest, result ID, seed lineage, and EvidenceEnvelope digest
+      - verify seven execution and seven EvidenceEnvelope global checks occur before source/recheck verdict, reproduced, and 3/3 plus 3/3 threshold processing
+      - verify seven distinct typed VIOLATED inputs remain STABLE_SURVIVOR, non-confirmed, and bug_claimed=false
+      - confirm confirmed states, caller reproduced, and diagnostic-only authority promotion are rejected
+    validation:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+      execution_count: exactly_once
+      expected: exit code 0
+    stop_conditions:
+      - any pre-test or post-test target SHA mismatch
+      - any write, child agent, forbidden-path modification, or authority-boundary violation
+    deliverable: exact pre/post SHA set, one scoped-test result, per-attack results, findings, counts, and zero-write attestation
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R5-C-CONTRACT
+    task_title: Contract 冻结负向复核、独立反例验证、异常输入验证
+    role: reviewer
+    mode: read_only_review
+    reviewer: r5_contract_independent_reviewer
+    allowed_write_paths: []
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - docs/project_architecture.md
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round4_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round4_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_contracts.yaml
+      - src/datadiff_osc/contract_engine/_phase6_corpora.py
+      - tests/osc/test_contract_phase6_corpora.py
+      - src/datadiff_osc/public_api_freeze.json
+    target_files:
+      - path: src/datadiff_osc/contract_engine/_phase6_corpora.py
+        sha256: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+        frozen: true
+      - path: tests/osc/test_contract_phase6_corpora.py
+        sha256: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+        frozen: true
+      - path: src/datadiff_osc/public_api_freeze.json
+        sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+        frozen: true
+    required_negative_review:
+      - reject arbitrary reviewer/root identities, repeated approval, and C0/path/resolver aliases
+      - reject cross-root signatures, component/global false-positive suppression, and compatibility-context swaps
+      - reject mutant-pair reuse, predicate substitution, and generic or source-only evidence
+      - confirm frozen Contract creates no public export, gate credit, or execution authorization
+    validation:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_contract_phase6_corpora.py
+      execution_count: exactly_once
+      expected: exit code 0
+    stop_conditions:
+      - any pre-test or post-test target SHA mismatch
+      - any write, child agent, forbidden-path modification, or authority-boundary violation
+    deliverable: exact pre/post SHA set, one scoped-test result, per-attack results, findings, counts, and zero-write attestation
+report_requirements:
+  - exact reviewed target SHA set before and after the one scoped test
+  - exact command, exit code, and test result
+  - independent negative review, independent counterexample validation, and abnormal-input validation result for every assigned attack
+  - findings with full runbook fields and blocker/high/medium/low counts
+  - explicit writes=0, child_agents=0, forbidden_paths_modified=[], and deviations=[]
+root_follow_up:
+  - Root may write only the R5 report set and coordination ledger after all three reports return
+  - Root may run the exact six-file combined scoped suite once only when all three genuinely independent reports have blocker=0, high=0, medium=0 and all pre/post target SHA values match
+  - Root must re-hash all thirteen target files before and after that combined suite
+  - no foundation barrier pass may be prewritten; it is decided only from actual three-report, SHA, combined-suite, and frozen-SHA evidence
+exit:
+  foundation_barrier_pending_until:
+    - all three direct read-only reports are received
+    - aggregate blocker=0, high=0, and medium=0
+    - all target pre/post SHA values match this contract
+    - the root's exact six-file combined scoped suite passes with pre/post target SHA matches
+    - frozen Contract and public API SHA values remain exact
+  failed_or_nonzero_findings: record the finding, retain foundation_barrier pending, and require a new remediation task contract before any code change
+execution_authorization:
+  scoped_tests_only: true
+  combined_scoped_suite_conditional: true
+  tests_osc: false
+  full_repository_tests: false
+  parity_100000: false
+  v3_2200: false
+  phase7_pilot_2h: false
+  twenty_four_hour: false
+decision:
+  foundation_barrier: pending
+  foundation_barrier_passed: false
+  tests_osc_authorized: false
+  full_repository_tests_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

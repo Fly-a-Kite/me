@@ -58,10 +58,12 @@ class SqlPipelineRuntime:
         return self.state.visible_projection(self.quote)
 
     def apply_projection(self, projection: str) -> str:
+        self.state.assert_invariants()
         self.source = self.adapter.transform_projection(projection, self.source)
         return self.source
 
     def drop_hidden_order_cols(self) -> bool:
+        self.state.assert_invariants()
         if not self.state.hidden_order_cols:
             return False
         self.apply_projection(self.visible_projection())
@@ -69,6 +71,7 @@ class SqlPipelineRuntime:
         return True
 
     def materialize_sql(self) -> str:
+        self.state.assert_invariants()
         projection = self.visible_projection()
         if self.state.pending_order is not None:
             return self.adapter.render_ordered_projection(
@@ -83,6 +86,7 @@ class SqlPipelineRuntime:
         return self.state.select_with_pending_order(cols, self.quote)
 
     def freeze_pending_order(self) -> bool:
+        self.state.assert_invariants()
         frozen = self.state.freeze_pending_order()
         if frozen is None:
             return False
@@ -95,6 +99,7 @@ class SqlPipelineRuntime:
         return True
 
     def finalize_source(self) -> str:
+        self.state.assert_invariants()
         projection = self.visible_projection()
         if self.state.pending_order is not None:
             self.source = self.adapter.transform_ordered_projection(
@@ -104,6 +109,7 @@ class SqlPipelineRuntime:
             )
         else:
             self.drop_hidden_order_cols()
+        self.state.assert_invariants()
         return self.source
 
 

@@ -4,27 +4,29 @@ from datadiff.backends.base import PreparedTable, prepare_table
 from datadiff.backends.duckdb_backend import (
     DUCKDB_DIALECT,
     _agg_expr,
-    _join_condition,
     _lit,
     _order_clause,
     _quote,
     _row_number_condition_sql,
     _running_sum_projection,
-    _semi_anti_join_condition,
     _sql_type,
     _tuple_absence_native_condition,
 )
 from datadiff.backends.sql_lowering import (
+    cast_logical_expression,
     render_aggregate_sql,
     render_case_when_expr,
     render_coalesce_expr,
+    render_filter_condition,
     render_fill_null_expr,
     render_groupby_sql,
+    render_join_condition,
+    render_join_right_projection,
     render_mutate_expr,
+    render_semi_anti_join_condition,
 )
 from datadiff.backends.sql_runtime import build_relation_step_runtime
 from datadiff.dsl import Case, Program, TableData, normalize_sort_keys
-from datadiff.filtering import sql_filter_condition
 from datadiff.join_keys import join_key_pairs
 from datadiff.operation_semantics import (
     groupby_keys,
@@ -38,6 +40,7 @@ from datadiff.operation_semantics import (
     op_value,
 )
 from datadiff.running import running_sum_sort_keys
+from datadiff.program_state import ProgramState, state_after_operation
 from datadiff.windowing import row_number_order_keys, row_number_partition_columns
 
 
@@ -108,6 +111,7 @@ def render_duckdb_query_sql(tables: list[TableData | PreparedTable], program: Pr
         raise UnsupportedDuckDBSqlExport("DuckDB SQL export requires at least one table")
     prepared_tables = [prepare_table(table) for table in tables]
     table_by_name = {table.name: table for table in prepared_tables}
+    semantic_state = ProgramState.from_table(prepared_tables[0])
     ctes: list[tuple[str, str]] = []
     relation = _quote(prepared_tables[0].name)
 
@@ -142,31 +146,32 @@ def render_duckdb_query_sql(tables: list[TableData | PreparedTable], program: Pr
 
     for op in program.operations:
         kind = op_kind(op)
+        next_semantic_state = state_after_operation(
+            semantic_state,
+            op,
+            tables=table_by_name,
+        )
         if kind not in SQL_EXPORT_SUPPORTED_OPS:
             raise UnsupportedDuckDBSqlExport(f"unsupported DuckDB SQL export operation: {kind}")
         if kind == "join":
             drop_hidden_order_cols()
             right = table_by_name[op_table(op)]
             _, right_keys = join_key_pairs(op)
-            right_key_set = set(right_keys)
-            right_cols = [
-                f"r.{_quote(column.name)} AS {_quote(column.name)}"
-                for column in right.columns
-                if column.name not in right_key_set
-            ]
-            select_right = ", " + ", ".join(right_cols) if right_cols else ""
+            right_types = {column.name: column.type for column in right.columns}
+            select_right, projected_right = render_join_right_projection(
+                right.column_names,
+                right_keys,
+                semantic_state.columns,
+                _quote,
+            )
             join_kind = "LEFT JOIN" if join_how(op) == "left" else "INNER JOIN"
             relation = runtime.assign_source(
                 add_step(
                     f"SELECT q.*{select_right} FROM {relation} q {join_kind} {_quote(right.name)} r "
-                    f"ON {_join_condition(op)}"
+                    f"ON {render_join_condition(op, DUCKDB_DIALECT, _quote, semantic_state.column_types, right_types)}"
                 )
             )
-            runtime.state.current_cols.extend(
-                column.name
-                for column in right.columns
-                if column.name not in right_key_set and column.name not in runtime.state.current_cols
-            )
+            runtime.state.current_cols.extend(projected_right)
             runtime.state.visible_cols = list(runtime.state.current_cols)
             runtime.state.pending_order = None
         elif kind == "union_all":
@@ -181,13 +186,27 @@ def render_duckdb_query_sql(tables: list[TableData | PreparedTable], program: Pr
             runtime.state.current_cols = list(runtime.state.visible_cols)
             runtime.state.pending_order = None
         elif kind in {"semi_join", "anti_join"}:
-            condition = _semi_anti_join_condition(op, kind)
+            right = table_by_name[op_table(op)]
+            right_types = {column.name: column.type for column in right.columns}
+            condition = render_semi_anti_join_condition(
+                op,
+                kind,
+                DUCKDB_DIALECT,
+                _quote,
+                semantic_state.column_types,
+                right_types,
+            )
             relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q WHERE {condition}"))
         elif kind == "drop_nulls":
             condition = " AND ".join(f"q.{_quote(column)} IS NOT NULL" for column in op["columns"])
             relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q WHERE {condition}"))
         elif kind == "filter":
-            condition = sql_filter_condition(f"q.{_quote(op_column(op))}", _lit(op_value(op)), op_comparator(op))
+            condition = render_filter_condition(
+                f"q.{_quote(op_column(op))}",
+                _lit(op_value(op)),
+                op_comparator(op),
+                DUCKDB_DIALECT,
+            )
             relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q WHERE {condition}"))
         elif kind == "tuple_absence_filter":
             relation = runtime.assign_source(
@@ -220,6 +239,9 @@ def render_duckdb_query_sql(tables: list[TableData | PreparedTable], program: Pr
             runtime.state.reset_projection(cols)
         elif kind == "fill_null":
             column, expr_sql = render_fill_null_expr(op, _quote, _lit)
+            output_type = next_semantic_state.column_types.get(column)
+            if output_type is not None:
+                expr_sql = cast_logical_expression(expr_sql, output_type, DUCKDB_DIALECT)
             if runtime.state.pending_order_mentions(column):
                 freeze_pending_order()
             projection = runtime.state.replace_projection_expr(column, expr_sql, _quote)
@@ -230,6 +252,9 @@ def render_duckdb_query_sql(tables: list[TableData | PreparedTable], program: Pr
                 drop_hidden_order_cols()
         elif kind == "coalesce":
             alias, expr_sql = render_coalesce_expr(op, _quote, _lit)
+            output_type = next_semantic_state.column_types.get(alias)
+            if output_type is not None:
+                expr_sql = cast_logical_expression(expr_sql, output_type, DUCKDB_DIALECT)
             if runtime.state.pending_order_mentions(alias):
                 freeze_pending_order()
             projection = runtime.state.replace_projection_expr(alias, expr_sql, _quote)
@@ -239,7 +264,10 @@ def render_duckdb_query_sql(tables: list[TableData | PreparedTable], program: Pr
                 runtime.state.clear_pending_order()
                 drop_hidden_order_cols()
         elif kind == "case_when":
-            alias, expr_sql = render_case_when_expr(op, _quote, _lit)
+            alias, expr_sql = render_case_when_expr(op, DUCKDB_DIALECT, _quote, _lit)
+            output_type = next_semantic_state.column_types.get(alias)
+            if output_type is not None:
+                expr_sql = cast_logical_expression(expr_sql, output_type, DUCKDB_DIALECT)
             if runtime.state.pending_order_mentions(alias):
                 freeze_pending_order()
             projection = runtime.state.replace_projection_expr(alias, expr_sql, _quote)
@@ -272,7 +300,16 @@ def render_duckdb_query_sql(tables: list[TableData | PreparedTable], program: Pr
             else:
                 relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q OFFSET {op_n(op)}"))
         elif kind == "mutate":
-            out_column, expr_sql = render_mutate_expr(op, DUCKDB_DIALECT, _quote, _lit)
+            out_column, expr_sql = render_mutate_expr(
+                op,
+                DUCKDB_DIALECT,
+                _quote,
+                _lit,
+                semantic_state.column_types,
+            )
+            output_type = next_semantic_state.column_types.get(out_column)
+            if output_type is not None:
+                expr_sql = cast_logical_expression(expr_sql, output_type, DUCKDB_DIALECT)
             if runtime.state.pending_order_mentions(out_column):
                 freeze_pending_order()
             projection = runtime.state.replace_projection_expr(out_column, expr_sql, _quote)
@@ -297,6 +334,7 @@ def render_duckdb_query_sql(tables: list[TableData | PreparedTable], program: Pr
             agg_sql, aliases = render_aggregate_sql(op, _agg_expr, _quote)
             relation = runtime.assign_source(add_step(f"SELECT {', '.join(agg_sql)} FROM {relation} q"))
             runtime.state.reset_projection(aliases)
+        semantic_state = next_semantic_state
     relation = runtime.assign_source(runtime.finalize_source())
     if ctes:
         cte_sql = ",\n     ".join(f"{_quote(name)} AS ({sql})" for name, sql in ctes)

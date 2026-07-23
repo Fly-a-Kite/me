@@ -270,6 +270,183 @@ DISCOVERY_LANE_SPECS: tuple[DiscoveryLaneSpec, ...] = (
         default=False,
         discovery_biases=(),
     ),
+    DiscoveryLaneSpec(
+        lane_id="orthogonal_stress",
+        target_suite="latest_all_engines",
+        preset="live_orthogonal_stress",
+        theme=(
+            "Fresh cross-engine physical-boundary exploration over nullable bitmaps, execution "
+            "vectors, wide projections, skewed joins, UTF-8 slicing, and deterministic windows"
+        ),
+        default=False,
+        semantic_focus_families=(
+            "physical_boundaries",
+            "stateful_ordering",
+            "schema_projection",
+            "string_semantics",
+            "join_membership",
+        ),
+        semantic_focus_signals=(
+            "bitmap_boundary_bool_aggregate",
+            "vector_boundary_groupby_distinct",
+            "wide_schema_projection_boundary",
+            "skewed_join_multiplicity",
+            "utf8_slice_length_groupby",
+            "unique_order_window_tiebreak",
+        ),
+        discovery_biases=(
+            _bias(
+                targets=[
+                    "bitmap_boundary_bool_aggregate",
+                    "vector_boundary_groupby_distinct",
+                    "wide_schema_projection_boundary",
+                    "skewed_join_multiplicity",
+                    "utf8_slice_length_groupby",
+                    "unique_order_window_tiebreak",
+                ],
+                feature_prefixes=[
+                    "generator_profile:",
+                    "pattern:",
+                    "join:",
+                    "sort:",
+                    "running:",
+                ],
+                score_bonus=0.60,
+                novelty_bonus=0.30,
+                contribution_bonus=0.30,
+                keep_in_pool=True,
+            ),
+        ),
+    ),
+    DiscoveryLaneSpec(
+        lane_id="chdb_targeted_boundaries",
+        target_suite="chdb_olap_cross",
+        preset="live_chdb_targeted_boundaries",
+        theme=(
+            "Fresh chDB OLAP boundary exploration against pandas, DuckDB, and SQLite "
+            "references using the orthogonal stress rotation"
+        ),
+        default=False,
+        semantic_focus_families=(
+            "physical_boundaries",
+            "stateful_ordering",
+            "schema_projection",
+            "string_semantics",
+            "join_membership",
+        ),
+        semantic_focus_signals=(
+            "bitmap_boundary_bool_aggregate",
+            "vector_boundary_groupby_distinct",
+            "wide_schema_projection_boundary",
+            "skewed_join_multiplicity",
+            "utf8_slice_length_groupby",
+            "unique_order_window_tiebreak",
+        ),
+        discovery_biases=(
+            _bias(
+                targets=[
+                    "bitmap_boundary_bool_aggregate",
+                    "vector_boundary_groupby_distinct",
+                    "wide_schema_projection_boundary",
+                    "skewed_join_multiplicity",
+                    "utf8_slice_length_groupby",
+                    "unique_order_window_tiebreak",
+                ],
+                feature_prefixes=[
+                    "generator_profile:",
+                    "pattern:",
+                    "join:",
+                    "sort:",
+                    "running:",
+                ],
+                score_bonus=0.65,
+                novelty_bonus=0.30,
+                contribution_bonus=0.35,
+                keep_in_pool=True,
+            ),
+        ),
+    ),
+    DiscoveryLaneSpec(
+        lane_id="pandas_targeted_boundaries",
+        target_suite="arrow_cross",
+        preset="live_pandas_targeted_boundaries",
+        theme="Pandas-targeted nullable bitmap, UTF-8, wide-block projection, vector-boundary distinct, and skewed join exploration",
+        default=False,
+        semantic_focus_families=("physical_boundaries", "string_semantics", "schema_projection"),
+        semantic_focus_signals=(
+            "bitmap_boundary_bool_aggregate",
+            "wide_schema_projection_boundary",
+            "utf8_slice_length_groupby",
+        ),
+        discovery_biases=(
+            _bias(
+                targets=[
+                    "bitmap_boundary_bool_aggregate",
+                    "wide_schema_projection_boundary",
+                    "utf8_slice_length_groupby",
+                ],
+                feature_prefixes=["generator_profile:", "pattern:", "expr:string_"],
+                score_bonus=0.50,
+                novelty_bonus=0.25,
+                contribution_bonus=0.25,
+                keep_in_pool=True,
+            ),
+        ),
+    ),
+    DiscoveryLaneSpec(
+        lane_id="polars_targeted_boundaries",
+        target_suite="polars_full_cross",
+        preset="live_polars_targeted_boundaries",
+        theme="Polars eager/lazy/streaming physical-boundary and deterministic-window equivalence exploration",
+        default=False,
+        semantic_focus_families=("physical_boundaries", "stateful_ordering", "schema_projection"),
+        semantic_focus_signals=(
+            "unique_order_window_tiebreak",
+            "bitmap_boundary_bool_aggregate",
+            "wide_schema_projection_boundary",
+        ),
+        discovery_biases=(
+            _bias(
+                targets=[
+                    "unique_order_window_tiebreak",
+                    "bitmap_boundary_bool_aggregate",
+                    "wide_schema_projection_boundary",
+                ],
+                feature_prefixes=["generator_profile:", "running:", "sort:", "pattern:"],
+                score_bonus=0.55,
+                novelty_bonus=0.25,
+                contribution_bonus=0.30,
+                keep_in_pool=True,
+            ),
+        ),
+    ),
+    DiscoveryLaneSpec(
+        lane_id="datafusion_targeted_boundaries",
+        target_suite="datafusion_cross",
+        preset="live_datafusion_targeted_boundaries",
+        theme="DataFusion execution-batch, skewed hash-join, wide projection, UTF-8, and deterministic-window exploration",
+        default=False,
+        semantic_focus_families=("physical_boundaries", "join_membership", "stateful_ordering"),
+        semantic_focus_signals=(
+            "vector_boundary_groupby_distinct",
+            "skewed_join_multiplicity",
+            "unique_order_window_tiebreak",
+        ),
+        discovery_biases=(
+            _bias(
+                targets=[
+                    "vector_boundary_groupby_distinct",
+                    "skewed_join_multiplicity",
+                    "unique_order_window_tiebreak",
+                ],
+                feature_prefixes=["generator_profile:", "join:", "groupby:", "running:"],
+                score_bonus=0.60,
+                novelty_bonus=0.25,
+                contribution_bonus=0.30,
+                keep_in_pool=True,
+            ),
+        ),
+    ),
 )
 
 

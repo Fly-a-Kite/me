@@ -1,0 +1,111 @@
+schema_version: osc-phase3-prewrite-declarations-v1
+freeze_manifest_sha256: 669816be0f913def018518ea85d2cc03b517453cc8e5ba764908dc3c3f42920f
+zero_crossing_verified: true
+tasks:
+  - task_id: OSC-3-A
+    owner: contract_agent
+    existing_files_to_modify:
+      - src/datadiff_osc/contract_engine/__init__.py
+      - src/datadiff_osc/contract_engine/applicability.py
+      - src/datadiff_osc/contract_engine/capability.py
+      - src/datadiff_osc/contract_engine/compatibility.py
+      - src/datadiff_osc/contract_engine/compiler.py
+      - src/datadiff_osc/contract_engine/demand.py
+      - src/datadiff_osc/contract_engine/derivation.py
+      - src/datadiff_osc/contract_engine/domains.py
+      - src/datadiff_osc/contract_engine/evidence.py
+      - src/datadiff_osc/contract_engine/fingerprints.py
+      - src/datadiff_osc/contract_engine/forward.py
+      - src/datadiff_osc/contract_engine/hypergraph.py
+      - src/datadiff_osc/contract_engine/model.py
+      - src/datadiff_osc/contract_engine/monitor.py
+      - src/datadiff_osc/contract_engine/mutations.py
+      - src/datadiff_osc/contract_engine/observers.py
+      - src/datadiff_osc/contract_engine/overlays.py
+      - src/datadiff_osc/contract_engine/planner.py
+      - src/datadiff_osc/contract_engine/relations.py
+      - src/datadiff_osc/contract_engine/rules.py
+      - tests/osc/test_contract_analysis.py
+      - tests/osc/test_contract_compatibility_mutations.py
+      - tests/osc/test_contract_model.py
+      - tests/osc/test_contract_relations_planner.py
+    new_files:
+      - src/datadiff_osc/contract_engine/gates.py
+      - tests/osc/test_contract_authority.py
+      - tests/osc/test_contract_entailment.py
+      - tests/osc/test_contract_fault_audit.py
+      - tests/osc/test_contract_gate_helpers.py
+      - tests/osc/test_contract_performance.py
+      - tests/osc/test_contract_v1_compatibility.py
+      - tests/osc/test_contract_two_pass_properties.py
+    change_requests: []
+    frozen_interface_confirmed: true
+    approved_to_write: true
+  - task_id: OSC-3-B
+    owner: search_agent
+    existing_files_to_modify:
+      - src/datadiff_osc/semantic_targets/declarations.py
+      - src/datadiff_osc/semantic_targets/taxonomy.py
+      - src/datadiff_osc/semantic_targets/compiler.py
+    new_files:
+      - src/datadiff_osc/semantic_targets/fresh_registry.py
+      - src/datadiff_osc/semantic_targets/regression_registry.py
+      - src/datadiff_osc/generation/extraction.py
+      - src/datadiff_osc/generation/construction.py
+      - src/datadiff_osc/generation/mutation.py
+      - src/datadiff_osc/search/matcher.py
+      - src/datadiff_osc/search/ledger.py
+      - src/datadiff_osc/search/epochs.py
+      - src/datadiff_osc/scheduler/policy.py
+      - tests/osc/test_targets_registry.py
+      - tests/osc/test_targets_compiler_properties.py
+      - tests/osc/test_generation_extraction.py
+      - tests/osc/test_generation_construction.py
+      - tests/osc/test_generation_mutation.py
+      - tests/osc/test_search_matcher.py
+      - tests/osc/test_search_ledger.py
+      - tests/osc/test_search_epochs.py
+      - tests/osc/test_search_reachability.py
+      - tests/osc/test_search_performance.py
+      - tests/osc/test_scheduler_policy.py
+    change_requests: []
+    frozen_interface_confirmed: true
+    approved_to_write: true
+  - task_id: OSC-3-C
+    owner: runtime_agent
+    existing_files_to_modify: []
+    new_files:
+      - src/datadiff_osc/comparison/__init__.py
+      - src/datadiff_osc/comparison/staged.py
+      - src/datadiff_osc/comparison/cache.py
+      - src/datadiff_osc/parallel/__init__.py
+      - src/datadiff_osc/parallel/dag.py
+      - src/datadiff_osc/parallel/resources.py
+      - src/datadiff_osc/parallel/executor.py
+      - src/datadiff_osc/parallel/invariance.py
+      - src/datadiff_osc/runtime/__init__.py
+      - src/datadiff_osc/runtime/gates.py
+      - src/datadiff_osc/runtime/benchmarks.py
+      - src/datadiff_osc/runtime/protocols.py
+      - scripts/osc/audit_staged_parity.py
+      - scripts/osc/benchmark_clustering.py
+      - scripts/osc/audit_parallel_invariance.py
+      - scripts/osc/benchmark_parallel_scaling.py
+      - scripts/osc/calculate_gate_report.py
+      - scripts/osc/build_v3_gate_plan.py
+      - scripts/osc/build_2h_pilot_plan.py
+      - tests/osc/test_comparison_staged.py
+      - tests/osc/test_comparison_cache.py
+      - tests/osc/test_parallel_dag.py
+      - tests/osc/test_parallel_resources.py
+      - tests/osc/test_parallel_executor.py
+      - tests/osc/test_parallel_invariance.py
+      - tests/osc/test_runtime_gates.py
+      - tests/osc/test_runtime_benchmarks.py
+      - tests/osc/test_runtime_protocols.py
+      - tests/osc/test_runtime_scripts.py
+    change_requests: []
+    frozen_interface_confirmed: true
+    formal_launcher_changes: false
+    pilot_or_campaign_execution: false
+    approved_to_write: true

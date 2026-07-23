@@ -1,0 +1,142 @@
+schema_version: osc-remediation-contract-v1
+phase: 6
+round: private_foundation_remediation_r5_cross_module_live_identity
+status: contract_created_implementation_not_started
+entry_review:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_reports.yaml
+  sha256: 1bc36fd45b4349dff67438d79afae1c3f753ca3eb08c3dd3c0ce20933c104fbb
+entry_review_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_contracts.yaml
+  sha256: c1e70ee5663173294545b4c8966d138debb718238b6da2a9c68001ad5680f5fa
+entry_ledger:
+  path: experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  sha256: 9897d1fb1531e420b8a9e3c9b991bba55de34c6946350671043329330cd539b0
+normative_inputs:
+  runbook:
+    path: docs/codex_multi_agent_development_runbook.md
+    sha256: a17a62d7937f5ff4755d8925dc6dd64c25946516a80f82466ddeda1ee8d845f9
+  architecture:
+    path: docs/project_architecture.md
+    sha256: 5fc31c1c2c4bf1241e41cc966f8d56abc890259a8577fe756076b490e3698d9f
+  public_api_freeze:
+    path: src/datadiff_osc/public_api_freeze.json
+    sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+workspace_entry:
+  head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  tracked_modified_paths: 141
+  staged_paths: 0
+  status_short_entries: 24231
+  status_short_sha256: 9ccd41602385f0e8fb278d5732bc546ba4e05673599fe336462df9d5bf38435d
+  status_all_untracked_entries: 24090
+  preservation_rule: existing dirty and untracked work is user work; never delete, reset, clean, checkout, overwrite, or bulk-format it
+coordination:
+  implementation_owner: root
+  implementation_child_agents: 0
+  review_after_remediation: exactly_three_direct_read_only_reviewers
+  grandchildren_allowed: false
+  implementation_authority_write_paths:
+    - src/datadiff_osc/search/context_receipts.py
+    - tests/osc/test_search_context_receipts.py
+  root_authority_write_paths:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round5_task_contracts.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round5_reports.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  review_language: "负向复核、独立反例验证、异常输入验证"
+global_requirements:
+  - remediate only OSC-6-FOUNDATION-SEARCH-R5-H1; no unrelated refactor, formatting, threshold, denominator, comparator, replay-authority, provenance-origin, admission-authority, or execution-authorization change is permitted
+  - use apply_patch for every repository write and PYTHONDONTWRITEBYTECODE=1 for every Python command
+  - public exports, src/datadiff_osc/public_api_freeze.json, and all frozen paths remain byte-identical
+  - diagnostic refs remain diagnostic-only; missing exact typed context fails closed or remains not_evaluated; candidate remains non-confirmed and bug_claimed=false
+  - no tests/osc directory suite, full repository suite, parity-100000, v3-2200, Phase 7, 2h, or 24h execution
+  - no six-file combined scoped suite occurs in this remediation contract; it is conditional on a later three-report R6 authority contract
+task:
+  task_id: OSC-6-FOUNDATION-REMEDIATE-SEARCH-R5
+  owner: root
+  mode: bounded_private_remediation_serial
+  finding: OSC-6-FOUNDATION-SEARCH-R5-H1
+  objective: >-
+    Bind the complete behavior-affecting live identity of cross-module direct Python-function dependencies used by the
+    mutation application-policy digest, or fail closed before a stale policy identity can authorize mutation execution.
+  allowed_write_paths:
+    - src/datadiff_osc/search/context_receipts.py
+    - tests/osc/test_search_context_receipts.py
+  forbidden_write_paths:
+    - src/datadiff_osc/search/context_replay.py
+    - src/datadiff_osc/search/lane_registry.py
+    - tests/osc/test_search_gate_crosswalk.py
+    - tests/osc/test_search_lane_registry.py
+    - src/datadiff_osc/runtime/**
+    - tests/osc/test_runtime_*.py
+    - src/datadiff_osc/contract_engine/**
+    - tests/osc/test_contract_*.py
+    - src/datadiff_osc/__init__.py
+    - src/datadiff_osc/public_api_freeze.json
+    - "**/public exports/**"
+  before_sha256:
+    src/datadiff_osc/search/context_receipts.py: b8fa8c7f8e30df35e01d00086a3823b10bf474146d0b578618a3450ef5e948d0
+    tests/osc/test_search_context_receipts.py: 58afd2c49c3dae0f7cf0d220ecdc7c3255b54d8daf6a980e651e6b01f502e60b
+  frozen_sha256:
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 922afa81b750905e0aaa6fc096d4b1176be2112269f119da81cc5aa72d09230d
+    tests/osc/test_runtime_receipt_producers.py: 41c15578eebb43f90a244f94562a8473301503a646f4eb5754853a99991c56c6
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  required_invariants:
+    - a cross-module direct function is not fully identified by static source/code/module/qualname when behavior-affecting globals can rebind
+    - behavior-affecting cross-module globals and recursively reachable direct dependencies are identity-bound, or mutable, cyclic, unresolved, uninspectable, dynamic, or unsupported context fails closed
+    - strengthened private application-policy identity semantics use a versioned private digest/schema domain, so a receipt carrying weaker semantics fails closed without public API change
+    - an old application-policy ID cannot accept a changed derive_stage_lineage/SeedLineage behavior before mutation execution, at capture, before replay, between replays, or after replay
+    - existing R4 global/default/kwdefault/closure/same-module recursive and intermediate-owner fail-closed guarantees remain intact
+    - full MutationOutcome equality, isolated Case cloning, derived MUTATION seed, target preservation, and accepted/repaired/rejected causal boundaries remain intact
+  required_regressions:
+    - >-
+      cold same-code/source/module/qualname clone of datadiff_osc.search.epochs.derive_stage_lineage with only its
+      SeedLineage global rebound changes policy ID or fails closed before mutation execution, while the derived mutation seed changes
+    - >-
+      warm version of the same derive_stage_lineage/SeedLineage global-rebind attack changes policy ID or fails closed;
+      the prior application-policy ID must reject with mutation operator application policy mismatch
+    - >-
+      cross-module direct callable with mutable, cyclic, unresolved, uninspectable, or unsupported behavior-affecting
+      context fails closed rather than receiving static-only acceptance
+    - existing MutationOutcome-global, defaults, kwdefaults, closure, same-module recursion, Holder.STATE, module.STATE, and registry/profile/callable substitution regressions remain passing
+  validation:
+    scoped_command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py
+      tests/osc/test_search_gate_crosswalk.py
+    execution_count: exactly_once_after_implementation
+    required_evidence: complete terminal exit code and result must be retained in the remediation report; detached or partial output is not a pass
+    sha_rule: re-hash both allowed paths and every frozen path before and after the scoped command
+  stop_conditions:
+    - any frozen or public API SHA mismatch
+    - any attempt to broaden allowed paths or modify public exports
+    - any missing complete scoped-test exit/result
+    - any negative regression that accepts the stale policy identity or promotes receipt/candidate/gate/authorization authority
+  completion_report_requirements:
+    - exact before/after SHA for both allowed paths and exact post-remediation SHA for every frozen path
+    - exact one-time scoped command, exit code, and complete result
+    - exact cold/warm negative-review, independent-counterexample, and abnormal-input outcomes for every required regression
+    - forbidden_paths_modified=[], deviations=[], child_agents=0
+post_remediation_review:
+  required_before_combined_suite:
+    - create a new R6 authority contract; do not reuse the R5 high finding as a pass
+    - spawn exactly three direct zero-write reviewers with no grandchildren for Search, Runtime, and Contract negative review, independent counterexample validation, and abnormal-input validation
+    - require three complete reports with aggregate blocker=0, high=0, medium=0 and exact pre/post target SHA values
+    - only then re-hash all thirteen targets and run the exact six-file combined scoped suite once
+decision:
+  implementation_permitted_scope: exact task.allowed_write_paths only
+  implementation_started: false
+  foundation_barrier: pending
+  foundation_barrier_passed: false
+  tests_osc_authorized: false
+  full_repository_tests_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

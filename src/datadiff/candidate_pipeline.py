@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,10 @@ from datadiff.dynamic_strategy import write_strategy_snapshot
 from datadiff.dsl import Case
 from datadiff.issue_readiness import build_issue_readiness
 from datadiff.oracle import Finding
+from datadiff.osc_diagnostic_facade import (
+    consume_opaque_diagnostic_ref_set,
+    not_evaluated_diagnostic_ref_set,
+)
 from datadiff.pathing import project_display_path as _project_display_path_impl
 from datadiff.pathing import resolve_project_path as _resolve_project_path_impl
 from datadiff.finding_outcomes import candidate_issue_family_keys
@@ -94,6 +99,7 @@ def build_candidate_pipeline(
         old_issue_dir=resolved_old_issue_dir,
         generated_issue_dir=resolved_generated_issue_dir,
         include_generated=True,
+        scan_generated_workflow_evidence=False,
     )
     existing_by_family = _issues_by_family(existing_queue.get("issues", []))
     confirmed_latest_families = set(existing_queue.get("bug_status_summary", {}).get("confirmed_latest_families", []))
@@ -127,10 +133,17 @@ def build_candidate_pipeline(
                 "findings": row.get("findings", []),
                 "normalized": row.get("normalized", {}),
                 "raw_results": row.get("raw_results", {}),
+                "backend_status": _candidate_diagnostic_backend_status(row),
                 "semantic_contract_evidence": _semantic_contract_evidence(row),
                 "ir_rewrite_evidence": _ir_rewrite_evidence(row),
+                "experiment_manifest": _candidate_diagnostic_manifest(row),
+                "osc_diagnostic_refs": _candidate_opaque_diagnostic_refs(row),
+                "osc_metamorphic_diagnostic_refs": (
+                    _candidate_opaque_metamorphic_diagnostic_refs(row)
+                ),
                 "config": {
                     **row_config,
+                    "artifact_output_dir": str(pipeline_dir / "bug-artifacts"),
                     "strategy_snapshot_path": str(strategy_snapshot_path),
                     "freeze_strategy_snapshot": True,
                     "strategy_learning_path": str(pipeline_dir / "strategy-learning" / "candidate-pipeline-learning.json"),
@@ -157,29 +170,53 @@ def build_candidate_pipeline(
             family_actionable_representatives=family_actionable_representatives,
         )
         if skip_reason:
-            candidates.append(
-                _skipped_pipeline_duplicate_candidate(
+            try:
+                candidate = _skipped_pipeline_duplicate_candidate(
                     candidate_id=candidate_id,
                     row=frozen_row,
                     pipeline_duplicate_of=pipeline_duplicate_of,
                     skip_reason=skip_reason,
+                    recheck_attempts=max(0, int(recheck_attempts)),
                     existing_by_family=existing_by_family,
                     confirmed_latest_families=confirmed_latest_families,
                 )
-            )
+            except Exception as exc:  # duplicate validation is still candidate-local
+                candidate = _failed_pipeline_candidate(
+                    candidate_id=candidate_id,
+                    row=frozen_row,
+                    error=exc,
+                    reduce_artifacts=False,
+                    existing_by_family=existing_by_family,
+                    confirmed_latest_families=confirmed_latest_families,
+                    family_seen_in_pipeline=family_seen_in_pipeline,
+                )
+            _attach_candidate_diagnostic_projection(candidate, frozen_row)
+            candidates.append(candidate)
             continue
-        candidate = _process_candidate(
-            candidate_id=candidate_id,
-            row=frozen_row,
-            pipeline_dir=pipeline_dir,
-            issue_drafts_dir=issue_drafts_dir,
-            recheck_attempts=max(0, int(recheck_attempts)),
-            reduce_artifacts=reduce_artifacts,
-            standalone_reproducer=standalone_reproducer,
-            confirmed_latest_families=confirmed_latest_families,
-            existing_by_family=existing_by_family,
-            family_seen_in_pipeline=family_seen_in_pipeline,
-        )
+        try:
+            candidate = _process_candidate(
+                candidate_id=candidate_id,
+                row=frozen_row,
+                pipeline_dir=pipeline_dir,
+                issue_drafts_dir=issue_drafts_dir,
+                recheck_attempts=max(0, int(recheck_attempts)),
+                reduce_artifacts=reduce_artifacts,
+                standalone_reproducer=standalone_reproducer,
+                confirmed_latest_families=confirmed_latest_families,
+                existing_by_family=existing_by_family,
+                family_seen_in_pipeline=family_seen_in_pipeline,
+            )
+        except Exception as exc:  # fail one candidate closed without aborting the batch
+            candidate = _failed_pipeline_candidate(
+                candidate_id=candidate_id,
+                row=frozen_row,
+                error=exc,
+                reduce_artifacts=reduce_artifacts,
+                existing_by_family=existing_by_family,
+                confirmed_latest_families=confirmed_latest_families,
+                family_seen_in_pipeline=family_seen_in_pipeline,
+            )
+        _attach_candidate_diagnostic_projection(candidate, frozen_row)
         candidates.append(candidate)
         if primary_family:
             family_seen_in_pipeline.setdefault(primary_family, candidate_id)
@@ -206,6 +243,7 @@ def build_candidate_pipeline(
         old_issue_dir=resolved_old_issue_dir,
         generated_issue_dir=resolved_generated_issue_dir,
         include_generated=False,
+        scan_generated_workflow_evidence=False,
     )
     readiness_by_path = {
         str(issue.get("path", "")): issue for issue in queue.get("issues", []) if str(issue.get("path", ""))
@@ -256,6 +294,8 @@ def render_candidate_pipeline_markdown(manifest: dict[str, Any]) -> str:
         f"- Generated at: `{manifest.get('generated_at', '')}`",
         f"- Frozen candidates: `{summary.get('candidate_count', 0)}`",
         f"- Rechecked candidates: `{summary.get('rechecked_count', 0)}`",
+        f"- Candidate processing errors: `{summary.get('processing_error_count', 0)}`",
+        f"- Recheck errors: `{summary.get('recheck_error_count', 0)}`",
         f"- Reproduced candidates: `{summary.get('reproduced_count', 0)}`",
         f"- Reduced artifacts: `{summary.get('reduced_count', 0)}`",
         f"- Skipped duplicate candidates: `{summary.get('skipped_duplicate_candidate_count', 0)}`",
@@ -499,6 +539,85 @@ def _primary_family_from_row(row: dict[str, Any]) -> str:
     return str(families[0]) if families else "unknown"
 
 
+def _failed_pipeline_candidate(
+    *,
+    candidate_id: str,
+    row: dict[str, Any],
+    error: Exception,
+    reduce_artifacts: bool,
+    existing_by_family: dict[str, list[str]],
+    confirmed_latest_families: set[str],
+    family_seen_in_pipeline: dict[str, str],
+) -> dict[str, Any]:
+    """Represent a candidate-local processing error without losing the batch."""
+
+    families = list(row.get("families", []) or [])
+    primary_family = _primary_family_from_row(row)
+    pipeline_duplicate_of = family_seen_in_pipeline.get(primary_family, "")
+    local_duplicate_paths = sorted(
+        {
+            path
+            for family in families
+            for path in existing_by_family.get(family, [])
+        }
+    )
+    return {
+        "candidate_id": candidate_id,
+        "primary_family": primary_family,
+        "families": families,
+        "candidate_acquisition": dict(row.get("candidate_acquisition", {}) or {}),
+        "source_evidence_file": str(row.get("source_evidence_file", "")),
+        "source_run_file": str(row.get("source_run_file", "")),
+        "case_id": row.get("case", {}).get("case_id", ""),
+        "semantic_contract_evidence": dict(row.get("semantic_contract_evidence", {}) or {}),
+        "ir_rewrite_evidence": dict(row.get("ir_rewrite_evidence", {}) or {}),
+        "bug_dir": str(row.get("bug_dir", "") or ""),
+        "artifact_created": False,
+        "initial_candidate_recheck": dict(row.get("candidate_recheck", {}) or {}),
+        "pipeline_processing": {
+            "status": "error",
+            "stage": "candidate_processing",
+            "error_type": error.__class__.__name__,
+            "error": str(error),
+        },
+        "recheck": {
+            "attempts": 0,
+            "successful_attempts": 0,
+            "error_count": 1,
+            "reproduced": False,
+            "reproduced_families": [],
+            "attempt_summaries": [],
+        },
+        "reduction": {
+            "requested": bool(reduce_artifacts),
+            "performed": False,
+            "skipped": True,
+            "skip_reason": "candidate_processing_error",
+        },
+        "triage": {
+            "verdict": "pipeline_error",
+            "paper_status": "not_evaluable",
+            "triage_confidence": "n/a",
+        },
+        "dedup": {
+            "status": _dedup_status(
+                families,
+                local_duplicate_paths=local_duplicate_paths,
+                pipeline_duplicate_of=pipeline_duplicate_of,
+                confirmed_latest_families=confirmed_latest_families,
+            ),
+            "local_duplicate_paths": local_duplicate_paths,
+            "pipeline_duplicate_of": pipeline_duplicate_of,
+            "confirmed_latest_family": any(
+                family in confirmed_latest_families for family in families
+            ),
+        },
+        "issue_draft": {},
+        "strategy_learning_path": "",
+        "issue_readiness": {},
+    }
+
+
 def _duplicate_processing_skip_reason(
     *,
     primary_family: str,
@@ -527,6 +646,7 @@ def _skipped_pipeline_duplicate_candidate(
     row: dict[str, Any],
     pipeline_duplicate_of: str,
     skip_reason: str,
+    recheck_attempts: int,
     existing_by_family: dict[str, list[str]],
     confirmed_latest_families: set[str],
 ) -> dict[str, Any]:
@@ -560,6 +680,21 @@ def _skipped_pipeline_duplicate_candidate(
         "pipeline_duplicate_of": pipeline_duplicate_of,
         "confirmed_latest_family": any(family in confirmed_latest_families for family in families),
     }
+    case = Case.from_dict(row.get("case", {}))
+    backends = _candidate_backends(row)
+    config_data = row.get("config", {}) if isinstance(row.get("config", {}), dict) else {}
+    recheck = _recheck_candidate(
+        case,
+        backends,
+        ExperimentConfig.from_payload(config_data),
+        families,
+        attempts=max(0, int(recheck_attempts)),
+    )
+    pipeline_status = (
+        "recheck_only_duplicate_family"
+        if int(recheck.get("attempts", 0) or 0) > 0
+        else "skipped_duplicate_family"
+    )
     return {
         "candidate_id": candidate_id,
         "primary_family": primary_family,
@@ -574,18 +709,12 @@ def _skipped_pipeline_duplicate_candidate(
         "artifact_created": False,
         "initial_candidate_recheck": dict(row.get("candidate_recheck", {}) or {}),
         "pipeline_processing": {
-            "status": "skipped_duplicate_family",
+            "status": pipeline_status,
             "reason": skip_reason,
             "pipeline_duplicate_of": pipeline_duplicate_of,
+            "expensive_processing_skipped": True,
         },
-        "recheck": {
-            "attempts": 0,
-            "reproduced": False,
-            "reproduced_families": [],
-            "attempt_summaries": [],
-            "skipped": True,
-            "skip_reason": skip_reason,
-        },
+        "recheck": recheck,
         "reduction": {
             "requested": False,
             "performed": False,
@@ -790,6 +919,93 @@ def _candidate_backends(row: dict[str, Any]) -> list[str]:
     return backends
 
 
+def _candidate_diagnostic_backend_status(
+    row: Mapping[str, Any],
+) -> dict[str, str]:
+    for key in ("normalized", "raw_results", "backend_status"):
+        try:
+            payload = row.get(key)
+            items = tuple(payload.items()) if isinstance(payload, Mapping) else ()
+        except Exception:
+            continue
+        status_by_backend: dict[str, str] = {}
+        for backend, value in items:
+            if not isinstance(backend, str) or not backend:
+                continue
+            try:
+                status = value.get("status") if isinstance(value, Mapping) else value
+            except Exception:
+                status = None
+            status_by_backend[backend] = (
+                status if isinstance(status, str) and status else "unknown"
+            )
+        if status_by_backend:
+            return status_by_backend
+    return {}
+
+
+def _candidate_diagnostic_backends(row: Mapping[str, Any]) -> list[str]:
+    return list(_candidate_diagnostic_backend_status(row))
+
+
+def _candidate_diagnostic_manifest(row: Mapping[str, Any]) -> dict[str, Any]:
+    try:
+        manifest = row.get("experiment_manifest")
+        return dict(manifest) if isinstance(manifest, Mapping) else {}
+    except Exception:
+        return {}
+
+
+def _candidate_diagnostic_case_digest(row: Mapping[str, Any]) -> str:
+    manifest = _candidate_diagnostic_manifest(row)
+    case_digest = manifest.get("case_digest")
+    return case_digest if isinstance(case_digest, str) else ""
+
+
+def _candidate_opaque_diagnostic_refs(row: Mapping[str, Any]) -> dict[str, Any]:
+    return consume_opaque_diagnostic_ref_set(
+        row.get("osc_diagnostic_refs"),
+        expected_backends=_candidate_diagnostic_backends(row),
+        case_digest=_candidate_diagnostic_case_digest(row),
+    )
+
+
+def _candidate_opaque_metamorphic_diagnostic_refs(
+    row: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    source = row.get("osc_metamorphic_diagnostic_refs")
+    if not isinstance(source, Mapping):
+        source = row.get("metamorphic")
+    if not isinstance(source, Mapping):
+        return {}
+    projections: dict[str, dict[str, Any]] = {}
+    try:
+        items = tuple(source.items())
+    except Exception:
+        return {}
+    for name, variant in items:
+        if not isinstance(name, str) or not name or not isinstance(variant, Mapping):
+            continue
+        projections[name] = {
+            "experiment_manifest": _candidate_diagnostic_manifest(variant),
+            "backend_status": _candidate_diagnostic_backend_status(variant),
+            "osc_diagnostic_refs": _candidate_opaque_diagnostic_refs(variant),
+        }
+    return projections
+
+
+def _attach_candidate_diagnostic_projection(
+    candidate: dict[str, Any],
+    source_row: Mapping[str, Any],
+) -> None:
+    candidate["experiment_manifest"] = _candidate_diagnostic_manifest(source_row)
+    candidate["backend_status"] = _candidate_diagnostic_backend_status(source_row)
+    candidate["osc_diagnostic_refs"] = _candidate_opaque_diagnostic_refs(source_row)
+    candidate["osc_metamorphic_diagnostic_refs"] = (
+        _candidate_opaque_metamorphic_diagnostic_refs(source_row)
+    )
+
+
 def _ensure_candidate_artifact_dir(row: dict[str, Any]) -> tuple[Path | None, bool]:
     artifact_dir_text = str(row.get("bug_dir", "") or "").strip()
     if artifact_dir_text:
@@ -802,12 +1018,16 @@ def _ensure_candidate_artifact_dir(row: dict[str, Any]) -> tuple[Path | None, bo
     raw_results = row.get("raw_results", {}) if isinstance(row.get("raw_results", {}), dict) else {}
     if not findings or not normalized or not raw_results:
         return None, False
+    config = row.get("config", {}) if isinstance(row.get("config", {}), dict) else {}
+    artifact_output_dir = str(config.get("artifact_output_dir", "") or "").strip()
+    artifact_base_dir = _resolve_project_path(Path(artifact_output_dir)) if artifact_output_dir else None
     artifact_dir = save_bug_artifact(
         case,
         raw_results=raw_results,
         normalized=normalized,
         findings=findings,
-        config=row.get("config", {}),
+        config=config,
+        base_dir=artifact_base_dir,
     )
     return artifact_dir, True
 
@@ -846,7 +1066,14 @@ def _recheck_candidate(
     attempts: int,
 ) -> dict[str, Any]:
     if attempts <= 0 or not backends or not families:
-        return {"attempts": 0, "reproduced": False, "reproduced_families": [], "attempt_summaries": []}
+        return {
+            "attempts": 0,
+            "successful_attempts": 0,
+            "error_count": 0,
+            "reproduced": False,
+            "reproduced_families": [],
+            "attempt_summaries": [],
+        }
     recheck_config_data = config.to_dict()
     recheck_config_data["candidate_recheck_count"] = 0
     recheck_config_data["enable_artifact"] = False
@@ -855,8 +1082,37 @@ def _recheck_candidate(
     original_families = set(families)
     reproduced_families: set[str] | None = None
     attempt_summaries: list[dict[str, Any]] = []
+    successful_attempts = 0
+    error_count = 0
     for attempt in range(attempts):
-        row = run_loaded_case(case, backends=backends, config=recheck_config, save_artifact=False)
+        try:
+            row = run_loaded_case(
+                case,
+                backends=backends,
+                config=recheck_config,
+                save_artifact=False,
+            )
+        except Exception as exc:  # a malformed/legacy case must not abort the pipeline
+            error_count += 1
+            reproduced_families = set()
+            attempt_summaries.append(
+                {
+                    "attempt": attempt + 1,
+                    "status": "error",
+                    "finding_count": 0,
+                    "candidate_families": [],
+                    "matched_families": [],
+                    "error_type": exc.__class__.__name__,
+                    "error": str(exc),
+                    "osc_diagnostic_refs": not_evaluated_diagnostic_ref_set(
+                        backends,
+                        reason_code="recheck_execution_error",
+                    ),
+                    "osc_metamorphic_diagnostic_refs": {},
+                }
+            )
+            continue
+        successful_attempts += 1
         current_families = set(candidate_issue_family_keys(row.get("findings", [])).keys())
         matched = sorted(original_families & current_families)
         if reproduced_families is None:
@@ -870,11 +1126,17 @@ def _recheck_candidate(
                 "finding_count": len(row.get("findings", []) or []),
                 "candidate_families": sorted(current_families),
                 "matched_families": matched,
+                "osc_diagnostic_refs": _candidate_opaque_diagnostic_refs(row),
+                "osc_metamorphic_diagnostic_refs": (
+                    _candidate_opaque_metamorphic_diagnostic_refs(row)
+                ),
             }
         )
     reproduced_families = reproduced_families or set()
     return {
         "attempts": attempts,
+        "successful_attempts": successful_attempts,
+        "error_count": error_count,
         "reproduced": bool(reproduced_families),
         "reproduced_families": sorted(reproduced_families),
         "attempt_summaries": attempt_summaries,
@@ -1034,9 +1296,19 @@ def _candidate_pipeline_summary(candidates: list[dict[str, Any]], queue: dict[st
     skipped_duplicate_count = sum(
         1
         for candidate in candidates
-        if candidate.get("pipeline_processing", {}).get("status") == "skipped_duplicate_family"
+        if candidate.get("pipeline_processing", {}).get("expensive_processing_skipped") is True
+        or candidate.get("pipeline_processing", {}).get("status") == "skipped_duplicate_family"
     )
     processed_count = len(candidates) - skipped_duplicate_count
+    processing_error_count = sum(
+        1
+        for candidate in candidates
+        if candidate.get("pipeline_processing", {}).get("status") == "error"
+    )
+    recheck_error_count = sum(
+        int(candidate.get("recheck", {}).get("error_count", 0) or 0)
+        for candidate in candidates
+    )
     local_duplicate_count = sum(
         1
         for candidate in candidates
@@ -1044,14 +1316,19 @@ def _candidate_pipeline_summary(candidates: list[dict[str, Any]], queue: dict[st
     )
     contract_summary = _semantic_contract_candidate_summary(candidates)
     rewrite_summary = _ir_rewrite_candidate_summary(candidates)
+    rechecked_count = sum(
+        1 for candidate in candidates if candidate.get("recheck", {}).get("attempts", 0) > 0
+    )
     return {
         "candidate_count": len(candidates),
         "unique_family_count": len({candidate.get("primary_family", "") for candidate in candidates if candidate.get("primary_family")}),
         "processed_candidate_count": processed_count,
+        "processing_error_count": processing_error_count,
+        "recheck_error_count": recheck_error_count,
         "skipped_duplicate_candidate_count": skipped_duplicate_count,
-        "rechecked_count": sum(1 for candidate in candidates if candidate.get("recheck", {}).get("attempts", 0) > 0),
+        "rechecked_count": rechecked_count,
         "reproduced_count": reproduced_count,
-        "recheck_pass_rate": reproduced_count / processed_count if processed_count else 0.0,
+        "recheck_pass_rate": reproduced_count / rechecked_count if rechecked_count else 0.0,
         "reduced_count": reduced_count,
         "artifact_created_count": sum(1 for candidate in candidates if candidate.get("artifact_created")),
         "candidate_bug_verdict_count": sum(

@@ -6,7 +6,7 @@ from typing import Any
 
 from datadiff.case_validation import validate_case_program
 from datadiff.datagen import repair_operations
-from datadiff.dsl import Case, Program
+from datadiff.dsl import Case, ColumnSpec, Program, TableData
 
 
 @dataclass(slots=True)
@@ -86,14 +86,15 @@ def _repair_case(case: Case) -> tuple[Case, bool]:
 
 
 def _fallback_case(case: Case) -> Case:
+    tables = _dedupe_case_tables(case.tables)
     return Case(
         case_id=case.case_id,
         seed=case.seed,
-        tables=case.tables,
+        tables=tables,
         program=Program(
             program_id=case.program.program_id,
             seed=case.program.seed,
-            operations=_fallback_operations(case),
+            operations=_fallback_operations_for_tables(tables),
         ),
         metadata=dict(case.metadata),
     )
@@ -101,3 +102,26 @@ def _fallback_case(case: Case) -> Case:
 
 def _fallback_operations(case: Case) -> list[dict[str, Any]]:
     return [{"op": "limit", "n": len(case.tables[0].rows) if case.tables else 0}]
+
+
+def _fallback_operations_for_tables(tables: list[TableData]) -> list[dict[str, Any]]:
+    return [{"op": "limit", "n": len(tables[0].rows) if tables else 0}]
+
+
+def _dedupe_case_tables(tables: list[TableData]) -> list[TableData]:
+    result: list[TableData] = []
+    used_table_names: set[str] = set()
+    for index, table in enumerate(tables):
+        table_name = table.name
+        if table_name in used_table_names:
+            table_name = f"{table.name}_{index}"
+        used_table_names.add(table_name)
+        seen_columns: set[str] = set()
+        columns: list[ColumnSpec] = []
+        for column in table.columns:
+            if column.name in seen_columns:
+                continue
+            seen_columns.add(column.name)
+            columns.append(ColumnSpec(column.name, column.type, nullable=column.nullable))
+        result.append(TableData(table_name, columns, list(table.rows)))
+    return result

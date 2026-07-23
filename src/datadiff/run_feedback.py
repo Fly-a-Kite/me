@@ -103,8 +103,16 @@ def apply_feedback_updates(
             case_fingerprint=row.get("case_fingerprint"),
             schedule_delta=float(feedback_summary.get("seed_schedule_delta", 0.0) or 0.0),
         )
-        row["feedback_corpus_persisted"] = feedback.last_persisted_to_disk
-        row["feedback_record_skip_reason"] = feedback.last_record_skip_reason
+        # Feedback implementations used by research controls may only expose
+        # the storage result.  These two fields are diagnostics, not part of
+        # the feedback protocol, so they must not abort an otherwise valid
+        # fuzz iteration.
+        row["feedback_corpus_persisted"] = bool(
+            getattr(feedback, "last_persisted_to_disk", False)
+        )
+        row["feedback_record_skip_reason"] = str(
+            getattr(feedback, "last_record_skip_reason", "") or ""
+        )
     else:
         feedback.last_persisted_to_disk = False
         row["stored_in_feedback_corpus"] = False
@@ -116,7 +124,11 @@ def apply_feedback_updates(
         candidate_source=selected_meta["source"],
     )
     row["feedback_summary"] = feedback_summary
-    feedback_outcome_recorder = getattr(feedback, "record_candidate_outcome")
+    feedback_outcome_recorder = getattr(feedback, "record_candidate_outcome", None)
+    if not callable(feedback_outcome_recorder):
+        feedback_outcome_recorder = getattr(feedback, "record_candidate_result", None)
+    if not callable(feedback_outcome_recorder):
+        raise AttributeError("feedback state must provide record_candidate_outcome")
     row["source_reward"] = feedback_outcome_recorder(
         selected_meta["source"],
         has_finding=discovery_signals.feedback_finding,

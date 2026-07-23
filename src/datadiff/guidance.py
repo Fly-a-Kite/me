@@ -389,6 +389,359 @@ TARGET_ALIASES: dict[str, set[str]] = {
         "pattern:pyarrow_groupby_filter_cast_membership",
         "membership:int-column-fractional-literal",
     },
+    "case_when_join_key_membership": {
+        "pattern:case_when_join_key_membership",
+        "semantic_signal:left_join_case_when_membership",
+        "semantic_signal:normalized_string_join_key",
+    },
+    "coalesce_union_distinct_type_boundary": {
+        "pattern:coalesce_union_distinct_type_boundary",
+        "semantic_signal:union_coalesce_distinct_topk",
+        "semantic_signal:coalesce_case_distinct_aggregation",
+    },
+    "multi_key_anti_join_null_guard": {
+        "pattern:multi_key_anti_join_null_guard",
+        "semantic_signal:multi_key_membership_aggregation",
+        "semantic_signal:multi_key_semi_anti_join",
+    },
+    "empty_then_union_groupby": {
+        "pattern:empty_then_union_groupby",
+        "pattern:empty_filter_groupby",
+        "pattern:union_all_row_append",
+    },
+    "boolean_coalesce_case_membership": {
+        "pattern:boolean_coalesce_case_membership",
+        "semantic_signal:boolean_coalesce_case_aggregation",
+        "semantic_signal:boolean_membership_case_aggregation",
+    },
+    "numeric_text_cast_membership_aggregation": {
+        "pattern:numeric_text_cast_membership_aggregation",
+        "semantic_signal:numeric_text_cast_membership_aggregation",
+        "semantic_signal:type_cast_membership_aggregation",
+    },
+    "string_token_join_distinct": {
+        "pattern:string_token_join_distinct",
+        "expr:string_replace",
+        "expr:string_split_part",
+        "semantic_signal:normalized_string_join_key",
+    },
+    "date_part_row_number_union": {
+        "pattern:date_part_row_number_union",
+        "expr:date_part",
+        "op:row_number_filter",
+        "pattern:union_all_row_append",
+    },
+    "post_groupby_join_global_aggregate": {
+        "pattern:post_groupby_join_global_aggregate",
+        "op:groupby",
+        "op:join",
+        "op:aggregate",
+        "semantic_signal:groupby_aggregation",
+    },
+    "distinct_anti_join_case_topk": {
+        "pattern:distinct_anti_join_case_topk",
+        "pattern:distinct_deduplicate",
+        "pattern:semi_anti_join_rewrite",
+        "semantic_signal:conditional_expression",
+    },
+    "coalesce_row_number_topk": {
+        "pattern:coalesce_row_number_topk",
+        "pattern:coalesce_null_semantics",
+        "op:row_number_filter",
+        "semantic_signal:coalesce_case_distinct_aggregation",
+    },
+    "union_distinct_anti_running_sum": {
+        "pattern:union_distinct_anti_running_sum",
+        "pattern:union_all_row_append",
+        "pattern:distinct_deduplicate",
+        "pattern:anti_join_exclusion",
+        "op:running_sum",
+    },
+    "null_case_semi_join_groupby": {
+        "pattern:null_case_semi_join_groupby",
+        "pattern:coalesce_null_semantics",
+        "pattern:semi_join_membership",
+        "semantic_signal:boolean_membership_case_aggregation",
+    },
+    "date_string_cast_row_number": {
+        "pattern:date_string_cast_row_number",
+        "expr:date_part",
+        "expr:string_lower",
+        "op:row_number_filter",
+    },
+    "drop_nulls_coalesce_distinct_join_topk": {
+        "pattern:drop_nulls_coalesce_distinct_join_topk",
+        "pattern:drop_nulls_null_filter",
+        "pattern:coalesce_null_semantics",
+        "pattern:distinct_deduplicate",
+        "semantic_signal:coalesce_topk_keys",
+    },
+    "date_part_distinct_offset": {
+        "pattern:date_part_distinct_offset",
+        "pattern:union_all_row_append",
+        "pattern:distinct_deduplicate",
+        "expr:date_part",
+        "op:offset",
+    },
+    "bool_fill_null_membership_row_number": {
+        "pattern:bool_fill_null_membership_row_number",
+        "pattern:fill_null_null_semantics",
+        "pattern:semi_anti_join_rewrite",
+        "semantic_signal:boolean_membership_case_aggregation",
+        "op:row_number_filter",
+    },
+    "string_numeric_cast_anti_join_aggregate": {
+        "pattern:string_numeric_cast_anti_join_aggregate",
+        "expr:string_lower",
+        "semantic_signal:type_cast_membership_aggregation",
+        "pattern:anti_join_exclusion",
+    },
+    "post_aggregate_case_membership": {
+        "pattern:post_aggregate_case_membership",
+        "op:groupby",
+        "op:aggregate",
+        "pattern:semi_join_membership",
+        "semantic_signal:conditional_expression",
+    },
+    "multi_key_nullable_membership_window": {
+        "pattern:multi_key_nullable_membership_window",
+        "pattern:coalesce_null_semantics",
+        "pattern:fill_null_null_semantics",
+        "pattern:semi_anti_join_rewrite",
+        "op:row_number_filter",
+        "semantic_signal:boolean_membership_case_aggregation",
+    },
+    "string_empty_pattern_membership_distinct": {
+        "pattern:string_empty_pattern_membership_distinct",
+        "expr:string_split_part",
+        "expr:string_null_if_empty",
+        "expr:string_contains",
+        "pattern:semi_anti_join_rewrite",
+        "pattern:distinct_deduplicate",
+    },
+    "date_cast_union_running_sum_topk": {
+        "pattern:date_cast_union_running_sum_topk",
+        "pattern:union_all_row_append",
+        "expr:date_part",
+        "semantic_signal:type_cast_membership_aggregation",
+        "op:running_sum",
+        "op:row_number_filter",
+    },
+    "coalesce_anti_join_union_topk": {
+        "pattern:coalesce_anti_join_union_topk",
+        "pattern:union_all_row_append",
+        "pattern:coalesce_null_semantics",
+        "pattern:fill_null_null_semantics",
+        "pattern:anti_join_exclusion",
+        "pattern:distinct_deduplicate",
+    },
+    "bool_null_distinct_running_sum": {
+        "pattern:bool_null_distinct_running_sum",
+        "pattern:fill_null_null_semantics",
+        "semantic_signal:conditional_expression",
+        "pattern:distinct_deduplicate",
+        "op:running_sum",
+        "op:row_number_filter",
+    },
+    "date_string_membership_offset_window": {
+        "pattern:date_string_membership_offset_window",
+        "expr:string_split_part",
+        "expr:string_null_if_empty",
+        "expr:date_part",
+        "pattern:coalesce_null_semantics",
+        "pattern:semi_join_membership",
+        "op:row_number_filter",
+        "op:offset",
+    },
+    "empty_union_window_aggregate": {
+        "pattern:empty_union_window_aggregate",
+        "pattern:union_all_row_append",
+        "op:running_sum",
+        "op:row_number_filter",
+        "op:groupby",
+        "filter:range-open",
+    },
+    "duplicate_key_join_distinct_anti_topk": {
+        "pattern:duplicate_key_join_distinct_anti_topk",
+        "pattern:coalesce_null_semantics",
+        "pattern:join_cardinality",
+        "pattern:distinct_deduplicate",
+        "pattern:anti_join_exclusion",
+        "semantic_signal:conditional_expression",
+    },
+    "large_int_text_membership_window": {
+        "pattern:large_int_text_membership_window",
+        "semantic_signal:type_cast_membership_aggregation",
+        "float:integer-precision-boundary",
+        "pattern:semi_join_membership",
+        "op:running_sum",
+    },
+    "nested_topk_offset_aggregate": {
+        "pattern:nested_topk_offset_aggregate",
+        "op:offset",
+        "op:groupby",
+        "limit:row-boundary",
+        "pattern:topk_filter_pushdown",
+    },
+    "union_distinct_empty_string_window": {
+        "pattern:union_distinct_empty_string_window",
+        "pattern:union_all_row_append",
+        "pattern:distinct_deduplicate",
+        "expr:string_strip",
+        "expr:string_lower",
+        "expr:string_null_if_empty",
+        "pattern:coalesce_null_semantics",
+        "op:running_sum",
+        "op:row_number_filter",
+    },
+    "multi_key_semi_join_window_aggregate": {
+        "pattern:multi_key_semi_join_window_aggregate",
+        "pattern:semi_join_membership",
+        "pattern:distinct_deduplicate",
+        "op:row_number_filter",
+        "op:groupby",
+        "pattern:coalesce_null_semantics",
+    },
+    "string_contains_anti_join_offset": {
+        "pattern:string_contains_anti_join_offset",
+        "expr:string_strip",
+        "expr:string_null_if_empty",
+        "expr:string_contains",
+        "pattern:anti_join_exclusion",
+        "semantic_signal:conditional_expression",
+        "op:offset",
+    },
+    "bool_case_distinct_groupby_union": {
+        "pattern:bool_case_distinct_groupby_union",
+        "pattern:union_all_row_append",
+        "semantic_signal:conditional_expression",
+        "pattern:distinct_deduplicate",
+        "pattern:fill_null_null_semantics",
+        "op:groupby",
+    },
+    "left_join_filter_distinct_window": {
+        "pattern:left_join_filter_distinct_window",
+        "pattern:join_cardinality",
+        "pattern:boolean_predicate_filter",
+        "pattern:distinct_deduplicate",
+        "pattern:coalesce_null_semantics",
+        "op:running_sum",
+        "op:row_number_filter",
+    },
+    "cast_groupby_membership": {
+        "pattern:cast_groupby_membership",
+        "semantic_signal:type_cast_membership_aggregation",
+        "pattern:semi_join_membership",
+        "pattern:fill_null_null_semantics",
+        "semantic_signal:conditional_expression",
+        "op:groupby",
+    },
+    "null_sort_window_union": {
+        "pattern:null_sort_window_union",
+        "pattern:union_all_row_append",
+        "op:offset",
+        "op:running_sum",
+        "op:row_number_filter",
+        "op:groupby",
+        "sort:nulls-first",
+    },
+    "date_part_membership_distinct_join": {
+        "pattern:date_part_membership_distinct_join",
+        "semantic_signal:datetime_expression",
+        "pattern:semi_join_membership",
+        "pattern:distinct_deduplicate",
+        "pattern:join_cardinality",
+        "op:groupby",
+    },
+    "coalesce_case_anti_join_aggregate": {
+        "pattern:coalesce_case_anti_join_aggregate",
+        "pattern:coalesce_null_semantics",
+        "semantic_signal:conditional_expression",
+        "pattern:anti_join_exclusion",
+        "pattern:distinct_deduplicate",
+        "op:groupby",
+    },
+    "string_token_transform_join_window": {
+        "pattern:string_token_transform_join_window",
+        "expr:string_replace",
+        "expr:string_slice",
+        "expr:string_split_part",
+        "expr:string_concat",
+        "pattern:semi_join_membership",
+        "pattern:distinct_deduplicate",
+        "op:running_sum",
+    },
+    "prefix_suffix_bool_membership": {
+        "pattern:prefix_suffix_bool_membership",
+        "expr:string_starts_with",
+        "expr:string_ends_with",
+        "pattern:anti_join_exclusion",
+        "semantic_signal:conditional_expression",
+        "op:row_number_filter",
+        "op:groupby",
+    },
+    "numeric_clip_division_anti_window": {
+        "pattern:numeric_clip_division_anti_window",
+        "expr:clip",
+        "expr:arith_const",
+        "numeric:clip",
+        "pattern:anti_join_exclusion",
+        "semantic_signal:conditional_expression",
+        "op:running_sum",
+    },
+    "bool_not_union_distinct_aggregate": {
+        "pattern:bool_not_union_distinct_aggregate",
+        "pattern:union_all_row_append",
+        "expr:bool_not",
+        "semantic_signal:conditional_expression",
+        "pattern:distinct_deduplicate",
+        "op:row_number_filter",
+        "op:groupby",
+    },
+    "outer_join_coalesce_distinct_topk": {
+        "pattern:outer_join_coalesce_distinct_topk",
+        "pattern:join_cardinality",
+        "pattern:coalesce_null_semantics",
+        "pattern:distinct_deduplicate",
+        "semantic_signal:conditional_expression",
+        "op:groupby",
+        "op:limit",
+    },
+    "chained_string_cleanup_membership_window": {
+        "pattern:chained_string_cleanup_membership_window",
+        "expr:string_strip",
+        "expr:string_lower",
+        "expr:string_replace",
+        "expr:string_split_part",
+        "expr:string_ends_with",
+        "pattern:semi_join_membership",
+        "op:row_number_filter",
+        "op:offset",
+    },
+    "cast_date_union_anti_running": {
+        "pattern:cast_date_union_anti_running",
+        "pattern:union_all_row_append",
+        "expr:date_part",
+        "semantic_signal:type_cast_membership_aggregation",
+        "pattern:anti_join_exclusion",
+        "op:running_sum",
+    },
+    "post_groupby_filter_membership_topk": {
+        "pattern:post_groupby_filter_membership_topk",
+        "op:groupby",
+        "op:filter",
+        "pattern:semi_join_membership",
+        "semantic_signal:conditional_expression",
+        "op:limit",
+    },
+    "duplicate_key_left_join_window_aggregate": {
+        "pattern:duplicate_key_left_join_window_aggregate",
+        "pattern:join_cardinality",
+        "pattern:coalesce_null_semantics",
+        "op:running_sum",
+        "op:row_number_filter",
+        "op:groupby",
+    },
     "null_predicate_filter": {"pattern:null_predicate_filter"},
     "null_predicate": {"filter:null-predicate"},
     "boolean_predicate_filter": {"pattern:boolean_predicate_filter"},
@@ -925,6 +1278,58 @@ _CASE_FEATURE_FLAG_NAMES = (
     "has_csv_long_numeric_roundtrip_probe",
 )
 
+_BOUNDARY_COMBO_GENERATOR_PROFILES = frozenset(
+    {
+        "case_when_join_key_membership",
+        "coalesce_union_distinct_type_boundary",
+        "multi_key_anti_join_null_guard",
+        "empty_then_union_groupby",
+        "boolean_coalesce_case_membership",
+        "numeric_text_cast_membership_aggregation",
+        "string_token_join_distinct",
+        "date_part_row_number_union",
+        "post_groupby_join_global_aggregate",
+        "distinct_anti_join_case_topk",
+        "coalesce_row_number_topk",
+        "union_distinct_anti_running_sum",
+        "null_case_semi_join_groupby",
+        "date_string_cast_row_number",
+        "drop_nulls_coalesce_distinct_join_topk",
+        "date_part_distinct_offset",
+        "bool_fill_null_membership_row_number",
+        "string_numeric_cast_anti_join_aggregate",
+        "post_aggregate_case_membership",
+        "multi_key_nullable_membership_window",
+        "string_empty_pattern_membership_distinct",
+        "date_cast_union_running_sum_topk",
+        "coalesce_anti_join_union_topk",
+        "bool_null_distinct_running_sum",
+        "date_string_membership_offset_window",
+        "empty_union_window_aggregate",
+        "duplicate_key_join_distinct_anti_topk",
+        "large_int_text_membership_window",
+        "nested_topk_offset_aggregate",
+        "union_distinct_empty_string_window",
+        "multi_key_semi_join_window_aggregate",
+        "string_contains_anti_join_offset",
+        "bool_case_distinct_groupby_union",
+        "left_join_filter_distinct_window",
+        "cast_groupby_membership",
+        "null_sort_window_union",
+        "date_part_membership_distinct_join",
+        "coalesce_case_anti_join_aggregate",
+        "string_token_transform_join_window",
+        "prefix_suffix_bool_membership",
+        "numeric_clip_division_anti_window",
+        "bool_not_union_distinct_aggregate",
+        "outer_join_coalesce_distinct_topk",
+        "chained_string_cleanup_membership_window",
+        "cast_date_union_anti_running",
+        "post_groupby_filter_membership_topk",
+        "duplicate_key_left_join_window_aggregate",
+    }
+)
+
 _CASE_FEATURE_PREFIX_CACHE: OrderedDict[tuple[Any, ...], "_CaseFeatureState"] = OrderedDict()
 _MAX_CASE_FEATURE_PREFIX_CACHE = 2048
 
@@ -1045,6 +1450,48 @@ def _base_case_feature_inputs(case: Case) -> tuple[set[str], tuple[Any, ...]]:
         tuple(_case_feature_table_schema_key(source_table) for source_table in case.tables),
     )
     return features, base_key
+
+
+def _tuple_absence_nullable_features(case: Case) -> set[str]:
+    if not case.tables:
+        return set()
+    table_by_name = {table.name: table for table in case.tables}
+    left_table = case.tables[0]
+    features: set[str] = set()
+    for op in case.program.operations:
+        if op_kind(op) != "tuple_absence_filter":
+            continue
+        right_table = table_by_name.get(op_table(op))
+        left_columns = op_columns(op)
+        right_columns = op_right_columns(op)
+        left_has_null = _table_columns_have_nulls(left_table, left_columns)
+        right_has_null = _table_columns_have_nulls(right_table, right_columns)
+        if left_has_null:
+            features.add("filter:tuple-absence-nullable-left")
+        if right_has_null:
+            features.add("filter:tuple-absence-nullable-right")
+        if left_has_null or right_has_null:
+            features.add("pattern:tuple_absence_nullable_row_value")
+            features.add("combo_risk:tuple_absence_nullable_row_value")
+            features.add(_semantic_signal_feature("tuple_absence_nullable_row_value"))
+        if right_has_null:
+            features.add("pattern:tuple_absence_nullable_subquery")
+            features.add("combo_risk:tuple_absence_nullable_subquery")
+            features.add(_semantic_signal_feature("tuple_absence_nullable_subquery"))
+    return features
+
+
+def _table_columns_have_nulls(table: Any, columns: list[str]) -> bool:
+    if table is None or not columns:
+        return False
+    column_set = set(columns)
+    column_specs = {column.name: column for column in getattr(table, "columns", ())}
+    if any(bool(column_specs.get(column) and column_specs[column].nullable) for column in column_set):
+        return True
+    for row in getattr(table, "rows", ()) or ():
+        if any(row.get(column) is None for column in column_set):
+            return True
+    return False
 
 
 def _initial_case_feature_state(case: Case, base_features: set[str]) -> _CaseFeatureState:
@@ -1718,6 +2165,7 @@ def _materialize_case_features(
         features.add("pattern:string_pattern_filter")
     if state.flags["has_tuple_absence_filter"]:
         features.add("pattern:tuple_absence_filter")
+        features.update(_tuple_absence_nullable_features(case))
     if state.flags["has_union_all"]:
         features.add("pattern:union_all_row_append")
     if state.flags["has_drop_nulls"]:
@@ -1740,6 +2188,9 @@ def _materialize_case_features(
         features.add("pattern:conditional_expression")
     if state.flags["has_exact_groupby_agg"]:
         features.add("pattern:groupby_sorted_input")
+    for profile in (generator_profile, mixed_generator_profile):
+        if profile in _BOUNDARY_COMBO_GENERATOR_PROFILES:
+            features.add(f"pattern:{profile}")
     if generator_profile == "row_value_absence_filter" or mixed_generator_profile == "row_value_absence_filter":
         features.add("pattern:row_value_absence_filter")
     if generator_profile == "large_int_filter_groupby" or mixed_generator_profile == "large_int_filter_groupby":
@@ -1871,6 +2322,19 @@ def extract_case_features(case: Case) -> set[str]:
     return derive_case_features(case)
 
 
+def _semantic_novelty_selection(case: Case) -> Mapping[str, Any]:
+    cache = getattr(case, "_runtime_cache", {})
+    payload = cache.get("semantic_novelty_selection", {}) if isinstance(cache, Mapping) else {}
+    return payload if isinstance(payload, Mapping) else {}
+
+
+def _semantic_novelty_metric(case: Case) -> float:
+    return max(
+        0.0,
+        float(_semantic_novelty_selection(case).get("selection_metric", 0.0) or 0.0),
+    )
+
+
 @dataclass(slots=True)
 class GuidanceDecision:
     case: Case
@@ -1900,6 +2364,7 @@ class GuidanceDecision:
     candidate_pool_bias_bonus_metric: float = 0.0
     candidate_pool_shared_bonus_metric: float = 0.0
     candidate_pool_diversity_bonus_metric: float = 0.0
+    semantic_novelty_metric: float = 0.0
     discovery_bias_keep_in_pool_flag: bool = False
     family_saturation_active_flag: bool = False
     profile_saturation_active_flag: bool = False
@@ -1956,6 +2421,7 @@ def _materialize_score_breakdown(
         "candidate_pool_diversity_bonus": decision.candidate_pool_diversity_bonus_metric,
         "candidate_pool_shared_bonus": decision.candidate_pool_shared_bonus_metric,
         "candidate_pool_bias_bonus": decision.candidate_pool_bias_bonus_metric,
+        "semantic_novelty": decision.semantic_novelty_metric,
         "discovery_bias_bonus": decision.discovery_bias_bonus_metric,
         "discovery_bias_hit_count": float(len(decision.discovery_bias_hits)),
         "discovery_bias_keep_in_pool": 1.0 if decision.discovery_bias_keep_in_pool_flag else 0.0,
@@ -2731,7 +3197,7 @@ class GuidanceState:
     ) -> GuidanceDecision:
         decision = GuidanceDecision(
             case=case,
-            score=dense_score.score,
+            score=dense_score.score + 0.5 * _semantic_novelty_metric(case),
             features=analysis.ordered_features,
             matched_targets=analysis.matched_targets,
             candidate_count=candidate_count,
@@ -2751,6 +3217,7 @@ class GuidanceState:
             recent_discovery_loop_penalty_metric=dense_score.recent_discovery_loop_penalty_metric,
             resolved_semantic_boundary_penalty_metric=dense_score.resolved_semantic_boundary_penalty_metric,
             candidate_pool_bias_bonus_metric=dense_score.candidate_pool_bias_bonus_metric,
+            semantic_novelty_metric=_semantic_novelty_metric(case),
             discovery_bias_keep_in_pool_flag=dense_score.discovery_bias_keep_in_pool_flag,
             family_saturation_active_flag=dense_score.family_saturation_active_flag,
             profile_saturation_active_flag=dense_score.profile_saturation_active_flag,
@@ -3035,6 +3502,10 @@ class GuidanceState:
         frontier_conformance = decision.frontier_conformance_metric
         contribution_potential = decision.contribution_potential_metric
         if decision.discovery_bias_keep_in_pool_flag:
+            return True
+
+        novelty = _semantic_novelty_selection(decision.case)
+        if int(novelty.get("unseen_motif_count", 0) or 0) > 0:
             return True
 
         if decision.matched_targets:
@@ -3336,6 +3807,7 @@ def _dominance_vector(
             decision.family_saturation_penalty_metric,
             decision.issue_replay_global_saturation_penalty_metric,
             decision.issue_inspired_source_saturation_penalty_metric,
+            decision.semantic_novelty_metric,
             decision.frontier_conformance_metric,
             decision.contribution_potential_metric,
             decision.discovery_diversity_bonus_metric,
@@ -3344,6 +3816,7 @@ def _dominance_vector(
     return (
         decision.candidate_pool_diversity_bonus_metric,
         decision.candidate_pool_shared_bonus_metric,
+        decision.semantic_novelty_metric,
         decision.discovery_bias_bonus_metric,
         decision.frontier_conformance_metric,
         decision.contribution_potential_metric,
@@ -3393,6 +3866,7 @@ def _lexicographic_decision_key(
             decision.family_saturation_penalty_metric,
             decision.issue_replay_global_saturation_penalty_metric,
             decision.issue_inspired_source_saturation_penalty_metric,
+            decision.semantic_novelty_metric,
             decision.frontier_conformance_metric,
             decision.contribution_potential_metric,
             decision.discovery_diversity_bonus_metric,
@@ -3402,6 +3876,7 @@ def _lexicographic_decision_key(
     return (
         decision.candidate_pool_diversity_bonus_metric,
         decision.candidate_pool_shared_bonus_metric,
+        decision.semantic_novelty_metric,
         decision.discovery_bias_bonus_metric,
         decision.frontier_conformance_metric,
         decision.contribution_potential_metric,
@@ -3423,6 +3898,10 @@ def _lexicographic_decision_key(
 
 def _decision_has_family_saturation(decision: GuidanceDecision) -> bool:
     return decision.family_saturation_active_flag
+
+
+_targeted_decision_key = _contrast_decision_key
+_decision_hits_family_diversity_guard = _decision_has_family_saturation
 
 
 def _decision_has_profile_saturation(decision: GuidanceDecision) -> bool:
@@ -4244,6 +4723,11 @@ def _family_saturation_penalty(count: int, *, threshold: int, penalty_weight: fl
     if count < threshold:
         return 0.0
     return max(0.0, penalty_weight) * (1.0 + math.log1p(count - threshold))
+
+
+_predicted_family_diversity_guard_penalty = _predicted_family_saturation_penalty
+_family_diversity_guard_penalty = _family_saturation_penalty
+_family_saturation = _family_saturation_penalty
 
 
 def _is_globally_saturated(count: int, *, threshold: int) -> bool:

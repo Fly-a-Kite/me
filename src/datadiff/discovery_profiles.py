@@ -8,6 +8,42 @@ ProfileGenerator = Callable[[int], Case]
 ProfileCaseGenerator = Callable[[int, str], Case]
 
 
+ORTHOGONAL_STRESS_ROTATION_PROFILES = (
+    "bitmap_boundary_bool_aggregate",
+    "vector_boundary_groupby_distinct",
+    "wide_schema_projection_boundary",
+    "skewed_join_multiplicity",
+    "utf8_slice_length_groupby",
+    "unique_order_window_tiebreak",
+)
+
+PANDAS_TARGETED_ROTATION_PROFILES = (
+    "wide_schema_projection_boundary",
+    "bitmap_boundary_bool_aggregate",
+    "utf8_slice_length_groupby",
+    "vector_boundary_groupby_distinct",
+    "skewed_join_multiplicity",
+)
+
+POLARS_TARGETED_ROTATION_PROFILES = (
+    "unique_order_window_tiebreak",
+    "bitmap_boundary_bool_aggregate",
+    "wide_schema_projection_boundary",
+    "vector_boundary_groupby_distinct",
+    "skewed_join_multiplicity",
+    "utf8_slice_length_groupby",
+)
+
+DATAFUSION_TARGETED_ROTATION_PROFILES = (
+    "vector_boundary_groupby_distinct",
+    "skewed_join_multiplicity",
+    "unique_order_window_tiebreak",
+    "wide_schema_projection_boundary",
+    "utf8_slice_length_groupby",
+    "bitmap_boundary_bool_aggregate",
+)
+
+
 DEEP_PROBE_ROTATION_PROFILES = (
     "simple_case_random_subject",
     "group_quantile_key_probe",
@@ -38,9 +74,56 @@ DEEP_PROBE_ROTATION_PROFILES = (
     "pyarrow_list_flatten_parent_indices_semantics",
     "polars_rolling_mean_by_null_count_semantics",
     "pyarrow_groupby_filter_cast_membership",
+    "case_when_join_key_membership",
+    "coalesce_union_distinct_type_boundary",
+    "multi_key_anti_join_null_guard",
+    "empty_then_union_groupby",
+    "boolean_coalesce_case_membership",
+    "numeric_text_cast_membership_aggregation",
     "partitioned_running_sum",
     "path_basename_keyed_pick",
     "csv_long_numeric_roundtrip",
+    "string_token_join_distinct",
+    "date_part_row_number_union",
+    "post_groupby_join_global_aggregate",
+    "distinct_anti_join_case_topk",
+    "coalesce_row_number_topk",
+    "union_distinct_anti_running_sum",
+    "null_case_semi_join_groupby",
+    "date_string_cast_row_number",
+    "drop_nulls_coalesce_distinct_join_topk",
+    "date_part_distinct_offset",
+    "bool_fill_null_membership_row_number",
+    "string_numeric_cast_anti_join_aggregate",
+    "post_aggregate_case_membership",
+    "multi_key_nullable_membership_window",
+    "string_empty_pattern_membership_distinct",
+    "date_cast_union_running_sum_topk",
+    "coalesce_anti_join_union_topk",
+    "bool_null_distinct_running_sum",
+    "date_string_membership_offset_window",
+    "empty_union_window_aggregate",
+    "duplicate_key_join_distinct_anti_topk",
+    "large_int_text_membership_window",
+    "nested_topk_offset_aggregate",
+    "union_distinct_empty_string_window",
+    "multi_key_semi_join_window_aggregate",
+    "string_contains_anti_join_offset",
+    "bool_case_distinct_groupby_union",
+    "left_join_filter_distinct_window",
+    "cast_groupby_membership",
+    "null_sort_window_union",
+    "date_part_membership_distinct_join",
+    "coalesce_case_anti_join_aggregate",
+    "string_token_transform_join_window",
+    "prefix_suffix_bool_membership",
+    "numeric_clip_division_anti_window",
+    "bool_not_union_distinct_aggregate",
+    "outer_join_coalesce_distinct_topk",
+    "chained_string_cleanup_membership_window",
+    "cast_date_union_anti_running",
+    "post_groupby_filter_membership_topk",
+    "duplicate_key_left_join_window_aggregate",
 )
 
 
@@ -62,12 +145,59 @@ ISSUE_FOCUS_MIXED_PROFILES = (
     "large_int_filter_groupby",
     "set_membership_filter",
     "pyarrow_groupby_filter_cast_membership",
+    "case_when_join_key_membership",
+    "coalesce_union_distinct_type_boundary",
+    "multi_key_anti_join_null_guard",
+    "empty_then_union_groupby",
+    "boolean_coalesce_case_membership",
+    "numeric_text_cast_membership_aggregation",
     "null_predicate_filter",
     "row_value_absence_filter",
     "path_basename_keyed_pick",
     "polars_reverse_division_columns",
     "pandas_bool_reduction_skipna_semantics",
     "csv_long_numeric_roundtrip",
+    "string_token_join_distinct",
+    "date_part_row_number_union",
+    "post_groupby_join_global_aggregate",
+    "distinct_anti_join_case_topk",
+    "coalesce_row_number_topk",
+    "union_distinct_anti_running_sum",
+    "null_case_semi_join_groupby",
+    "date_string_cast_row_number",
+    "drop_nulls_coalesce_distinct_join_topk",
+    "date_part_distinct_offset",
+    "bool_fill_null_membership_row_number",
+    "string_numeric_cast_anti_join_aggregate",
+    "post_aggregate_case_membership",
+    "multi_key_nullable_membership_window",
+    "string_empty_pattern_membership_distinct",
+    "date_cast_union_running_sum_topk",
+    "coalesce_anti_join_union_topk",
+    "bool_null_distinct_running_sum",
+    "date_string_membership_offset_window",
+    "empty_union_window_aggregate",
+    "duplicate_key_join_distinct_anti_topk",
+    "large_int_text_membership_window",
+    "nested_topk_offset_aggregate",
+    "union_distinct_empty_string_window",
+    "multi_key_semi_join_window_aggregate",
+    "string_contains_anti_join_offset",
+    "bool_case_distinct_groupby_union",
+    "left_join_filter_distinct_window",
+    "cast_groupby_membership",
+    "null_sort_window_union",
+    "date_part_membership_distinct_join",
+    "coalesce_case_anti_join_aggregate",
+    "string_token_transform_join_window",
+    "prefix_suffix_bool_membership",
+    "numeric_clip_division_anti_window",
+    "bool_not_union_distinct_aggregate",
+    "outer_join_coalesce_distinct_topk",
+    "chained_string_cleanup_membership_window",
+    "cast_date_union_anti_running",
+    "post_groupby_filter_membership_topk",
+    "duplicate_key_left_join_window_aggregate",
 )
 
 
@@ -99,6 +229,59 @@ def deep_probe_rotation_case(seed: int, *, generate_profile_case: ProfileCaseGen
         seed,
         profile,
         generator_profile="deep_probe_rotation",
+    )
+
+
+def orthogonal_stress_rotation_case(seed: int, *, generate_profile_case: ProfileCaseGenerator) -> Case:
+    return _rotation_case(
+        seed,
+        profiles=ORTHOGONAL_STRESS_ROTATION_PROFILES,
+        generator_profile="orthogonal_stress_rotation",
+        generate_profile_case=generate_profile_case,
+    )
+
+
+def pandas_targeted_rotation_case(seed: int, *, generate_profile_case: ProfileCaseGenerator) -> Case:
+    return _rotation_case(
+        seed,
+        profiles=PANDAS_TARGETED_ROTATION_PROFILES,
+        generator_profile="pandas_targeted_rotation",
+        generate_profile_case=generate_profile_case,
+    )
+
+
+def polars_targeted_rotation_case(seed: int, *, generate_profile_case: ProfileCaseGenerator) -> Case:
+    return _rotation_case(
+        seed,
+        profiles=POLARS_TARGETED_ROTATION_PROFILES,
+        generator_profile="polars_targeted_rotation",
+        generate_profile_case=generate_profile_case,
+    )
+
+
+def datafusion_targeted_rotation_case(seed: int, *, generate_profile_case: ProfileCaseGenerator) -> Case:
+    return _rotation_case(
+        seed,
+        profiles=DATAFUSION_TARGETED_ROTATION_PROFILES,
+        generator_profile="datafusion_targeted_rotation",
+        generate_profile_case=generate_profile_case,
+    )
+
+
+def _rotation_case(
+    seed: int,
+    *,
+    profiles: tuple[str, ...],
+    generator_profile: str,
+    generate_profile_case: ProfileCaseGenerator,
+) -> Case:
+    profile = profiles[seed % len(profiles)]
+    case = generate_profile_case(seed, profile)
+    return as_discovery_mixed_case(
+        case,
+        seed,
+        profile,
+        generator_profile=generator_profile,
     )
 
 
@@ -251,6 +434,64 @@ def discovery_issue_inspired_case(
         return mixed("path_basename_keyed_pick")
     if seed % 251 == 48:
         return mixed("csv_long_numeric_roundtrip")
+    if seed % 257 == 116:
+        return mixed("case_when_join_key_membership")
+    if seed % 263 == 118:
+        return mixed("coalesce_union_distinct_type_boundary")
+    if seed % 269 == 120:
+        return mixed("multi_key_anti_join_null_guard")
+    if seed % 271 == 122:
+        return mixed("empty_then_union_groupby")
+    if seed % 277 == 124:
+        return mixed("boolean_coalesce_case_membership")
+    if seed % 281 == 126:
+        return mixed("numeric_text_cast_membership_aggregation")
+    if seed % 283 == 128:
+        return mixed("string_token_join_distinct")
+    if seed % 293 == 130:
+        return mixed("date_part_row_number_union")
+    if seed % 307 == 132:
+        return mixed("post_groupby_join_global_aggregate")
+    if seed % 311 == 134:
+        return mixed("distinct_anti_join_case_topk")
+    if seed % 313 == 136:
+        return mixed("coalesce_row_number_topk")
+    if seed % 317 == 138:
+        return mixed("union_distinct_anti_running_sum")
+    if seed % 331 == 140:
+        return mixed("null_case_semi_join_groupby")
+    if seed % 337 == 142:
+        return mixed("date_string_cast_row_number")
+    if seed % 347 == 144:
+        return mixed("drop_nulls_coalesce_distinct_join_topk")
+    if seed % 349 == 146:
+        return mixed("date_part_distinct_offset")
+    if seed % 353 == 148:
+        return mixed("bool_fill_null_membership_row_number")
+    if seed % 359 == 150:
+        return mixed("string_numeric_cast_anti_join_aggregate")
+    if seed % 367 == 152:
+        return mixed("post_aggregate_case_membership")
+    if seed % 373 == 154:
+        return mixed("multi_key_nullable_membership_window")
+    if seed % 379 == 156:
+        return mixed("string_empty_pattern_membership_distinct")
+    if seed % 383 == 158:
+        return mixed("date_cast_union_running_sum_topk")
+    if seed % 389 == 160:
+        return mixed("coalesce_anti_join_union_topk")
+    if seed % 397 == 162:
+        return mixed("bool_null_distinct_running_sum")
+    if seed % 401 == 164:
+        return mixed("date_string_membership_offset_window")
+    if seed % 409 == 166:
+        return mixed("empty_union_window_aggregate")
+    if seed % 419 == 168:
+        return mixed("duplicate_key_join_distinct_anti_topk")
+    if seed % 421 == 170:
+        return mixed("large_int_text_membership_window")
+    if seed % 431 == 172:
+        return mixed("nested_topk_offset_aggregate")
     return None
 
 

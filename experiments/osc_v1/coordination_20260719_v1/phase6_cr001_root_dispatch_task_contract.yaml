@@ -1,0 +1,93 @@
+schema_version: osc-task-contract-v1
+phase: 6
+change_request: CR-OSC-6-001
+task_id: OSC-6-CR001-ROOT-DISPATCH
+role: root
+mode: implementation_serial_after_three_domain_barrier
+objective: Connect canonical typed admissions to exactly one real-object semantic replayer and discard every admission that cannot prove exact local reconstruction and intrinsic subject identity.
+required_inputs:
+  - path: experiments/osc_v1/coordination_20260719_v1/phase6_cr001_domain_barrier.yaml
+    sha256: 7b5ebf389c83416d0f6a825cd7376c001efa26644f11a039a3addf5152754e14
+  - path: src/datadiff_osc/_phase6_gate_authority.py
+    sha256: 70dc5cc93619f7b1aa5dbed57c4da53035fa245512c2b01922ea46a1bdd574fe
+  - path: tests/osc/test_phase6_gate_authority_integration.py
+    sha256: 4af7d64673f1749c95d16a898d942c92922386357508c7fd77a68bfa8c0d76c9
+allowed_write_paths:
+  - src/datadiff_osc/_phase6_gate_authority.py
+  - tests/osc/test_phase6_gate_authority_integration.py
+forbidden_write_paths:
+  - src/datadiff_osc/_replay_support.py
+  - src/datadiff_osc/_canonical.py
+  - src/datadiff_osc/contract_engine/**
+  - src/datadiff_osc/search/**
+  - src/datadiff_osc/runtime/**
+  - src/datadiff_osc/schemas.py
+  - src/datadiff_osc/api.py
+  - src/datadiff_osc/public_api_freeze.json
+domain_ownership:
+  contract:
+    - [HyperContract, osc-hypercontract-v1]
+    - [Endpoint, osc-hypercontract-v1]
+    - [ResultGroup, osc-result-group-v1]
+    - [ApplicabilityCertificate, osc-applicability-certificate-v1]
+    - [ObservationCertificate, osc-observation-certificate-v1]
+    - [ExactEscalationCertificate, osc-exact-escalation-v1]
+  search:
+    - [ConstructionOutcome, osc-root-construction-outcome-v1]
+    - [MutationOutcome, osc-root-mutation-outcome-v1]
+    - [TargetAssignment, osc-root-target-assignment-v1]
+    - [ExtractionResult, osc-atom-extraction-v1]
+    - [ContrastExtraction, osc-contrast-extraction-v1]
+    - [ActivationCertificate, osc-activation-certificate-v1]
+    - [FormalLanePlan, osc-root-formal-lane-plan-v1]
+  runtime:
+    - [StructuredExecutionOutcome, osc-structured-execution-outcome-v1]
+    - [EvidenceEnvelope, osc-evidence-envelope-v1]
+    - [TaskSpec, osc-task-spec-v1]
+    - [TaskIdentity, osc-task-v1]
+    - [SeedLineage, osc-seed-lineage-v1]
+    - [InvarianceReport, osc-parallel-invariance-report-v2]
+    - [AuthorityEvidenceSnapshot, osc-authority-evidence-snapshot-v2]
+    - [V3RunReceipt, osc-root-v3-run-receipt-v1]
+    - [RepositoryTestReceipt, osc-root-repository-test-receipt-v1]
+    - [TargetVersionReceipt, osc-root-target-version-receipt-v1]
+    - [CandidateClassificationReceipt, osc-root-candidate-classification-v1]
+    - [PairedBenchmarkReceipt, osc-root-paired-benchmark-receipt-v1]
+required_invariants:
+  - the union of allowed typed envelope pairs equals the dispatcher key set
+  - every allowed pair has exactly one domain owner
+  - Root passes decoded payload, declared exact type/version and caller subjects to the domain replayer
+  - malformed, hash-mismatched, synthetic, type-mismatched, version-mismatched or replay-failed admissions are discarded rather than retained
+  - a subject substitution or context-only claim is discarded
+  - Runtime replay success remains discarded with a distinct Root-provenance-pending error until CR-OSC-6-004
+  - the unconditional semantic-replay-pending sentinel is removed only after dispatcher and forgery-negative tests pass
+  - no replay success alone grants gate, evidence, candidate, bug, confirmed-root or 24h authority
+  - public exports and public API freeze remain byte-identical
+validation:
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/osc/test_phase6_gate_authority_integration.py
+    expected: exit 0
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/osc/test_replay_support.py
+      tests/osc/test_contract_semantic_replay.py
+      tests/osc/test_search_semantic_replay.py
+      tests/osc/test_runtime_private_receipts.py
+      tests/osc/test_runtime_semantic_replay.py
+      tests/osc/test_phase6_gate_authority_integration.py
+      tests/osc/test_public_api_freeze.py
+    expected: exit 0
+  - command: git diff --check
+    expected: exit 0
+stop_conditions:
+  - any domain-owned or public path change is required
+  - a caller subject would be trusted as an identity source
+  - Runtime provenance would be inferred from shape or words
+  - any long gate, 2h pilot or 24h execution would be needed
+completion_report: exact SHA-256 values, scoped and combined test results, residual blocker/high list
+execution_policy:
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_paired_pilot_authorized: false
+  twenty_four_hour_run_authorized: false

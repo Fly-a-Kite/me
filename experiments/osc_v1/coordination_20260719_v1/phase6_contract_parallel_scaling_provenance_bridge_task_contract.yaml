@@ -1,0 +1,247 @@
+schema_version: osc-phase6-contract-parallel-scaling-provenance-bridge-task-contract-v1
+phase: 6
+authority:
+  task_id: OSC-6-CONTRACT-PARALLEL-SCALING-PROVENANCE-BRIDGE-R7
+  owner: /root
+  role: root
+  mode: root_serial_private_parallel_scaling_provenance_bridge
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  grandchildren_allowed: false
+  remediation_is_serial: true
+  user_authorization:
+    date: 2026-07-23
+    instruction: "授权; 继续"
+    interpretation: >-
+      The user authorized the next bounded Phase-6 Contract slice after the
+      R6 private typed parallel-scaling producer. It may add one private,
+      re-readable provenance binding for that producer and Root-only exact
+      pairing checks. It does not authorize a public interface, a frozen
+      producer/provenance edit, a real gate artifact, a corpus/cohort
+      execution, raw metric calculation, a gate decision, Phase 7, a 2h
+      pilot, or a 24h run.
+  authority_write_paths:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  source_state_before_write:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    untracked_path_count: 2767
+    coordination_ledger_sha256: f892a1b56b04053adfc4a383a595499876ca04206f2358400574190b9ce5fdd6
+  required_input_sha256:
+    docs/codex_multi_agent_development_runbook.md: a17a62d7937f5ff4755d8925dc6dd64c25946516a80f82466ddeda1ee8d845f9
+    experiments/final_bug_discovery_protocol_v3/TODO.md: 1ad989d412651f5cc9ae3c3ac5d7d7207176557e0bcdcfb449788f016d607419
+    docs/project_architecture.md: 5fc31c1c2c4bf1241e41cc966f8d56abc890259a8577fe756076b490e3698d9f
+    docs/fine_grained_discovery_architecture.md: 58d0e11a3cd3c2ea9b7096449f9beafae756b94cae3e41f04d4377b2b4d6dbf2
+    docs/discovery_search_and_parallel_architecture.md: 7af5fb51be2de1e0162ffb4a2db2bf40df050f35c0446bcae707e419936cf1b9
+    docs/semantic_hypercontract_architecture.md: 20a5e22513c64c60e77b115233b28fdca2591081f08d5f2945a15dda18442dae
+    docs/architecture_credibility_and_alternatives.md: 95bd949dba93d41d9b2594122fc49766164008c5de8df6aec91dc88f2afa0762
+    docs/competitive_paper_experiment_blueprint.md: e2537e9ec03f5222321af7ae11491341f402d6e294c19ae4c8c3d397c4c1cd18
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_typed_producer_task_contract.yaml: ccb1980bd1be6f042f7d89ae700b49886986becc2557f6d0f8889954818429f2
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_typed_producer_report.yaml: 05b0b8d7250e48e408f69a2cda61ce3d7f903d1980aa9ed136497c30f59c56b1
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_receipt_task_contract.yaml: 86cad586419e533ff46d7b5892fdd169ba5e10df2065d35e185139a861540e71
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_receipt_report.yaml: ec5c5c26f93615921b0b4aabdc9b2496058427cba89e34e457f28f5e34857c40
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_first_error_remediation_task_contract.yaml: c4e6bc7528ba9e9ff22d25ae64537bec93090dbb79a9701af63deb48be4f5276
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_first_error_remediation_report.yaml: ec2888ebf84b088c2a676b20a0ddc9e6d42d8765746d14e102afed7091de66b2
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_typed_producer_task_contract.yaml: ded42c5e657bf7616817980a033d865e7e97b4f8047037b4eb7da49ea400e564
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_typed_producer_report.yaml: fc4442a0338a20b43ae8cffdbf456bad290f5bb60e721863eefa744eb25372ee
+    src/datadiff_osc/_phase6_gate_authority.py: 16ebc364ca521aee547a809a7a0906d4d150a42258be6ab31943e79c171d21fc
+    src/datadiff_osc/runtime/_phase6_parallel_scaling_producers.py: 14c6b912b02622aebe17b9e84d818e8523f1f6c8b7899c364f9f0c7178d8bfd3
+    tests/osc/test_runtime_phase6_parallel_scaling_producers.py: a3ef03f8fbd1ee8591c0c6189aedf654ab85438707aa23889b2f929ffd77b00d
+    src/datadiff_osc/runtime/_phase6_parallel_scaling_receipts.py: 0c65ff117b8a15a9ac7b0d6f5841475f02db7019a6825218a90faf37d2daaf71
+    tests/osc/test_runtime_phase6_parallel_scaling_receipts.py: 4299e15f0b34c55f200f5f2eb5633f1986777f4dd04c8652dc0c5012a7ba40da
+    src/datadiff_osc/runtime/_semantic_replay.py: ded341713ae92ecda70032bbeeee570e68802e8aed63c35c18af9f8f59663dd8
+    src/datadiff_osc/contract_engine/replay.py: 3beca4f611aa0e65e81f8389af52610a6f56a60b53c271964b9e61f532580311
+    src/datadiff_osc/runtime/gate_artifacts.py: 1eed10563c076514acb12259ddef44698510f49f34c13e4e54e1e4bd1e07743a
+  new_paths_required_absent_before_write:
+    - src/datadiff_osc/runtime/_phase6_parallel_scaling_provenance.py
+    - tests/osc/test_runtime_phase6_parallel_scaling_provenance.py
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_report.yaml
+  frozen_target_sha256:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+task:
+  task_id: OSC-6-CONTRACT-PARALLEL-SCALING-PROVENANCE-BRIDGE-R7
+  objective: >-
+    Add a private, Root-verifiable provenance bridge for one R6
+    ParallelScalingEvidenceReceipt. The bridge must preserve an exact typed
+    production observation, re-read it at the Root boundary, rebuild the R6
+    receipt, and admit the receipt only when a unique canonical provenance
+    record binds the same admission, source, receipt bytes and receipt identity.
+    It is evidence plumbing only and cannot itself make an artifact, metric,
+    denominator, bundle, candidate, or gate authoritative.
+  allowed_write_paths:
+    - src/datadiff_osc/runtime/_phase6_parallel_scaling_provenance.py
+    - src/datadiff_osc/_phase6_gate_authority.py
+    - tests/osc/test_runtime_phase6_parallel_scaling_provenance.py
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  forbidden_write_paths:
+    - src/datadiff_osc/__init__.py
+    - src/datadiff_osc/public_api_freeze.json
+    - src/datadiff_osc/search/**
+    - src/datadiff_osc/contract_engine/**
+    - src/datadiff_osc/runtime/_receipt_producers.py
+    - tests/osc/test_runtime_receipt_producers.py
+    - src/datadiff_osc/runtime/_producer_provenance.py
+    - tests/osc/test_runtime_producer_provenance.py
+    - src/datadiff_osc/runtime/_phase6_parallel_scaling_producers.py
+    - tests/osc/test_runtime_phase6_parallel_scaling_producers.py
+    - src/datadiff_osc/runtime/_phase6_parallel_scaling_receipts.py
+    - tests/osc/test_runtime_phase6_parallel_scaling_receipts.py
+    - src/datadiff_osc/runtime/_semantic_replay.py
+    - tests/osc/test_runtime_semantic_replay.py
+    - src/datadiff_osc/runtime/gate_artifacts.py
+    - src/datadiff_osc/runtime/gates.py
+    - tests/osc/test_runtime_gates.py
+    - tests/osc/test_runtime_gate_artifacts.py
+    - tests/osc/test_phase6_gate_authority_integration.py
+    - src/datadiff_osc/contract_engine/_phase6_corpora.py
+    - tests/osc/test_contract_phase6_corpora.py
+    - docs/**
+    - scripts/**
+    - experiments/final_bug_discovery_protocol_v3/**
+  read_only_dependencies:
+    - src/datadiff_osc/runtime/_phase6_parallel_scaling_producers.py
+    - src/datadiff_osc/runtime/_phase6_parallel_scaling_receipts.py
+    - src/datadiff_osc/runtime/_receipt_producers.py
+    - src/datadiff_osc/runtime/_semantic_replay.py
+    - src/datadiff_osc/runtime/_producer_provenance.py
+    - src/datadiff_osc/contract_engine/replay.py
+    - src/datadiff_osc/runtime/gate_artifacts.py
+    - tests/osc/test_runtime_phase6_parallel_scaling_producers.py
+    - tests/osc/test_runtime_phase6_parallel_scaling_receipts.py
+    - tests/osc/test_phase6_gate_authority_integration.py
+  frozen_interfaces:
+    - osc-public-api-freeze-v1:cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    - osc-pre24-gate-spec-set-d9792996cacb6fc6e47bce602d5f7ab6d6382c62ba9e1ac6bc1f8003ecbec552
+    - all thirteen frozen_target_sha256 entries above
+    - R5 ParallelScalingEvidenceReceipt v1
+    - R6 ParallelScalingProductionObservation private construction contract
+  required_invariants:
+    - >-
+      The new Runtime module is private and adds no public export. It owns one
+      canonical provenance payload containing a complete
+      ParallelScalingProductionObservation, the derived R6 receipt, and exact
+      implementation-byte bindings. It accepts no caller-authored receipt,
+      sample, source, task/result/evidence, worker, counter, configuration, or
+      implementation digest as a substitute for a typed rebuild.
+    - >-
+      Reconstructing the provenance payload must exact-round-trip every nested
+      ResultGroup, TaskSpec, SeedLineage, StructuredExecutionOutcome,
+      WorkerBoundExecutionResult, raw counter/clock and EvidenceEnvelope using
+      the owning private replayers. The bridge must invoke the R6 builder again
+      and reject any changed source, task/result, seed, outcome, evidence,
+      worker count, raw counter, configuration, clock, logical task graph, or
+      receipt byte/identity before returning a usable provenance result.
+    - >-
+      Root may make a provisional exception to the general Runtime-provenance
+      rejection only for ParallelScalingEvidenceReceipt under
+      performance_paired_replay and only while a separately declared canonical
+      provenance binding is present. Root must then require a one-to-one exact
+      admission/provenance pairing, re-hash both files, reconstruct the proof,
+      compare the re-derived receipt to the admitted canonical receipt, and
+      bind its digest into VerifiedProducerReceipt. A missing, duplicate,
+      unreadable, stale, malformed, wrong-schema, wrong-path, wrong-admission,
+      wrong-source, or extra provenance record fails closed and removes that
+      Runtime admission from retained producer evidence.
+    - >-
+      The pre-existing general Runtime provenance-pending behavior remains
+      fail-closed for every other Runtime envelope and for direct helper use.
+      A legacy PairedBenchmarkReceipt, a digest-only assertion, a same-cardinality
+      substitution, or a caller-created dynamic record cannot bypass the new
+      pairing check.
+    - >-
+      A legal bridge fixture is still an incomplete, non-publishable receipt
+      index because no complete required producer set, canonical raw artifact,
+      100000 corpus, 1000-pair cohort, bootstrap, metric calculation, or gate
+      evidence is created by this task. No artifact may be treated as real
+      execution merely because it contains this private proof.
+    - >-
+      Diagnostic refs remain permanently diagnostic-only. Missing exact typed
+      context is fail-closed/not_evaluated. No candidate is confirmed,
+      bug_claimed remains false, and no public/gate/Phase-7/2h/24h authority is
+      created.
+  required_tests:
+    负向复核:
+      - >-
+        Mutate one nested source, ResultGroup, TaskSpec, seed, outcome,
+        EvidenceEnvelope, worker-count, raw-counter, clock, configuration,
+        logical-dependency, receipt, or implementation-byte binding at a time;
+        assert canonical reconstruction or the Root exact-pairing check rejects
+        it before retained Runtime evidence or a dynamic record can contribute.
+      - >-
+        Demonstrate absent proof, post-admission receipt/proof byte mutation,
+        duplicate proof/admission, proof-admission swap, source rebind, extra
+        proof, and same-cardinality receipt substitution all fail closed.
+    独立反例验证:
+      - >-
+        Build one legal R6 observation and provenance envelope, admit it through
+        an otherwise incomplete private receipt index, and confirm Root retains
+        only the exact paired parallel admission while the index remains invalid
+        and non-publishable for all missing producer/artifact requirements.
+      - >-
+        Confirm a changed valid observation creates a different provenance and
+        receipt identity and cannot bind the prior admission or source.
+    异常输入验证:
+      - >-
+        Reject missing/extra payload fields, malformed digests, unordered or
+        duplicate bindings, unsupported schema/type, path escape, wrong object
+        type, invalid canonical envelope, and unsupported legacy receipt without
+        throwing, publication, candidate confirmation, or bug claim.
+  scoped_validation:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_runtime_phase6_parallel_scaling_provenance.py
+      tests/osc/test_runtime_phase6_parallel_scaling_producers.py
+      tests/osc/test_runtime_phase6_parallel_scaling_receipts.py
+      tests/osc/test_phase6_gate_authority_integration.py
+    timing: exactly once, only after all allowed implementation writes and SHA checks
+    forbidden_substitutes:
+      - tests/osc
+      - repository suite
+      - six-file combined suite
+      - 100000 parity execution
+      - v3 2200
+      - Phase 7
+      - 2h pilot
+      - 24h run
+  completion_requirements:
+    - reverify all allowed product paths and all thirteen frozen/public SHA values before the scoped suite
+    - retain the exact command, exit code, and complete terminal result in the report
+    - reverify all allowed product paths and all thirteen frozen/public SHA values after the scoped suite
+    - use apply_patch for the report and ledger only after the real terminal result is known
+    - retain phase_6_contract as pending regardless of scoped-suite outcome
+  stop_conditions:
+    - any frozen/public SHA mismatch, staged user path, pre-existing target path, or scope expansion
+    - any need to modify a public export, frozen producer/provenance/test, R5/R6 receipt/producer, semantic replay, gate artifacts/spec, docs, or scripts
+    - any accepted unpaired Runtime receipt, caller-authored identity/digest proof, retained legacy paired receipt, artifact/gate pass, candidate confirmation, or bug_claimed=true
+    - failed scoped suite or incomplete terminal test evidence
+decision:
+  product_write_authorized_only_for_allowed_paths: true
+  phase_6_contract: pending
+  private_parallel_scaling_provenance_bridge_authorized: true
+  real_artifact_admission_authorized: false
+  corpus_or_cohort_execution_authorized: false
+  raw_metric_or_bootstrap_authorized: false
+  gate_spec_or_gate_calculation_authorized: false
+  combined_suite_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_pilot_2h_authorized: false
+  twenty_four_hour_run_authorized: false

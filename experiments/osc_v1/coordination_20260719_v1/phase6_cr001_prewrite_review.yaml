@@ -1,0 +1,80 @@
+schema_version: osc-phase6-cr001-prewrite-review-v1
+phase: 6
+change_request: CR-OSC-6-001
+review_status: root_dependencies_authorized_before_domain_writes
+phase6_authorized: true
+phase7_paired_pilot_authorized: false
+twenty_four_hour_run_authorized: false
+inputs:
+  task_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_cr001_task_contracts.yaml
+    sha256: 2d875db44e83f130085e2f7a5b4414bc20138d77ccbe2322fe57850436809a36
+  prewrite_reports:
+    - task_id: OSC-6-CR001-CONTRACT-PREWRITE
+      agent: /root/phase5_authority_audit
+      status: complete_zero_writes
+    - task_id: OSC-6-CR001-SEARCH-PREWRITE
+      agent: /root/phase5_consumer_audit
+      status: complete_zero_writes
+    - task_id: OSC-6-CR001-RUNTIME-PREWRITE
+      agent: /root/phase5_evidence_audit
+      status: complete_zero_writes
+root_decisions:
+  shared_replay_support:
+    path: src/datadiff_osc/_replay_support.py
+    ownership: root
+    reason: keep private replay mechanics separate from the frozen canonical transport module
+    public_export: false
+    domain_rule: domain owners retain exact type reconstruction and semantic invariants
+  canonical_transport:
+    path: src/datadiff_osc/_canonical.py
+    action: unchanged_for_root_dependency_step
+  frozen_domain_signature:
+    value: >-
+      replay_<domain>_admission(*, envelope_type: str, schema_version: str,
+      payload: object, subject_kind: str, subject_ids: tuple[str, ...])
+      -> tuple[str, ...]
+    return_semantics: deterministic_error_tuple_empty_only_when_exact_replay_and_subject_derivation_succeed
+  replay_layers:
+    - canonical bytes and envelope fields are verified by Root
+    - domain owner strictly reconstructs the real nested object and re-runs invariants
+    - reconstructed object must round-trip to the exact decoded payload
+    - domain owner derives only intrinsic subject identities
+    - Root later validates receipt-set and cross-domain bindings before gate credit
+  exact_escalation_mapping:
+    external_envelope_type: ExactEscalationCertificate
+    internal_type: datadiff_osc.contract_engine.evidence.ExactEscalation
+    approved: true
+    public_alias_or_rename: false
+  fail_closed_subjects:
+    contract_until_CR_OSC_6_002:
+      - confirmed_roots_total
+      - high_risk_mutants_total
+      - false_positive_fixes
+    search_until_replay_set_context_and_CR_OSC_6_003A:
+      - scheduled_target_attempts
+      - mutation_attempts
+      - edge_observation_denominator
+      - formal_lanes
+      - focus_signals
+    runtime_until_CR_OSC_6_004_provenance:
+      - any authority claim based only on object shape
+  provenance_rule:
+    diagnostic_synthetic: never authority eligible
+    preregistered_parity: contract parity only after independent corpus binding
+    real_execution: requires Root-verified producer provenance and raw artifact binding
+    blanket_word_scan_is_not_a_final_provenance_model: true
+implementation_sequence:
+  - root lands and tests private shared replay support
+  - three domains implement strict reconstruction on disjoint paths
+  - root integrates dispatch and receipt-set cross-binding
+  - CR-OSC-6-002, CR-OSC-6-003A and CR-OSC-6-004 add authoritative corpus, lane and producer contexts
+barrier_rules:
+  remove_unconditional_semantic_replay_sentinel: only_after_all_allowed_types_have_one_owner_and_positive_and_forgery_negative_tests_pass
+  authority_crossing_from_intrinsic_replay_alone: false
+  public_api_freeze_may_change: false
+  parity_100000_may_run_now: false
+  v3_2200_may_run_now: false
+  phase7_or_2h_may_run_now: false
+  twenty_four_hour_may_run_now: false
+

@@ -30,6 +30,10 @@ PROBE_ROOTS = {
     "float_literal_precision_probe": "duckdb_float_literal_precision",
     "timestamp_precision_filter_probe": "polars_timestamp_precision_filter",
     "series_rtruediv_probe": "series_rtruediv_operand_order",
+    "series_reflected_arithmetic_probe": (
+        "polars_reflected_arithmetic_operand_order"
+    ),
+    "datafusion_grouped_null_topk_probe": "grouped_topk_null_sort_key",
     "uint64_isin_probe": "pandas_uint64_isin_precision",
     "tuple_anti_null_probe": "duckdb_tuple_anti_null_semantics",
     "setop_all_duplicate_probe": "datafusion_setop_all_duplicate_count",
@@ -118,7 +122,12 @@ def last_probe_root(case: Case) -> str | None:
 
 def last_probe_root_for_operations(operations: Iterable[dict[str, Any]]) -> str | None:
     for op in reversed(list(operations)):
-        root = PROBE_ROOTS.get(op_kind(op))
+        kind = op_kind(op)
+        if kind == "confirmed_root_witness_probe":
+            root = str(op.get("root_cause", "") or "")
+            if root:
+                return root
+        root = PROBE_ROOTS.get(kind)
         if root is not None:
             return root
     return None

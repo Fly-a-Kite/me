@@ -1,0 +1,102 @@
+schema_version: osc-phase5-root-authority-control-barrier-v1
+task_id: OSC-5-ROOT-004-AUTHORITY-CONTROL-PLANE
+status: root_fail_closed_control_plane_pass_root_and_three_agent_verified
+phase5_exit_gate_passed: false
+phase5_exit_blocker: root_legacy_facade_and_consumer_migration_pending
+finding_disposition:
+  OSC-4-B-F1: closed_phase5_fail_closed_control_plane
+change_requests:
+  - id: CR-OSC-5-004
+    status: closed_phase5_runtime_consumer_and_root_control_plane_phase6_evidence_pending
+  - id: CR-OSC-ROOT-004
+    status: closed_phase5_fail_closed_control_plane_phase6_semantic_replay_pending
+authority_results:
+  default_gate_specs: 41
+  denominator_universes: 38
+  denominator_partition:
+    static: 21
+    unit: 1
+    dynamic: 16
+  frozen_hard_counts:
+    fresh_cells: 16/232
+    regression_cells: 9/144
+    directional_edges: 384
+    obligations: 502
+  source_snapshot_externally_sha_bound: true
+  source_files_independently_discovered_and_rehashed: true
+  git_head_and_scoped_status_bound: true
+  dynamic_plan_externally_sha_bound: true
+  planned_and_executed_v3_universes_separate: true
+  exact_v3_runs_required: 22
+  exact_v3_cases_required: 2200
+  performance_samples_minimum: 1000
+  typed_producer_envelopes_required: true
+  aggregate_ledger_events_authoritative: false
+  synthetic_evidence_authoritative: false
+  typed_admission_semantic_replay_pending_phase6: true
+  publishable_before_phase6_semantic_replay: false
+  build_preflight_can_authorize_24h: false
+  successful_publish_postcommit_reporting_io: false
+  rejected_build_exit_code: 2
+  rejected_build_creates_authority_output: false
+negative_regressions:
+  - caller-authored source, count, denominator, reducer, threshold or authority claims cannot establish authority
+  - same-cardinality replacement identities cannot establish 232/384/502 coverage
+  - missing or malformed source snapshot, dynamic plan, typed receipt or raw artifact fails closed
+  - aggregate ledger/count-shaped/synthetic receipts cannot publish
+  - source, plan, receipt, authority and manifest mutation or symlink-loop races return no-go
+  - regular-file and symlink EEXIST competitors are preserved
+  - post-link target replacement never deletes the competitor inode
+  - post-link exceptions roll back only the published inode and fsync the parent directory
+  - manifest and fresh-rebuild split views fail SHA binding
+  - buffered or closed stdout fails before publication and the real process exits 2 rather than 120
+tests:
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/osc/test_phase6_gate_authority_integration.py
+    exit_code: 0
+    result: 27 passed in 21.96s (Root)
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/osc/test_runtime_*.py
+      tests/osc/test_phase6_gate_authority_integration.py
+    exit_code: 0
+    result: 76 passed in 30.05s (Root)
+  - command: targeted real buffered closed-pipe subprocess probe
+    exit_code: 2
+    result: no publish marker, no authority output and no interpreter-shutdown exception
+reviews:
+  - agent: contract_agent
+    scope: exact final four-path SHA and fail-closed contract
+    blocker_high_medium: 0
+    changed_files: []
+  - agent: search_agent
+    scope: exact final four-path SHA, hard-universe recomputation and real closed-pipe probe
+    blocker_high_medium: 0
+    changed_files: []
+  - agent: runtime_agent
+    scope: exact final four-path SHA, publication races, durability, split views and pipe commit point
+    blocker_high_medium: 0
+    changed_files: []
+hashes:
+  src/datadiff_osc/_phase6_gate_authority.py: 70dc5cc93619f7b1aa5dbed57c4da53035fa245512c2b01922ea46a1bdd574fe
+  tests/osc/test_phase6_gate_authority_integration.py: 4af7d64673f1749c95d16a898d942c92922386357508c7fd77a68bfa8c0d76c9
+  scripts/osc/build_phase6_gate_authority_bundle.py: 1ad106195e60f7edf9d7cf8b47c6d0d6ad71153c8a1a48e668a6546a092dfe83
+  scripts/osc/preflight_phase6_gate_authority_bundle.py: 4187152bbbd63eafb63410cc3301a6fe01dc5a1720bbd99f7bff813ab4fc94d6
+integrity:
+  phase5_change_requests_sha256: 5aa6186579776811aecf714312aa6aa94228091b2fe8f0e87677827fe77c0665
+  phase5_task_contracts_sha256: 8d3c321c697b574a769fde21fbb688a08435fe3ea72798e0805589733553977b
+  phase5_prewrite_declarations_sha256: 24215ea682df76a4126f2a6964fab704a652c4972e27933b058718aa5742619d
+  coordination_ledger_sha256: ad46c11c609606dafbbdf06c9e783e9f717934bb4d5f96c6d9f6ef8820fc21ec
+  public_api_freeze_sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  tracked_diff_stat_sha256: 341553eede7eb403553383d713f9a803207214388e7b1c0378d78b74445b45d9
+  staged_paths: 0
+barrier_decision:
+  root_authority_control_plane_closed: true
+  actual_phase6_gate_evidence_complete: false
+  next_writer: root_legacy_facade
+  phase6_started: false
+  pilot_started: false
+  two_hour_run_started: false
+  twenty_four_hour_run_authorized: false
+  twenty_four_hour_run_started: false

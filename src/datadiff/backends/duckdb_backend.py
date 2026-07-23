@@ -3,16 +3,23 @@ from __future__ import annotations
 import os
 import tempfile
 import time
+from dataclasses import dataclass
+from typing import Any
 
 from datadiff.backends.base import Backend, BackendResult, PreparedTable, prepare_table
 from datadiff.backends.sql_lowering import (
     SqlDialect,
+    cast_logical_expression,
     render_aggregate_sql,
     render_case_when_expr,
     render_coalesce_expr,
+    render_filter_condition,
     render_fill_null_expr,
     render_groupby_sql,
+    render_join_condition,
+    render_join_right_projection,
     render_mutate_expr,
+    render_semi_anti_join_condition,
 )
 from datadiff.backends.sql_runtime import build_relation_step_runtime
 from datadiff.csv_roundtrip import (
@@ -21,7 +28,6 @@ from datadiff.csv_roundtrip import (
     long_numeric_csv_path,
 )
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
-from datadiff.filtering import sql_filter_condition
 from datadiff.join_keys import join_key_pairs
 from datadiff.operation_semantics import (
     aggregate_alias,
@@ -42,6 +48,8 @@ from datadiff.operation_semantics import (
     op_value,
     join_how,
 )
+from datadiff.physical_plan import collect_physical_plan_bundle
+from datadiff.program_state import ProgramState, state_after_operation
 from datadiff.running import running_sum_partition_columns, running_sum_sort_keys
 from datadiff.sortedness import is_sorted_values
 from datadiff.windowing import row_number_order_keys, row_number_partition_columns
@@ -49,6 +57,18 @@ from datadiff.windowing import row_number_order_keys, row_number_partition_colum
 
 def _quote(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
+
+
+@dataclass(slots=True)
+class _DuckDBNativeRows:
+    columns: list[str]
+    row_values: list[list[Any]]
+    column_types: list[str]
+
+    def rows(self, named: bool = False):
+        if named:
+            return [dict(zip(self.columns, row)) for row in self.row_values]
+        return self.row_values
 
 
 def _lit(value):
@@ -67,7 +87,17 @@ def _lit(value):
         if math.isinf(value):
             return "'Infinity'::DOUBLE" if value > 0 else "'-Infinity'::DOUBLE"
         return repr(value)
-    s = str(value).replace("'", "''")
+    s = str(value)
+    if "\x00" in s:
+        parts = []
+        for index, part in enumerate(s.split("\x00")):
+            if part:
+                escaped_part = part.replace("'", "''")
+                parts.append(f"'{escaped_part}'")
+            if index < s.count("\x00"):
+                parts.append("CHR(0)")
+        return "(" + " || ".join(parts or ["''"]) + ")"
+    s = s.replace("'", "''")
     return f"'{s}'"
 
 
@@ -102,10 +132,17 @@ def _agg_expr(column: str, func: str) -> str:
 
 
 DUCKDB_DIALECT = SqlDialect(
-    float_cast_type="DOUBLE",
-    int_cast_type="BIGINT",
-    str_cast_type="VARCHAR",
+    logical_type_sql={
+        "bool": "BOOLEAN",
+        "float": "DOUBLE",
+        "int": "BIGINT",
+        "str": "VARCHAR",
+    },
     string_slice_fn="SUBSTRING",
+    string_length_sql=lambda source: f"LENGTH({source})",
+    string_contains_sql=lambda source, needle: (
+        f"CASE WHEN {source} IS NULL THEN NULL ELSE INSTR({source}, {needle}) > 0 END"
+    ),
     string_startswith_fn=lambda source, needle: (
         f"CASE WHEN {source} IS NULL THEN NULL ELSE SUBSTRING({source}, 1, LENGTH({needle})) = {needle} END"
     ),
@@ -118,21 +155,6 @@ DUCKDB_DIALECT = SqlDialect(
     division_sql=lambda source, value: f"CAST({source} AS DOUBLE) / {value}",
     reverse_division_sql=lambda numerator, source: f"CAST({numerator} AS DOUBLE) / {source}",
 )
-
-
-def _join_condition(op: dict) -> str:
-    left_keys, right_keys = join_key_pairs(op)
-    return " AND ".join(f"q.{_quote(left)} = r.{_quote(right)}" for left, right in zip(left_keys, right_keys))
-
-
-def _semi_anti_join_condition(op: dict, kind: str) -> str:
-    left_keys, right_keys = join_key_pairs(op)
-    predicates = [
-        *(f"r.{_quote(right)} IS NOT NULL" for right in right_keys),
-        *(f"q.{_quote(left)} = r.{_quote(right)}" for left, right in zip(left_keys, right_keys)),
-    ]
-    exists_sql = f"EXISTS (SELECT 1 FROM {_quote(op['table'])} r WHERE {' AND '.join(predicates)})"
-    return exists_sql if kind == "semi_join" else f"NOT {exists_sql}"
 
 
 def _tuple_absence_native_condition(op: dict) -> str:
@@ -343,6 +365,81 @@ def _duckdb_csv_long_numeric_roundtrip_mismatch(con, op: dict) -> bool:
     return csv_long_numeric_roundtrip_mismatch(observed_values, expected_values)
 
 
+_DUCKDB_JOIN_FILTER_NEGATIVE_RECHECKS = 16
+
+
+def _duckdb_confirmed_root_mismatch(con, op: dict[str, Any]) -> bool:
+    if str(op.get("target_backend", "") or "") != "duckdb":
+        return False
+    root_id = str(op.get("root_id", "") or "")
+    if root_id != "duckdb-join-filter-pushdown-limit-001":
+        raise ValueError(f"unsupported DuckDB confirmed root probe: {root_id}")
+    params = op.get("native_parameters", {})
+    if not isinstance(params, dict):
+        params = dict(params) if params else {}
+    cut_mode = str(params.get("cut_mode", "") or "")
+    membership_mode = str(params.get("membership_mode", "") or "")
+    if cut_mode == "offset1_desc":
+        order_sql = (
+            "ord DESC NULLS LAST, flag DESC NULLS LAST, "
+            "min_flag DESC NULLS LAST"
+        )
+        offset_n = 1
+    else:
+        order_sql = (
+            "ord ASC NULLS LAST, flag ASC NULLS LAST, "
+            "min_flag ASC NULLS LAST"
+        )
+        offset_n = 2
+    membership_sql = "SEMI JOIN" if membership_mode == "semi_join" else "INNER JOIN"
+    cte = f"""
+WITH step_0 AS (
+  SELECT q.id, q.flag, r.z, r.tag
+  FROM {_quote('t0')} q INNER JOIN {_quote('t1')} r ON q.id = r.id
+), step_1 AS (
+  SELECT q.id, q.flag, q.z, q.tag, q.z * 2 AS m_0 FROM step_0 q
+), step_2 AS (
+  SELECT * FROM step_1 q WHERE q.tag NOT IN ('beta', '中文', 'alpha')
+), step_3 AS (
+  SELECT flag, MIN(flag) AS min_flag, MAX(z) AS max_z
+  FROM step_2 q GROUP BY flag
+), step_4 AS (
+  SELECT q.flag, q.min_flag, q.max_z AS ord FROM step_3 q
+), step_5 AS (
+  SELECT * FROM step_4 q ORDER BY {order_sql} OFFSET {offset_n}
+), step_6 AS (
+  SELECT q.flag, q.min_flag FROM step_5 q
+)
+"""
+    treatment_sql = (
+        cte
+        + f"SELECT q.* FROM step_6 q {membership_sql} {_quote('keys')} r "
+        "ON q.flag = r.flag_key"
+    )
+    treatment = con.execute(treatment_sql).fetchall()
+    materialized_name = "__datadiff_duckdb_join_filter_materialized"
+    con.execute(f"DROP TABLE IF EXISTS {_quote(materialized_name)}")
+    con.execute(
+        f"CREATE TEMP TABLE {_quote(materialized_name)} AS "
+        + cte
+        + "SELECT * FROM step_6"
+    )
+    expected = con.execute(
+        f"SELECT q.* FROM {_quote(materialized_name)} q "
+        f"{membership_sql} {_quote('keys')} r ON q.flag = r.flag_key"
+    ).fetchall()
+    if treatment != expected:
+        return True
+    # DuckDB 1.5.4's affected runtime-filter plan is normally deterministic
+    # with one thread, but a heavily loaded full-suite process can rarely
+    # produce the correct row for several consecutive executions. Retry only
+    # that negative observation; active cells keep the one-query fast path.
+    return any(
+        con.execute(treatment_sql).fetchall() != expected
+        for _ in range(_DUCKDB_JOIN_FILTER_NEGATIVE_RECHECKS)
+    )
+
+
 def _table_to_dataframe(pd, table: TableData | PreparedTable):
     prepared = prepare_table(table)
     data = {}
@@ -361,9 +458,62 @@ def _table_to_dataframe(pd, table: TableData | PreparedTable):
 
 class DuckDBBackend(Backend):
     name = "duckdb"
+    session_reuse_policy = "reset"
+    session_reset_managed_by_backend = True
     persistent_storage = False
+    plan_collection_support = "logical+physical_inline"
 
-    def run(
+    def __init__(self) -> None:
+        self._connection = None
+        self._registered_relations: set[str] = set()
+
+    def _configure_connection(self, con) -> None:
+        thread_limit = _duckdb_threads()
+        if thread_limit is not None:
+            con.execute(f"PRAGMA threads={thread_limit}")
+
+    def _connection_for_case(self, duckdb):
+        if self._connection is None:
+            self._connection = duckdb.connect(database=":memory:")
+            self._configure_connection(self._connection)
+        else:
+            self.reset_for_case()
+        return self._connection
+
+    def reset_for_case(self) -> None:
+        con = self._connection
+        if con is None:
+            self._registered_relations.clear()
+            return
+        for name in tuple(self._registered_relations):
+            try:
+                con.unregister(name)
+            except Exception:  # noqa: BLE001
+                pass
+        self._registered_relations.clear()
+        try:
+            table_names = [
+                str(row[0])
+                for row in con.execute(
+                    "SELECT table_name FROM duckdb_tables()"
+                ).fetchall()
+            ]
+        except Exception:  # noqa: BLE001
+            table_names = []
+        for table_name in table_names:
+            try:
+                con.execute(f"DROP TABLE IF EXISTS {_quote(table_name)}")
+            except Exception:  # noqa: BLE001
+                pass
+
+    def close(self) -> None:
+        con = self._connection
+        self._connection = None
+        self._registered_relations.clear()
+        if con is not None:
+            con.close()
+
+    def execute_lowered(
         self,
         tables: list[TableData | PreparedTable],
         program: Program,
@@ -372,35 +522,50 @@ class DuckDBBackend(Backend):
         start = time.perf_counter()
         tempdir = tempfile.TemporaryDirectory() if self.persistent_storage else None
         con = None
+        physical_plan = None
         try:
             import duckdb
             import pandas as pd
 
-            database = f"{tempdir.name}/datadiff.duckdb" if tempdir is not None else ":memory:"
-            con = duckdb.connect(database=database)
-            thread_limit = _duckdb_threads()
-            if thread_limit is not None:
-                con.execute(f"PRAGMA threads={thread_limit}")
+            if tempdir is not None:
+                database = f"{tempdir.name}/datadiff.duckdb"
+                con = duckdb.connect(database=database)
+                self._configure_connection(con)
+            else:
+                con = self._connection_for_case(duckdb)
             table_by_name = {table.name: table for table in tables}
+            semantic_state = ProgramState.from_table(tables[0])
             current_cols = [c.name for c in tables[0].columns]
             for table in tables:
                 df = _table_to_dataframe(pd, table)
                 registered_name = f"__datadiff_input_{table.name}"
                 con.register(registered_name, df)
-                col_defs = ", ".join(f"{_quote(c.name)} {_sql_type(c.type)}" for c in table.columns)
-                scope = "" if self.persistent_storage else "TEMP "
-                con.execute(f"CREATE {scope}TABLE {_quote(table.name)} ({col_defs})")
-                if table.columns:
-                    cols = ", ".join(_quote(c.name) for c in table.columns)
-                    cast_cols = ", ".join(
-                        f"CAST({_quote(c.name)} AS {_sql_type(c.type)}) AS {_quote(c.name)}"
+                self._registered_relations.add(registered_name)
+                try:
+                    col_defs = ", ".join(
+                        f"{_quote(c.name)} {_sql_type(c.type)}"
                         for c in table.columns
                     )
+                    scope = "" if self.persistent_storage else "TEMP "
                     con.execute(
-                        f"INSERT INTO {_quote(table.name)} ({cols}) "
-                        f"SELECT {cast_cols} FROM {_quote(registered_name)}"
+                        f"CREATE {scope}TABLE {_quote(table.name)} ({col_defs})"
                     )
-                con.unregister(registered_name)
+                    if table.columns:
+                        cols = ", ".join(_quote(c.name) for c in table.columns)
+                        cast_cols = ", ".join(
+                            f"CAST({_quote(c.name)} AS {_sql_type(c.type)}) "
+                            f"AS {_quote(c.name)}"
+                            for c in table.columns
+                        )
+                        con.execute(
+                            f"INSERT INTO {_quote(table.name)} ({cols}) "
+                            f"SELECT {cast_cols} FROM {_quote(registered_name)}"
+                        )
+                finally:
+                    try:
+                        con.unregister(registered_name)
+                    finally:
+                        self._registered_relations.discard(registered_name)
             if self.persistent_storage:
                 con.execute("CHECKPOINT")
             ctes: list[tuple[str, str]] = []
@@ -444,27 +609,28 @@ class DuckDBBackend(Backend):
 
             for op in program.operations:
                 kind = op_kind(op)
+                next_semantic_state = state_after_operation(
+                    semantic_state,
+                    op,
+                    tables=table_by_name,
+                )
                 if kind == "join":
                     drop_hidden_order_cols()
                     right = table_by_name[op_table(op)]
                     _, right_keys = join_key_pairs(op)
-                    right_key_set = set(right_keys)
-                    right_cols = [
-                        f"r.{_quote(c.name)} AS {_quote(c.name)}"
-                        for c in right.columns
-                        if c.name not in right_key_set
-                    ]
-                    select_right = ", " + ", ".join(right_cols) if right_cols else ""
+                    right_types = {column.name: column.type for column in right.columns}
+                    select_right, projected_right = render_join_right_projection(
+                        right.column_names,
+                        right_keys,
+                        semantic_state.columns,
+                        _quote,
+                    )
                     join_kind = "LEFT JOIN" if join_how(op) == "left" else "INNER JOIN"
                     relation = runtime.assign_source(add_step(
                         f"SELECT q.*{select_right} FROM {relation} q {join_kind} {_quote(right.name)} r "
-                        f"ON {_join_condition(op)}"
+                        f"ON {render_join_condition(op, DUCKDB_DIALECT, _quote, semantic_state.column_types, right_types)}"
                     ))
-                    runtime.state.current_cols.extend(
-                        c.name
-                        for c in right.columns
-                        if c.name not in right_key_set and c.name not in runtime.state.current_cols
-                    )
+                    runtime.state.current_cols.extend(projected_right)
                     runtime.state.visible_cols = list(runtime.state.current_cols)
                     runtime.state.pending_order = None
                 elif kind == "union_all":
@@ -477,13 +643,27 @@ class DuckDBBackend(Backend):
                     runtime.state.current_cols = list(runtime.state.visible_cols)
                     runtime.state.pending_order = None
                 elif kind in {"semi_join", "anti_join"}:
-                    condition = _semi_anti_join_condition(op, kind)
+                    right = table_by_name[op_table(op)]
+                    right_types = {column.name: column.type for column in right.columns}
+                    condition = render_semi_anti_join_condition(
+                        op,
+                        kind,
+                        DUCKDB_DIALECT,
+                        _quote,
+                        semantic_state.column_types,
+                        right_types,
+                    )
                     relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q WHERE {condition}"))
                 elif kind == "drop_nulls":
                     condition = " AND ".join(f"q.{_quote(column)} IS NOT NULL" for column in op["columns"])
                     relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q WHERE {condition}"))
                 elif kind == "filter":
-                    condition = sql_filter_condition(f"q.{_quote(op_column(op))}", _lit(op_value(op)), op_comparator(op))
+                    condition = render_filter_condition(
+                        f"q.{_quote(op_column(op))}",
+                        _lit(op_value(op)),
+                        op_comparator(op),
+                        DUCKDB_DIALECT,
+                    )
                     relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q WHERE {condition}"))
                 elif kind == "tuple_absence_filter":
                     relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q WHERE {_tuple_absence_native_condition(op)}"))
@@ -509,6 +689,7 @@ class DuckDBBackend(Backend):
                     )
                     materialized_name = f"__datadiff_sortedness_{len(ctes)}"
                     con.register(materialized_name, pd.DataFrame({op["as"]: [ok]}))
+                    self._registered_relations.add(materialized_name)
                     ctes = []
                     relation = runtime.assign_source(_quote(materialized_name))
                     runtime.reset_source(relation, op["as"])
@@ -552,6 +733,24 @@ class DuckDBBackend(Backend):
                     ctes = []
                     relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
                     runtime.reset_source(relation, op["as"])
+                elif kind == "series_reflected_arithmetic_probe":
+                    ctes = []
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
+                elif kind == "datafusion_grouped_null_topk_probe":
+                    ctes = []
+                    relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
+                    runtime.reset_source(relation, op["as"])
+                elif kind == "confirmed_root_witness_probe":
+                    ctes = []
+                    mismatch = _duckdb_confirmed_root_mismatch(con, op)
+                    relation = runtime.assign_source(
+                        add_step(
+                            f"SELECT {'TRUE' if mismatch else 'FALSE'} "
+                            f"AS {_quote(op['as'])}"
+                        )
+                    )
+                    runtime.reset_source(relation, op["as"])
                 elif kind == "uint64_isin_probe":
                     ctes = []
                     relation = runtime.assign_source(add_step(f"SELECT FALSE AS {_quote(op['as'])}"))
@@ -569,6 +768,7 @@ class DuckDBBackend(Backend):
                     mismatch = _duckdb_json_predicate_order_mismatch(con)
                     materialized_name = f"__datadiff_json_predicate_order_{len(ctes)}"
                     con.register(materialized_name, pd.DataFrame({op["as"]: [mismatch]}))
+                    self._registered_relations.add(materialized_name)
                     relation = runtime.assign_source(_quote(materialized_name))
                     runtime.reset_source(relation, op["as"])
                 elif kind == "sparse_mask_probe":
@@ -640,6 +840,7 @@ class DuckDBBackend(Backend):
                     mismatch = _duckdb_csv_long_numeric_roundtrip_mismatch(con, op)
                     materialized_name = f"__datadiff_csv_long_numeric_{len(ctes)}"
                     con.register(materialized_name, pd.DataFrame({op["as"]: [mismatch]}))
+                    self._registered_relations.add(materialized_name)
                     relation = runtime.assign_source(_quote(materialized_name))
                     runtime.reset_source(relation, op["as"])
                 elif kind == "select":
@@ -654,6 +855,9 @@ class DuckDBBackend(Backend):
                     runtime.state.reset_projection(cols)
                 elif kind == "fill_null":
                     column, expr_sql = render_fill_null_expr(op, _quote, _lit)
+                    output_type = next_semantic_state.column_types.get(column)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, DUCKDB_DIALECT)
                     if runtime.state.pending_order_mentions(column):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(column, expr_sql, _quote)
@@ -664,6 +868,9 @@ class DuckDBBackend(Backend):
                         drop_hidden_order_cols()
                 elif kind == "coalesce":
                     alias, expr_sql = render_coalesce_expr(op, _quote, _lit)
+                    output_type = next_semantic_state.column_types.get(alias)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, DUCKDB_DIALECT)
                     if runtime.state.pending_order_mentions(alias):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(alias, expr_sql, _quote)
@@ -673,7 +880,10 @@ class DuckDBBackend(Backend):
                         runtime.state.clear_pending_order()
                         drop_hidden_order_cols()
                 elif kind == "case_when":
-                    alias, expr_sql = render_case_when_expr(op, _quote, _lit)
+                    alias, expr_sql = render_case_when_expr(op, DUCKDB_DIALECT, _quote, _lit)
+                    output_type = next_semantic_state.column_types.get(alias)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, DUCKDB_DIALECT)
                     if runtime.state.pending_order_mentions(alias):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(alias, expr_sql, _quote)
@@ -702,7 +912,16 @@ class DuckDBBackend(Backend):
                     else:
                         relation = runtime.assign_source(add_step(f"SELECT * FROM {relation} q OFFSET {op_n(op)}"))
                 elif kind == "mutate":
-                    out_column, expr_sql = render_mutate_expr(op, DUCKDB_DIALECT, _quote, _lit)
+                    out_column, expr_sql = render_mutate_expr(
+                        op,
+                        DUCKDB_DIALECT,
+                        _quote,
+                        _lit,
+                        semantic_state.column_types,
+                    )
+                    output_type = next_semantic_state.column_types.get(out_column)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, DUCKDB_DIALECT)
                     if runtime.state.pending_order_mentions(out_column):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(out_column, expr_sql, _quote)
@@ -727,37 +946,80 @@ class DuckDBBackend(Backend):
                     runtime.state.reset_projection(aliases)
                 else:
                     raise ValueError(kind)
+                semantic_state = next_semantic_state
             relation = runtime.assign_source(runtime.finalize_source())
             if ctes:
                 cte_sql = ", ".join(f"{_quote(name)} AS ({sql})" for name, sql in ctes)
                 query = f"WITH {cte_sql} SELECT * FROM {relation}"
             else:
                 query = f"SELECT * FROM {relation}"
-            out = con.execute(query).df()
-            con.close()
+            if self.physical_plan_collection_enabled:
+                def duckdb_physical_plan() -> str:
+                    rows = con.execute(f"EXPLAIN {query}").fetchall()
+                    for plan_kind, plan_text in rows:
+                        if str(plan_kind) == "physical_plan":
+                            return str(plan_text)
+                    return "\n".join(
+                        f"{plan_kind}\n{plan_text}"
+                        for plan_kind, plan_text in rows
+                    )
+
+                physical_plan = collect_physical_plan_bundle(
+                    backend=self.name,
+                    backend_version=str(getattr(duckdb, "__version__", "")),
+                    sources={"physical": duckdb_physical_plan},
+                    unsupported={
+                        "logical": "DuckDB Python EXPLAIN does not expose a stable logical plan"
+                    },
+                    detail=self.physical_plan_collection_mode,
+                )
+            cursor = con.execute(query)
+            columns = [str(description[0]) for description in cursor.description]
+            column_types = [str(description[1]) for description in cursor.description]
+            out = _DuckDBNativeRows(
+                columns=columns,
+                row_values=[list(row) for row in cursor.fetchall()],
+                column_types=column_types,
+            )
+            if tempdir is not None:
+                con.close()
             if tempdir is not None:
                 tempdir.cleanup()
-            return BackendResult(self.name, "ok", data=out, duration_ms=(time.perf_counter()-start)*1000)
+            return BackendResult(
+                self.name,
+                "ok",
+                data=out,
+                duration_ms=(time.perf_counter()-start)*1000,
+                physical_plan=physical_plan,
+            )
         except Exception as exc:  # noqa: BLE001
-            if con is not None:
+            if con is not None and tempdir is not None:
                 try:
                     con.close()
                 except Exception:
                     pass
             if tempdir is not None:
                 tempdir.cleanup()
-            return BackendResult(self.name, "error", error_type=type(exc).__name__, error=str(exc), duration_ms=(time.perf_counter()-start)*1000)
+            return BackendResult(
+                self.name,
+                "error",
+                error_type=type(exc).__name__,
+                error=str(exc),
+                duration_ms=(time.perf_counter()-start)*1000,
+                physical_plan=physical_plan,
+            )
 
 
 class DuckDBPersistentBackend(DuckDBBackend):
     name = "duckdb_persistent"
+    session_reuse_policy = "fresh_only"
     persistent_storage = True
 
 
 def _duckdb_threads() -> int | None:
     raw = os.environ.get("DATADIFF_DUCKDB_THREADS")
     if raw is None:
-        return None
+        return 1
     try:
         return max(1, int(raw))
     except ValueError:

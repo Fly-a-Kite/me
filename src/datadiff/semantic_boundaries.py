@@ -6,9 +6,18 @@ from typing import Any, Callable
 from datadiff.dsl import Case
 from datadiff.dynamic_strategy import StrategyRuleRecord, load_strategy_snapshot
 from datadiff.oracle import Finding
+from datadiff.semantic_contracts import finding_contract_boundary_precedes_reference
 from datadiff.util import unique_preserve_order
 
 BoundaryPredicate = Callable[[Case, Finding | dict[str, Any], dict[str, Any]], bool]
+PRE_REFERENCE_SEMANTIC_BOUNDARY_RULE_IDS = frozenset(
+    {
+        "boundary:join_null_keys",
+        "boundary:modulo_semantics",
+        "boundary:unicode_case_mapping",
+    }
+)
+SEMANTIC_CONTRACT_BOUNDARY_RULE_ID = "boundary:semantic_contract_lattice"
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +31,31 @@ class SemanticBoundaryRule:
 class SemanticBoundaryMatch:
     rule_id: str
     reason: str
+
+
+def pre_reference_semantic_boundary_matches(
+    matches: list[SemanticBoundaryMatch],
+    case: Case,
+    finding: Finding | dict[str, Any],
+) -> list[SemanticBoundaryMatch]:
+    """Select boundary evidence that must precede value-reference attribution."""
+
+    kind = (
+        finding.get("kind", "")
+        if isinstance(finding, dict)
+        else getattr(finding, "kind", "")
+    )
+    if str(kind or "") != "semantic_output_mismatch":
+        return []
+    return [
+        match
+        for match in matches
+        if match.rule_id in PRE_REFERENCE_SEMANTIC_BOUNDARY_RULE_IDS
+        or (
+            match.rule_id == SEMANTIC_CONTRACT_BOUNDARY_RULE_ID
+            and finding_contract_boundary_precedes_reference(case, finding)
+        )
+    ]
 
 
 def finding_root_is(expected_root: str, get_finding_value: Callable[[Finding | dict[str, Any], str, Any], Any]) -> BoundaryPredicate:
@@ -170,3 +204,25 @@ def matching_semantic_rules(
 
 def semantic_boundary_reasons(matches: list[SemanticBoundaryMatch]) -> list[str]:
     return unique_preserve_order(match.reason for match in matches)
+
+
+def documentation_refs(finding: Finding | dict[str, Any]) -> list[dict[str, str]]:
+    root = str(
+        finding.get("root_cause", "")
+        if isinstance(finding, dict)
+        else getattr(finding, "root_cause", "")
+    )
+    if root != "nan_inf_semantics":
+        return []
+    return [
+        {
+            "title": "Polars floating point numbers",
+            "url": "https://docs.pola.rs/user-guide/concepts/data-types-and-structures/#floating-point-numbers",
+            "note": "Polars documents NaN ordering/comparison behavior as distinct from regular missing data.",
+        },
+        {
+            "title": "Polars missing data",
+            "url": "https://docs.pola.rs/user-guide/expressions/missing-data/#not-a-number-or-nan-values",
+            "note": "Polars documents null as missing data and NaN as a floating-point value.",
+        },
+    ]

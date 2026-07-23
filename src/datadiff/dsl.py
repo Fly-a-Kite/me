@@ -83,8 +83,20 @@ class Program:
     def order_sensitive(self) -> bool:
         from datadiff.operation_semantics import op_kind
 
+        # Internal order observers affect which values a program computes even
+        # when a later operation (for example, a join or groupby) destroys the
+        # final row order.  Keep this broad predicate for mutation/metamorphic
+        # safety and use ``output_order_sensitive`` when comparing final rows.
         if any(op_kind(op) in {"running_sum", "row_number_filter", "sortedness_check"} for op in self.operations):
             return True
+        return self.output_order_sensitive
+
+    @property
+    def output_order_sensitive(self) -> bool:
+        """Whether the final operation chain defines observable row order."""
+
+        from datadiff.operation_semantics import op_kind
+
         row_order_preserving = {
             "filter",
             "tuple_absence_filter",
@@ -723,6 +735,9 @@ OPERATION_NODE_TYPES: dict[str, type[Operation]] = {
     "float_literal_precision_probe": ProbeOp,
     "timestamp_precision_filter_probe": ProbeOp,
     "series_rtruediv_probe": ProbeOp,
+    "series_reflected_arithmetic_probe": ProbeOp,
+    "datafusion_grouped_null_topk_probe": ProbeOp,
+    "confirmed_root_witness_probe": ProbeOp,
     "uint64_isin_probe": ProbeOp,
     "tuple_anti_null_probe": ProbeOp,
     "setop_all_duplicate_probe": ProbeOp,
@@ -862,6 +877,12 @@ class Case:
     tables: list[TableData]
     program: Program
     metadata: dict[str, Any] = field(default_factory=dict)
+    _runtime_cache: dict[str, Any] = field(
+        default_factory=dict,
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     def to_dict(self) -> dict[str, Any]:
         data = {

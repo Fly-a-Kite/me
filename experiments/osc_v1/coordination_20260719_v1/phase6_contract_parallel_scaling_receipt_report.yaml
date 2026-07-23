@@ -1,0 +1,235 @@
+schema_version: osc-phase6-contract-parallel-scaling-receipt-report-v1
+phase: 6
+status: scoped_validation_failed_pending_isolated_remediation_contract
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_receipt_task_contract.yaml
+  sha256: 86cad586419e533ff46d7b5892fdd169ba5e10df2065d35e185139a861540e71
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  forbidden_paths_modified: []
+  foundation_barrier: pass_unchanged
+source_state:
+  authority_before_contract_write:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    untracked_path_count: 24126
+    coordination_ledger_sha256: f899e3856ca41d114dbaa68c8f2ed5558a2e30a544a0592dadfa87f02111bd70
+  pre_scoped_suite:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    untracked_path_count: 24129
+    coordination_ledger_sha256: e7821925f6c050eb819364cb2d87320b90b2a89c7c8be709837daef43ff9c462
+  post_scoped_suite:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    untracked_path_count: 24129
+    coordination_ledger_sha256: e7821925f6c050eb819364cb2d87320b90b2a89c7c8be709837daef43ff9c462
+implementation:
+  private_parallel_scaling_receipt:
+    path: src/datadiff_osc/runtime/_phase6_parallel_scaling_receipts.py
+    pre_sha256: absent
+    post_sha256: 0c65ff117b8a15a9ac7b0d6f5841475f02db7019a6825218a90faf37d2daaf71
+  runtime_replay:
+    path: src/datadiff_osc/runtime/_semantic_replay.py
+    pre_sha256: 8926a2c42d657f8637244c14fc17ee0be6a67e162e63c87be02a439276b95aaa
+    post_sha256: ded341713ae92ecda70032bbeeee570e68802e8aed63c35c18af9f8f59663dd8
+  root_dynamic_binding:
+    path: src/datadiff_osc/_phase6_gate_authority.py
+    pre_sha256: 36f1a2f78bddf95408a4babdcf96d22e44d8401729da4ed6bc65558c68ef4f2d
+    post_sha256: 16ebc364ca521aee547a809a7a0906d4d150a42258be6ab31943e79c171d21fc
+  regression_tests:
+    path: tests/osc/test_runtime_phase6_parallel_scaling_receipts.py
+    pre_sha256: absent
+    post_sha256: a8ba9437112aa697705e1fcf1c7e19805aed699f9e4cbca2bdbc35f76fb29aaa
+validation:
+  static_parse:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -c
+      'import ast, pathlib; paths=("src/datadiff_osc/runtime/_phase6_parallel_scaling_receipts.py",
+      "src/datadiff_osc/runtime/_semantic_replay.py",
+      "src/datadiff_osc/_phase6_gate_authority.py",
+      "tests/osc/test_runtime_phase6_parallel_scaling_receipts.py",
+      "tests/osc/test_phase6_gate_authority_integration.py");
+      [ast.parse(pathlib.Path(path).read_text(encoding="utf-8"), filename=path)
+      for path in paths]; print("AST_OK", len(paths))'
+    exit_code: 0
+    complete_result: AST_OK 5
+  scoped_suite:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_runtime_phase6_parallel_scaling_receipts.py
+      tests/osc/test_runtime_phase6_contract_performance_receipts.py
+      tests/osc/test_runtime_semantic_replay.py
+      tests/osc/test_phase6_gate_authority_integration.py
+    execution_count: 1
+    exit_code: 1
+    complete_terminal_result: |-
+      ................F....................................................... [ 75%]
+      ........................                                                 [100%]
+      =================================== FAILURES ===================================
+      __ test_root_binds_parallel_receipt_to_exact_record_and_rejects_substitutions __
+
+      tmp_path = PosixPath('/tmp/pytest-of-root/pytest-17/test_root_binds_parallel_recei0')
+
+          def test_root_binds_parallel_receipt_to_exact_record_and_rejects_substitutions(
+              tmp_path,
+          ):
+              source_digest = _sha("parallel-source")
+              receipt = _receipt(source_digest=source_digest)
+              admission, path = _admission(tmp_path, receipt)
+              producer = authority_module.VerifiedProducerReceipt(
+                  receipt_id="parallel-producer",
+                  producer_kind="performance_paired_replay",
+                  artifact_id="parallel-artifact",
+                  admissions=(admission,),
+              )
+              record = authority_module._parallel_scaling_dynamic_record(
+                  receipt,
+                  producer_receipt_digest=producer.digest,
+              )
+
+              errors: list[str] = []
+              authority_module._verify_parallel_scaling_dynamic_bindings(
+                  source_digest=source_digest,
+                  records=(record,),
+                  performance_producer_receipt=producer,
+                  errors=errors,
+              )
+              assert errors == []
+              assert (
+                  "ParallelScalingEvidenceReceipt",
+                  PARALLEL_SCALING_EVIDENCE_RECEIPT_SCHEMA_VERSION,
+              ) in authority_module._ALLOWED_TYPED_ENVELOPES["performance_paired_replay"]
+              assert (
+                  "PairedBenchmarkReceipt",
+                  "osc-root-paired-benchmark-receipt-v1",
+              ) not in authority_module._ALLOWED_TYPED_ENVELOPES["performance_paired_replay"]
+
+              forged = dict(record)
+              forged["six_worker_result_digest"] = _sha("forged-six-result")
+              errors = []
+              authority_module._verify_parallel_scaling_dynamic_bindings(
+                  source_digest=source_digest,
+                  records=(forged,),
+                  performance_producer_receipt=producer,
+                  errors=errors,
+              )
+              assert errors == [
+                  "parallel_scaling_record_binding_mismatch:"
+                  f"{receipt.sample_id}:six_worker_result_digest"
+              ]
+
+              errors = []
+              authority_module._verify_parallel_scaling_dynamic_bindings(
+                  source_digest=_sha("parallel-other-source"),
+                  records=(record,),
+                  performance_producer_receipt=producer,
+                  errors=errors,
+              )
+              assert errors == [
+                  "parallel_scaling_receipt_source_snapshot_mismatch:"
+                  f"{receipt.sample_id}"
+              ]
+
+              path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+              errors = []
+              authority_module._verify_parallel_scaling_dynamic_bindings(
+                  source_digest=source_digest,
+                  records=(record,),
+                  performance_producer_receipt=producer,
+                  errors=errors,
+              )
+      >       assert errors == [
+                  f"parallel_scaling_admission_hash_mismatch:{admission.admission_id}"
+              ]
+      E       AssertionError: assert ['parallel_sc...40e1967a0176'] == ['parallel_sc...ng-admission']
+      E
+      E         Left contains one more item: 'parallel_scaling_record_not_admitted:osc-phase6-parallel-scaling-sample-id-v1-a53e92e7df46a0fd2b7911683903b6b13bcf8e0611974e4998f740e1967a0176'
+      E         Use -v to get more diff
+
+      tests/osc/test_runtime_phase6_parallel_scaling_receipts.py:251: AssertionError
+      =========================== short test summary info ============================
+      FAILED tests/osc/test_runtime_phase6_parallel_scaling_receipts.py::test_root_binds_parallel_receipt_to_exact_record_and_rejects_substitutions
+      1 failed, 95 passed in 25.41s
+sha_verification:
+  allowed_product_paths_pre_and_post_exact:
+    src/datadiff_osc/runtime/_phase6_parallel_scaling_receipts.py: 0c65ff117b8a15a9ac7b0d6f5841475f02db7019a6825218a90faf37d2daaf71
+    src/datadiff_osc/runtime/_semantic_replay.py: ded341713ae92ecda70032bbeeee570e68802e8aed63c35c18af9f8f59663dd8
+    src/datadiff_osc/_phase6_gate_authority.py: 16ebc364ca521aee547a809a7a0906d4d150a42258be6ab31943e79c171d21fc
+    tests/osc/test_runtime_phase6_parallel_scaling_receipts.py: a8ba9437112aa697705e1fcf1c7e19805aed699f9e4cbca2bdbc35f76fb29aaa
+    tests/osc/test_runtime_semantic_replay.py: 40f2a7db1cea6956ec869368c827653b582e84aea340c50c15d028f6de8348df
+    tests/osc/test_phase6_gate_authority_integration.py: 0e9e40c2cd1a783d3a0513c1fdec267427cbb12ec72955960631277eed56495a
+  frozen_target_sha256_pre_and_post_exact:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+findings:
+  - id: OSC-6-CONTRACT-R5-F1
+    severity: medium
+    claim: >-
+      A post-admission byte mutation yields the required first exact failure,
+      parallel_scaling_admission_hash_mismatch, but the accumulator then emits
+      parallel_scaling_record_not_admitted.  The R5 regression incorrectly
+      required a singleton error list rather than verifying the required first
+      Root exact binding failure and fail-closed outcome; the only R5 scoped
+      suite therefore fails.
+    reproduction: >-
+      Run the recorded scoped command.  The byte mutation at
+      test_runtime_phase6_parallel_scaling_receipts.py:243 makes the admission
+      hash mismatch first, then leaves no decoded receipt to match the record.
+    violated_invariant: >-
+      The R5 required test states that a one-field mutation must assert the
+      first Root exact binding failure.  The test overconstrains later,
+      fail-closed accumulator diagnostics and cannot establish a passing
+      R5 authority result.
+    required_test: >-
+      A newly authorized isolated remediation must retain the byte-mutation
+      counterexample, assert errors[0] is the exact admission hash mismatch,
+      assert errors is nonempty/fail-closed, and preserve all no-authority
+      boundaries.  It must not change product logic merely to hide later
+      diagnostics unless a distinct negative finding demonstrates that the
+      first failure is wrong.
+counts:
+  blocker: 0
+  high: 0
+  medium: 1
+  low: 0
+  scoped_tests_passed: 95
+  scoped_tests_failed: 1
+  writes: 6
+  child_agents: 0
+  forbidden_paths_modified: []
+remaining_gate_boundary:
+  phase_6_contract: pending
+  reason: >-
+    R5's only scoped suite failed.  The private receipt and Root binding must
+    not be treated as an accepted Contract gate, typed producer, artifact or
+    provenance admission, cohort, corpus, bootstrap, metric, or gate result.
+  legacy_paired_receipt_authoritative: false
+  candidate_confirmed: false
+  bug_claimed: false
+  combined_suite_run: false
+  phase7_pilot_2h_run: false
+  twenty_four_hour_run: false
+next_step_requires_new_task_contract:
+  - >-
+    Create a narrowly scoped R5A remediation authority for the failed
+    first-error regression only.  It may change the R5 parallel-scaling test
+    and run one replacement scoped suite; it may not change product code,
+    frozen paths, public interfaces, gate specifications, artifacts,
+    provenance, cohorts, corpus execution, or any gate status.

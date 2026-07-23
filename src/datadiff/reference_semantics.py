@@ -173,7 +173,13 @@ def reference_result(case: Case, *, backend_name: str = "dsl_reference") -> Norm
                 rows, columns = _reference_aggregate(rows, op)
             else:
                 return None
-        return normalize_reference_rows(columns, rows, preserve_order=case.program.order_sensitive, backend_name=backend_name)
+        return normalize_reference_rows(
+            columns,
+            rows,
+            preserve_order=case.program.output_order_sensitive,
+            preserve_float_precision=case.program.order_sensitive,
+            backend_name=backend_name,
+        )
     except Exception:
         return None
 
@@ -183,13 +189,19 @@ def normalize_reference_rows(
     rows: list[dict[str, Any]],
     *,
     preserve_order: bool = False,
+    preserve_float_precision: bool | None = None,
     backend_name: str = "dsl_reference",
 ) -> NormalizedResult:
+    if preserve_float_precision is None:
+        preserve_float_precision = preserve_order
     column_positions = sorted(enumerate(columns), key=lambda item: (item[1], item[0]))
     out_columns = [name for _, name in column_positions]
     out_rows = [
         [
-            _norm_value(row.get(columns[idx]), preserve_float_precision=preserve_order)
+            _norm_value(
+                row.get(columns[idx]),
+                preserve_float_precision=preserve_float_precision,
+            )
             for idx, _ in column_positions
         ]
         for row in rows

@@ -1,0 +1,61 @@
+schema_version: osc-phase6-authorization-and-preflight-v1
+phase: 6
+authorization:
+  user_instruction: "授权进入 Phase 6"
+  date: 2026-07-20
+  timezone: Asia/Shanghai
+  phase6_authorized_by_user: true
+  phase6_started: true
+  phase7_paired_pilot_authorized: false
+  pilot_started: false
+  two_hour_run_started: false
+  twenty_four_hour_run_authorized: false
+  twenty_four_hour_run_started: false
+  scope: phase6_hard_gate_validation_and_evidence_only
+  excluded_scope:
+    - phase7_paired_2h_pilot
+    - phase8_24h_authorization_and_execution
+phase5_entry_barrier:
+  path: experiments/osc_v1/coordination_20260719_v1/phase5_exit_barrier.yaml
+  sha256: 85509d13f916cf652b113b1053847ccc9ebdcd0342f505e3566d1833354c02af
+  status: pass_three_direct_exact_sha_reviews
+  phase5_exit_gate_passed: true
+specification_inputs:
+  experiments/final_bug_discovery_protocol_v3/TODO.md: 1ad989d412651f5cc9ae3c3ac5d7d7207176557e0bcdcfb449788f016d607419
+  docs/project_architecture.md: 5fc31c1c2c4bf1241e41cc966f8d56abc890259a8577fe756076b490e3698d9f
+  docs/fine_grained_discovery_architecture.md: 58d0e11a3cd3c2ea9b7096449f9beafae756b94cae3e41f04d4377b2b4d6dbf2
+  docs/discovery_search_and_parallel_architecture.md: 7af5fb51be2de1e0162ffb4a2db2bf40df050f35c0446bcae707e419936cf1b9
+  docs/semantic_hypercontract_architecture.md: 20a5e22513c64c60e77b115233b28fdca2591081f08d5f2945a15dda18442dae
+  docs/architecture_credibility_and_alternatives.md: 95bd949dba93d41d9b2594122fc49766164008c5de8df6aec91dc88f2afa0762
+  docs/competitive_paper_experiment_blueprint.md: e2537e9ec03f5222321af7ae11491341f402d6e294c19ae4c8c3d397c4c1cd18
+  docs/codex_multi_agent_development_runbook.md: a17a62d7937f5ff4755d8925dc6dd64c25946516a80f82466ddeda1ee8d845f9
+workspace_entry:
+  git_head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  normal_status_entries: 2908
+  normal_status_sha256: afdb15e19bb98330957e06d648cc141e7167357bbb71604c5aa0b4c824ca1cee
+  full_untracked_status_entries: 24167
+  full_untracked_status_sha256: 11260bb61c02d410e52572dffec9f4c8372099194d9156734d6f245a9ff472ed
+  tracked_diff_paths: 141
+  tracked_diff_stat_sha256: d80555d37018902ec03aa7b77ab042e032f5cd1e47babbb5b3eb2e1561e5ec7a
+  staged_paths: 0
+  active_related_processes: 0
+  tmux_sessions: 0
+  public_api_freeze_sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  preservation_rule: preserve every existing dirty and untracked path; no reset, checkout, clean, overwrite, or bulk format
+team:
+  root_agent: /root
+  direct_agents:
+    - /root/phase5_authority_audit
+    - /root/phase5_consumer_audit
+    - /root/phase5_evidence_audit
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  initial_mode: read_only_audit
+phase6_gates:
+  contract: pending
+  granularity_reachability: pending
+  runtime_correctness: pending
+  latest_target_audit: pending
+  full_repository_tests: pending
+phase6_exit_gate_passed: false
+

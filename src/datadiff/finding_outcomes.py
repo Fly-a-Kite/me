@@ -8,6 +8,15 @@ from datadiff.family_novelty import family_key_matches_known_family, split_famil
 
 CANDIDATE_BUG_VERDICT = "candidate_implementation_bug"
 ISSUE_REPLAY_ORIGIN = "issue_replay"
+NON_FRESH_LIFECYCLE_STATES = {
+    "submitted",
+    "acknowledged",
+    "confirmed",
+    "fixed",
+    "duplicate",
+    "invalid",
+    "saturated",
+}
 SEMANTIC_DIVERGENCE_VERDICTS = {
     "documented_semantic_divergence",
     "expected_semantic_divergence",
@@ -20,6 +29,7 @@ RESOLVED_SEMANTIC_DIVERGENCE_VERDICTS = {
 FALSE_POSITIVE_VERDICTS = {
     "generator_false_positive",
     "normalizer_false_positive",
+    "harness_lowering_error",
 }
 NEEDS_CONFIRMATION_VERDICTS = {
     "needs_manual_confirmation",
@@ -37,6 +47,8 @@ EMPTY_FINDING_REWARD_SIGNALS = {
     "issue_replay_candidate_bug_count": 0,
     "known_saturated_candidate_bug_count": 0,
     "source_issue_candidate_bug_count": 0,
+    "nonfresh_lifecycle_candidate_bug_count": 0,
+    "duplicate_candidate_bug_count": 0,
     "semantic_divergence": False,
     "semantic_divergence_count": 0,
     "resolved_semantic_divergence_count": 0,
@@ -55,6 +67,8 @@ class FindingOutcomeAnalysis:
     issue_replay_candidate_bug_count: int = 0
     known_saturated_candidate_bug_count: int = 0
     source_issue_candidate_bug_count: int = 0
+    nonfresh_lifecycle_candidate_bug_count: int = 0
+    duplicate_candidate_bug_count: int = 0
     semantic_divergence_count: int = 0
     resolved_semantic_divergence_count: int = 0
     semantic_divergence_needs_confirmation_count: int = 0
@@ -71,6 +85,8 @@ class FindingOutcomeAnalysis:
             and self.issue_replay_candidate_bug_count == 0
             and self.known_saturated_candidate_bug_count == 0
             and self.source_issue_candidate_bug_count == 0
+            and self.nonfresh_lifecycle_candidate_bug_count == 0
+            and self.duplicate_candidate_bug_count == 0
             and self.semantic_divergence_count == 0
             and self.resolved_semantic_divergence_count == 0
             and self.semantic_divergence_needs_confirmation_count == 0
@@ -84,6 +100,8 @@ class FindingOutcomeAnalysis:
             "issue_replay_candidate_bug_count": self.issue_replay_candidate_bug_count,
             "known_saturated_candidate_bug_count": self.known_saturated_candidate_bug_count,
             "source_issue_candidate_bug_count": self.source_issue_candidate_bug_count,
+            "nonfresh_lifecycle_candidate_bug_count": self.nonfresh_lifecycle_candidate_bug_count,
+            "duplicate_candidate_bug_count": self.duplicate_candidate_bug_count,
             "semantic_divergence": self.semantic_divergence_count > 0,
             "semantic_divergence_count": self.semantic_divergence_count,
             "resolved_semantic_divergence_count": self.resolved_semantic_divergence_count,
@@ -128,6 +146,7 @@ def analyze_finding_outcomes(
         is_issue_replay = is_issue_replay_finding(finding)
         is_known_saturated = family_key_matches_known_family(family_key, known_families)
         is_source_issue = has_source_issue(finding)
+        lifecycle = finding_lifecycle(finding)
         if is_issue_replay:
             analysis.issue_replay_candidate_bug_count += 1
             if not root.startswith("metamorphic_"):
@@ -136,7 +155,10 @@ def analyze_finding_outcomes(
             analysis.known_saturated_candidate_bug_count += 1
         if is_source_issue:
             analysis.source_issue_candidate_bug_count += 1
-        if is_issue_replay or is_known_saturated or is_source_issue:
+        if lifecycle in NON_FRESH_LIFECYCLE_STATES:
+            analysis.nonfresh_lifecycle_candidate_bug_count += 1
+            analysis.duplicate_candidate_bug_count += int(lifecycle == "duplicate")
+        if is_issue_replay or is_known_saturated or is_source_issue or lifecycle in NON_FRESH_LIFECYCLE_STATES:
             continue
         analysis.candidate_bug_count += 1
         if not root.startswith("metamorphic_"):
@@ -165,7 +187,49 @@ def row_reward_signals(
         findings,
         known_saturated_bug_families=known_saturated_bug_families,
     )
-    return analysis.reward_signals()
+    signals = analysis.reward_signals()
+    lane = evidence_lane_for_row(row)
+    if lane in {"seeded_sensitivity", "replay", "known_regression"}:
+        # Keep the raw observation counts in explicit lane fields, but prevent
+        # historical/seeded/known evidence from entering fresh discovery reward
+        # or report totals.
+        signals["evidence_lane"] = lane
+        signals["excluded_lane_candidate_bug_count"] = int(signals["candidate_bug_count"])
+        signals["seeded_candidate_bug_count"] = (
+            int(signals["candidate_bug_count"])
+            if lane == "seeded_sensitivity"
+            else 0
+        )
+        signals["candidate_bug"] = False
+        signals["candidate_bug_count"] = 0
+        signals["rewardable_semantic_divergence"] = False
+    return signals
+
+
+def evidence_lane_for_row(row: dict[str, Any]) -> str:
+    source = str(row.get("candidate_source", "") or "").strip().lower()
+    suite = str(row.get("target_suite", "") or "").strip().lower()
+    metadata = row.get("metadata")
+    metadata_text = ""
+    if isinstance(metadata, dict):
+        metadata_text = " ".join(
+            str(metadata.get(key, "") or "")
+            for key in ("source", "family_lifecycle", "generator_profile")
+        ).lower()
+    text = f"{source} {suite} {metadata_text}"
+    if "seeded" in text or "fault_sensitivity" in text:
+        return "seeded_sensitivity"
+    if "known_regression" in text or "known replay" in text:
+        return "known_regression"
+    if "replay" in text or "historical" in text or "exact_reproducer" in text:
+        return "replay"
+    if "known" in text or "regression" in text:
+        return "known_regression"
+    if "feedback" in text:
+        return "feedback"
+    if "metamorphic" in text or "semantic" in text:
+        return "semantic_metamorphic"
+    return "fresh"
 
 
 def reward_signals_have_rewardable_finding(signals: dict[str, Any]) -> bool:
@@ -219,6 +283,17 @@ def has_source_issue(finding: dict[str, Any]) -> bool:
     return bool(str(finding.get("source_issue", "")).strip())
 
 
+def finding_lifecycle(finding: dict[str, Any]) -> str:
+    raw = (
+        finding.get("family_lifecycle")
+        or finding.get("lifecycle_status")
+        or finding.get("candidate_status")
+        or finding.get("bug_status")
+        or "novel"
+    )
+    return str(raw).strip().lower().replace("-", "_").replace(" ", "_") or "novel"
+
+
 def backend_group_key(finding: dict[str, Any]) -> str:
     return ",".join(sorted(finding.get("suspicious_backends", []) or [])) or "unknown"
 
@@ -251,6 +326,7 @@ def is_rewardable_candidate_issue_finding(
         is_candidate_issue_finding(finding)
         and not is_issue_replay_finding(finding)
         and not has_source_issue(finding)
+        and finding_lifecycle(finding) not in NON_FRESH_LIFECYCLE_STATES
         and not is_known_saturated_candidate_issue_finding(finding, known_saturated_bug_families)
     )
 
@@ -282,6 +358,7 @@ def offline_finding_bucket(
             is_known_saturated_candidate_issue_finding(finding, known_saturated_bug_families)
             or is_issue_replay_finding(finding)
             or has_source_issue(finding)
+            or finding_lifecycle(finding) in NON_FRESH_LIFECYCLE_STATES
         ):
             return OFFLINE_BUCKET_KNOWN_BUG
         return OFFLINE_BUCKET_NEW_BUG

@@ -4,6 +4,14 @@ import argparse
 from collections.abc import Sequence
 from typing import Callable
 
+from datadiff.backend_sampling_cli import add_backend_sampling_flags
+from datadiff.candidate_pool_sampling_cli import add_candidate_pool_sampling_flags
+from datadiff.method_arms import (
+    DEFAULT_METHOD_ARM_ID,
+    live_method_arm_ids,
+    research_control_arm_ids,
+)
+
 
 def add_ablation_flags(
     parser: argparse.ArgumentParser,
@@ -11,6 +19,24 @@ def add_ablation_flags(
     parse_adaptive_components_func: Callable[[str], set[str]],
     adaptive_components: Sequence[str],
 ) -> None:
+    parser.add_argument(
+        "--method-arm",
+        choices=live_method_arm_ids(),
+        default=DEFAULT_METHOD_ARM_ID,
+        help=(
+            "registered research arm; use this instead of assembling implicit method "
+            "booleans for paper ablations"
+        ),
+    )
+    parser.add_argument(
+        "--research-control-arm",
+        choices=research_control_arm_ids(),
+        default="",
+        help=(
+            "explicit frozen/ablation control; research controls are separate from "
+            "the live P8 method registry"
+        ),
+    )
     parser.add_argument("--disable-type-aware-generation", action="store_true")
     parser.add_argument("--disable-normalizer", action="store_true")
     parser.add_argument("--disable-differential-oracle", action="store_true")
@@ -32,10 +58,28 @@ def add_ablation_flags(
     parser.add_argument("--enable-reducer", action="store_true")
     parser.add_argument("--disable-artifact", action="store_true")
     parser.add_argument(
+        "--enable-parallel-backend-execution",
+        action="store_true",
+        help=(
+            "enable the non-promoted parallel backend arm; the P4.8-B production "
+            "default is sequential"
+        ),
+    )
+    parser.add_argument(
         "--disable-parallel-backend-execution",
         action="store_true",
-        help="run each case on configured backends sequentially for runtime ablation or debugging",
+        help="explicitly retain the sequential P4.8-B production default",
     )
+    parser.add_argument(
+        "--disable-backend-session-reuse",
+        action="store_true",
+        help=(
+            "construct fresh backend instances for each execution call; use as the "
+            "P4.2 isolation/control arm"
+        ),
+    )
+    add_backend_sampling_flags(parser)
+    add_candidate_pool_sampling_flags(parser)
     parser.add_argument("--disable-preflight-validation", action="store_true")
     parser.add_argument("--disable-preflight-repair", action="store_true")
     parser.add_argument("--persist-feedback-corpus", action="store_true")

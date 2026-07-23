@@ -1,0 +1,295 @@
+schema_version: osc-phase5-prewrite-declarations-v1
+review_report_sha256: de6bdab517e96d7ebecd5afd31f7136dd8a8a262d4bbf84e86641e9adf0e58e7
+freeze_manifest_sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+change_request:
+  id: CR-OSC-5-001
+  status: accepted_and_all_consumers_confirmed
+  field_shape_changed: false
+  schema_version_changed: false
+repair_order:
+  - OSC-5-A-contract
+  - OSC-5-A-ROOT-binding
+  - OSC-5-B-search
+  - OSC-5-C-runtime
+  - OSC-5-ROOT-integration
+parallel_writes_allowed: false
+tasks:
+  - task_id: OSC-5-A
+    owner: contract
+    finding_ids: [OSC-4-C-F1, OSC-4-C-F2, OSC-4-C-F3, OSC-4-C-F4, OSC-4-C-F5]
+    exact_files_to_modify:
+      - src/datadiff_osc/contract_engine/relations.py
+      - src/datadiff_osc/contract_engine/applicability.py
+      - src/datadiff_osc/contract_engine/monitor.py
+      - src/datadiff_osc/contract_engine/planner.py
+      - src/datadiff_osc/contract_engine/demand.py
+      - src/datadiff_osc/contract_engine/compiler.py
+      - tests/osc/test_contract_authority.py
+      - tests/osc/test_contract_relations_planner.py
+      - tests/osc/test_contract_two_pass_properties.py
+      - tests/osc/test_contract_entailment.py
+      - tests/osc/test_contract_v1_compatibility.py
+    new_files: []
+    public_interface_change_required: false
+    zero_crossing: true
+    approved_to_write: false
+    status: complete_root_verified
+  - task_id: OSC-5-A-ROOT-BINDING
+    owner: root
+    finding_ids: [OSC-4-C-F2]
+    exact_files_to_modify:
+      - src/datadiff_osc/comparison/staged.py
+      - scripts/osc/audit_staged_parity.py
+      - tests/osc/test_comparison_staged.py
+    new_files: []
+    public_interface_change_required: false
+    frozen_field_or_schema_change_required: false
+    zero_crossing: true
+    approved_to_write: false
+    status: complete_root_verified
+    barrier: passed
+  - task_id: OSC-5-B
+    owner: search
+    finding_ids: [OSC-4-A-F1, OSC-4-A-F2, OSC-4-A-F3, OSC-4-A-F4]
+    exact_files_to_modify:
+      - src/datadiff_osc/generation/extraction.py
+      - src/datadiff_osc/search/matcher.py
+      - src/datadiff_osc/search/ledger.py
+      - src/datadiff_osc/semantic_targets/declarations.py
+      - src/datadiff_osc/scheduler/policy.py
+      - tests/osc/test_generation_extraction.py
+      - tests/osc/test_search_matcher.py
+      - tests/osc/test_search_ledger.py
+      - tests/osc/test_search_reachability.py
+      - tests/osc/test_targets_registry.py
+      - tests/osc/test_scheduler_policy.py
+      - tests/osc/test_search_performance.py
+    new_files: []
+    public_interface_change_required: false
+    zero_crossing: true
+    approved_to_write: false
+    status: complete_root_verified_after_authority_followup
+    barrier: OSC-5-A and OSC-5-A-ROOT-BINDING passed root verification
+  - task_id: OSC-5-C
+    owner: runtime
+    finding_ids: [OSC-4-B-F1, OSC-4-B-F2, OSC-4-B-F3, OSC-4-B-F4]
+    exact_files_to_modify:
+      - src/datadiff_osc/runtime/gates.py
+      - src/datadiff_osc/comparison/cache.py
+      - src/datadiff_osc/parallel/executor.py
+      - src/datadiff_osc/parallel/invariance.py
+      - src/datadiff_osc/runtime/benchmarks.py
+      - scripts/osc/calculate_gate_report.py
+      - scripts/osc/audit_parallel_invariance.py
+      - scripts/osc/benchmark_parallel_scaling.py
+      - tests/osc/test_runtime_gates.py
+      - tests/osc/test_comparison_cache.py
+      - tests/osc/test_parallel_executor.py
+      - tests/osc/test_parallel_invariance.py
+      - tests/osc/test_runtime_benchmarks.py
+      - tests/osc/test_runtime_scripts.py
+    new_files:
+      - src/datadiff_osc/runtime/gate_artifacts.py
+      - tests/osc/test_runtime_gate_artifacts.py
+    public_interface_change_required: false
+    zero_crossing: true
+    approved_to_write: false
+    status: superseded_by_osc_5_c_authority_followup
+    barrier: OSC-5-B, Root observation authority, and Search authority followup passed root verification
+    root_counterexample: >-
+      A schema/hash-self-consistent caller-authored manifest using a self-asserted
+      source digest and 232 nonexistent cell identities for both
+      fresh_cells_observed and fresh_cells_declared currently yields
+      evidence.valid=true and coverage.fresh_cells passed=true.  Hashing a
+      self-declared universe does not independently bind the frozen universe.
+  - task_id: OSC-5-C-AUTHORITY-FOLLOWUP
+    owner: runtime
+    finding_ids: [OSC-4-B-F1]
+    exact_files_to_modify:
+      - src/datadiff_osc/runtime/gate_artifacts.py
+      - src/datadiff_osc/runtime/gates.py
+      - scripts/osc/calculate_gate_report.py
+      - tests/osc/test_runtime_gate_artifacts.py
+      - tests/osc/test_runtime_gates.py
+      - tests/osc/test_runtime_scripts.py
+    new_files: []
+    public_interface_change_required: false
+    internal_interface_change: CR-OSC-5-004
+    zero_crossing: true
+    approved_to_write: false
+    status: complete_root_verified_runtime_consumer
+    barrier: Runtime writer was read-only while Root registered CR-OSC-5-004 and this exact six-path contract
+  - task_id: OSC-5-C-BINDING-FOLLOWUP
+    owner: runtime
+    finding_ids: [OSC-4-B-F2, OSC-4-B-F4]
+    exact_files_to_modify:
+      - src/datadiff_osc/comparison/cache.py
+      - src/datadiff_osc/parallel/executor.py
+      - src/datadiff_osc/parallel/invariance.py
+      - src/datadiff_osc/runtime/benchmarks.py
+      - scripts/osc/audit_parallel_invariance.py
+      - scripts/osc/benchmark_parallel_scaling.py
+      - tests/osc/test_comparison_cache.py
+      - tests/osc/test_parallel_executor.py
+      - tests/osc/test_parallel_invariance.py
+      - tests/osc/test_runtime_benchmarks.py
+      - tests/osc/test_runtime_scripts.py
+    new_files: []
+    public_interface_change_required: false
+    internal_interface_change: CR-OSC-5-005
+    zero_crossing: true
+    approved_to_write: false
+    status: complete_root_verified
+    barrier: OSC-5-C-AUTHORITY-FOLLOWUP completed and Root independently verified 32 scoped plus 97 joint tests
+  - task_id: OSC-5-A-OUTCOME-ADMISSION
+    owner: contract
+    finding_ids: [OSC-5-ROOT-003-A-F1]
+    exact_files_to_modify:
+      - src/datadiff_osc/contract_engine/planner.py
+      - tests/osc/test_contract_relations_planner.py
+      - tests/osc/test_contract_authority.py
+    new_files: []
+    public_interface_change_required: false
+    internal_interface_change: CR-OSC-ROOT-003-A
+    zero_crossing: true
+    approved_to_write: false
+    status: complete_root_verified
+    barrier: Root independently verified 48 scoped and 139 Contract-plus-freeze tests; exact hashes match the section-12 report
+  - task_id: OSC-5-C-OUTCOME-ROUTING
+    owner: runtime
+    finding_ids: [OSC-5-ROOT-003-A-F1]
+    exact_files_to_modify:
+      - src/datadiff_osc/comparison/staged.py
+      - scripts/osc/audit_staged_parity.py
+      - tests/osc/test_comparison_staged.py
+      - tests/osc/test_runtime_scripts.py
+    new_files: []
+    public_interface_change_required: false
+    internal_interface_change: CR-OSC-ROOT-003-A
+    zero_crossing: true
+    approved_to_write: false
+    status: complete_root_verified
+    barrier: Root independently verified 25 scoped and 218 joint tests; exact four-path hashes match the section-12 report
+  - task_id: OSC-5-ROOT-004-AUTHORITY-CONTROL-PLANE
+    owner: root
+    finding_ids: [OSC-4-B-F1]
+    exact_files_to_modify:
+      - src/datadiff_osc/_phase6_gate_authority.py
+      - tests/osc/test_phase6_gate_authority_integration.py
+      - scripts/osc/build_phase6_gate_authority_bundle.py
+      - scripts/osc/preflight_phase6_gate_authority_bundle.py
+    new_files:
+      - src/datadiff_osc/_phase6_gate_authority.py
+      - tests/osc/test_phase6_gate_authority_integration.py
+      - scripts/osc/build_phase6_gate_authority_bundle.py
+      - scripts/osc/preflight_phase6_gate_authority_bundle.py
+    public_interface_change_required: false
+    internal_interface_change: CR-OSC-ROOT-004 and CR-OSC-5-004
+    zero_crossing: true
+    approved_to_write: false
+    status: complete_root_verified
+    barrier: Root verified 27 scoped and 76 Runtime-wildcard tests; all three exact-SHA reviews report zero blocker/high/medium; Phase6 evidence remains intentionally absent
+  - task_id: OSC-5-ROOT
+    owner: root
+    finding_ids: [OSC-4-A-F1, OSC-4-A-F5]
+    exact_files_to_modify:
+      - src/datadiff_osc/probe_contracts.py
+      - src/datadiff_osc/semantic_targets/compiler.py
+      - tests/osc/test_probe_contract_integration.py
+    new_files:
+      - src/datadiff_osc/probe_contracts.py
+      - tests/osc/test_probe_contract_integration.py
+    public_interface_change_required: false
+    frozen_field_or_schema_change_required: false
+    zero_crossing: true
+    approved_to_write: false
+    status: complete_root_verified
+    barrier: Search writer stopped after read-only barrier counterexample; Runtime remains locked
+  - task_id: OSC-5-B-AUTHORITY-FOLLOWUP
+    owner: search
+    finding_ids: [OSC-4-A-F1]
+    exact_files_to_modify:
+      - src/datadiff_osc/search/ledger.py
+      - tests/osc/test_search_ledger.py
+    new_files: []
+    public_interface_change_required: false
+    zero_crossing: true
+    approved_to_write: false
+    status: complete_root_verified
+  - task_id: OSC-5-ROOT-LEGACY-DIAGNOSTIC-FACADE
+    owner: root
+    finding_ids: [OSC-5-ROOT-003-A-F1]
+    exact_files_to_modify:
+      - src/datadiff/osc_diagnostic_facade.py
+      - tests/osc/test_legacy_diagnostic_facade.py
+    new_files:
+      - src/datadiff/osc_diagnostic_facade.py
+      - tests/osc/test_legacy_diagnostic_facade.py
+    prewrite_sha256:
+      src/datadiff/osc_diagnostic_facade.py: absent
+      tests/osc/test_legacy_diagnostic_facade.py: absent
+    public_interface_change_required: false
+    frozen_field_or_schema_change_required: false
+    internal_interface_change: CR-OSC-ROOT-003 and CR-OSC-ROOT-003-B
+    zero_crossing: true
+    approved_to_write: false
+    status: complete_root_and_independent_review_verified
+    barrier: >-
+      58 bounded tests pass at source SHA
+      139545e03db5fbf9178907a57e37d6889e8d82a2e9e36e5d5f358293f98391bf
+      and test SHA e8ad6381029d826e6521db7e27922cd7ce144ec328474f0f5af09d3caabd8b9c;
+      independent review reports blocker/high/medium=0.
+  - task_id: OSC-5-ROOT-OPAQUE-DIAGNOSTIC-CONSUMERS
+    owner: root
+    finding_ids: [OSC-5-ROOT-003-A-F1]
+    exact_files_to_modify:
+      - src/datadiff/execution.py
+      - src/datadiff/run_loaded.py
+      - src/datadiff/runner.py
+      - src/datadiff/run_summaries.py
+      - src/datadiff/discovery_runtime.py
+      - src/datadiff/candidate_pipeline.py
+      - tests/test_execution.py
+      - tests/test_run_loaded.py
+      - tests/test_runner.py
+      - tests/test_discovery_runtime.py
+      - tests/test_candidate_pipeline.py
+    new_files: []
+    prewrite_sha256:
+      src/datadiff/execution.py: 42c0aca10a7670a556fd61a93ac96b0ca463192a5fde317a015acd9f730baed5
+      src/datadiff/run_loaded.py: 77e4e1ce275869b02c3a160caae32a5b15229b067643eea0404ae2f5a729292e
+      src/datadiff/runner.py: d9253d731756f5ee7cd82496f58ccd7a99353af05b0c2c201d04de8d584ec798
+      src/datadiff/run_summaries.py: d3e99c05508661bd5574bd883352baa3ce112d6f4d499b56d498edcfeb907df3
+      src/datadiff/discovery_runtime.py: 8dc67bcd68c05d7d92c4dbefd22add328b9640464e4220a884fac0205fda9342
+      src/datadiff/candidate_pipeline.py: ca5dce5498667d4525f099527664e4c42451eeb474be99cf5cfd659aaf206e65
+      tests/test_execution.py: 1f992d7bf9695c81f726fd76c5f49c8c29fcbb06ae0fad5a90c7cc33999eb35c
+      tests/test_run_loaded.py: 7fd70388363448c79350f9fd2d5f18ea76e7fe681b798ec29b9e6a8dff857905
+      tests/test_runner.py: 5ab514e5ede3a287c5a84425acfe406fa0781f1a47b7ec1e80f2c08f0b33c0e8
+      tests/test_discovery_runtime.py: c1743d093bb0708f4596b42672e7e10c05f7d32849fa9f0b1655e46f7aabc49c
+      tests/test_candidate_pipeline.py: 5c21f21f43ed5023d58bfd0ad6efce5283f7abd1c64a028e7b786df4eff2736c
+    public_interface_change_required: false
+    frozen_field_or_schema_change_required: false
+    internal_interface_change: CR-OSC-ROOT-003, CR-OSC-ROOT-003-A and CR-OSC-ROOT-003-B
+    zero_crossing: true
+    approved_to_write: false
+    status: complete_root_and_three_exact_sha_reviews_verified
+    postwrite_sha256:
+      src/datadiff/execution.py: cf570fca915338e2a46e4ec69c2739313e53bde8b61ebf1ee1cfc6dbecb7fad8
+      src/datadiff/run_loaded.py: 8eb0330efbe1e164506c02c71510db1ca0e8ed526aa44ed5c9c5d92166e3a723
+      src/datadiff/runner.py: c40d79ef6bbce619bf3b7e5453934ddd92cb8a028e83e9227d4458db4b84dcbf
+      src/datadiff/run_summaries.py: 3d4377c951ae1f8f0957cbd40fd575b067d38c161bbbc2a5d9b7ba993c45c795
+      src/datadiff/discovery_runtime.py: 77b1aad054d622741f842b48ef6f7db9a606905bbc150c0499c6cbf96d78d86f
+      src/datadiff/candidate_pipeline.py: bb4302d658d1812dbb82c6ade3e91644ed87820c129a2f36d5b19456ccb4971c
+      tests/test_execution.py: dffaba0e069968fdafff23e9ecf6751adcdb77106256c8c50ac6b956da7a601c
+      tests/test_run_loaded.py: c3793132a97e04b56d4a0ea02f186659c4a7b7c53059b5e7d8216ce908c108be
+      tests/test_runner.py: c58c74ed89516d7543fe0e3ea96089689aa7a95e8ac3fcebd269ac5d2ad2a4c6
+      tests/test_discovery_runtime.py: ae71913ff814eb35a830ef4cad319b9ee359f2d7bcb66226c1f018b95a5559e1
+      tests/test_candidate_pipeline.py: 0ad414f6aabe28c2dc76f201857aa4e4ba969f806c916bfe23593660f195de56
+    barrier: experiments/osc_v1/coordination_20260719_v1/phase5_opaque_diagnostic_consumer_barrier.yaml
+deferred_findings:
+  - finding_id: OSC-4-C-F6
+    severity: low
+    disposition: defer_to_phase6_measured_performance_review
+    reason: relation-aware fingerprint canonicalization changes screening semantics and lacks measured benefit
+pilot_started: false
+twenty_four_hour_run_authorized: false

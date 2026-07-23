@@ -1,0 +1,59 @@
+schema_version: osc-review-report-v1
+phase: 6
+change_request: CR-OSC-6-001
+review_round: 2
+status: medium_remediated_test_target_refrozen
+review_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_round2_contracts.yaml
+  sha256: 59aca1fe66f2ba1303e8d8b2d8269b257441ca40ed3b21760b4ab6244d75ff23
+reviewed_target_shas:
+  authority: 03b6ef9323f38fee8cb9daafffd2a309818953fbc78fa2ae0cd2c99b1503bbd7
+  integration_test: c02495dbe21db569b968d694d26f272ac342d1ffc1260105cc912cce48e807de
+reviews:
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-A-R2
+    agent: /root/phase5_authority_audit
+    status: complete_read_only_pass
+    exact_sha_match: true
+    forbidden_writes: 0
+    findings: {blocker: 0, high: 0, medium: 0}
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-B-R2
+    agent: /root/phase5_consumer_audit
+    status: complete_read_only_medium
+    exact_sha_match: true
+    forbidden_writes: 0
+    findings: {blocker: 0, high: 0, medium: 1}
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-C-R2
+    agent: /root/phase5_evidence_audit
+    status: complete_read_only_pass
+    exact_sha_match: true
+    forbidden_writes: 0
+    findings: {blocker: 0, high: 0, medium: 0}
+accepted_finding:
+  id: OSC-6-CR001-R2-B-M1
+  severity: medium
+  issue: Root integration lacked an end-to-end Search-owned admission route and receipt-retention regression
+  counterexample: a Search pair could retain owner label search while its mapped function was replaced by an always-success implementation without failing the prior owner-count or direct-domain tests
+  disposition: fixed
+  fixes:
+    - assert all seven Search pairs map to the exact replay_search_admission function object
+    - add a Root Search intrinsic-subject positive admission
+    - add a Root Search subject-substitution negative admission
+    - verify a context-only Search admission is omitted from VerifiedProducerReceipt while a valid sibling admission remains
+remediated_target_shas:
+  authority: 03b6ef9323f38fee8cb9daafffd2a309818953fbc78fa2ae0cd2c99b1503bbd7
+  integration_test: 61ca0eba76f71dcea39af3312cb1dbfecf8b606283ff84d9c9fa5af254a27289
+root_verification_after_remediation:
+  scoped: 41 passed in 22.94s
+  combined_replay_and_freeze: 129 passed in 24.13s
+  full_osc: 474 passed in 113.42s
+  full_repository_before_test_only_remediation: 3172 passed and 1 skipped in 252.08s
+  diff_check: clean
+decision:
+  production_authority_sha_changed: false
+  integration_test_sha_changed: true
+  round2_reviews_obsolete_for_exact_target_pair: true
+  round3_three_exact_sha_reviews_required: true
+  root_dispatch_closed: false
+  phase6_gate_execution_authorized: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

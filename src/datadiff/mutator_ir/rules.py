@@ -161,7 +161,7 @@ def ir_rewrite_rule_registry_payload() -> dict[str, Any]:
         "semantics_classes": list(IR_REWRITE_SEMANTICS_CLASSES),
         "rules": [rule.to_dict() for rule in _IR_REWRITE_RULES],
         "methodology_claim": (
-            "Typed IR rewrite rules are a single source for mutation, metamorphic "
+            "CCS-IR rewrite rules are a single source for mutation, metamorphic "
             "relations, and reducer explanations; each rule declares whether it is "
             "semantics-preserving, a semantics-changing probe, or an optimizer boundary."
         ),

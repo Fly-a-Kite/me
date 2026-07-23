@@ -1,0 +1,200 @@
+schema_version: osc-phase6-contract-performance-provenance-bridge-report-v1
+phase: 6
+status: complete_private_contract_performance_provenance_bridge_scoped_validation_pass_contract_gate_pending
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_performance_provenance_bridge_task_contract.yaml
+  sha256: 6166bc8174d730af77d64f3789951dc75289cb283a1fd67500688579e15283cb
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  forbidden_paths_modified: []
+  predecessor_r8_boundary_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_execution_provenance_raw_artifact_boundary_task_contract.yaml
+    sha256: c35bcd9f1e1585454f0a2e303abe3a409e37654b9b0d0076fe8802878502efda
+  predecessor_r8_boundary_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_execution_provenance_raw_artifact_boundary_report.yaml
+    sha256: f68fbe5dd33f075c5d4a44994269b40a101d73bd300e99258db09618f4b6d710
+  predecessor_r7_parallel_bridge_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_task_contract.yaml
+    sha256: c582a5edd5a3ac160d4b9484207586d3d0166a1377307e602db68624cae84349
+  predecessor_r7_parallel_bridge_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_report.yaml
+    sha256: 8bda392d7be17c03d0f6eb1eca985f895720f4787590f6f55e8e2aa58c970052
+  foundation_barrier: pass_unchanged
+source_state:
+  authority_before_contract_write:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    untracked_path_count: 24142
+    coordination_ledger_sha256: 713ded1d6edabcd7c64a56183ba014e3f295edff5ccc4b6a817f80022bb7a30e
+  pre_scoped_suite:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    untracked_path_count: 2767
+    coordination_ledger_sha256: d19f4691f9477cd9de336c42b1179672a6bdd0a9f4729bc33c9a59169ca44efb
+  post_scoped_suite:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    untracked_path_count: 2767
+    coordination_ledger_sha256: d19f4691f9477cd9de336c42b1179672a6bdd0a9f4729bc33c9a59169ca44efb
+implementation:
+  private_contract_performance_provenance:
+    path: src/datadiff_osc/runtime/_phase6_contract_performance_provenance.py
+    pre_sha256: absent
+    post_sha256: 2dc9ca6e3900dc3b3a80e0fadaa03461d6fef420bda8ee488b28db384540831f
+    result: >-
+      Added a private canonical envelope containing the complete R4
+      ContractPerformanceProductionObservation, its exact derived R3 receipt,
+      and current R4-producer/bridge implementation byte hashes. Reconstruction
+      uses the owning Contract comparison replayer and Runtime typed
+      task/seed/outcome/evidence replayers, re-runs the R4 construction,
+      rebuilds the receipt, and rejects source, comparison, task, result,
+      seed, outcome, evidence, context, counter, receipt, or implementation
+      substitution before an envelope can bind an admission.
+  root_pairing_boundary:
+    path: src/datadiff_osc/_phase6_gate_authority.py
+    pre_sha256: 38660065f8c98d98d9d835dc065c969803950cc47342dba8b2f75ef5f5b536d7
+    post_sha256: 6520dd263b17fbcc911a6f3b46540357d402b2283d36993ef7f675176270a9ee
+    result: >-
+      Root retains ContractPerformanceEvidenceReceipt only under
+      performance_paired_replay when a uniquely sorted, separately declared,
+      readable Contract-performance proof binds that exact admission. Root
+      hashes, reads, reconstructs, re-derives and compares the receipt and
+      implementation bindings, then commits compact verified proof fields into
+      the producer receipt digest. Missing, duplicate, stale, swapped, extra,
+      malformed, path-escaping, wrong-schema, wrong-type, source-rebound, or
+      wrong-admission proofs remove the Contract-performance admission. R7
+      ParallelScaling proof remains type-specific and cannot cross-satisfy it.
+  tests:
+    path: tests/osc/test_runtime_phase6_contract_performance_provenance.py
+    pre_sha256: absent
+    post_sha256: 9cf064cb69ec86459e7ded6a9abe7f6bef2631b0bcf8bf3ce122e9964db27b5c
+    result: >-
+      Added legal exact reconstruction/pairing coverage, changed-source and
+      changed-counter identity separation, per-field payload substitution,
+      malformed and extra payload coverage, wrong object/module coverage, and
+      missing, duplicate, byte-mutated, source-rebound, wrong-admission and
+      wrong-proof-type binding rejection. The sole legal fixture remains an
+      incomplete, invalid and non-publishable receipt index.
+validation:
+  static_parse:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -c 'import ast, pathlib;
+      paths = ("src/datadiff_osc/runtime/_phase6_contract_performance_provenance.py",
+      "src/datadiff_osc/_phase6_gate_authority.py",
+      "tests/osc/test_runtime_phase6_contract_performance_provenance.py");
+      [ast.parse(pathlib.Path(path).read_text(encoding="utf-8"), filename=path)
+      for path in paths]; print("AST_OK", len(paths))'
+    exit_code: 0
+    complete_result: AST_OK 3
+  scoped_suite:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_runtime_phase6_contract_performance_provenance.py
+      tests/osc/test_runtime_phase6_contract_performance_producers.py
+      tests/osc/test_runtime_phase6_contract_performance_receipts.py
+      tests/osc/test_phase6_gate_authority_integration.py
+    execution_count: 1
+    exit_code: 0
+    complete_terminal_result: |-
+      ........................................................................ [ 72%]
+      ............................                                             [100%]
+      100 passed in 25.95s
+  coverage:
+    负向复核: >-
+      Passed exact comparison/source/result-group/endpoint/task/result/seed/
+      outcome/evidence/context/configuration/counter/receipt/implementation
+      rejection and Root proof absence/duplicate/swap/extra/post-byte-mutation
+      rejection before a Contract-performance admission is retained.
+    独立反例验证: >-
+      Passed one legal R4 observation/proof pair retained only inside an
+      otherwise incomplete non-publishable index. A valid changed-source or
+      changed-counter observation derives a different receipt/proof identity
+      and cannot bind the original admission.
+    异常输入验证: >-
+      Passed missing and extra fields, malformed implementation digest, wrong
+      object, invalid canonical-envelope variants, wrong proof type, and
+      unreadable-equivalent hash mismatch rejection with no publication,
+      confirmation, or bug claim.
+  prohibited_commands_not_run:
+    - tests/osc
+    - repository suite
+    - six-file combined suite
+    - 100000 parity execution
+    - v3 2200
+    - Phase 7
+    - 2h pilot
+    - 24h run
+sha_verification:
+  allowed_product_paths_pre_and_post_exact:
+    src/datadiff_osc/runtime/_phase6_contract_performance_provenance.py: 2dc9ca6e3900dc3b3a80e0fadaa03461d6fef420bda8ee488b28db384540831f
+    src/datadiff_osc/_phase6_gate_authority.py: 6520dd263b17fbcc911a6f3b46540357d402b2283d36993ef7f675176270a9ee
+    tests/osc/test_runtime_phase6_contract_performance_provenance.py: 9cf064cb69ec86459e7ded6a9abe7f6bef2631b0bcf8bf3ce122e9964db27b5c
+  immutable_r3_r4_r7_inputs_pre_and_post_exact:
+    src/datadiff_osc/runtime/_phase6_contract_performance_producers.py: 417f5552a040f74b884bedb23838f27684e0868ff59819c32735fd408f1b0d5b
+    src/datadiff_osc/runtime/_phase6_contract_performance_receipts.py: cf2b1500a97a884f396eacc0f6354a2d47ae59cc4a480e4119ad9c2515431cf1
+    src/datadiff_osc/runtime/_semantic_replay.py: ded341713ae92ecda70032bbeeee570e68802e8aed63c35c18af9f8f59663dd8
+    src/datadiff_osc/contract_engine/_phase6_comparison_receipts.py: 78e43fcb6df63e22e1ef344c00e60fb5e8abeac94a16340dd51c6fcbe4385d7c
+    src/datadiff_osc/contract_engine/replay.py: 3beca4f611aa0e65e81f8389af52610a6f56a60b53c271964b9e61f532580311
+    src/datadiff_osc/runtime/_phase6_parallel_scaling_provenance.py: 799ddfbdaa883ce79cc8fba5ebc9b03898f5d0d4f767dfe14570ec7715dbca25
+    src/datadiff_osc/runtime/_phase6_parallel_scaling_producers.py: 14c6b912b02622aebe17b9e84d818e8523f1f6c8b7899c364f9f0c7178d8bfd3
+    src/datadiff_osc/runtime/_phase6_parallel_scaling_receipts.py: 0c65ff117b8a15a9ac7b0d6f5841475f02db7019a6825218a90faf37d2daaf71
+  frozen_target_sha256_pre_and_post_exact:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+findings: []
+inherited_open_findings:
+  - id: OSC-6-CONTRACT-R8-B1
+    severity: blocker
+    claim: >-
+      Artifact receipt provenance_digest remains declared digest text; Root does
+      not yet read, hash, reconstruct, or exact-bind a process transcript to
+      an artifact, typed admission, source snapshot, output bytes and exit.
+    disposition: unchanged_and_not_addressed_by_this_private_bridge
+counts:
+  blocker_new: 0
+  high_new: 0
+  medium_new: 0
+  low_new: 0
+  scoped_tests_passed: 100
+  scoped_tests_failed: 0
+  writes: 3
+  child_agents: 0
+  forbidden_paths_modified: []
+remaining_gate_boundary:
+  phase_6_contract: pending
+  reason: >-
+    R9 proves only a private re-readable exact pairing for one R4
+    Contract-performance receipt. It creates no real source snapshot, process
+    transcript, raw artifact, full producer set, 100000-decision corpus,
+    1000-pair cohort, bootstrap, metric result, authority bundle, manifest,
+    gate calculation or publication. The inherited R8 raw-artifact blocker and
+    clean-worktree paper-authority requirement therefore remain open.
+  real_execution_provenance_admitted: false
+  raw_artifact_admitted: false
+  candidate_confirmed: false
+  bug_claimed: false
+  combined_suite_run: false
+  phase7_pilot_2h_run: false
+  twenty_four_hour_run: false
+next_step_requires_new_task_contract:
+  - >-
+    A new narrow Root-owned contract must address real execution provenance and
+    raw-artifact reconstruction/binding before any artifact admission, cohort,
+    corpus, metric or gate activity can be considered. It must preserve the
+    frozen core and current dirty-worktree paper-authority boundary.

@@ -1,0 +1,60 @@
+schema_version: osc-review-contract-v1
+phase: 6
+change_request: CR-OSC-6-001
+review_round: 3
+review_target: final_root_typed_semantic_replay_dispatch_and_search_integration_tests
+mode: three_parallel_exact_sha_read_only_reviews
+execution_policy:
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  writes_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_paired_pilot_authorized: false
+  twenty_four_hour_run_authorized: false
+round2_report:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_round2.yaml
+  sha256: 0fb5184dd213478cdfefbbdbb0aad2db5651b3e93c0a32c5b53bbe9efe976d7c
+frozen_target_files:
+  - path: src/datadiff_osc/_phase6_gate_authority.py
+    sha256: 03b6ef9323f38fee8cb9daafffd2a309818953fbc78fa2ae0cd2c99b1503bbd7
+  - path: tests/osc/test_phase6_gate_authority_integration.py
+    sha256: 61ca0eba76f71dcea39af3312cb1dbfecf8b606283ff84d9c9fa5af254a27289
+unchanged_public_api_freeze:
+  path: src/datadiff_osc/public_api_freeze.json
+  sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+root_test_evidence:
+  scoped: 41 passed in 22.94s
+  combined_replay_and_freeze: 129 passed in 24.13s
+  full_osc: 474 passed in 113.42s
+  diff_check: clean
+required_checks:
+  - all prior high and medium findings are closed at the exact target SHA pair
+  - all seven Search pairs map to the exact replay_search_admission function
+  - Search intrinsic identity is derived from the rebuilt TargetAssignment
+  - Search subject substitution and context-only claims are discarded
+  - a rejected Search context admission is absent from retained receipt admissions
+  - Contract staged parity remains Root-context-pending until CR-OSC-6-002
+  - Runtime replay remains Root-provenance-pending until CR-OSC-6-004
+  - candidate cannot become a confirmed bug and no replay grants gate or 24h authority
+reviews:
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-A-R3
+    agent: /root/phase5_authority_audit
+    focus: final exact-SHA authority soundness and closure of all round1/round2 findings
+    allowed_write_paths: []
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-B-R3
+    agent: /root/phase5_consumer_audit
+    focus: verify R2-B-M1 test closure and Search route/subject/retention boundaries
+    allowed_write_paths: []
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-C-R3
+    agent: /root/phase5_evidence_audit
+    focus: final Runtime provenance, candidate-not-bug, discard, gate and 24h boundaries
+    allowed_write_paths: []
+required_report:
+  - independently state exact observed SHA-256 for both target files
+  - state forbidden writes and child Agent count as zero
+  - report exact blocker/high/medium counts
+  - state whether CR-OSC-6-001 Root dispatch may close at this exact SHA pair
+stop_conditions:
+  - target SHA mismatch
+  - any write, child Agent or long gate would be needed

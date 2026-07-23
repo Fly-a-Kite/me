@@ -1,0 +1,96 @@
+schema_version: osc-phase1-dependency-dag-v1
+run_id: osc-20260719T144951+0800
+phase_1_exit:
+  reports_with_file_symbol_test_evidence: true
+  child_writes: 0
+  uncertainties_explicit: true
+  blockers:
+    - staged comparison can disagree with exact authority
+    - typed numeric exactness loses large-integer precision
+    - certificates are not cryptographically and structurally bound end-to-end
+    - fresh 502 and regression 228 obligations are exposed as a mixed 730 collection
+    - legacy v1 remains production authority while OSC has no production consumer
+    - OSC extractor, matcher, ledger, generation, search, scheduler, comparison, parallel, runtime and gate tooling are absent
+nodes:
+  - id: P2_CANONICAL
+    owner: root
+    depends_on: []
+    output: tagged scalar/key encoding, deep immutability, canonical serialization and stable digest rules
+  - id: P2_SHARED_SCHEMAS
+    owner: root
+    depends_on: [P2_CANONICAL]
+    output: SemanticAtomEvidence, EvidenceTier, structured execution outcome, seed lineage, task identity, result group, evidence envelope, ledger event, staged comparison request/result, cache/resource schemas
+  - id: P2_PUBLIC_FREEZE
+    owner: root
+    depends_on: [P2_SHARED_SCHEMAS]
+    output: one public export source, schema/field/order/version manifest and import/serialization smoke
+  - id: C_MODEL_CERT_BINDING
+    owner: contract
+    depends_on: [P2_PUBLIC_FREEZE]
+    output: strict model invariants and derivation/applicability/observation binding
+  - id: C_EXACT_RELATIONS
+    owner: contract
+    depends_on: [C_MODEL_CERT_BINDING]
+    output: typed exact numeric/scalar relations and validated relation parameters
+  - id: C_TWO_PASS
+    owner: contract
+    depends_on: [C_MODEL_CERT_BINDING]
+    output: node-local forward state consumed by backward observability with fail-closed rule trace
+  - id: C_PERMISSION_ENTAILMENT
+    owner: contract
+    depends_on: [C_EXACT_RELATIONS, C_TWO_PASS]
+    output: versioned component permission integration and acyclic proof-scoped entailment
+  - id: C_STAGED_AUTHORITY
+    owner: contract
+    depends_on: [C_PERMISSION_ENTAILMENT]
+    output: evidence-tier-closed staged plan with exact escalation and small differential parity
+  - id: C_COMPATIBILITY_GATES
+    owner: contract
+    depends_on: [C_STAGED_AUTHORITY]
+    output: v1 corpus parity/precision fixes, executable mutant kill, recall/precision and 100k/performance tools
+  - id: S_DECLARATIONS_COMPILER
+    owner: search
+    depends_on: [P2_PUBLIC_FREEZE]
+    output: fail-closed provenance and separately typed fresh 502/regression 228 denominators
+  - id: S_EXTRACT_MATCH
+    owner: search
+    depends_on: [S_DECLARATIONS_COMPILER]
+    output: provenance-bearing generic extraction and exact matcher without family dispatch
+  - id: S_LEDGER
+    owner: search
+    depends_on: [S_EXTRACT_MATCH, C_MODEL_CERT_BINDING]
+    output: constructed/activated/executed/observed cell/edge/pair ledger with certificate admission and deterministic merge
+  - id: S_SEEDS_EPOCHS
+    owner: search
+    depends_on: [P2_SHARED_SCHEMAS]
+    output: keyed stage substreams and no-replacement cell/edge epochs
+  - id: S_GENERATION_MUTATION
+    owner: search
+    depends_on: [S_EXTRACT_MATCH, S_SEEDS_EPOCHS]
+    output: typed oracle-tail construction, bounded repair/infeasible evidence and re-match target preservation
+  - id: S_SCHEDULER
+    owner: search
+    depends_on: [S_LEDGER, S_GENERATION_MUTATION]
+    output: deterministic coverage floor, max-min debt and bounded Pareto selection
+  - id: R_COMPARISON_CACHE
+    owner: runtime
+    depends_on: [C_STAGED_AUTHORITY, P2_SHARED_SCHEMAS]
+    output: contract-driven O(B) clustering/exact escalation and complete evidence-tier cache key
+  - id: R_TASK_RUNTIME
+    owner: runtime
+    depends_on: [P2_SHARED_SCHEMAS, S_SEEDS_EPOCHS]
+    output: immutable deterministic DAG, resource tokens, epoch barrier, structured failure/retry and stable merge
+  - id: R_GATE_TOOLING
+    owner: runtime
+    depends_on: [R_COMPARISON_CACHE, R_TASK_RUNTIME, S_LEDGER, S_SCHEDULER, C_COMPATIBILITY_GATES]
+    output: machine-readable contract/232/384/502/parallel/v3/2h gate tools; never a 24h launcher
+  - id: ROOT_INTEGRATION
+    owner: root
+    depends_on: [C_COMPATIBILITY_GATES, S_SCHEDULER, R_GATE_TOOLING]
+    output: shared exports, legacy read-only facade, adapter/runner glue, integration tests and fail-closed authorization preflight
+unresolved_semantic_questions:
+  - timeout, crash and adapter failures must retain a structured execution outcome; top-level verdict mapping must be frozen separately and cannot turn them into pass or unsupported
+  - hash equality may screen only under a validated observer/parameter schema; audit/finding/fresh/native evidence remains exact
+  - target assignment metadata cannot be a source of observed atoms or activation credit
+  - interaction tiles remain shadow until post-pilot promotion evidence
+twenty_four_hour_run_authorized: false

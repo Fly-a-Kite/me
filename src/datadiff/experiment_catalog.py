@@ -1130,7 +1130,7 @@ FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX = ExperimentMatrix(
             rq_tags=("RQ4", "RQ6"),
             analysis_tags=("ablation", "adaptive_component", "typed_ir_rewrite"),
             notes=(
-                "Disable typed IR rewrite mutations while keeping operator learning, "
+                "Disable CCS-IR rewrite mutations while keeping operator learning, "
                 "seed-energy batching, and quality-diversity archive enabled."
             ),
         ),
@@ -1175,7 +1175,7 @@ FINAL_ADAPTIVE_COMPONENT_ABLATION_MATRIX = ExperimentMatrix(
             rq_tags=("RQ4", "RQ6"),
             analysis_tags=("ablation", "adaptive_component", "grow_shrink_mutation"),
             notes=(
-                "Disable shrink-side mutation operators while keeping growth, typed IR "
+                "Disable shrink-side mutation operators while keeping growth, CCS-IR "
                 "rewrites, and operator learning enabled."
             ),
         ),

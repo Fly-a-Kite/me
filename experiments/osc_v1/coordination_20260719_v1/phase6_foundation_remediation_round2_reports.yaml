@@ -1,0 +1,121 @@
+schema_version: osc-implementation-report-v1
+phase: 6
+round: private_foundation_remediation_r2
+status: implementation_complete_root_scoped_pass_pending_rotated_review_r3
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round2_task_contracts.yaml
+  sha256: f2bdd822dfb80df088889c04cd95e422ff749b9147e1fd224dd48a1ad791ea40
+entry_review:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round2_reports.yaml
+  sha256: 56a046668a4b1a6153a870ccba32fb87f690762f16ac7ef338b739db389eed0a
+implementations:
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-SEARCH-R2
+    owner: /root/phase5_consumer_audit
+    finding: OSC-6-FOUNDATION-SEARCH-R2-H1
+    changed_files:
+      - path: src/datadiff_osc/search/context_receipts.py
+        before_sha256: 2759a4fc837323c9f02ce1905dc22fea9806eea7f4a0e9d5806b2e52bd7c3b31
+        after_sha256: cc573077433458031661a52b9e540266eb3d9d036f7cd378a2c43f7bd4169b59
+      - path: src/datadiff_osc/search/context_replay.py
+        before_sha256: 75b087f908c153b72aabe5484550931a4b0b839864ae918834e7f552548211ca
+        after_sha256: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+      - path: tests/osc/test_search_context_receipts.py
+        before_sha256: 3e06d62355d4e84ca88fe045763e2c2d558a6753e5f60bf7fa499efdfa5e5273
+        after_sha256: e8680db1793945d3e884edb36e092c712412f8f28daad90418b48085eb613aac
+      - path: tests/osc/test_search_gate_crosswalk.py
+        before_sha256: 8af147b11283c5973e50ab69e279612a7b332acb300d57a6ebe55eddd20ea959
+        after_sha256: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    stable_test:
+      command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py tests/osc/test_search_gate_crosswalk.py
+      result: 29 passed in 25.61s
+      exit_code: 0
+    implementation_summary:
+      - receipt and attempt domains advance to v3 and bind a fixed operator-application policy identity
+      - the exact frozen operator profile and callable source/code identity are resolved before execution
+      - a canonical isolated Case clone is mutated with the derived MUTATION seed in a fresh empty Context
+      - frozen TargetPreservingMutator, TargetMatcher and AtomExtractor reconstruct the complete outcome twice and require deterministic full-object equality
+      - unknown, uninspectable, execution-failing, nondeterministic or mismatching contexts fail closed
+    red_green:
+      - value outcome under nullify_value with its matching registry digest now rejects
+      - wrong implementation/policy/source/seed/assignment/outcome now rejects
+      - exact selected-operator accepted/rejected and reachable repaired outcomes round-trip
+    deviations: []
+
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-RUNTIME-R2
+    owner: /root/phase5_evidence_audit
+    findings: [OSC-6-FOUNDATION-RUNTIME-R2-B1, OSC-6-FOUNDATION-RUNTIME-R2-B2, OSC-6-FOUNDATION-RUNTIME-R2-H1]
+    changed_files:
+      - path: src/datadiff_osc/runtime/_producer_provenance.py
+        before_sha256: e49dc7655a10b9f705a89062ff62db61049b6f689eb34ddc9819122926575d3a
+        after_sha256: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+      - path: src/datadiff_osc/runtime/_receipt_producers.py
+        before_sha256: 2525652d88f08c1407d8836c502ff35c1a0cc803a2b23d22c91e0187120214e4
+        after_sha256: 6a3eedd911096c54923709b59fb4f7ae3c97ecf54bca7cbef53174466f577683
+      - path: tests/osc/test_runtime_producer_provenance.py
+        before_sha256: c9f9a738573c4709b3ac5db68b39cfa2e5ede826958de3b179933607c093bd31
+        after_sha256: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+      - path: tests/osc/test_runtime_receipt_producers.py
+        before_sha256: 99634e6e28d5b6c3135ed2c4d619b2b5cdf19c7daf677cfce2998ec5c0e34fe2
+        after_sha256: 5276f580256c28fb710ea369aa21b5c2e9c4d29bfe684a1f53b5cb3e416dc053
+    stable_test:
+      command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+      result: 40 passed in 0.38s
+      exit_code: 0
+    implementation_summary:
+      - provenance v3 uses singular policy origins and ordered role-bound raw parents
+      - RepositoryTestReceipt is rebuilt from canonical context plus exact JUnit/log bytes; missing closed rebuilders fail context-missing
+      - one/N arms retain complete execution evidence while independently deriving logical projections that exclude only decision_index, attempt, their derived instance IDs and explicit worker count
+      - logical graph equality preserves epoch, task kind, protocol, seed, case, endpoint, backend, payload, dependencies and all resources
+      - reproduced is no longer a caller field and is derived from exact typed VIOLATED source/recheck evidence; SATISFIED is false and incomplete verdicts fail closed
+    red_green:
+      - malformed/swapped/extra raw parents and frozen-to-real relabel reject
+      - BACKEND_EXECUTION versus LOCALIZATION and non-instance task/context swaps reject
+      - isomorphic logical dependency graphs with distinct execution IDs pass
+      - six SATISFIED rechecks reject and exact VIOLATED witnesses derive true without a bool
+    deviations: []
+
+  - task_id: OSC-6-FOUNDATION-CONTRACT-FROZEN-R2
+    owner: /root/phase5_authority_audit
+    mode: frozen_read_only_sentinel
+    source_sha256: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    test_sha256: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    writes: 0
+    child_agents: 0
+root_verification:
+  combined_scoped:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/osc/test_contract_phase6_corpora.py
+      tests/osc/test_search_lane_registry.py
+      tests/osc/test_search_context_receipts.py
+      tests/osc/test_search_gate_crosswalk.py
+      tests/osc/test_runtime_producer_provenance.py
+      tests/osc/test_runtime_receipt_producers.py
+    result: 88 passed in 26.63s
+    exit_code: 0
+  independent_counterexamples:
+    malformed_raw_parents: rejected with provenance_typed_raw_rebuild_failed
+    frozen_to_real_relabel: rejected with provenance_origin_not_allowed
+    satisfied_rechecks_as_reproduced: rejected with campaign reproduction threshold not met
+    backend_execution_to_localization: rejected with logical task-set projection mismatch
+    value_outcome_under_nullify_value: rejected with selected-operator reproduction mismatch
+  public_api_freeze_sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  declared_path_diff_check: clean
+  staged_paths: 0
+  child_agents: 0
+authority_boundaries:
+  - Contract foundation remains frozen and previously passed
+  - diagnostic refs remain diagnostic-only and are not consumed
+  - absent exact causal context fails closed or remains context-missing/not_evaluated
+  - candidate remains candidate and confirmed states/bug_claimed true remain rejected
+  - no coverage, evidence, gate, Phase 7 or 24h authority was created
+decision:
+  implementation_round_complete: true
+  rotated_exact_sha_review_r3_required: true
+  foundation_barrier_passed: false
+  tests_osc_authorized: false
+  full_repository_tests_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

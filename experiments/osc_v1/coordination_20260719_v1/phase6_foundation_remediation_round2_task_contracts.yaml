@@ -1,0 +1,155 @@
+schema_version: osc-task-contract-v1
+phase: 6
+round: private_foundation_remediation_r2
+mode: two_parallel_disjoint_bounded_writes_one_frozen_domain
+entry_review:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round2_reports.yaml
+  sha256: 56a046668a4b1a6153a870ccba32fb87f690762f16ac7ef338b739db389eed0a
+  aggregate_counts: {blocker: 2, high: 2, medium: 0, low: 0}
+coordination:
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  active_writers: 2
+  frozen_contract_domain: /root/phase5_authority_audit
+  root_owns_shared_integration: true
+  preserve_dirty_worktree: true
+global_forbidden_paths:
+  - src/datadiff_osc/__init__.py
+  - src/datadiff_osc/api.py
+  - src/datadiff_osc/runtime/__init__.py
+  - src/datadiff_osc/public_api_freeze.json
+  - src/datadiff_osc/_phase6_gate_authority.py
+  - src/datadiff_osc/_replay_support.py
+  - src/datadiff_osc/contract_engine/_phase6_corpora.py
+  - tests/osc/test_contract_phase6_corpora.py
+  - src/datadiff_osc/contract_engine/replay.py
+  - src/datadiff_osc/search/semantic_replay.py
+  - src/datadiff_osc/runtime/_semantic_replay.py
+  - src/datadiff_osc/runtime/gates.py
+  - src/datadiff/strategy_registry.py
+  - src/datadiff/mutator.py
+  - src/datadiff_osc/generation/mutation.py
+  - experiments/canonical_confirmed_bug_corpus/**
+global_requirements:
+  - resolve all four assigned findings with causal typed reconstruction, not additional caller labels or co-hashed digests
+  - increment private schema versions whenever required fields or accepted meaning changes
+  - exact typed payloads must reconstruct real objects and rerun constructor and semantic invariants
+  - if exact typed causal context is absent, reject or remain context-required/not_evaluated; never guess or accept a boolean claim
+  - all types remain private and unexported; public API freeze remains byte-identical
+  - diagnostic refs remain diagnostic-only and are never consumed here
+  - candidate remains candidate; confirmed states and bug_claimed true remain rejected
+  - no coverage, evidence, bug, gate, Phase 7 or 24h authority is created
+  - use PYTHONDONTWRITEBYTECODE=1 for every Python command and run only each task's scoped tests
+  - preserve unrelated tracked and untracked user work
+tasks:
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-SEARCH-R2
+    owner: /root/phase5_consumer_audit
+    finding: OSC-6-FOUNDATION-SEARCH-R2-H1
+    allowed_write_paths:
+      - src/datadiff_osc/search/context_receipts.py
+      - src/datadiff_osc/search/context_replay.py
+      - tests/osc/test_search_context_receipts.py
+      - tests/osc/test_search_gate_crosswalk.py
+    forbidden_write_paths:
+      - all_paths_except_allowed_write_paths
+    requirements:
+      - >-
+        Resolve the selected operator through the frozen
+        ALL_MUTATION_OPERATOR_PROFILES registry, verify its exact implementation
+        digest, and deterministically apply that exact operator to an isolated
+        reconstruction of the exact source Case using the derived MUTATION seed.
+      - >-
+        Feed the exact selected-operator result through the frozen target-
+        preservation and repair semantics, reconstruct the resulting
+        MutationOutcome, ActivationCertificate and accepted Case, and require
+        exact equality with the supplied typed outcome before constructing a
+        receipt. Co-hashing independently valid operator and outcome values is
+        insufficient.
+      - >-
+        Bind a versioned private operator-application policy identity including
+        RNG/seed semantics, source cloning, target matcher/extractor semantics and
+        repair policy. Unknown or non-replayable operators fail closed.
+      - preserve exact source/run/lineage/seed/assignment/certificate checks and admitted=false/context-required boundaries
+    required_tests:
+      - the same source/assignment/outcome rebuilt under value and nullify_value with matching registered digests rejects
+      - operator swaps that happen to yield a structurally valid typed outcome still reject unless exact execution reproduces it
+      - valid exact selected-operator rejected, accepted and repaired outcomes reconstruct and round-trip where reachable; unavailable exact contexts fail closed
+      - wrong seed, source, assignment, operator implementation digest, repair policy or outcome rejects
+      - all prior 27 Search scoped tests remain green after fixture migration
+    scoped_test: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py tests/osc/test_search_gate_crosswalk.py
+
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-RUNTIME-R2
+    owner: /root/phase5_evidence_audit
+    findings: [OSC-6-FOUNDATION-RUNTIME-R2-B1, OSC-6-FOUNDATION-RUNTIME-R2-B2, OSC-6-FOUNDATION-RUNTIME-R2-H1]
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_producer_provenance.py
+      - src/datadiff_osc/runtime/_receipt_producers.py
+      - tests/osc/test_runtime_producer_provenance.py
+      - tests/osc/test_runtime_receipt_producers.py
+    forbidden_write_paths:
+      - all_paths_except_allowed_write_paths
+    requirements:
+      - >-
+        Every expected provenance record has exactly one frozen origin, never an
+        allowed-origin union. Frozen origins require the independently supplied
+        exact SHA; REAL_EXECUTION cannot substitute for a frozen origin.
+      - >-
+        Every typed output declares an exact ordered role-to-raw-parent mapping.
+        A closed producer/envelope-specific rebuilder must parse those exact raw
+        bytes, reconstruct the real raw observation and typed receipt, rerun its
+        invariants, and compare the complete canonical envelope and subject IDs.
+        Missing rebuilders, malformed/swapped/extra parents or incomplete raw
+        context fail closed.
+      - >-
+        Repository provenance must derive JUnit/log outcomes rather than accept
+        an independently authored typed receipt; preserve strict TargetVersion
+        and other registered typed producer derivations with equivalent exact
+        raw reconstruction or reject them as context-missing.
+      - >-
+        For parallel scaling, independently derive one-worker and N-worker
+        canonical logical-task projections and arm digests. Bind explicit worker
+        counts 1 and N greater than 1 to their TaskSpecs; exclude only the frozen
+        worker-multiplicity fields from logical equality. TaskKind, case,
+        protocol, endpoint, dependency graph, payload and every non-worker
+        resource field must match. Never assign one shared cross-arm digest to
+        both receipt fields.
+      - >-
+        Remove caller authority over reproduced. Derive each recheck's
+        reproduction from exact typed source/recheck verdict and observation
+        semantics; a SATISFIED or context-incomplete recheck cannot count as a
+        reproduced VIOLATED finding. If no replayable typed reproduction witness
+        exists, fail closed/not_evaluated rather than accept a boolean.
+      - preserve raw monotonic measurement derivation, cross-stage disjointness, confirmed-state rejection and bug_claimed=false
+    required_tests:
+      - malformed JUnit/log parents, raw role/order swaps, extra parents, typed/raw mismatch and missing rebuilder reject
+      - a frozen record relabeled REAL_EXECUTION rejects even when all caller policy fields are self-consistent
+      - independently rebuilt valid RepositoryTestReceipt provenance passes; other registered types either rebuild exactly or fail context-missing
+      - BACKEND_EXECUTION versus LOCALIZATION and payload/dependency/resource/case swaps reject
+      - separately derived one/N logical task-set digests match only for legitimate worker multiplicity changes
+      - all six SATISFIED rechecks with caller-like true claims reject; exact VIOLATED typed reproduction derives true without trusting a bool
+      - all prior 36 Runtime scoped tests remain green after fixture migration
+    scoped_test: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+
+  - task_id: OSC-6-FOUNDATION-CONTRACT-FROZEN-R2
+    owner: /root/phase5_authority_audit
+    mode: frozen_read_only_sentinel
+    allowed_write_paths: []
+    requirements:
+      - do not modify or rerun the passed Contract foundation during the writer round
+      - remain available for the next rotated exact-SHA review
+frozen_contract_files:
+  src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+  tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+round_exit:
+  - both writers return exact before/after SHAs, scoped tests and section-12 reports
+  - Root independently reruns the four counterexamples and the combined six-file scoped suite
+  - all writes remain inside the two disjoint allowlists and frozen Contract/public/shared files retain exact SHAs
+  - a third rotated exact-SHA ring review reports blocker=0, high=0 and medium=0
+execution_authorization:
+  scoped_tests_only: true
+  tests_osc: false
+  full_repository_tests: false
+  parity_100000: false
+  v3_2200: false
+  phase7_pilot_2h: false
+  twenty_four_hour: false

@@ -1,0 +1,63 @@
+schema_version: osc-review-contract-v1
+phase: 6
+change_request: CR-OSC-6-001
+review_round: 2
+review_target: remediated_root_typed_semantic_replay_dispatch
+mode: three_parallel_exact_sha_read_only_reviews
+execution_policy:
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  writes_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_paired_pilot_authorized: false
+  twenty_four_hour_run_authorized: false
+round1_report:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_round1.yaml
+  sha256: e15fdf84aa158d8a707c1e378f959c0412248886d15adc22cfe92ce41ee9623b
+frozen_target_files:
+  - path: src/datadiff_osc/_phase6_gate_authority.py
+    sha256: 03b6ef9323f38fee8cb9daafffd2a309818953fbc78fa2ae0cd2c99b1503bbd7
+  - path: tests/osc/test_phase6_gate_authority_integration.py
+    sha256: c02495dbe21db569b968d694d26f272ac342d1ffc1260105cc912cce48e807de
+unchanged_dependencies:
+  replay_support: 6f52a8836288cb0e7578c984a8f0c3c26661a17d648050912c07a54515192dc1
+  contract_replay: f7289bfe133611b50b14676697d3ef97c02e5f77162ad0cdf9fb9e11b654c615
+  search_replay: af65bd9f1f06a3a2555b33dd2c38d574ed03d0ab70ed5dcee035099e3364b28b
+  runtime_replay: 0b5ec02b247d718d4258dada0fb59493081f258cc1e49913c1d294c7c9e062b9
+  runtime_private_receipts: 490c7f7f076fb65c75cc577831fab508f6d9dcb0820422170169b274e50af07f
+  public_api_freeze: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+root_test_evidence:
+  scoped: 38 passed in 21.95s
+  combined_replay_and_freeze: 126 passed in 22.78s
+  full_osc: 471 passed in 112.95s
+  diff_check: clean
+required_remediation_checks:
+  - staged_parity_groups is reconstructed but discarded as Root-context-pending until CR-OSC-6-002 binds all dynamic record digests
+  - hash, inner-type, inner-version and invalid-envelope forgeries are discarded before any domain replayer call
+  - all 25 allowed pairs retain exactly one owner
+  - Runtime semantic success remains discarded pending CR-OSC-6-004 provenance
+  - candidate remains non-bug and no admission creates gate or 24h authority
+reviews:
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-A-R2
+    agent: /root/phase5_authority_audit
+    focus: verify round1 high/medium closure and re-audit Contract/Root authority soundness
+    allowed_write_paths: []
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-B-R2
+    agent: /root/phase5_consumer_audit
+    focus: subject derivation, Search/context forgery, discarded receipt retention, and missing tests
+    allowed_write_paths: []
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-C-R2
+    agent: /root/phase5_evidence_audit
+    focus: Runtime provenance, candidate-not-bug, malformed/synthetic discard, gate and 24h non-authority
+    allowed_write_paths: []
+required_report:
+  - independently state exact observed SHA-256 for both target files
+  - state forbidden writes and child Agent count as zero
+  - report blocker/high/medium exact counts
+  - identify any finding with file/symbol, counterexample, violated invariant and minimal fix
+  - state whether Root dispatch may close at the exact round2 SHAs
+stop_conditions:
+  - target SHA mismatch
+  - any write or child Agent would be needed
+  - any long gate would be needed

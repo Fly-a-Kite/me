@@ -1,0 +1,152 @@
+schema_version: osc-phase6-granularity-reachability-execution-binding-report-v1
+phase: 6
+task_id: OSC-6-GRANULARITY-REACHABILITY-EXECUTION-BINDING-R1
+status: complete_private_structural_context_binding_scoped_validation_pass_granularity_barrier_pending
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_task_contract.yaml
+  sha256: edc8d81aa2c30958d63e5c05d808c11561ae51b60b505540baf341d34362c25f
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  writes:
+    - src/datadiff_osc/runtime/_phase6_reachability_execution_binding.py
+    - tests/osc/test_runtime_phase6_reachability_execution_binding.py
+    - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  forbidden_paths_modified: []
+source_state:
+  head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  contract_prewrite_workspace:
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    untracked_path_count: 2767
+    coordination_ledger_sha256: 6037a314a56358ae35049cf5b4af036d9248deee83b8d16ab2fbac43e006ea0a
+  pre_scoped_suite:
+    coordination_ledger_sha256: a7cac494482817615a26f12fcbe4cfb6c91ce96f20f01f4c5b3b4751485526f6
+  post_scoped_suite:
+    coordination_ledger_sha256: a7cac494482817615a26f12fcbe4cfb6c91ce96f20f01f4c5b3b4751485526f6
+implementation:
+  private_reachability_execution_binding:
+    path: src/datadiff_osc/runtime/_phase6_reachability_execution_binding.py
+    pre_implementation_sha256: absent_new_authorized_path
+    pre_scoped_suite_sha256: a223b85b46c434ed761feefbd1b8ad2d91adda95139fc7af2bbfb8e9aae16570
+    post_scoped_suite_sha256: a223b85b46c434ed761feefbd1b8ad2d91adda95139fc7af2bbfb8e9aae16570
+    result: >-
+      Added one private fail-closed binding for exactly one frozen Search
+      scheduled/observation context, canonical Case, construction result,
+      independently recomputed extraction and activation, selected fresh
+      backend pair, materialized HyperContract, endpoint tuple,
+      ApplicabilityCertificate, typed Runtime task/result/outcome,
+      EvidenceEnvelope and ObservationCertificate. It recomputes every
+      relationship before examining an observation verdict and requires exact
+      opaque refs, backend SeedLineage, task payload, result group and evidence
+      identity. The record exposes authority_eligible=false, gate_credit=false,
+      and bug_claimed=false unconditionally.
+  tests:
+    path: tests/osc/test_runtime_phase6_reachability_execution_binding.py
+    pre_implementation_sha256: absent_new_authorized_path
+    pre_scoped_suite_sha256: abea91bc0860602b377c8db93c3dedab1f3c76224e1b0a7365985b19ab9e19da
+    post_scoped_suite_sha256: abea91bc0860602b377c8db93c3dedab1f3c76224e1b0a7365985b19ab9e19da
+    result: >-
+      Added positive one-cell/pair structural binding coverage plus
+      fail-closed plan/run/block, assignment, pair, contract, endpoint,
+      opaque-ref, typed task/result/seed/outcome/evidence, duplicate,
+      confirmed-state, non-final verdict, unelevated-VIOLATED, malformed
+      construction, extraction drift and activation drift cases.
+validation:
+  scoped_suite:
+    execution_count: 1
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_runtime_phase6_reachability_execution_binding.py
+    exit_code: 0
+    complete_terminal_result: |-
+      ......                                                                   [100%]
+      6 passed in 4.13s
+  coverage:
+    负向复核: >-
+      Passed frozen formal-plan/run/block, assignment/cell, selected pair,
+      materialized contract, endpoint and opaque runtime-ref substitutions;
+      all are rejected without a coverage event, artifact or gate credit.
+    独立反例验证: >-
+      Main-Agent implementation validation only, not an independent reviewer:
+      task payload/result-group/SeedLineage/outcome/evidence substitutions and
+      duplicate task/evidence identities fail before an INCONCLUSIVE verdict
+      can mask the typed-context error; caller-confirmed evidence is rejected.
+    异常输入验证: >-
+      Passed non-OK outcome, INAPPLICABLE, INCONCLUSIVE, unelevated VIOLATED,
+      malformed/unresolved construction, extraction drift and invalid
+      activation rejection. No candidate was promoted and bug_claimed remains
+      false.
+  prohibited_commands_not_run:
+    - tests/osc
+    - repository suite
+    - six-file combined suite
+    - 100000 parity execution
+    - v3 2200
+    - real adapter execution
+    - raw artifact production
+    - Phase 7
+    - 2h pilot
+    - 24h run
+sha_verification:
+  allowed_product_paths_pre_and_post_exact:
+    src/datadiff_osc/runtime/_phase6_reachability_execution_binding.py: a223b85b46c434ed761feefbd1b8ad2d91adda95139fc7af2bbfb8e9aae16570
+    tests/osc/test_runtime_phase6_reachability_execution_binding.py: abea91bc0860602b377c8db93c3dedab1f3c76224e1b0a7365985b19ab9e19da
+  frozen_public_targets_pre_and_post_exact:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+findings: []
+inherited_open_findings:
+  - id: OSC-6-G-B1
+    severity: blocker
+    claim: >-
+      There is still no real-adapter 232/384/502 observation with fresh
+      seed/mutation/focus/dimension/search-performance producer evidence.
+    disposition: >-
+      unchanged; this R1 record is private structural context only and cannot
+      contribute any observed coverage or Phase-6 granularity/reachability
+      credit.
+counts:
+  blocker_new: 0
+  high_new: 0
+  medium_new: 0
+  low_new: 0
+  scoped_tests_passed: 6
+  scoped_tests_failed: 0
+  product_writes: 2
+  child_agents: 0
+  forbidden_paths_modified: []
+barrier:
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_granularity_reachability: pending
+  phase_6_contract: pending
+  phase_6_runtime_correctness: pending
+  combined_suite: unauthorized
+  real_adapter_execution_admitted: false
+  raw_artifact_admitted: false
+  coverage_events_created: false
+  authority_eligible: false
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+next_step_requires_new_task_contract:
+  - >-
+    OSC-6-G-B1 requires a separately authorized real-adapter observation and
+    producer/provenance path; this private context binding must not be widened
+    into that work without new authority.

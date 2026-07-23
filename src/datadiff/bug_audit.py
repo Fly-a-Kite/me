@@ -1505,3 +1505,9 @@ PROBES: dict[str, BugAuditProbe] = {
         runner=_polars_lazy_eager_equivalence_probe,
     ),
 }
+
+
+available_bug_audit_probe_ids = list_audit_probe_ids
+run_bug_audit = run_probe_audit
+write_bug_audit_outputs = write_probe_audit_outputs
+write_bug_audit_issue_drafts = write_probe_issue_drafts

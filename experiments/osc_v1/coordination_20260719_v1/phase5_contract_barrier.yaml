@@ -1,0 +1,89 @@
+schema_version: osc-phase5-contract-barrier-v1
+task_ids: [OSC-5-A, OSC-5-A-ROOT-BINDING]
+status: pass_root_verified
+change_requests:
+  - id: CR-OSC-5-001
+    status: closed_all_consumers_confirmed
+  - id: CR-OSC-5-002
+    status: closed_exact_path_expansion_verified
+    frozen_manifest_changed: false
+findings:
+  - {id: OSC-4-C-F1, status: closed_root_verified}
+  - {id: OSC-4-C-F2, status: closed_root_verified}
+  - {id: OSC-4-C-F3, status: closed_root_verified}
+  - {id: OSC-4-C-F4, status: closed_root_verified}
+  - {id: OSC-4-C-F5, status: closed_root_verified}
+  - {id: OSC-4-C-F6, status: deferred_to_phase6_measurement, severity: low}
+authority_invariants:
+  - contract RelationRegistry digest binds versioned trusted evaluator identities
+  - derivation rule-registry digest remains a separate compiler binding
+  - original Endpoint tuple is mandatory before screening or exact authority
+  - backend/version/mode/layout/capability and certificate endpoint digests are revalidated
+  - every Observation metadata.endpoint_digest equals the corresponding recomputed Endpoint digest
+  - top-k preserves multiplicity
+  - containment does not inject cardinality equality
+  - explicit status relations distinguish semantic errors from execution failures
+negative_evidence:
+  - case: same-metadata replacement evaluator
+    prior_result: exact authority could be rewritten
+    final_result: rejected before evaluation
+  - case: v1-only certificate rebound to v9 with no observation endpoint metadata
+    prior_result: SATISFIED
+    final_result: INCONCLUSIVE with authority_endpoint_tuple_missing
+  - case: v1-only certificate and observation endpoint digests forged together
+    prior_result: SATISFIED
+    final_result: INCONCLUSIVE with authority_endpoint_tuple_missing
+  - case: staged wrapper omitted Endpoint authority
+    red_baseline: 6 failed and 2 passed
+    final_result: explicit Endpoint routing and S0 fail-closed regression
+final_file_sha256:
+  src/datadiff_osc/contract_engine/relations.py: 0a1237ff476f20fe4a43b73476b3fd02457397e4ce8f15fac6ec1ef9facd2972
+  src/datadiff_osc/contract_engine/applicability.py: 8840876c67b26e327b5c8430b5b57a15b45ae97ca59e9e99a719b440b553ec06
+  src/datadiff_osc/contract_engine/monitor.py: 61f9721a8a59a817a0d7f5dc9220a81a282f688af46b64149b7d3a29cb47869a
+  src/datadiff_osc/contract_engine/planner.py: 8ae6d50453ca7b852a541e03329ca73b8ed189fc649f30ed2639da815e9ae118
+  src/datadiff_osc/contract_engine/demand.py: 8ef6a5ac200ef30e935aabd42c252595cae7828ae8295b11fad886c929e26e8d
+  src/datadiff_osc/contract_engine/compiler.py: 83fcf81ec6d8257f5363e30b60377244367a5711db17a50e8d6ccb7b6c6122a6
+  src/datadiff_osc/comparison/staged.py: 76337fd7733a41d2b67a634d55da25dfc28dc95a754da8f5de2e2a2bee4a3f27
+  scripts/osc/audit_staged_parity.py: 22c307276075dc0d103e1ce17bcf875b304b5d29a956bd8066fcddba88ad28c1
+  tests/osc/test_contract_authority.py: e5a0067d8a910e47d487876bc5fb4bb9c6469bf4d6a350c3bee463ae526be806
+  tests/osc/test_contract_relations_planner.py: 08b122094bd6150d76f9f1831d1a761520c1a98ac052ec9f710116b7cbe220f8
+  tests/osc/test_contract_two_pass_properties.py: 5d13219d39788be184ca23f3b36b4a1ff402538aa4730be69ad81264943c5625
+  tests/osc/test_contract_entailment.py: 4612d78826c3e625c3471b6e247e61f88143fe8c7a00314ed21c5eb493e2afdb
+  tests/osc/test_contract_v1_compatibility.py: 505f3cd95e70c32fc8a32ced0f4479f67f68363ab03a86cdcec4a21bb991c191
+  tests/osc/test_comparison_staged.py: cd85585f5efa7c09453019127e2a6d99f6fccf5e921cbe8c0f550664f83442dd
+validation:
+  - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_contract_*.py
+    result: 123 passed in 0.75s
+    exit_code: 0
+    executor: root
+  - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_comparison_staged.py
+    result: 9 passed in 0.15s
+    exit_code: 0
+    executor: root
+  - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_runtime_scripts.py
+    result: 4 passed in 2.80s
+    exit_code: 0
+    executor: root
+  - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_contract_*.py tests/osc/test_public_api_freeze.py
+    result: 130 passed in 0.96s
+    exit_code: 0
+    executor: root
+  - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc
+    result: 218 passed in 48.02s
+    exit_code: 0
+    executor: root
+integrity:
+  public_api_freeze_sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  tracked_diff_stat_sha256: 341553eede7eb403553383d713f9a803207214388e7b1c0378d78b74445b45d9
+  staged_paths: 0
+  ruff_available: false
+coordination_incident:
+  detail: contract agent report transport disconnected once after writes stopped
+  disposition: root inspected the six authorized paths, reproduced one stale test assertion, agent corrected only that assertion, and root reran all validation
+barrier_decision:
+  contract_closed: true
+  search_authorized_to_write: true
+  runtime_authorized_to_write: false
+  pilot_started: false
+  twenty_four_hour_run_authorized: false
+  twenty_four_hour_run_started: false

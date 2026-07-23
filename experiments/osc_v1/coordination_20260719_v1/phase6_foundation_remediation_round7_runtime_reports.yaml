@@ -1,0 +1,153 @@
+schema_version: osc-remediation-report-v1
+phase: 6
+round: private_foundation_remediation_r7_runtime_exact_typed_context_precedence
+status: scoped_suite_failed_new_remediation_contract_required
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round7_runtime_task_contracts.yaml
+  sha256: 6438e63dee4f6e92febda6c584d4a6bea83503fa64bd3efb33097039cec6b113
+entry_authority:
+  r7_review_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_contracts.yaml
+    sha256: 7f5111e0d2bb4906b1c037441c7c7aa27843664e30b029807eb9464ceacf7a8d
+  r7_review_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_reports.yaml
+    sha256: 2dc9f31509079969e9ec8240ca8cff983e315eda89994c74918b710203ac25d9
+  coordination_ledger_before_report_write:
+    path: experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    sha256: 87d56285933ccf67bbe2e4785f0726f3ea7732f54a4133ecedfb4ee1c1a8b8e8
+finding_under_remediation:
+  id: OSC-6-FOUNDATION-RUNTIME-R7-M1
+  severity: medium
+  status: not_closed_scoped_suite_failed
+implementation:
+  owner: root
+  implementation_child_agents: 0
+  changed_paths:
+    - src/datadiff_osc/runtime/_receipt_producers.py
+    - tests/osc/test_runtime_receipt_producers.py
+  attempted_change: >-
+    The candidate seven-execution precheck retained global identity disjointness and added
+    stage cardinality, ordinal, recheck case, ResultGroup, and OK-outcome validation before
+    source verdict handling, plus INCONCLUSIVE/SATISFIED × campaign/pipeline typed-context
+    regressions.
+  failure_boundary: >-
+    The attempted precheck used observation.source_case.case_id before canonical TypedCase
+    reconstruction. A forged caller case ID therefore raised candidate source case/result
+    mismatch before the established canonical `caller case ID conflicts` failure. No further
+    product edit or test rerun is authorized under this contract.
+target_sha256:
+  before_implementation:
+    src/datadiff_osc/runtime/_receipt_producers.py: 1c941edd9c28ac196ee7d0e7ab1ceeb4dc235c64a778cad2a9cce549a9328320
+    tests/osc/test_runtime_receipt_producers.py: 63763813a44c669bd1b75c554f6277fb11f85d9db6db3ac5792bbedec0cfe036
+  before_scoped_suite:
+    src/datadiff_osc/runtime/_receipt_producers.py: dd3263b4aaaa36a8eed9aefa289052ca72323b82564421c11bff80c219cc3ef3
+    tests/osc/test_runtime_receipt_producers.py: 99b404ca66c63e1e1929ea34b5ca70f5450ffd5cfea6ea1397051df7d4cc68d7
+  after_scoped_suite:
+    src/datadiff_osc/runtime/_receipt_producers.py: dd3263b4aaaa36a8eed9aefa289052ca72323b82564421c11bff80c219cc3ef3
+    tests/osc/test_runtime_receipt_producers.py: 99b404ca66c63e1e1929ea34b5ca70f5450ffd5cfea6ea1397051df7d4cc68d7
+frozen_sha256:
+  src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+  tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+  src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+  tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+  src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+  tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+  src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+  tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+  src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+  tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+  src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+validation:
+  scoped_suite:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+    execution_count: 1
+    exit_code: 1
+    result: |-
+      ........................................................................ [ 88%]
+      ..F......                                                                [100%]
+      =================================== FAILURES ===================================
+      __________ test_candidate_non_ok_recheck_and_wrong_typed_case_reject ___________
+
+          def test_candidate_non_ok_recheck_and_wrong_typed_case_reject():
+              observation = _candidate_observation()
+              bad_outcome = _outcome(status=ExecutionStatus.SEMANTIC_ERROR)
+              bad_result = replace(observation.campaign_rechecks[0].result, outcome=bad_outcome)
+              bad_evidence = replace(
+                  observation.campaign_rechecks[0].evidence,
+                  execution_outcomes=(bad_outcome,),
+              )
+              with pytest.raises(ValueError, match="requires an OK outcome"):
+                  build_candidate_classification_receipt(...)
+              with pytest.raises(ValueError, match="caller case ID conflicts"):
+      E       AssertionError: Regex pattern did not match.
+      E         Expected regex: 'caller case ID conflicts'
+      E         Actual message: 'candidate source case/result mismatch'
+
+      tests/osc/test_runtime_receipt_producers.py:988: AssertionError
+      =========================== short test summary info ============================
+      FAILED tests/osc/test_runtime_receipt_producers.py::test_candidate_non_ok_recheck_and_wrong_typed_case_reject
+      1 failed, 80 passed in 0.66s
+    exact_sha_verified_pre_and_post: true
+  负向复核:
+    r7_m1_recheck_context_matrix: >-
+      Not accepted as closing R7-M1 because the only authorized scoped suite failed; no second
+      suite was run to isolate or replace terminal evidence.
+    canonical_source_case_boundary: failed; see OSC-6-FOUNDATION-RUNTIME-R7-M2.
+  独立反例验证:
+    status: not_claimed_after_scoped_suite_failure
+  异常输入验证:
+    forged_typed_case_id: >-
+      failed at the wrong fail-closed boundary: candidate source case/result mismatch masked
+      canonical caller case ID conflicts.
+findings:
+  - id: OSC-6-FOUNDATION-RUNTIME-R7-M2
+    severity: medium
+    claim: >-
+      The R7-M1 precheck attempt trusts the caller-provided TypedCaseObservation.case_id before
+      canonical case reconstruction. It can mask the established canonical typed-case integrity
+      failure with candidate source case/result mismatch.
+    reproduction: >-
+      Run test_candidate_non_ok_recheck_and_wrong_typed_case_reject with source_case replaced
+      only by case_id=forged-case while the typed JSON and source result retain case-001. The
+      first error is candidate source case/result mismatch, not caller case ID conflicts.
+    violated_invariant: >-
+      The source typed case must reconstruct canonically and bind source_result.case_id before
+      verdict handling; caller fields cannot become an authority substitute for canonical case
+      bytes or mask the existing exact typed-case failure boundary.
+    required_test: >-
+      Preserve the canonical forged-TypedCaseObservation case-ID regression and add its
+      INCONCLUSIVE/SATISFIED source-verdict cross. Canonical caller case ID conflicts must
+      precede verdict handling, while the R7-M1 recheck case/result-group/non-OK/ordinal matrix
+      remains ahead of source VIOLATED-witness handling.
+counts: {blocker: 0, high: 0, medium: 1, low: 0}
+authority_boundaries:
+  diagnostic_refs_authority_eligible: false
+  missing_exact_typed_context: fail_closed_or_not_evaluated
+  candidate_promoted_to_confirmed: false
+  bug_claimed: false
+  public_exports_changed: false
+  public_api_freeze_changed: false
+  execution_authorization_created: false
+writes:
+  implementation_child_agents: 0
+  changed_paths:
+    - src/datadiff_osc/runtime/_receipt_producers.py
+    - tests/osc/test_runtime_receipt_producers.py
+  forbidden_paths_modified: []
+manual_repository_writes_used_apply_patch: true
+decision:
+  remediation_code_complete: false
+  scoped_suite_passed: false
+  foundation_barrier: pending
+  foundation_barrier_passed: false
+  combined_six_file_scoped_suite_authorized: false
+  new_remediation_task_contract_required_before_code_change: true
+  tests_osc_authorized: false
+  full_repository_tests_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_entry_authorized: false
+  phase7_pilot_2h_authorized: false
+  twenty_four_hour_run_authorized: false

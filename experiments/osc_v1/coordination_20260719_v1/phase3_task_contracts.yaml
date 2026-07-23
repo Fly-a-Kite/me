@@ -1,0 +1,246 @@
+freeze:
+  version: osc-public-api-freeze-v1
+  manifest: src/datadiff_osc/public_api_freeze.json
+  sha256: 669816be0f913def018518ea85d2cc03b517453cc8e5ba764908dc3c3f42920f
+
+tasks:
+  - task_id: OSC-3-A
+    role: contract
+    mode: implementation
+    objective: >-
+      Turn the existing HyperContract prototype into a low-complexity, fail-closed
+      authority core without changing the frozen public schema, and supply scoped
+      correctness/property/mutation/performance tests and reusable gate helpers.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - docs/semantic_hypercontract_architecture.md
+      - docs/architecture_credibility_and_alternatives.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_contract_audit.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_dependency_dag.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase2_interface_freeze.md
+      - src/datadiff_osc/public_api_freeze.json
+      - current src/datadiff_osc/contract_engine/** and tests/osc/test_contract_*.py
+    allowed_write_paths:
+      - src/datadiff_osc/contract_engine/**
+      - tests/osc/test_contract_*.py
+    forbidden_write_paths:
+      - src/datadiff_osc/__init__.py
+      - src/datadiff_osc/_canonical.py
+      - src/datadiff_osc/schemas.py
+      - src/datadiff_osc/api.py
+      - src/datadiff_osc/public_api_freeze.json
+      - src/datadiff_osc/semantic_targets/**
+      - src/datadiff_osc/generation/**
+      - src/datadiff_osc/search/**
+      - src/datadiff_osc/scheduler/**
+      - src/datadiff_osc/comparison/**
+      - src/datadiff_osc/parallel/**
+      - src/datadiff_osc/runtime/**
+      - scripts/**
+      - src/datadiff/**
+      - tests/osc/conftest.py
+      - tests/osc/test_public_api_freeze.py
+      - pyproject.toml
+      - experiments/**
+    frozen_interfaces:
+      - all symbols, dataclass fields, enum values, versions, canonical rules and unique sources in osc-public-api-freeze-v1
+    required_invariants:
+      - preserve all user dirty work; no destructive Git or bulk formatting
+      - no family/root/candidate/backend-name authority dispatch
+      - capability and semantic permission remain independent
+      - four verdict values remain distinct; structured failures never become pass or unsupported
+      - unsupported is INAPPLICABLE only with bound capability evidence; timeout/crash/adapter/missing remain INCONCLUSIVE outcomes
+      - exact integer/decimal/tagged scalar semantics may not convert through binary64
+      - unknown rule/relation/parameter/evidence tier fails closed
+      - all non-screening tiers use exact authority; screening uncertainty escalates exact
+      - no relaxation of contract, relation, tolerance, comparator or gate
+      - no new production dependency, SMT, e-graph, Rust or native kernel
+      - do not start any campaign, pilot or 24h run
+      - do not create subagents
+    deliverables:
+      - strict model and three-certificate binding/validity using frozen fields
+      - typed exact relation and parameter validation including partial-order/top-k
+      - node-local forward-state-aware backward demand with fail-closed traces
+      - component-scoped semantic permission integration
+      - acyclic, proof-scoped entailment consumed safely by the planner
+      - executable staged plan with exact escalation and frozen EvidenceTier rejection
+      - structured outcome handling and endpoint/contract/applicability binding
+      - v1 compatibility helpers that preserve all five views and explicit precision fixes, without touching legacy authority
+      - executable comparator/axis/hyperedge fault audit helpers
+      - deterministic helpers for root/false-positive/parity/performance gates; raw Phase 6 evidence is not fabricated here
+      - unit/property/mutation/benchmark tests and runbook section 12 completion report
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_contract_*.py
+        expected: zero failures
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_public_api_freeze.py
+        expected: 7 passed and unchanged freeze hash
+    stop_conditions:
+      - a frozen public field/version/hash rule must change
+      - a required fix needs a forbidden path
+      - exact authority would need a semantic relaxation
+      - baseline failure cannot be localized to owned code
+    completion_report: docs/codex_multi_agent_development_runbook.md section 12
+
+  - task_id: OSC-3-B
+    role: search
+    mode: implementation
+    objective: >-
+      Implement declaration-derived semantic targets, provenance-bearing extraction,
+      exact matching/ledger, deterministic seed epochs, typed backward construction,
+      target-preserving mutation and constraint-first scheduling without family runtime dispatch.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - docs/fine_grained_discovery_architecture.md
+      - docs/discovery_search_and_parallel_architecture.md
+      - docs/architecture_credibility_and_alternatives.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_search_audit.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_dependency_dag.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase2_interface_freeze.md
+      - src/datadiff_osc/public_api_freeze.json
+      - current semantic target implementation and reusable legacy typed IR/state/bitmap/seed primitives
+    allowed_write_paths:
+      - src/datadiff_osc/semantic_targets/**
+      - src/datadiff_osc/generation/**
+      - src/datadiff_osc/search/**
+      - src/datadiff_osc/scheduler/**
+      - tests/osc/test_targets_*.py
+      - tests/osc/test_generation_*.py
+      - tests/osc/test_search_*.py
+      - tests/osc/test_scheduler_*.py
+    forbidden_write_paths:
+      - src/datadiff_osc/__init__.py
+      - src/datadiff_osc/_canonical.py
+      - src/datadiff_osc/schemas.py
+      - src/datadiff_osc/api.py
+      - src/datadiff_osc/public_api_freeze.json
+      - src/datadiff_osc/contract_engine/**
+      - src/datadiff_osc/comparison/**
+      - src/datadiff_osc/parallel/**
+      - src/datadiff_osc/runtime/**
+      - scripts/**
+      - src/datadiff/**
+      - tests/osc/conftest.py
+      - tests/osc/test_public_api_freeze.py
+      - pyproject.toml
+      - experiments/**
+    frozen_interfaces:
+      - all symbols, dataclass fields, enum values, versions, canonical rules and unique sources in osc-public-api-freeze-v1
+      - fresh_backend_pair_obligations is the only fresh denominator view and must remain 502; regression view must remain separate at 228
+    required_invariants:
+      - preserve all user dirty work; no destructive Git or bulk formatting
+      - family is declaration/report projection only; no family-specific evaluator/repair/scheduler dispatch
+      - fresh, regression, known/saturated and issue-inspired provenance never mix
+      - cells/edges/obligations are recomputed from declarations; no magic-count pass evidence
+      - assignment metadata cannot create observed atoms or activation credit
+      - every credited atom has provenance; every observed ledger transition has frozen certificate bindings
+      - keyed SeedLineage stages and no-replacement epochs are independent of worker count/order/retry
+      - generated does not imply activated; mutation must re-extract and re-match or reject/repair
+      - deterministic coverage floor and worst-group max-min precede adaptive/Pareto optimization
+      - adaptive policy never changes oracle verdict or bug classification
+      - no new production dependency, solver/e-graph/PSO/GA/MAP-Elites authority, or known-root fresh seed
+      - do not start any campaign, pilot or 24h run
+      - do not create subagents
+    deliverables:
+      - physical/type-safe fresh and regression registry views with fail-closed provenance and unsupported evidence hooks
+      - generic CCS-IR/case/data atom extraction with AtomProvenance and single-extraction cache boundary
+      - all/any/none matcher with exact ActivationCertificate and no circular assignment evidence
+      - exact cell/edge/backend-pair constructed/activated/executed/observed ledger, deterministic merge/replay and report projections
+      - keyed stage substreams and stable no-replacement permutations for 232 cells and 384 edges
+      - typed reusable fragments/effects, oracle-tail-first bounded construction, dominance pruning and explicit InfeasibleConstructionEvidence
+      - target-preserving mutation with generic atom-class repair and reject path
+      - deterministic coverage floor, max-min debt and bounded Pareto/lazy selection; complex graph heat/archive remain off or shadow absent promotion evidence
+      - denominator/reachability/property/mutation/performance tests and runbook section 12 completion report
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_targets_*.py tests/osc/test_generation_*.py tests/osc/test_search_*.py tests/osc/test_scheduler_*.py
+        expected: zero failures
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_public_api_freeze.py
+        expected: 7 passed and unchanged freeze hash
+    stop_conditions:
+      - a frozen public field/version/hash rule must change
+      - a required extractor fact is unavailable without assignment self-evidence
+      - a required fix needs a forbidden path or known-root source
+      - baseline failure cannot be localized to owned code
+    completion_report: docs/codex_multi_agent_development_runbook.md section 12
+
+  - task_id: OSC-3-C
+    role: runtime
+    mode: implementation
+    objective: >-
+      Implement exact-preserving staged comparison, complete cache identity,
+      deterministic resource-aware parallel task execution and machine-readable
+      pre-24h gate tooling while leaving all formal launchers untouched.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - docs/discovery_search_and_parallel_architecture.md
+      - docs/semantic_hypercontract_architecture.md
+      - docs/architecture_credibility_and_alternatives.md
+      - docs/competitive_paper_experiment_blueprint.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_runtime_audit.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_dependency_dag.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase2_interface_freeze.md
+      - src/datadiff_osc/public_api_freeze.json
+      - current contract planner/monitor and reusable legacy execution/cache/worker/accounting patterns
+    allowed_write_paths:
+      - src/datadiff_osc/comparison/**
+      - src/datadiff_osc/parallel/**
+      - src/datadiff_osc/runtime/**
+      - scripts/osc/**
+      - tests/osc/test_comparison_*.py
+      - tests/osc/test_parallel_*.py
+      - tests/osc/test_runtime_*.py
+    forbidden_write_paths:
+      - src/datadiff_osc/__init__.py
+      - src/datadiff_osc/_canonical.py
+      - src/datadiff_osc/schemas.py
+      - src/datadiff_osc/api.py
+      - src/datadiff_osc/public_api_freeze.json
+      - src/datadiff_osc/contract_engine/**
+      - src/datadiff_osc/semantic_targets/**
+      - src/datadiff_osc/generation/**
+      - src/datadiff_osc/search/**
+      - src/datadiff_osc/scheduler/**
+      - src/datadiff/**
+      - tests/osc/conftest.py
+      - tests/osc/test_public_api_freeze.py
+      - pyproject.toml
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - any existing formal launcher
+    frozen_interfaces:
+      - all symbols, dataclass fields, enum values, versions, canonical rules and unique sources in osc-public-api-freeze-v1
+    required_invariants:
+      - preserve all user dirty work; no destructive Git or bulk formatting
+      - approximation/fingerprint/cluster uncertainty always exact-escalates
+      - no majority vote, heuristic or learned verdict authority
+      - structured timeout/crash/domain/adapter/unsupported outcomes remain distinct
+      - RuntimeCacheKey covers every frozen identity field; fresh/native never cache
+      - worker count, completion order and retry do not change task set, seed lineage, stable result order or authority verdict
+      - retry changes only TaskIdentity.attempt; it never consumes a new seed/case
+      - resource tokens account for CPU, RSS, I/O, internal threads and exclusive state
+      - gate report records exact numerator/denominator/threshold/evidence and fails closed on missing data
+      - candidate/finding is never reported as a bug or confirmed root
+      - no threshold relaxation, skip/xfail, new dependency, formal launcher edit, campaign, pilot or 24h run
+      - do not create subagents
+    deliverables:
+      - contract-driven component staging and deterministic O(B) clustering with exact mismatch/uncertainty escalation
+      - integrated complete RuntimeCacheKey and evidence-tier isolation
+      - immutable TaskSpec DAG validation, deterministic epoch controller/barrier and stable task/result merge
+      - resource allocator, isolated worker outcome taxonomy, bounded retry and failure evidence
+      - workers 1 versus N/retry/completion-order invariance harness
+      - machine-readable gate calculator/report for contract, 232/384/502, activation/mutation/lane/dimension, parallel and v3 health inputs
+      - reproducible 100k parity, p95/throughput, clustering and parallel-scaling scripts; scripts may generate evidence but must not fabricate pass
+      - post-refactor 2200-case and preregistered 2h pilot support utilities only; do not execute pilot or edit/start a launcher
+      - scoped tests and runbook section 12 completion report
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_comparison_*.py tests/osc/test_parallel_*.py tests/osc/test_runtime_*.py
+        expected: zero failures
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_public_api_freeze.py
+        expected: 7 passed and unchanged freeze hash
+    stop_conditions:
+      - a frozen public field/version/hash rule must change
+      - a required authority correction belongs to contract/search/root ownership
+      - exact parity fails and cannot be corrected inside runtime paths
+      - a requested action would start a pilot/campaign or touch a formal launcher
+    completion_report: docs/codex_multi_agent_development_runbook.md section 12

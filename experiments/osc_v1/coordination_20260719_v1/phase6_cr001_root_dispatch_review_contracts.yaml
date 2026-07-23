@@ -1,0 +1,74 @@
+schema_version: osc-review-contract-v1
+phase: 6
+change_request: CR-OSC-6-001
+review_target: root_typed_semantic_replay_dispatch
+mode: three_parallel_exact_sha_read_only_reviews
+execution_policy:
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  writes_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_paired_pilot_authorized: false
+  twenty_four_hour_run_authorized: false
+frozen_target_files:
+  - path: src/datadiff_osc/_phase6_gate_authority.py
+    sha256: 224603eeb6e8f4a307060543208c3190fe86acecd76ebcf2e28728880de8eb03
+  - path: tests/osc/test_phase6_gate_authority_integration.py
+    sha256: 1db60ffb93d3b5d92608f8143a50c583863982a357da8bb7f26b8a79c3912752
+frozen_dependencies:
+  - path: src/datadiff_osc/_replay_support.py
+    sha256: 6f52a8836288cb0e7578c984a8f0c3c26661a17d648050912c07a54515192dc1
+  - path: src/datadiff_osc/contract_engine/replay.py
+    sha256: f7289bfe133611b50b14676697d3ef97c02e5f77162ad0cdf9fb9e11b654c615
+  - path: src/datadiff_osc/search/semantic_replay.py
+    sha256: af65bd9f1f06a3a2555b33dd2c38d574ed03d0ab70ed5dcee035099e3364b28b
+  - path: src/datadiff_osc/runtime/_semantic_replay.py
+    sha256: 0b5ec02b247d718d4258dada0fb59493081f258cc1e49913c1d294c7c9e062b9
+  - path: src/datadiff_osc/runtime/_private_receipts.py
+    sha256: 490c7f7f076fb65c75cc577831fab508f6d9dcb0820422170169b274e50af07f
+  - path: src/datadiff_osc/public_api_freeze.json
+    sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+root_test_evidence:
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/osc/test_phase6_gate_authority_integration.py
+    result: 33 passed in 21.80s
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/osc/test_replay_support.py
+      tests/osc/test_contract_semantic_replay.py
+      tests/osc/test_search_semantic_replay.py
+      tests/osc/test_runtime_private_receipts.py
+      tests/osc/test_runtime_semantic_replay.py
+      tests/osc/test_phase6_gate_authority_integration.py
+      tests/osc/test_public_api_freeze.py
+    result: 121 passed in 23.11s
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/osc
+    result: 466 passed in 116.02s
+reviews:
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-A
+    agent: /root/phase5_authority_audit
+    focus: dispatcher ownership completeness, canonical/hash/type fail-closed behavior, Contract invariants, and authority non-escalation
+    allowed_write_paths: []
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-B
+    agent: /root/phase5_consumer_audit
+    focus: exact subject derivation, substitution/context forgery rejection, Search ownership, receipt retention semantics, and missing tests
+    allowed_write_paths: []
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-C
+    agent: /root/phase5_evidence_audit
+    focus: Runtime reconstruction, provenance barrier, candidate-not-bug boundary, malformed/synthetic discard, and gate or 24h non-authority
+    allowed_write_paths: []
+required_report:
+  - independently recompute and state both frozen target SHA-256 values
+  - state forbidden writes as zero
+  - report only correctness, soundness, reproducibility, performance-gate or missing-test findings
+  - each finding includes severity, file/symbol, counterexample or reproduction, violated invariant and minimal fix
+  - explicitly report blocker/high/medium counts even when zero
+  - state whether CR-OSC-6-001 Root dispatch may close at the exact reviewed SHAs
+stop_conditions:
+  - target SHA mismatch
+  - any write would be required
+  - any child Agent would be required

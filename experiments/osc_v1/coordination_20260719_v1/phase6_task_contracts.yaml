@@ -1,0 +1,127 @@
+schema_version: osc-task-contract-v1
+phase: 6
+execution_policy:
+  initial_mode: read_only_audit
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  simultaneous_gate_runs: 0
+  phase7_paired_pilot_authorized: false
+  twenty_four_hour_run_authorized: false
+tasks:
+  - task_id: OSC-6-CONTRACT-AUDIT
+    role: contract
+    agent: /root/phase5_authority_audit
+    mode: read_only_audit
+    objective: Map every frozen Phase 6 Contract gate to current source, tests, datasets, reproducible commands, thresholds, expected cost, and missing evidence without executing a long gate.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - docs/semantic_hypercontract_architecture.md
+      - docs/architecture_credibility_and_alternatives.md
+      - experiments/osc_v1/coordination_20260719_v1/phase5_contract_barrier.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_root_authority_control_barrier.yaml
+      - src/datadiff_osc/public_api_freeze.json
+    allowed_write_paths: []
+    forbidden_write_paths: ["**"]
+    frozen_interfaces:
+      - osc-public-api-freeze-v1@cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      - exact authority comparator and four-valued verdict semantics
+      - Phase 6 thresholds in runbook section 7 and TODO P0
+    required_invariants:
+      - 9/9 recall and false-positive fixes must come from frozen corpora, not self-authored rows
+      - fault and mutant kill rates must use frozen identities and exact denominators
+      - staged-vs-exact 100000 groups must report zero verdict discrepancy
+      - performance thresholds must be measured, never inferred from unit tests
+      - no comparator, contract, tolerance, denominator, or threshold weakening
+      - no code writes, pilot, campaign, 2h, or 24h execution
+    deliverables:
+      - runbook section-12 report
+      - exact command matrix for every Contract gate
+      - explicit implemented, missing, and blocker classification with file/symbol evidence
+    validation:
+      - command: read-only source/test/script inspection and bounded help or micro-smoke only
+        expected: zero repository writes and no long gate execution
+    stop_conditions:
+      - any required write or public-interface change
+      - any absent frozen corpus or irreproducible denominator
+      - any command that would start a pilot, campaign, 2h, or 24h run
+    completion_report: runbook section 12
+
+  - task_id: OSC-6-GRANULARITY-AUDIT
+    role: search
+    agent: /root/phase5_consumer_audit
+    mode: read_only_audit
+    objective: Map every Phase 6 granularity, construction, activation, reachability, mutation, lane-focus, dimension, and performance gate to independently recomputable producers and exact commands.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - docs/fine_grained_discovery_architecture.md
+      - docs/discovery_search_and_parallel_architecture.md
+      - experiments/osc_v1/coordination_20260719_v1/phase5_search_barrier.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_observation_contract_barrier.yaml
+      - src/datadiff_osc/public_api_freeze.json
+    allowed_write_paths: []
+    forbidden_write_paths: ["**"]
+    frozen_interfaces:
+      - osc-public-api-freeze-v1@cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      - fresh 16/232, regression 9/144, edge 384, obligation 502 declaration-derived universes
+      - Phase 6 thresholds in runbook section 7 and TODO P0
+    required_invariants:
+      - every denominator is independently derived from declarations
+      - fresh and regression evidence remain physically separated
+      - unsupported requires frozen evidence
+      - deterministic and fresh-seed activation evidence cannot be synthetic or self-asserted
+      - family remains a reporting view, never runtime verdict authority
+      - no code writes, pilot, campaign, 2h, or 24h execution
+    deliverables:
+      - runbook section-12 report
+      - exact command and artifact matrix for all granularity/reachability gates
+      - explicit implemented, missing, and blocker classification with file/symbol evidence
+    validation:
+      - command: read-only source/test/script inspection and bounded help or micro-smoke only
+        expected: zero repository writes and no long gate execution
+    stop_conditions:
+      - any required write or public-interface change
+      - any hardcoded or caller-authored authority denominator
+      - any command that would start a pilot, campaign, 2h, or 24h run
+    completion_report: runbook section 12
+
+  - task_id: OSC-6-RUNTIME-AUDIT
+    role: runtime
+    agent: /root/phase5_evidence_audit
+    mode: read_only_audit
+    objective: Map Phase 6 exact escalation, parallel invariance, 22-run/2200-case v3 gate, candidate rechecks, full-suite, and latest-target audit to current tooling and a safe serial execution plan.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - docs/discovery_search_and_parallel_architecture.md
+      - docs/competitive_paper_experiment_blueprint.md
+      - experiments/osc_v1/coordination_20260719_v1/phase5_runtime_barrier.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_root_authority_control_barrier.yaml
+      - src/datadiff_osc/public_api_freeze.json
+    allowed_write_paths: []
+    forbidden_write_paths: ["**"]
+    frozen_interfaces:
+      - osc-public-api-freeze-v1@cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      - complete independently planned 41-gate authority set
+      - Phase 6 thresholds in runbook section 7 and TODO P0
+    required_invariants:
+      - workers 1 and N preserve task set, seed lineage, ordering, verdict, ledger, and certificates
+      - every approximation or prune has exact escalation and injected faults fail closed
+      - 2200 gate counts actual execution and all backend statuses, not campaign labels
+      - candidate remains candidate and requires campaign 3/3 plus pipeline 3/3 rechecks
+      - latest target versions must be measured from the active environment
+      - no code writes, pilot, campaign execution, 2h, or 24h execution during audit
+    deliverables:
+      - runbook section-12 report
+      - exact serial command/resource/artifact plan for runtime and 2200-case gates
+      - explicit implemented, missing, and blocker classification with file/symbol evidence
+    validation:
+      - command: read-only source/test/script inspection and bounded help or micro-smoke only
+        expected: zero repository writes and no long gate execution
+    stop_conditions:
+      - any required write or public-interface change
+      - missing provenance or a non-authoritative subset would be mistaken for full authority
+      - any command that would start a pilot, campaign, 2h, or 24h run
+    completion_report: runbook section 12
+

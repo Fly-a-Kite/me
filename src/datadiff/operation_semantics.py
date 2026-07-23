@@ -140,9 +140,10 @@ def condition_cmp(op: OperationLike, default: str = "") -> str:
     condition = op.get("condition")
     value = getattr(condition, "comparator", None)
     if value in {None, ""}:
-        value = condition_payload(op).get("cmp", default)
+        payload = condition_payload(op)
+        value = payload.get("cmp") if "cmp" in payload else None
     if value in {None, ""}:
-        value = op.get("cmp", default)
+        value = op.get("cmp")
     if value in {None, ""}:
         return default
     return str(value)

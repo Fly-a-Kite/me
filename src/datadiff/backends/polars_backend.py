@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from datadiff.backends.base import Backend, BackendResult, PreparedTable, prepare_table
@@ -31,10 +31,12 @@ from datadiff.operation_semantics import (
     op_columns,
     op_kind,
     op_nulls,
+    op_output_alias,
     op_right_columns,
     op_table,
     op_values,
 )
+from datadiff.physical_plan import collect_physical_plan_bundle
 from datadiff.running import running_sum_sort_keys
 from datadiff.sortedness import is_sorted_values
 from datadiff.tuple_logic import evaluate_tuple_absence
@@ -51,12 +53,24 @@ def _polars_probe_handlers(
         "group_quantile_probe": lambda: _polars_group_quantile_key_mismatch(pl, op, lazy=lazy),
         "window_avg_probe": lambda: _polars_sql_window_avg_mismatch(pl),
         "timestamp_precision_filter_probe": (
-            lambda: _polars_timestamp_precision_filter_mismatch(pl, collect=collect) if lazy
-            else _polars_timestamp_precision_filter_mismatch(pl)
+            lambda: _polars_timestamp_precision_filter_mismatch(
+                pl, op=op, collect=collect
+            ) if lazy
+            else _polars_timestamp_precision_filter_mismatch(pl, op=op)
         ),
         "series_rtruediv_probe": lambda: _polars_series_rtruediv_mismatch(pl) if not lazy else False,
+        "series_reflected_arithmetic_probe": (
+            lambda: _polars_series_reflected_arithmetic_mismatch(pl, op)
+            if not lazy
+            else False
+        ),
+        "confirmed_root_witness_probe": (
+            lambda: _polars_confirmed_root_mismatch(pl, op)
+            if not lazy
+            else False
+        ),
         "float_wrap_probe": lambda: _polars_float_wrap_mismatch(pl, lazy=lazy),
-        "polars_timezone_filter_probe": lambda: _polars_timezone_filter_mismatch(pl, lazy=lazy),
+        "polars_timezone_filter_probe": lambda: _polars_timezone_filter_mismatch(pl, op=op, lazy=lazy),
         "empty_literal_groupby_probe": lambda: _polars_empty_literal_groupby_mismatch(pl, lazy=lazy),
         "rolling_mean_by_null_count_probe": lambda: _polars_rolling_mean_by_null_count_mismatch(pl, lazy=lazy),
         "csv_long_numeric_roundtrip_probe": (
@@ -76,7 +90,7 @@ class PolarsBackend(Backend):
         schema = {column.name: _polars_dtype(pl, column.type) for column in prepared.columns}
         return pl.DataFrame(data, schema=schema)
 
-    def run(
+    def execute_lowered(
         self,
         tables: list[TableData | PreparedTable],
         program: Program,
@@ -173,19 +187,21 @@ class PolarsBackend(Backend):
 class PolarsLazyBackend(PolarsBackend):
     name = "polars_lazy"
     collect_engine: str | None = None
+    plan_collection_support = "logical+physical_inline"
 
     def _collect_lazy_frame(self, lazy_frame):
         if self.collect_engine is None:
             return lazy_frame.collect()
         return lazy_frame.collect(engine=self.collect_engine)
 
-    def run(
+    def execute_lowered(
         self,
         tables: list[TableData | PreparedTable],
         program: Program,
         timeout_s: float = 5.0,
     ) -> BackendResult:
         start = time.perf_counter()
+        physical_plan = None
         try:
             import polars as pl
 
@@ -202,6 +218,7 @@ class PolarsLazyBackend(PolarsBackend):
                         right_on=join_key_arg(right_keys),
                         how=join_how(op),
                         suffix="_r",
+                        maintain_order="left",
                     )
                     drop_cols = [c for c in lf.collect_schema().names() if c.endswith("_r")]
                     current_names = lf.collect_schema().names()
@@ -226,6 +243,7 @@ class PolarsLazyBackend(PolarsBackend):
                         left_on=join_key_arg(left_keys),
                         right_on=join_key_arg(right_key_cols),
                         how=how,
+                        maintain_order="left",
                     )
                 elif kind == "drop_nulls":
                     lf = lf.drop_nulls(subset=op_columns(op))
@@ -273,9 +291,35 @@ class PolarsLazyBackend(PolarsBackend):
                         if next_lf is None:
                             raise ValueError(kind)
                         lf = next_lf
-            return BackendResult(self.name, "ok", data=self._collect_lazy_frame(lf), duration_ms=(time.perf_counter()-start)*1000)
+            if self.physical_plan_collection_enabled:
+                physical_plan = collect_physical_plan_bundle(
+                    backend=self.name,
+                    backend_version=str(getattr(pl, "__version__", "")),
+                    sources={
+                        "logical": lambda: lf.explain(optimized=False),
+                        "optimized_logical": lambda: lf.explain(optimized=True),
+                    },
+                    unsupported={
+                        "physical": "Polars LazyFrame does not expose a stable physical plan API"
+                    },
+                    detail=self.physical_plan_collection_mode,
+                )
+            return BackendResult(
+                self.name,
+                "ok",
+                data=self._collect_lazy_frame(lf),
+                duration_ms=(time.perf_counter()-start)*1000,
+                physical_plan=physical_plan,
+            )
         except Exception as exc:  # noqa: BLE001
-            return BackendResult(self.name, "error", error_type=type(exc).__name__, error=str(exc), duration_ms=(time.perf_counter()-start)*1000)
+            return BackendResult(
+                self.name,
+                "error",
+                error_type=type(exc).__name__,
+                error=str(exc),
+                duration_ms=(time.perf_counter()-start)*1000,
+                physical_plan=physical_plan,
+            )
 
 
 class PolarsStreamingBackend(PolarsLazyBackend):
@@ -398,6 +442,77 @@ def _polars_series_rtruediv_mismatch(pl) -> bool:
     )
 
 
+def _polars_series_reflected_arithmetic_mismatch(pl, op: dict[str, Any]) -> bool:
+    operator = str(op.get("operator", "") or "")
+    lhs_values = list(op.get("lhs_values", []) or [])
+    rhs_values = list(op.get("rhs_values", []) or [])
+    lhs = pl.Series(str(op.get("lhs_name", "lhs") or "lhs"), lhs_values)
+    rhs = pl.Series(str(op.get("rhs_name", "rhs") or "rhs"), rhs_values)
+    direct = {
+        "rsub": lambda: rhs - lhs,
+        "rtruediv": lambda: rhs / lhs,
+        "rfloordiv": lambda: rhs // lhs,
+        "rmod": lambda: rhs % lhs,
+        "rpow": lambda: rhs**lhs,
+    }.get(operator)
+    if direct is None:
+        raise ValueError(f"unsupported reflected arithmetic operator: {operator}")
+    expected = direct().to_list()
+    try:
+        observed = getattr(lhs, f"__{operator}__")(rhs).to_list()
+    except Exception:  # backend exception is an operand-order mismatch observation
+        return True
+    if operator == "rtruediv":
+        return len(observed) != len(expected) or any(
+            actual is None
+            or wanted is None
+            or not math.isclose(
+                float(actual),
+                float(wanted),
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            )
+            for actual, wanted in zip(observed, expected)
+        )
+    return observed != expected
+
+
+def _polars_confirmed_root_mismatch(pl, op: dict[str, Any]) -> bool:
+    if str(op.get("target_backend", "") or "") != "polars":
+        return False
+    root_id = str(op.get("root_id", "") or "")
+    if root_id != "polars-grouped-max-sort-metadata-001":
+        raise ValueError(f"unsupported Polars confirmed root probe: {root_id}")
+    params = op.get("native_parameters", {})
+    if not isinstance(params, dict):
+        params = dict(params) if params else {}
+    rows = list(params.get("rows", []) or [])
+    frame = pl.DataFrame(
+        {
+            "s": [str(row.get("s", "")) for row in rows],
+            "z": [row.get("z") for row in rows],
+        },
+        schema={"s": pl.Utf8, "z": pl.Int64},
+    )
+    nulls_last = str(params.get("input_order", "") or "") != "asc_nulls_first"
+    grouped = (
+        frame.sort("z", nulls_last=nulls_last)
+        .group_by("s", maintain_order=True)
+        .agg(pl.col("z").max().alias("max_z"))
+    )
+    observed = grouped.sort(
+        "max_z",
+        descending=True,
+        nulls_last=True,
+    ).to_dicts()
+    expected = (
+        pl.DataFrame(grouped.to_dicts())
+        .sort("max_z", descending=True, nulls_last=True)
+        .to_dicts()
+    )
+    return observed != expected
+
+
 def _polars_float_wrap_mismatch(pl, *, lazy: bool) -> bool:
     expected = [100, 44]
     frame = pl.DataFrame({"float_value": [100.0, 300.0], "int_value": [100, 300]})
@@ -414,7 +529,35 @@ def _polars_float_wrap_mismatch(pl, *, lazy: bool) -> bool:
     return observed_float != expected or observed_int != expected
 
 
-def _polars_timestamp_precision_filter_mismatch(pl, collect=None) -> bool:
+def _polars_timestamp_precision_filter_mismatch(
+    pl,
+    op: dict[str, Any] | None = None,
+    collect=None,
+) -> bool:
+    if (op or {}).get("family_id") == "polars_lazy_temporal_cast_boundary":
+        direction = str((op or {}).get("direction", "") or "")
+        boundary = str((op or {}).get("boundary", "") or "")
+        source_unit, literal_unit = (
+            ("us", "ns") if direction == "forward" else ("ns", "us")
+        )
+        source_value = 2
+        threshold_value = {"below": 1, "equal": 2, "above": 3}.get(boundary)
+        if threshold_value is None:
+            return True
+        source_ns = source_value * (1_000 if source_unit == "us" else 1)
+        threshold_ns = threshold_value * (1_000 if literal_unit == "us" else 1)
+        expected_height = int(source_ns < threshold_ns)
+        frame = pl.DataFrame(
+            {"ts": [source_value]}, schema={"ts": pl.Datetime(source_unit)}
+        )
+        predicate = pl.col("ts") < pl.lit(
+            threshold_value,
+            dtype=pl.Datetime(literal_unit),
+        )
+        result = frame.filter(predicate) if collect is None else collect(
+            frame.lazy().filter(predicate)
+        )
+        return result.height != expected_height
     frame = pl.DataFrame({"ts": [1]}, schema={"ts": pl.Datetime("us")})
     predicate = pl.col("ts") < pl.lit(1_500, dtype=pl.Datetime("ns"))
     if collect is None:
@@ -424,7 +567,42 @@ def _polars_timestamp_precision_filter_mismatch(pl, collect=None) -> bool:
     return result.height != 1
 
 
-def _polars_timezone_filter_mismatch(pl, *, lazy: bool) -> bool:
+def _polars_timezone_filter_mismatch(
+    pl,
+    op: dict[str, Any] | None = None,
+    *,
+    lazy: bool,
+) -> bool:
+    if (op or {}).get("family_id") == "polars_lazy_temporal_cast_boundary":
+        direction = str((op or {}).get("direction", "") or "")
+        boundary = str((op or {}).get("boundary", "") or "")
+        utc = ZoneInfo("UTC")
+        london = ZoneInfo("Europe/London")
+        source_zone, target_zone = (
+            (utc, london) if direction == "forward" else (london, utc)
+        )
+        values = [
+            datetime(2024, 6, 1, 0, 30, tzinfo=source_zone),
+            datetime(2024, 6, 1, 2, 30, tzinfo=source_zone),
+        ]
+        converted = [value.astimezone(target_zone) for value in values]
+        threshold = {
+            "below": min(converted) - timedelta(minutes=1),
+            "equal": min(converted),
+            "above": max(converted) + timedelta(minutes=1),
+        }.get(boundary)
+        if threshold is None:
+            return True
+        expected_height = sum(value >= threshold for value in converted)
+        frame = pl.DataFrame({"ts": values})
+        if lazy:
+            frame = frame.lazy()
+        result = frame.with_columns(
+            local=pl.col("ts").dt.convert_time_zone(str(target_zone))
+        ).filter(pl.col("local") >= pl.lit(threshold))
+        if lazy:
+            result = result.collect()
+        return result.height != expected_height
     london = ZoneInfo("Europe/London")
     frame = pl.DataFrame(
         {

@@ -1,0 +1,93 @@
+schema_version: osc-phase5-runtime-owner-barrier-v1
+task_ids:
+  - OSC-5-C
+  - OSC-5-C-AUTHORITY-FOLLOWUP
+  - OSC-5-C-BINDING-FOLLOWUP
+status: runtime_owner_repairs_pass_root_integration_pending
+phase5_exit_gate_passed: false
+finding_disposition:
+  OSC-4-B-F1: runtime_consumer_closed_root_authority_producer_pending
+  OSC-4-B-F2: closed_root_verified
+  OSC-4-B-F3: closed_root_verified
+  OSC-4-B-F4: closed_root_verified
+change_requests:
+  - id: CR-OSC-5-004
+    status: runtime_consumer_closed_root_producer_pending
+  - id: CR-OSC-5-005
+    status: closed_root_verified
+authority_results:
+  complete_authoritative_gate_specs: 41
+  custom_or_subset_reports_authority_eligible: false
+  independently_anchored_source_plan_artifact_and_universe_consumer: true
+  root_authority_plan_producer: pending_CR-OSC-ROOT-004
+  cache_exact_requirement_source: StagedComparisonRequest.exact_required
+  exact_cache_stage: S3_EXACT_MATERIALIZED
+  cache_put_and_get_revalidation: true
+  execution_run_worker_count_schema: osc-deterministic-execution-run-v2
+  authority_snapshot_worker_count_schema: osc-authority-evidence-snapshot-v2
+  non_vacuous_worker_design_required: true
+  single_worker_cli_rejected_before_execution: true
+negative_regressions:
+  - self-asserted source plus 232 fake cell identities cannot produce authority
+  - same-cardinality replacement universe cannot match the Root identity commitment
+  - post-verification authority-plan, manifest or artifact mutation fails closed
+  - SCREENING plus force_exact cannot cache or return an arbitrary untyped value
+  - exact_escalated with a non-S3 stage fails on put and get
+  - endpoint replacement or reordering and result-schema replacement fail on put and get
+  - one-point and duplicate-count invariance designs are rejected before work
+  - a real workers=1 run duplicated and labelled workers=(1,6) cannot pass
+tests:
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_runtime_gate_artifacts.py tests/osc/test_runtime_gates.py
+      tests/osc/test_runtime_scripts.py
+    exit_code: 0
+    result: 32 passed in 7.06s (Root)
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_comparison_cache.py tests/osc/test_parallel_executor.py
+      tests/osc/test_parallel_invariance.py tests/osc/test_runtime_benchmarks.py
+      tests/osc/test_runtime_scripts.py
+    exit_code: 0
+    result: 61 passed in 4.61s (Root)
+  - command: authorized red counterexample scope before CR-OSC-5-005 implementation
+    exit_code: 1
+    result: 23 failed and 38 passed; all accepted F2/F4 attacks reproduced
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_comparison_*.py tests/osc/test_parallel_*.py
+      tests/osc/test_runtime_*.py tests/osc/test_public_api_freeze.py
+    exit_code: 0
+    result: 118 passed in 9.15s (Root)
+  - command: focused Root attack selection
+    exit_code: 0
+    result: 10 passed in 0.17s
+  - command: audit_parallel_invariance.py and benchmark_parallel_scaling.py with --workers 1
+    exit_code: 2
+    result: both reject before task or worker execution
+hashes:
+  src/datadiff_osc/runtime/gate_artifacts.py: 1eed10563c076514acb12259ddef44698510f49f34c13e4e54e1e4bd1e07743a
+  src/datadiff_osc/runtime/gates.py: c6051320db1583b83972cd05d0b776cb0d39c472f139ec01cd04471ef9df7c4e
+  scripts/osc/calculate_gate_report.py: 797962f5c9985bc1f7b56c6267832db1ede82dd8f26f0e86f4344002147d7faa
+  src/datadiff_osc/comparison/cache.py: ddbf840b1c77a159a9c1c3e26a90d3e3ec665986fa0cc0774396f83f642e9afb
+  src/datadiff_osc/parallel/executor.py: b8442b5e0f260caa7d007fa6a0650db196410f1b5033308a816c26110092a3f6
+  src/datadiff_osc/parallel/invariance.py: 1473ee4c30d743b013dd9e8a7659171ba52974fee914d64ba8bc1b0a7a645f06
+  src/datadiff_osc/runtime/benchmarks.py: 571a3d090760239ddc57f50bab44164e95b8abfdedfc2fb872f810c45edaccfc
+  scripts/osc/audit_parallel_invariance.py: e94e7af3b4dbbf5f377e9f31cbafe342e6887ad677933030a811fa6685200594
+  scripts/osc/benchmark_parallel_scaling.py: b9a1907f139c9c902f8c82c0c4c9e17a0aaedb00e9d629888fb5d41d10208d3d
+integrity:
+  phase5_change_requests_sha256: ba4f46f170b5e7c8543ecfe7fc7f4fc122c61d2f638ada58e0d5ffe83e6824ef
+  phase5_task_contracts_sha256: a3f96373c0444eb6f39d2b6cc2dda8fae40d465aff03363beeadac13c6e99768
+  phase5_prewrite_declarations_sha256: 9a41863ecdb863dd0d04f4d9783784ae42c7425e416237765429bdf6f5f56cd4
+  coordination_ledger_sha256: c2fa56cda1b19cae1349db54fa534fa321ab7b99c4a17adcba42d9676a5981e4
+  public_api_freeze_sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  tracked_diff_stat_sha256: 341553eede7eb403553383d713f9a803207214388e7b1c0378d78b74445b45d9
+  staged_paths: 0
+barrier_decision:
+  runtime_owner_findings_closed_except_root_producer: true
+  root_authority_producer_required_before_phase5_exit: true
+  next_writer: contract_agent_OSC-5-A-OUTCOME-ADMISSION
+  pilot_started: false
+  two_hour_run_started: false
+  twenty_four_hour_run_authorized: false
+  twenty_four_hour_run_started: false

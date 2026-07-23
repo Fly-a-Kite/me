@@ -1,8 +1,6 @@
 from __future__ import annotations
-
 from dataclasses import asdict, dataclass, field
 from typing import Any
-
 from datadiff.adjudication import build_adjudication
 from datadiff.canonicalization import compare_result_against_anchor
 from datadiff.case_features import (
@@ -18,6 +16,7 @@ from datadiff.classification_signals import (
     all_backends_rejected_due_to_generated_invalidity as _all_backends_rejected_due_to_generated_invalidity,
     has_clear_minority_backend as _has_clear_minority_backend,
     has_limit_or_offset_without_defined_order as _has_limit_or_offset_without_defined_order,
+    is_backend_resource_limit_boundary as _is_backend_resource_limit_boundary,
     is_float_precision_boundary_mismatch as _is_float_precision_boundary_mismatch,
     is_order_only_mismatch as _is_order_only_mismatch,
     is_pyarrow_empty_global_bool_aggregate_adapter_error as _is_pyarrow_empty_global_bool_aggregate_adapter_error,
@@ -36,20 +35,17 @@ from datadiff.semantic_boundaries import (
     SemanticBoundaryMatch,
     build_documented_semantic_rules,
     build_semantic_boundary_rules,
+    documentation_refs as _documentation_refs,
     matching_semantic_rules,
     ordered_rules_from_snapshot,
-    semantic_boundary_reasons,
+    pre_reference_semantic_boundary_matches,
     semantic_rule_records,
 )
 from datadiff.dynamic_strategy import StrategyRuleRecord
-
-PRE_REFERENCE_SEMANTIC_BOUNDARY_RULE_IDS = frozenset(
-    {
-        "boundary:modulo_semantics",
-        "boundary:unicode_case_mapping",
-    }
+from datadiff.harness_errors import (
+    harness_lowering_errors,
+    lowering_failure_classification,
 )
-
 
 @dataclass(slots=True)
 class Classification:
@@ -113,8 +109,8 @@ def annotate_findings(
     config: dict[str, Any],
     backends: list[str],
 ) -> None:
-    discovery_origin = _discovery_origin(case)
-    source_issue = _source_issue(case)
+    discovery_origin = case_discovery_origin(case)
+    source_issue = primary_source_issue(case)
     for finding in findings:
         classification = classify_finding(case, finding, normalized, raw_results, config, backends)
         finding.triage_verdict = classification.verdict
@@ -229,8 +225,41 @@ def classify_finding(
             ),
         )
 
+    lowering_errors = harness_lowering_errors(raw_results)
+    if lowering_errors:
+        return lowering_failure_classification(
+            lowering_errors,
+            classify=_classification,
+            build_adjudication=build_adjudication,
+        )
+
+    if _is_backend_resource_limit_boundary(finding, raw_results):
+        return _classification(
+            "expected_semantic_divergence",
+            "valid_finding_not_bug",
+            "medium",
+            evidence=(
+                "At least one backend rejected the generated query with a recursion/depth/resource-limit error "
+                "while another backend accepted it; this is a backend resource boundary, not standalone bug evidence."
+            ),
+            recommendation=[
+                "Do not count this finding as an implementation bug.",
+                "Regenerate or minimize to a small backend-native query before considering upstream submission.",
+            ],
+            adjudication=build_adjudication(
+                "expected_semantic_divergence",
+                validity_gate="valid_case",
+                semantic_gate="expected_boundary",
+                attribution_gate="backend_resource_limit",
+                reference_support="not_used",
+                countable_as_valid_finding=True,
+                needs_manual_review=False,
+                boundary_rule_ids=["boundary:backend_resource_limit"],
+            ),
+        )
+
     if _is_order_only_mismatch(normalized):
-        if not case.program.order_sensitive:
+        if not case.program.output_order_sensitive:
             return _classification(
                 "normalizer_false_positive",
                 "exclude_normalizer_failure",
@@ -337,7 +366,7 @@ def classify_finding(
                 "Keep as a semantic-divergence benchmark finding.",
                 "Do not count as a confirmed implementation bug.",
             ],
-            documentation_refs=_documentation_refs(case, finding),
+            documentation_refs=_documentation_refs(finding),
             adjudication=build_adjudication(
                 "documented_semantic_divergence",
                 validity_gate="valid_case",
@@ -382,11 +411,11 @@ def classify_finding(
 
     semantic_boundary_matches = _semantic_boundary_matches(case, finding, config)
     semantic_boundary_reasons = [match.reason for match in semantic_boundary_matches]
-    pre_reference_boundary_matches = [
-        match
-        for match in semantic_boundary_matches
-        if match.rule_id in PRE_REFERENCE_SEMANTIC_BOUNDARY_RULE_IDS
-    ]
+    pre_reference_boundary_matches = pre_reference_semantic_boundary_matches(
+        semantic_boundary_matches,
+        case,
+        finding,
+    )
     if pre_reference_boundary_matches:
         return _classification(
             "expected_semantic_divergence",
@@ -474,14 +503,6 @@ def classify_finding(
             needs_manual_review=True,
         ),
     )
-
-
-def _source_issue(case: Case) -> str:
-    return primary_source_issue(case)
-
-
-def _discovery_origin(case: Case) -> str:
-    return case_discovery_origin(case)
 
 
 def _metamorphic_classification(
@@ -722,14 +743,6 @@ def semantic_boundary_rule_records() -> tuple[StrategyRuleRecord, ...]:
     return semantic_rule_records(SEMANTIC_BOUNDARY_RULES, kind="semantic_boundary_rule")
 
 
-def _is_documented_semantic_divergence(case: Case, finding: Finding | dict[str, Any], config: dict[str, Any]) -> bool:
-    return bool(_documented_semantic_matches(case, finding, config))
-
-
-def _is_semantic_boundary(case: Case, finding: Finding | dict[str, Any], config: dict[str, Any]) -> bool:
-    return bool(_semantic_boundary_matches(case, finding, config))
-
-
 def _documented_semantic_matches(
     case: Case,
     finding: Finding | dict[str, Any],
@@ -762,28 +775,6 @@ def _semantic_boundary_matches(
         finding,
         config,
     )
-
-
-def _semantic_boundary_reasons(case: Case, finding: Finding | dict[str, Any], config: dict[str, Any]) -> list[str]:
-    return semantic_boundary_reasons(_semantic_boundary_matches(case, finding, config))
-
-
-def _documentation_refs(case: Case, finding: Finding | dict[str, Any]) -> list[dict[str, str]]:
-    root = str(_get(finding, "root_cause", ""))
-    if root == "nan_inf_semantics":
-        return [
-            {
-                "title": "Polars floating point numbers",
-                "url": "https://docs.pola.rs/user-guide/concepts/data-types-and-structures/#floating-point-numbers",
-                "note": "Polars documents NaN ordering/comparison behavior as distinct from regular missing data.",
-            },
-            {
-                "title": "Polars missing data",
-                "url": "https://docs.pola.rs/user-guide/expressions/missing-data/#not-a-number-or-nan-values",
-                "note": "Polars documents null as missing data and NaN as a floating-point value.",
-            },
-        ]
-    return []
 
 
 def _get(finding: Finding | dict[str, Any], key: str, default: Any = None) -> Any:

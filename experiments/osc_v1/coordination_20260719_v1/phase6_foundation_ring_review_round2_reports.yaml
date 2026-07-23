@@ -1,0 +1,129 @@
+schema_version: osc-ring-review-report-v1
+phase: 6
+round: private_foundation_remediation_exact_sha_ring_review_r2
+status: fail_remediation_required
+review_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round2_contracts.yaml
+  sha256: 2d0b08d751f041421f5e5fb88c4bb33e58d8b0f9d232968a01f729eff4667b84
+entry_report:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_reports.yaml
+  sha256: 6699988023fc4538cbd5db7addd9519c86f2a05fac5e886e3ad1e51cec171d4f
+reviews:
+  - task_id: OSC-6-FOUNDATION-REVIEW-R2-A-RUNTIME
+    reviewer: /root/phase5_authority_audit
+    target_owner: /root/phase5_evidence_audit
+    exact_sha_verified: true
+    writes: 0
+    child_agents: 0
+    scoped_test: 36 passed in 0.30s
+    counts: {blocker: 2, high: 1, medium: 0, low: 0}
+    decision: fail
+    findings:
+      - id: OSC-6-FOUNDATION-RUNTIME-R2-B1
+        severity: blocker
+        claim: >-
+          Typed envelopes are replayed independently but are not derived from
+          role-typed raw-parent bytes; a policy that permits multiple origins
+          can also turn frozen material into mutable REAL_EXECUTION material.
+        evidence:
+          path: src/datadiff_osc/runtime/_producer_provenance.py
+          symbols: [ExpectedProvenanceRecordPolicy, _reconstruct_typed_output, verify_producer_provenance]
+        reproduction: malformed JUnit/log raw parents and frozen-to-real relabel both verify valid
+        required_fix: rebuild every registered typed receipt from exact role-typed raw parents and require one exact origin per record
+      - id: OSC-6-FOUNDATION-RUNTIME-R2-B2
+        severity: blocker
+        claim: >-
+          Parallel task-set equality is tautological because one combined
+          cross-arm digest is assigned to both fields; unrelated TaskKinds,
+          resources and payloads pass as the same logical task set.
+        evidence:
+          path: src/datadiff_osc/runtime/_receipt_producers.py
+          symbols: [_require_paired_context, ParallelScalingObservation, build_paired_benchmark_receipt]
+        reproduction: BACKEND_EXECUTION versus LOCALIZATION with unrelated resources/payload builds and reports equal task-set digests
+        required_fix: independently derive each arm's logical case/task-set projection and compare exact projections before emitting separate arm digests
+      - id: OSC-6-FOUNDATION-RUNTIME-R2-H1
+        severity: high
+        claim: reproduced remains a caller boolean rather than a fact derived from exact source/recheck verdict evidence
+        evidence:
+          path: src/datadiff_osc/runtime/_receipt_producers.py
+          symbols: [CandidateRecheckObservation, _validate_evidence_result_binding, _build_candidate_rechecks]
+        reproduction: all six recheck verdicts changed to SATISFIED with reproduced=true still emit STABLE_SURVIVOR
+        required_fix: derive reproduction from exact source/recheck relation and reject caller/evidence contradiction
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R2-B-CONTRACT
+    reviewer: /root/phase5_consumer_audit
+    target_owner: /root/phase5_authority_audit
+    exact_sha_verified: true
+    writes: 0
+    child_agents: 0
+    scoped_test: 19 passed in 0.54s
+    counts: {blocker: 0, high: 0, medium: 0, low: 0}
+    decision: pass
+    prior_findings:
+      OSC-6-C-H1: resolved
+      OSC-6-C-H2: resolved
+      OSC-6-C-H3: resolved
+      OSC-6-C-H4: resolved
+      OSC-6-C-H5: resolved
+      OSC-6-C-M1: resolved
+    bounded_results:
+      - arbitrary reviewers never gain approval, minimum denominator or authority
+      - nine-root verdict/signature substitutions reject
+      - global suppression and generic false-positive shells reject
+      - cross-context, incomplete and source-only compatibility pairs reject
+      - source-only, cross-mutant, duplicate and wrong-category witnesses reject
+      - all 32 C0 values plus path alias, escape and resolver failures reject
+    transport_note: final long-form message hit remote compaction after the complete exact-SHA/count/test result had already been received
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R2-C-SEARCH
+    reviewer: /root/phase5_evidence_audit
+    target_owner: /root/phase5_consumer_audit
+    exact_sha_verified: true
+    writes: 0
+    child_agents: 0
+    scoped_test: 27 passed in 6.86s
+    counts: {blocker: 0, high: 1, medium: 0, low: 0}
+    decision: fail
+    prior_findings:
+      OSC-6-FOUNDATION-SEARCH-H1: resolved
+      OSC-6-FOUNDATION-SEARCH-H2: resolved
+      OSC-6-FOUNDATION-SEARCH-H3: not_closed_carried_by_R2_H1
+      OSC-6-FOUNDATION-SEARCH-H4: resolved
+      OSC-6-FOUNDATION-SEARCH-M1: resolved
+    findings:
+      - id: OSC-6-FOUNDATION-SEARCH-R2-H1
+        severity: high
+        claim: MutationAttemptReceipt accepts the same caller-supplied outcome under a different registered operator with its matching digest
+        evidence:
+          path: src/datadiff_osc/search/context_receipts.py
+          symbols: [registered_mutation_operator_digest, MutationAttemptReceipt.build, MutationAttemptReceipt.__post_init__]
+        reproduction: the same source, assignment and outcome build under both value and nullify_value operators
+        required_fix: execute the selected frozen operator with the exact source Case, derived seed and frozen repair policy, or verify an equivalently replayable typed application witness
+aggregate_counts: {blocker: 2, high: 2, medium: 0, low: 0}
+root_independent_reproduction:
+  command_kind: bounded in-memory typed constructors with PYTHONDONTWRITEBYTECODE=1
+  results:
+    - R2-B1 malformed raw parents returned valid=true and errors=()
+    - R2-H1 SATISFIED rechecks with caller reproduced=true emitted stable_survivor
+    - R2-B2 backend_execution versus localization emitted identical one/six task-set digests
+    - SEARCH-R2-H1 value versus nullify_value accepted the identical outcome digest
+  writes: 0
+authority_boundaries_preserved:
+  - public API freeze remains cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  - all reviewed schemas remain private and no public export changed
+  - diagnostic refs remain diagnostic-only
+  - candidate remains candidate and bug_claimed true remains rejected
+  - no gate, Phase 7 or 24h authority was created
+decision:
+  review_round_passed: false
+  remediation_required: true
+  contract_foundation_passed_this_round: true
+  search_foundation_passed_this_round: false
+  runtime_foundation_passed_this_round: false
+  foundation_barrier_passed: false
+  tests_osc_authorized: false
+  full_repository_tests_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

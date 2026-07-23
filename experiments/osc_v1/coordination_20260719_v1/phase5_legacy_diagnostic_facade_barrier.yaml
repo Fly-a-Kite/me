@@ -1,0 +1,108 @@
+schema_version: osc-phase5-legacy-diagnostic-facade-barrier-v1
+task_id: OSC-5-ROOT-LEGACY-DIAGNOSTIC-FACADE
+status: pass_root_and_independent_exact_sha_verified
+phase5_exit_gate_passed: false
+phase5_exit_blocker: opaque_diagnostic_consumer_migration_and_final_verification_pending
+finding_disposition:
+  OSC-5-ROOT-003-A-F1: facade_closed_consumer_migration_active
+change_requests:
+  - id: CR-OSC-ROOT-003
+    status: facade_closed_consumer_migration_active
+  - id: CR-OSC-ROOT-003-A
+    status: contract_runtime_and_root_facade_closed_consumer_migration_active
+  - id: CR-OSC-ROOT-003-B
+    status: facade_barrier_passed_consumers_authorized_serially
+authority_boundary:
+  legacy_facade_scope: diagnostic_only
+  authority_eligible: false
+  admission_authority: false
+  coverage_authority: false
+  evidence_authority: false
+  candidate_authority: false
+  bug_authority: false
+  gate_authority: false
+  twenty_four_hour_authority: false
+  typed_endpoint_observation_outcome_externalized: false
+  opaque_types_exported_from_module: false
+  osc_public_exports_changed: false
+  public_api_freeze_changed: false
+fail_closed_results:
+  missing_or_mismatched_typed_context: not_evaluated
+  generic_legacy_error: ADAPTER_ERROR
+  normalization_error: ADAPTER_ERROR
+  non_spi_semantic_error_or_crash: not_evaluated
+  unsupported_requires_recomputed_evidence_digest: true
+  trusted_target_registry_binding: true
+  local_backend_version_and_source_binding: true
+  case_payload_digest_recomputed: true
+  ref_set_case_digest_bound: true
+  cross_case_replay_rejected: true
+  exact_expected_backend_context_required: true
+  serialized_evaluated_claim_downgraded_without_typed_producer: true
+  caller_claimed_ok_schema_nullability_order_accepted: false
+  fabricated_coverage_receipt_evidence_envelope_authority: false
+negative_regressions:
+  - generic error messages containing timeout, unsupported, crash or semantic tokens remain ADAPTER_ERROR
+  - forged or unbound capability decisions remain MISSING rather than UNSUPPORTED
+  - raw and normalized status mismatches return not_evaluated
+  - caller-claimed OK type, nullability, tagged values or order cannot create an evaluated observation
+  - target registry, environment source/version, optimizer config and case digest rebinding fail closed
+  - missing, malformed, legacy, tampered or cross-case opaque sets fail closed
+  - malformed backend containers/elements and hostile Python Mapping/string values never escape the public boundary
+  - an opaque serialized evaluated claim is preserved only as a reference and downgraded to not_evaluated
+tests:
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/osc/test_legacy_diagnostic_facade.py
+    exit_code: 0
+    result: 33 passed as part of the final 58-test bounded suite
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/osc/test_legacy_diagnostic_facade.py
+      tests/osc/test_contract_v1_compatibility.py
+      tests/osc/test_comparison_staged.py
+      tests/osc/test_public_api_freeze.py
+    exit_code: 0
+    result: 58 passed in 0.72s (Root final candidate)
+reviews:
+  - agent: /root/phase5_authority_audit
+    scope: exact facade/test SHA, typed taxonomy, hostile input and opaque authority boundary
+    final_result: pass
+    blocker: 0
+    high: 0
+    medium: 0
+    changed_files: []
+  - review_round: initial
+    result: fail_closed_before_consumer_release
+    closed_findings:
+      - unsupported outcome used CapabilityDecision rather than UnsupportedEvidence digest
+      - caller-authored OK schema/nullability/order was accepted
+      - malformed top-level context escaped
+      - raw/normalized status mismatch and non-SPI semantic status were accepted
+  - review_round: followups
+    result: all_counterexamples_closed
+    closed_findings:
+      - malformed expected backends
+      - target/environment/case rebinding
+      - cross-case opaque replay
+      - invented serialized evaluated claims
+      - hostile string and Mapping conversion escape paths
+hashes:
+  src/datadiff/osc_diagnostic_facade.py: 139545e03db5fbf9178907a57e37d6889e8d82a2e9e36e5d5f358293f98391bf
+  tests/osc/test_legacy_diagnostic_facade.py: e8ad6381029d826e6521db7e27922cd7ce144ec328474f0f5af09d3caabd8b9c
+integrity:
+  phase5_prewrite_declarations_sha256: 3ee211dce3113ba91b7a8ee9c4e172ae028fed6167ac864fb671a421a2f962eb
+  phase5_task_contracts_sha256: 811eadf8fb17021427eb379c6e3985764b50ec23892b0020a94d565a832b5d61
+  phase5_change_requests_sha256: ae1a01f46f003b18121bc538449a8407c48e4daaee9e7e48db45bf2e8890b535
+  coordination_ledger_sha256: 134491b12d722a4c7b77113a945208d52c0265c0fbacb02b0bbfe52a5bd23e71
+  public_api_freeze_sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  staged_paths: 0
+barrier_decision:
+  legacy_diagnostic_facade_closed: true
+  opaque_consumer_migration_authorized_serially: true
+  phase5_closed: false
+  phase6_started: false
+  pilot_started: false
+  two_hour_run_started: false
+  twenty_four_hour_run_authorized: false
+  twenty_four_hour_run_started: false

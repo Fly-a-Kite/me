@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from datadiff.config import ExperimentConfig
+from datadiff.experiment_manifest import finalize_config_payload
 from datadiff.exploration_objectives import objective_features_for_rules
 from datadiff.semantic_signal import canonical_target_key, semantic_signal_feature
 
@@ -51,10 +52,13 @@ def _configured_guidance_targets(config: ExperimentConfig) -> list[str]:
 def _config_payload_with_effective_guidance_targets(config: ExperimentConfig) -> dict[str, Any]:
     payload = config.to_dict()
     payload["effective_guidance_targets"] = _configured_guidance_targets(config)
-    return payload
+    payload["method_arm_manifest"] = config.method_arm_manifest
+    return finalize_config_payload(payload)
 
 
 def _config_layer_payload(config: ExperimentConfig) -> dict[str, Any]:
     payload = config.to_nested_dict()
     payload["guidance"]["effective_targets"] = _configured_guidance_targets(config)
+    flat_payload = _config_payload_with_effective_guidance_targets(config)
+    payload["config_digest"] = flat_payload["config_digest"]
     return payload

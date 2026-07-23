@@ -39,6 +39,11 @@ CONTRACT_POLICIES: tuple[str, ...] = (
 )
 BOUNDARY_POLICIES = frozenset({"boundary", "probe"})
 BUG_POLICIES = frozenset({"strict", "canonicalized", "tolerated"})
+REFERENCE_DECISIVE_FINDING_KINDS = frozenset({"accept_reject_mismatch"})
+REFERENCE_DECISIVE_MISMATCH_CLASSES = frozenset(
+    {"accept_reject", "status", "error_type", "exception", "exception_taxonomy"}
+)
+REFERENCE_NON_NORMATIVE_BOUNDARY_AXES = frozenset({"nan"})
 _POLICY_RANK = {policy: index for index, policy in enumerate(CONTRACT_POLICIES)}
 
 _ROOT_CAUSE_AXES: dict[str, tuple[str, ...]] = {
@@ -196,10 +201,19 @@ def finding_contract_axes(finding: Any) -> tuple[str, ...]:
         axes.append("dtype_coercion")
     if "error" in root_lower or "exception" in root_lower:
         axes.append("error_equivalence")
+    if mismatch == "accept_reject" and not root_lower.endswith("_probe"):
+        axes.append("error_equivalence")
     if any(token in root_lower for token in ("layout", "schema", "projection", "partition", "chunk", "sliced")):
         axes.append("layout_sensitivity")
     if any(token in root_lower for token in ("random", "inplace", "alias")):
         axes.append("determinism")
+    return tuple(axis for axis in _unique(axes) if axis in CONTRACT_AXES)
+
+
+def finding_contract_axes_for_case(case: Case, finding: Any) -> tuple[str, ...]:
+    axes = list(finding_contract_axes(finding))
+    if not axes:
+        axes.extend(_operation_boundary_axes_for_finding(case, finding))
     return tuple(axis for axis in _unique(axes) if axis in CONTRACT_AXES)
 
 
@@ -209,11 +223,45 @@ def finding_matches_contract_boundary(
     config: Mapping[str, Any] | None = None,
 ) -> bool:
     del config
-    axes = finding_contract_axes(finding)
+    axes = finding_contract_axes_for_case(case, finding)
+    if not axes:
+        return False
+    if _case_uses_probe_operation(case):
+        return False
+    lattice = semantic_contract_lattice(case)
+    return any(
+        lattice.axes[axis].policy in BOUNDARY_POLICIES
+        for axis in axes
+    )
+
+
+def finding_contract_boundary_precedes_reference(case: Case, finding: Any) -> bool:
+    """Return whether a result-level contract boundary outranks the DSL reference.
+
+    The local DSL reference is useful evidence for ordinary value semantics, but it
+    is not an external specification for axes explicitly marked non-normative for
+    that reference. Execution-outcome mismatches remain reference-led, and mixed
+    axes remain reference-led so a broad root-cause mapping cannot hide a candidate
+    implementation bug.
+    """
+
+    kind = _finding_value(finding, "kind", "")
+    mismatch_class = _finding_value(finding, "mismatch_class", "")
+    if kind in REFERENCE_DECISIVE_FINDING_KINDS:
+        return False
+    if mismatch_class in REFERENCE_DECISIVE_MISMATCH_CLASSES:
+        return False
+    if _case_uses_probe_operation(case):
+        return False
+    axes = finding_contract_axes_for_case(case, finding)
     if not axes:
         return False
     lattice = semantic_contract_lattice(case)
-    return any(lattice.axes[axis].policy in BOUNDARY_POLICIES for axis in axes)
+    return all(
+        axis in REFERENCE_NON_NORMATIVE_BOUNDARY_AXES
+        and lattice.axes[axis].policy in BOUNDARY_POLICIES
+        for axis in axes
+    )
 
 
 def _operation_contracts(case: Case) -> Iterable[OperationContract]:
@@ -230,6 +278,36 @@ def _operation_contracts(case: Case) -> Iterable[OperationContract]:
                 contract_tags=tuple(tags),
             )
         order_defined = _next_order_defined(order_defined, operation)
+
+
+def _operation_boundary_axes_for_finding(case: Case, finding: Any) -> tuple[str, ...]:
+    root = _finding_value(finding, "root_cause", "").lower()
+    if not root:
+        return ()
+    axes: list[str] = []
+    lattice = semantic_contract_lattice(case)
+    for contract in lattice.operation_contracts:
+        if not _operation_matches_finding_root(contract.operation, root):
+            continue
+        axes.extend(
+            axis.axis
+            for axis in contract.axes
+            if axis.policy in BOUNDARY_POLICIES
+        )
+    return tuple(_unique(axes))
+
+
+def _case_uses_probe_operation(case: Case) -> bool:
+    return any(op_kind(operation).endswith("_probe") for operation in case.program.operations)
+
+
+def _operation_matches_finding_root(operation: str, root: str) -> bool:
+    if not operation:
+        return False
+    aliases = {
+        "case_when": ("conditional", "case_when"),
+    }
+    return any(alias in root for alias in aliases.get(operation, ()))
 
 
 def _axes_for_operation(

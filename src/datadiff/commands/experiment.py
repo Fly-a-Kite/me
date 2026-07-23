@@ -5,6 +5,9 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from datadiff.backend_sampling_cli import add_backend_sampling_flags
+from datadiff.candidate_pool_sampling_cli import add_candidate_pool_sampling_flags
+
 
 CommandHandler = Callable[[argparse.Namespace], int]
 
@@ -137,6 +140,30 @@ def register(
         help="number of experiment matrix runs to execute in parallel, or 'auto'",
     )
     p_exp.add_argument(
+        "--worker-batch-size",
+        type=int,
+        default=4,
+        help=(
+            "maximum static experiment runs handled by one persistent child process; "
+            "0 restores legacy unbounded process-pool reuse"
+        ),
+    )
+    p_exp.add_argument(
+        "--worker-max-rss-mib",
+        type=int,
+        default=2048,
+        help=(
+            "request child recycling after a completed run when peak RSS reaches this MiB; "
+            "0 disables the RSS gate"
+        ),
+    )
+    p_exp.add_argument(
+        "--worker-retry-limit",
+        type=int,
+        default=1,
+        help="maximum retries for a failed static experiment run or crashed worker batch",
+    )
+    p_exp.add_argument(
         "--max-parallel-cost",
         type=float,
         default=None,
@@ -250,10 +277,17 @@ def register(
     )
     p_exp.add_argument("--no-compress-run-log", action="store_true")
     p_exp.add_argument(
+        "--enable-parallel-backend-execution",
+        action="store_true",
+        help="enable the non-promoted parallel backend experiment arm",
+    )
+    p_exp.add_argument(
         "--disable-parallel-backend-execution",
         action="store_true",
-        help="run each experiment case on configured backends sequentially for runtime ablation",
+        help="explicitly retain sequential backend execution",
     )
+    add_backend_sampling_flags(p_exp)
+    add_candidate_pool_sampling_flags(p_exp)
     p_exp.add_argument(
         "--persist-closed-loop-state",
         action="store_true",

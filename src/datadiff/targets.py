@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 import importlib
-from typing import Any
+from typing import Any, Literal
 from typing import Sequence
+
+from datadiff.backends.base import Backend
+from datadiff.capability_model import (
+    CapabilityDecision,
+    CapabilityModel,
+    capability_model_from_tokens,
+)
 
 
 PROJECT_METHODOLOGY_NAME = "capability_aware_closed_loop_semantic_differential_fuzzing"
@@ -37,6 +44,7 @@ DEFAULT_TARGET_EXTENSION_CONTRACT: tuple[str, ...] = (
     "reuse_normalizer_and_oracles",
     "compose_target_suite_and_preset",
 )
+TargetScope = Literal["production", "research_control", "test_fixture"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,7 +56,9 @@ class TargetSpec:
     adapter: str
     status: str
     capabilities: tuple[str, ...]
+    capability_model: CapabilityModel
     description: str
+    scope: TargetScope = "production"
     execution_model: str = "tabular_engine"
     result_contract: str = "normalized_result_v1"
     portability_tier: str = "adapter_reuse"
@@ -58,17 +68,43 @@ class TargetSpec:
     adapter_kwargs: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, object]:
-        return _json_ready(asdict(self))
+        payload = _json_ready(asdict(self))
+        payload["capability_model"] = self.capability_model.to_dict()
+        return payload
+
+    def capability_decision(
+        self,
+        *,
+        required_tokens: Sequence[str] = (),
+        execution_mode: str = "",
+        physical_layout: str = "",
+        plan_kind: str = "",
+        native_export_format: str = "",
+    ) -> CapabilityDecision:
+        return self.capability_model.decision(
+            required_tokens=required_tokens,
+            execution_mode=execution_mode,
+            physical_layout=physical_layout,
+            plan_kind=plan_kind,
+            native_export_format=native_export_format,
+        )
 
     def instantiate_backend(self) -> Any:
         module_name, sep, class_name = self.adapter.rpartition(".")
         if not sep or not module_name or not class_name:
             raise ValueError(f"target {self.backend} declares an invalid adapter path: {self.adapter}")
         module = importlib.import_module(module_name)
-        adapter_cls = getattr(module, class_name, None)
+        adapter_cls = vars(module).get(class_name)
         if adapter_cls is None:
             raise ValueError(f"target {self.backend} adapter class is missing: {self.adapter}")
-        return adapter_cls(*self.adapter_args, **self.adapter_kwargs)
+        if not isinstance(adapter_cls, type) or not issubclass(adapter_cls, Backend):
+            raise TypeError(f"target {self.backend} adapter must subclass Backend: {self.adapter}")
+        backend = adapter_cls(*self.adapter_args, **self.adapter_kwargs)
+        if backend.name != self.backend:
+            raise ValueError(
+                f"target {self.backend} adapter identity mismatch: backend.name={backend.name}"
+            )
+        return backend
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,7 +139,7 @@ class TargetContext:
             "shared_capabilities": list(self.common_capabilities),
             "extensibility_claim": (
                 "Adding a new target should require a new TargetSpec declaration plus a backend adapter, "
-                "while reusing the typed IR, normalization, oracle, scheduling, and evidence pipeline."
+                "while reusing CCS-IR, normalization, oracle, scheduling, and evidence pipeline."
             ),
         }
 
@@ -158,6 +194,9 @@ COMMON_DSL_CAPABILITIES: tuple[str, ...] = (
     "op:float_literal_precision_probe",
     "op:timestamp_precision_filter_probe",
     "op:series_rtruediv_probe",
+    "op:series_reflected_arithmetic_probe",
+    "op:datafusion_grouped_null_topk_probe",
+    "op:confirmed_root_witness_probe",
     "op:uint64_isin_probe",
     "op:tuple_anti_null_probe",
     "op:setop_all_duplicate_probe",
@@ -221,15 +260,14 @@ COMMON_DSL_CAPABILITIES: tuple[str, ...] = (
 )
 
 
-# chDB v1: SQL frontend without native running_sum / row_number_filter /
-# sortedness_check / scalar_subquery_probe. The backend stubs probe-kinds
-# in EXTENDED_FALSE_PROBE_KINDS the same way SQLite does, so those caps
-# remain advertised. Ops below are dropped to avoid routing cases that
-# would resolve to BackendResult(status="missing").
+# chDB's SQL frontend supports the shared running-sum window contract.  It
+# still lacks native row_number_filter / sortedness_check /
+# scalar_subquery_probe lowering.  The backend stubs probe-kinds in
+# EXTENDED_FALSE_PROBE_KINDS the same way SQLite does, so those caps remain
+# advertised. Ops below are dropped to avoid routing cases that would resolve
+# to BackendResult(status="missing").
 _CHDB_DISABLED_CAPS: frozenset[str] = frozenset(
     {
-        "op:running_sum",
-        "running:partition_by",
         "op:row_number_filter",
         "op:sortedness_check",
         "op:scalar_subquery_probe",
@@ -237,6 +275,150 @@ _CHDB_DISABLED_CAPS: frozenset[str] = frozenset(
 )
 CHDB_DSL_CAPABILITIES: tuple[str, ...] = tuple(
     cap for cap in COMMON_DSL_CAPABILITIES if cap not in _CHDB_DISABLED_CAPS
+)
+
+# These probes exercise Arrow/Pandas and Polars-specific APIs.  DuckDB's SQL
+# adapter intentionally has no lowering for them; advertising them as shared
+# DuckDB capabilities turns a deterministic rejection into an unknown cell.
+_DUCKDB_DISABLED_CAPS: frozenset[str] = frozenset(
+    {
+        "op:arrow_string_contains_na_probe",
+        "op:polars_timezone_filter_probe",
+    }
+)
+DUCKDB_DSL_CAPABILITIES: tuple[str, ...] = tuple(
+    cap for cap in COMMON_DSL_CAPABILITIES if cap not in _DUCKDB_DISABLED_CAPS
+)
+NUMPY_DSL_CAPABILITIES: tuple[str, ...] = (
+    "table:single",
+    "op:filter",
+    "op:select",
+    "op:limit",
+    "op:offset",
+    "op:mutate",
+    "expr:add_const",
+    "expr:arith_const",
+    "expr:abs",
+    "expr:bool_not",
+    "expr:string_lower",
+    "expr:string_upper",
+    "expr:string_strip",
+    "type:int",
+    "type:float",
+    "type:bool",
+    "type:str",
+    "nulls",
+)
+
+
+def _structured_capabilities(
+    tokens: tuple[str, ...],
+    *,
+    null_semantics: tuple[str, ...],
+    order_semantics: tuple[str, ...],
+    plan_kinds: tuple[str, ...],
+    execution_modes: tuple[str, ...],
+    physical_layouts: tuple[str, ...],
+    native_export_formats: tuple[str, ...] = (),
+) -> CapabilityModel:
+    return capability_model_from_tokens(
+        tokens,
+        null_semantics=null_semantics,
+        order_semantics=order_semantics,
+        plan_kinds=plan_kinds,
+        execution_modes=execution_modes,
+        physical_layouts=physical_layouts,
+        native_export_formats=native_export_formats,
+    )
+
+
+PANDAS_CAPABILITY_MODEL = _structured_capabilities(
+    COMMON_DSL_CAPABILITIES,
+    null_semantics=("dataframe_nullable", "nan_distinct_from_null"),
+    order_semantics=("explicit_sort", "input_order_preserving"),
+    plan_kinds=(),
+    execution_modes=("eager",),
+    physical_layouts=("dataframe_columns",),
+)
+POLARS_EAGER_CAPABILITY_MODEL = _structured_capabilities(
+    COMMON_DSL_CAPABILITIES,
+    null_semantics=("arrow_validity", "nan_distinct_from_null"),
+    order_semantics=("explicit_sort", "input_order_preserving"),
+    plan_kinds=(),
+    execution_modes=("eager",),
+    physical_layouts=("contiguous",),
+)
+POLARS_LAZY_CAPABILITY_MODEL = _structured_capabilities(
+    COMMON_DSL_CAPABILITIES,
+    null_semantics=("arrow_validity", "nan_distinct_from_null"),
+    order_semantics=("explicit_sort", "optimizer_reordered_without_sort"),
+    plan_kinds=("logical", "physical"),
+    execution_modes=("lazy",),
+    physical_layouts=("contiguous",),
+)
+POLARS_STREAMING_CAPABILITY_MODEL = _structured_capabilities(
+    COMMON_DSL_CAPABILITIES,
+    null_semantics=("arrow_validity", "nan_distinct_from_null"),
+    order_semantics=("explicit_sort", "stream_partition_order"),
+    plan_kinds=("logical", "physical"),
+    execution_modes=("streaming",),
+    physical_layouts=("stream_batches",),
+)
+DUCKDB_CAPABILITY_MODEL = _structured_capabilities(
+    DUCKDB_DSL_CAPABILITIES,
+    null_semantics=("sql_three_valued", "nan_distinct_from_null"),
+    order_semantics=("explicit_sort", "unspecified_without_sort"),
+    plan_kinds=("logical", "physical"),
+    execution_modes=("embedded_sql",),
+    physical_layouts=("in_memory_table",),
+)
+DUCKDB_PERSISTENT_CAPABILITY_MODEL = _structured_capabilities(
+    DUCKDB_DSL_CAPABILITIES,
+    null_semantics=("sql_three_valued", "nan_distinct_from_null"),
+    order_semantics=("explicit_sort", "unspecified_without_sort"),
+    plan_kinds=("logical", "physical"),
+    execution_modes=("embedded_sql_storage",),
+    physical_layouts=("persistent_table",),
+)
+DATAFUSION_CAPABILITY_MODEL = _structured_capabilities(
+    COMMON_DSL_CAPABILITIES,
+    null_semantics=("arrow_validity", "sql_three_valued"),
+    order_semantics=("explicit_sort", "optimizer_reordered_without_sort"),
+    plan_kinds=("logical", "physical"),
+    execution_modes=("arrow_sql",),
+    physical_layouts=("record_batch",),
+)
+PYARROW_CAPABILITY_MODEL = _structured_capabilities(
+    COMMON_DSL_CAPABILITIES,
+    null_semantics=("arrow_validity", "nan_distinct_from_null"),
+    order_semantics=("kernel_input_order",),
+    plan_kinds=(),
+    execution_modes=("arrow_compute",),
+    physical_layouts=("chunked", "contiguous", "dictionary", "sliced"),
+)
+SQLITE_CAPABILITY_MODEL = _structured_capabilities(
+    COMMON_DSL_CAPABILITIES,
+    null_semantics=("sql_three_valued",),
+    order_semantics=("explicit_sort", "unspecified_without_sort"),
+    plan_kinds=(),
+    execution_modes=("embedded_sql",),
+    physical_layouts=("in_memory_table",),
+)
+CHDB_CAPABILITY_MODEL = _structured_capabilities(
+    CHDB_DSL_CAPABILITIES,
+    null_semantics=("clickhouse_nullable", "sql_three_valued"),
+    order_semantics=("explicit_sort", "parallel_unspecified_without_sort"),
+    plan_kinds=(),
+    execution_modes=("embedded_columnar_olap",),
+    physical_layouts=("memory_engine_table",),
+)
+NUMPY_CAPABILITY_MODEL = _structured_capabilities(
+    NUMPY_DSL_CAPABILITIES,
+    null_semantics=("object_null", "nan_distinct_from_null"),
+    order_semantics=("input_order_preserving",),
+    plan_kinds=(),
+    execution_modes=("vectorized_eager",),
+    physical_layouts=("numpy_object_columns",),
 )
 
 
@@ -249,6 +431,7 @@ TARGETS: dict[str, TargetSpec] = {
         adapter="datadiff.backends.pandas_backend.PandasBackend",
         status="implemented",
         capabilities=COMMON_DSL_CAPABILITIES,
+        capability_model=PANDAS_CAPABILITY_MODEL,
         description="Python DataFrame baseline with pandas semantics.",
         execution_model="dataframe_api",
         methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
@@ -262,6 +445,7 @@ TARGETS: dict[str, TargetSpec] = {
         adapter="datadiff.backends.polars_backend.PolarsBackend",
         status="implemented",
         capabilities=COMMON_DSL_CAPABILITIES,
+        capability_model=POLARS_EAGER_CAPABILITY_MODEL,
         description="Columnar DataFrame engine with eager Polars semantics.",
         execution_model="dataframe_api",
         methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
@@ -275,6 +459,7 @@ TARGETS: dict[str, TargetSpec] = {
         adapter="datadiff.backends.polars_backend.PolarsLazyBackend",
         status="implemented",
         capabilities=COMMON_DSL_CAPABILITIES,
+        capability_model=POLARS_LAZY_CAPABILITY_MODEL,
         description="Polars lazy query execution path for optimizer-sensitive differential tests.",
         execution_model="lazy_dataframe_plan",
         methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
@@ -288,6 +473,7 @@ TARGETS: dict[str, TargetSpec] = {
         adapter="datadiff.backends.polars_backend.PolarsStreamingBackend",
         status="implemented",
         capabilities=COMMON_DSL_CAPABILITIES,
+        capability_model=POLARS_STREAMING_CAPABILITY_MODEL,
         description="Polars lazy streaming engine execution path for streaming optimizer-sensitive differential tests.",
         execution_model="streaming_dataframe_plan",
         methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
@@ -300,7 +486,8 @@ TARGETS: dict[str, TargetSpec] = {
         layer="embedded_analytical_engine",
         adapter="datadiff.backends.duckdb_backend.DuckDBBackend",
         status="implemented",
-        capabilities=COMMON_DSL_CAPABILITIES,
+        capabilities=DUCKDB_DSL_CAPABILITIES,
+        capability_model=DUCKDB_CAPABILITY_MODEL,
         description="Embedded analytical SQL engine executed over generated tables.",
         execution_model="embedded_sql_engine",
         methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
@@ -313,8 +500,10 @@ TARGETS: dict[str, TargetSpec] = {
         layer="embedded_analytical_engine_storage",
         adapter="datadiff.backends.duckdb_backend.DuckDBPersistentBackend",
         status="implemented",
-        capabilities=COMMON_DSL_CAPABILITIES,
+        capabilities=DUCKDB_DSL_CAPABILITIES,
+        capability_model=DUCKDB_PERSISTENT_CAPABILITY_MODEL,
         description="DuckDB executed over a temporary persisted database to exercise storage-aware optimizer paths.",
+        scope="research_control",
         execution_model="embedded_sql_storage_engine",
         methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
         extension_contract=DEFAULT_TARGET_EXTENSION_CONTRACT,
@@ -327,6 +516,7 @@ TARGETS: dict[str, TargetSpec] = {
         adapter="datadiff.backends.datafusion_backend.DataFusionBackend",
         status="implemented",
         capabilities=COMMON_DSL_CAPABILITIES,
+        capability_model=DATAFUSION_CAPABILITY_MODEL,
         description="Apache DataFusion SQL engine over Arrow record batches.",
         execution_model="arrow_query_engine",
         methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
@@ -340,6 +530,7 @@ TARGETS: dict[str, TargetSpec] = {
         adapter="datadiff.backends.pyarrow_backend.PyArrowBackend",
         status="implemented",
         capabilities=COMMON_DSL_CAPABILITIES,
+        capability_model=PYARROW_CAPABILITY_MODEL,
         description="Apache Arrow table/compute backend using PyArrow kernels.",
         execution_model="arrow_table_compute",
         methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
@@ -353,6 +544,7 @@ TARGETS: dict[str, TargetSpec] = {
         adapter="datadiff.backends.sqlite_backend.SQLiteBackend",
         status="implemented",
         capabilities=COMMON_DSL_CAPABILITIES,
+        capability_model=SQLITE_CAPABILITY_MODEL,
         description="Embedded SQL reference target for common relational operators.",
         execution_model="embedded_sql_engine",
         methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
@@ -366,9 +558,26 @@ TARGETS: dict[str, TargetSpec] = {
         adapter="datadiff.backends.chdb_backend.ChDBBackend",
         status="experimental",
         capabilities=CHDB_DSL_CAPABILITIES,
+        capability_model=CHDB_CAPABILITY_MODEL,
         description="Embedded ClickHouse (chDB) columnar OLAP engine — distinct optimizer family from DuckDB/SQLite.",
         execution_model="embedded_columnar_olap",
         portability_tier="optional_dependency",
+        methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
+        extension_contract=DEFAULT_TARGET_EXTENSION_CONTRACT,
+    ),
+    "numpy": TargetSpec(
+        name="numpy",
+        backend="numpy",
+        family="array",
+        layer="vectorized_array_execution",
+        adapter="datadiff.backends.numpy_backend.NumPyBackend",
+        status="experimental",
+        capabilities=NUMPY_DSL_CAPABILITIES,
+        capability_model=NUMPY_CAPABILITY_MODEL,
+        description="Narrow NumPy object-column adapter added from the P6 SPI template.",
+        scope="research_control",
+        execution_model="vectorized_array_engine",
+        portability_tier="from_zero_adapter_experiment",
         methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
         extension_contract=DEFAULT_TARGET_EXTENSION_CONTRACT,
     ),
@@ -380,7 +589,9 @@ TARGETS: dict[str, TargetSpec] = {
         adapter="datadiff.backends.faulty_backend.FaultyPandasBackend",
         status="implemented",
         capabilities=COMMON_DSL_CAPABILITIES,
+        capability_model=PANDAS_CAPABILITY_MODEL,
         description="Pandas-compatible backend with an injected filter output fault for evaluation.",
+        scope="test_fixture",
         execution_model="fault_injection_wrapper",
         portability_tier="seeded_fault_reuse",
         methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
@@ -395,7 +606,9 @@ TARGETS: dict[str, TargetSpec] = {
         adapter="datadiff.backends.faulty_backend.FaultyPandasBackend",
         status="implemented",
         capabilities=COMMON_DSL_CAPABILITIES,
+        capability_model=PANDAS_CAPABILITY_MODEL,
         description="Pandas-compatible backend with an injected groupby aggregate fault for evaluation.",
+        scope="test_fixture",
         execution_model="fault_injection_wrapper",
         portability_tier="seeded_fault_reuse",
         methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
@@ -410,7 +623,9 @@ TARGETS: dict[str, TargetSpec] = {
         adapter="datadiff.backends.faulty_backend.FaultyPandasBackend",
         status="implemented",
         capabilities=COMMON_DSL_CAPABILITIES,
+        capability_model=PANDAS_CAPABILITY_MODEL,
         description="Pandas-compatible backend with an injected join cardinality fault for evaluation.",
+        scope="test_fixture",
         execution_model="fault_injection_wrapper",
         portability_tier="seeded_fault_reuse",
         methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
@@ -425,7 +640,9 @@ TARGETS: dict[str, TargetSpec] = {
         adapter="datadiff.backends.faulty_backend.FaultyPandasBackend",
         status="implemented",
         capabilities=COMMON_DSL_CAPABILITIES,
+        capability_model=PANDAS_CAPABILITY_MODEL,
         description="Pandas-compatible backend with an injected mutate expression fault for evaluation.",
+        scope="test_fixture",
         execution_model="fault_injection_wrapper",
         portability_tier="seeded_fault_reuse",
         methodology_roles=DEFAULT_TARGET_METHODOLOGY_ROLES,
@@ -434,10 +651,19 @@ TARGETS: dict[str, TargetSpec] = {
     ),
 }
 
+
+def production_target_ids() -> tuple[str, ...]:
+    return tuple(
+        backend
+        for backend, spec in TARGETS.items()
+        if spec.scope == "production"
+    )
+
 TARGET_SUITES: dict[str, list[str]] = {
     "dataframe": ["pandas", "polars"],
     "dataframe_lazy": ["polars", "polars_lazy"],
     "polars_cross": ["pandas", "polars", "polars_lazy"],
+    "polars_full_cross": ["pandas", "polars", "polars_lazy", "polars_streaming"],
     "polars_streaming_cross": ["polars_lazy", "polars_streaming"],
     "embedded_sql": ["duckdb", "sqlite"],
     "embedded_sql_cross": ["pandas", "duckdb", "sqlite"],
@@ -447,12 +673,14 @@ TARGET_SUITES: dict[str, list[str]] = {
     "core_lazy": ["pandas", "polars", "polars_lazy", "duckdb", "sqlite"],
     "datafusion_cross": ["pandas", "duckdb", "datafusion"],
     "core_datafusion": ["pandas", "polars", "polars_lazy", "duckdb", "sqlite", "datafusion"],
+    "pandas_pyarrow": ["pandas", "pyarrow"],
     "arrow_cross": ["pandas", "duckdb", "pyarrow"],
     "core_arrow": ["pandas", "polars", "polars_lazy", "duckdb", "sqlite", "pyarrow"],
     "latest_all_engines": ["pandas", "pyarrow", "polars", "polars_lazy", "duckdb", "sqlite", "datafusion"],
     "latest_no_datafusion": ["pandas", "pyarrow", "polars", "polars_lazy", "duckdb", "sqlite"],
     "chdb_cross": ["pandas", "duckdb", "chdb"],
     "chdb_olap_cross": ["pandas", "duckdb", "sqlite", "chdb"],
+    "numpy_cross": ["pandas", "numpy"],
     "latest_with_chdb": ["pandas", "pyarrow", "polars", "polars_lazy", "duckdb", "sqlite", "chdb"],
     "seeded_filter": ["pandas", "buggy_filter"],
     "seeded_groupby": ["pandas", "buggy_groupby"],
@@ -520,8 +748,12 @@ def target_context(
     result_contracts = tuple(sorted({spec.result_contract for spec in specs}))
     portability_tiers = tuple(sorted({spec.portability_tier for spec in specs}))
     shared_caps = tuple(common_capabilities(list(selected)))
-    shared_roles = tuple(_common_string_contract(list(specs), attr="methodology_roles"))
-    shared_extension_contract = tuple(_common_string_contract(list(specs), attr="extension_contract"))
+    shared_roles = tuple(
+        _common_declared_values([spec.methodology_roles for spec in specs])
+    )
+    shared_extension_contract = tuple(
+        _common_declared_values([spec.extension_contract for spec in specs])
+    )
     return TargetContext(
         backends=tuple(selected),
         targets=specs,
@@ -566,6 +798,35 @@ def target_capability_matrix(backends: list[str] | None = None) -> dict[str, lis
     }
 
 
+def target_structured_capability_matrix(
+    backends: list[str] | None = None,
+) -> dict[str, dict[str, Any]]:
+    selected = list(backends) if backends is not None else sorted(TARGETS)
+    return {
+        backend: target_spec(backend).capability_model.to_dict()
+        for backend in selected
+        if backend in TARGETS
+    }
+
+
+def target_capability_decision(
+    backend: str,
+    *,
+    required_tokens: Sequence[str] = (),
+    execution_mode: str = "",
+    physical_layout: str = "",
+    plan_kind: str = "",
+    native_export_format: str = "",
+) -> dict[str, Any]:
+    return target_spec(backend).capability_decision(
+        required_tokens=required_tokens,
+        execution_mode=execution_mode,
+        physical_layout=physical_layout,
+        plan_kind=plan_kind,
+        native_export_format=native_export_format,
+    ).to_dict()
+
+
 def common_capabilities(backends: list[str]) -> list[str]:
     selected = [target_spec(backend) for backend in backends if backend in TARGETS]
     if not selected:
@@ -587,6 +848,12 @@ def validate_target_registry() -> None:
             raise ValueError(f"target spec identity mismatch for {backend}")
         if not spec.capabilities:
             raise ValueError(f"target {backend} must declare capabilities")
+        if spec.scope not in {"production", "research_control", "test_fixture"}:
+            raise ValueError(f"target {backend} declares invalid scope: {spec.scope}")
+        if tuple(sorted(spec.capabilities)) != spec.capability_model.legacy_tokens:
+            raise ValueError(
+                f"target {backend} legacy capability tokens do not match its structured model"
+            )
         if not spec.methodology_roles:
             raise ValueError(f"target {backend} must declare methodology roles")
         if not spec.extension_contract:
@@ -607,12 +874,12 @@ def validate_target_registry() -> None:
             raise ValueError(f"target suite {suite} references unknown backends: {', '.join(unknown)}")
 
 
-def _common_string_contract(targets: list[TargetSpec], *, attr: str) -> list[str]:
-    if not targets:
+def _common_declared_values(values: Sequence[Sequence[str]]) -> list[str]:
+    if not values:
         return []
-    common = set(getattr(targets[0], attr))
-    for target in targets[1:]:
-        common &= set(getattr(target, attr))
+    common = set(values[0])
+    for declared in values[1:]:
+        common &= set(declared)
     return sorted(common)
 
 

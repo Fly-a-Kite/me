@@ -1,0 +1,196 @@
+schema_version: osc-review-report-set-v1
+phase: 6
+round: private_foundation_remediation_exact_sha_ring_review_r8b
+status: complete_incomplete_reports_no_combined_suite_authorization
+review_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8b_contracts.yaml
+  sha256: 4a9cc4603e8d4d308831267337bf7d5c04d68772b18576351c15aca51051007c
+entry_authority:
+  r8_review_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_contracts.yaml
+    sha256: 633ba886b2b9c425f478e3e1d5b4a1bb32e123897199d0cb2a7eb065ff0850dc
+  r8_review_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_reports.yaml
+    sha256: ba677869909db8f3663632910f92495ad59e88d70044d6865c5afc30fa404222
+  current_dispatch_ledger:
+    path: experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    expected_sha256: bb2ee1048d251dcd76206ab19fd9691ab288ed862427a7efab55cc57bfd0afd0
+    root_observed_before_aggregation_sha256: bb2ee1048d251dcd76206ab19fd9691ab288ed862427a7efab55cc57bfd0afd0
+  historical_pre_r8b_registration_snapshot:
+    sha256: c43a82fef04ef4e50f6c7de72b559e69fb031d15686a7797d8f42f6120828805
+    gating: false
+    comparison_to_current: prohibited_by_r8b_contract
+workspace_after_r8b_attempts:
+  head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  staged_paths: 0
+  root_target_sha_reverification: exact_for_all_thirteen_targets
+  preservation_check: >-
+    No product or frozen file was written. Runtime's reviewer report states writes=0,
+    child_agents=0, forbidden_paths_modified=[]; Search and Contract agents returned service
+    errors rather than reports and are not counted as reports or as evidence of a repository write.
+coordination:
+  direct_reviewer_slots: 3
+  reviewer_slots_reused_from_r7_r8: true
+  additional_agents_created: 0
+  root_is_not_an_independent_reviewer: true
+  review_language: "负向复核、独立反例验证、异常输入验证"
+  aggregation_note: >-
+    This Root aggregation records the only returned independent report and the two external agent
+    errors. Root does not convert static observations or its own analysis into missing independent
+    reviews.
+reports:
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8B-A-SEARCH
+    reviewer: r8b_search_independent_reviewer
+    status: no_report_external_agent_usage_limit
+    complete_independent_report_received: false
+    scoped_test:
+      execution_count: unknown
+      exit_code: unavailable
+      complete_terminal_result: unavailable
+    external_terminal_error: >-
+      Agent errored: You've hit your usage limit. Upgrade to Pro, visit Codex settings to
+      purchase credits, or try again at Jul 29th, 2026 1:58 PM.
+    负向复核: unavailable_no_report
+    独立反例验证: unavailable_no_report
+    异常输入验证: unavailable_no_report
+    findings: unavailable_no_report
+    counts: unavailable_no_report
+    writes: unknown_no_report
+    child_agents: unknown_no_report
+    forbidden_paths_modified: unknown_no_report
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8B-B-RUNTIME
+    reviewer: r8b_runtime_independent_reviewer
+    mode: read_only_exact_sha_negative_review
+    status: incomplete_terminal_evidence
+    complete_independent_report_received: true
+    authority_sha_pre_post:
+      current_dispatch_ledger:
+        expected: bb2ee1048d251dcd76206ab19fd9691ab288ed862427a7efab55cc57bfd0afd0
+        pre: bb2ee1048d251dcd76206ab19fd9691ab288ed862427a7efab55cc57bfd0afd0
+        post: bb2ee1048d251dcd76206ab19fd9691ab288ed862427a7efab55cc57bfd0afd0
+      historical_pre_r8b_registration_snapshot:
+        value: c43a82fef04ef4e50f6c7de72b559e69fb031d15686a7797d8f42f6120828805
+        gating: false
+        comparison_to_current: not_performed_per_r8b_contract
+      r5_r6_r7_r7b_r8_authority: exact_pre_and_post
+      r8b_contract:
+        expected: 4a9cc4603e8d4d308831267337bf7d5c04d68772b18576351c15aca51051007c
+        pre: 4a9cc4603e8d4d308831267337bf7d5c04d68772b18576351c15aca51051007c
+        post: 4a9cc4603e8d4d308831267337bf7d5c04d68772b18576351c15aca51051007c
+    target_sha_pre_post:
+      src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+      tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+      src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+      tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+      all_other_frozen_public_targets: exact_pre_and_post
+      head_pre_post: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    scoped_test:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+      execution_count: 1
+      terminal_session: completed
+      exit_code: unavailable
+      complete_terminal_result: unavailable
+      rerun: forbidden_and_not_performed
+    review_results:
+      负向复核:
+        r7_m1_context_precedence: static_pass
+        r7_m2_canonical_case_precedence: static_pass
+        r6_binding_collision_candidate_boundary: static_pass
+      独立反例验证:
+        r7_m1_matrix: static_pass
+        r7_m2_matrix: static_pass
+        r6_exact_binding_collision_matrix: static_pass
+      异常输入验证:
+        malformed_provenance: static_fail_closed
+        confirmed_or_bug_claimed_candidate: static_rejected
+        caller_reproduced_field: static_rejected
+        diagnostic_origin_or_authority: static_rejected
+        missing_or_wrong_typed_context: static_fail_closed
+    findings: []
+    counts: {blocker: 0, high: 0, medium: 0, low: 0}
+    requirements_unsatisfied:
+      - Required complete scoped-suite terminal exit code/result is unavailable; this is not passing review evidence.
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations:
+      - The one authorized pytest session completed, but its channel returned no stdout/stderr or exit code; it was not rerun.
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8B-C-CONTRACT
+    reviewer: r8b_contract_independent_reviewer
+    status: no_report_external_agent_retry_limit
+    complete_independent_report_received: false
+    scoped_test:
+      execution_count: unknown
+      exit_code: unavailable
+      complete_terminal_result: unavailable
+    external_terminal_error: "Agent errored: exceeded retry limit, last status: 429 Too Many Requests."
+    负向复核: unavailable_no_report
+    独立反例验证: unavailable_no_report
+    异常输入验证: unavailable_no_report
+    findings: unavailable_no_report
+    counts: unavailable_no_report
+    writes: unknown_no_report
+    child_agents: unknown_no_report
+    forbidden_paths_modified: unknown_no_report
+review_completion:
+  expected_reports: 3
+  complete_independent_reports_received: 0
+  reports_returned: 1
+  reports_with_complete_scoped_terminal_evidence: 0
+  reviewer_findings_aggregate: unavailable_due_to_missing_reports
+  root_post_report_target_sha_exact: true
+root_authority_process_blockers:
+  - id: OSC-6-FOUNDATION-ROOT-R8B-RUNTIME-TERMINAL-001
+    severity: blocker
+    claim: Runtime's exactly-once R8B scoped suite lacks a recoverable exit code and complete terminal result.
+    reproduction: The reviewer reports completed session with exit_code and complete_result both unavailable.
+    violated_invariant: Every R8B scoped pytest needs exact exit code and complete terminal evidence; rerun under the same contract is forbidden.
+    required_test: Fresh Runtime independent review under a newly issued authority with one complete terminal session.
+  - id: OSC-6-FOUNDATION-ROOT-R8B-SEARCH-REPORT-001
+    severity: blocker
+    claim: Search R8B independent report and terminal evidence are absent after an external agent usage-limit error.
+    reproduction: Reviewer returned only service message reporting usage limit and a retry date, not the required report.
+    violated_invariant: All three independent reports and their terminal evidence are required before aggregation or combined suite.
+    required_test: Fresh Search independent review under a newly issued authority when the same reviewer slot is service-available.
+  - id: OSC-6-FOUNDATION-ROOT-R8B-CONTRACT-REPORT-001
+    severity: blocker
+    claim: Contract R8B independent report and terminal evidence are absent after an external 429 retry-limit error.
+    reproduction: Reviewer returned only `exceeded retry limit, last status: 429 Too Many Requests`.
+    violated_invariant: All three independent reports and their terminal evidence are required before aggregation or combined suite.
+    required_test: Fresh Contract independent review under a newly issued authority when the same reviewer slot is service-available.
+combined_scoped_test:
+  status: not_run
+  authorization: false
+  reason:
+    - No complete independent R8B report has complete scoped-suite terminal evidence.
+    - Search and Contract reports are absent; Runtime exit/result is absent.
+    - Root process blockers are each severity blocker; no reviewer finding is downgraded or replaced.
+authority_boundaries:
+  diagnostic_refs_authority_eligible: false
+  missing_exact_typed_context: fail_closed_or_not_evaluated
+  candidate_promoted_to_confirmed: false
+  bug_claimed: false
+  public_api_freeze_changed: false
+  public_exports_changed: false
+  phase7_entry_authorized: false
+  two_hour_run_authorized: false
+  twenty_four_hour_run_authorized: false
+decision:
+  all_three_reports_received: false
+  all_three_complete_terminal_results_received: false
+  aggregate_findings_clear: false
+  combined_scoped_test_authorized: false
+  combined_scoped_pass: false
+  foundation_barrier: pending
+  foundation_barrier_passed: false
+  new_review_authority_required: true
+  tests_osc_authorized: false
+  full_repository_tests_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

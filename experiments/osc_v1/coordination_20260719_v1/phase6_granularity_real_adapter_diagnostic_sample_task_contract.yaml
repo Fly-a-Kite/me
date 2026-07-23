@@ -1,0 +1,163 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-GRANULARITY-REAL-ADAPTER-DIAGNOSTIC-SAMPLE-R2
+owner: /root
+mode: root_serial_private_real_adapter_diagnostic_sample
+implementation_child_agents: 0
+reviewer_child_agents_created: 0
+change_requests:
+  - CR-OSC-6-003
+  - CR-OSC-6-004
+objective: >-
+  Add one private, fail-closed, ephemeral real-adapter diagnostic sample for
+  exactly one declaration-derived fresh target cell and its exact fresh
+  backend-pair obligation. The capture must invoke the existing direct serial
+  uncached execution entry point against the two real adapters, bind canonical
+  raw summaries and normalized results to the already exact R1 Search-to-Runtime
+  context, and remain permanently non-authoritative.
+authorization_boundary:
+  authorized_product_writes:
+    - src/datadiff_osc/runtime/_phase6_real_adapter_execution_sample.py
+    - tests/osc/test_runtime_phase6_real_adapter_execution_sample.py
+  authorized_authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  all_other_paths: forbidden
+verified_preconditions:
+  head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  staged_paths: 0
+  dirty_worktree_preserved:
+    tracked_status_entries: 141
+    untracked_status_entries: 2767
+  prior_authority:
+    r1_task_contract:
+      path: experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_task_contract.yaml
+      sha256: edc8d81aa2c30958d63e5c05d808c11561ae51b60b505540baf341d34362c25f
+    r1_report:
+      path: experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_report.yaml
+      sha256: 3e65845cc204a548642543f281b7ae97e3e8437cbc143b4f371c04d50f978c40
+    ledger:
+      path: experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+      sha256_before_contract_write: 98440dcca40d1b90dd1c6333cf27b35c37de1c78d8859a35659613f97c3d4db3
+  frozen_public_targets:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+required_inputs_read:
+  - docs/codex_multi_agent_development_runbook.md
+  - experiments/final_bug_discovery_protocol_v3/TODO.md
+  - docs/project_architecture.md
+  - docs/fine_grained_discovery_architecture.md
+  - docs/discovery_search_and_parallel_architecture.md
+  - docs/semantic_hypercontract_architecture.md
+  - docs/architecture_credibility_and_alternatives.md
+  - docs/competitive_paper_experiment_blueprint.md
+  - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_audit_findings.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_change_requests.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_task_contract.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_report.yaml
+  - src/datadiff/execution.py
+  - src/datadiff/backends/__init__.py
+  - src/datadiff/backends/base.py
+  - src/datadiff/family_witness_registry.py
+  - src/datadiff_osc/runtime/_phase6_reachability_execution_binding.py
+required_invariants:
+  - >-
+    The selected cell and pair must be re-derived from the frozen compiled
+    declaration universe. The scoped test may select the existing
+    pandas_nullable_bool_reduction declaration family, but runtime code must
+    not become a family-specific evaluator or hard-code any denominator,
+    target-cell ID, or pair obligation ID.
+  - >-
+    Admit only a valid R1 ReachabilityExecutionBinding whose canonical Case
+    exactly equals the current registration-generated case for its fresh cell
+    construction index and whose exact pair order equals the registration
+    backend order. Recompute and reject stale, swapped, synthetic, unresolved,
+    non-fresh, or otherwise mismatched context before adapter launch.
+  - >-
+    The only admitted execution shape is one direct serial uncached call to
+    datadiff.execution.execute_case with parallel=false, exact freshly
+    instantiated adapters from datadiff.backends.make_backend, no supplied
+    adapter injection, and deterministic adapter close in all paths.
+  - >-
+    Bind the exact ordered real adapter identities, canonical raw summary
+    payload bytes/digests, canonical normalized-result payload bytes/digests,
+    case/context binding digest, and direct execution mode. Require an OK
+    result from each endpoint; missing, timeout, error, unsupported,
+    malformed, substituted, reordered, non-canonical, or digest-mismatched
+    results fail closed.
+  - >-
+    The ephemeral sample is diagnostic-only: authority_eligible=false,
+    gate_credit=false, raw_artifact_admitted=false,
+    coverage_event_created=false, candidate_confirmed=false, and
+    bug_claimed=false unconditionally. It must not create a CoverageLedger
+    event, artifact receipt, provenance receipt, source snapshot, source
+    worktree, candidate classification, promotion, or public export.
+  - >-
+    This one sample neither claims nor contributes observed coverage for
+    232/384/502, activation, fresh seed blocks, mutation preservation, lane
+    focus, dimensions, search performance, exactness, parallel invariance,
+    v3 2200, repository gates, Phase 7, 2h, or 24h.
+negative_review_requirements:
+  负向复核:
+    - stale/generated-case, fresh-cell, backend-pair/order, adapter-identity, and direct-mode substitutions
+    - raw/normalized status, canonical-payload, digest, and endpoint-order substitutions
+  独立反例验证:
+    - valid structural R1 context alone cannot be admitted as real execution or gain artifact, coverage, authority, or gate credit
+    - non-OK/unsupported/missing/error result forms and a swapped endpoint must fail before any verdict or candidate branch
+  异常输入验证:
+    - wrong binding type, malformed canonical JSON, duplicate records, unexpected adapter name, unsupported values, and close-path failure handling fail closed
+forbidden:
+  - public exports
+  - src/datadiff_osc/public_api_freeze.json
+  - all listed frozen_public_targets
+  - src/datadiff_osc/_phase6_gate_authority.py
+  - src/datadiff_osc/search/ledger.py
+  - src/datadiff_osc/runtime/_receipt_producers.py
+  - src/datadiff_osc/runtime/_producer_provenance.py
+  - src/datadiff_osc/runtime/_phase6_reachability_execution_binding.py
+  - all existing tests except the one new authorized test path
+  - tests/osc whole directory
+  - full repository suite
+  - six-file combined suite
+  - 100000 parity
+  - v3 2200
+  - source snapshot or clean-worktree creation
+  - persistent raw artifact production
+  - Phase 7, 2h pilot, 24h execution
+validation:
+  execution_count_before_implementation: 0
+  authorized_real_adapter_pair_invocations: 1
+  exactly_one_authorized_scoped_suite_after_implementation: >-
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+    tests/osc/test_runtime_phase6_real_adapter_execution_sample.py
+  expected_exit_code: 0
+  combined_suite: unauthorized
+  phase6_gate_claim: pending
+stop_conditions:
+  - any frozen/public SHA mismatch
+  - any scoped-suite failure or missing complete terminal result
+  - any adapter launch before post-contract SHA verification
+  - any more than one actual adapter-pair invocation in the scoped suite
+  - any stale/generated-case or pair substitution accepted
+  - any candidate becomes confirmed or bug_claimed becomes true
+  - any request to broaden into persistent artifact, source snapshot, coverage, or gate execution
+completion_report_requirements:
+  - exact pre/post SHA for the two product paths and all frozen/public targets
+  - exact one-time command, exit code, complete terminal result, and actual adapter-pair invocation count
+  - 负向复核, 独立反例验证, 异常输入验证 results
+  - explicit remaining blocker OSC-6-G-B1 and barrier pending statement
+  - writes and forbidden_paths_modified fields
+  - no prewritten pass claim

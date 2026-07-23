@@ -1,0 +1,15 @@
+schema_version: osc-task-contract-erratum-v1
+phase: 6
+applies_to:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_next_change_prewrite_task_contracts.yaml
+  sha256: 369003f6cbd0aca1882bc6c631bc9082655ed01865cec706d2dcedb3e65f72a6
+task_id: OSC-6-CR003A-PREWRITE
+correction:
+  invalid_path: experiments/yield_gate_v3_post_triage/manifest.json
+  valid_path: experiments/final_bug_discovery_protocol_v3/yield_gate_v3_post_triage/manifest.json
+  valid_path_sha256: 8d5cbf66c230cd5b87e5f521419bbf5a6a759f486a5d951f464031462c1116ce
+root_verification:
+  invalid_path_exists: false
+  valid_path_exists: true
+authority_rule: the historic manifest is comparison evidence only; formal lane and focus authority must be independently derived from executable declarations
+other_contract_terms_changed: false

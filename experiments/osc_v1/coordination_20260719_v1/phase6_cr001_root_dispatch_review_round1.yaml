@@ -1,0 +1,60 @@
+schema_version: osc-review-report-v1
+phase: 6
+change_request: CR-OSC-6-001
+review_round: 1
+status: findings_remediated_targets_refrozen
+review_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_contracts.yaml
+  sha256: ea6b78d549c1f82dfb9f97b5f7248928fe139859875707f22ec663e6d6f2b4ce
+reviewed_target_shas:
+  authority: 224603eeb6e8f4a307060543208c3190fe86acecd76ebcf2e28728880de8eb03
+  integration_test: 1db60ffb93d3b5d92608f8143a50c583863982a357da8bb7f26b8a79c3912752
+reviews:
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-A
+    agent: /root/phase5_authority_audit
+    status: complete_read_only_findings
+    exact_sha_match: true
+    forbidden_writes: 0
+    findings: {blocker: 0, high: 1, medium: 1}
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-B
+    agent: /root/phase5_consumer_audit
+    status: incomplete_agent_usage_limit
+    exact_sha_match: null
+    forbidden_writes: 0
+    findings: null
+    note: no substantive review report was produced; this does not count as a passed review
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-C
+    agent: /root/phase5_evidence_audit
+    status: complete_read_only_pass
+    exact_sha_match: true
+    forbidden_writes: 0
+    findings: {blocker: 0, high: 0, medium: 0}
+accepted_findings:
+  - id: OSC-6-CR001-R1-A-H1
+    severity: high
+    issue: staged parity retained only a replayed ResultGroup group identity without Root binding the group, contract fingerprint and endpoint-set digests to the dynamic record
+    disposition: fixed_fail_closed_pending_CR_OSC_6_002
+    fix: semantically replay staged_parity_groups and then discard it with a distinct Root-context-pending error
+    regression: test_staged_parity_group_waits_for_root_cross_object_binding
+  - id: OSC-6-CR001-R1-A-M1
+    severity: medium
+    issue: external hash, inner type, inner version and invalid-envelope transport branches lacked exact integration regressions
+    disposition: fixed
+    fix: parameterized tests assert admission discard and zero domain-replayer calls for all four transport forgeries
+    regression: test_transport_forgery_is_discarded_before_domain_replay
+remediated_target_shas:
+  authority: 03b6ef9323f38fee8cb9daafffd2a309818953fbc78fa2ae0cd2c99b1503bbd7
+  integration_test: c02495dbe21db569b968d694d26f272ac342d1ffc1260105cc912cce48e807de
+root_verification_after_remediation:
+  scoped: 38 passed in 21.95s
+  combined_replay_and_freeze: 126 passed in 22.78s
+  full_osc: 471 passed in 112.95s
+  full_repository_before_remediation: 3167 passed and 1 skipped in 251.65s
+  diff_check: clean
+decision:
+  round1_reviews_obsolete_after_target_change: true
+  round2_three_exact_sha_reviews_required: true
+  root_dispatch_closed: false
+  phase6_gate_execution_authorized: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

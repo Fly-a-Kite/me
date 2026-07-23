@@ -1,0 +1,197 @@
+schema_version: osc-remediation-report-v1
+phase: 6
+round: private_foundation_remediation_r4_single_agent_serial
+status: implementation_complete_combined_scoped_pass_pending_rotated_independent_review
+execution_mode: single_agent_serial_override
+rotated_independent_review_complete: false
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round4_task_contracts.yaml
+  sha256: 8f5a5328d2effdfd9dcc35bde216a6bf1de3d2637f49b64669e9f5cb2b622c13
+entry_review:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_reports.yaml
+  sha256: 793567c5fcb35aaf72fc91fe4edd75dd732948faba80b093c505da2743fee630
+workspace_entry:
+  head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  tracked_modified_paths: 141
+  staged_paths: 0
+  status_short_entries: 2908
+  status_short_sha256: afdb15e19bb98330957e06d648cc141e7167357bbb71604c5aa0b4c824ca1cee
+  status_all_untracked_entries: 24226
+  status_all_untracked_sha256: 10bad310aa0d3377d3bc827e506764ab8cf6e472ebd2996a752fc53207a50a37
+workspace_exit:
+  head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  tracked_modified_paths: 141
+  staged_paths: 0
+  status_short_entries: 2908
+  status_short_sha256: afdb15e19bb98330957e06d648cc141e7167357bbb71604c5aa0b4c824ca1cee
+  status_all_untracked_entries: 24229
+  status_all_untracked_sha256: 4551464e5da035fbc320f76f7d2b44634d18ac2ec142094fef12eb04c97ee912
+  authority_artifacts_added_by_this_serial_remediation: 4
+implementations:
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-SEARCH-R4
+    owner: /root
+    findings:
+      - OSC-6-FOUNDATION-SEARCH-R4-H1
+      - OSC-6-FOUNDATION-SEARCH-R4-H2
+    changed_files:
+      - path: src/datadiff_osc/search/context_receipts.py
+        before_sha256: e59bee28afc89cc58706eecc9168043e18fe7c74bf40f4d66e515a1a2a7673bd
+        after_sha256: b8fa8c7f8e30df35e01d00086a3823b10bf474146d0b578618a3450ef5e948d0
+      - path: src/datadiff_osc/search/context_replay.py
+        before_sha256: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+        after_sha256: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+      - path: tests/osc/test_search_context_receipts.py
+        before_sha256: 6b472c41e46aa9cc1bd46453dd273204cf82670cf4522944d62c658af6a6873f
+        after_sha256: 58afd2c49c3dae0f7cf0d220ecdc7c3255b54d8daf6a980e651e6b01f502e60b
+      - path: tests/osc/test_search_gate_crosswalk.py
+        before_sha256: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+        after_sha256: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    implementation_summary:
+      - application-policy callables now bind supported live globals, defaults, keyword defaults, closure cells, function attributes, annotations and recursively reachable same-module direct functions; cross-module direct functions bind source, code, module, defaults, keyword defaults, closure and attributes
+      - application-policy identity is captured and checked at capture, before the first fresh replay, between fresh replays and after the second replay
+      - every module/class attribute-path owner is identity-bound; mutable, cyclic, unresolved and uninspectable owners fail closed
+      - private receipt and application-policy digest/schema domains were versioned; public exports and public freeze were not changed
+    scoped_test:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py
+        tests/osc/test_search_gate_crosswalk.py
+      exit_code: 0
+      result: 53 passed in 204.39s (0:03:24)
+
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-RUNTIME-R4
+    owner: /root
+    findings:
+      - OSC-6-FOUNDATION-RUNTIME-R4-M1
+    changed_files:
+      - path: src/datadiff_osc/runtime/_receipt_producers.py
+        before_sha256: 4e939d0d8dd30858a60109318c12ceb4614e8848816761b1ccdbc772986ae9d6
+        after_sha256: 922afa81b750905e0aaa6fc096d4b1176be2112269f119da81cc5aa72d09230d
+      - path: tests/osc/test_runtime_receipt_producers.py
+        before_sha256: dccb5339abea3f4f92c41113766a36e7d25f30db0dc3df03d4275200d5404caf
+        after_sha256: 41c15578eebb43f90a244f94562a8473301503a646f4eb5754853a99991c56c6
+    implementation_summary:
+      - source plus campaign3 plus pipeline3 execution and EvidenceEnvelope identities are checked globally before source/recheck verdict, reproduced or threshold processing
+      - typed VIOLATED derivation, exact 3/3 plus 3/3 thresholds, STABLE_SURVIVOR non-confirmed state and bug_claimed=false remain unchanged
+      - replay, provenance-origin and admission authority were not expanded
+    scoped_test:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+      exit_code: 0
+      result: 53 passed in 7.20s
+
+frozen_sha256:
+  src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+  tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+  src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+  tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+  src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+  tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+  src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+
+root_independent_counterexample_validation:
+  mode: single_agent_serial_independent_counterexample_validation
+  prior_r3_search_live_profile_substitution:
+    result: rejected_before_prior_identity_can_authorize_replacement
+    exact_results:
+      baseline_warm_identity_stable: true
+      replacement_warm_identity_stable: true
+      replacement_identity_changed: true
+      replacement_outcome_changed: true
+      prior_receipt_rejected: true
+  prior_r3_runtime_source_reuse:
+    result: both_stages_reject_global_disjointness_first
+    combinations:
+      - reused_stage: campaign
+        first_error: source/campaign/pipeline identities must be globally disjoint
+      - reused_stage: pipeline
+        first_error: source/campaign/pipeline identities must be globally disjoint
+  r4_h1_policy_global_replacement:
+    result: rejected_before_prior_identity_can_authorize_replacement
+    exact_results:
+      baseline_status: rejected
+      baseline_attempts: 2
+      replacement_status: rejected
+      replacement_attempts: 1
+      outcome_changed: true
+      code_identity_same: true
+      source_same: true
+      module_same: true
+      qualname_same: true
+      policy_id_changed: true
+      prior_receipt_rejected: true
+  r4_h2_intermediate_attribute_owners:
+    result: full_identity_changes_or_fails_closed
+    class_path:
+      terminal_digest_unchanged: true
+      full_identity_changed: true
+      behavior_before: class-baseline
+      behavior_after: class-replacement
+      behavior_changed: true
+    module_path:
+      terminal_digest_unchanged: true
+      full_identity_changed: true
+      behavior_before: module-baseline
+      behavior_after: module-replacement
+      behavior_changed: true
+    abnormal_input_validation:
+      mutable_intermediate_owner_rejected: true
+      cyclic_intermediate_owner_rejected: true
+      unresolved_intermediate_owner_rejected: true
+      uninspectable_intermediate_owner_rejected: true
+  r4_m1_source_reuse_ordering:
+    result: all_four_reject_global_disjointness_first
+    combinations:
+      - source_verdict: INCONCLUSIVE
+        reused_stage: campaign
+        first_error: source/campaign/pipeline identities must be globally disjoint
+      - source_verdict: INCONCLUSIVE
+        reused_stage: pipeline
+        first_error: source/campaign/pipeline identities must be globally disjoint
+      - source_verdict: SATISFIED
+        reused_stage: campaign
+        first_error: source/campaign/pipeline identities must be globally disjoint
+      - source_verdict: SATISFIED
+        reused_stage: pipeline
+        first_error: source/campaign/pipeline identities must be globally disjoint
+
+combined_scoped_test:
+  command: >-
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+    tests/osc/test_contract_phase6_corpora.py tests/osc/test_search_lane_registry.py
+    tests/osc/test_search_context_receipts.py tests/osc/test_search_gate_crosswalk.py
+    tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+  exit_code: 0
+  result: 125 passed in 213.93s (0:03:33)
+  exact_sha_verified_pre_and_post_test: true
+
+authority_boundaries:
+  public_exports_changed: false
+  public_api_freeze_changed: false
+  diagnostic_refs_authority_eligible: false
+  missing_exact_typed_context: not_evaluated_or_rejected
+  candidate_promoted_to_confirmed: false
+  bug_claimed: false
+  fabricated_coverage_or_receipt_or_evidence_authority: false
+  forbidden_paths_modified: []
+  deviations: []
+  child_agents: 0
+  manual_repository_writes_used_apply_patch: true
+
+implementation_residual_counts: {blocker: 0, high: 0, medium: 0, low: 0}
+finding_disposition:
+  OSC-6-FOUNDATION-SEARCH-R4-H1: remediated_by_root_independent_counterexample_validation_pending_external_review
+  OSC-6-FOUNDATION-SEARCH-R4-H2: remediated_by_root_independent_counterexample_validation_pending_external_review
+  OSC-6-FOUNDATION-RUNTIME-R4-M1: remediated_by_root_independent_counterexample_validation_pending_external_review
+decision:
+  implementation_round_complete: true
+  root_independent_counterexample_validation: true
+  combined_scoped_pass: true
+  rotated_independent_review_required: true
+  rotated_independent_review_complete: false
+  foundation_barrier: false
+  foundation_barrier_passed: false
+  next_step: >-
+    A reviewer independent of this implementation must re-hash the final target
+    set, replay the R4 counterexamples and independently decide the foundation barrier.

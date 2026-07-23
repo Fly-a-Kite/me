@@ -1,26 +1,33 @@
 from __future__ import annotations
 
 import math
+import os
 import time
 from typing import Any
 
-from datadiff.backends.base import Backend, BackendResult, PreparedTable, prepare_table
+from datadiff.backends.base import Backend, BackendResult, NativeRows, PreparedTable, prepare_table
 from datadiff.backends.dataframe_semantics import running_sum_plan, tuple_absence_plan
 from datadiff.backends.probe_semantics import EXTENDED_FALSE_PROBE_KINDS
 from datadiff.backends.sql_lowering import (
     SqlDialect,
+    cast_logical_expression,
     render_aggregate_sql,
     render_case_when_expr,
     render_coalesce_expr,
+    render_filter_condition,
     render_fill_null_expr,
     render_groupby_sql,
+    render_join_condition,
+    render_join_right_projection,
     render_mutate_expr,
+    render_semi_anti_join_condition,
 )
 from datadiff.backends.sql_runtime import build_subquery_runtime
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
-from datadiff.filtering import sql_filter_condition
 from datadiff.join_keys import join_key_pairs
 from datadiff.operation_semantics import groupby_keys, is_default_false_probe_kind, join_how, op_ascending, op_column, op_columns, op_comparator, op_kind, op_n, op_nulls, op_output_alias, op_table, op_value
+from datadiff.physical_plan import collect_physical_plan_bundle
+from datadiff.program_state import ProgramState, state_after_operation
 from datadiff.running import running_sum_partition_columns, running_sum_sort_keys
 from datadiff.sortedness import is_sorted_values
 from datadiff.windowing import row_number_order_keys, row_number_partition_columns
@@ -70,10 +77,17 @@ def _agg_expr(column: str, func: str) -> str:
 
 
 DATAFUSION_DIALECT = SqlDialect(
-    float_cast_type="DOUBLE",
-    int_cast_type="BIGINT",
-    str_cast_type="VARCHAR",
+    logical_type_sql={
+        "bool": "BOOLEAN",
+        "float": "DOUBLE",
+        "int": "BIGINT",
+        "str": "VARCHAR",
+    },
     string_slice_fn="SUBSTRING",
+    string_length_sql=lambda source: f"LENGTH({source})",
+    string_contains_sql=lambda source, needle: (
+        f"CASE WHEN {source} IS NULL THEN NULL ELSE INSTR({source}, {needle}) > 0 END"
+    ),
     string_startswith_fn=lambda source, needle: (
         f"CASE WHEN {source} IS NULL THEN NULL ELSE SUBSTRING({source}, 1, LENGTH({needle})) = {needle} END"
     ),
@@ -88,19 +102,127 @@ DATAFUSION_DIALECT = SqlDialect(
 )
 
 
-def _join_condition(op: dict[str, Any]) -> str:
-    left_keys, right_keys = join_key_pairs(op)
-    return " AND ".join(f"q.{_quote(left)} = r.{_quote(right)}" for left, right in zip(left_keys, right_keys))
-
-
-def _semi_anti_join_condition(op: dict[str, Any], kind: str) -> str:
-    left_keys, right_keys = join_key_pairs(op)
-    predicates = [
-        *(f"r.{_quote(right)} IS NOT NULL" for right in right_keys),
-        *(f"q.{_quote(left)} = r.{_quote(right)}" for left, right in zip(left_keys, right_keys)),
+def _datafusion_grouped_null_topk_mismatch(
+    ctx: Any,
+    source_sql: str,
+    op: Any,
+) -> bool:
+    aggregate = str(op.get("aggregate", "") or "").lower()
+    if aggregate not in {"min", "max"}:
+        raise ValueError(f"unsupported grouped-null TopK aggregate: {aggregate}")
+    direction = str(op.get("direction", "") or "").lower()
+    if direction not in {"asc", "desc"}:
+        raise ValueError(f"unsupported grouped-null TopK direction: {direction}")
+    nulls = str(op.get("nulls", "") or "").lower()
+    if nulls not in {"first", "last"}:
+        raise ValueError(f"unsupported grouped-null TopK null placement: {nulls}")
+    limit = max(1, int(op.get("limit", 1) or 1))
+    group_column = str(op.get("group_column", "g") or "g")
+    value_column = str(op.get("value_column", "x") or "x")
+    aggregate_alias = "__datadiff_grouped_null_aggregate"
+    grouped_sql = (
+        f"SELECT {_quote(group_column)}, "
+        f"{aggregate.upper()}({_quote(value_column)}) AS {_quote(aggregate_alias)} "
+        f"FROM ({source_sql}) q GROUP BY {_quote(group_column)}"
+    )
+    observed_table = ctx.sql(
+        f"SELECT {_quote(aggregate_alias)} FROM ({grouped_sql}) q "
+        f"ORDER BY {_quote(aggregate_alias)} {direction.upper()} "
+        f"NULLS {nulls.upper()} LIMIT {limit}"
+    ).to_arrow_table()
+    observed_values = [
+        row.get(aggregate_alias) for row in observed_table.to_pylist()
     ]
-    exists_sql = f"EXISTS (SELECT 1 FROM {_quote(op_table(op))} r WHERE {' AND '.join(predicates)})"
-    return exists_sql if kind == "semi_join" else f"NOT {exists_sql}"
+    expected_values = list(op.get("expected_values", []) or [])
+    return observed_values != expected_values
+
+
+def _datafusion_confirmed_root_mismatch(
+    ctx: Any,
+    source_sql: str,
+    op: Any,
+) -> bool:
+    if str(op.get("target_backend", "") or "") != "datafusion":
+        return False
+    root_id = str(op.get("root_id", "") or "")
+    params = op.get("native_parameters", {})
+    if not isinstance(params, dict):
+        params = dict(params) if params else {}
+
+    def rows(sql: str) -> list[dict[str, Any]]:
+        return ctx.sql(sql).to_arrow_table().to_pylist()
+
+    if root_id == "datafusion-limit-offset-pushdown-001":
+        limit_n = max(1, int(params.get("inner_limit", 8) or 8))
+        offset_n = max(1, int(params.get("outer_offset", 1) or 1))
+        base = (
+            "SELECT l.id, COUNT(l.id) AS count_id, "
+            "COUNT(DISTINCT r.j) AS nunique_j "
+            f"FROM ({source_sql}) l LEFT JOIN {_quote('t1')} r ON l.id = r.id "
+            "GROUP BY l.id"
+        )
+        outer_order = (
+            "ORDER BY id DESC NULLS LAST, count_id DESC NULLS LAST, "
+            "nunique_j ASC NULLS LAST"
+        )
+        inner_order = (
+            "ORDER BY id DESC NULLS LAST, count_id DESC NULLS LAST, "
+            "nunique_j DESC NULLS LAST"
+        )
+        expected = rows(
+            f"SELECT * FROM ({base}) q {outer_order} OFFSET {offset_n}"
+        )
+        observed = rows(
+            f"SELECT * FROM (SELECT * FROM ({base}) q {inner_order} "
+            f"LIMIT {limit_n}) q2 {outer_order} OFFSET {offset_n}"
+        )
+        return observed != expected
+
+    if root_id == "datafusion-negative-zero-comparison-001":
+        expression_mode = str(params.get("expression_mode", "") or "")
+        expression = "y * -1" if expression_mode == "multiply_neg_one" else "-y"
+        comparator = str(params.get("comparator", "") or "")
+        operator = ">=" if comparator == "ge_zero" else "="
+        observed = rows(
+            f"SELECT id, ({expression}) AS m, "
+            f"(({expression}) {operator} 0.0) AS cmp "
+            f"FROM ({source_sql}) q WHERE y = 0.0 ORDER BY id"
+        )
+        return not observed or any(row.get("cmp") is not True for row in observed)
+
+    if root_id == "datafusion-distinct-null-topk-001":
+        projection_mode = str(params.get("projection_mode", "") or "")
+        if projection_mode == "aliased_subquery":
+            distinct_source = (
+                f"SELECT probe_v AS v FROM (SELECT v AS probe_v FROM ({source_sql}) q) p"
+            )
+        else:
+            distinct_source = f"SELECT v FROM ({source_sql}) q"
+        order_mode = str(params.get("order_mode", "") or "")
+        direction = "DESC" if order_mode == "desc_nulls_first" else "ASC"
+        base = f"SELECT DISTINCT v FROM ({distinct_source}) d"
+        full = rows(f"{base} ORDER BY v {direction} NULLS FIRST")
+        top = rows(f"{base} ORDER BY v {direction} NULLS FIRST LIMIT 1")
+        return top != full[:1]
+
+    if root_id == "datafusion-ordered-limit-idempotence-001":
+        limit_n = max(1, int(params.get("limit_n", 5) or 5))
+        offset_n = max(1, int(params.get("offset_n", 2) or 2))
+        inner_order = "ORDER BY s ASC NULLS FIRST, id ASC NULLS LAST"
+        outer_order = "ORDER BY x DESC NULLS FIRST, id ASC NULLS LAST"
+        limited = f"SELECT * FROM ({source_sql}) q {inner_order} LIMIT {limit_n}"
+        expected_sql = (
+            f"SELECT * FROM (SELECT * FROM ({limited}) q {outer_order} "
+            f"OFFSET {offset_n}) q {outer_order}"
+        )
+        duplicate_sql = (
+            "SELECT * FROM (SELECT * FROM ("
+            f"SELECT * FROM ({limited}) q {inner_order} LIMIT {limit_n}"
+            f") q {outer_order} OFFSET {offset_n}) q {outer_order}"
+        )
+        return rows(duplicate_sql) != rows(expected_sql)
+
+    raise ValueError(f"unsupported DataFusion confirmed root probe: {root_id}")
 
 
 def _tuple_absence_safe_condition(op: dict[str, Any]) -> str:
@@ -183,6 +305,42 @@ def _setop_all_duplicate_probe_sql(op: dict[str, Any]) -> str:
 
 class DataFusionBackend(Backend):
     name = "datafusion"
+    session_reuse_policy = "reset"
+    session_reset_managed_by_backend = True
+    plan_collection_support = "logical+physical_inline"
+
+    def __init__(self) -> None:
+        self._context = None
+        self._registered_tables: set[str] = set()
+        self._target_partitions = _datafusion_target_partitions()
+
+    def reset_for_case(self) -> None:
+        if self._context is None:
+            self._registered_tables.clear()
+            return
+        for table_name in tuple(self._registered_tables):
+            try:
+                self._context.deregister_table(table_name)
+            except Exception:  # noqa: BLE001
+                pass
+        self._registered_tables.clear()
+
+    def close(self) -> None:
+        self.reset_for_case()
+        self._context = None
+
+    def _context_for_case(self, SessionContext, SessionConfig):
+        if self._context is None:
+            self._context = SessionContext(
+                SessionConfig().with_target_partitions(self._target_partitions)
+            )
+        else:
+            self.reset_for_case()
+        return self._context
+
+    def _register_record_batches(self, ctx, table_name: str, batches) -> None:
+        ctx.register_record_batches(table_name, batches)
+        self._registered_tables.add(str(table_name))
 
     def _to_record_batch(self, table: TableData | PreparedTable, pa):
         prepared = prepare_table(table)
@@ -194,21 +352,28 @@ class DataFusionBackend(Backend):
             fields.append(pa.field(column.name, typ, nullable=column.nullable))
         return pa.RecordBatch.from_arrays(arrays, schema=pa.schema(fields))
 
-    def run(
+    def execute_lowered(
         self,
         tables: list[TableData | PreparedTable],
         program: Program,
         timeout_s: float = 5.0,
     ) -> BackendResult:
         start = time.perf_counter()
+        physical_plan = None
         try:
-            from datafusion import SessionContext
+            import datafusion
+            from datafusion import SessionConfig, SessionContext
             import pyarrow as pa
 
-            ctx = SessionContext()
+            ctx = self._context_for_case(SessionContext, SessionConfig)
             table_by_name = {table.name: table for table in tables}
+            semantic_state = ProgramState.from_table(tables[0])
             for table in tables:
-                ctx.register_record_batches(table.name, [[self._to_record_batch(table, pa)]])
+                self._register_record_batches(
+                    ctx,
+                    table.name,
+                    [[self._to_record_batch(table, pa)]],
+                )
 
             query = f"SELECT * FROM {_quote(tables[0].name)}"
             runtime = build_subquery_runtime(
@@ -245,27 +410,28 @@ class DataFusionBackend(Backend):
 
             for op in program.operations:
                 kind = op_kind(op)
+                next_semantic_state = state_after_operation(
+                    semantic_state,
+                    op,
+                    tables=table_by_name,
+                )
                 if kind == "join":
                     drop_hidden_order_cols()
                     right = table_by_name[op_table(op)]
                     _, right_keys = join_key_pairs(op)
-                    right_key_set = set(right_keys)
-                    right_cols = [
-                        f"r.{_quote(c.name)} AS {_quote(c.name)}"
-                        for c in right.columns
-                        if c.name not in right_key_set
-                    ]
-                    select_right = ", " + ", ".join(right_cols) if right_cols else ""
+                    right_types = {column.name: column.type for column in right.columns}
+                    select_right, projected_right = render_join_right_projection(
+                        right.column_names,
+                        right_keys,
+                        semantic_state.columns,
+                        _quote,
+                    )
                     join_kind = "LEFT JOIN" if join_how(op) == "left" else "INNER JOIN"
                     query = runtime.assign_source(
                         f"SELECT q.*{select_right} FROM ({query}) q {join_kind} {_quote(right.name)} r "
-                        f"ON {_join_condition(op)}"
+                        f"ON {render_join_condition(op, DATAFUSION_DIALECT, _quote, semantic_state.column_types, right_types)}"
                     )
-                    runtime.state.current_cols.extend(
-                        c.name
-                        for c in right.columns
-                        if c.name not in right_key_set and c.name not in runtime.state.current_cols
-                    )
+                    runtime.state.current_cols.extend(projected_right)
                     runtime.state.visible_cols = list(runtime.state.current_cols)
                     runtime.state.pending_order = None
                 elif kind == "union_all":
@@ -278,13 +444,27 @@ class DataFusionBackend(Backend):
                     runtime.state.current_cols = list(runtime.state.visible_cols)
                     runtime.state.pending_order = None
                 elif kind in {"semi_join", "anti_join"}:
-                    condition = _semi_anti_join_condition(op, kind)
+                    right = table_by_name[op_table(op)]
+                    right_types = {column.name: column.type for column in right.columns}
+                    condition = render_semi_anti_join_condition(
+                        op,
+                        kind,
+                        DATAFUSION_DIALECT,
+                        _quote,
+                        semantic_state.column_types,
+                        right_types,
+                    )
                     query = runtime.assign_source(f"SELECT * FROM ({query}) q WHERE {condition}")
                 elif kind == "drop_nulls":
                     condition = " AND ".join(f"q.{_quote(column)} IS NOT NULL" for column in op["columns"])
                     query = runtime.assign_source(f"SELECT * FROM ({query}) q WHERE {condition}")
                 elif kind == "filter":
-                    condition = sql_filter_condition(f"q.{_quote(op_column(op))}", _lit(op_value(op)), op_comparator(op))
+                    condition = render_filter_condition(
+                        f"q.{_quote(op_column(op))}",
+                        _lit(op_value(op)),
+                        op_comparator(op),
+                        DATAFUSION_DIALECT,
+                    )
                     query = runtime.assign_source(
                         f"SELECT * FROM ({query}) q "
                         f"WHERE {condition}"
@@ -326,8 +506,30 @@ class DataFusionBackend(Backend):
                     alias = op_output_alias(op)
                     materialized_name = f"__datadiff_sortedness_{len(runtime.state.current_cols)}"
                     arrow_table = pa.Table.from_pydict({alias: [ok]})
-                    ctx.register_record_batches(materialized_name, [arrow_table.to_batches()])
+                    self._register_record_batches(
+                        ctx,
+                        materialized_name,
+                        [arrow_table.to_batches()],
+                    )
                     _reset_probe_query(alias, f"SELECT * FROM {_quote(materialized_name)}")
+                elif kind == "datafusion_grouped_null_topk_probe":
+                    alias = op_output_alias(op)
+                    mismatch = _datafusion_grouped_null_topk_mismatch(
+                        ctx,
+                        query,
+                        op,
+                    )
+                    _reset_probe_query(
+                        alias,
+                        f"SELECT {'true' if mismatch else 'false'} AS {_quote(alias)}",
+                    )
+                elif kind == "confirmed_root_witness_probe":
+                    alias = op_output_alias(op)
+                    mismatch = _datafusion_confirmed_root_mismatch(ctx, query, op)
+                    _reset_probe_query(
+                        alias,
+                        f"SELECT {'true' if mismatch else 'false'} AS {_quote(alias)}",
+                    )
                 elif kind in EXTENDED_FALSE_PROBE_KINDS or is_default_false_probe_kind(kind):
                     alias = op_output_alias(op)
                     _reset_probe_query(alias, f"SELECT false AS {_quote(alias)}")
@@ -346,6 +548,9 @@ class DataFusionBackend(Backend):
                     runtime.state.reset_projection(cols)
                 elif kind == "fill_null":
                     column, expr_sql = render_fill_null_expr(op, _quote, _lit)
+                    output_type = next_semantic_state.column_types.get(column)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, DATAFUSION_DIALECT)
                     if runtime.state.pending_order_mentions(column):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(column, expr_sql, _quote)
@@ -356,6 +561,9 @@ class DataFusionBackend(Backend):
                         drop_hidden_order_cols()
                 elif kind == "coalesce":
                     alias, expr_sql = render_coalesce_expr(op, _quote, _lit)
+                    output_type = next_semantic_state.column_types.get(alias)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, DATAFUSION_DIALECT)
                     if runtime.state.pending_order_mentions(alias):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(alias, expr_sql, _quote)
@@ -365,7 +573,10 @@ class DataFusionBackend(Backend):
                         runtime.state.clear_pending_order()
                         drop_hidden_order_cols()
                 elif kind == "case_when":
-                    alias, expr_sql = render_case_when_expr(op, _quote, _lit)
+                    alias, expr_sql = render_case_when_expr(op, DATAFUSION_DIALECT, _quote, _lit)
+                    output_type = next_semantic_state.column_types.get(alias)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, DATAFUSION_DIALECT)
                     if runtime.state.pending_order_mentions(alias):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(alias, expr_sql, _quote)
@@ -394,7 +605,16 @@ class DataFusionBackend(Backend):
                     else:
                         query = runtime.assign_source(f"SELECT * FROM ({query}) q OFFSET {op_n(op)}")
                 elif kind == "mutate":
-                    out_column, expr_sql = render_mutate_expr(op, DATAFUSION_DIALECT, _quote, _lit)
+                    out_column, expr_sql = render_mutate_expr(
+                        op,
+                        DATAFUSION_DIALECT,
+                        _quote,
+                        _lit,
+                        semantic_state.column_types,
+                    )
+                    output_type = next_semantic_state.column_types.get(out_column)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, DATAFUSION_DIALECT)
                     if runtime.state.pending_order_mentions(out_column):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(out_column, expr_sql, _quote)
@@ -419,9 +639,28 @@ class DataFusionBackend(Backend):
                     runtime.state.reset_projection(aliases)
                 else:
                     raise ValueError(kind)
+                semantic_state = next_semantic_state
             query = runtime.assign_source(runtime.finalize_source())
-            out = ctx.sql(query).to_pandas()
-            return BackendResult(self.name, "ok", data=out, duration_ms=(time.perf_counter() - start) * 1000)
+            dataframe = ctx.sql(query)
+            if self.physical_plan_collection_enabled:
+                physical_plan = collect_physical_plan_bundle(
+                    backend=self.name,
+                    backend_version=str(getattr(datafusion, "__version__", "")),
+                    sources={
+                        "logical": lambda: str(dataframe.logical_plan()),
+                        "optimized_logical": lambda: str(dataframe.optimized_logical_plan()),
+                        "physical": lambda: str(dataframe.execution_plan()),
+                    },
+                    detail=self.physical_plan_collection_mode,
+                )
+            out = _arrow_native_rows(dataframe.to_arrow_table())
+            return BackendResult(
+                self.name,
+                "ok",
+                data=out,
+                duration_ms=(time.perf_counter() - start) * 1000,
+                physical_plan=physical_plan,
+            )
         except Exception as exc:  # noqa: BLE001
             return BackendResult(
                 self.name,
@@ -429,6 +668,7 @@ class DataFusionBackend(Backend):
                 error_type=type(exc).__name__,
                 error=str(exc),
                 duration_ms=(time.perf_counter() - start) * 1000,
+                physical_plan=physical_plan,
             )
 
 
@@ -440,3 +680,24 @@ def _arrow_type(pa, kind: str):
     if kind == "bool":
         return pa.bool_()
     return pa.string()
+
+
+def _datafusion_target_partitions() -> int:
+    """Use a deterministic single-partition default for bounded fuzz cases."""
+
+    raw = os.environ.get("DATADIFF_DATAFUSION_TARGET_PARTITIONS")
+    if raw is None:
+        return 1
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 1
+
+
+def _arrow_native_rows(table: Any) -> NativeRows:
+    columns = [str(column) for column in table.column_names]
+    return NativeRows(
+        columns=columns,
+        row_values=[[row.get(column) for column in columns] for row in table.to_pylist()],
+        column_types=[str(field.type) for field in table.schema],
+    )

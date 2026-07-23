@@ -1,10 +1,23 @@
 from __future__ import annotations
 
 import json
+import math
+from dataclasses import replace
 from dataclasses import dataclass
-from typing import Any, Iterable
+from functools import lru_cache
+from typing import Any, Callable, Iterable
 
-from datadiff.canonicalization import compare_result_batch, dedupe_by_canonical_key, short_canonical_hash
+from datadiff.canonicalization import (
+    compare_result_batch,
+    dedupe_by_canonical_key,
+    short_canonical_hash,
+)
+from datadiff.contract_comparison import (
+    ContractComparisonProfile,
+    compare_results_under_contract,
+    comparison_payload_for_case,
+    comparison_profile_for_case,
+)
 from datadiff.dsl import Case, ColumnSpec, Program, TableData, sort_columns
 from datadiff.operation_type_semantics import case_when_output_type
 from datadiff.expression_semantics import aggregate_output_type, cast_output_type, expr_output_type, literal_output_type
@@ -84,53 +97,17 @@ def ir_rewrite_metamorphic_rule_registry() -> dict[str, Any]:
 
 
 def all_metamorphic_variants(case: Case) -> list[MetamorphicVariant]:
-    variants: list[MetamorphicVariant] = []
-    variants.extend(_filter_input_materialization_variants(case))
-    variants.extend(_cleanup_input_materialization_variants(case))
-    variants.extend(_input_partition_union_all_variants(case))
-    variants.extend(_filter_rejecting_row_injection_variants(case))
-    variants.extend(_join_unmatched_dimension_injection_variants(case))
-    variants.extend(_join_inner_left_equivalence_variants(case))
-    variants.extend(_join_filter_pushdown_variants(case))
-    variants.extend(_semi_anti_join_rewrite_variants(case))
-    variants.extend(_groupby_sorted_input_variants(case))
-    variants.extend(_groupby_neutral_mutation_variants(case))
-    variants.extend(_mutate_add_zero_insertion_variants(case))
-    variants.extend(_filter_mutate_commutation_variants(case))
-    variants.extend(_string_lower_normalized_column_variants(case))
-    variants.extend(_string_lower_idempotence_variants(case))
-    variants.extend(_string_upper_idempotence_variants(case))
-    variants.extend(_string_strip_idempotence_variants(case))
-    variants.extend(_string_null_if_empty_idempotence_variants(case))
-    variants.extend(_string_replace_idempotence_variants(case))
-    variants.extend(_string_slice_prefix_idempotence_variants(case))
-    variants.extend(_string_split_part_idempotence_variants(case))
-    variants.extend(_filter_tautology_insertion_variants(case))
-    variants.extend(_offset_limit_fusion_variants(case))
-    variants.extend(_limit_offset_fusion_variants(case))
-    variants.extend(_offset_zero_insertion_variants(case))
-    variants.extend(_groupby_aggregation_permutation_variants(case))
-    variants.extend(_sort_select_commutation_variants(case))
-    variants.extend(_sort_idempotence_variants(case))
-    variants.extend(_row_permutation_variants(case))
-    variants.extend(_join_table_permutation_variants(case))
-    variants.extend(_filter_idempotence_variants(case))
-    variants.extend(_union_all_empty_append_variants(case))
-    variants.extend(_drop_nulls_idempotence_variants(case))
-    variants.extend(_semi_anti_join_unmatched_right_injection_variants(case))
-    variants.extend(_semi_anti_join_right_duplicate_variants(case))
-    variants.extend(_distinct_idempotence_variants(case))
-    variants.extend(_fill_null_idempotence_variants(case))
-    variants.extend(_coalesce_idempotence_variants(case))
-    variants.extend(_case_when_idempotence_variants(case))
-    variants.extend(_limit_idempotence_variants(case))
-    variants.extend(_groupby_key_permutation_variants(case))
-    variants.extend(_filter_commutativity_variants(case))
-    variants.extend(_select_idempotence_variants(case))
-    variants.extend(_limit_above_data_no_op_variants(case))
-    variants.extend(_offset_zero_at_tail_after_limit_variants(case))
-    variants.extend(_filter_idempotence_immediate_variants(case))
-    return variants
+    return [
+        variant
+        for _relations, builder in _metamorphic_builder_specs()
+        for variant in builder(case)
+    ]
+
+
+def constructible_metamorphic_relations(case: Case) -> frozenset[str]:
+    """Return relations for which the canonical builder produced a variant."""
+
+    return frozenset(variant.relation for variant in all_metamorphic_variants(case))
 
 
 def select_metamorphic_variants(
@@ -152,6 +129,104 @@ def select_metamorphic_variants(
     return [variant for _index, variant in ranked[:limit]]
 
 
+@lru_cache(maxsize=1)
+def metamorphic_relation_builder_registry(
+) -> dict[str, tuple[Callable[[Case], list[MetamorphicVariant]], ...]]:
+    """Executable builders used by CCS-guided obligation selection."""
+
+    registry: dict[str, list[Callable[[Case], list[MetamorphicVariant]]]] = {}
+    for relations, builder in _metamorphic_builder_specs():
+        for relation in relations:
+            registry.setdefault(relation, []).append(builder)
+    return {
+        relation: tuple(builders)
+        for relation, builders in registry.items()
+    }
+
+
+def _metamorphic_builder_specs() -> tuple[
+    tuple[tuple[str, ...], Callable[[Case], list[MetamorphicVariant]]], ...
+]:
+    """Single ordered source of truth for complete and guided construction."""
+
+    return (
+        (("filter_input_materialization",), _filter_input_materialization_variants),
+        (
+            (
+                "drop_nulls_input_materialization",
+                "fill_null_input_materialization",
+                "distinct_input_materialization",
+            ),
+            _cleanup_input_materialization_variants,
+        ),
+        (("input_partition_union_all",), _input_partition_union_all_variants),
+        (("filter_rejecting_row_injection",), _filter_rejecting_row_injection_variants),
+        (("join_unmatched_dimension_injection",), _join_unmatched_dimension_injection_variants),
+        (("join_inner_left_equivalence",), _join_inner_left_equivalence_variants),
+        (("join_filter_pushdown",), _join_filter_pushdown_variants),
+        (("semi_anti_join_rewrite",), _semi_anti_join_rewrite_variants),
+        (("groupby_sorted_input",), _groupby_sorted_input_variants),
+        (("groupby_neutral_mutation",), _groupby_neutral_mutation_variants),
+        (("mutate_add_zero_insertion",), _mutate_add_zero_insertion_variants),
+        (("filter_mutate_commutation",), _filter_mutate_commutation_variants),
+        (("string_lower_normalized_column",), _string_lower_normalized_column_variants),
+        (("string_lower_idempotence",), _string_lower_idempotence_variants),
+        (("string_upper_idempotence",), _string_upper_idempotence_variants),
+        (("string_strip_idempotence",), _string_strip_idempotence_variants),
+        (("string_null_if_empty_idempotence",), _string_null_if_empty_idempotence_variants),
+        (("string_replace_idempotence",), _string_replace_idempotence_variants),
+        (("string_slice_prefix_idempotence",), _string_slice_prefix_idempotence_variants),
+        (("string_split_part_idempotence",), _string_split_part_idempotence_variants),
+        (("filter_tautology_insertion",), _filter_tautology_insertion_variants),
+        (("offset_limit_fusion",), _offset_limit_fusion_variants),
+        (("limit_offset_fusion",), _limit_offset_fusion_variants),
+        (("offset_zero_insertion",), _offset_zero_insertion_variants),
+        (("groupby_aggregation_permutation",), _groupby_aggregation_permutation_variants),
+        (("sort_select_commutation",), _sort_select_commutation_variants),
+        (("sort_idempotence",), _sort_idempotence_variants),
+        (("row_permutation",), _row_permutation_variants),
+        (("join_table_permutation",), _join_table_permutation_variants),
+        (("filter_idempotence",), _filter_idempotence_variants),
+        (("union_all_empty_append",), _union_all_empty_append_variants),
+        (("drop_nulls_idempotence",), _drop_nulls_idempotence_variants),
+        (
+            ("semi_anti_join_unmatched_right_injection",),
+            _semi_anti_join_unmatched_right_injection_variants,
+        ),
+        (
+            ("semi_anti_join_right_duplicate_injection",),
+            _semi_anti_join_right_duplicate_variants,
+        ),
+        (("distinct_idempotence",), _distinct_idempotence_variants),
+        (("fill_null_idempotence",), _fill_null_idempotence_variants),
+        (("coalesce_idempotence",), _coalesce_idempotence_variants),
+        (("case_when_idempotence",), _case_when_idempotence_variants),
+        (("limit_idempotence",), _limit_idempotence_variants),
+        (("groupby_key_permutation",), _groupby_key_permutation_variants),
+        (("filter_commutativity",), _filter_commutativity_variants),
+        (("select_idempotence",), _select_idempotence_variants),
+        (("limit_above_data_no_op",), _limit_above_data_no_op_variants),
+        (("offset_zero_at_tail_after_limit",), _offset_zero_at_tail_after_limit_variants),
+        (("filter_idempotence_immediate",), _filter_idempotence_immediate_variants),
+    )
+
+
+def build_metamorphic_variants_for_relations(
+    case: Case,
+    relations: Iterable[str],
+) -> list[MetamorphicVariant]:
+    registry = metamorphic_relation_builder_registry()
+    requested = tuple(dict.fromkeys(str(item) for item in relations if str(item)))
+    requested_set = set(requested)
+    builders: list[Callable[[Case], list[MetamorphicVariant]]] = []
+    for relation in requested:
+        for builder in registry.get(relation, ()):
+            if builder not in builders:
+                builders.append(builder)
+    variants = [variant for builder in builders for variant in builder(case)]
+    return [variant for variant in variants if variant.relation in requested_set]
+
+
 def _relation_order_index(relation_order: Iterable[Any] | None) -> dict[str, int]:
     out: dict[str, int] = {}
     for value in relation_order or []:
@@ -165,20 +240,54 @@ def evaluate_metamorphic_variants(
     case: Case,
     base: dict[str, NormalizedResult],
     variants: dict[str, dict[str, NormalizedResult]],
+    *,
+    comparison_mode: str = "contract",
 ) -> list[Finding]:
+    if comparison_mode not in {"legacy", "contract"}:
+        raise ValueError(f"unsupported comparison mode: {comparison_mode}")
     findings: list[Finding] = []
+    base_comparison_profile = comparison_profile_for_case(case)
     for variant_name, normalized in variants.items():
+        relation = variant_name.split(":", 1)[0]
+        comparison_profile = _metamorphic_comparison_profile(
+            base_comparison_profile,
+            relation,
+        )
         for backend, base_result in base.items():
             variant_result = normalized.get(backend)
             if variant_result is None:
                 continue
-            if base_result.comparison_key == variant_result.comparison_key:
-                continue
-            if _relaxed_float_payload(base_result) == _relaxed_float_payload(variant_result):
-                continue
-            relation = variant_name.split(":", 1)[0]
-            mismatch_class = compare_result_batch([base_result, variant_result]).mismatch_class
-            sig = _signature(case, backend, variant_name, base_result, variant_result)
+            contract_comparison = None
+            if comparison_mode == "legacy":
+                if base_result.comparison_key == variant_result.comparison_key:
+                    continue
+                if _relaxed_float_payload(base_result) == _relaxed_float_payload(variant_result):
+                    continue
+                comparison = compare_result_batch([base_result, variant_result])
+            else:
+                contract_comparison = compare_results_under_contract(
+                    case,
+                    [base_result, variant_result],
+                    profile=comparison_profile,
+                )
+                if not contract_comparison.has_mismatch:
+                    continue
+                comparison = contract_comparison.comparison
+            mismatch_class = comparison.mismatch_class
+            sig = _signature(
+                case,
+                backend,
+                variant_name,
+                base_result,
+                variant_result,
+                profile=comparison_profile,
+                comparison_mode=comparison_mode,
+            )
+            comparison_detail = (
+                f"mismatch_class={mismatch_class}"
+                if comparison_mode == "legacy"
+                else f"view={contract_comparison.profile.view}; mismatch_class={mismatch_class}"
+            )
             findings.append(
                 Finding(
                     finding_id=f"finding-{sig}",
@@ -188,7 +297,7 @@ def evaluate_metamorphic_variants(
                     evidence=(
                         f"Backend {backend} violates metamorphic relation {variant_name}; "
                         f"base_status={base_result.status} variant_status={variant_result.status}; "
-                        f"mismatch_class={mismatch_class}"
+                        f"{comparison_detail}"
                     ),
                     signature=sig,
                     root_cause=f"metamorphic_{relation}",
@@ -198,6 +307,18 @@ def evaluate_metamorphic_variants(
                 )
             )
     return findings
+
+
+def _metamorphic_comparison_profile(
+    profile: ContractComparisonProfile,
+    relation: str,
+) -> ContractComparisonProfile:
+    if relation == "semi_anti_join_rewrite" and profile.view == "ordered_value":
+        # The rewrite checks relational membership equivalence. Replacing an
+        # existence join with an inner/left join does not promise that the
+        # physical join operator preserves an upstream row order.
+        return replace(profile, view="bag_value")
+    return profile
 
 
 def _row_permutation_variants(case: Case) -> list[MetamorphicVariant]:
@@ -441,6 +562,8 @@ def _join_unmatched_dimension_injection_variants(case: Case) -> list[Metamorphic
         right = table_by_name.get(op_table(op))
         if right is None:
             continue
+        if any(op_table(later_op) == right.name for later_op in case.program.operations[idx + 1 :]):
+            continue
         left_keys, right_keys = join_key_pairs(op)
         if len(left_keys) != 1 or len(right_keys) != 1:
             continue
@@ -499,7 +622,10 @@ def _join_inner_left_equivalence_variants(case: Case) -> list[MetamorphicVariant
         right = table_by_name.get(op_table(op))
         if right is None or not left_on or not right_on or left_on in mutated:
             return []
-        left_values = {row.get(left_on) for row in primary.rows}
+        left_raw_values = [row.get(left_on) for row in primary.rows]
+        if any(_is_nullish_join_key(value) for value in left_raw_values):
+            return []
+        left_values = set(left_raw_values)
         if not left_values:
             return []
         right_values = {row.get(right_on) for row in right.rows}
@@ -541,6 +667,12 @@ def _multiset_stable_tail(case: Case, start_index: int) -> bool:
             if func == "sum" and source_type == "float":
                 return False
     return True
+
+
+def _is_nullish_join_key(value: Any) -> bool:
+    if value is None:
+        return True
+    return isinstance(value, float) and math.isnan(value)
 
 
 def _join_filter_pushdown_variants(case: Case) -> list[MetamorphicVariant]:
@@ -1755,6 +1887,15 @@ def _semi_anti_join_right_duplicate_variants(case: Case) -> list[MetamorphicVari
         right = tables.get(op_table(op))
         if right is None:
             continue
+        if any(
+            other_index != idx and op_table(other) == right.name
+            for other_index, other in enumerate(case.program.operations)
+        ):
+            # The transformation mutates the input table globally. Reusing
+            # that table in another operation (for example an earlier inner
+            # join) can legitimately change the program before the target
+            # existence join, invalidating the MR.
+            continue
         _, right_keys = join_key_pairs(op)
         if not right_keys:
             continue
@@ -2147,13 +2288,21 @@ def _fresh_unmatched_value(column_type: str, existing: set[Any]) -> Any:
     return _NO_VALUE
 
 
-def _payload(norm: NormalizedResult) -> dict[str, Any]:
-    return {
-        "status": norm.status,
-        "columns": norm.columns,
-        "rows": norm.rows,
-        "error_type": norm.error_type,
-    }
+def _payload(
+    case: Case,
+    norm: NormalizedResult,
+    *,
+    profile: ContractComparisonProfile,
+    comparison_mode: str,
+) -> dict[str, Any]:
+    if comparison_mode == "legacy":
+        return {
+            "status": norm.status,
+            "columns": norm.columns,
+            "rows": norm.rows,
+            "error_type": norm.error_type,
+        }
+    return comparison_payload_for_case(case, norm, profile=profile)
 
 
 def _relaxed_float_payload(norm: NormalizedResult) -> dict[str, Any]:
@@ -2174,12 +2323,25 @@ def _signature(
     variant_name: str,
     base_result: NormalizedResult,
     variant_result: NormalizedResult,
+    *,
+    profile: ContractComparisonProfile,
+    comparison_mode: str = "contract",
 ) -> str:
     payload = {
         "case_id": case.case_id,
         "backend": backend,
         "variant": variant_name,
-        "base": _payload(base_result),
-        "variant_result": _payload(variant_result),
+        "base": _payload(
+            case,
+            base_result,
+            profile=profile,
+            comparison_mode=comparison_mode,
+        ),
+        "variant_result": _payload(
+            case,
+            variant_result,
+            profile=profile,
+            comparison_mode=comparison_mode,
+        ),
     }
     return short_canonical_hash(payload, 16)

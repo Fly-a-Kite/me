@@ -1,0 +1,683 @@
+{
+  "canonical_serialization": {
+    "bytes_encoding": "tagged RFC 4648 base64",
+    "dataclass_encoding": "declared dataclass fields; nested values recursively canonicalized",
+    "encoding": "UTF-8 canonical JSON",
+    "float_encoding": "finite float.hex; tagged nan,+inf,-inf,-0",
+    "mapping_keys": "non-empty schema fields use string keys only; non-string keys fail closed",
+    "mapping_order": "lexicographic key order",
+    "schema_version": "osc-canonical-json-v1",
+    "sequence_order": "tuple/list order is preserved",
+    "set_order": "canonical JSON byte order",
+    "unknown_values": "fail closed with TypeError"
+  },
+  "compatibility": {
+    "authority_rule": "private lookalike dataclasses are forbidden; import the unique source",
+    "field_change": "adding, removing, renaming, retyping or reordering a field requires a new schema version",
+    "reader_rule": "exact schema version unless an explicit versioned adapter is registered",
+    "v1_facade": "read-only after root-owned compatibility parity; never semantic authority"
+  },
+  "contract_authority": {
+    "contract_fingerprint_registry_digest": "HyperContract.registry_digest and ContractFingerprint.registry_digest bind the authority RelationRegistry, including versioned trusted evaluator implementation identities",
+    "derivation_rule_registry_digest": "DerivationCertificate.rule_registry_digest separately binds the compiler rule registry and must not be substituted for the authority relation registry",
+    "evaluator_identity": "each relation evaluator has an explicit versioned implementation identity whose binding is validated against the trusted implementation before its registry can be used",
+    "registry_injection": "a supplied RelationRegistry whose digest or trusted evaluator binding differs from the contract-bound authority registry fails closed before screening or exact evaluation"
+  },
+  "coverage_admission": {
+    "activated": "activation certificate required",
+    "constructed": "construction/preflight evidence",
+    "executed": "activation, applicability and structured endpoint outcomes required",
+    "observed": "activation, applicability and observation certificate required"
+  },
+  "evidence_tiers": {
+    "audit": "exact required",
+    "finding": "exact required",
+    "fresh_confirmation": "exact and uncached",
+    "native_reproduction": "exact and uncached",
+    "screening": "fingerprint screening allowed; any uncertainty escalates exact",
+    "unknown": "rejected"
+  },
+  "execution_outcome_policy": {
+    "adapter_error": "INCONCLUSIVE with structured adapter outcome",
+    "crash": "INCONCLUSIVE with structured crash outcome",
+    "missing": "INCONCLUSIVE with structured missing-result outcome",
+    "ok": "relation evaluation decides SATISFIED or VIOLATED",
+    "semantic_error": "an explicit error relation decides SATISFIED or VIOLATED; otherwise fail closed",
+    "timeout": "INCONCLUSIVE with structured timeout outcome",
+    "unsupported": "INAPPLICABLE only with capability evidence bound to endpoint and contract"
+  },
+  "hash_rule": {
+    "algorithm": "SHA-256",
+    "envelope_fields": [
+      "canonical_schema_version",
+      "namespace",
+      "payload"
+    ],
+    "python_hash_forbidden": true,
+    "text_form": "<namespace>-<64 lowercase hex digits>"
+  },
+  "obligation_partitions": {
+    "combined_public_denominator": "forbidden",
+    "fresh": "CompiledTargetUniverse.fresh_backend_pair_obligations",
+    "regression": "CompiledTargetUniverse.regression_backend_pair_obligations"
+  },
+  "owner": "root",
+  "schema_version": "osc-public-api-freeze-v1",
+  "status": "frozen_after_phase5_cr_osc_5_001",
+  "symbols": {
+    "ActivationCertificate": {
+      "fields": [
+        "target_fingerprint",
+        "assignment_digest",
+        "selected_cell_ids",
+        "activated_cell_ids",
+        "required_atoms",
+        "observed_atoms",
+        "missing_atoms",
+        "forbidden_atoms",
+        "static_facts",
+        "semantic_atom_digests",
+        "preflight_valid",
+        "mutation_preserved",
+        "degraded_reasons",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.semantic_targets.model"
+    },
+    "ApplicabilityCertificate": {
+      "fields": [
+        "contract_digest",
+        "endpoint_digests",
+        "capability_decisions",
+        "satisfied_preconditions",
+        "missing_preconditions",
+        "unsupported_evidence",
+        "selected_atoms",
+        "activated_atoms",
+        "mutation_preserved",
+        "verdict",
+        "reason",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.contract_engine.applicability"
+    },
+    "AtomProvenance": {
+      "fields": [
+        "source_kind",
+        "source_digest",
+        "source_path",
+        "evidence_digest",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "BackendPairObligation": {
+      "fields": [
+        "obligation_id",
+        "target_cell_id",
+        "provenance_class",
+        "target_backend",
+        "control_backend",
+        "observation_contract",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.semantic_targets.model"
+    },
+    "CompiledTargetUniverse": {
+      "fields": [
+        "fresh_cells",
+        "regression_cells",
+        "fresh_edges",
+        "fresh_backend_pair_obligations",
+        "regression_backend_pair_obligations",
+        "shadow_tiles",
+        "taxonomy_digest",
+        "template_digest",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.semantic_targets.model"
+    },
+    "ContractFingerprint": {
+      "fields": [
+        "contract_digest",
+        "registry_digest",
+        "canonical_schema_version",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "ContrastEdge": {
+      "fields": [
+        "contrast_edge_id",
+        "base_cell_id",
+        "sibling_cell_id",
+        "changed_axis",
+        "base_value",
+        "sibling_value",
+        "relation",
+        "activation_contract",
+        "observation_contract",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.semantic_targets.model"
+    },
+    "ContrastSet": {
+      "fields": [
+        "contrast_set_id",
+        "base_cell_id",
+        "sibling_cell_ids",
+        "edge_ids",
+        "assignment_digest",
+        "seed_lineage",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.semantic_targets.model"
+    },
+    "CoverageLevel": {
+      "kind": "enum",
+      "source": "datadiff_osc.schemas",
+      "values": [
+        "constructed",
+        "activated",
+        "executed",
+        "observed"
+      ]
+    },
+    "DerivationCertificate": {
+      "fields": [
+        "program_digest",
+        "rule_registry_digest",
+        "forward_digest",
+        "backward_digest",
+        "rule_ids",
+        "premise_fact_ids",
+        "output_fact_ids",
+        "backend_overlay_digests",
+        "unresolved_facts",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.contract_engine.derivation"
+    },
+    "Endpoint": {
+      "fields": [
+        "endpoint_id",
+        "case_digest",
+        "backend",
+        "backend_version",
+        "adapter_revision",
+        "execution_mode",
+        "physical_layout",
+        "optimizer_config",
+        "capabilities"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.contract_engine.model"
+    },
+    "EvidenceEnvelope": {
+      "fields": [
+        "evidence_id",
+        "state",
+        "result_group_digest",
+        "task_id",
+        "seed_lineage_digest",
+        "contract_fingerprint",
+        "target_fingerprint",
+        "derivation_certificate_digest",
+        "applicability_certificate_digest",
+        "activation_certificate_digest",
+        "observation_certificate_digest",
+        "execution_outcomes",
+        "verdict_kind",
+        "artifact_refs",
+        "metadata",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "EvidenceState": {
+      "kind": "enum",
+      "source": "datadiff_osc.schemas",
+      "values": [
+        "finding",
+        "stable_survivor",
+        "native_reproducible",
+        "minimized",
+        "unique_root",
+        "independently_confirmed",
+        "not_a_candidate"
+      ]
+    },
+    "EvidenceTier": {
+      "kind": "enum",
+      "source": "datadiff_osc.schemas",
+      "values": [
+        "screening",
+        "audit",
+        "finding",
+        "fresh_confirmation",
+        "native_reproduction"
+      ]
+    },
+    "ExecutionStatus": {
+      "kind": "enum",
+      "source": "datadiff_osc.schemas",
+      "values": [
+        "ok",
+        "semantic_error",
+        "unsupported",
+        "timeout",
+        "crash",
+        "adapter_error",
+        "missing"
+      ]
+    },
+    "FailureKind": {
+      "kind": "enum",
+      "source": "datadiff_osc.schemas",
+      "values": [
+        "none",
+        "semantic_domain_error",
+        "unsupported_capability",
+        "timeout",
+        "crash",
+        "adapter_error",
+        "missing_result",
+        "unknown"
+      ]
+    },
+    "HyperContract": {
+      "fields": [
+        "contract_id",
+        "endpoint_requirements",
+        "preconditions",
+        "observations",
+        "obligations",
+        "strength",
+        "derivation_digest",
+        "registry_digest",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.contract_engine.model"
+    },
+    "InfeasibleConstructionEvidence": {
+      "fields": [
+        "target_fingerprint",
+        "assignment_digest",
+        "reason_code",
+        "missing_requirements",
+        "attempts",
+        "trace_digest",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "InteractionTile": {
+      "fields": [
+        "tile_id",
+        "test_family_id",
+        "axis_a",
+        "axis_b",
+        "base_cell_id",
+        "a_only_cell_id",
+        "b_only_cell_id",
+        "joint_cell_id",
+        "non_target_coordinates",
+        "relation",
+        "scheduler_status",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.semantic_targets.model"
+    },
+    "LedgerEvent": {
+      "fields": [
+        "task_id",
+        "level",
+        "event_order_key",
+        "cell_ids",
+        "edge_ids",
+        "backend_pair_obligation_ids",
+        "activation_certificate_digest",
+        "applicability_certificate_digest",
+        "observation_certificate_digest",
+        "execution_outcome_digests",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "Observation": {
+      "fields": [
+        "endpoint_id",
+        "status",
+        "schema",
+        "rows",
+        "error_category",
+        "error_type",
+        "error_message",
+        "execution_metadata",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.contract_engine.model"
+    },
+    "ObservationCertificate": {
+      "fields": [
+        "contract_digest",
+        "applicability_digest",
+        "executed_endpoint_ids",
+        "observer_ids",
+        "component_fingerprints",
+        "relation_trace",
+        "comparison_stage",
+        "exact_escalated",
+        "materialized_endpoint_ids",
+        "verdict",
+        "cache_used",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.contract_engine.evidence"
+    },
+    "ProvenanceClass": {
+      "kind": "enum",
+      "source": "datadiff_osc.semantic_targets.model",
+      "values": [
+        "fresh_discovery",
+        "known_regression",
+        "sensitivity_control"
+      ]
+    },
+    "RelationObligation": {
+      "fields": [
+        "obligation_id",
+        "relation_id",
+        "endpoint_ids",
+        "components",
+        "parameters",
+        "strength",
+        "relation_properties"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.contract_engine.model"
+    },
+    "ResourceTokens": {
+      "fields": [
+        "cpu_tokens",
+        "rss_bytes",
+        "io_class",
+        "backend_internal_threads",
+        "exclusive_state",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "ResultGroup": {
+      "fields": [
+        "result_group_id",
+        "task_ids",
+        "endpoint_ids",
+        "contract_fingerprint",
+        "target_fingerprint",
+        "evidence_tier",
+        "result_order_key",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "RuntimeCacheKey": {
+      "fields": [
+        "endpoint_digest",
+        "contract_fingerprint",
+        "semantic_schema_version",
+        "backend",
+        "backend_version",
+        "adapter_revision",
+        "execution_mode",
+        "physical_layout",
+        "evidence_tier",
+        "canonical_schema_version",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "SchemaField": {
+      "fields": [
+        "name",
+        "logical_type",
+        "nullable"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.contract_engine.model"
+    },
+    "SeedLineage": {
+      "fields": [
+        "protocol_digest",
+        "master_seed",
+        "lane_id",
+        "case_index",
+        "stage_name",
+        "counter",
+        "parent_digest",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "SeedStage": {
+      "kind": "enum",
+      "source": "datadiff_osc.schemas",
+      "values": [
+        "target",
+        "axes",
+        "constructor",
+        "data",
+        "boundary",
+        "mutation",
+        "backend",
+        "oracle_sample"
+      ]
+    },
+    "SemanticAtom": {
+      "fields": [
+        "atom_id",
+        "namespace",
+        "value",
+        "provenance",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "StagedComparisonRequest": {
+      "fields": [
+        "result_group_digest",
+        "contract_fingerprint",
+        "endpoint_ids",
+        "observer_ids",
+        "evidence_tier",
+        "force_exact",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "StagedComparisonResult": {
+      "fields": [
+        "request_digest",
+        "plan_digest",
+        "observation_certificate_digest",
+        "evidence_tier",
+        "comparison_stage",
+        "exact_escalated",
+        "endpoint_order",
+        "component_fingerprint_digests",
+        "verdict_kind",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "StructuredExecutionOutcome": {
+      "fields": [
+        "endpoint_id",
+        "status",
+        "failure_kind",
+        "reason",
+        "unsupported_evidence_digest",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "TargetAssignment": {
+      "fields": [
+        "selected_cell_ids",
+        "seed_lineage",
+        "selected_edge_ids",
+        "selected_tile_ids",
+        "parameters"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.semantic_targets.model"
+    },
+    "TargetCell": {
+      "fields": [
+        "target_cell_id",
+        "template_id",
+        "test_family_id",
+        "provenance_class",
+        "coordinates",
+        "required_all_atoms",
+        "required_any_atom_groups",
+        "forbidden_atoms",
+        "target_backend",
+        "control_backends",
+        "required_capabilities",
+        "risk_class",
+        "cost_class",
+        "construction_contract",
+        "activation_contract",
+        "observation_contract",
+        "construction_index",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.semantic_targets.model"
+    },
+    "TargetFingerprint": {
+      "fields": [
+        "universe_digest",
+        "taxonomy_digest",
+        "template_digest",
+        "canonical_schema_version",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "TargetTemplate": {
+      "fields": [
+        "template_id",
+        "test_family_id",
+        "provenance_class",
+        "semantic_dimensions",
+        "axes",
+        "required_all_atoms",
+        "required_any_atom_groups",
+        "forbidden_atoms",
+        "target_backend",
+        "control_backends",
+        "required_capabilities",
+        "risk_class",
+        "priority",
+        "cost_class",
+        "constructor_provider",
+        "oracle_relation",
+        "provenance_evidence_id",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.semantic_targets.model"
+    },
+    "TaskIdentity": {
+      "fields": [
+        "protocol_digest",
+        "task_kind",
+        "epoch_index",
+        "decision_index",
+        "seed_lineage_digest",
+        "contrast_set_id",
+        "endpoint_id",
+        "backend",
+        "attempt",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "TaskKind": {
+      "kind": "enum",
+      "source": "datadiff_osc.schemas",
+      "values": [
+        "epoch_decision",
+        "contrast_construction",
+        "endpoint_preflight",
+        "endpoint_activation",
+        "backend_execution",
+        "fingerprint_cluster",
+        "full_diff",
+        "fresh_recheck",
+        "localization",
+        "reduction",
+        "native_reproduction"
+      ]
+    },
+    "TaskSpec": {
+      "fields": [
+        "identity",
+        "dependency_task_ids",
+        "resources",
+        "payload_digest",
+        "schema_version"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.schemas"
+    },
+    "Verdict": {
+      "fields": [
+        "kind",
+        "reason",
+        "components"
+      ],
+      "kind": "frozen_dataclass",
+      "source": "datadiff_osc.contract_engine.model"
+    },
+    "VerdictKind": {
+      "kind": "enum",
+      "source": "datadiff_osc.schemas",
+      "values": [
+        "SATISFIED",
+        "VIOLATED",
+        "INAPPLICABLE",
+        "INCONCLUSIVE"
+      ]
+    }
+  },
+  "twenty_four_hour_run_authorized": false
+}

@@ -1,0 +1,332 @@
+schema_version: osc-change-request-ledger-v1
+phase: 5
+requests:
+  - id: CR-OSC-5-001
+    requester: contract
+    symbol: HyperContract.registry_digest / ContractFingerprint.registry_digest semantics
+    reason: >-
+      HyperContract.registry_digest was populated with the compiler rule-registry
+      digest while exact authority is executed by a separate RelationRegistry.
+      The existing meaning cannot reject a same-metadata replacement evaluator.
+    minimal_change: >-
+      Keep every public field, type, order, dataclass, and schema version unchanged.
+      Freeze registry_digest as the authority RelationRegistry digest, including
+      versioned trusted evaluator implementation identities. Keep
+      DerivationCertificate.rule_registry_digest as the separate compiler-rule
+      binding. Reject any registry mismatch before screening or exact evaluation.
+    alternatives_considered:
+      - alternative: add relation_registry_digest to public dataclasses
+        decision: rejected
+        reason: unnecessary larger migration and new public schema version
+      - alternative: hash callable names/source without comparing to the contract fingerprint
+        decision: rejected
+        reason: does not prevent evaluator substitution
+      - alternative: ignore caller registry and always use the current default
+        decision: rejected
+        reason: does not prove that an older contract was compiled against the current evaluator version
+    affected_tests:
+      - tests/osc/test_contract_authority.py
+      - tests/osc/test_public_api_freeze.py
+      - tests/osc/test_comparison_staged.py
+    owner: root_then_contract
+    status: accepted_root_manifest_updated
+    prior_manifest_sha256: 669816be0f913def018518ea85d2cc03b517453cc8e5ba764908dc3c3f42920f
+    updated_manifest_sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    freeze_validation: tests/osc/test_public_api_freeze.py -> 7 passed in 0.25s
+    field_shape_changed: false
+    schema_version_changed: false
+    twenty_four_hour_run_authorized: false
+  - id: CR-OSC-5-002
+    requester: root_contract_barrier_review
+    symbol: authority Endpoint evidence routing and exact-path ownership
+    reason: >-
+      Root independently reproduced that a v1-only contract can be rebound to a
+      v9 Endpoint and still return SATISFIED when monitor_exact receives neither
+      the original Endpoint tuple nor independently bound observation provenance.
+      Matching metadata.endpoint_digest to a replaced certificate endpoint digest
+      also remains forgeable and does not permit backend/version/mode/layout
+      revalidation.
+    minimal_change: >-
+      Keep every frozen dataclass field, type, order, schema version, and manifest
+      entry unchanged. Require every authority comparison to receive the original
+      Endpoint tuple, re-run applicability scope/capability/digest validation, and
+      require every Observation metadata.endpoint_digest to equal the corresponding
+      recomputed Endpoint digest. Route Endpoint tuples through the non-frozen
+      StagedComparisonEngine wrapper and the Phase 6 parity fixture. Missing either
+      authority input fails closed before screening or exact evaluation.
+    alternatives_considered:
+      - alternative: trust certificate.endpoint_digests without Endpoint objects
+        decision: rejected
+        reason: the certificate can be replaced and the digest does not expose scope fields
+      - alternative: trust matching observation and certificate digest strings
+        decision: rejected
+        reason: both strings can be forged together and v1-to-v9 rebinding still passes
+      - alternative: add Endpoint payload fields to frozen public certificates
+        decision: rejected
+        reason: unnecessary public schema migration because the original Endpoint tuple already exists at execution time
+    affected_source:
+      - src/datadiff_osc/contract_engine/applicability.py
+      - src/datadiff_osc/comparison/staged.py
+      - scripts/osc/audit_staged_parity.py
+    affected_tests:
+      - tests/osc/test_contract_authority.py
+      - tests/osc/test_contract_relations_planner.py
+      - tests/osc/test_contract_two_pass_properties.py
+      - tests/osc/test_contract_entailment.py
+      - tests/osc/test_contract_v1_compatibility.py
+      - tests/osc/test_comparison_staged.py
+    owner: contract_then_root
+    status: accepted_exact_path_expansion_no_frozen_interface_change
+    manifest_sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    field_shape_changed: false
+    schema_version_changed: false
+    public_manifest_changed: false
+    twenty_four_hour_run_authorized: false
+  - id: CR-OSC-5-003
+    requester: root_search_barrier_review
+    symbol: TargetCell/ContrastEdge/BackendPairObligation observation_contract semantics
+    reason: >-
+      Root independently reproduced that a credited pandas-to-polars obligation
+      reaches observed using an unrelated left_backend-to-right_backend
+      HyperContract.  The target compiler also collapses 232 cells to 10
+      observation-contract IDs and 384 directional edges to 12 IDs, so the
+      ledger has no trusted resolver from a credited target to an executable
+      HyperContract.
+    minimal_change: >-
+      Keep every frozen dataclass field, type, order and schema version
+      unchanged.  Freeze observation_contract as a unique, recomputable policy
+      identity that binds the full cell or edge identity, backend roles,
+      direction and a versioned predicate plugin when present.  Materialize the
+      authority HyperContract only from the trusted universe policy, original
+      per-cell extraction source and original Endpoint objects.  Require edge
+      authority to cover both base and sibling contexts and a declared backend
+      pair for each context.
+    alternatives_considered:
+      - alternative: compare caller-supplied contract digest strings
+        decision: rejected
+        reason: the caller can forge the target and contract digests together
+      - alternative: disable observed edge credit
+        decision: rejected
+        reason: this makes the frozen 384-of-384 observed hard gate unreachable
+      - alternative: treat every probe as bag equality
+        decision: rejected
+        reason: the five mismatch predicates require witness_false and distinct versioned identities
+      - alternative: add public target-policy fields
+        decision: rejected
+        reason: the existing observation_contract field can carry the policy identity without a schema migration
+    affected_source:
+      - src/datadiff_osc/probe_contracts.py
+      - src/datadiff_osc/semantic_targets/compiler.py
+      - src/datadiff_osc/search/ledger.py
+    affected_tests:
+      - tests/osc/test_probe_contract_integration.py
+      - tests/osc/test_search_ledger.py
+      - tests/osc/test_public_api_freeze.py
+    owner: root_then_search
+    status: closed_root_and_search_consumers_verified
+    field_shape_changed: false
+    schema_version_changed: false
+    public_manifest_changed: false
+    twenty_four_hour_run_authorized: false
+  - id: CR-OSC-5-004
+    requester: root_runtime_barrier_review
+    symbol: authoritative gate evidence plan and full frozen gate-set calculation
+    reason: >-
+      Root and Runtime independently reproduced that a caller-authored manifest
+      can self-assert its source digest and use 232 nonexistent cell identities
+      for both fresh_cells_observed and fresh_cells_declared.  Because the raw
+      bytes and manifest are hash-self-consistent, the current implementation
+      reports evidence.valid=true and coverage.fresh_cells passed=true.  The
+      custom specs parameter can also turn a passing one-gate evaluation into a
+      GateReport whose all_gates_pass field appears authoritative.
+    minimal_change: >-
+      Add a non-public, hash-verified GateAuthorityPlan consumer that is supplied
+      independently from the raw manifest and binds the expected source digest,
+      complete default 41-gate spec-set digest, exact COUNT_UNIQUE denominator
+      identity-universe digests/cardinalities with provenance, and exact allowed
+      raw-artifact identities/hashes/schemas.  Authoritative calculation must
+      always run the complete default gate set and revalidate plan, source,
+      manifest, artifact, reducer, denominator-universe and numerator-subset
+      bindings.  Move custom/subset calculations to a separate evaluation-only
+      report that can never be authority eligible or authorize 24h.  Root will
+      later materialize the trusted plan from declaration/compiler, frozen plans
+      and Phase 6 producers under CR-OSC-ROOT-004; Runtime must not derive trust
+      from the caller-authored raw manifest itself.
+    alternatives_considered:
+      - alternative: accept a caller-provided expected_source_digest only
+        decision: rejected
+        reason: a caller can use the expected source string while still forging cell identities and observed credit
+      - alternative: validate only exact denominator cardinalities such as 232
+        decision: rejected
+        reason: same-cardinality replacement identities still fabricate coverage
+      - alternative: keep specs parameter on authoritative calculate_gate_report
+        decision: rejected
+        reason: a passing subset is not evidence that all frozen pre-24h gates passed
+      - alternative: make the raw manifest contain its own authority universe
+        decision: rejected
+        reason: moving the self-asserted claim into the same trust domain does not create independent authority
+    affected_source:
+      - src/datadiff_osc/runtime/gate_artifacts.py
+      - src/datadiff_osc/runtime/gates.py
+      - scripts/osc/calculate_gate_report.py
+    affected_tests:
+      - tests/osc/test_runtime_gate_artifacts.py
+      - tests/osc/test_runtime_gates.py
+      - tests/osc/test_runtime_scripts.py
+    owner: runtime_consumer_then_root_authority_producer
+    status: closed_phase5_runtime_consumer_and_root_fail_closed_control_plane_phase6_evidence_pending
+    composes_with: CR-OSC-ROOT-004
+    field_shape_changed: false
+    schema_version_changed: false
+    public_manifest_changed: false
+    twenty_four_hour_run_authorized: false
+  - id: CR-OSC-5-005
+    requester: root_runtime_barrier_review
+    symbol: cache exact-stage binding and execution worker-count provenance
+    reason: >-
+      Root independently reproduced two authority bypass classes after the first
+      Runtime implementation.  A SCREENING request with force_exact=true accepts
+      and returns an arbitrary non-exact string because cache policy checks only
+      EvidenceTier.requires_exact; typed results can also lie about exact stage or
+      replace an endpoint while retaining one matching endpoint.  Separately, a
+      single max_workers=1 ExecutionRun can be duplicated and labelled as workers
+      (1,6), or a script can request only workers=1, while every invariance flag and
+      report.passed remains true because ExecutionRun carries no worker-count
+      provenance and the audit admits a vacuous one-point design.
+    minimal_change: >-
+      At both cache boundaries derive exactness from request.exact_required.  An
+      exact-required request may cache only a StagedComparisonResult bound to the
+      same request/tier/schema and exact endpoint order, with exact_escalated=true
+      and the frozen exact comparison stage; reject inconsistent stage/flag pairs
+      on put and get.  Add actual positive worker_count provenance to the internal
+      ExecutionRun and AuthorityEvidenceSnapshot schemas, bind it in run/snapshot
+      digests, and require every invariance design to contain at least two distinct
+      counts including 1 and one N>1 whose labels exactly equal the producing runs.
+      Validate the design before executing benchmark work and reject invalid CLI
+      worker lists.  Keep all synthetic script output Phase-6-ineligible and keep
+      24h authorization false.
+    alternatives_considered:
+      - alternative: infer exactness only from EvidenceTier
+        decision: rejected
+        reason: SCREENING plus force_exact is explicitly an exact-required request
+      - alternative: trust request_digest without validating result endpoint order and stage
+        decision: rejected
+        reason: the result remains independently replaceable and can carry a false stage
+      - alternative: trust caller worker-count labels
+        decision: rejected
+        reason: duplicated workers=1 executions can masquerade as a 1-versus-N audit
+      - alternative: treat a one-point audit as informational passing evidence
+        decision: rejected
+        reason: invariance is not established without at least two distinct execution designs
+    affected_source:
+      - src/datadiff_osc/comparison/cache.py
+      - src/datadiff_osc/parallel/executor.py
+      - src/datadiff_osc/parallel/invariance.py
+      - src/datadiff_osc/runtime/benchmarks.py
+      - scripts/osc/audit_parallel_invariance.py
+      - scripts/osc/benchmark_parallel_scaling.py
+    affected_tests:
+      - tests/osc/test_comparison_cache.py
+      - tests/osc/test_parallel_executor.py
+      - tests/osc/test_parallel_invariance.py
+      - tests/osc/test_runtime_benchmarks.py
+      - tests/osc/test_runtime_scripts.py
+    owner: runtime
+    status: accepted_runtime_binding_followup_authorized
+    internal_field_shape_changed: true
+    internal_schema_versions_must_change: true
+    public_manifest_changed: false
+    twenty_four_hour_run_authorized: false
+  - id: CR-OSC-ROOT-003-A
+    requester: root_legacy_facade_design_review
+    symbol: staged execution-outcome admission before screening fingerprints
+    reason: >-
+      Contract and Root independently reproduced that observations=(OK,OK) with
+      execution_outcomes=(OK,TIMEOUT) can return S2_COMPONENT_FINGERPRINT,
+      exact_escalated=false and SATISFIED.  execute_staged_comparison passes
+      outcomes only to monitor_exact, so the screening fast path never validates
+      endpoint order, status or unsupported-evidence binding; the Runtime wrapper
+      does not accept outcomes at all.
+    minimal_change: >-
+      At the Contract-owned staged entrypoint, after Endpoint/observation binding
+      and before any applicability early return or fingerprint, require a complete
+      typed execution-outcome tuple and run the existing exact binding validator.
+      Missing or mismatched evidence returns an S0_STATIC INCONCLUSIVE certificate
+      with no fingerprints.  Valid explicit failure outcomes enter exact authority;
+      valid bound OK outcomes may enter S2.  Keep monitor_exact validation as
+      defense in depth.  In a later serial Runtime task, make
+      StagedComparisonEngine.compare require and route execution_outcomes, then
+      migrate the script and remaining owner-scoped consumers.  No frozen public
+      dataclass, field, type, order or schema changes.
+    alternatives_considered:
+      - alternative: validate outcomes only after a fingerprint mismatch
+        decision: rejected
+        reason: equal fingerprints would retain the false SATISFIED bypass
+      - alternative: infer outcomes from Observation.status
+        decision: rejected
+        reason: this discards independent structured failure and unsupported evidence
+      - alternative: silently synthesize MISSING when outcomes are absent
+        decision: rejected
+        reason: missing authority evidence is not an observed MISSING/MISSING_RESULT execution
+      - alternative: let the Root facade bypass staged comparison forever
+        decision: rejected
+        reason: direct exact is required initially, but the exported staged authority path must also fail closed
+    affected_source:
+      - src/datadiff_osc/contract_engine/planner.py
+      - src/datadiff_osc/comparison/staged.py
+      - scripts/osc/audit_staged_parity.py
+    affected_tests:
+      - tests/osc/test_contract_relations_planner.py
+      - tests/osc/test_contract_authority.py
+      - tests/osc/test_comparison_staged.py
+      - tests/osc/test_search_ledger.py
+      - tests/osc/test_probe_contract_integration.py
+      - tests/osc/test_runtime_scripts.py
+    owner: contract_then_runtime_then_root_and_search_consumers
+    status: closed_phase5_all_typed_outcome_and_opaque_consumers_verified
+    field_shape_changed: false
+    schema_version_changed: false
+    public_manifest_changed: false
+    twenty_four_hour_run_authorized: false
+  - id: CR-OSC-ROOT-003-B
+    requester: root_replacement_session_recovery
+    symbol: Root-local opaque legacy diagnostic reference boundary
+    reason: >-
+      CR-OSC-ROOT-003 requires typed legacy translation, while downstream legacy
+      consumers must not receive Endpoint, Observation, StructuredExecutionOutcome,
+      Verdict, certificate or evidence objects that could be mistaken for authority.
+      A frozen internal diagnostic-only reference shape is required before serial
+      consumer migration.
+    minimal_change: >-
+      Add only Root-local immutable LegacyDiagnosticContext and opaque diagnostic
+      reference/ref-set types under src/datadiff.  References carry a deterministic
+      digest, evaluated/not_evaluated state and reason code plus hard-coded
+      diagnostic_only and authority_eligible=false markers.  They carry no verdict,
+      evidence, coverage, candidate, bug, gate or authorization fields and are not
+      exported by datadiff_osc.
+    alternatives_considered:
+      - alternative: pass typed OSC outcomes directly through legacy logs
+        decision: rejected
+        reason: consumers could accidentally treat authority-shaped objects as evidence
+      - alternative: translate missing context using backend or error-message defaults
+        decision: rejected
+        reason: guessed context or taxonomy violates fail-closed behavior
+      - alternative: omit the migration field on old or incomplete rows
+        decision: rejected
+        reason: an explicit not_evaluated reference is auditable and cannot be confused with pass
+    affected_source:
+      - src/datadiff/osc_diagnostic_facade.py
+      - src/datadiff/execution.py
+      - src/datadiff/run_loaded.py
+      - src/datadiff/runner.py
+      - src/datadiff/run_summaries.py
+      - src/datadiff/discovery_runtime.py
+      - src/datadiff/candidate_pipeline.py
+    affected_tests:
+      - tests/osc/test_legacy_diagnostic_facade.py
+      - owner-scoped legacy consumer tests to be declared only after the facade barrier
+    owner: root
+    status: closed_phase5_facade_and_opaque_consumers_verified
+    internal_field_shape_changed: true
+    public_manifest_changed: false
+    twenty_four_hour_run_authorized: false

@@ -765,6 +765,7 @@ def normalized_row_number_filter_op(op: Any, available: set[str]) -> dict[str, A
     except ValueError:
         return None
     order_keys = dedupe_sort_keys([key for key in order_keys if key.column in available])
+    order_keys = stabilized_order_keys(order_keys, available, partition_by=partition_by)
     if not order_keys:
         return None
     comparator = condition_cmp(op, "==")
@@ -790,6 +791,7 @@ def normalized_running_sum_op(op: Any, available: set[str]) -> dict[str, Any] | 
     except ValueError:
         return None
     order_keys = dedupe_sort_keys([key for key in order_keys if key.column in available])
+    order_keys = stabilized_order_keys(order_keys, available, partition_by=partition_by)
     if not order_keys:
         return None
     repaired = {
@@ -820,6 +822,24 @@ def normalized_sort_op(op: Any, available: set[str]) -> dict[str, Any] | None:
     repaired = dict(op.to_dict()) if hasattr(op, "to_dict") else dict(op)
     repaired["columns"] = [key.column for key in full_keys]
     return repaired
+
+
+def stabilized_order_keys(
+    keys: list[SortKey],
+    available: set[str],
+    *,
+    partition_by: list[str] | tuple[str, ...] = (),
+) -> list[SortKey]:
+    seen = {key.column for key in keys}
+    skip = set(partition_by)
+    preferred = ("id", "row_id", "sample_id", "row_nr")
+    appended: list[SortKey] = []
+    for column in [*preferred, *sorted(available)]:
+        if column in seen or column in skip or column not in available:
+            continue
+        appended.append(SortKey(column=column, ascending=True, nulls="last"))
+        seen.add(column)
+    return [*keys, *appended]
 
 
 def dedupe_sort_keys(keys: list[SortKey]) -> list[SortKey]:

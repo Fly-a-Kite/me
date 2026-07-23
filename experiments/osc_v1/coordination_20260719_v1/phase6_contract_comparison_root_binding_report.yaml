@@ -1,0 +1,189 @@
+schema_version: osc-phase6-contract-comparison-root-binding-report-v1
+phase: 6
+status: complete_private_root_dynamic_binding_scoped_validation_pass_contract_gate_pending
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_task_contract.yaml
+  sha256: e2d26e04495cc628fe72dc900bb40f20e53c08282f0792c264d007448b7f53c7
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  forbidden_paths_modified: []
+  predecessor_r1_task_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_evidence_task_contract.yaml
+    sha256: df8118dadc5102203ee2e7a9a3efe754f3bba4c95fa430ef582f5d37de4e50dc
+  predecessor_r1_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_evidence_report.yaml
+    sha256: 56cca3cc7077df35008e354e2df0d0ca474d1ae6efcac5eb295dc60cea70d5a6
+  foundation_barrier: pass_unchanged
+source_state:
+  authority_before_contract_write:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    coordination_ledger_sha256: e709291c5a8f2c8f3ca5042ef92f2ee48321250eb1b2e9fc5901c7ec8ec9e5f3
+  pre_scoped_suite:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    coordination_ledger_sha256: eb2eccecc1d0f3f296ce0aa10889ecc71a1bca4833d8f96a74b74dca2e415d58
+  post_scoped_suite:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    coordination_ledger_sha256: eb2eccecc1d0f3f296ce0aa10889ecc71a1bca4833d8f96a74b74dca2e415d58
+implementation:
+  dynamic_plan_schema:
+    path: src/datadiff_osc/_phase6_gate_authority.py
+    pre_sha256: 4d2bcc4651b93aa48f217389fa309d3fe777c1fb3f72973296954403fd0bb56e
+    post_sha256: d7fd3c9372f604b8df635a6f587156be7d8fea8191e89d6f7a4f0a60e92d5517
+    result: >-
+      The private dynamic-plan schema is now v2. The unbound
+      staged_parity_groups denominator input is replaced by ordered
+      contract_comparison_decisions keyed by derived comparison_decision_id;
+      v1 plans fail closed and cannot be migrated by count or shape.
+  root_cross_object_binding:
+    path: src/datadiff_osc/_phase6_gate_authority.py
+    result: >-
+      Root maps staged_exact_groups only to the new comparison-decision
+      identities and requires the contract_exact_replay producer's exact
+      contract_comparison_decision_ids subject set. It re-reads and hashes each
+      retained envelope, verifies canonical envelope type/version/digest, asks
+      the Contract owner to reconstruct and canonical-round-trip the private
+      receipt, and then compares the derived source, case, ResultGroup,
+      contract fingerprint, endpoint set, task/result, partition, and producer
+      receipt fields one by one. Duplicate dynamic IDs or duplicate receipt
+      decisions fail closed.
+  contract_private_reconstruction:
+    path: src/datadiff_osc/contract_engine/replay.py
+    pre_sha256: 8bd57ba79e4d4ca251d086d4baf72a33b700db3562448ea1b72b3448f20ae1ca
+    post_sha256: 3beca4f611aa0e65e81f8389af52610a6f56a60b53c271964b9e61f532580311
+    result: >-
+      A non-exported Contract-owned helper reconstructs and exact-round-trips
+      ContractComparisonReceipt. Root calls that helper rather than duplicating
+      Contract parsing; the receipt itself remains private and unchanged.
+  tests:
+    comparison_receipts:
+      pre_sha256: ba784c13e09e46c00660ef899d50f01d9bc74a83b1b4b0ae1bbd276573132f11
+      post_sha256: a1575e6dc34c3c3ea32fda4ad9d18c65f64ff776e719deb1321f382861054f32
+    contract_semantic_replay:
+      sha256_unchanged: a56545b658fc35ad463159da8199271dcf7cc7c90ba434bf4c0a33ae15466979
+    root_authority_integration:
+      pre_sha256: 4d547452dd3c3c6009be26ed275c3a608996b58fc516df03ea07bc04fd7fd590
+      post_sha256: 28ae0d6feb5b5ce7086e3c929a4c7046a1b46a9100dc32cdfac9f60c0e0a5e26
+validation:
+  command: >-
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+    tests/osc/test_contract_phase6_comparison_receipts.py
+    tests/osc/test_contract_semantic_replay.py
+    tests/osc/test_phase6_gate_authority_integration.py
+  runs: 1
+  exit_code: 0
+  complete_terminal_result: 83 passed in 24.26s
+  result: pass
+  prohibited_commands_not_run:
+    - tests/osc
+    - repository suite
+    - six-file combined suite
+    - 100000 parity execution
+    - v3 2200
+    - Phase 7
+    - 2h pilot
+    - 24h run
+validation_detail:
+  negative_review_scope:
+    status: root_owned_validation_not_an_independent_review
+  负向复核:
+    status: pass_root_owned_not_an_independent_reviewer
+    evidence:
+      - >-
+        Every exact dynamic field—source snapshot/case, ResultGroup, contract
+        fingerprint, endpoint set, fingerprint/exact task and result,
+        fingerprint/canonical partition, and producer digest—was substituted
+        independently and rejected at the first Root binding mismatch.
+      - >-
+        An old dynamic-plan v1, missing/extra fields, duplicate IDs, unordered
+        decision records, a duplicate receipt decision, non-comparison shape,
+        and post-admission byte mutation all failed closed.
+  独立反例验证:
+    status: pass_isolated_counterexamples_not_an_independent_reviewer
+    evidence:
+      - >-
+        A real canonical private receipt and exact record bind only when source
+        and every derived field agree. A source rebind and same-cardinality
+        substitutions cannot bind the original decision.
+      - >-
+        A fingerprint collision with unequal canonical values remains an exact
+        typed record that is non-authoritative and non-publishable: this task
+        creates no raw discrepancy metric or pass claim.
+  异常输入验证:
+    status: pass_root_owned
+    evidence:
+      - >-
+        Re-read hash/type/version/envelope-digest/reconstruction checks reject
+        stale, malformed, substituted, unreadable, duplicate, and unsupported
+        context before any denominator can be authoritative.
+  root_boundaries:
+    - >-
+      contract_comparison_decision_ids leaves the R1 pending map only for this
+      exact Root cross-object check. Legacy ResultGroup staged_parity_groups is
+      still context-pending under CR-OSC-6-002.
+    - >-
+      An incomplete plan or missing producer/raw metric still cannot publish a
+      bundle. No gate spec, raw metric, paired benchmark receipt, runtime
+      producer, candidate state, or public export changed.
+frozen_target_sha256:
+  pre_scoped_suite:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  post_scoped_suite:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+findings: []
+counts: {blocker: 0, high: 0, medium: 0, low: 0}
+writes:
+  - src/datadiff_osc/_phase6_gate_authority.py
+  - src/datadiff_osc/contract_engine/replay.py
+  - tests/osc/test_contract_phase6_comparison_receipts.py
+  - tests/osc/test_phase6_gate_authority_integration.py
+  - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_task_contract.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_report.yaml
+  - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+decision:
+  phase_6_contract: pending
+  private_comparison_receipt: complete_r1
+  root_comparison_dynamic_binding: complete_r2
+  raw_metric_producer_completed: false
+  gate_spec_edit_completed: false
+  real_100000_corpus_evidence: not_run
+  combined_suite_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_pilot_2h_authorized: false
+  twenty_four_hour_run_authorized: false
+  next_step_requires_new_task_contract: >-
+    A separately bounded Contract raw-metric/producer contract is required
+    before any complete 100000-decision evidence, compile/match p95, paired
+    bytes/pairs/CPU reduction, or gate calculation can be attempted.

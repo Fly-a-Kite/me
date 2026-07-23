@@ -1,0 +1,84 @@
+schema_version: osc-task-contract-v1
+phase: 6
+round: private_foundation_exact_sha_ring_review
+mode: three_parallel_read_only_reviews
+entry_report:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_implementation_reports.yaml
+  sha256: 676a4953b3aefa4d08cbaf8ac24782915a91447113684166426403dc8d63b097
+coordination:
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  writes_authorized: false
+  preserve_dirty_worktree: true
+shared_requirements:
+  - verify every assigned source and test SHA before review
+  - review semantics and authority boundaries, not style
+  - provide file/symbol, severity, exact counterexample, violated requirement, fix owner and required regression test
+  - distinguish an intentional context-pending boundary from a missing intrinsic invariant
+  - do not modify files, stage changes, run long gates or create child agents
+  - use PYTHONDONTWRITEBYTECODE=1 for any bounded test command
+tasks:
+  - task_id: OSC-6-FOUNDATION-REVIEW-A-SEARCH
+    owner: /root/phase5_authority_audit
+    review_target: CR-OSC-6-003A Search foundation
+    allowed_write_paths: []
+    forbidden_write_paths: ["**"]
+    exact_files:
+      - [src/datadiff_osc/search/lane_registry.py, e4d19e8536309b374c351855d0dcf416459e6042526e5bbc67f7299870fbbdcc]
+      - [src/datadiff_osc/search/context_receipts.py, 2d6459cc1427052ce8bcec42cbe34ce7d24d89999f1f2999a95ed44e71686529]
+      - [src/datadiff_osc/search/context_replay.py, 4701eb347e3f2694cdf032af24c44b02a75d97fc32a3985c00891822258e697c]
+      - [tests/osc/test_search_lane_registry.py, 383d25d0911e8abc0e9e702d018fd9ba481d3dffbc0f3fb08af373515a5acb84]
+      - [tests/osc/test_search_context_receipts.py, bd245ea72ee9980196f8db77f11dbaa67a3b05424eb45e5b6bb15019554e4512]
+      - [tests/osc/test_search_gate_crosswalk.py, 4a917e27a9b38235141644bfc14c877ecf04d56b9de26c5432740a48728462dc]
+    required_focus:
+      - lossy set-based deduplication in convenience builders
+      - exact case/run/seed-block and SeedLineage cross-binding
+      - whether mutation and focus models bind enough intrinsic data before Runtime handoff
+      - typed reconstruction, canonical round-trip and metadata-only forgery rejection
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-B-RUNTIME
+    owner: /root/phase5_consumer_audit
+    review_target: CR-OSC-6-004 Runtime foundation
+    allowed_write_paths: []
+    forbidden_write_paths: ["**"]
+    exact_files:
+      - [src/datadiff_osc/runtime/_producer_provenance.py, 74130d2eee419b106253e765f33a49f2cbda51dad23eab81ff70f50a06ca5a30]
+      - [src/datadiff_osc/runtime/_receipt_producers.py, 5d892ce1a8186d005067ae110439dcf47144c51f95c77274cfe3b6ff9f31d711]
+      - [tests/osc/test_runtime_producer_provenance.py, aecccb8441340715a03ec9842e890a02fd9a24ca064d791faf6afedfd612ab18]
+      - [tests/osc/test_runtime_receipt_producers.py, 802c55fb456e01a99750910137d4480790acdea41177df0aa7640f554e0c9e1e]
+    required_focus:
+      - source snapshot trust and subject-specific origin-policy forgery resistance
+      - exact raw input/output/environment/implementation recomputation
+      - Repository, Target, Candidate and Paired builder identity completeness
+      - 3-of-3 plus 3-of-3, non-OK outcomes, confirmed-state and bug-claim rejection
+      - caller scalar or aggregate substitution and missing task/result cross-bindings
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-C-CONTRACT
+    owner: /root/phase5_evidence_audit
+    review_target: CR-OSC-6-002 Contract foundation
+    allowed_write_paths: []
+    forbidden_write_paths: ["**"]
+    exact_files:
+      - [src/datadiff_osc/contract_engine/_phase6_corpora.py, 7102b3d0967a2daeda5b50f59e5d06f740774b8f0376a9c70952bebf57e74245]
+      - [tests/osc/test_contract_phase6_corpora.py, f56c58fc575f4a292102148e9226778caec5e9486b17e74fcf9004e71dbd87b7]
+    required_focus:
+      - pending-root exclusion and exact source-SHA chain
+      - structural approval versus trusted independent approval and Root authority
+      - false-positive component-scoped adjudication and no-global-axis-suppression requirements
+      - compatibility verdict-pair and mutant semantic kill-witness completeness
+      - canonical decoding, duplicate fields, path traversal and caller authority forgery
+report_requirements:
+  - exact reviewed SHA set
+  - writes=0 and child_agents=0
+  - blocker/high/medium/low counts
+  - every blocker/high/medium includes a concrete regression test
+  - explicit pass only when blocker/high/medium are all zero
+execution_authorization:
+  bounded_read_only_tests: true
+  implementation_writes: false
+  tests_osc: false
+  full_repository_tests: false
+  parity_100000: false
+  v3_2200: false
+  phase7_pilot_2h: false
+  twenty_four_hour: false

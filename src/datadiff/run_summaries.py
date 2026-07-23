@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from collections import Counter
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ from datadiff.normalizer import NormalizedResult, normalized_results_from_mappin
 from datadiff.operation_semantics import operation_names
 from datadiff.oracle import evaluate_case
 from datadiff.finding_outcomes import backend_group_key, offline_finding_bucket
+from datadiff.osc_diagnostic_facade import consume_opaque_diagnostic_ref_set
 from datadiff.util import load_json, read_jsonl, read_jsonl_partial, run_meta_path
 
 
@@ -25,6 +27,81 @@ def _project_relative_summary_path(value: str | Path | None) -> str:
         return str(path.resolve().relative_to(Path.cwd().resolve()))
     except ValueError:
         return str(path)
+
+
+def _diagnostic_manifest_from_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    try:
+        manifest = row.get("experiment_manifest")
+        return dict(manifest) if isinstance(manifest, Mapping) else {}
+    except Exception:
+        return {}
+
+
+def _diagnostic_backend_status_from_row(
+    row: Mapping[str, Any],
+) -> dict[str, str]:
+    for key in ("normalized", "raw_results", "backend_status"):
+        try:
+            payload = row.get(key)
+            items = tuple(payload.items()) if isinstance(payload, Mapping) else ()
+        except Exception:
+            continue
+        status_by_backend: dict[str, str] = {}
+        for backend, value in items:
+            if not isinstance(backend, str) or not backend:
+                continue
+            try:
+                status = value.get("status") if isinstance(value, Mapping) else value
+            except Exception:
+                status = None
+            status_by_backend[backend] = (
+                status if isinstance(status, str) and status else "unknown"
+            )
+        if status_by_backend:
+            return status_by_backend
+    return {}
+
+
+def _diagnostic_backends_from_row(row: Mapping[str, Any]) -> list[str]:
+    return list(_diagnostic_backend_status_from_row(row))
+
+
+def _diagnostic_case_digest_from_row(row: Mapping[str, Any]) -> str:
+    manifest = _diagnostic_manifest_from_row(row)
+    case_digest = manifest.get("case_digest")
+    return case_digest if isinstance(case_digest, str) else ""
+
+
+def _opaque_diagnostic_refs_from_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    return consume_opaque_diagnostic_ref_set(
+        row.get("osc_diagnostic_refs"),
+        expected_backends=_diagnostic_backends_from_row(row),
+        case_digest=_diagnostic_case_digest_from_row(row),
+    )
+
+
+def _opaque_metamorphic_diagnostic_refs_from_row(
+    row: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    source = row.get("osc_metamorphic_diagnostic_refs")
+    if not isinstance(source, Mapping):
+        source = row.get("metamorphic")
+    if not isinstance(source, Mapping):
+        return {}
+    projections: dict[str, dict[str, Any]] = {}
+    try:
+        items = tuple(source.items())
+    except Exception:
+        return {}
+    for name, variant in items:
+        if not isinstance(name, str) or not name or not isinstance(variant, Mapping):
+            continue
+        projections[name] = {
+            "experiment_manifest": _diagnostic_manifest_from_row(variant),
+            "backend_status": _diagnostic_backend_status_from_row(variant),
+            "osc_diagnostic_refs": _opaque_diagnostic_refs_from_row(variant),
+        }
+    return projections
 
 
 def _summarize_run_health(run_file: Path, *, limit: int = 3) -> dict[str, Any]:
@@ -371,6 +448,7 @@ def _classify_run_row(
                 "findings": candidate_findings,
                 "normalized": row.get("normalized", {}),
                 "raw_results": row.get("raw_results", {}),
+                "backend_status": row.get("backend_status", {}),
                 "config": row.get("config", {}),
                 "candidate_recheck": row.get("candidate_recheck", {}),
                 "bug_dir": row.get("bug_dir", ""),
@@ -378,6 +456,11 @@ def _classify_run_row(
                 "case_index": row.get("case_index", ""),
                 "elapsed_s": row.get("elapsed_s", ""),
                 "candidate_bug_families": dict(candidate_keys),
+                "experiment_manifest": row.get("experiment_manifest", {}),
+                "osc_diagnostic_refs": _opaque_diagnostic_refs_from_row(row),
+                "osc_metamorphic_diagnostic_refs": (
+                    _opaque_metamorphic_diagnostic_refs_from_row(row)
+                ),
             }
         )
 

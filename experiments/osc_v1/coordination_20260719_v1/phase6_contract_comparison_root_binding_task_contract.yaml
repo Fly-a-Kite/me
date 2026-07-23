@@ -1,0 +1,221 @@
+schema_version: osc-phase6-contract-comparison-root-binding-task-contract-v1
+phase: 6
+authority:
+  task_id: OSC-6-CONTRACT-COMPARISON-ROOT-BINDING-R2
+  owner: /root
+  role: root
+  mode: root_serial_private_dynamic_binding_implementation
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  grandchildren_allowed: false
+  user_authorization:
+    date: 2026-07-23
+    instructions:
+      - "授权"
+      - "继续"
+    interpretation: >-
+      This authorizes the next narrow Phase-6 Contract implementation slice:
+      Root-only binding of the already-private comparison receipt to an exact
+      dynamic-plan record and its trusted Contract producer. It does not
+      authorize a Contract-gate pass, a real 100000-decision corpus execution,
+      any raw-performance evidence, a combined suite, Phase 7, a 2h pilot, or
+      a 24h run.
+  predecessor:
+    definition_task_contract:
+      path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_task_contract.yaml
+      sha256: 5734d1a3ae5673fb1b4adc04c63d86761dd85112f29da36305381ec3cc9a0a04
+    definition_report:
+      path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_report.yaml
+      sha256: 778c54465013f2892387a1909fd62330388e95ba2c415aee6af5f5fc00793118
+    r1_task_contract:
+      path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_evidence_task_contract.yaml
+      sha256: df8118dadc5102203ee2e7a9a3efe754f3bba4c95fa430ef582f5d37de4e50dc
+    r1_report:
+      path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_evidence_report.yaml
+      sha256: 56cca3cc7077df35008e354e2df0d0ca474d1ae6efcac5eb295dc60cea70d5a6
+  source_state_before_write:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    coordination_ledger_sha256: e709291c5a8f2c8f3ca5042ef92f2ee48321250eb1b2e9fc5901c7ec8ec9e5f3
+  required_input_sha256:
+    src/datadiff_osc/_phase6_gate_authority.py: 4d2bcc4651b93aa48f217389fa309d3fe777c1fb3f72973296954403fd0bb56e
+    src/datadiff_osc/contract_engine/_phase6_comparison_receipts.py: 78e43fcb6df63e22e1ef344c00e60fb5e8abeac94a16340dd51c6fcbe4385d7c
+    src/datadiff_osc/contract_engine/replay.py: 8bd57ba79e4d4ca251d086d4baf72a33b700db3562448ea1b72b3448f20ae1ca
+    tests/osc/test_contract_phase6_comparison_receipts.py: ba784c13e09e46c00660ef899d50f01d9bc74a83b1b4b0ae1bbd276573132f11
+    tests/osc/test_contract_semantic_replay.py: a56545b658fc35ad463159da8199271dcf7cc7c90ba434bf4c0a33ae15466979
+    tests/osc/test_phase6_gate_authority_integration.py: 4d547452dd3c3c6009be26ed275c3a608996b58fc516df03ea07bc04fd7fd590
+  new_paths_required_absent_before_write:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_report.yaml
+  frozen_target_sha256:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+task:
+  task_id: OSC-6-CONTRACT-COMPARISON-ROOT-BINDING-R2
+  objective: >-
+    Bind every admissible private ContractComparisonReceipt to one exact
+    dynamic-plan comparison-decision record using the current verified source,
+    canonical envelope bytes, Contract-owned reconstruction, and the trusted
+    contract_exact_replay producer receipt. This is evidence plumbing only;
+    it cannot itself make a denominator authoritative or a gate publishable.
+  allowed_write_paths:
+    - src/datadiff_osc/_phase6_gate_authority.py
+    - src/datadiff_osc/contract_engine/replay.py
+    - tests/osc/test_contract_phase6_comparison_receipts.py
+    - tests/osc/test_contract_semantic_replay.py
+    - tests/osc/test_phase6_gate_authority_integration.py
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  forbidden_write_paths:
+    - src/datadiff_osc/__init__.py
+    - src/datadiff_osc/public_api_freeze.json
+    - src/datadiff_osc/search/**
+    - src/datadiff_osc/runtime/**
+    - src/datadiff_osc/contract_engine/_phase6_comparison_receipts.py
+    - src/datadiff_osc/contract_engine/_phase6_corpora.py
+    - src/datadiff_osc/contract_engine/gates.py
+    - src/datadiff_osc/contract_engine/model.py
+    - src/datadiff_osc/contract_engine/evidence.py
+    - src/datadiff_osc/contract_engine/planner.py
+    - tests/osc/test_contract_phase6_corpora.py
+    - tests/osc/test_search_context_receipts.py
+    - tests/osc/test_search_gate_crosswalk.py
+    - tests/osc/test_search_lane_registry.py
+    - tests/osc/test_runtime_receipt_producers.py
+    - tests/osc/test_runtime_producer_provenance.py
+    - docs/**
+    - scripts/**
+  read_only_dependencies:
+    - src/datadiff_osc/contract_engine/_phase6_comparison_receipts.py
+    - src/datadiff_osc/contract_engine/model.py
+    - src/datadiff_osc/contract_engine/evidence.py
+    - src/datadiff_osc/contract_engine/planner.py
+    - src/datadiff_osc/runtime/gates.py
+    - src/datadiff_osc/runtime/gate_artifacts.py
+  frozen_interfaces:
+    - osc-public-api-freeze-v1:cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    - osc-pre24-gate-spec-set-d9792996cacb6fc6e47bce602d5f7ab6d6382c62ba9e1ac6bc1f8003ecbec552
+    - all thirteen frozen_target_sha256 entries above
+  required_invariants:
+    - >-
+      The dynamic plan advances to a new private schema version and rejects
+      every old plan fail closed. It replaces the unbound staged-parity
+      denominator record with a contract_comparison_decisions record keyed by
+      the derived comparison_decision_id; no automatic v1 migration or
+      count-only substitute is allowed.
+    - >-
+      Each dynamic comparison record contains only exact derived bindings:
+      comparison decision, source snapshot and case, ResultGroup and contract
+      fingerprint, ordered endpoint set, fingerprint/exact task IDs and result
+      digests, and separately domain-tagged derived fingerprint and canonical
+      partition digests, plus the producer receipt digest. Root recomputes all
+      of them; caller-authored IDs, booleans, partitions, equality claims, or
+      digest-only objects never establish a binding.
+    - >-
+      Before Root compares a dynamic record, it must re-read and re-hash the
+      admitted envelope, verify its canonical type/version/envelope digest, and
+      invoke one Contract-owned private reconstruction/round-trip helper for
+      ContractComparisonReceipt. Root must not duplicate or weaken Contract
+      parsing and must reject stale bytes, malformed payloads, old schemas,
+      wrong type, wrong source, wrong case, wrong group, wrong contract,
+      endpoint substitution/order changes, task/result substitutions, and
+      partition substitutions fail closed.
+    - >-
+      The contract_exact_replay producer must have exactly one canonical
+      ContractComparisonReceipt admission per derived decision ID. Duplicate
+      admission IDs, duplicate decision IDs, a non-comparison envelope, a
+      mismatched subject, or a record lacking the exact producer receipt digest
+      is a Root binding failure before a denominator can contribute to a gate.
+    - >-
+      contract_comparison_decision_ids may leave the R1 context-pending map
+      only because Root now performs the exact cross-object binding above.
+      Legacy ResultGroup staged_parity_groups remains context-pending. A valid
+      isolated receipt, an incomplete plan, or any collision/mismatch fixture
+      remains non-publishable; no raw staged_exact_discrepancies metric is
+      accepted or synthesized in this task.
+    - >-
+      The existing private receipt schema stays private and unchanged, the
+      Contract replay owner remains unique, no public export is added, and no
+      public freeze/gate-spec/raw-metric/producer/runtime behavior changes.
+    - >-
+      Diagnostic refs remain permanently diagnostic-only. Every fixture keeps
+      candidates non-confirmed and bug_claimed=false; missing exact typed
+      context is fail-closed/not_evaluated and cannot promote a candidate.
+  required_tests:
+    负向复核:
+      - >-
+        Mutate one dynamic record field at a time for source, case,
+        ResultGroup, contract fingerprint, endpoint-set, fingerprint/exact
+        task, fingerprint/exact result, partition digest, or producer digest;
+        assert Root reports the first exact cross-object binding failure and
+        never produces a publishable bundle.
+      - >-
+        Demonstrate old dynamic-plan schema, post-admission envelope byte
+        changes, malformed/wrong-type receipt envelopes, duplicate admissions,
+        and duplicate decision identities all fail closed before denominator or
+        gate acceptance.
+    独立反例验证:
+      - >-
+        Build one real canonical ContractComparisonReceipt admission and its
+        exact dynamic record, then show that same-cardinality endpoint/group or
+        task/result substitutes cannot bind to the original record. Confirm a
+        fingerprint collision with unequal canonical values is retained only
+        as non-publishable failure evidence, never as a pass claim.
+    异常输入验证:
+      - >-
+        Reject missing/extra record fields, malformed digest formats,
+        unordered/duplicate records, stale source digest, unsupported schema,
+        unreadable envelope, and canonical round-trip failures without throws,
+        publication, candidate confirmation, or bug claim.
+  scoped_validation:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_contract_phase6_comparison_receipts.py
+      tests/osc/test_contract_semantic_replay.py
+      tests/osc/test_phase6_gate_authority_integration.py
+    timing: exactly once, only after all allowed implementation writes and SHA checks
+    forbidden_substitutes:
+      - tests/osc
+      - repository suite
+      - six-file combined suite
+      - 100000 parity execution
+      - v3 2200
+      - Phase 7
+      - 2h pilot
+      - 24h run
+  completion_requirements:
+    - reverify every allowed product path and all thirteen frozen/public SHA values before the scoped suite
+    - retain complete command, exit code, and terminal result in the report
+    - reverify every allowed product path and all thirteen frozen/public SHA values after the scoped suite
+    - use apply_patch for report and ledger only after the real terminal result is known
+    - retain phase_6_contract as pending regardless of scoped-suite outcome
+  stop_conditions:
+    - any frozen/public SHA mismatch, staged user path, pre-existing report path, or scope expansion
+    - any need to modify a public export, gate spec, raw metric reducer, paired benchmark receipt, runtime producer, frozen target, docs, or script
+    - any accepted unbound receipt, caller-authored identity/equality/partition, source rebind, count-only proof, publishable bundle, gate pass, candidate confirmation, or bug_claimed=true
+    - failed scoped suite or incomplete terminal test evidence
+decision:
+  product_write_authorized_only_for_allowed_paths: true
+  phase_6_contract: pending
+  root_comparison_dynamic_binding_authorized: true
+  raw_metric_producer_authorized: false
+  gate_spec_edit_authorized: false
+  real_gate_evidence_authorized: false
+  combined_suite_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_pilot_2h_authorized: false
+  twenty_four_hour_run_authorized: false

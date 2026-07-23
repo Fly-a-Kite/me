@@ -1,0 +1,114 @@
+schema_version: osc-gate-crosswalk-prewrite-v1
+phase: 6
+status: root_reviewed_not_yet_frozen_for_implementation
+current_gate_set:
+  source: src/datadiff_osc/runtime/gates.py
+  source_sha256: c6051320db1583b83972cd05d0b776cb0d39c472f139ec01cd04471ef9df7c4e
+  count: 41
+  digest: osc-pre24-gate-spec-set-d9792996cacb6fc6e47bce602d5f7ab6d6382c62ba9e1ac6bc1f8003ecbec552
+  disposition: >-
+    The existing set covers the runbook Phase-6 minimum list but does not cover
+    every numeric hard criterion in the normative architecture documents.
+    It must not be changed until exact raw producers and every missing or
+    qualitative threshold are frozen by Root change control.
+normative_sources:
+  - path: docs/codex_multi_agent_development_runbook.md
+    sha256: a17a62d7937f5ff4755d8925dc6dd64c25946516a80f82466ddeda1ee8d845f9
+    relevant_lines: [445, 481]
+  - path: experiments/final_bug_discovery_protocol_v3/TODO.md
+    sha256: 1ad989d412651f5cc9ae3c3ac5d7d7207176557e0bcdcfb449788f016d607419
+    relevant_lines: [40, 82]
+  - path: docs/semantic_hypercontract_architecture.md
+    sha256: 20a5e22513c64c60e77b115233b28fdca2591081f08d5f2945a15dda18442dae
+    relevant_lines: [568, 581]
+  - path: docs/fine_grained_discovery_architecture.md
+    sha256: 58d0e11a3cd3c2ea9b7096449f9beafae756b94cae3e41f04d4377b2b4d6dbf2
+    relevant_lines: [451, 481]
+  - path: docs/discovery_search_and_parallel_architecture.md
+    sha256: 7af5fb51be2de1e0162ffb4a2db2bf40df050f35c0446bcae707e419936cf1b9
+    relevant_lines: [395, 425]
+required_corrections_to_existing_specs:
+  - gate_id: focus.signals
+    current: minimum_denominator_1_without_exact_denominator
+    required: exact_37_lane_signal_obligations_each_with_at_least_5_distinct_observed_cases
+    dependency: CR-OSC-6-003A registry and CR-OSC-6-003 focus producers
+missing_numeric_gate_candidates:
+  contract:
+    - id: contract.fingerprint_full_canonical_equivalence
+      threshold: 100_percent_complete_frozen_regression_corpus
+    - id: contract.mismatch_full_diff_escalation
+      threshold: 100_percent
+    - id: contract.equal_fingerprint_full_audit_deviations
+      threshold: zero
+      blocker: preregistered_audit_sample_denominator_missing
+    - id: contract.comparison_cpu_reduction
+      threshold: at_least_30_percent_against_always_materialize
+    - id: contract.backend_clustering_pairwise_equivalence
+      threshold: 100_percent
+  search:
+    - id: search.atom_extract_match_budget
+      threshold: p95_at_most_2_ms_or_p95_wall_share_at_most_5_percent
+    - id: search.target_construction_match_budget
+      threshold: p95_at_most_5_ms_per_case
+    - id: search.paired_throughput_regression
+      threshold: at_most_10_percent
+    - id: search.coverage_ledger_rss
+      threshold: at_most_64_MiB_per_worker
+    - id: search.compact_log_growth
+      threshold: at_most_15_percent
+    - id: search.cell_epoch_exact
+      threshold: exact_232_identities_with_zero_duplicate_or_omission
+    - id: search.edge_epoch_exact
+      threshold: exact_384_identities_with_zero_duplicate_or_omission
+    - id: search.pruning_constructibility
+      threshold: 100_percent
+    - id: search.pruning_reduction_or_minimal_proof
+      threshold: at_least_30_percent_or_typed_minimal_pool_proof
+    - id: search.multi_credit_precision
+      threshold: 100_percent
+    - id: search.multi_credit_mean_gain
+      threshold: strictly_greater_than_zero_against_cell_only_control
+  parallel:
+    - id: parallel.steady_cpu_utilization_lower
+      threshold: at_least_70_percent
+    - id: parallel.steady_cpu_utilization_upper
+      threshold: at_most_95_percent
+    - id: parallel.oom_events
+      threshold: zero
+    - id: parallel.hidden_retries
+      threshold: zero
+    - id: parallel.state_leakage
+      threshold: zero
+qualitative_or_unfrozen_criteria:
+  - id: contract.materialized_bytes_reduction
+    normative_text: significant_reduction
+    status: blocker_numeric_or_statistical_definition_absent
+  - id: contract.backend_pair_comparison_reduction
+    normative_text: significant_reduction
+    status: blocker_numeric_or_statistical_definition_absent
+  - id: search.seed_axis_independence
+    normative_text: Cramers_V_and_maximum_deviation_below_preregistered_threshold
+    status: blocker_preregistered_numeric_threshold_absent
+research_metrics_not_current_hard_gates:
+  - contract.backend_calls_reduction
+  - contract.RSS_and_backend_count_scaling
+  - phase7.issue_ready_roots_per_CPU_hour_effect
+root_policy:
+  - do not invent a threshold or silently select an effect test
+  - do not lower any current threshold
+  - do not treat a diagnostic scalar as a raw paired observation
+  - every denominator is an exact typed identity set derived from declarations or an approved corpus
+  - zero-valued failure series require a complete bound denominator rather than omission
+  - any spec-set change requires a new expected digest in Root authority plus negative regression tests
+next_barriers:
+  - private foundation implementation round passes scoped tests and exact-path review
+  - Root freezes all missing numeric definitions and resolves qualitative blockers
+  - raw producer schemas and record-ID cross-bindings are complete
+  - only then update the frozen spec set and its Root authority digest
+execution_authorization:
+  gate_spec_edit: false
+  long_gate_execution: false
+  parity_100000: false
+  v3_2200: false
+  phase7_pilot_2h: false
+  twenty_four_hour: false

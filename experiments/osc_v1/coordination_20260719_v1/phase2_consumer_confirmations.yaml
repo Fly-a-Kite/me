@@ -1,0 +1,47 @@
+schema_version: osc-phase2-consumer-confirmations-v1
+freeze_version: osc-public-api-freeze-v1
+freeze_manifest_sha256: 669816be0f913def018518ea85d2cc03b517453cc8e5ba764908dc3c3f42920f
+confirmations:
+  - agent: contract_agent
+    confirmed: true
+    public_change_request: null
+    consumes:
+      - canonical serialization and stable digest functions
+      - Endpoint, Observation, HyperContract, Verdict and VerdictKind
+      - three certificates plus ActivationCertificate
+      - structured execution outcome, evidence tier/envelope and ledger event
+      - contract/target fingerprints, result groups and staged comparison request/result
+    internal_only:
+      - finite domains and rule registry
+      - node-local two-pass analysis and compiled contracts
+      - relation validation, entailment, observers, exact monitor and staged executor
+      - compatibility, mutation, hardening and contract microbench
+  - agent: search_agent
+    confirmed: true
+    public_change_request: null
+    consumes:
+      - semantic atoms and provenance
+      - typed seed lineage, target fingerprint, tasks and ledger events
+      - infeasible construction evidence
+      - target assignment, activation certificate and target/contrast models
+      - separately typed fresh and regression obligation collections
+    internal_only:
+      - declarations, extractor, matcher and ledger storage
+      - keyed epochs, generation, mutation, repair and scheduler algorithms
+  - agent: runtime_agent
+    confirmed: true
+    public_change_request: null
+    consumes:
+      - comparison, result, cache and evidence schemas
+      - typed seed/task DAG and stable result ordering
+      - resource tokens and structured failure outcomes
+      - ledger/certificate/target evidence for gate calculation
+    internal_only:
+      - comparison plan/executor and cache store
+      - task graph, resource allocator, epoch barrier and retry controller
+      - gate calculator and report renderer
+validation:
+  manifest_sha256_confirmed_by_all: true
+  freeze_tests: 7 passed
+  all_implementation_tasks_possible_without_public_api_changes: true
+twenty_four_hour_run_authorized: false

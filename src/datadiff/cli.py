@@ -2,12 +2,25 @@ from __future__ import annotations
 
 import argparse
 import json
+import multiprocessing
 import os
 import time
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor as _ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from collections import Counter
 from pathlib import Path
 from typing import get_args
+
+
+class ProcessPoolExecutor(_ProcessPoolExecutor):
+    """Process pool that never forks a potentially multi-threaded Python parent."""
+
+    def __init__(self, *args, mp_context=None, **kwargs):
+        super().__init__(
+            *args,
+            mp_context=mp_context or multiprocessing.get_context("spawn"),
+            **kwargs,
+        )
 
 from datadiff.ablation_audit import analyze_ablation_audit
 from datadiff.adaptive_learning import AdaptiveLearningState, ContinualPriorityMemory
@@ -1071,6 +1084,7 @@ def cmd_experiment(args: argparse.Namespace) -> int:
         job_config_func=_job_config,
         experiment_job_weight_func=_experiment_job_weight,
         resolve_experiment_parallelism_func=_resolve_experiment_parallelism,
+        resolve_experiment_worker_batching_func=_resolve_experiment_worker_batching,
         resolve_experiment_schedule_func=_resolve_experiment_schedule,
         invalid_live_adaptive_experiment_presets_func=_invalid_live_adaptive_experiment_presets,
         effective_job_local_source_scheduler_func=_effective_job_local_source_scheduler,
@@ -1157,6 +1171,21 @@ def _resolve_experiment_parallelism(args: argparse.Namespace, planned_runs: list
         planned_runs,
         cpu_count_func=os.cpu_count,
         experiment_job_weight_func=_experiment_job_weight,
+    )
+
+
+def _resolve_experiment_worker_batching(
+    args: argparse.Namespace,
+    planned_runs: list[dict[str, Any]],
+    *,
+    jobs: int,
+    schedule: str,
+) -> dict[str, Any]:
+    return _experiment_runtime.resolve_experiment_worker_batching(
+        args,
+        planned_runs,
+        jobs=jobs,
+        schedule=schedule,
     )
 
 
@@ -1257,6 +1286,10 @@ def _run_experiment_jobs_parallel(
     planned_runs: list[dict],
     *,
     max_parallel_cost: float,
+    worker_batch_size: int = 0,
+    worker_max_rss_kib: int = 0,
+    worker_retry_limit: int = 0,
+    worker_batch_manifest: dict[str, Any] | None = None,
 ) -> list[dict]:
     return _experiment_runtime.run_experiment_jobs_parallel(
         executor_cls,
@@ -1267,6 +1300,11 @@ def _run_experiment_jobs_parallel(
         next_schedulable_job_index_func=_next_schedulable_job_index,
         job_estimated_cost_func=_job_estimated_cost,
         run_experiment_job_func=_run_experiment_job,
+        run_experiment_job_batch_func=_run_experiment_job_batch,
+        worker_batch_size=worker_batch_size,
+        worker_max_rss_kib=worker_max_rss_kib,
+        worker_retry_limit=worker_retry_limit,
+        worker_batch_manifest=worker_batch_manifest,
     )
 
 
@@ -1305,19 +1343,30 @@ def _backend_cost(backend: str) -> float:
 
 
 def _run_experiment_job(job: dict) -> dict:
-    return _experiment_runtime.run_experiment_job(
-        job,
-        apply_native_thread_limits_func=_apply_native_thread_limits,
-        job_config_func=_job_config,
-        parse_adaptive_components_func=_parse_adaptive_components,
-        adaptive_component_config_func=_adaptive_component_config,
-        apply_adaptive_component_config_func=_apply_adaptive_component_config,
-        run_fuzz_func=run_fuzz,
-        write_report_func=write_report,
-        job_experiment_meta_func=_job_experiment_meta,
-        resolved_run_semantics_func=resolved_run_semantics,
-        catalog_preset_metadata_func=catalog_preset_metadata,
-        configured_guidance_targets_func=_configured_guidance_targets,
+    previous_thread_limits = _experiment_runtime.capture_native_thread_limits()
+    try:
+        return _experiment_runtime.run_experiment_job(
+            job,
+            apply_native_thread_limits_func=_apply_native_thread_limits,
+            job_config_func=_job_config,
+            parse_adaptive_components_func=_parse_adaptive_components,
+            adaptive_component_config_func=_adaptive_component_config,
+            apply_adaptive_component_config_func=_apply_adaptive_component_config,
+            run_fuzz_func=run_fuzz,
+            write_report_func=write_report,
+            job_experiment_meta_func=_job_experiment_meta,
+            resolved_run_semantics_func=resolved_run_semantics,
+            catalog_preset_metadata_func=catalog_preset_metadata,
+            configured_guidance_targets_func=_configured_guidance_targets,
+        )
+    finally:
+        _experiment_runtime.restore_native_thread_limits(previous_thread_limits)
+
+
+def _run_experiment_job_batch(batch: dict[str, Any]) -> dict[str, Any]:
+    return _experiment_runtime.run_experiment_job_batch(
+        batch,
+        run_experiment_job_func=_run_experiment_job,
     )
 
 

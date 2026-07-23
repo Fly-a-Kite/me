@@ -1,0 +1,134 @@
+tasks:
+  - task_id: OSC-1-A
+    role: contract
+    mode: read_only_audit
+    objective: Audit the OSC HyperContract implementation against the frozen architecture and TODO hard gates, with file/symbol/test evidence and a minimal dependency-ordered implementation sequence.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - docs/semantic_hypercontract_architecture.md
+      - docs/architecture_credibility_and_alternatives.md
+      - docs/project_architecture.md
+      - src/datadiff_osc/contract_engine/**
+      - tests/osc/test_contract_*.py
+      - src/datadiff_osc/__init__.py
+      - src/datadiff_osc/_canonical.py
+    allowed_write_paths: []
+    forbidden_write_paths:
+      - "**"
+    frozen_interfaces:
+      - existing src/datadiff_osc public exports and canonical encoding are read-only audit subjects, not modifiable interfaces
+    required_invariants:
+      - preserve dirty worktree; perform no writes and no destructive Git operations
+      - family/root/backend-name dispatch may not own semantic verdicts
+      - capability and semantic permission remain separate
+      - SATISFIED, VIOLATED, INAPPLICABLE, and INCONCLUSIVE remain distinct
+      - unsupported, timeout, crash, and domain error remain structured and distinct
+      - do not recommend relaxing contracts, comparisons, tolerances, activation definitions, denominators, or hard gates
+      - certificates are auditable derivations, not claims of general formal proof
+      - no SMT, e-graph, Rust, native kernel, or new production dependency without measured promotion evidence
+      - do not start 2h or 24h runs
+      - do not create subagents
+    deliverables:
+      - implemented/partial/missing/contradictory/unverified matrix with file and symbol evidence
+      - audit of two-pass compiler, four-valued verdict, three certificates, capability/permission, relation entailment, staged planner, v1 facade, fault mutants, 100k exact differential, and performance gates
+      - minimal implementation sequence, dependency requests, missing tests, and risks
+      - completion report using runbook section 12 with changed_files empty and forbidden_paths_modified empty
+    validation:
+      - command: git status --short
+        expected: no file changed by this agent
+      - command: .venv/bin/pytest -q tests/osc/test_contract_*.py
+        expected: report current result only; do not repair failures
+    stop_conditions:
+      - any requested action would write a file, alter a shared interface, run a long campaign, or conflict irreconcilably with frozen specifications
+    completion_report: docs/codex_multi_agent_development_runbook.md section 12
+
+  - task_id: OSC-1-B
+    role: search
+    mode: read_only_audit
+    objective: Audit semantic targets and reusable generation/search/scheduler code against the 16/232, 9/144, 384, 502, reachability, mutation, seed, and scheduling requirements.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - docs/fine_grained_discovery_architecture.md
+      - docs/discovery_search_and_parallel_architecture.md
+      - docs/architecture_credibility_and_alternatives.md
+      - docs/project_architecture.md
+      - src/datadiff_osc/semantic_targets/**
+      - existing generation/search/scheduler-related implementation and tests under src/datadiff/** and tests/**
+      - src/datadiff_osc/__init__.py
+      - src/datadiff_osc/_canonical.py
+    allowed_write_paths: []
+    forbidden_write_paths:
+      - "**"
+    frozen_interfaces:
+      - existing src/datadiff_osc public exports and canonical encoding are read-only audit subjects, not modifiable interfaces
+    required_invariants:
+      - preserve dirty worktree; perform no writes and no destructive Git operations
+      - family is declaration/report projection only, never a runtime evaluator
+      - fresh, regression, known/saturated, and issue-inspired evidence remain physically or type separated
+      - 232, 384, and 502 must be recomputed from declarations and compiler output, never asserted as magic constants
+      - keyed seed lineage and task sets must be invariant to parallelism
+      - target activation and observation cannot be inferred from case generation alone
+      - adaptive policies may schedule budget but never alter verdict or bug classification
+      - do not recommend relaxing activation, reachability, mutation preservation, denominators, or hard gates
+      - do not start 2h or 24h runs
+      - do not create subagents
+    deliverables:
+      - independently recomputable denominator evidence and discrepancy list
+      - implemented/partial/missing/contradictory/unverified matrix for atoms, compiler, matcher, bitmap ledger, substreams, epochs, backward synthesis, mutation, repair, and scheduler
+      - reusable legacy code map with migration risks and root-owned interface dependencies
+      - minimal implementation sequence and completion report using runbook section 12
+    validation:
+      - command: git status --short
+        expected: no file changed by this agent
+      - command: .venv/bin/pytest -q tests/osc
+        expected: report current result only; do not repair failures
+    stop_conditions:
+      - any requested action would write a file, use known-root source as fresh evidence, alter a shared interface, run a long campaign, or conflict irreconcilably with frozen specifications
+    completion_report: docs/codex_multi_agent_development_runbook.md section 12
+
+  - task_id: OSC-1-C
+    role: runtime
+    mode: read_only_audit
+    objective: Audit comparison, execution, parallel runtime, gate tooling, runner and adapter integration against exactness, determinism, resource, evidence, v3 gate, and pilot requirements.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - docs/discovery_search_and_parallel_architecture.md
+      - docs/semantic_hypercontract_architecture.md
+      - docs/architecture_credibility_and_alternatives.md
+      - docs/competitive_paper_experiment_blueprint.md
+      - docs/project_architecture.md
+      - existing comparison/execution/cache/parallel/runtime/runner/adapter/gate code and tests
+      - src/datadiff_osc/contract_engine/**
+      - src/datadiff_osc/__init__.py
+      - src/datadiff_osc/_canonical.py
+    allowed_write_paths: []
+    forbidden_write_paths:
+      - "**"
+    frozen_interfaces:
+      - existing src/datadiff_osc public exports and canonical encoding are read-only audit subjects, not modifiable interfaces
+    required_invariants:
+      - preserve dirty worktree; perform no writes and no destructive Git operations
+      - approximation and pruning must exactly escalate whenever equality or verdict authority is uncertain
+      - majority votes and learned/heuristic scores never own bug verdicts
+      - timeout, crash, domain error, unsupported, pass, and violation remain distinct
+      - cache keys include endpoint, contract, semantic version, backend/version, mode/layout, adapter revision, and evidence tier; fresh/native evidence is uncached
+      - worker count, completion order, and retry may not change frozen assignments, seed lineage, result ordering, or authority verdict
+      - candidate is not a bug without native reproduction, minimization, root dedup, upstream search, and independent confirmation
+      - do not recommend relaxing exactness, performance, v3 gate, repository test, or evidence thresholds
+      - do not start 2h or 24h runs
+      - do not create subagents
+    deliverables:
+      - implemented/partial/missing/contradictory/unverified matrix with file/symbol/test evidence
+      - reusable code and migration-risk map for staged comparison, clustering, cache, deterministic DAG, resources, worker failures, gate reports, microbench, v3 2200-case, and 2h pilot tooling
+      - ordered validation plan, root-owned interface dependencies, and completion report using runbook section 12
+    validation:
+      - command: git status --short
+        expected: no file changed by this agent
+      - command: .venv/bin/pytest -q tests/osc
+        expected: report current result only; do not repair failures
+    stop_conditions:
+      - any requested action would write a file, change authority semantics, alter a shared interface, start a campaign, or conflict irreconcilably with frozen specifications
+    completion_report: docs/codex_multi_agent_development_runbook.md section 12

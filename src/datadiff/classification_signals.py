@@ -22,7 +22,10 @@ from datadiff.operation_semantics import (
     op_n,
     op_table,
 )
-from datadiff.program_analysis import case_uses_precision_sensitive_float_arithmetic
+from datadiff.program_analysis import (
+    case_uses_precision_sensitive_float_arithmetic,
+    numeric_cast_string_columns,
+)
 from datadiff.reference_semantics import reference_result
 
 
@@ -80,6 +83,38 @@ def is_pyarrow_empty_global_bool_aggregate_adapter_error(
     return _has_empty_input_global_bool_aggregate(case)
 
 
+def is_backend_resource_limit_boundary(
+    finding: Any,
+    raw_results: dict[str, dict[str, Any]],
+) -> bool:
+    mismatch_class = str(_get(finding, "mismatch_class", "") or "")
+    kind = str(_get(finding, "kind", "") or "")
+    if mismatch_class not in {"accept_reject", "status", "error_type", "exception"} and kind != "accept_reject_mismatch":
+        return False
+    if not raw_results:
+        return False
+    if not any(str(result.get("status", "")) == "ok" for result in raw_results.values()):
+        return False
+    errored = [result for result in raw_results.values() if str(result.get("status", "")) == "error"]
+    if not errored:
+        return False
+    resource_markers = (
+        "recursionlimitexceeded",
+        "recursion limit",
+        "current limit",
+        "expression depth",
+        "maximum recursion",
+        "stack overflow",
+        "resource exhausted",
+        "resource limit",
+    )
+    for result in errored:
+        text = f"{result.get('error_type', '')} {result.get('error', '')}".lower()
+        if any(marker in text for marker in resource_markers):
+            return True
+    return False
+
+
 def all_backends_rejected_due_to_generated_invalidity(raw_results: dict[str, dict[str, Any]]) -> bool:
     if not raw_results:
         return False
@@ -115,16 +150,26 @@ def is_float_precision_boundary_mismatch(
     first_columns = column_sets[0]
     if any(columns != first_columns for columns in column_sets):
         return False
+    precise_rows = [_precision_rows(result) for result in ok_results]
     comparison = compare_row_set_batch(
-        [_result_get(result, "rows", []) for result in ok_results],
+        precise_rows,
         column_sets=column_sets,
     )
     if not comparison.has_mismatch:
         return False
-    relaxed_rows = [
-        [_relaxed_float_precision_row(row) for row in _result_get(result, "rows", [])]
-        for result in ok_results
-    ]
+    numeric_string_columns = numeric_cast_string_columns(case)
+    relaxed_rows = []
+    for result, columns in zip(ok_results, column_sets, strict=True):
+        relaxed_rows.append(
+            [
+                _relaxed_float_precision_row(
+                    row,
+                    columns=columns,
+                    numeric_string_columns=numeric_string_columns,
+                )
+                for row in _result_get(result, "rows", [])
+            ]
+        )
     relaxed_comparison = compare_row_set_batch(
         relaxed_rows,
         column_sets=column_sets,
@@ -132,6 +177,17 @@ def is_float_precision_boundary_mismatch(
     if relaxed_comparison.is_exact_match():
         return True
     return relaxed_comparison.is_order_only_mismatch()
+
+
+def _precision_rows(
+    result: NormalizedResult | dict[str, Any],
+) -> list[list[Any]]:
+    if isinstance(result, NormalizedResult):
+        return [list(row) for row in result.effective_lossless_rows]
+    lossless_rows = result.get("lossless_rows", [])
+    if lossless_rows:
+        return [list(row) for row in lossless_rows]
+    return [list(row) for row in result.get("rows", [])]
 
 
 def has_clear_minority_backend(finding: Any, backends: list[str]) -> bool:
@@ -182,7 +238,13 @@ def is_sort_topk_tie_cutoff_mismatch(case: Case) -> bool:
     rows = _reference_rows_before_operation(case, op_index)
     if rows is None or len(rows) < 2:
         return False
-    sorted_rows = list(sort_row_mappings(rows, sort_keys))
+    # This is a defensive triage signal, not backend execution. Feedback or
+    # replay evidence can contain nested extension values even when a declared
+    # scalar column was expected; use a deterministic repr fallback so the
+    # classifier cannot turn such a case into a harness iteration failure.
+    sorted_rows = list(
+        sort_row_mappings(rows, sort_keys, scalar_fallback_to_repr=True)
+    )
     start = 0
     end = len(sorted_rows)
     saw_topk = False
@@ -309,8 +371,22 @@ def _has_empty_input_global_bool_aggregate(case: Case) -> bool:
     return False
 
 
-def _relaxed_float_precision_row(row: list[Any]) -> list[Any]:
-    return [_norm_value(value, preserve_float_precision=False) for value in row]
+def _relaxed_float_precision_row(
+    row: list[Any],
+    *,
+    columns: list[str],
+    numeric_string_columns: set[str],
+) -> list[Any]:
+    relaxed = []
+    for index, value in enumerate(row):
+        column = columns[index] if index < len(columns) else ""
+        if column in numeric_string_columns and isinstance(value, str):
+            try:
+                value = float(value)
+            except ValueError:
+                pass
+        relaxed.append(_norm_value(value, preserve_float_precision=False))
+    return relaxed
 
 
 def _last_order_defining_operation_index(case: Case) -> int | None:

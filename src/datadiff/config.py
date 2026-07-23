@@ -10,6 +10,12 @@ from datadiff.exploration_objectives import (
     ExplorationObjectiveRule,
     merge_exploration_objective_rules,
 )
+from datadiff.method_arms import (
+    DEFAULT_METHOD_ARM_ID,
+    MethodArmResolution,
+    resolve_method_arm,
+)
+from datadiff.method_policy import EvidenceTier, MethodPolicy
 
 OracleMode = Literal["differential", "metamorphic", "both"]
 GeneratorProfile = Literal[
@@ -46,6 +52,53 @@ GeneratorProfile = Literal[
     "large_int_filter_groupby",
     "set_membership_filter",
     "pyarrow_groupby_filter_cast_membership",
+    "case_when_join_key_membership",
+    "coalesce_union_distinct_type_boundary",
+    "multi_key_anti_join_null_guard",
+    "empty_then_union_groupby",
+    "boolean_coalesce_case_membership",
+    "numeric_text_cast_membership_aggregation",
+    "string_token_join_distinct",
+    "date_part_row_number_union",
+    "post_groupby_join_global_aggregate",
+    "distinct_anti_join_case_topk",
+    "coalesce_row_number_topk",
+    "union_distinct_anti_running_sum",
+    "null_case_semi_join_groupby",
+    "date_string_cast_row_number",
+    "drop_nulls_coalesce_distinct_join_topk",
+    "date_part_distinct_offset",
+    "bool_fill_null_membership_row_number",
+    "string_numeric_cast_anti_join_aggregate",
+    "post_aggregate_case_membership",
+    "multi_key_nullable_membership_window",
+    "string_empty_pattern_membership_distinct",
+    "date_cast_union_running_sum_topk",
+    "coalesce_anti_join_union_topk",
+    "bool_null_distinct_running_sum",
+    "date_string_membership_offset_window",
+    "empty_union_window_aggregate",
+    "duplicate_key_join_distinct_anti_topk",
+    "large_int_text_membership_window",
+    "nested_topk_offset_aggregate",
+    "union_distinct_empty_string_window",
+    "multi_key_semi_join_window_aggregate",
+    "string_contains_anti_join_offset",
+    "bool_case_distinct_groupby_union",
+    "left_join_filter_distinct_window",
+    "cast_groupby_membership",
+    "null_sort_window_union",
+    "date_part_membership_distinct_join",
+    "coalesce_case_anti_join_aggregate",
+    "string_token_transform_join_window",
+    "prefix_suffix_bool_membership",
+    "numeric_clip_division_anti_window",
+    "bool_not_union_distinct_aggregate",
+    "outer_join_coalesce_distinct_topk",
+    "chained_string_cleanup_membership_window",
+    "cast_date_union_anti_running",
+    "post_groupby_filter_membership_topk",
+    "duplicate_key_left_join_window_aggregate",
     "null_predicate_filter",
     "boolean_predicate_filter",
     "post_topk_range_filter",
@@ -87,6 +140,10 @@ GeneratorProfile = Literal[
     "pyarrow_list_flatten_parent_indices_semantics",
     "polars_rolling_mean_by_null_count_semantics",
     "csv_long_numeric_roundtrip",
+    "orthogonal_stress_rotation",
+    "pandas_targeted_rotation",
+    "polars_targeted_rotation",
+    "datafusion_targeted_rotation",
 ]
 GuidanceStrategy = Literal["random", "guided"]
 LogLevel = Literal["full", "compact", "minimal"]
@@ -191,13 +248,18 @@ DEFAULT_KNOWN_SATURATED_BUG_FAMILIES = [
     "ordered_topk_projection@datafusion",
     "outer_join_truth_filter@datafusion",
     "pandas_arrow_timestamp_index_attr_semantics@pandas",
+    "path_projection_keyed_pick@datafusion",
     "path_projection_keyed_pick@duckdb",
     "polars_reflected_arithmetic_operand_order@polars",
     "polars_vector_division_rounding@polars",
     "pyarrow_dataset_isin_all_match_semantics@pyarrow",
+    "pyarrow_large_string_partition_schema_semantics@pyarrow",
+    "pyarrow_run_end_null_compute_semantics@pyarrow",
     "pyarrow_sliced_bool_groupby_any_all@pyarrow",
     "topk_filter_pushdown@datafusion",
+    "topk_filter_pushdown@duckdb",
     "reverse_division_operand_order@polars",
+    "sortedness_null_placement@polars",
     "tuple_absence_null_filter@duckdb",
 ]
 
@@ -315,6 +377,14 @@ class FeedbackConfig:
 class GuidanceConfig:
     strategy: GuidanceStrategy = "random"
     candidate_pool: int = 1
+    enable_adaptive_candidate_pool: bool = False
+    adaptive_candidate_pool_min_size: int = 4
+    adaptive_candidate_pool_full_sweep_interval: int = 12
+    adaptive_candidate_pool_calibration_cases: int = 8
+    adaptive_candidate_pool_candidate_burst_cases: int = 8
+    adaptive_candidate_pool_candidate_burst_novel_only: bool = False
+    adaptive_candidate_pool_preserve_seed_stride: bool = False
+    adaptive_candidate_pool_compensate_seed_horizon: bool = False
     targets: tuple[str, ...] = ()
     semantic_focus_families: tuple[str, ...] = ()
     semantic_focus_signals: tuple[str, ...] = ()
@@ -336,6 +406,26 @@ class GuidanceConfig:
         return {
             "strategy": self.strategy,
             "candidate_pool": self.candidate_pool,
+            "enable_adaptive_candidate_pool": self.enable_adaptive_candidate_pool,
+            "adaptive_candidate_pool_min_size": self.adaptive_candidate_pool_min_size,
+            "adaptive_candidate_pool_full_sweep_interval": (
+                self.adaptive_candidate_pool_full_sweep_interval
+            ),
+            "adaptive_candidate_pool_calibration_cases": (
+                self.adaptive_candidate_pool_calibration_cases
+            ),
+            "adaptive_candidate_pool_candidate_burst_cases": (
+                self.adaptive_candidate_pool_candidate_burst_cases
+            ),
+            "adaptive_candidate_pool_candidate_burst_novel_only": (
+                self.adaptive_candidate_pool_candidate_burst_novel_only
+            ),
+            "adaptive_candidate_pool_preserve_seed_stride": (
+                self.adaptive_candidate_pool_preserve_seed_stride
+            ),
+            "adaptive_candidate_pool_compensate_seed_horizon": (
+                self.adaptive_candidate_pool_compensate_seed_horizon
+            ),
             "targets": list(self.targets),
             "semantic_focus_families": list(self.semantic_focus_families),
             "semantic_focus_signals": list(self.semantic_focus_signals),
@@ -405,6 +495,7 @@ class LearningConfig:
 class LoggingConfig:
     log_level: LogLevel = "compact"
     compress_run_log: bool = True
+    enable_event_evidence: bool = True
     enable_artifact: bool = True
     artifact_limit: int | None = None
     enable_reducer: bool = False
@@ -415,9 +506,18 @@ class LoggingConfig:
 
 @dataclass(frozen=True, slots=True)
 class ExecutionConfig:
-    enable_parallel_backend_execution: bool = True
+    enable_parallel_backend_execution: bool = False
+    enable_backend_session_reuse: bool = True
     enable_preflight_validation: bool = True
     enable_preflight_repair: bool = True
+    enable_backend_sampling: bool = False
+    backend_sample_size: int = 3
+    backend_full_sweep_interval: int = 16
+    backend_sample_confirm_candidates: bool = True
+    backend_sampling_calibration_cases: int = 8
+    backend_sampling_candidate_burst_cases: int = 8
+    backend_sampling_candidate_burst_novel_only: bool = False
+    backend_sample_confirmation_recheck_count: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -425,6 +525,9 @@ class ExecutionConfig:
 
 @dataclass(slots=True)
 class ExperimentConfig:
+    method_arm: str = DEFAULT_METHOD_ARM_ID
+    method_arm_overrides: dict[str, Any] = field(default_factory=dict)
+    evidence_tier: EvidenceTier = "screening"
     enable_type_aware_generation: bool = True
     enable_normalizer: bool = True
     enable_differential_oracle: bool = True
@@ -434,15 +537,35 @@ class ExperimentConfig:
     enable_replay_bug: bool = False
     enable_reducer: bool = False
     enable_artifact: bool = True
-    enable_parallel_backend_execution: bool = True
+    enable_parallel_backend_execution: bool = False
+    enable_backend_session_reuse: bool = True
     enable_preflight_validation: bool = True
     enable_preflight_repair: bool = True
+    enable_backend_sampling: bool = False
+    backend_sample_size: int = 3
+    backend_full_sweep_interval: int = 16
+    backend_sample_confirm_candidates: bool = True
+    backend_sampling_calibration_cases: int = 8
+    backend_sampling_candidate_burst_cases: int = 8
+    backend_sampling_candidate_burst_novel_only: bool = False
+    backend_sample_confirmation_recheck_count: int | None = None
     persist_feedback_corpus: bool = False
     feedback_persist_limit: int = 4096
     feedback_max_cases_per_profile: int = 6
     enable_local_source_scheduler: bool = False
     local_source_exploration_weight: float = 0.5
+    enable_semantic_metamorphic_source: bool = False
+    enable_known_regression_source: bool = False
+    enable_coordinator_coverage_debt: bool = True
+    enable_semantic_novelty_scheduler: bool = True
+    semantic_novelty_weight: float = 1.0
+    semantic_depth_weight: float = 1.0
+    coordinator_candidate_pool: int = 1
+    fresh_generation_min_share: float = 0.60
+    feedback_mutation_max_share: float = 0.25
+    coordinator_recheck_parallelism: int = 2
     compress_run_log: bool = True
+    enable_event_evidence: bool = True
     artifact_limit: int | None = None
     oracle_mode: OracleMode = "differential"
     generator_profile: GeneratorProfile = "common"
@@ -481,6 +604,14 @@ class ExperimentConfig:
     enable_champion_graft_donor_bandit: bool = True
     guidance_strategy: GuidanceStrategy = "random"
     guidance_candidate_pool: int = 1
+    enable_adaptive_candidate_pool: bool = False
+    adaptive_candidate_pool_min_size: int = 4
+    adaptive_candidate_pool_full_sweep_interval: int = 12
+    adaptive_candidate_pool_calibration_cases: int = 8
+    adaptive_candidate_pool_candidate_burst_cases: int = 8
+    adaptive_candidate_pool_candidate_burst_novel_only: bool = False
+    adaptive_candidate_pool_preserve_seed_stride: bool = False
+    adaptive_candidate_pool_compensate_seed_horizon: bool = False
     guidance_targets: list[str] = field(default_factory=list)
     semantic_focus_families: list[str] = field(default_factory=list)
     semantic_focus_signals: list[str] = field(default_factory=list)
@@ -518,6 +649,24 @@ class ExperimentConfig:
         return cls(**{str(key): value for key, value in payload.items() if str(key) in allowed})
 
     def __post_init__(self) -> None:
+        method_resolution = resolve_method_arm(
+            self.method_arm,
+            self.method_arm_overrides,
+        )
+        if method_resolution.base_arm.arm_id == "p8_candidate_v1" and method_resolution.overrides:
+            raise ValueError(
+                "p8_candidate_v1 is sealed and does not accept method-arm overrides"
+            )
+        self.method_arm = method_resolution.base_arm.arm_id
+        self.method_arm_overrides = dict(method_resolution.overrides)
+        self.evidence_tier = str(self.evidence_tier or "screening")  # type: ignore[assignment]
+        if self.evidence_tier not in {
+            "screening",
+            "finding",
+            "fresh_confirmation",
+            "native_reproduction",
+        }:
+            raise ValueError(f"unsupported evidence tier: {self.evidence_tier}")
         self.guidance_targets = _normalize_string_list(self.guidance_targets)
         self.semantic_focus_families = _normalize_string_list(self.semantic_focus_families)
         self.semantic_focus_signals = _normalize_string_list(self.semantic_focus_signals)
@@ -535,6 +684,91 @@ class ExperimentConfig:
         self.enable_metamorphic_relation_learning = bool(self.enable_metamorphic_relation_learning)
         self.enable_backend_pair_learning = bool(self.enable_backend_pair_learning)
         self.enable_parallel_backend_execution = bool(self.enable_parallel_backend_execution)
+        self.enable_event_evidence = bool(self.enable_event_evidence)
+        self.enable_coordinator_coverage_debt = bool(
+            self.enable_coordinator_coverage_debt
+        )
+        self.enable_semantic_novelty_scheduler = bool(
+            self.enable_semantic_novelty_scheduler
+        )
+        self.semantic_novelty_weight = max(
+            0.0,
+            float(self.semantic_novelty_weight or 0.0),
+        )
+        self.semantic_depth_weight = max(
+            0.0,
+            float(self.semantic_depth_weight or 0.0),
+        )
+        self.coordinator_candidate_pool = max(
+            1,
+            int(self.coordinator_candidate_pool or 1),
+        )
+        self.enable_semantic_metamorphic_source = bool(
+            self.enable_semantic_metamorphic_source
+        )
+        self.enable_known_regression_source = bool(
+            self.enable_known_regression_source
+        )
+        self.fresh_generation_min_share = min(
+            1.0,
+            max(0.0, float(self.fresh_generation_min_share or 0.0)),
+        )
+        self.feedback_mutation_max_share = min(
+            1.0,
+            max(0.0, float(self.feedback_mutation_max_share or 0.0)),
+        )
+        self.coordinator_recheck_parallelism = max(
+            1,
+            int(self.coordinator_recheck_parallelism or 1),
+        )
+        self.enable_backend_session_reuse = bool(self.enable_backend_session_reuse)
+        self.enable_backend_sampling = bool(self.enable_backend_sampling)
+        self.backend_sample_size = max(2, int(self.backend_sample_size or 3))
+        self.backend_full_sweep_interval = max(0, int(self.backend_full_sweep_interval or 0))
+        self.backend_sample_confirm_candidates = bool(self.backend_sample_confirm_candidates)
+        self.backend_sampling_calibration_cases = max(
+            0,
+            int(self.backend_sampling_calibration_cases or 0),
+        )
+        self.backend_sampling_candidate_burst_cases = max(
+            0,
+            int(self.backend_sampling_candidate_burst_cases or 0),
+        )
+        self.backend_sampling_candidate_burst_novel_only = bool(
+            self.backend_sampling_candidate_burst_novel_only
+        )
+        if self.backend_sample_confirmation_recheck_count is not None:
+            self.backend_sample_confirmation_recheck_count = max(
+                0,
+                int(self.backend_sample_confirmation_recheck_count),
+            )
+        self.enable_adaptive_candidate_pool = bool(self.enable_adaptive_candidate_pool)
+        self.adaptive_candidate_pool_min_size = max(
+            1,
+            int(self.adaptive_candidate_pool_min_size or 1),
+        )
+        self.adaptive_candidate_pool_full_sweep_interval = max(
+            0,
+            int(self.adaptive_candidate_pool_full_sweep_interval or 0),
+        )
+        self.adaptive_candidate_pool_calibration_cases = max(
+            0,
+            int(self.adaptive_candidate_pool_calibration_cases or 0),
+        )
+        self.adaptive_candidate_pool_candidate_burst_cases = max(
+            0,
+            int(self.adaptive_candidate_pool_candidate_burst_cases or 0),
+        )
+        self.adaptive_candidate_pool_candidate_burst_novel_only = bool(
+            self.adaptive_candidate_pool_candidate_burst_novel_only
+        )
+        self.adaptive_candidate_pool_compensate_seed_horizon = bool(
+            self.adaptive_candidate_pool_compensate_seed_horizon
+        )
+        self.adaptive_candidate_pool_preserve_seed_stride = bool(
+            self.adaptive_candidate_pool_preserve_seed_stride
+            or self.adaptive_candidate_pool_compensate_seed_horizon
+        )
         self.enable_witness_oracle = bool(self.enable_witness_oracle)
         self.enable_mutation_operator_learning = bool(self.enable_mutation_operator_learning)
         self.enable_operator_swarm = bool(self.enable_operator_swarm)
@@ -576,6 +810,23 @@ class ExperimentConfig:
             rule.to_dict() for rule in self.exploration_objective_rules
         ]
         return payload
+
+    @property
+    def resolved_method_arm(self) -> MethodArmResolution:
+        return resolve_method_arm(self.method_arm, self.method_arm_overrides)
+
+    @property
+    def method_arm_manifest(self) -> dict[str, Any]:
+        return self.resolved_method_arm.manifest()
+
+    @property
+    def method_policy(self) -> MethodPolicy:
+        return self.resolved_method_arm.effective_arm.policy
+
+    def for_evidence_tier(self, evidence_tier: EvidenceTier) -> "ExperimentConfig":
+        payload = self.to_dict()
+        payload["evidence_tier"] = evidence_tier
+        return ExperimentConfig.from_payload(payload)
 
     @property
     def oracle(self) -> OracleConfig:
@@ -624,6 +875,26 @@ class ExperimentConfig:
         return GuidanceConfig(
             strategy=self.guidance_strategy,
             candidate_pool=self.guidance_candidate_pool,
+            enable_adaptive_candidate_pool=self.enable_adaptive_candidate_pool,
+            adaptive_candidate_pool_min_size=self.adaptive_candidate_pool_min_size,
+            adaptive_candidate_pool_full_sweep_interval=(
+                self.adaptive_candidate_pool_full_sweep_interval
+            ),
+            adaptive_candidate_pool_calibration_cases=(
+                self.adaptive_candidate_pool_calibration_cases
+            ),
+            adaptive_candidate_pool_candidate_burst_cases=(
+                self.adaptive_candidate_pool_candidate_burst_cases
+            ),
+            adaptive_candidate_pool_candidate_burst_novel_only=(
+                self.adaptive_candidate_pool_candidate_burst_novel_only
+            ),
+            adaptive_candidate_pool_preserve_seed_stride=(
+                self.adaptive_candidate_pool_preserve_seed_stride
+            ),
+            adaptive_candidate_pool_compensate_seed_horizon=(
+                self.adaptive_candidate_pool_compensate_seed_horizon
+            ),
             targets=tuple(self.guidance_targets),
             semantic_focus_families=tuple(self.semantic_focus_families),
             semantic_focus_signals=tuple(self.semantic_focus_signals),
@@ -671,6 +942,7 @@ class ExperimentConfig:
         return LoggingConfig(
             log_level=self.log_level,
             compress_run_log=self.compress_run_log,
+            enable_event_evidence=self.enable_event_evidence,
             enable_artifact=self.enable_artifact,
             artifact_limit=self.artifact_limit,
             enable_reducer=self.enable_reducer,
@@ -680,12 +952,26 @@ class ExperimentConfig:
     def execution(self) -> ExecutionConfig:
         return ExecutionConfig(
             enable_parallel_backend_execution=self.enable_parallel_backend_execution,
+            enable_backend_session_reuse=self.enable_backend_session_reuse,
             enable_preflight_validation=self.enable_preflight_validation,
             enable_preflight_repair=self.enable_preflight_repair,
+            enable_backend_sampling=self.enable_backend_sampling,
+            backend_sample_size=self.backend_sample_size,
+            backend_full_sweep_interval=self.backend_full_sweep_interval,
+            backend_sample_confirm_candidates=self.backend_sample_confirm_candidates,
+            backend_sampling_calibration_cases=self.backend_sampling_calibration_cases,
+            backend_sampling_candidate_burst_cases=self.backend_sampling_candidate_burst_cases,
+            backend_sampling_candidate_burst_novel_only=(
+                self.backend_sampling_candidate_burst_novel_only
+            ),
+            backend_sample_confirmation_recheck_count=(
+                self.backend_sample_confirmation_recheck_count
+            ),
         )
 
     def to_nested_dict(self) -> dict[str, Any]:
         return {
+            "method": self.method_arm_manifest,
             "generation": {
                 "generator_profile": self.generator_profile,
                 "enable_type_aware_generation": self.enable_type_aware_generation,
@@ -693,6 +979,18 @@ class ExperimentConfig:
             "oracle": self.oracle.to_dict(),
             "feedback": self.feedback.to_dict(),
             "guidance": self.guidance.to_dict(),
+            "coordinator": {
+                "fresh_generation_min_share": self.fresh_generation_min_share,
+                "feedback_mutation_max_share": self.feedback_mutation_max_share,
+                "recheck_parallelism": self.coordinator_recheck_parallelism,
+                "enable_semantic_metamorphic_source": self.enable_semantic_metamorphic_source,
+                "enable_known_regression_source": self.enable_known_regression_source,
+                "enable_coverage_debt": self.enable_coordinator_coverage_debt,
+                "enable_semantic_novelty": self.enable_semantic_novelty_scheduler,
+                "semantic_novelty_weight": self.semantic_novelty_weight,
+                "semantic_depth_weight": self.semantic_depth_weight,
+                "candidate_pool": self.coordinator_candidate_pool,
+            },
             "learning": self.learning.to_dict(),
             "logging": self.logging.to_dict(),
             "execution": self.execution.to_dict(),

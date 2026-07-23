@@ -1,0 +1,104 @@
+schema_version: osc-prewrite-review-v1
+phase: 6
+review_id: phase6_cr002_cr003a_cr004_foundation
+status: approved_for_bounded_foundation_implementation
+reviewed_by: /root
+inputs:
+  runbook:
+    path: docs/codex_multi_agent_development_runbook.md
+    sha256: a17a62d7937f5ff4755d8925dc6dd64c25946516a80f82466ddeda1ee8d845f9
+  architecture:
+    path: docs/project_architecture.md
+    sha256: 5fc31c1c2c4bf1241e41cc966f8d56abc890259a8577fe756076b490e3698d9f
+  cr001_barrier:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_cr001_exit_barrier.yaml
+    sha256: e6f16e5281a24b62d30640c3ba4fd4b96cbe1ac275ab4841175ff24b7c2965b0
+  prewrite_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_next_change_prewrite_task_contracts.yaml
+    sha256: 369003f6cbd0aca1882bc6c631bc9082655ed01865cec706d2dcedb3e65f72a6
+  prewrite_erratum:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_next_change_prewrite_task_contracts_erratum.yaml
+    sha256: 96ce6d5a146f8c7263c59622b1620e89f3c559cb9d927056cc520a08479bfa36
+prewrite_reports:
+  - task_id: OSC-6-CR002-PREWRITE
+    agent: /root/phase5_authority_audit
+    result: blocked_missing_approved_corpora_and_exact_producers
+    writes: 0
+    child_agents: 0
+    accepted_findings:
+      - 9 confirmed roots are exactly derivable and the one pending root is excluded
+      - 32 mutant identities are exactly derivable as 12 comparator, 13 axis and 7 hyperedge mutants
+      - no approved frozen Phase-6 false-positive corpus or reproducible denominator exists
+      - compatibility and mutant kill-witness material is not an authority corpus
+      - current parity and performance helpers lack exact ResultGroup, task and raw-sample cross-bindings
+  - task_id: OSC-6-CR003A-PREWRITE
+    agent: /root/phase5_consumer_audit
+    result: ready_for_private_registry_and_receipt_foundation
+    writes: 0
+    child_agents: 0
+    accepted_findings:
+      - the executable declarations contain every member of the formal 11-lane set
+      - the formal denominator is 37 lane-signal obligations over 20 unique signals
+      - the legacy default remains a distinct 9-lane set and must not be modified
+      - current focus and dynamic-plan identities are not sufficient authority
+      - real 232, 384 and 502 observations remain dependent on Runtime producer provenance
+  - task_id: OSC-6-CR004-PREWRITE
+    agent: /root/phase5_evidence_audit
+    result: ready_for_typed_provenance_and_pure_receipt_foundation
+    writes: 0
+    child_agents: 0
+    accepted_findings:
+      - historic 2200 evidence is comparison-only and cannot satisfy the post-refactor gate
+      - producer-authored provenance digests and raw synthetic word scans are not authority
+      - the source, producer, dynamic-plan, typed-index, raw-artifact and manifest chain must be acyclic and exact-SHA bound
+      - V3 completion requires exact 22-by-100 records, all backend statuses OK and explicit campaign 3-of-3 plus pipeline 3-of-3 rechecks
+      - candidate receipts remain non-bug and cannot contain confirmed states
+root_independent_recomputation:
+  command_class: bounded_read_only_python
+  result:
+    confirmed_roots: 9
+    pending_roots_excluded: 1
+    confirmed_manifest_sha256: 0203ec26781d32828ed9914cb510efbe2f8c7807d25d4addfaf3652a339b47f4
+    mutants: {comparator: 12, axis: 13, hyperedge: 7, total: 32}
+    formal_lanes: 11
+    lane_signal_obligations: 37
+    unique_focus_signals: 20
+    legacy_default_lanes: 9
+    fresh: {families: 16, cells: 232}
+    regression: {families: 9, cells: 144}
+    contrast_edges: 384
+    backend_pair_obligations: 502
+  public_api_freeze_sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+root_decisions:
+  - approve only private, fail-closed foundation models and bounded unit tests in the next parallel round
+  - do not create or label a false-positive, compatibility or mutant-witness corpus as approved
+  - do not modify legacy discovery defaults, OSC public exports, public_api_freeze.json or the frozen gate-spec set
+  - do not admit new receipt types through Root authority until a later serial exact-context integration barrier
+  - caller-authored names, booleans, digests, focus metadata and opaque diagnostic refs confer no authority
+  - typed foundation objects are diagnostic or context-pending until Root independently binds real producer inputs
+  - candidate is not a confirmed bug and bug_claimed remains false
+open_blockers:
+  - id: OSC-6-C-B1
+    owner: root_then_contract
+    condition: approved false-positive corpus and exact denominator do not exist
+  - id: OSC-6-C-B2
+    owner: root_then_contract
+    condition: approved compatibility and mutant kill-witness corpora do not exist
+  - id: OSC-6-S-B1
+    owner: search_then_root_runtime
+    condition: real attempt, mutation, observation and focus producers do not exist
+  - id: OSC-6-R-B1
+    owner: root_then_runtime
+    condition: real producer provenance and the complete authority artifact chain do not exist
+execution_authorization:
+  bounded_implementation_and_unit_tests: true
+  tests_osc: false
+  full_repository_tests: false
+  parity_100000: false
+  v3_2200: false
+  phase7_pilot_2h: false
+  twenty_four_hour: false
+decision:
+  phase6_overall_passed: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

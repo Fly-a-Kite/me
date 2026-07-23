@@ -1,0 +1,242 @@
+schema_version: osc-phase6-contract-gate-definition-task-contract-v1
+phase: 6
+authority:
+  task_id: OSC-6-CONTRACT-GATE-DEFINITIONS
+  owner: /root
+  role: root
+  mode: root_owned_definition_freeze_no_product_write
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  grandchildren_allowed: false
+  remediation_is_serial: true
+  user_authorization:
+    date: 2026-07-23
+    instruction: "授权"
+    interpretation: >-
+      The user authorized Root to establish Phase-6 Contract change control after
+      Root disclosed the conservative proposal: audit every equal-fingerprint
+      decision in the mandatory 100k corpus, and require at least 30 percent
+      paired reduction plus a positive paired 95 percent lower confidence bound
+      for materialized bytes and backend-pair comparisons. This contract records
+      those choices explicitly; it does not represent them as pre-existing pass
+      evidence or as an implicit relaxation of any normative threshold.
+  authority_write_paths:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  source_state_before_write:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    coordination_ledger_sha256: fffde2093ff60f9b09a1ff8df8dec6a12cdfd6c2fd62f2227f9239e0004eb2c1
+  required_input_sha256:
+    docs/codex_multi_agent_development_runbook.md: a17a62d7937f5ff4755d8925dc6dd64c25946516a80f82466ddeda1ee8d845f9
+    experiments/final_bug_discovery_protocol_v3/TODO.md: 1ad989d412651f5cc9ae3c3ac5d7d7207176557e0bcdcfb449788f016d607419
+    docs/project_architecture.md: 5fc31c1c2c4bf1241e41cc966f8d56abc890259a8577fe756076b490e3698d9f
+    docs/fine_grained_discovery_architecture.md: 58d0e11a3cd3c2ea9b7096449f9beafae756b94cae3e41f04d4377b2b4d6dbf2
+    docs/discovery_search_and_parallel_architecture.md: 7af5fb51be2de1e0162ffb4a2db2bf40df050f35c0446bcae707e419936cf1b9
+    docs/semantic_hypercontract_architecture.md: 20a5e22513c64c60e77b115233b28fdca2591081f08d5f2945a15dda18442dae
+    docs/architecture_credibility_and_alternatives.md: 95bd949dba93d41d9b2594122fc49766164008c5de8df6aec91dc88f2afa0762
+    docs/competitive_paper_experiment_blueprint.md: e2537e9ec03f5222321af7ae11491341f402d6e294c19ae4c8c3d397c4c1cd18
+    experiments/osc_v1/coordination_20260719_v1/phase6_authorization_and_preflight.yaml: 2e7f87dc82490d57609e7bf09b428af735607cc13239b336eb9cab1092cad451
+    experiments/osc_v1/coordination_20260719_v1/phase6_normative_gate_crosswalk_prewrite.yaml: 29ce87d733ecb0a155fc8fae69c34d105deaf16dbae366df5c5eb33dfc3e2675
+    src/datadiff_osc/runtime/gates.py: c6051320db1583b83972cd05d0b776cb0d39c472f139ec01cd04471ef9df7c4e
+    src/datadiff_osc/runtime/gate_artifacts.py: 1eed10563c076514acb12259ddef44698510f49f34c13e4e54e1e4bd1e07743a
+    src/datadiff_osc/_phase6_gate_authority.py: 03b6ef9323f38fee8cb9daafffd2a309818953fbc78fa2ae0cd2c99b1503bbd7
+    src/datadiff_osc/contract_engine/gates.py: 36da99462bc27a49079f9c51b0c2bfd6e8f2946b00f9b853ef160037c085e213
+    tests/osc/test_contract_gate_helpers.py: 45e4684963793c369971326887c2e4f86e2e5cf0ddba4bb34922747456712f83
+    tests/osc/test_phase6_gate_authority_integration.py: 61ca0eba76f71dcea39af3312cb1dbfecf8b606283ff84d9c9fa5af254a27289
+    tests/osc/test_runtime_gates.py: 6dc8dd4b8d24ae301fa7eac4c32ec474e5e608a769d7c207b1a5e3850b01257d
+    tests/osc/test_runtime_gate_artifacts.py: 5261992a58666d3b4fd8e6d684613e982aa7bde8ec484a89e1ffbe4f6c7a0050
+    tests/osc/test_contract_performance.py: d2923fdf6bf4ac9ee6c0b588998fa0880b1ef148be4ddf526282d69e41a1cb37
+  frozen_target_sha256:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+task:
+  task_id: OSC-6-CONTRACT-GATE-DEFINITIONS
+  role: root
+  mode: root_owned_definition_freeze_no_product_write
+  objective: >-
+    Freeze the missing Phase-6 Contract gate denominators, paired-observation
+    binding, statistical decision rule, and required fail-closed behavior before
+    any gate-spec, producer, authority, or test implementation is permitted.
+  required_inputs:
+    - docs/codex_multi_agent_development_runbook.md
+    - experiments/final_bug_discovery_protocol_v3/TODO.md
+    - docs/project_architecture.md
+    - docs/fine_grained_discovery_architecture.md
+    - docs/discovery_search_and_parallel_architecture.md
+    - docs/semantic_hypercontract_architecture.md
+    - docs/architecture_credibility_and_alternatives.md
+    - docs/competitive_paper_experiment_blueprint.md
+    - experiments/osc_v1/coordination_20260719_v1/phase6_authorization_and_preflight.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_normative_gate_crosswalk_prewrite.yaml
+    - src/datadiff_osc/runtime/gates.py
+    - src/datadiff_osc/runtime/gate_artifacts.py
+    - src/datadiff_osc/_phase6_gate_authority.py
+    - src/datadiff_osc/contract_engine/gates.py
+  allowed_write_paths:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  forbidden_write_paths:
+    - src/**
+    - tests/**
+    - scripts/**
+    - docs/**
+    - experiments/final_bug_discovery_protocol_v3/**
+    - src/datadiff_osc/public_api_freeze.json
+    - src/datadiff_osc/search/context_replay.py
+    - tests/osc/test_search_gate_crosswalk.py
+    - src/datadiff_osc/search/lane_registry.py
+    - tests/osc/test_search_lane_registry.py
+    - src/datadiff_osc/runtime/_producer_provenance.py
+    - tests/osc/test_runtime_producer_provenance.py
+    - src/datadiff_osc/contract_engine/_phase6_corpora.py
+    - tests/osc/test_contract_phase6_corpora.py
+  frozen_interfaces:
+    - osc-public-api-freeze-v1:cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    - osc-pre24-gate-spec-set-d9792996cacb6fc6e47bce602d5f7ab6d6382c62ba9e1ac6bc1f8003ecbec552
+    - all thirteen frozen_target_sha256 entries above
+  required_invariants:
+    - >-
+      This definition task does not edit the 41-spec set, an authority schema,
+      any producer, public API/export, corpus foundation, or test. A successor
+      implementation task contract is required before each such edit.
+    - >-
+      Every gate denominator is a complete exact typed identity set. Cardinality
+      alone, caller-authored IDs, aggregate scalars, a sample relabeled as a full
+      audit, or a missing zero-valued series is not evidence.
+    - >-
+      The Phase-6 full canonical comparison corpus is exactly 100000 uniquely
+      identified normalized ResultGroup comparison decisions. Each decision must
+      bind result_group_digest, canonical ordered endpoint_set_digest,
+      contract_fingerprint_digest, source_case_digest, source snapshot digest,
+      canonical-comparison algorithm identity, fingerprint task/result identity,
+      and exact-comparator task/result identity. Its frozen identity digest is
+      supplied by a Root authority plan; an incomplete, duplicate, substituted,
+      unresolved, or non-typed record fails closed.
+    - >-
+      `contract.fingerprint_full_canonical_equivalence` requires all 100000 full
+      corpus decisions to have a fingerprint equality decision recomputed from
+      raw fingerprint objects and the same full-canonical equality decision
+      recomputed from raw canonical objects. The two booleans must agree for
+      every exact identity; self-declared verdicts do not count.
+    - >-
+      `contract.mismatch_full_diff_escalation` uses the exact subset of full
+      corpus decision IDs for which the recomputed fingerprint equality decision
+      is false. Every member must have one separately typed full-diff execution
+      bound to the same decision; no mismatch may be dropped, duplicated,
+      substituted, or discharged by a scalar. An empty mismatch subset is
+      admissible only after the complete 100000 full corpus is independently
+      verified.
+    - >-
+      `contract.equal_fingerprint_full_audit_deviations` audits every exact full
+      corpus decision whose recomputed fingerprint equality decision is true,
+      not a sample. Each must have a bound full-canonical comparison and the
+      deviation set (fingerprint equal but canonical unequal) must be exactly
+      empty. Empty, incomplete, duplicate, or forged equal-fingerprint subsets
+      fail closed rather than passing vacuously.
+    - >-
+      `contract.backend_clustering_pairwise_equivalence` requires a complete
+      full-corpus comparison of the planner's canonical backend-cluster partition
+      with an explicit pairwise-canonical-comparison partition under the same
+      ordered endpoint set and contract identity. All 100000 partitions must be
+      exactly equivalent; a fingerprint collision cannot be used as evidence of
+      equivalence.
+    - >-
+      The paired performance cohort is exactly 1000 distinct eligible decisions
+      selected without replacement from the frozen 100000 corpus by ascending
+      SHA-256 rank of the domain-separated tuple
+      (`osc-phase6-contract-performance-cohort-v1`, comparison_decision_id).
+      Eligibility is frozen before measurement: at least two endpoints and an
+      always-materialize pairwise baseline is planned. Fewer than 1000 eligible
+      decisions, changed rank rule, duplicate/missing IDs, or any post-hoc
+      selection fails closed.
+    - >-
+      Each paired performance observation has one cohort decision ID and exactly
+      two distinct typed task/result bindings: baseline is always-materialize
+      explicit pairwise comparison and treatment is the staged planner with
+      exact escalation. Both bind the same result group, ordered endpoint set,
+      contract fingerprint, source case, source snapshot, backend/version/mode/
+      layout context, semantic comparator identity, resource envelope, and
+      verdict. Raw non-negative finite baseline/treatment materialized bytes,
+      backend-pair comparison counts, and comparison CPU nanoseconds are stored
+      per pair; aggregates or diagnostics alone cannot serve as raw observations.
+    - >-
+      For `contract.comparison_cpu_reduction`, the exact cohort aggregate is
+      `1 - sum(treatment_cpu_ns) / sum(baseline_cpu_ns)` and must be at least
+      0.30. A non-positive baseline aggregate or any absent/misbound raw pair
+      fails closed.
+    - >-
+      For both `contract.materialized_bytes_reduction` and
+      `contract.backend_pair_comparison_reduction`, the exact cohort aggregate
+      `1 - sum(treatment) / sum(baseline)` must be at least 0.30, and the
+      deterministic paired bootstrap 95 percent lower confidence bound of that
+      same reduction must be strictly greater than zero. The bootstrap uses the
+      1000 pairs sorted by comparison_decision_id, 10000 resamples of 1000 pairs
+      with replacement, seed `int(sha256(canonical_json({schema_version,
+      source_digest, cohort_identity_digest, metric_key})), 16)`, and the
+      nearest-rank 2.5th percentile at index 249. Each baseline observation must
+      be strictly positive for the relevant metric; otherwise the metric is
+      not_evaluated and fails closed. This is an explicit user-authorized
+      definition of the formerly qualitative word `significant`, not a pass.
+    - >-
+      All paired comparisons preserve the authority verdict: baseline and
+      treatment exact verdicts must agree for every performance-cohort identity;
+      an approximate or pruned result cannot substitute for the required exact
+      comparator. Missing exact typed context is fail closed/not_evaluated.
+    - >-
+      Diagnostic refs remain permanently diagnostic-only. No definition,
+      producer, metric, evaluation, or report may change candidate to confirmed,
+      set bug_claimed=true, authorize a gate pass, Phase 7, a 2h pilot, or a 24h
+      run.
+  deliverables:
+    - this immutable task contract
+    - a root-owned definition report recording the source mapping and no-product-write outcome
+    - synchronized coordination ledger retaining phase_6_contract as pending
+    - a successor implementation contract only after its exact exclusive paths and tests are mapped
+  validation:
+    - command: sha256sum for all thirteen frozen/public targets before and after authority writes
+      expected: every value exactly equals frozen_target_sha256
+    - command: git diff --cached --name-only
+      expected: zero staged paths
+    - command: no product test or long gate command
+      expected: no test authorization is consumed by this definition-only task
+  stop_conditions:
+    - any frozen/public SHA mismatch or staged user path
+    - any need to alter public exports, public_api_freeze.json, or a frozen target
+    - any ambiguous denominator, unbound raw pair, self-authored pass claim, or threshold change
+    - any request to execute 100000 parity, v3 2200, tests/osc, repository tests, Phase 7, 2h, or 24h
+    - any need to create a child agent or to modify a product path without a successor implementation contract
+  completion_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_report.yaml
+    required_fields:
+      - exact before/after SHA for all frozen/public targets
+      - source-to-definition crosswalk and minimum successor implementation surface
+      - explicit statement that no product code, test, gate-spec, producer, or long gate ran
+      - 负向复核、独立反例验证、异常输入验证 requirements for the successor implementation
+      - findings without downgrade or concealment
+      - writes limited to authority paths, implementation_child_agents=0, forbidden_paths_modified=[]
+decision:
+  phase_6_contract_status: pending
+  contract_gate_spec_edit_authorized: false
+  raw_producer_edit_authorized: false
+  long_gate_execution_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  tests_osc_authorized: false
+  repository_suite_authorized: false
+  phase7_pilot_2h_authorized: false
+  twenty_four_hour_run_authorized: false

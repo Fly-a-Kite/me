@@ -1,0 +1,125 @@
+schema_version: osc-task-contract-v1
+phase: 6
+change_request: CR-OSC-6-001
+execution_policy:
+  current_mode: implementation_prewrite_design_only
+  writes_authorized: false
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  simultaneous_writers: 0
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_paired_pilot_authorized: false
+  twenty_four_hour_run_authorized: false
+frozen_internal_consumer_signature: >-
+  replay_<domain>_admission(*, envelope_type: str, schema_version: str,
+  payload: object, subject_kind: str, subject_ids: tuple[str, ...]) -> tuple[str, ...]
+tasks:
+  - task_id: OSC-6-CR001-CONTRACT-PREWRITE
+    role: contract
+    agent: /root/phase5_authority_audit
+    mode: implementation_prewrite_design_only
+    objective: Design exact-path Contract semantic replay for existing contract-owned canonical types without changing public interfaces.
+    required_inputs:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_audit_findings.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_change_requests.yaml
+      - src/datadiff_osc/_canonical.py
+      - src/datadiff_osc/contract_engine/**
+      - src/datadiff_osc/schemas.py
+    allowed_write_paths: []
+    forbidden_write_paths: ["**"]
+    future_owned_types:
+      - HyperContract
+      - Endpoint
+      - ResultGroup
+      - ApplicabilityCertificate
+      - ObservationCertificate
+      - ExactEscalationCertificate
+    required_invariants:
+      - reconstruction invokes real dataclass invariants and canonical byte round-trip
+      - subject identities derive from replayed objects, never receipt claims alone
+      - no public export, schema or freeze change
+    deliverables:
+      - exact proposed production and test paths
+      - exact symbols, tests and zero-crossing declaration
+      - dependency or change-request list
+    validation: [read-only inspection only]
+    stop_conditions: [any write, public change, cross-owner path, long gate]
+    completion_report: prewrite handshake plus runbook section-12 delta
+
+  - task_id: OSC-6-CR001-SEARCH-PREWRITE
+    role: search
+    agent: /root/phase5_consumer_audit
+    mode: implementation_prewrite_design_only
+    objective: Design exact-path Search semantic replay for construction, assignment, extraction, activation and lane-plan canonical types without changing public interfaces.
+    required_inputs:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_audit_findings.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_change_requests.yaml
+      - src/datadiff_osc/_canonical.py
+      - src/datadiff_osc/semantic_targets/**
+      - src/datadiff_osc/generation/**
+      - src/datadiff_osc/search/**
+    allowed_write_paths: []
+    forbidden_write_paths: ["**"]
+    future_owned_types:
+      - ConstructionOutcome
+      - MutationOutcome
+      - TargetAssignment
+      - ExtractionResult
+      - ContrastExtraction
+      - ActivationCertificate
+      - FormalLanePlan
+    required_invariants:
+      - reconstruction revalidates case/assignment/extraction/certificate bindings
+      - family never becomes verdict authority
+      - subject identities derive from replayed objects and frozen compiler universes
+      - no public export, schema or freeze change
+    deliverables:
+      - exact proposed production and test paths
+      - exact symbols, tests and zero-crossing declaration
+      - dependency or change-request list
+    validation: [read-only inspection only]
+    stop_conditions: [any write, public change, cross-owner path, long gate]
+    completion_report: prewrite handshake plus runbook section-12 delta
+
+  - task_id: OSC-6-CR001-RUNTIME-PREWRITE
+    role: runtime
+    agent: /root/phase5_evidence_audit
+    mode: implementation_prewrite_design_only
+    objective: Design exact-path Runtime semantic replay and missing private receipt dataclasses without changing public interfaces.
+    required_inputs:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_audit_findings.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_change_requests.yaml
+      - src/datadiff_osc/_canonical.py
+      - src/datadiff_osc/schemas.py
+      - src/datadiff_osc/parallel/**
+      - src/datadiff_osc/runtime/**
+    allowed_write_paths: []
+    forbidden_write_paths: ["**"]
+    future_owned_types:
+      - StructuredExecutionOutcome
+      - EvidenceEnvelope
+      - TaskSpec
+      - TaskIdentity
+      - SeedLineage
+      - InvarianceReport
+      - AuthorityEvidenceSnapshot
+      - V3RunReceipt
+      - RepositoryTestReceipt
+      - TargetVersionReceipt
+      - CandidateClassificationReceipt
+      - PairedBenchmarkReceipt
+    required_invariants:
+      - private receipt types carry enough fields to replay source/plan/task/result bindings
+      - candidate receipt cannot set or imply confirmed bug
+      - synthetic runtime evidence remains ineligible
+      - every Python command sets PYTHONDONTWRITEBYTECODE=1
+      - no public export, schema or freeze change
+    deliverables:
+      - exact proposed production and test paths
+      - exact symbols, tests and zero-crossing declaration
+      - dependency or change-request list
+    validation: [read-only inspection only]
+    stop_conditions: [any write including bytecode, public change, cross-owner path, long gate]
+    completion_report: prewrite handshake plus runbook section-12 delta
+

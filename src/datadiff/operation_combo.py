@@ -47,6 +47,9 @@ CANONICAL_OPERATION_ORDER = (
     "float_literal_precision_probe",
     "timestamp_precision_filter_probe",
     "series_rtruediv_probe",
+    "series_reflected_arithmetic_probe",
+    "datafusion_grouped_null_topk_probe",
+    "confirmed_root_witness_probe",
     "uint64_isin_probe",
     "tuple_anti_null_probe",
     "setop_all_duplicate_probe",
@@ -597,6 +600,17 @@ def _semantic_signals(operations: list[dict[str, Any]] | list[Any], sequence: li
         signals.append("polars_timestamp_precision_filter")
     if "series_rtruediv_probe" in op_set:
         signals.append("series_rtruediv_operand_order")
+    if "series_reflected_arithmetic_probe" in op_set:
+        signals.append("polars_reflected_arithmetic_operand_order")
+    if "datafusion_grouped_null_topk_probe" in op_set:
+        signals.append("grouped_topk_null_sort_key")
+    if "confirmed_root_witness_probe" in op_set:
+        signals.extend(
+            str(operation.get("root_cause", "") or "")
+            for operation in operations
+            if op_kind(operation) == "confirmed_root_witness_probe"
+            and str(operation.get("root_cause", "") or "")
+        )
     if "uint64_isin_probe" in op_set:
         signals.append("pandas_uint64_isin_precision")
     if "tuple_anti_null_probe" in op_set:
@@ -779,3 +793,7 @@ def _priority_score(frequency_bucket: str, semantic_signals: list[str], operatio
     signal_density_score = min(0.60, 0.12 * len(semantic_signals))
     depth_score = min(0.25, 0.04 * max(0, operation_count - 2))
     return round(frequency_score + signal_density_score + depth_score, 6)
+
+
+classify_operation_combo = describe_operation_combo
+summarize_operation_combo = describe_operation_combo

@@ -5,6 +5,7 @@ from typing import Any
 
 from datadiff.dsl import Case
 from datadiff.fingerprint import CaseFingerprint, compute_fingerprint
+from datadiff.canonicalization import short_canonical_hash
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,9 +18,14 @@ class BehavioralDescriptor:
     row_mass_axis: str
     column_count_axis: str
     backend_disagreement_axis: str = "pair:none"
+    descriptor_mode: str = "legacy_qd"
+    interaction_axis: str = "interaction:none"
+    plan_axis: str = "plan:none"
+    layout_axis: str = "layout:logical_rows"
+    cold_stratum_axis: str = "cold:legacy"
 
     def axis_tuples(self) -> tuple[tuple[str, str], ...]:
-        return (
+        axes = (
             ("bd_profile", self.profile_axis),
             ("bd_op_skeleton", self.op_skeleton_axis),
             ("bd_target_class", self.target_class_axis),
@@ -29,6 +35,15 @@ class BehavioralDescriptor:
             ("bd_column_count", self.column_count_axis),
             ("bd_backend_disagreement", self.backend_disagreement_axis),
         )
+        if self.descriptor_mode == "semantic_plan_qd":
+            axes = (
+                *axes,
+                ("bd_interaction", self.interaction_axis),
+                ("bd_plan", self.plan_axis),
+                ("bd_layout", self.layout_axis),
+                ("bd_cold_stratum", self.cold_stratum_axis),
+            )
+        return axes
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -40,6 +55,11 @@ class BehavioralDescriptor:
             "row_mass_axis": self.row_mass_axis,
             "column_count_axis": self.column_count_axis,
             "backend_disagreement_axis": self.backend_disagreement_axis,
+            "descriptor_mode": self.descriptor_mode,
+            "interaction_axis": self.interaction_axis,
+            "plan_axis": self.plan_axis,
+            "layout_axis": self.layout_axis,
+            "cold_stratum_axis": self.cold_stratum_axis,
             "axis_tuples": [list(item) for item in self.axis_tuples()],
         }
 
@@ -56,6 +76,11 @@ class BehavioralDescriptor:
             row_mass_axis=_axis_text(data.get("row_mass_axis"), "rows:0"),
             column_count_axis=_axis_text(data.get("column_count_axis"), "cols:0"),
             backend_disagreement_axis=_axis_text(data.get("backend_disagreement_axis"), "pair:none"),
+            descriptor_mode=_axis_text(data.get("descriptor_mode"), "legacy_qd"),
+            interaction_axis=_axis_text(data.get("interaction_axis"), "interaction:none"),
+            plan_axis=_axis_text(data.get("plan_axis"), "plan:none"),
+            layout_axis=_axis_text(data.get("layout_axis"), "layout:logical_rows"),
+            cold_stratum_axis=_axis_text(data.get("cold_stratum_axis"), "cold:legacy"),
         )
 
     @classmethod
@@ -69,6 +94,11 @@ class BehavioralDescriptor:
             row_mass_axis="rows:0",
             column_count_axis="cols:0",
             backend_disagreement_axis="pair:none",
+            descriptor_mode="legacy_qd",
+            interaction_axis="interaction:none",
+            plan_axis="plan:none",
+            layout_axis="layout:logical_rows",
+            cold_stratum_axis="cold:legacy",
         )
 
 
@@ -77,8 +107,15 @@ def compute_behavioral_descriptor(
     *,
     profile_key: str = "",
     target_keys: list[str] | tuple[str, ...] = (),
+    mode: str = "legacy_qd",
 ) -> BehavioralDescriptor:
     fingerprint = _case_fingerprint(case)
+    descriptor_mode = (
+        "semantic_plan_qd" if str(mode) == "semantic_plan_qd" else "legacy_qd"
+    )
+    interaction_axis = _interaction_axis(case)
+    plan_axis = _plan_axis(case)
+    layout_axis = _layout_axis(case)
     return BehavioralDescriptor(
         profile_axis=_axis_token(profile_key or _case_profile_key(case) or "generic"),
         op_skeleton_axis=f"op:{_axis_token(fingerprint.op_skeleton_hash or 'none')}",
@@ -88,6 +125,21 @@ def compute_behavioral_descriptor(
         row_mass_axis=f"rows:{int(fingerprint.row_mass_bucket)}",
         column_count_axis=f"cols:{_column_count_bucket(int(fingerprint.column_count))}",
         backend_disagreement_axis=f"pair:{_axis_token(_backend_disagreement_axis(case))}",
+        descriptor_mode=descriptor_mode,
+        interaction_axis=interaction_axis,
+        plan_axis=plan_axis,
+        layout_axis=layout_axis,
+        cold_stratum_axis=(
+            "cold:"
+            + short_canonical_hash(
+                {
+                    "interaction": interaction_axis,
+                    "plan": plan_axis,
+                    "layout": layout_axis,
+                },
+                16,
+            )
+        ),
     )
 
 
@@ -132,6 +184,98 @@ def _backend_disagreement_axis(case: Case) -> str:
         mismatch = str(descriptor.get("mismatch_class", "") or "").strip()
         return f"mismatch:{mismatch}" if mismatch and mismatch != "none" else "none"
     return "__".join(sorted(dict.fromkeys(pairs))[:4])
+
+
+def _interaction_axis(case: Case) -> str:
+    metadata = case.metadata if isinstance(case.metadata, dict) else {}
+    descriptor = metadata.get("interaction_descriptor")
+    if not isinstance(descriptor, dict):
+        goal = str(metadata.get("goal_id", "") or "")
+        return f"interaction:goal_{_axis_token(goal)}" if goal else "interaction:none"
+    tokens = descriptor.get("tokens", ()) or ()
+    categories = sorted(
+        {
+            str(item.get("category", ""))
+            for item in tokens
+            if isinstance(item, dict) and str(item.get("category", ""))
+        }
+    )
+    special = sorted(
+        {
+            str(item.get("category", ""))
+            for item in tokens
+            if isinstance(item, dict)
+            and str(item.get("category", "")).startswith("order_required_")
+        }
+    )
+    if not categories:
+        return "interaction:none"
+    return "interaction:" + short_canonical_hash(
+        {"categories": categories, "special": special},
+        16,
+    )
+
+
+def _plan_axis(case: Case) -> str:
+    metadata = case.metadata if isinstance(case.metadata, dict) else {}
+    descriptor = metadata.get("interaction_descriptor")
+    if not isinstance(descriptor, dict):
+        return "plan:none"
+    signatures: list[tuple[str, ...]] = []
+    for item in descriptor.get("tokens", ()) or ():
+        if not isinstance(item, dict):
+            continue
+        category = str(item.get("category", ""))
+        if category not in {"plan_state", "plan_edge"}:
+            continue
+        components = tuple(
+            str(component)
+            for component in item.get("components", ()) or ()
+            if str(component).startswith(
+                (
+                    "backend=",
+                    "mode=",
+                    "kind=",
+                    "plan_kind=",
+                    "operators=",
+                    "edge=",
+                    "changed=",
+                    "added=",
+                    "removed=",
+                )
+            )
+        )
+        if components:
+            signatures.append(components)
+    if not signatures:
+        return "plan:none"
+    return "plan:" + short_canonical_hash(sorted(signatures), 16)
+
+
+def _layout_axis(case: Case) -> str:
+    metadata = case.metadata if isinstance(case.metadata, dict) else {}
+    layouts = metadata.get("input_layouts", {})
+    if not isinstance(layouts, dict) or not layouts:
+        return "layout:logical_rows"
+    signatures = []
+    for table, raw in sorted(layouts.items()):
+        if not isinstance(raw, dict):
+            continue
+        signatures.append(
+            {
+                "table": str(table),
+                "representation": str(raw.get("representation", "logical_rows")),
+                "chunks": _column_count_bucket(int(raw.get("chunk_count", 0) or 0)),
+                "dictionary": bool(raw.get("dictionary_columns", ())),
+                "slice": bool(
+                    isinstance(raw.get("attributes"), dict)
+                    and int(raw["attributes"].get("slice_offset", 0) or 0) > 0
+                ),
+            }
+        )
+    if not signatures:
+        return "layout:logical_rows"
+    return "layout:" + short_canonical_hash(signatures, 16)
 
 
 def _normalize_pair_key(value: str) -> str:

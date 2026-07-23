@@ -6,7 +6,11 @@ from typing import Any
 
 from datadiff.behavioral_descriptor import BehavioralDescriptor
 
-QUALITY_ARCHIVE_SCHEMA_VERSION = "quality-diversity-archive-v2"
+QUALITY_ARCHIVE_SCHEMA_VERSION = "quality-diversity-archive-v3"
+COLD_PROTECTION_BONUS_PER_DEBT = 0.15
+MAX_COLD_PROTECTION_BONUS = 1.0
+SATURATED_FAMILY_ENERGY_MULTIPLIER = 0.35
+ENERGY_AUDIT_FLOOR = 0.20
 
 
 @dataclass(slots=True)
@@ -249,6 +253,13 @@ class QualityDiversityArchive:
     split_variance_threshold: float = 0.20
     merge_variance_threshold: float = 0.02
     max_hierarchy_depth: int = 1
+    cold_min_exposures: int = 2
+    cold_axis_names: tuple[str, ...] = (
+        "bd_interaction",
+        "bd_plan",
+        "bd_layout",
+        "bd_cold_stratum",
+    )
     cells: dict[str, QualityDiversityCell] = field(default_factory=dict)
     axis_cells: dict[str, dict[str, QualityDiversityCell]] = field(default_factory=dict)
 
@@ -444,6 +455,73 @@ class QualityDiversityArchive:
             return 0.0
         return cell.health_penalty()
 
+    def cold_stratum_status(
+        self,
+        descriptor: BehavioralDescriptor | dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        strata: list[dict[str, Any]] = []
+        total_debt = 0
+        for axis_name, axis_value in _descriptor_axis_tuples(descriptor):
+            if axis_name not in self.cold_axis_names:
+                continue
+            cell = self.axis_cells.get(axis_name, {}).get(axis_value)
+            exposures = _cell_exposures(cell)
+            debt = max(0, int(self.cold_min_exposures) - exposures)
+            total_debt += debt
+            strata.append(
+                {
+                    "axis_name": axis_name,
+                    "axis_value": axis_value,
+                    "exposures": exposures,
+                    "debt": debt,
+                    "cold": debt > 0,
+                }
+            )
+        return {
+            "schema_version": QUALITY_ARCHIVE_SCHEMA_VERSION,
+            "minimum_exposures": int(self.cold_min_exposures),
+            "strata": strata,
+            "cold_stratum_count": sum(bool(item["cold"]) for item in strata),
+            "total_cold_debt": total_debt,
+        }
+
+    def cold_protection_bonus(
+        self,
+        descriptor: BehavioralDescriptor | dict[str, Any] | None,
+    ) -> float:
+        debt = int(self.cold_stratum_status(descriptor)["total_cold_debt"])
+        return min(
+            MAX_COLD_PROTECTION_BONUS,
+            COLD_PROTECTION_BONUS_PER_DEBT * max(0, debt),
+        )
+
+    def energy_decision_trace(
+        self,
+        descriptor: BehavioralDescriptor | dict[str, Any] | None,
+        *,
+        saturated_family: bool = False,
+    ) -> dict[str, Any]:
+        status = self.cold_stratum_status(descriptor)
+        cold_bonus = self.cold_protection_bonus(descriptor)
+        saturation_multiplier = (
+            SATURATED_FAMILY_ENERGY_MULTIPLIER if saturated_family else 1.0
+        )
+        effective_multiplier = max(
+            ENERGY_AUDIT_FLOOR,
+            saturation_multiplier + cold_bonus,
+        )
+        return {
+            "schema_version": QUALITY_ARCHIVE_SCHEMA_VERSION,
+            "cold_status": status,
+            "cold_debt": int(status["total_cold_debt"]),
+            "cold_protection_bonus": cold_bonus,
+            "saturated_family": bool(saturated_family),
+            "saturation_multiplier": saturation_multiplier,
+            "effective_energy_multiplier": effective_multiplier,
+            "audit_floor": ENERGY_AUDIT_FLOOR,
+            "audit_floor_preserved": effective_multiplier >= ENERGY_AUDIT_FLOOR,
+        }
+
     def elite_indexes(self, cluster_key: str) -> list[int]:
         cell = self.cells.get(cluster_key)
         if cell is None:
@@ -542,6 +620,8 @@ class QualityDiversityArchive:
             "split_variance_threshold": self.split_variance_threshold,
             "merge_variance_threshold": self.merge_variance_threshold,
             "max_hierarchy_depth": self.max_hierarchy_depth,
+            "cold_min_exposures": self.cold_min_exposures,
+            "cold_axis_names": list(self.cold_axis_names),
             "cells": [cell.to_state_dict() for cell in self.cells.values()],
             "axis_cells": {
                 axis_name: [cell.to_state_dict() for cell in cells.values()]
@@ -560,6 +640,15 @@ class QualityDiversityArchive:
             split_variance_threshold=max(0.0, float(data.get("split_variance_threshold", 0.20) or 0.20)),
             merge_variance_threshold=max(0.0, float(data.get("merge_variance_threshold", 0.02) or 0.02)),
             max_hierarchy_depth=max(0, int(data.get("max_hierarchy_depth", 1) or 1)),
+            cold_min_exposures=max(1, int(data.get("cold_min_exposures", 2) or 2)),
+            cold_axis_names=tuple(
+                str(item)
+                for item in data.get(
+                    "cold_axis_names",
+                    ("bd_interaction", "bd_plan", "bd_layout", "bd_cold_stratum"),
+                )
+                if str(item)
+            ),
         )
         for raw_cell in data.get("cells", []) or []:
             if not isinstance(raw_cell, dict):
@@ -763,3 +852,10 @@ def _bounded_confident_mean_reward(total_reward: float, pulls: int, *, max_abs: 
     bounded_mean_reward = max(-max_abs, min(max_abs, mean_reward))
     confidence = min(1.0, math.log1p(float(pulls)) / math.log(4.0))
     return bounded_mean_reward * confidence
+
+
+def _cell_exposures(cell: QualityDiversityCell | None) -> int:
+    if cell is None:
+        return 0
+    pull_count = sum(max(0, int(seed.pulls)) for seed in cell.seeds.values())
+    return max(int(cell.outcome_count), pull_count)

@@ -1,0 +1,126 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-GRANULARITY-REAL-ADAPTER-DIAGNOSTIC-SAMPLE-R2A-TEST-ONLY
+owner: /root
+mode: root_serial_test_only_remediation
+implementation_child_agents: 0
+reviewer_child_agents_created: 0
+remediates:
+  - OSC-6-G-R2-M1
+objective: >-
+  Repair only the R2 fixture's invalid Endpoint scope metadata so that it
+  constructs the same applicability-compatible private R1 context already
+  proven by the R1 test. This task does not modify the capture product code or
+  enlarge the diagnostic-only authority boundary.
+authorization_boundary:
+  authorized_product_writes:
+    - tests/osc/test_runtime_phase6_real_adapter_execution_sample.py
+  authorized_authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_r2a_test_only_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_r2a_test_only_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  all_other_paths: forbidden
+verified_preconditions:
+  head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  staged_paths: 0
+  dirty_worktree_preserved:
+    tracked_status_entries: 141
+    untracked_status_entries: 2767
+  failed_r2_authority:
+    task_contract:
+      path: experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_task_contract.yaml
+      sha256: 82dd8763427e21bf6304af20a5ec00a93fc2db3886c79a67106e614d408b0423
+    report:
+      path: experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_report.yaml
+      sha256: 32695912b2e5cd866932c877992ac54998030f92ab0a3f2d6ac5ca17adb35b81
+    ledger:
+      path: experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+      sha256_before_contract_write: a465ad5d5363c5b1d38536ff6a2fbbcac83f403c151448e408aacd2213cc24c7
+  product_paths:
+    src/datadiff_osc/runtime/_phase6_real_adapter_execution_sample.py: f002ece5a9e612f3b8bf3d51fd6d4fd02483acf99fb25a7879106d2316363444
+    tests/osc/test_runtime_phase6_real_adapter_execution_sample.py: e2005fe4f57e7b01ee863fb921f4ada46a932fcdd4769d611ccf94a7697d333d
+  frozen_public_targets:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+required_inputs_read:
+  - docs/codex_multi_agent_development_runbook.md
+  - experiments/final_bug_discovery_protocol_v3/TODO.md
+  - docs/project_architecture.md
+  - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_task_contract.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_report.yaml
+  - tests/osc/test_runtime_phase6_reachability_execution_binding.py
+  - tests/osc/test_runtime_phase6_real_adapter_execution_sample.py
+required_invariants:
+  - >-
+    Change only the fixture Endpoint scope metadata needed to make the exact
+    current HyperContract applicability valid. Reuse the established R1
+    compatible endpoint metadata shape (backend_version=1.0.0 and
+    adapter_revision=adapter-v1); do not change pair ordering, Case generation,
+    Search/R1 binding, product capture logic, or any gate condition.
+  - >-
+    The new module-scope fixture must perform exactly one direct real
+    pandas/polars adapter-pair invocation only after valid R1 context
+    construction. All other tests remain in-memory and must not call capture.
+  - >-
+    The sample remains diagnostic-only with authority_eligible=false,
+    gate_credit=false, raw_artifact_admitted=false,
+    coverage_event_created=false, candidate_confirmed=false, and
+    bug_claimed=false. It grants no 232/384/502, activation, mutation, focus,
+    dimension, performance, exactness, parallel, v3, repository, or Phase-7
+    credit.
+negative_review_requirements:
+  负向复核:
+    - mismatched endpoint order/scope and record-order substitutions remain rejected
+  独立反例验证:
+    - structural context without two actual records cannot become real execution evidence or gate credit
+  异常输入验证:
+    - malformed canonical records, non-OK result status, wrong binding type, and close failure remain fail closed without a second adapter invocation
+forbidden:
+  - src/datadiff_osc/runtime/_phase6_real_adapter_execution_sample.py
+  - public exports
+  - src/datadiff_osc/public_api_freeze.json
+  - all listed frozen_public_targets
+  - all existing tests except the one authorized test path
+  - tests/osc whole directory
+  - full repository suite
+  - six-file combined suite
+  - 100000 parity
+  - v3 2200
+  - source snapshot or clean-worktree creation
+  - persistent raw artifact production
+  - Phase 7, 2h pilot, 24h execution
+validation:
+  prior_r2_scoped_suite_rerun: forbidden
+  execution_count_before_implementation: 0
+  authorized_real_adapter_pair_invocations: 1
+  exactly_one_authorized_scoped_suite_after_implementation: >-
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+    tests/osc/test_runtime_phase6_real_adapter_execution_sample.py
+  expected_exit_code: 0
+  combined_suite: unauthorized
+  phase6_gate_claim: pending
+stop_conditions:
+  - any frozen/public SHA mismatch
+  - any scoped-suite failure or missing complete terminal result
+  - any adapter launch before post-contract SHA verification
+  - any more than one actual adapter-pair invocation in the scoped suite
+  - any candidate becomes confirmed or bug_claimed becomes true
+  - any request to broaden code or authority scope
+completion_report_requirements:
+  - exact pre/post SHA for the authorized test and all frozen/public targets
+  - exact one-time command, exit code, complete terminal result, and actual adapter-pair invocation count
+  - 负向复核, 独立反例验证, 异常输入验证 results
+  - explicit remaining blocker OSC-6-G-B1 and barrier pending statement
+  - writes and forbidden_paths_modified fields
+  - no prewritten pass claim

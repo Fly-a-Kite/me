@@ -1,0 +1,744 @@
+schema_version: osc-task-contract-v1
+phase: 5
+execution_policy:
+  repair_order: [contract, root_contract_binding, search, runtime, root]
+  simultaneous_writers: 1
+  twenty_four_hour_run_authorized: false
+tasks:
+  - task_id: OSC-5-A
+    role: contract
+    mode: implementation
+    objective: Repair OSC-4-C-F1 through F5 without weakening exact authority or changing public field shape.
+    required_inputs:
+      - experiments/osc_v1/coordination_20260719_v1/phase4_review_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_prewrite_declarations.yaml
+      - src/datadiff_osc/public_api_freeze.json
+      - docs/semantic_hypercontract_architecture.md
+      - docs/codex_multi_agent_development_runbook.md
+    allowed_write_paths:
+      - src/datadiff_osc/contract_engine/relations.py
+      - src/datadiff_osc/contract_engine/applicability.py
+      - src/datadiff_osc/contract_engine/monitor.py
+      - src/datadiff_osc/contract_engine/planner.py
+      - src/datadiff_osc/contract_engine/demand.py
+      - src/datadiff_osc/contract_engine/compiler.py
+      - tests/osc/test_contract_authority.py
+      - tests/osc/test_contract_relations_planner.py
+      - tests/osc/test_contract_two_pass_properties.py
+      - tests/osc/test_contract_entailment.py
+      - tests/osc/test_contract_v1_compatibility.py
+    forbidden_write_paths:
+      - src/datadiff_osc/_canonical.py
+      - src/datadiff_osc/schemas.py
+      - src/datadiff_osc/api.py
+      - src/datadiff_osc/public_api_freeze.json
+      - src/datadiff_osc/semantic_targets/**
+      - src/datadiff_osc/generation/**
+      - src/datadiff_osc/search/**
+      - src/datadiff_osc/scheduler/**
+      - src/datadiff_osc/comparison/**
+      - src/datadiff_osc/parallel/**
+      - src/datadiff_osc/runtime/**
+      - scripts/**
+      - src/datadiff/**
+    frozen_interfaces:
+      - osc-public-api-freeze-v1@cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      - CR-OSC-5-001 accepted semantics
+      - four-valued outcome policy
+    required_invariants:
+      - exact authority RelationRegistry includes validated versioned evaluator identity and must match the contract fingerprint
+      - derivation rule registry remains separately bound
+      - endpoint backend/version/mode/layout and observation metadata bind end to end
+      - top-k preserves multiplicity
+      - containment and status relations remain orthogonal
+      - timeout/crash/adapter/missing never become pass or unsupported
+    deliverables:
+      - fixes for OSC-4-C-F1 through F5
+      - all mandatory negative regression tests
+      - complete section-12 completion report
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_contract_authority.py tests/osc/test_contract_relations_planner.py tests/osc/test_contract_two_pass_properties.py
+        expected: exit 0 and all new counterexamples fail closed as specified
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_contract_*.py
+        expected: exit 0
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_public_api_freeze.py
+        expected: 7 passed and manifest hash unchanged
+    stop_conditions:
+      - any need for a second public interface change
+      - any file outside the exact approved list
+      - any proposed relaxation of a comparator, certificate, or failure policy
+      - any pilot, campaign, or 24h execution
+    completion_report: runbook section 12, including per-finding regression evidence
+
+  - task_id: OSC-5-A-ROOT-BINDING
+    role: root
+    mode: cross_subsystem_integration_after_contract_writer_stops
+    objective: Route original Endpoint authority through the staged wrapper and parity fixture without changing frozen fields or schemas.
+    required_inputs:
+      - completed OSC-5-A endpoint fail-closed repair
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - src/datadiff_osc/public_api_freeze.json
+    allowed_write_paths:
+      - src/datadiff_osc/comparison/staged.py
+      - scripts/osc/audit_staged_parity.py
+      - tests/osc/test_comparison_staged.py
+    forbidden_write_paths: [contract, search, scheduler, parallel, runtime, legacy, formal launcher]
+    frozen_interfaces:
+      - osc-public-api-freeze-v1@cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    required_invariants:
+      - original Endpoint tuple reaches applicability scope revalidation
+      - every Observation is bound to the recomputed Endpoint digest
+      - missing Endpoint or observation digest fails closed
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_comparison_staged.py tests/osc/test_runtime_scripts.py
+        expected: exit 0
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_public_api_freeze.py
+        expected: 7 passed and manifest hash unchanged
+    stop_conditions:
+      - any frozen field, type, order, schema version, or manifest change
+      - any write outside the exact approved list
+      - any pilot, campaign, or 24h execution
+    completion_report: root integration ledger entry before Search release
+
+  - task_id: OSC-5-B
+    role: search
+    mode: implementation_after_contract_barrier
+    objective: Repair OSC-4-A-F1 through F4 using real evidence objects, endpoint-bound contrast activation, closed provenance, and universe-derived scheduler denominators.
+    required_inputs:
+      - experiments/osc_v1/coordination_20260719_v1/phase4_review_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_prewrite_declarations.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_contract_barrier.yaml
+      - src/datadiff_osc/public_api_freeze.json
+      - completed OSC-5-A contract authority and OSC-5-A-ROOT-BINDING routing
+    allowed_write_paths: see exact OSC-5-B list in phase5_prewrite_declarations.yaml
+    forbidden_write_paths: [contract, runtime, root shared, legacy, launcher]
+    frozen_interfaces: [osc-public-api-freeze-v1, Contract authority after OSC-5-A]
+    required_invariants: [real certificate object binding, original Endpoint authority for applicability scope, directional endpoints, physical fresh/regression split, fixed universe denominators]
+    deliverables: [F1-F4 fixes, negative regressions, section-12 report]
+    validation: [scoped target/generation/search/scheduler tests, public freeze tests]
+    stop_conditions: [contract barrier not passed, public change required, exact path list expansion, pilot/campaign/24h request]
+    completion_report: runbook section 12
+
+  - task_id: OSC-5-C
+    role: runtime
+    mode: implementation_after_search_barrier
+    objective: Repair OSC-4-B-F1 through F4 with verified raw artifacts, bidirectional cache bindings, dependency blocking, and authority-complete invariance.
+    required_inputs:
+      - experiments/osc_v1/coordination_20260719_v1/phase4_review_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_prewrite_declarations.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_observation_contract_barrier.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_search_barrier.yaml
+      - src/datadiff_osc/public_api_freeze.json
+      - completed OSC-5-A, Root observation authority, and OSC-5-B evidence paths
+    allowed_write_paths: see exact OSC-5-C list in phase5_prewrite_declarations.yaml
+    forbidden_write_paths: [contract, search, root shared, legacy, formal launcher]
+    frozen_interfaces: [osc-public-api-freeze-v1, Contract and Search evidence after prior barriers]
+    required_invariants: [artifact-backed recomputation, cache tier isolation, failed prerequisite blocking, assignment/verdict/ledger/certificate invariance]
+    deliverables: [F1-F4 fixes, negative regressions, section-12 report]
+    validation: [scoped comparison/parallel/runtime tests, script tests, public freeze tests]
+    stop_conditions: [prior barriers not passed, public change required, exact path list expansion, pilot/campaign/24h request]
+    completion_report: runbook section 12
+
+  - task_id: OSC-5-C-AUTHORITY-FOLLOWUP
+    role: runtime
+    mode: implementation_after_root_counterexample_and_cr_acceptance
+    objective: >-
+      Close the Runtime consumer half of OSC-4-B-F1 by rejecting self-asserted
+      source/universe evidence and separating complete authoritative gate reports
+      from subset/custom evaluations.
+    required_inputs:
+      - experiments/osc_v1/coordination_20260719_v1/phase4_review_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_prewrite_declarations.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_search_barrier.yaml
+      - src/datadiff_osc/public_api_freeze.json
+      - Root and Runtime fake-universe counterexample for CR-OSC-5-004
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/gate_artifacts.py
+      - src/datadiff_osc/runtime/gates.py
+      - scripts/osc/calculate_gate_report.py
+      - tests/osc/test_runtime_gate_artifacts.py
+      - tests/osc/test_runtime_gates.py
+      - tests/osc/test_runtime_scripts.py
+    forbidden_write_paths:
+      - src/datadiff_osc/_canonical.py
+      - src/datadiff_osc/schemas.py
+      - src/datadiff_osc/api.py
+      - src/datadiff_osc/public_api_freeze.json
+      - src/datadiff_osc/contract_engine/**
+      - src/datadiff_osc/semantic_targets/**
+      - src/datadiff_osc/generation/**
+      - src/datadiff_osc/search/**
+      - src/datadiff_osc/scheduler/**
+      - src/datadiff_osc/comparison/**
+      - src/datadiff_osc/parallel/**
+      - src/datadiff/**
+      - formal launcher and preregistration paths
+    frozen_interfaces:
+      - osc-public-api-freeze-v1@cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      - CR-OSC-5-004 accepted semantics
+      - complete default 41-gate thresholds and twenty_four_hour_run_authorized=false
+    required_invariants:
+      - expected source authority is supplied independently and matches plan, manifest and every raw artifact
+      - every COUNT_UNIQUE denominator binds an exact independently frozen identity universe and provenance
+      - every COUNT_UNIQUE numerator identity is a subset of its trusted denominator universe
+      - exact artifact set, identities, schemas and hashes match the independently frozen authority plan
+      - authoritative calculate_gate_report always evaluates the complete default 41-gate spec set
+      - custom or subset evaluation has a distinct non-authoritative report and never sets all_gates_pass or authority eligibility
+      - no runtime object or script authorizes pilot, 2h or 24h
+    deliverables:
+      - verified GateAuthorityPlan consumer and source/universe/artifact rebinding checks
+      - authoritative/evaluation-only API separation
+      - fake-universe, source, plan, artifact, provenance, subset and full-set regression tests
+      - complete runbook section-12 follow-up report
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_runtime_gate_artifacts.py tests/osc/test_runtime_gates.py tests/osc/test_runtime_scripts.py
+        expected: exit 0 and all CR-OSC-5-004 counterexamples fail closed
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_comparison_*.py tests/osc/test_parallel_*.py tests/osc/test_runtime_*.py tests/osc/test_public_api_freeze.py
+        expected: exit 0 and public freeze hash unchanged
+    stop_conditions:
+      - trusted plan would be derived from the caller-authored raw manifest rather than an independent root producer
+      - any public frozen field, type, order, schema version or manifest change
+      - any write outside the six exact approved paths
+      - any weakening of a denominator, threshold, reducer or complete gate set
+      - any pilot, campaign, 2h or 24h execution
+    completion_report: runbook section 12 with the original fake-universe reproduction shown red then green
+
+  - task_id: OSC-5-ROOT-003-DESIGN-REVIEW
+    role: reviewer
+    mode: read_only_review_parallel_with_disjoint_runtime_writer
+    objective: >-
+      Design the minimal Root-owned legacy BackendResult/NormalizedResult to OSC
+      Endpoint, Observation and StructuredExecutionOutcome facade with an explicit
+      non-legacy authority boundary and lossless failure taxonomy.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - docs/project_architecture.md
+      - docs/semantic_hypercontract_architecture.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_contract_audit.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_runtime_audit.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_dependency_dag.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - src/datadiff_osc/public_api_freeze.json
+      - current legacy BackendResult, normalization, execution and oracle paths
+    allowed_write_paths: []
+    forbidden_write_paths: ["**"]
+    frozen_interfaces:
+      - osc-public-api-freeze-v1@cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      - CR-OSC-ROOT-003
+      - four-valued contract verdict and seven-valued structured execution status
+    required_invariants:
+      - legacy v1 remains a compatibility payload only and never owns OSC verdict authority
+      - unsupported requires independently validated capability evidence
+      - timeout, crash, adapter error, semantic domain error and missing remain distinct and never become pass
+      - OK observations preserve lossless typed values, multiplicity, order and endpoint scope
+      - facade must not infer failure class or semantic permission from root/family/backend/error-message substrings
+      - no production launcher, campaign, pilot, 2h or 24h execution
+    deliverables:
+      - exact current-path evidence and counterexamples
+      - proposed Root-owned source/test paths and signatures
+      - explicit authority/non-authority data-flow boundary
+      - migration risks and negative integration tests
+      - runbook section-12 report with changed_files empty
+    validation:
+      - command: read-only rg/file inspection and optional bounded existing tests only
+        expected: zero repository writes
+    stop_conditions:
+      - any action would write a repository file
+      - any proposed public freeze change or legacy verdict authorization
+      - any pilot, campaign, 2h or 24h execution
+    completion_report: runbook section 12, read-only
+
+  - task_id: OSC-5-ROOT-004-UNIVERSE-REVIEW
+    role: reviewer
+    mode: read_only_review_parallel_with_disjoint_runtime_writer
+    objective: >-
+      Map every denominator and artifact in the complete 41-gate set to an
+      independently recomputable trusted producer, exact identity universe and
+      provenance source for the Root half of CR-OSC-ROOT-004/CR-OSC-5-004.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - docs/fine_grained_discovery_architecture.md
+      - docs/discovery_search_and_parallel_architecture.md
+      - docs/semantic_hypercontract_architecture.md
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_dependency_dag.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - src/datadiff_osc/runtime/gates.py
+      - current target compiler/universe, ledger, scheduler, benchmark and v3 plan paths
+    allowed_write_paths: []
+    forbidden_write_paths: ["**"]
+    frozen_interfaces:
+      - complete default 41-gate thresholds
+      - compiled fresh 16/232, regression 9/144, fresh 384 edges and fresh 502 obligations
+      - CR-OSC-5-004 Runtime consumer semantics
+      - twenty_four_hour_run_authorized=false
+    required_invariants:
+      - 232, 384 and 502 identities derive from declarations/compiler output, never numeric constants or self-declared gate records
+      - observed numerators derive from admitted ledger/certificate/outcome evidence
+      - dynamic run/test/recheck denominators derive from frozen plans and exact case/test identities
+      - performance scalars retain raw sample identities and paired provenance
+      - synthetic scripts are Phase-6-ineligible
+      - missing producer is reported missing, never replaced with an invented plan claim
+      - no pilot, campaign, 2h or 24h execution
+    deliverables:
+      - 41-gate numerator/denominator/reducer/producer/identity/provenance matrix
+      - exact existing reusable paths and missing Root producer/glue paths
+      - plan-construction and preflight signature proposal that never trusts raw-manifest self-claims
+      - required negative and integration tests
+      - runbook section-12 report with changed_files empty
+    validation:
+      - command: read-only source/artifact inspection and bounded import/count checks only
+        expected: zero repository writes and independently recomputed 16/232, 9/144, 384 and 502 counts
+    stop_conditions:
+      - any action would write a repository file
+      - any temptation to invent missing Phase 6 evidence or lower a gate
+      - any pilot, campaign, 2h or 24h execution
+    completion_report: runbook section 12, read-only
+
+  - task_id: OSC-5-ROOT-OBSERVATION-AUTHORITY
+    role: root
+    mode: shared_binding_integration_serial_after_search_writer_stops
+    objective: Bind every compiled cell/edge observation policy to a trusted, endpoint-scoped HyperContract and give the five probe predicates distinct versioned witness_false plugins.
+    required_inputs:
+      - experiments/osc_v1/coordination_20260719_v1/phase4_review_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - Search Agent read-only canonical-binding counterexample
+      - docs/fine_grained_discovery_architecture.md
+      - docs/semantic_hypercontract_architecture.md
+      - src/datadiff_osc/public_api_freeze.json
+    allowed_write_paths:
+      - src/datadiff_osc/probe_contracts.py
+      - src/datadiff_osc/semantic_targets/compiler.py
+      - tests/osc/test_probe_contract_integration.py
+    forbidden_write_paths: [contract_engine, generation, search, scheduler, comparison, parallel, runtime, legacy, public freeze, launcher]
+    frozen_interfaces:
+      - osc-public-api-freeze-v1@cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      - TargetCell/ContrastEdge/BackendPairObligation existing observation_contract string fields
+    required_invariants:
+      - observation policy IDs are recomputable and unique per complete cell/edge semantic identity
+      - caller-supplied digest strings never establish authority
+      - exact target/control backend roles bind to the cell extraction source and original Endpoint scope
+      - edge authority requires both directional contexts and declared pairs for both cells
+      - probe predicates use versioned trusted witness_false plugins and missing plugins fail closed
+      - no family-specific runtime evaluator or denominator change
+    deliverables:
+      - trusted policy registry and HyperContract materializer
+      - compiler routing for unique cell and directional edge policy IDs
+      - negative integration regressions for collapse, missing plugins, backend/case rebinding and incomplete edge context
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_probe_contract_integration.py tests/osc/test_targets_compiler_properties.py tests/osc/test_public_api_freeze.py
+        expected: exit 0; 232/384/502 unchanged; all policy and rebinding negatives fail closed
+    stop_conditions:
+      - any frozen field, type, order, schema version, or manifest change
+      - any need to relax a relation, backend role, endpoint scope, or denominator
+      - any unresolvable non-probe monotonic edge policy
+      - any pilot, campaign, or 24h execution
+    completion_report: root barrier artifact before Search follow-up release
+
+  - task_id: OSC-5-C-BINDING-FOLLOWUP
+    role: runtime
+    mode: implementation_serial_after_authority_followup_root_verification
+    objective: >-
+      Close Root's accepted OSC-4-B-F2 and OSC-4-B-F4 counterexamples by making
+      cache exactness request-authoritative and making workers=1/N audit labels
+      cryptographically and structurally match the executions that produced them.
+    required_inputs:
+      - experiments/osc_v1/coordination_20260719_v1/phase4_review_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_search_barrier.yaml
+      - completed OSC-5-C-AUTHORITY-FOLLOWUP and Root 32/97-test verification
+      - Root force_exact, stage-lie, endpoint-replacement, one-worker and duplicate-run counterexamples
+      - src/datadiff_osc/public_api_freeze.json
+    allowed_write_paths:
+      - src/datadiff_osc/comparison/cache.py
+      - src/datadiff_osc/parallel/executor.py
+      - src/datadiff_osc/parallel/invariance.py
+      - src/datadiff_osc/runtime/benchmarks.py
+      - scripts/osc/audit_parallel_invariance.py
+      - scripts/osc/benchmark_parallel_scaling.py
+      - tests/osc/test_comparison_cache.py
+      - tests/osc/test_parallel_executor.py
+      - tests/osc/test_parallel_invariance.py
+      - tests/osc/test_runtime_benchmarks.py
+      - tests/osc/test_runtime_scripts.py
+    forbidden_write_paths:
+      - src/datadiff_osc/_canonical.py
+      - src/datadiff_osc/schemas.py
+      - src/datadiff_osc/api.py
+      - src/datadiff_osc/public_api_freeze.json
+      - src/datadiff_osc/contract_engine/**
+      - src/datadiff_osc/semantic_targets/**
+      - src/datadiff_osc/generation/**
+      - src/datadiff_osc/search/**
+      - src/datadiff_osc/scheduler/**
+      - src/datadiff_osc/runtime/gate_artifacts.py
+      - src/datadiff_osc/runtime/gates.py
+      - src/datadiff/**
+      - formal launcher and preregistration paths
+    frozen_interfaces:
+      - osc-public-api-freeze-v1@cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      - StagedComparisonRequest.exact_required semantics
+      - ComparisonStage.S3_EXACT_MATERIALIZED exact authority stage
+      - synthetic scripts remain Phase-6-ineligible
+    required_invariants:
+      - cache exact requirement is request.exact_required, including SCREENING plus force_exact
+      - exact-required values are typed StagedComparisonResult objects with exact_escalated true and S3_EXACT_MATERIALIZED stage
+      - typed result stage/flag, evidence tier, schema version, request digest and endpoint_order exactly match the request
+      - every get boundary independently revalidates the stored value and its complete binding
+      - ExecutionRun records the actual positive DeterministicTaskExecutor.max_workers and changes its internal schema version
+      - AuthorityEvidenceSnapshot explicitly binds the run worker count and changes its internal schema version
+      - audit worker counts are distinct, contain a baseline 1 and at least one N greater than 1, and exactly match each run
+      - benchmark validation occurs before any executor invocation; scripts reject invalid lists rather than emitting passing reports
+      - one-count and duplicate workers=1-as-6 counterexamples fail closed
+      - no pilot, campaign, 2h or 24h execution
+    deliverables:
+      - bidirectional cache request/result exact-stage binding
+      - run and authority-snapshot worker-count provenance with versioned internal schemas
+      - non-vacuous invariance-design validation shared by direct audit and benchmark paths
+      - negative regressions for every Root counterexample and CLI invalid designs
+      - runbook section-12 completion report
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_comparison_cache.py tests/osc/test_parallel_executor.py tests/osc/test_parallel_invariance.py tests/osc/test_runtime_benchmarks.py tests/osc/test_runtime_scripts.py
+        expected: exit 0 and all F2/F4 counterexamples fail closed
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_comparison_*.py tests/osc/test_parallel_*.py tests/osc/test_runtime_*.py tests/osc/test_public_api_freeze.py
+        expected: exit 0 and public freeze hash unchanged
+    stop_conditions:
+      - any public frozen field, type, order, schema version or manifest change
+      - any write outside the eleven exact approved paths
+      - any cache rule that lets request.exact_required return non-exact evidence
+      - any audit path that trusts worker-count labels without run provenance
+      - any pilot, campaign, 2h or 24h execution
+    completion_report: runbook section 12 with all five Root counterexamples shown red then green
+
+  - task_id: OSC-5-A-OUTCOME-ADMISSION
+    role: contract
+    mode: implementation_serial_after_runtime_owner_barrier
+    objective: >-
+      Implement the Contract-owned half of CR-OSC-ROOT-003-A so no staged
+      screening or applicability early return can bypass independent structured
+      execution-outcome binding.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - OSC-5-ROOT-003-DESIGN-REVIEW and its read-only appendix
+      - existing execution_outcome_binding_errors and original Endpoint authority
+      - src/datadiff_osc/public_api_freeze.json
+    allowed_write_paths:
+      - src/datadiff_osc/contract_engine/planner.py
+      - tests/osc/test_contract_relations_planner.py
+      - tests/osc/test_contract_authority.py
+    forbidden_write_paths:
+      - src/datadiff_osc/contract_engine/model.py
+      - src/datadiff_osc/contract_engine/monitor.py
+      - src/datadiff_osc/schemas.py
+      - src/datadiff_osc/api.py
+      - src/datadiff_osc/public_api_freeze.json
+      - src/datadiff_osc/comparison/**
+      - src/datadiff_osc/semantic_targets/**
+      - src/datadiff_osc/generation/**
+      - src/datadiff_osc/search/**
+      - src/datadiff_osc/scheduler/**
+      - src/datadiff_osc/parallel/**
+      - src/datadiff_osc/runtime/**
+      - scripts/**
+      - src/datadiff/**
+      - formal launcher and preregistration paths
+    frozen_interfaces:
+      - osc-public-api-freeze-v1@cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      - seven-valued StructuredExecutionOutcome status/failure mapping
+      - four-valued VerdictKind semantics
+      - original Endpoint and Observation endpoint_digest authority
+    required_invariants:
+      - missing execution_outcomes is missing authority evidence and yields S0_STATIC INCONCLUSIVE with empty fingerprints
+      - reordered, incomplete, duplicate, status-mismatched or unsupported-evidence-mismatched outcomes never enter S2
+      - explicit bound MISSING/MISSING_RESULT or other non-OK outcomes enter S3 exact and remain INCONCLUSIVE unless a frozen error relation says otherwise
+      - valid bound OK outcomes may use S2 screening only when every other screening precondition is satisfied
+      - a valid bound UNSUPPORTED outcome may support INAPPLICABLE only with its exact applicability UnsupportedEvidence
+      - S3 monitor_exact independently repeats the outcome validation
+      - no public schema, relation, comparator, tolerance, denominator or threshold changes
+      - no pilot, campaign, 2h or 24h execution
+    deliverables:
+      - S0 outcome admission in execute_staged_comparison
+      - missing/mismatch/incomplete/valid-OK/explicit-MISSING/S3 defense regressions
+      - updates only to the two authorized Contract test consumers
+      - runbook section-12 report and exact file hashes
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_contract_relations_planner.py tests/osc/test_contract_authority.py
+        expected: exit 0 with the OK/TIMEOUT S2 counterexample closed
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_contract_*.py tests/osc/test_public_api_freeze.py
+        expected: exit 0 and public freeze hash unchanged
+    stop_conditions:
+      - any need to change a frozen public field, schema or relation semantics
+      - any write outside the three exact approved paths
+      - any attempt to infer outcomes from strings or observations alone
+      - any pilot, campaign, 2h or 24h execution
+    completion_report: runbook section 12; consumer migrations remain separately locked until Root verification
+
+  - task_id: OSC-5-C-OUTCOME-ROUTING
+    role: runtime
+    mode: implementation_serial_after_contract_outcome_barrier
+    objective: >-
+      Complete the Runtime-owned half of CR-OSC-ROOT-003-A by making the staged
+      wrapper require independently produced structured execution outcomes and by
+      routing the same bound tuple through the bounded parity script.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_contract_outcome_barrier.yaml
+      - src/datadiff_osc/contract_engine/planner.py@0198feafb030d4c07b2ec989c13cc4e9113502ef7e8b4392f0a5c861d907c4d5
+      - src/datadiff_osc/public_api_freeze.json
+    allowed_write_paths:
+      - src/datadiff_osc/comparison/staged.py
+      - scripts/osc/audit_staged_parity.py
+      - tests/osc/test_comparison_staged.py
+      - tests/osc/test_runtime_scripts.py
+    forbidden_write_paths:
+      - src/datadiff_osc/contract_engine/**
+      - src/datadiff_osc/schemas.py
+      - src/datadiff_osc/api.py
+      - src/datadiff_osc/public_api_freeze.json
+      - src/datadiff_osc/semantic_targets/**
+      - src/datadiff_osc/generation/**
+      - src/datadiff_osc/search/**
+      - src/datadiff_osc/scheduler/**
+      - src/datadiff_osc/parallel/**
+      - src/datadiff_osc/runtime/**
+      - scripts/osc/** except scripts/osc/audit_staged_parity.py
+      - tests/osc/** except the two exact allowed test paths
+      - src/datadiff/**
+      - formal launcher and preregistration paths
+    frozen_interfaces:
+      - osc-public-api-freeze-v1@cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      - StructuredExecutionOutcome seven-valued status/failure mapping
+      - StagedComparisonRequest and StagedComparisonResult frozen schemas
+      - execute_staged_comparison outcome-admission semantics at planner hash 0198feafb030d4c07b2ec989c13cc4e9113502ef7e8b4392f0a5c861d907c4d5
+    required_invariants:
+      - StagedComparisonEngine.compare has a required keyword-only execution_outcomes tuple with no default
+      - the wrapper passes the caller-provided typed tuple unchanged to execute_staged_comparison
+      - missing wrapper outcomes raise TypeError and mismatched outcomes fail closed through Contract authority
+      - the wrapper never synthesizes outcomes from Observation.status, reason strings or normalized values
+      - parity samples carry outcomes produced alongside observations and route the same tuple to staged and exact paths
+      - the parity script remains synthetic, phase6-ineligible below its frozen floor, and never authorizes 24h
+      - no public schema, relation, comparator, tolerance, denominator or threshold changes
+      - no pilot, campaign, 2h or 24h execution
+    deliverables:
+      - required typed outcome routing in StagedComparisonEngine.compare
+      - independently constructed outcomes in audit_staged_parity.py
+      - wrapper missing/mismatch/OK/S3 routing regressions
+      - bounded script regression and runbook section-12 report
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_comparison_staged.py tests/osc/test_runtime_scripts.py
+        expected: exit 0 after the frozen 6-failed/14-passed consumer red baseline is closed
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_comparison_*.py tests/osc/test_runtime_*.py tests/osc/test_contract_*.py tests/osc/test_public_api_freeze.py
+        expected: exit 0 and public freeze hash unchanged
+    stop_conditions:
+      - any need to change Contract-owned planner/monitor or a frozen public field/schema
+      - any write outside the four exact approved paths
+      - any attempt to infer or synthesize execution outcomes from observations or strings
+      - any pilot, campaign, 2h or 24h execution
+    completion_report: runbook section 12 with red/green counts, exact hashes and remaining Root integrations
+
+  - task_id: OSC-5-ROOT-004-AUTHORITY-CONTROL-PLANE
+    role: root
+    mode: root_owned_integration_serial_after_outcome_routing_barrier
+    objective: >-
+      Implement the Root-owned, fail-closed Phase-6 gate authority build and
+      preflight control plane required by CR-OSC-ROOT-004/CR-OSC-5-004 without
+      fabricating any missing Phase-6 plan, admission or raw evidence.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_runtime_barrier.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_outcome_routing_barrier.yaml
+      - OSC-5-ROOT-004-IMPLEMENTATION-CONTRACT-RECHECK section-12 report
+      - src/datadiff_osc/runtime/gate_artifacts.py
+      - src/datadiff_osc/runtime/gates.py
+      - src/datadiff_osc/public_api_freeze.json
+    allowed_write_paths:
+      - src/datadiff_osc/_phase6_gate_authority.py
+      - tests/osc/test_phase6_gate_authority_integration.py
+      - scripts/osc/build_phase6_gate_authority_bundle.py
+      - scripts/osc/preflight_phase6_gate_authority_bundle.py
+    forbidden_write_paths:
+      - src/datadiff_osc/api.py
+      - src/datadiff_osc/__init__.py
+      - src/datadiff_osc/schemas.py
+      - src/datadiff_osc/public_api_freeze.json
+      - src/datadiff_osc/contract_engine/**
+      - src/datadiff_osc/semantic_targets/**
+      - src/datadiff_osc/generation/**
+      - src/datadiff_osc/search/**
+      - src/datadiff_osc/scheduler/**
+      - src/datadiff_osc/comparison/**
+      - src/datadiff_osc/parallel/**
+      - src/datadiff_osc/runtime/**
+      - src/datadiff/**
+      - scripts/osc/** except the two exact allowed scripts
+      - tests/osc/** except the exact integration test
+      - formal launcher and preregistration paths
+    frozen_interfaces:
+      - osc-public-api-freeze-v1@cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      - complete default 41-gate spec set and 38 denominator keys
+      - osc-gate-authority-plan-v1 Runtime verifier contract
+      - osc-pre24-gate-spec-set-d9792996cacb6fc6e47bce602d5f7ab6d6382c62ba9e1ac6bc1f8003ecbec552
+      - compiled universe osc-compiled-target-universe-c822459944b38c1ae8abc6c271725bece0509457046c16e1088d455e2ac3982e
+    required_invariants:
+      - source snapshots are externally SHA-bound and every source file is rehashed on build and preflight
+      - static universes derive from declarations/compiler and frozen code definitions, never cardinality claims
+      - all 38 denominator identities are present exactly once before publication
+      - the 16 dynamic denominator sets require producer-specific externally SHA-bound plans and receipts
+      - raw manifests, claimed metric maps, denominator counts/digests, reducers, thresholds and authority flags are not builder trust inputs
+      - CoverageLedger counts, credited_ids and merged ledgers are never accepted as original admission authority
+      - missing admission envelopes, construction evidence, dynamic plans, producer receipts or artifacts return publishable=false
+      - a failed build script exits 2 and leaves no authority plan, manifest or raw artifact output
+      - preflight independently recomputes trusted inputs, then calls Runtime plan, manifest and full-41 report verifiers and rehashes for TOCTOU
+      - synthetic parity/invariance/scaling evidence is rejected regardless of self-claimed eligibility
+      - Runtime and Root reports always keep twenty_four_hour_run_authorized=false
+      - no pilot, campaign, 2h or 24h execution
+    deliverables:
+      - private Root authority dataclasses, strict verifiers, static-universe derivation, build result and preflight report
+      - fail-closed build and preflight CLIs
+      - exact 41/38 and 16/232, 9/144, 384/502 integration tests
+      - manifest self-claim, same-cardinality substitution, mutation, missing-plan, synthetic and TOCTOU negative regressions
+      - runbook section-12 report with explicit Phase6 evidence gaps
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_phase6_gate_authority_integration.py tests/osc/test_runtime_gate_artifacts.py tests/osc/test_runtime_gates.py tests/osc/test_public_api_freeze.py
+        expected: exit 0, full frozen counts unchanged, failed builds leave no outputs
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_runtime_*.py tests/osc/test_phase6_gate_authority_integration.py
+        expected: exit 0
+    stop_conditions:
+      - any need to change Runtime verifier, frozen public API, gate spec, threshold, reducer or denominator
+      - any write outside the four exact approved paths
+      - any path that can publish from counts, raw manifest self-claims, synthetic evidence or incomplete plans
+      - any pilot, campaign, 2h or 24h execution
+    completion_report: runbook section 12; control-plane completion is not Phase6 evidence completion
+
+  - task_id: OSC-5-ROOT-LEGACY-DIAGNOSTIC-FACADE
+    role: root
+    mode: implementation_serial_after_root_authority_control_barrier
+    objective: >-
+      Implement the minimal Root-owned BackendResult/NormalizedResult to typed
+      OSC diagnostic facade and freeze an opaque, permanently diagnostic-only
+      reference boundary without granting any legacy verdict or evidence authority.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - docs/project_architecture.md
+      - docs/semantic_hypercontract_architecture.md
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_root_authority_control_barrier.yaml
+      - OSC-5-ROOT-003-DESIGN-REVIEW read-only findings reconstructed by the replacement-session authority reviewer
+      - src/datadiff_osc/public_api_freeze.json
+      - current BackendResult, NormalizedResult, target capability model, environment and execution metadata paths
+    allowed_write_paths:
+      - src/datadiff/osc_diagnostic_facade.py
+      - tests/osc/test_legacy_diagnostic_facade.py
+    forbidden_write_paths:
+      - src/datadiff_osc/api.py
+      - src/datadiff_osc/__init__.py
+      - src/datadiff_osc/public_api_freeze.json
+      - src/datadiff_osc/** except read-only imports
+      - src/datadiff/** except src/datadiff/osc_diagnostic_facade.py
+      - tests/** except tests/osc/test_legacy_diagnostic_facade.py
+      - scripts/**
+      - formal launcher and preregistration paths
+    frozen_interfaces:
+      - osc-public-api-freeze-v1@cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      - Endpoint, Observation and StructuredExecutionOutcome frozen field shapes
+      - ExecutionStatus and FailureKind seven-valued mapping
+      - CR-OSC-ROOT-003-A staged outcome-admission behavior
+    required_invariants:
+      - the facade and every emitted reference are diagnostic_only with authority_eligible=false
+      - no admission, coverage, evidence, candidate, bug, gate or 24h authority is exposed
+      - absent, ambiguous or mismatched typed context emits not_evaluated and never a default semantic relation
+      - case digest is recomputed from the exact case payload; target metadata must equal the local trusted registry and backend version/source digest must equal an independently collected local environment
+      - every generic legacy error and normalization_error maps only to ADAPTER_ERROR regardless of message text
+      - UNSUPPORTED requires a recomputed endpoint-bound capability decision and exact legacy-decision digest binding; otherwise MISSING or not_evaluated
+      - OK requires an execution-owned source for exact logical types, nullability, lossless tagged rows and original row-order provenance; caller claims are rejected and the current legacy path is not_evaluated
+      - timeout, crash, adapter error, semantic-domain error, unsupported and missing remain distinct and never become pass
+      - no Verdict, certificate, EvidenceEnvelope, receipt, coverage credit, candidate state or confirmed-bug field crosses the opaque boundary
+      - every opaque ref set is bound to one recomputable case digest and consumers reject missing or mismatched case/backend context
+      - serialized opaque evaluated claims are never authenticated as execution facts; consumers preserve the ref identity but downgrade the claim to not_evaluated without the typed producer
+      - no public export, public manifest, launcher, pilot, 2h or 24h change or execution
+    deliverables:
+      - immutable LegacyDiagnosticContext and OpaqueDiagnosticRef/RefSet boundary local to datadiff
+      - exact-context validator and deterministic diagnostic reference construction
+      - negative tests for context absence/mismatch, error-string spoofing, forged unsupported claims and prohibited authority fields
+      - deterministic OK not_evaluated regression proving caller-claimed schema nullability and order provenance cannot create a typed observation
+      - scoped compatibility/staged/public-freeze verification and Root barrier before consumer migration
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_legacy_diagnostic_facade.py
+        expected: exit 0 and all fail-closed/authority-boundary regressions pass
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_contract_v1_compatibility.py tests/osc/test_comparison_staged.py tests/osc/test_public_api_freeze.py
+        expected: exit 0 and public freeze SHA unchanged
+    stop_conditions:
+      - any need to change a frozen OSC public field, export, schema version or manifest
+      - any missing exact context would need a guessed default
+      - any diagnostic value would influence authority, coverage, evidence or candidate classification
+      - any write outside the two exact approved paths
+      - any pilot, campaign, 2h or 24h execution
+    completion_report: Root-authored section-12-equivalent barrier followed by read-only child review
+
+  - task_id: OSC-5-ROOT-OPAQUE-DIAGNOSTIC-CONSUMERS
+    role: root
+    mode: implementation_serial_after_legacy_diagnostic_facade_barrier
+    objective: >-
+      Route only case/backend-bound opaque diagnostic references through execution,
+      run-loaded logging, run compaction, offline summaries, discovery evidence and
+      candidate processing without allowing the references to affect any decision.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - docs/project_architecture.md
+      - experiments/osc_v1/coordination_20260719_v1/phase5_legacy_diagnostic_facade_barrier.yaml
+      - src/datadiff/osc_diagnostic_facade.py@139545e03db5fbf9178907a57e37d6889e8d82a2e9e36e5d5f358293f98391bf
+      - src/datadiff_osc/public_api_freeze.json@cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      - exact eleven-path prewrite SHA set in phase5_prewrite_declarations.yaml
+    allowed_write_paths:
+      - src/datadiff/execution.py
+      - src/datadiff/run_loaded.py
+      - src/datadiff/runner.py
+      - src/datadiff/run_summaries.py
+      - src/datadiff/discovery_runtime.py
+      - src/datadiff/candidate_pipeline.py
+      - tests/test_execution.py
+      - tests/test_run_loaded.py
+      - tests/test_runner.py
+      - tests/test_discovery_runtime.py
+      - tests/test_candidate_pipeline.py
+    forbidden_write_paths:
+      - src/datadiff_osc/**
+      - src/datadiff/osc_diagnostic_facade.py
+      - src/datadiff/** except the six exact consumer paths
+      - tests/** except the five exact consumer test paths
+      - scripts/**
+      - formal launcher and preregistration paths
+    frozen_interfaces:
+      - opaque build/consume functions at facade SHA 139545e03db5fbf9178907a57e37d6889e8d82a2e9e36e5d5f358293f98391bf
+      - osc-public-api-freeze-v1@cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      - every existing finding, triage, candidate, recheck, ranking, dedup and issue-readiness rule
+    required_invariants:
+      - consumers import only build_legacy_diagnostic_ref_set, consume_opaque_diagnostic_ref_set or not_evaluated_diagnostic_ref_set and never typed/private facade symbols
+      - run_loaded emits one base ref set and one independently case-bound set for each executed metamorphic variant
+      - runner validates and preserves refs for full, compact and minimal logging without feeding event evidence, coordinator, feedback or counters
+      - run_summaries, discovery_runtime and candidate_pipeline only validate/copy refs; no branch, filter, rank, triage, recheck, reproduction, reduction, dedup, draft or readiness decision reads their contents
+      - old, missing, malformed, cross-case or backend-mismatched refs become not_evaluated and serialized evaluated claims are downgraded
+      - candidate remains candidate; no ref can create a confirmed bug, coverage, receipt, EvidenceEnvelope, authority or gate result
+      - no OSC export/freeze, public schema, finding rule, gate, launcher, pilot, 2h or 24h change or execution
+    deliverables:
+      - execution-owned diagnostic-ref builder using the exact Case object and resolved metadata
+      - base/metamorphic run_loaded refs plus log-level-safe runner preservation
+      - summary/discovery/candidate pipeline opaque propagation including recheck attempts
+      - negative tests proving forged refs do not change candidate admission, counts, ranking, triage or confirmed status
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/test_execution.py tests/test_run_loaded.py tests/test_runner.py tests/test_discovery_runtime.py tests/test_candidate_pipeline.py tests/osc/test_legacy_diagnostic_facade.py
+        expected: exit 0; opaque refs propagate or fail closed and candidate decisions are unchanged
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc
+        expected: exit 0 and public freeze SHA unchanged
+    stop_conditions:
+      - any consumer would import or expose Endpoint, Observation, StructuredExecutionOutcome, Verdict, certificate or EvidenceEnvelope
+      - any candidate/admission/coverage/evidence/gate/authorization decision would inspect a diagnostic ref
+      - any prewrite SHA mismatch or write outside the eleven exact paths
+      - any public OSC, launcher, pilot, 2h or 24h change or execution
+    completion_report: Root section-12 report followed by all three direct agents' exact-SHA reviews

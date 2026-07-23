@@ -5,6 +5,11 @@ from pathlib import Path
 from typing import Any
 
 from datadiff.finding_outcomes import row_has_rewardable_new_behavior
+from datadiff.execution_accounting import (
+    execution_profile_backend_calls,
+    execution_profile_backend_reported_ms,
+)
+from datadiff.candidate_burst import row_has_candidate_signal
 
 STAGE_TIMING_KEYS: tuple[str, ...] = (
     "generate_mutate_ms",
@@ -116,6 +121,13 @@ class RunCounters:
     findings: int = 0
     new_behavior_cases: int = 0
     signal_new_behavior_cases: int = 0
+    candidate_bug_cases: int = 0
+    recheck_surviving_candidate_cases: int = 0
+    sampled_candidate_screens: int = 0
+    sampled_candidate_confirmed: int = 0
+    sampled_candidate_rejected: int = 0
+    backend_reported_total_ms: float = 0.0
+    backend_calls: int = 0
     saved_artifacts: int = 0
     preflight_repaired_cases: int = 0
     preflight_fallback_cases: int = 0
@@ -125,6 +137,13 @@ class RunCounters:
     saturated_family_filtered_candidates: int = 0
     saturated_family_fallback_candidates: int = 0
     quality_oracles: dict[str, int] = field(default_factory=dict)
+    semantic_activation_goal_first_cases: int = 0
+    semantic_activation_syntactic_reached_cases: int = 0
+    semantic_activation_evaluated_cases: int = 0
+    semantic_activation_activated_cases: int = 0
+    semantic_activation_not_activated_cases: int = 0
+    semantic_activation_not_evaluated_cases: int = 0
+    semantic_activation_by_goal: dict[str, dict[str, int]] = field(default_factory=dict)
     case_iteration_failures: int = 0
     checkpoint_write_failures: int = 0
     last_case_iteration_error: str = ""
@@ -154,12 +173,32 @@ class RunCounters:
         key = f"{oracle['name']}:{oracle['verdict']}"
         self.quality_oracles[key] = self.quality_oracles.get(key, 0) + 1
 
+    def semantic_activation_summary(self) -> dict[str, Any]:
+        evaluated = self.semantic_activation_evaluated_cases
+        return {
+            "schema_version": "semantic-activation-summary-v1",
+            "goal_first_cases": self.semantic_activation_goal_first_cases,
+            "syntactic_reached_cases": self.semantic_activation_syntactic_reached_cases,
+            "evaluated_cases": evaluated,
+            "activated_cases": self.semantic_activation_activated_cases,
+            "not_activated_cases": self.semantic_activation_not_activated_cases,
+            "not_evaluated_cases": self.semantic_activation_not_evaluated_cases,
+            "activation_rate_evaluated": (
+                self.semantic_activation_activated_cases / evaluated if evaluated else 0.0
+            ),
+            "by_goal": {
+                goal_id: dict(sorted(counts.items()))
+                for goal_id, counts in sorted(self.semantic_activation_by_goal.items())
+            },
+        }
+
     def record_completed_case(
         self,
         *,
         row: dict[str, Any],
         preflight: dict[str, Any],
     ) -> None:
+        self._record_semantic_activation(row.get("semantic_activation", {}))
         self.preflight_repaired_cases += int(bool(preflight.get("repaired", False)))
         self.preflight_fallback_cases += int(bool(preflight.get("fallback_used", False)))
         self.preflight_invalid_cases += int(not bool(preflight.get("valid", True)))
@@ -171,7 +210,64 @@ class RunCounters:
                 known_saturated_bug_families=self.known_saturated_bug_families,
             )
         )
+        is_candidate = row_has_candidate_signal(row)
+        self.candidate_bug_cases += int(is_candidate)
+        recheck = row.get("candidate_recheck", {}) or {}
+        self.recheck_surviving_candidate_cases += int(
+            is_candidate
+            and bool(recheck.get("enabled", False))
+            and bool(recheck.get("reproduced_keys", []) or [])
+        )
+        sampling = row.get("backend_sampling", {}) or {}
+        screening = sampling.get("screening", {}) or {}
+        screened_candidate = bool(
+            sampling.get("confirmation_executed", False)
+            and (
+                screening.get("candidate_signal") is True
+                or str(screening.get("status", "")) == "bug"
+                or int(screening.get("finding_count", 0) or 0) > 0
+            )
+        )
+        self.sampled_candidate_screens += int(screened_candidate)
+        self.sampled_candidate_confirmed += int(screened_candidate and is_candidate)
+        self.sampled_candidate_rejected += int(screened_candidate and not is_candidate)
+        execution_profile = row.get("execution_profile", {}) or {}
+        self.backend_reported_total_ms += execution_profile_backend_reported_ms(execution_profile)
+        self.backend_calls += execution_profile_backend_calls(execution_profile)
         self.executed += 1
+
+    def _record_semantic_activation(self, payload: Any) -> None:
+        if not isinstance(payload, dict) or not payload:
+            return
+        self.semantic_activation_goal_first_cases += 1
+        syntactic_reached = bool(payload.get("syntactic_reached", False))
+        self.semantic_activation_syntactic_reached_cases += int(syntactic_reached)
+        status = str(payload.get("evaluation_status", "not_evaluated") or "not_evaluated")
+        if status not in {"activated", "not_activated", "not_evaluated"}:
+            status = "not_evaluated"
+        evaluated = status in {"activated", "not_activated"}
+        self.semantic_activation_evaluated_cases += int(evaluated)
+        self.semantic_activation_activated_cases += int(status == "activated")
+        self.semantic_activation_not_activated_cases += int(status == "not_activated")
+        self.semantic_activation_not_evaluated_cases += int(status == "not_evaluated")
+        goal_id = str(payload.get("goal_id", "unknown") or "unknown")
+        counts = self.semantic_activation_by_goal.setdefault(
+            goal_id,
+            {
+                "cases": 0,
+                "syntactic_reached": 0,
+                "evaluated": 0,
+                "activated": 0,
+                "not_activated": 0,
+                "not_evaluated": 0,
+            },
+        )
+        counts["cases"] += 1
+        counts["syntactic_reached"] += int(syntactic_reached)
+        counts["evaluated"] += int(evaluated)
+        counts["activated"] += int(status == "activated")
+        counts["not_activated"] += int(status == "not_activated")
+        counts["not_evaluated"] += int(status == "not_evaluated")
 
 
 @dataclass(frozen=True, slots=True)

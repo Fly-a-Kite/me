@@ -1,0 +1,104 @@
+schema_version: osc-ring-review-report-v1
+phase: 6
+round: private_foundation_exact_sha_ring_review
+status: fail_remediation_required
+review_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_task_contracts.yaml
+  sha256: a9ce06af98d3f70894a9144f77e04b626e12154bf515e9a0a6302994848ba5d4
+reviews:
+  - task_id: OSC-6-FOUNDATION-REVIEW-A-SEARCH
+    reviewer: /root/phase5_authority_audit
+    target_owner: /root/phase5_consumer_audit
+    exact_sha_verified: true
+    writes: 0
+    child_agents: 0
+    counts: {blocker: 0, high: 4, medium: 1, low: 0}
+    findings:
+      - id: OSC-6-FOUNDATION-SEARCH-H1
+        severity: high
+        summary: plan builder silently deduplicates planned-case and seed-block identities
+      - id: OSC-6-FOUNDATION-SEARCH-H2
+        severity: high
+        summary: formal plan lacks exact run and case-to-seed-block/SeedLineage mapping
+      - id: OSC-6-FOUNDATION-SEARCH-H3
+        severity: high
+        summary: mutation attempt lacks derived mutation lineage, typed outcome and activation binding
+      - id: OSC-6-FOUNDATION-SEARCH-H4
+        severity: high
+        summary: arbitrary metadata digest can be relabeled as an allowed focus evidence source
+      - id: OSC-6-FOUNDATION-SEARCH-M1
+        severity: medium
+        summary: observation and focus builders silently deduplicate Runtime refs and evidence
+  - task_id: OSC-6-FOUNDATION-REVIEW-B-RUNTIME
+    reviewer: /root/phase5_consumer_audit
+    target_owner: /root/phase5_evidence_audit
+    exact_sha_verified: true
+    writes: 0
+    child_agents: 0
+    counts: {blocker: 2, high: 3, medium: 0, low: 0}
+    findings:
+      - id: OSC-6-FOUNDATION-RUNTIME-B1
+        severity: blocker
+        summary: record category, subject, path, schema and origin can be relabeled without exact per-record policy or typed replay
+      - id: OSC-6-FOUNDATION-RUNTIME-B2
+        severity: blocker
+        summary: paired tasks and gate scalars lack shared typed context and raw monotonic measurement bindings
+      - id: OSC-6-FOUNDATION-RUNTIME-H1
+        severity: high
+        summary: stable survivor can be emitted with zero reproduced rechecks and cross-stage task reuse
+      - id: OSC-6-FOUNDATION-RUNTIME-H2
+        severity: high
+        summary: target installed/latest versions are caller scalars not derived from frozen raw metadata
+      - id: OSC-6-FOUNDATION-RUNTIME-H3
+        severity: high
+        summary: repository node outcomes are caller summaries not derived from JUnit and log bytes
+  - task_id: OSC-6-FOUNDATION-REVIEW-C-CONTRACT
+    reviewer: /root/phase5_evidence_audit
+    target_owner: /root/phase5_authority_audit
+    exact_sha_verified: true
+    writes: 0
+    child_agents: 0
+    counts: {blocker: 0, high: 5, medium: 1, low: 0}
+    findings:
+      - id: OSC-6-C-H1
+        severity: high
+        summary: arbitrary distinct reviewer string is mislabeled independently approved and meets minimum
+      - id: OSC-6-C-H2
+        severity: high
+        summary: confirmed-root expected verdict and signature semantics are not bound
+      - id: OSC-6-C-H3
+        severity: high
+        summary: false-positive entry lacks component adjudication and no-global-suppression proof
+      - id: OSC-6-C-H4
+        severity: high
+        summary: compatibility entry lacks exact paired v1/v2 task, context and verdict results
+      - id: OSC-6-C-H5
+        severity: high
+        summary: mutant source plus category label is accepted without a semantic kill witness
+      - id: OSC-6-C-M1
+        severity: medium
+        summary: NUL/control path reaches Path.resolve and escapes as an unstructured ValueError
+aggregate_counts: {blocker: 2, high: 12, medium: 2, low: 0}
+root_reproduced_counterexamples:
+  - duplicate Search plan IDs collapse to the singleton receipt and digest
+  - STABLE_SURVIVOR is emitted when all six rechecks have reproduced=false
+  - different paired seed lineages and caller-provided zero latency or extreme throughput are accepted
+  - arbitrary empty JSON plus arbitrary reviewer IDs becomes structurally independently approved
+  - exact nine confirmed roots pass with every expected verdict flipped to SATISFIED
+  - source-only 32-mutant material passes candidate validation without a kill witness
+positive_boundaries_preserved:
+  - all new types remain private and unexported
+  - Root semantic replay and authority files are unchanged
+  - public API freeze and legacy discovery defaults are unchanged
+  - current context-required and admitted=false boundaries prevent immediate authority bypass
+  - no candidate is promoted to confirmed bug and no 24h authority is created
+decision:
+  foundation_round_passed: false
+  remediation_required: true
+  root_integration_authorized: false
+  tests_osc_authorized: false
+  full_repository_tests_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

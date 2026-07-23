@@ -241,6 +241,11 @@ def _build_methodology_report(
     new_behavior_evidence = run_log_evidence["closed_loop_new_behavior"]
     raw_new_behavior_cases = _int(new_behavior_evidence.get("raw_new_behavior_cases"))
     signal_new_behavior_cases = _int(new_behavior_evidence.get("signal_new_behavior_cases"))
+    feedback_seed_schedule_delta_total = (
+        _float(new_behavior_evidence.get("seed_schedule_delta_total"))
+        if "seed_schedule_delta_total" in new_behavior_evidence
+        else sum(_float(row.get("seed_schedule_delta_total")) for row in run_rows)
+    )
     closed_loop = {
         "raw_new_behavior_cases": raw_new_behavior_cases,
         "signal_new_behavior_cases": signal_new_behavior_cases,
@@ -270,7 +275,7 @@ def _build_methodology_report(
         ),
         "source_reward_adjustment_total": sum(_float(row.get("source_reward_adjustment_total")) for row in run_rows),
         "guidance_reward_adjustment_total": sum(_float(row.get("guidance_reward_adjustment_total")) for row in run_rows),
-        "seed_schedule_delta_total": sum(_float(row.get("seed_schedule_delta_total")) for row in run_rows),
+        "seed_schedule_delta_total": feedback_seed_schedule_delta_total,
         "productive_mutation_cases": sum(_int(row.get("productive_mutation_cases")) for row in run_rows),
         "invalid_mutation_cases": sum(_int(row.get("invalid_mutation_cases")) for row in run_rows),
         "feedback_finding_yield_cases": sum(_int(row.get("feedback_finding_yield_cases")) for row in run_rows),
@@ -289,7 +294,11 @@ def _build_methodology_report(
         "quality_score_per_case": _avg_float(aggregate_rows, "quality_score_per_case"),
         "source_reward_adjustment_per_case": _avg_float(aggregate_rows, "source_reward_adjustment_per_case"),
         "guidance_reward_adjustment_per_case": _avg_float(aggregate_rows, "guidance_reward_adjustment_per_case"),
-        "seed_schedule_delta_per_case": _avg_float(aggregate_rows, "seed_schedule_delta_per_case"),
+        "seed_schedule_delta_per_case": (
+            feedback_seed_schedule_delta_total / total_cases
+            if total_cases
+            else _avg_float(aggregate_rows, "seed_schedule_delta_per_case")
+        ),
         "productive_mutation_rate": _avg_float(aggregate_rows, "productive_mutation_rate"),
         "guided_productive_rate": _avg_float(aggregate_rows, "guided_productive_rate"),
         "guided_target_miss_rate": _avg_float(aggregate_rows, "guided_target_miss_rate"),
@@ -1596,6 +1605,7 @@ def _run_log_evidence(
     missing = 0
     raw_new_behavior_cases = 0
     signal_new_behavior_cases = 0
+    feedback_seed_schedule_delta_total = 0.0
     candidate_bug_cases = 0
     case_row_count = 0
     contract_row_count = 0
@@ -1654,6 +1664,9 @@ def _run_log_evidence(
             signal_new_behavior_cases += int(
                 row_has_rewardable_new_behavior(item, known_saturated)
             )
+            feedback_summary = item.get("feedback_summary", {})
+            if isinstance(feedback_summary, dict):
+                feedback_seed_schedule_delta_total += _float(feedback_summary.get("seed_schedule_delta"))
 
             bug_dir_text = str(item.get("bug_dir", "") or "").strip()
             if bug_dir_text:
@@ -1747,6 +1760,7 @@ def _run_log_evidence(
         "closed_loop_new_behavior": {
             "raw_new_behavior_cases": raw_new_behavior_cases,
             "signal_new_behavior_cases": signal_new_behavior_cases,
+            "seed_schedule_delta_total": feedback_seed_schedule_delta_total,
             "source": _scan_source(scanned, missing),
         },
         "run_log_scan": {
@@ -2655,7 +2669,11 @@ def _adaptive_health_summary_from_closed_loop_summary(value: Any) -> dict[str, A
 
 
 def _quality_archive_state_summary(value: Any) -> dict[str, Any]:
-    if not isinstance(value, dict) or str(value.get("schema_version", "") or "") != "quality-diversity-archive-v1":
+    if not isinstance(value, dict) or str(value.get("schema_version", "") or "") not in {
+        "quality-diversity-archive-v1",
+        "quality-diversity-archive-v2",
+        "quality-diversity-archive-v3",
+    }:
         return _empty_quality_archive_state_summary()
     cells = [cell for cell in value.get("cells", []) or [] if isinstance(cell, dict)]
     seed_count = 0
@@ -3081,3 +3099,7 @@ def _fmt_optional_ratio(value: float | None) -> str:
 
 def _counter_text(counter: dict[str, Any]) -> str:
     return ", ".join(f"{key}:{value}" for key, value in sorted(counter.items())) or "none"
+
+
+_reference_comparisons = _reference_variant_comparisons
+_run_known_saturated_bug_families = _known_saturated_families_for_run

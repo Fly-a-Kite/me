@@ -178,6 +178,74 @@ CONFIG_OVERLAYS: dict[str, ConfigOverlay] = {
         updates={"guidance_strategy": "guided", "guidance_candidate_pool": 8},
         notes="Turn on guided selection with the standard final-harness candidate pool.",
     ),
+    "enable_coverage_backend_sampling": ConfigOverlay(
+        overlay_id="enable_coverage_backend_sampling",
+        updates={
+            "enable_backend_sampling": True,
+            "backend_sample_size": 3,
+            "backend_full_sweep_interval": 12,
+            "backend_sample_confirm_candidates": True,
+            "backend_sampling_calibration_cases": 8,
+            "backend_sampling_candidate_burst_cases": 8,
+        },
+        notes=(
+            "Balance target and target-pair exposure while screening most cases on three "
+            "backends and confirming candidate findings on the complete configured suite."
+        ),
+    ),
+    "reuse_full_confirmation_as_recheck_evidence": ConfigOverlay(
+        overlay_id="reuse_full_confirmation_as_recheck_evidence",
+        updates={"backend_sample_confirmation_recheck_count": 1},
+        notes=(
+            "After a sampled candidate receives full-suite confirmation, require one fresh-backend "
+            "recheck instead of two; direct full-sweep findings retain the configured recheck count."
+        ),
+    ),
+    "enable_adaptive_candidate_pool": ConfigOverlay(
+        overlay_id="enable_adaptive_candidate_pool",
+        updates={
+            "enable_adaptive_candidate_pool": True,
+            "adaptive_candidate_pool_min_size": 4,
+            "adaptive_candidate_pool_full_sweep_interval": 12,
+            "adaptive_candidate_pool_calibration_cases": 8,
+            "adaptive_candidate_pool_candidate_burst_cases": 8,
+        },
+        notes=(
+            "Use the full guidance candidate pool for calibration, periodic coverage, and "
+            "post-candidate bursts while reducing steady-state generation to four candidates."
+        ),
+    ),
+    "preserve_adaptive_candidate_seed_stride": ConfigOverlay(
+        overlay_id="preserve_adaptive_candidate_seed_stride",
+        updates={"adaptive_candidate_pool_preserve_seed_stride": True},
+        notes=(
+            "Keep reduced candidate batches on the same configured full-pool seed stride, "
+            "so throughput savings do not narrow or shift the logical seed range."
+        ),
+    ),
+    "enable_novel_candidate_bursts": ConfigOverlay(
+        overlay_id="enable_novel_candidate_bursts",
+        updates={
+            "backend_sampling_candidate_burst_novel_only": True,
+            "adaptive_candidate_pool_candidate_burst_novel_only": True,
+        },
+        notes=(
+            "Renew full backend and candidate-pool bursts only for first-seen families "
+            "with independent confirmation. Repeated confirmed families remain logged "
+            "and rechecked; unconfirmed or unclassified candidates retain a safety burst."
+        ),
+    ),
+    "compensate_adaptive_candidate_seed_horizon": ConfigOverlay(
+        overlay_id="compensate_adaptive_candidate_seed_horizon",
+        updates={
+            "adaptive_candidate_pool_preserve_seed_stride": True,
+            "adaptive_candidate_pool_compensate_seed_horizon": True,
+        },
+        notes=(
+            "Advance the raw seed frontier by the preregistered full-pool-equivalent "
+            "estimate derived from each reduced pool's observed generation/filter attempts."
+        ),
+    ),
     "target_filter": ConfigOverlay(
         overlay_id="target_filter",
         updates={"guidance_targets": ["filter"]},
@@ -971,6 +1039,52 @@ PRESET_CATALOG: dict[str, PresetSpec] = {
         base_preset="discovery_guided",
         variant_limit=8,
     ),
+    "coverage_throughput": _config_spec(
+        base_preset="discovery_guided",
+        enable_backend_sampling=True,
+        backend_sample_size=3,
+        backend_full_sweep_interval=12,
+        backend_sample_confirm_candidates=True,
+        backend_sampling_calibration_cases=8,
+        backend_sampling_candidate_burst_cases=8,
+        candidate_recheck_count=2,
+    ),
+    "coverage_throughput_adaptive_pool": _overlay_preset(
+        base_preset="coverage_throughput",
+        overlays=("enable_adaptive_candidate_pool",),
+    ),
+    "coverage_throughput_adaptive_pool_stride": _overlay_preset(
+        base_preset="coverage_throughput_adaptive_pool",
+        overlays=("preserve_adaptive_candidate_seed_stride",),
+    ),
+    "coverage_throughput_metamorphic": _config_spec(
+        base_preset="coverage_throughput",
+        enable_metamorphic_oracle=True,
+        oracle_mode="both",
+        metamorphic_variant_limit=1,
+    ),
+    "coverage_throughput_metamorphic_adaptive_pool": _overlay_preset(
+        base_preset="coverage_throughput_metamorphic",
+        overlays=("enable_adaptive_candidate_pool",),
+    ),
+    "coverage_throughput_metamorphic_adaptive_pool_stride": _overlay_preset(
+        base_preset="coverage_throughput_metamorphic_adaptive_pool",
+        overlays=("preserve_adaptive_candidate_seed_stride",),
+    ),
+    "coverage_throughput_metamorphic_adaptive_pool_stride_confirmation_recheck1": _overlay_preset(
+        base_preset="coverage_throughput_metamorphic_adaptive_pool_stride",
+        overlays=("reuse_full_confirmation_as_recheck_evidence",),
+    ),
+    "coverage_throughput_metamorphic_adaptive_pool_novel_bursts": _overlay_preset(
+        base_preset=(
+            "coverage_throughput_metamorphic_adaptive_pool_stride_confirmation_recheck1"
+        ),
+        overlays=("enable_novel_candidate_bursts",),
+    ),
+    "coverage_throughput_metamorphic_adaptive_pool_novel_bursts_horizon": _overlay_preset(
+        base_preset="coverage_throughput_metamorphic_adaptive_pool_novel_bursts",
+        overlays=("compensate_adaptive_candidate_seed_horizon",),
+    ),
     "discovery_no_groupby_guided_metamorphic": _metamorphic_overlay(
         base_preset="discovery_no_groupby_guided",
         variant_limit=8,
@@ -1212,6 +1326,183 @@ PRESET_CATALOG: dict[str, PresetSpec] = {
         candidate_pool=4,
         variant_limit=2,
     ),
+    "live_orthogonal_stress": _config_spec(
+        base_preset="live_deep_organic",
+        generator_profile="orthogonal_stress_rotation",
+        guidance_candidate_pool=1,
+        guidance_targets=[
+            "bitmap_boundary_bool_aggregate",
+            "vector_boundary_groupby_distinct",
+            "wide_schema_projection_boundary",
+            "skewed_join_multiplicity",
+            "utf8_slice_length_groupby",
+            "unique_order_window_tiebreak",
+        ],
+        discovery_biases=discovery_biases_for_lanes("orthogonal_stress"),
+        semantic_focus_families=[
+            "physical_boundaries",
+            "stateful_ordering",
+            "schema_projection",
+            "string_semantics",
+            "join_membership",
+        ],
+        semantic_focus_signals=[
+            "bitmap_boundary_bool_aggregate",
+            "vector_boundary_groupby_distinct",
+            "wide_schema_projection_boundary",
+            "skewed_join_multiplicity",
+            "utf8_slice_length_groupby",
+            "unique_order_window_tiebreak",
+        ],
+        enable_metamorphic_oracle=False,
+        enable_metamorphic_relation_learning=False,
+        oracle_mode="differential",
+        metamorphic_variant_limit=0,
+        candidate_recheck_count=3,
+        enable_feedback=False,
+        enable_local_source_scheduler=False,
+        enable_champion_corpus=False,
+        enable_champion_graft_donor_bandit=False,
+        local_source_exploration_weight=0.0,
+        family_saturation_threshold=2,
+        family_saturation_penalty=8.0,
+    ),
+    "live_chdb_targeted_boundaries": _config_spec(
+        base_preset="live_deep_organic",
+        generator_profile="orthogonal_stress_rotation",
+        guidance_candidate_pool=1,
+        guidance_targets=[
+            "bitmap_boundary_bool_aggregate",
+            "vector_boundary_groupby_distinct",
+            "wide_schema_projection_boundary",
+            "skewed_join_multiplicity",
+            "utf8_slice_length_groupby",
+            "unique_order_window_tiebreak",
+        ],
+        discovery_biases=discovery_biases_for_lanes("chdb_targeted_boundaries"),
+        semantic_focus_families=[
+            "physical_boundaries",
+            "stateful_ordering",
+            "schema_projection",
+            "string_semantics",
+            "join_membership",
+        ],
+        semantic_focus_signals=[
+            "bitmap_boundary_bool_aggregate",
+            "vector_boundary_groupby_distinct",
+            "wide_schema_projection_boundary",
+            "skewed_join_multiplicity",
+            "utf8_slice_length_groupby",
+            "unique_order_window_tiebreak",
+        ],
+        enable_metamorphic_oracle=False,
+        enable_metamorphic_relation_learning=False,
+        oracle_mode="differential",
+        metamorphic_variant_limit=0,
+        candidate_recheck_count=3,
+        enable_feedback=False,
+        enable_local_source_scheduler=False,
+        enable_champion_corpus=False,
+        enable_champion_graft_donor_bandit=False,
+        local_source_exploration_weight=0.0,
+        family_saturation_threshold=2,
+        family_saturation_penalty=8.0,
+    ),
+    "live_pandas_targeted_boundaries": _config_spec(
+        base_preset="live_arrow_deep_organic",
+        generator_profile="pandas_targeted_rotation",
+        guidance_candidate_pool=1,
+        guidance_targets=[
+            "wide_schema_projection_boundary",
+            "bitmap_boundary_bool_aggregate",
+            "utf8_slice_length_groupby",
+            "vector_boundary_groupby_distinct",
+            "skewed_join_multiplicity",
+        ],
+        discovery_biases=discovery_biases_for_lanes("pandas_targeted_boundaries"),
+        semantic_focus_families=["physical_boundaries", "string_semantics", "schema_projection"],
+        semantic_focus_signals=[
+            "wide_schema_projection_boundary",
+            "bitmap_boundary_bool_aggregate",
+            "utf8_slice_length_groupby",
+        ],
+        enable_metamorphic_oracle=False,
+        enable_metamorphic_relation_learning=False,
+        oracle_mode="differential",
+        metamorphic_variant_limit=0,
+        candidate_recheck_count=3,
+        enable_feedback=False,
+        enable_local_source_scheduler=False,
+        enable_champion_corpus=False,
+        enable_champion_graft_donor_bandit=False,
+        local_source_exploration_weight=0.0,
+        family_saturation_threshold=2,
+        family_saturation_penalty=8.0,
+    ),
+    "live_polars_targeted_boundaries": _config_spec(
+        base_preset="live_polars_deep_organic",
+        generator_profile="polars_targeted_rotation",
+        guidance_candidate_pool=1,
+        guidance_targets=[
+            "unique_order_window_tiebreak",
+            "bitmap_boundary_bool_aggregate",
+            "wide_schema_projection_boundary",
+            "vector_boundary_groupby_distinct",
+            "skewed_join_multiplicity",
+            "utf8_slice_length_groupby",
+        ],
+        discovery_biases=discovery_biases_for_lanes("polars_targeted_boundaries"),
+        semantic_focus_families=["physical_boundaries", "stateful_ordering", "schema_projection"],
+        semantic_focus_signals=[
+            "unique_order_window_tiebreak",
+            "bitmap_boundary_bool_aggregate",
+            "wide_schema_projection_boundary",
+        ],
+        enable_metamorphic_oracle=False,
+        enable_metamorphic_relation_learning=False,
+        oracle_mode="differential",
+        metamorphic_variant_limit=0,
+        candidate_recheck_count=3,
+        enable_feedback=False,
+        enable_local_source_scheduler=False,
+        enable_champion_corpus=False,
+        enable_champion_graft_donor_bandit=False,
+        local_source_exploration_weight=0.0,
+        family_saturation_threshold=2,
+        family_saturation_penalty=8.0,
+    ),
+    "live_datafusion_targeted_boundaries": _config_spec(
+        base_preset="live_datafusion_deep_organic",
+        generator_profile="datafusion_targeted_rotation",
+        guidance_candidate_pool=1,
+        guidance_targets=[
+            "vector_boundary_groupby_distinct",
+            "skewed_join_multiplicity",
+            "unique_order_window_tiebreak",
+            "wide_schema_projection_boundary",
+            "utf8_slice_length_groupby",
+            "bitmap_boundary_bool_aggregate",
+        ],
+        discovery_biases=discovery_biases_for_lanes("datafusion_targeted_boundaries"),
+        semantic_focus_families=["physical_boundaries", "join_membership", "stateful_ordering"],
+        semantic_focus_signals=[
+            "vector_boundary_groupby_distinct",
+            "skewed_join_multiplicity",
+            "unique_order_window_tiebreak",
+        ],
+        enable_metamorphic_oracle=False,
+        enable_metamorphic_relation_learning=False,
+        oracle_mode="differential",
+        metamorphic_variant_limit=0,
+        candidate_recheck_count=3,
+        enable_feedback=False,
+        enable_local_source_scheduler=False,
+        enable_champion_corpus=False,
+        enable_champion_graft_donor_bandit=False,
+        local_source_exploration_weight=0.0,
+        family_saturation_threshold=2,
+        family_saturation_penalty=8.0,
+    ),
 }
 
 for _profile_name, _profile_spec in PROFILE_PRESET_SPECS.items():
@@ -1315,6 +1606,26 @@ def catalog_preset_metadata(
         "generator_profile_pool": list(config.generator_profile_pool),
         "guidance_strategy": str(config.guidance_strategy or ""),
         "guidance_candidate_pool": int(config.guidance_candidate_pool or 0),
+        "enable_adaptive_candidate_pool": bool(config.enable_adaptive_candidate_pool),
+        "adaptive_candidate_pool_min_size": int(config.adaptive_candidate_pool_min_size),
+        "adaptive_candidate_pool_full_sweep_interval": int(
+            config.adaptive_candidate_pool_full_sweep_interval
+        ),
+        "adaptive_candidate_pool_calibration_cases": int(
+            config.adaptive_candidate_pool_calibration_cases
+        ),
+        "adaptive_candidate_pool_candidate_burst_cases": int(
+            config.adaptive_candidate_pool_candidate_burst_cases
+        ),
+        "adaptive_candidate_pool_candidate_burst_novel_only": bool(
+            config.adaptive_candidate_pool_candidate_burst_novel_only
+        ),
+        "adaptive_candidate_pool_preserve_seed_stride": bool(
+            config.adaptive_candidate_pool_preserve_seed_stride
+        ),
+        "adaptive_candidate_pool_compensate_seed_horizon": bool(
+            config.adaptive_candidate_pool_compensate_seed_horizon
+        ),
         "guidance_targets": list(config.guidance_targets),
         "semantic_focus_families": list(families),
         "semantic_focus_signals": list(signals),
@@ -1330,6 +1641,22 @@ def catalog_preset_metadata(
         "enable_local_source_scheduler": bool(config.enable_local_source_scheduler),
         "local_source_exploration_weight": float(config.local_source_exploration_weight or 0.0),
         "candidate_recheck_count": int(config.candidate_recheck_count or 0),
+        "enable_backend_sampling": bool(config.enable_backend_sampling),
+        "backend_sample_size": int(config.backend_sample_size),
+        "backend_full_sweep_interval": int(config.backend_full_sweep_interval),
+        "backend_sample_confirm_candidates": bool(config.backend_sample_confirm_candidates),
+        "backend_sampling_calibration_cases": int(config.backend_sampling_calibration_cases),
+        "backend_sampling_candidate_burst_cases": int(
+            config.backend_sampling_candidate_burst_cases
+        ),
+        "backend_sampling_candidate_burst_novel_only": bool(
+            config.backend_sampling_candidate_burst_novel_only
+        ),
+        "backend_sample_confirmation_recheck_count": (
+            None
+            if config.backend_sample_confirmation_recheck_count is None
+            else int(config.backend_sample_confirmation_recheck_count)
+        ),
         "known_saturated_bug_family_count": len(config.known_saturated_bug_families),
         "replay_bug_source_issue_count": len(config.replay_bug_source_issues),
         "methodology_tags": methodology_tags,
@@ -1433,6 +1760,15 @@ def _methodology_tags(
         tags.append("cross_version_replay")
     if config.guidance_strategy == "guided":
         tags.append("guided_search")
+    if config.enable_adaptive_candidate_pool:
+        tags.append("adaptive_candidate_pool")
+    if (
+        config.backend_sampling_candidate_burst_novel_only
+        or config.adaptive_candidate_pool_candidate_burst_novel_only
+    ):
+        tags.append("novel_candidate_bursts")
+    if config.adaptive_candidate_pool_compensate_seed_horizon:
+        tags.append("acceptance_compensated_seed_horizon")
     if config.enable_feedback:
         tags.append("closed_loop_feedback")
     if config.enable_metamorphic_oracle or config.oracle_mode in {"metamorphic", "both"}:

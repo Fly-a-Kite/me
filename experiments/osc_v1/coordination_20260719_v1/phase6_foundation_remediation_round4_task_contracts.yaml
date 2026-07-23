@@ -1,0 +1,125 @@
+schema_version: osc-remediation-contract-v1
+phase: 6
+round: private_foundation_remediation_r4_single_agent_serial
+execution_mode: single_agent_serial_override
+rotated_independent_review_complete: false
+entry_review:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_reports.yaml
+  sha256: 793567c5fcb35aaf72fc91fe4edd75dd732948faba80b093c505da2743fee630
+coordination:
+  direct_agent_count: 1
+  child_agents: 0
+  preserve_dirty_worktree: true
+  public_exports_frozen: true
+  public_api_freeze_sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+global_requirements:
+  - fix only OSC-6-FOUNDATION-SEARCH-R4-H1, OSC-6-FOUNDATION-SEARCH-R4-H2 and OSC-6-FOUNDATION-RUNTIME-R4-M1
+  - use apply_patch for every repository write and PYTHONDONTWRITEBYTECODE=1 for every Python command
+  - protect every pre-existing dirty/untracked path; no reset, clean, checkout, deletion, overwrite or bulk formatting
+  - no public export, public_api_freeze.json, frozen path, threshold, denominator, replay authority, provenance origin or admission-authority change
+  - diagnostic refs remain diagnostic-only; missing exact typed context remains fail-closed/not_evaluated; candidate remains non-confirmed and bug_claimed=false
+  - this serial remediation cannot satisfy rotated independent review; foundation_barrier remains false and pending an external independent reviewer
+  - no tests/osc, full repository, parity 100000, v3 2200, Phase 7, 2h or 24h execution
+tasks:
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-SEARCH-R4
+    owner: /root
+    mode: bounded_private_remediation_single_agent_serial
+    findings:
+      - OSC-6-FOUNDATION-SEARCH-R4-H1
+      - OSC-6-FOUNDATION-SEARCH-R4-H2
+    allowed_write_paths:
+      - src/datadiff_osc/search/context_receipts.py
+      - src/datadiff_osc/search/context_replay.py
+      - tests/osc/test_search_context_receipts.py
+      - tests/osc/test_search_gate_crosswalk.py
+    frozen_paths:
+      - path: src/datadiff_osc/search/lane_registry.py
+        sha256: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+      - path: tests/osc/test_search_lane_registry.py
+        sha256: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    before_sha256:
+      src/datadiff_osc/search/context_receipts.py: e59bee28afc89cc58706eecc9168043e18fe7c74bf40f4d66e515a1a2a7673bd
+      src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+      tests/osc/test_search_context_receipts.py: 6b472c41e46aa9cc1bd46453dd273204cf82670cf4522944d62c658af6a6873f
+      tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    requirements:
+      - application-policy callable identity must use complete live-context identity, never static-only source/code/module identity or cache-state authority
+      - bind behavior-affecting globals, defaults, keyword defaults, closure cells, function attributes, annotations and recursively reachable direct dependencies
+      - bind every intermediate owner in module/class attribute paths, not only the terminal descriptor; mutable, cyclic, unresolved and uninspectable owners must fail closed
+      - capture the live policy identity and revalidate it before capture replay, between both fresh replays and after replay; registry/profile/callable/policy substitutions must reject before a replacement outcome is accepted under a prior ID
+      - version any strengthened private digest/schema domain so receipts with weaker identity semantics fail closed; do not change public APIs
+      - preserve full MutationOutcome equality, fresh Context, isolated Case cloning, derived MUTATION seed, target preservation and accepted/repaired/rejected boundaries
+    required_regressions:
+      - cold and warm MutationOutcome-global substitution of TargetPreservingMutator.mutate changes policy identity or fails closed before replay
+      - a replacement outcome with attempts=1 rejects under a prior application-policy ID
+      - defaults, keyword defaults, closure cells, globals and profile fields alter identity or fail closed on both cold and warm paths
+      - Holder.STATE.get and module.STATE.get intermediate-owner replacement changes identity or rejects before behavior can replay
+      - mutable and cyclic intermediate owners fail closed; unresolved and uninspectable owners remain fail closed
+      - exact unmodified operators retain deterministic accepted/repaired/rejected causal replay where reachable
+    scoped_test: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py
+      tests/osc/test_search_gate_crosswalk.py
+
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-RUNTIME-R4
+    owner: /root
+    mode: bounded_private_remediation_single_agent_serial
+    findings:
+      - OSC-6-FOUNDATION-RUNTIME-R4-M1
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_receipt_producers.py
+      - tests/osc/test_runtime_receipt_producers.py
+    frozen_paths:
+      - path: src/datadiff_osc/runtime/_producer_provenance.py
+        sha256: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+      - path: tests/osc/test_runtime_producer_provenance.py
+        sha256: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    before_sha256:
+      src/datadiff_osc/runtime/_receipt_producers.py: 4e939d0d8dd30858a60109318c12ceb4614e8848816761b1ccdbc772986ae9d6
+      tests/osc/test_runtime_receipt_producers.py: dccb5339abea3f4f92c41113766a36e7d25f30db0dc3df03d4275200d5404caf
+    requirements:
+      - build and validate one source-plus-campaign3-plus-pipeline3 collection before any source/recheck verdict, reproduced or threshold evaluation
+      - require global uniqueness across all seven executions for task ID, complete TaskSpec digest, result ID and seed-lineage digest, and across all seven EvidenceEnvelope digests with exact result/task bindings
+      - source result/evidence reuse in either campaign or pipeline must reject before source typed-VIOLATED, recheck verdict, reproduced or 3/3 plus 3/3 threshold evaluation
+      - preserve typed VIOLATED derivation, exact 3/3 campaign plus 3/3 pipeline thresholds, STABLE_SURVIVOR non-confirmed state and bug_claimed=false
+      - do not broaden semantic replay, provenance origin policy or admission authority
+    required_regressions:
+      - source verdict INCONCLUSIVE with campaign source reuse first reports source/campaign/pipeline identities must be globally disjoint
+      - source verdict INCONCLUSIVE with pipeline source reuse first reports source/campaign/pipeline identities must be globally disjoint
+      - source verdict SATISFIED with campaign source reuse first reports source/campaign/pipeline identities must be globally disjoint
+      - source verdict SATISFIED with pipeline source reuse first reports source/campaign/pipeline identities must be globally disjoint
+      - valid seven-distinct typed VIOLATED fixture still emits non-confirmed STABLE_SURVIVOR with 3/3 plus 3/3
+    scoped_test: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+
+  - task_id: OSC-6-FOUNDATION-CONTRACT-FROZEN-R4
+    owner: /root
+    mode: frozen_read_only_sentinel
+    allowed_write_paths: []
+    exact_sha256:
+      src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+      tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    requirements:
+      - make no writes
+      - verify frozen SHA and public freeze after remediation and combined scoped suite
+completion_report_requirements:
+  - exact before/after SHA for every allowed path; exact SHA for every frozen path and public_api_freeze.json
+  - Search and Runtime scoped command, exit code and exact result
+  - all new and prior 独立反例验证 results after remediation, with every malformed/mutable/cyclic/substitution/reuse input fail closed
+  - six-file combined scoped command, exit code and exact result
+  - forbidden_paths_modified=[], deviations=[], child_agents=0
+  - execution_mode=single_agent_serial_override and rotated_independent_review_complete=false
+exit:
+  - implementation_round_complete=true only after both bounded remediations, scoped tests, all independent counterexample validations and combined suite pass
+  - root_independent_counterexample_validation=true only when all three R4 findings reject/fail closed after remediation
+  - combined_scoped_pass=true only for the exact six-file command
+  - rotated_independent_review_required=true and foundation_barrier=false remain mandatory; stop for a future independent reviewer
+execution_authorization:
+  scoped_tests_only: true
+  tests_osc: false
+  full_repository_tests: false
+  parity_100000: false
+  v3_2200: false
+  phase7_pilot_2h: false
+  twenty_four_hour: false

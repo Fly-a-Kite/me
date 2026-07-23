@@ -1,0 +1,97 @@
+schema_version: osc-phase-barrier-v1
+phase: 6
+change_request: CR-OSC-6-001
+barrier: typed_semantic_replay_core
+status: pass
+scope_closed:
+  - private exact canonical replay primitives
+  - Contract, Search and Runtime real typed-object reconstruction
+  - constructor and semantic invariant replay
+  - exact canonical payload round-trip
+  - independently derived intrinsic subject comparison
+  - Root one-owner dispatch for all 25 allowed type/version pairs
+  - malformed, synthetic, substituted and context-only admission discard
+  - Runtime provenance fail-closed handoff to CR-OSC-6-004
+inputs:
+  root_support_barrier:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_support_barrier.yaml
+    sha256: b7f56cbe675d2ce2667472c8683fb144880625740f621139d5dd018fcd562e71
+  domain_barrier:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_cr001_domain_barrier.yaml
+    sha256: 7b5ebf389c83416d0f6a825cd7376c001efa26644f11a039a3addf5152754e14
+  final_review:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_round3.yaml
+    sha256: 767753a8bb8a5e0fad853b0d86643073c3735324d98def829bce58ff57d4f1d8
+final_files:
+  - path: src/datadiff_osc/_replay_support.py
+    sha256: 6f52a8836288cb0e7578c984a8f0c3c26661a17d648050912c07a54515192dc1
+  - path: src/datadiff_osc/contract_engine/replay.py
+    sha256: f7289bfe133611b50b14676697d3ef97c02e5f77162ad0cdf9fb9e11b654c615
+  - path: src/datadiff_osc/search/semantic_replay.py
+    sha256: af65bd9f1f06a3a2555b33dd2c38d574ed03d0ab70ed5dcee035099e3364b28b
+  - path: src/datadiff_osc/runtime/_private_receipts.py
+    sha256: 490c7f7f076fb65c75cc577831fab508f6d9dcb0820422170169b274e50af07f
+  - path: src/datadiff_osc/runtime/_semantic_replay.py
+    sha256: 0b5ec02b247d718d4258dada0fb59493081f258cc1e49913c1d294c7c9e062b9
+  - path: src/datadiff_osc/_phase6_gate_authority.py
+    sha256: 03b6ef9323f38fee8cb9daafffd2a309818953fbc78fa2ae0cd2c99b1503bbd7
+test_files:
+  - path: tests/osc/test_replay_support.py
+    sha256: b7a114caa0b9ec606a8b43861ae0dcdcd78af4c2763f3b3d2365e10c904d8e89
+  - path: tests/osc/test_contract_semantic_replay.py
+    sha256: a56545b658fc35ad463159da8199271dcf7cc7c90ba434bf4c0a33ae15466979
+  - path: tests/osc/test_search_semantic_replay.py
+    sha256: 31127935baa845e5458ea46ae2d6ae753b943c7a779641fe1e40863acf5494c1
+  - path: tests/osc/test_runtime_private_receipts.py
+    sha256: 13a4a3607faaa8a98a241b66aaf6309ff7882ec87a7c3ad3c8bb17ac108ca24b
+  - path: tests/osc/test_runtime_semantic_replay.py
+    sha256: dce47e72b3b64c198a9605ab1156e97b59bdecad1a1322f28ebbad6d86b91c57
+  - path: tests/osc/test_phase6_gate_authority_integration.py
+    sha256: 61ca0eba76f71dcea39af3312cb1dbfecf8b606283ff84d9c9fa5af254a27289
+verification:
+  root_dispatch_scoped: 41 passed in 22.94s
+  combined_replay_and_freeze: 129 passed in 24.13s
+  full_osc: 474 passed in 113.42s
+  full_repository: 3175 passed and 1 skipped in 250.50s
+  git_diff_check: clean
+  staged_paths: 0
+  public_api_freeze:
+    path: src/datadiff_osc/public_api_freeze.json
+    sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    changed: false
+independent_reviews:
+  exact_sha_pair:
+    authority: 03b6ef9323f38fee8cb9daafffd2a309818953fbc78fa2ae0cd2c99b1503bbd7
+    integration_test: 61ca0eba76f71dcea39af3312cb1dbfecf8b606283ff84d9c9fa5af254a27289
+  direct_agents: 3
+  grandchildren: 0
+  forbidden_writes: 0
+  findings: {blocker: 0, high: 0, medium: 0}
+authority_boundaries:
+  - intrinsic semantic replay alone does not establish producer provenance
+  - staged parity remains discarded until CR-OSC-6-002 cross-object binding
+  - Search attempt, observation, lane and focus context remains discarded until CR-OSC-6-003A and CR-OSC-6-003
+  - every Runtime semantic success remains discarded until CR-OSC-6-004 verifies real producers and raw artifacts
+  - candidate receipts cannot represent confirmed states and bug_claimed must be false
+  - no replay success creates bug, gate, Phase 7 or 24h authority
+residual_dependencies:
+  - id: CR-OSC-6-002
+    status: ready_for_prewrite
+    scope: approved corpora and exact Contract producers
+  - id: CR-OSC-6-003A
+    status: ready_for_prewrite
+    scope: declaration-derived formal 11-lane and focus registry
+  - id: CR-OSC-6-003
+    status: pending_after_CR_OSC_6_003A
+    scope: normative granularity and reachability gates
+  - id: CR-OSC-6-004
+    status: ready_for_prewrite
+    scope: real Runtime producers, provenance and raw receipt cross-binding
+decision:
+  cr_osc_6_001_semantic_replay_core_closed: true
+  next_change_request_prewrite_authorized: true
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase6_overall_passed: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

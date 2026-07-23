@@ -15,6 +15,7 @@ def _selected_candidate_metadata(
     guidance_enabled: bool,
 ) -> dict[str, Any]:
     generated_metadata = _generated_candidate_metadata(case)
+    case_metadata = case.metadata if isinstance(case.metadata, dict) else {}
     return {
         "source": "generated",
         "generated_seed": case.seed,
@@ -22,6 +23,15 @@ def _selected_candidate_metadata(
         "mutation": generated_metadata["mutation"],
         "feedback_decision": {},
         "quality_archive_context": {},
+        "goal_first_generation": dict(
+            case_metadata.get("goal_first_generation", {}) or {}
+        ),
+        "semantic_activation": dict(
+            case_metadata.get("semantic_activation", {}) or {}
+        ),
+        "boundary_application": dict(
+            case_metadata.get("boundary_application", {}) or {}
+        ),
         "operation_combo": describe_operation_combo(case.program.operations),
         "preflight": {
             "valid": True,
@@ -133,6 +143,13 @@ def _attach_semantic_contract_lattice_to_row_case(
     lattice: dict[str, Any],
 ) -> None:
     _attach_metadata_to_row_case(row, "semantic_contract_lattice", lattice)
+
+
+def _attach_interaction_descriptor_to_row_case(
+    row: dict[str, Any],
+    descriptor: dict[str, Any],
+) -> None:
+    _attach_metadata_to_row_case(row, "interaction_descriptor", descriptor)
 
 
 def _fingerprint_anchor_result(normalized: dict[str, Any]) -> Any | None:

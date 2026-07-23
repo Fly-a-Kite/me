@@ -1,0 +1,57 @@
+schema_version: osc-review-report-v1
+phase: 6
+change_request: CR-OSC-6-001
+review_round: 3
+status: pass_three_exact_sha_reviews
+review_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_round3_contracts.yaml
+  sha256: 225124b24b744e1c989b1942f98c2d33fef916e4a68d63d46cacaaee96258b9e
+reviewed_target_shas:
+  authority: 03b6ef9323f38fee8cb9daafffd2a309818953fbc78fa2ae0cd2c99b1503bbd7
+  integration_test: 61ca0eba76f71dcea39af3312cb1dbfecf8b606283ff84d9c9fa5af254a27289
+reviews:
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-A-R3
+    agent: /root/phase5_authority_audit
+    status: complete_read_only_pass
+    exact_sha_match: true
+    forbidden_writes: 0
+    child_agents: 0
+    long_gates: 0
+    findings: {blocker: 0, high: 0, medium: 0}
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-B-R3
+    agent: /root/phase5_consumer_audit
+    status: complete_read_only_pass
+    exact_sha_match: true
+    forbidden_writes: 0
+    child_agents: 0
+    long_gates: 0
+    findings: {blocker: 0, high: 0, medium: 0}
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-C-R3
+    agent: /root/phase5_evidence_audit
+    status: complete_read_only_pass
+    exact_sha_match: true
+    forbidden_writes: 0
+    child_agents: 0
+    long_gates: 0
+    findings: {blocker: 0, high: 0, medium: 0}
+prior_findings_closed:
+  - OSC-6-CR001-R1-A-H1 staged parity cross-object substitution
+  - OSC-6-CR001-R1-A-M1 missing transport forgery regressions
+  - OSC-6-CR001-R2-B-M1 missing Root Search route and receipt-retention regressions
+root_final_verification:
+  scoped: 41 passed in 22.94s
+  combined_replay_and_freeze: 129 passed in 24.13s
+  full_osc: 474 passed in 113.42s
+  full_repository: 3175 passed and 1 skipped in 250.50s
+  diff_check: clean
+  staged_paths: 0
+  public_api_freeze:
+    path: src/datadiff_osc/public_api_freeze.json
+    sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+closure:
+  cr_osc_6_001_root_dispatch_closed: true
+  root_provenance_closed: false
+  phase6_barrier_closed: false
+  phase6_gate_execution_authorized_by_this_review: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

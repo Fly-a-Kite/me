@@ -1,0 +1,117 @@
+schema_version: osc-review-contract-v1
+phase: 6
+round: private_foundation_remediation_exact_sha_ring_review_r2
+mode: three_parallel_rotated_read_only_reviews
+entry_report:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_reports.yaml
+  sha256: 6699988023fc4538cbd5db7addd9519c86f2a05fac5e886e3ad1e51cec171d4f
+entry_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_task_contracts.yaml
+  sha256: 25d71cd5811c08f004520d6032c984aee0e38836743b722ad630390cdb0eb7e9
+coordination:
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  writes_allowed: false
+  preserve_dirty_worktree: true
+  reviewers_must_not_review_own_implementation: true
+global_requirements:
+  - verify every target SHA before reading semantics or running tests; any mismatch stops review
+  - perform correctness, soundness, reproducibility, authority-boundary and missing-test review rather than style review
+  - independently reconstruct at least one valid typed object and at least one forgery for every prior finding family
+  - inspect both implementation and tests; green tests alone are not proof
+  - unknown, malformed, incomplete, aggregate, relabeled, swapped or caller-authored evidence must fail closed
+  - exact missing context remains context-required, not_evaluated, MISSING_INPUT or rejected
+  - private schemas and public exports/freeze must remain unchanged during review
+  - no diagnostic ref may influence admission, coverage, evidence, candidate/bug, gate or authorization
+  - candidate remains candidate; confirmed states and bug_claimed true remain unrepresentable or rejected
+  - report blocker, high, medium and low counts separately; pass requires blocker=0, high=0 and medium=0
+  - use PYTHONDONTWRITEBYTECODE=1 for every Python command and only the assigned scoped tests
+  - do not run tests/osc, full repository, parity 100000, v3 2200, Phase 7 pilot or 24h
+tasks:
+  - task_id: OSC-6-FOUNDATION-REVIEW-R2-A-RUNTIME
+    reviewer: /root/phase5_authority_audit
+    target_owner: /root/phase5_evidence_audit
+    allowed_write_paths: []
+    target_files:
+      - path: src/datadiff_osc/runtime/_producer_provenance.py
+        sha256: e49dc7655a10b9f705a89062ff62db61049b6f689eb34ddc9819122926575d3a
+      - path: src/datadiff_osc/runtime/_receipt_producers.py
+        sha256: 2525652d88f08c1407d8836c502ff35c1a0cc803a2b23d22c91e0187120214e4
+      - path: tests/osc/test_runtime_producer_provenance.py
+        sha256: c9f9a738573c4709b3ac5db68b39cfa2e5ede826958de3b179933607c093bd31
+      - path: tests/osc/test_runtime_receipt_producers.py
+        sha256: 99634e6e28d5b6c3135ed2c4d619b2b5cdf19c7daf677cfce2998ec5c0e34fe2
+    prior_findings: [OSC-6-FOUNDATION-RUNTIME-B1, OSC-6-FOUNDATION-RUNTIME-B2, OSC-6-FOUNDATION-RUNTIME-H1, OSC-6-FOUNDATION-RUNTIME-H2, OSC-6-FOUNDATION-RUNTIME-H3]
+    review_focus:
+      - prove the per-record policy cannot be escaped through any category, ID, subject, path, schema, origin or frozen-SHA relabel
+      - prove canonical typed replay reconstructs the declared real type, reruns invariants, recomputes subject identity and binds every raw parent
+      - prove all performance fields derive from typed raw monotonic values and exact same case/result-group/contract/endpoints/seed/protocol TaskSpec and result context
+      - prove state-specific candidate reproduction and cross-stage disjointness cannot be bypassed through digest swaps
+      - prove JUnit, installed metadata and public JSON parsing cannot be contradicted by caller summaries
+    scoped_test: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R2-B-CONTRACT
+    reviewer: /root/phase5_consumer_audit
+    target_owner: /root/phase5_authority_audit
+    allowed_write_paths: []
+    target_files:
+      - path: src/datadiff_osc/contract_engine/_phase6_corpora.py
+        sha256: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+      - path: tests/osc/test_contract_phase6_corpora.py
+        sha256: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    prior_findings: [OSC-6-C-H1, OSC-6-C-H2, OSC-6-C-H3, OSC-6-C-H4, OSC-6-C-H5, OSC-6-C-M1]
+    review_focus:
+      - prove arbitrary reviewer identities and structurally valid files cannot claim independent approval, minimum denominator or Root authority
+      - prove all nine roots bind frozen VIOLATED verdicts plus recomputed expected-signature identity
+      - prove false-positive adjudication is component-scoped with exact verdict/source/rule-diff and no global-axis/family suppression
+      - prove compatibility pairs share exact case/endpoint/contract context and bind both TaskSpecs/results/outcomes/verdicts
+      - prove mutant witnesses bind exact baseline/mutant execution pairs and category-specific kill predicates without cross-mutant reuse
+      - prove generic/source-only evidence and all C0/path/resolve forgeries fail deterministically
+    scoped_test: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_contract_phase6_corpora.py
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R2-C-SEARCH
+    reviewer: /root/phase5_evidence_audit
+    target_owner: /root/phase5_consumer_audit
+    allowed_write_paths: []
+    target_files:
+      - path: src/datadiff_osc/search/lane_registry.py
+        sha256: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+      - path: src/datadiff_osc/search/context_receipts.py
+        sha256: 2759a4fc837323c9f02ce1905dc22fea9806eea7f4a0e9d5806b2e52bd7c3b31
+      - path: src/datadiff_osc/search/context_replay.py
+        sha256: 75b087f908c153b72aabe5484550931a4b0b839864ae918834e7f552548211ca
+      - path: tests/osc/test_search_lane_registry.py
+        sha256: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+      - path: tests/osc/test_search_context_receipts.py
+        sha256: 3e06d62355d4e84ca88fe045763e2c2d558a6753e5f60bf7fa499efdfa5e5273
+      - path: tests/osc/test_search_gate_crosswalk.py
+        sha256: 8af147b11283c5973e50ab69e279612a7b332acb300d57a6ebe55eddd20ea959
+    prior_findings: [OSC-6-FOUNDATION-SEARCH-H1, OSC-6-FOUNDATION-SEARCH-H2, OSC-6-FOUNDATION-SEARCH-H3, OSC-6-FOUNDATION-SEARCH-H4, OSC-6-FOUNDATION-SEARCH-M1]
+    review_focus:
+      - prove no builder silently erases duplicate plan, seed, Runtime-ref or focus-proof identities
+      - prove run/case/seed-block/master-seed/SeedLineage mappings are exact and reject wrong stage/index/counter/parent or cross-run replay
+      - prove mutation source Case, registered operator, derived MUTATION lineage/seed, typed outcome and certificate cannot be independently swapped
+      - prove intrinsic focus derives the obligation signal from a typed source-specific payload and cannot accept digest-only or metadata relabeling
+      - prove Runtime observation remains context-required/admitted-false and no Search receipt creates gate or authority credit
+    scoped_test: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py tests/osc/test_search_gate_crosswalk.py
+report_requirements:
+  - exact reviewed SHA set and entry report/contract SHA
+  - writes=0, child_agents=0, forbidden_paths_modified=[] and deviations=[]
+  - bounded counterexamples attempted and their exact results
+  - prior finding disposition one by one
+  - new findings in runbook finding schema with owner and required regression
+  - explicit pass or fail; no conditional pass
+exit:
+  foundation_review_passes_only_if:
+    - all three exact-SHA reports are received
+    - aggregate blocker, high and medium counts are zero
+    - Root independently verifies unchanged exact SHAs after reviews
+    - public API freeze remains cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+execution_authorization:
+  scoped_tests_only: true
+  tests_osc: false
+  full_repository_tests: false
+  parity_100000: false
+  v3_2200: false
+  phase7_pilot_2h: false
+  twenty_four_hour: false

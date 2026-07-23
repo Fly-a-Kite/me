@@ -76,6 +76,42 @@ def discovery_signature(row: dict[str, Any]) -> str:
     return short_canonical_hash(payload, 16)
 
 
+def coverage_discovery_signature(row: dict[str, Any]) -> str:
+    """Compare sampled and full sweeps without treating backend-set rotation as novelty."""
+    operations = operation_names(row["case"]["program"]["operations"], default="unknown")
+    combo = describe_operation_combo(row["case"]["program"]["operations"])
+    findings = row.get("findings") or []
+    outcome_classes = {
+        (
+            str(result.get("status", "unknown")),
+            str(result.get("error_type", "")),
+            len(result.get("columns", [])),
+            row_count_bucket(len(result.get("rows", []))),
+        )
+        for result in (row.get("normalized") or {}).values()
+    }
+    payload = {
+        "combo_template": combo.get("template", ""),
+        "operation_histogram": sorted(Counter(operations).items()),
+        "outcome_classes": sorted(outcome_classes),
+        "finding_kinds": sorted(str(finding.get("kind", "")) for finding in findings),
+        "finding_roots": sorted(
+            str(finding.get("root_cause", "unknown"))
+            for finding in findings
+            if not bool(finding.get("false_positive"))
+        ),
+        "suspicious_backends": sorted(
+            {
+                str(backend)
+                for finding in findings
+                if not bool(finding.get("false_positive"))
+                for backend in finding.get("suspicious_backends", []) or []
+            }
+        ),
+    }
+    return short_canonical_hash(payload, 16)
+
+
 def signal_signature(row: dict[str, Any]) -> str:
     operations = sorted(set(operation_names(row["case"]["program"]["operations"], default="unknown")))
     combo = describe_operation_combo(row["case"]["program"]["operations"])
@@ -90,6 +126,41 @@ def signal_signature(row: dict[str, Any]) -> str:
             }
             for backend, result in sorted((row.get("normalized") or {}).items())
         },
+        "finding_buckets": sorted(
+            {
+                offline_finding_bucket(finding)
+                for finding in findings
+                if not bool(finding.get("false_positive"))
+            }
+        ),
+        "suspicious_backends": sorted(
+            {
+                str(backend)
+                for finding in findings
+                if not bool(finding.get("false_positive"))
+                for backend in finding.get("suspicious_backends", []) or []
+            }
+        ),
+    }
+    return short_canonical_hash(payload, 16)
+
+
+def coverage_signal_signature(row: dict[str, Any]) -> str:
+    operations = sorted(set(operation_names(row["case"]["program"]["operations"], default="unknown")))
+    combo = describe_operation_combo(row["case"]["program"]["operations"])
+    findings = row.get("findings") or []
+    payload = {
+        "combo_template": combo.get("template", ""),
+        "operation_set": operations,
+        "backend_outcome_classes": sorted(
+            {
+                (
+                    str(result.get("status", "unknown")),
+                    str(result.get("error_type", "")),
+                )
+                for result in (row.get("normalized") or {}).values()
+            }
+        ),
         "finding_buckets": sorted(
             {
                 offline_finding_bucket(finding)

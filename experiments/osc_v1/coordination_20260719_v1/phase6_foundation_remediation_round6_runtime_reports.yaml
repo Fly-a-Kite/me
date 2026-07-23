@@ -1,0 +1,118 @@
+schema_version: osc-remediation-report-v1
+phase: 6
+round: private_foundation_remediation_r6_runtime_exact_evidence_binding
+status: implementation_complete_scoped_suite_passed_pending_r7_independent_review
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_runtime_task_contracts.yaml
+  sha256: 3ea22a3856303f8f2b136d7f853fd2012fe43d0a8218c7c9790da05d40ae7b59
+entry_authority:
+  r6_review_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_contracts.yaml
+    sha256: 8ecbe889ba06cedbe4d23eab95f9b0702a051cd70948eee9bf7084845aa84cdd
+  r6_review_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_reports.yaml
+    sha256: 664d151e31f46a5352cd0d649703f8e4d26e0b3dca56b7055e4798d806f1a1a1
+  completed_search_remediation_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_search_reports.yaml
+    sha256: ddb0a23cfa2488068b16cf93cefc69993e83296239cfda1049fea5fe853ea003
+finding:
+  id: OSC-6-FOUNDATION-RUNTIME-R6-M1
+  severity: medium
+  status: remediated_by_root_validation_not_independently_closed
+implementation:
+  owner: root
+  implementation_child_agents: 0
+  changed_paths:
+    - src/datadiff_osc/runtime/_receipt_producers.py
+    - tests/osc/test_runtime_receipt_producers.py
+  summary:
+    - >-
+      The seven-execution precheck retains global task/TaskSpec/result/seed/envelope
+      digest uniqueness as its first check, preserving R4/R5 collision semantics.
+    - >-
+      Once identities are disjoint, the same precheck validates every source,
+      campaign, and pipeline EvidenceEnvelope against its typed execution result:
+      state, result group, task ID, seed lineage, contract, target, and exact outcome.
+      It runs before source/recheck verdict, reproduced, and threshold handling.
+    - >-
+      Recheck construction retains its defensive per-item binding validation, while
+      the new earlier seven-item validation prevents a non-VIOLATED source verdict
+      from masking a unique but misbound recheck envelope.
+target_sha256:
+  before_implementation:
+    src/datadiff_osc/runtime/_receipt_producers.py: 922afa81b750905e0aaa6fc096d4b1176be2112269f119da81cc5aa72d09230d
+    tests/osc/test_runtime_receipt_producers.py: 41c15578eebb43f90a244f94562a8473301503a646f4eb5754853a99991c56c6
+  before_scoped_suite:
+    src/datadiff_osc/runtime/_receipt_producers.py: 1c941edd9c28ac196ee7d0e7ab1ceeb4dc235c64a778cad2a9cce549a9328320
+    tests/osc/test_runtime_receipt_producers.py: 63763813a44c669bd1b75c554f6277fb11f85d9db6db3ac5792bbedec0cfe036
+  after_scoped_suite:
+    src/datadiff_osc/runtime/_receipt_producers.py: 1c941edd9c28ac196ee7d0e7ab1ceeb4dc235c64a778cad2a9cce549a9328320
+    tests/osc/test_runtime_receipt_producers.py: 63763813a44c669bd1b75c554f6277fb11f85d9db6db3ac5792bbedec0cfe036
+frozen_sha256:
+  src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+  tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+  src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+  tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+  src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+  tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+  src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+  tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+  src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+  tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+  src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+validation:
+  scoped_suite:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+    execution_count: 1
+    exit_code: 0
+    result: 63 passed in 0.51s
+    exact_sha_verified_pre_and_post: true
+  negative_review:
+    nonviolated_source_exact_task_binding: >-
+      pass: INCONCLUSIVE/SATISFIED crossed with campaign/pipeline (4/4) kept all
+      seven task IDs, TaskSpec digests, result IDs, seed-lineage digests, and
+      EvidenceEnvelope digests unique while only one stage EvidenceEnvelope.task_id
+      was wrong; every first error was candidate evidence/task mismatch.
+    result_group_seed_outcome_variants: >-
+      pass: campaign/pipeline result-group, seed, and execution-outcome EvidenceEnvelope
+      variants all failed at their exact binding message before source verdict.
+    global_collisions: >-
+      pass: task ID, TaskSpec digest, result ID, seed lineage, and envelope-digest
+      collisions still reject first at source/campaign/pipeline global disjointness.
+    legal_typed_violated: >-
+      pass: seven distinct typed VIOLATED inputs remain STABLE_SURVIVOR, non-confirmed,
+      with bug_claimed=false and exact 3/3 plus 3/3 reproduction.
+  abnormal_input_validation:
+    confirmed_state: rejected
+    caller_reproduced: rejected
+    diagnostic_promotion: rejected
+    missing_exact_typed_context: fail_closed_or_not_evaluated
+authority_boundaries:
+  diagnostic_refs_authority_eligible: false
+  candidate_promoted_to_confirmed: false
+  bug_claimed: false
+  public_exports_changed: false
+  public_api_freeze_changed: false
+  fabricated_coverage_or_receipt_or_evidence_authority: false
+findings: []
+counts: {blocker: 0, high: 0, medium: 0, low: 0}
+forbidden_paths_modified: []
+deviations: []
+manual_repository_writes_used_apply_patch: true
+decision:
+  remediation_code_complete: true
+  search_remediation_complete: true
+  r7_authority_contract_created: false
+  independent_review_complete: false
+  foundation_barrier: pending
+  foundation_barrier_passed: false
+  combined_six_file_scoped_suite_authorized: false
+  tests_osc_authorized: false
+  full_repository_tests_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_entry_authorized: false
+  phase7_pilot_2h_authorized: false
+  twenty_four_hour_run_authorized: false

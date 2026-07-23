@@ -124,6 +124,16 @@ def state_after_operations(
     return state
 
 
+def state_after_operation(
+    state: ProgramState,
+    operation: Any,
+    *,
+    tables: Mapping[str, TableData] | None = None,
+) -> ProgramState:
+    next_state = state.copy()
+    return apply_operation_state(next_state, operation, tables=tables)
+
+
 def state_before_operation(case: Case, op_index: int) -> ProgramState:
     if not case.tables:
         return ProgramState([], {}, set())

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import time
+from collections.abc import Mapping
 from concurrent.futures import FIRST_COMPLETED, as_completed, wait
 from pathlib import Path
 from typing import Any, Callable
@@ -15,6 +16,12 @@ from datadiff.experiment_catalog import (
     replay_bug_enabled_by_default,
 )
 from datadiff.experiment_metadata import normalize_experiment_meta, resolved_run_semantics
+from datadiff.experiment_worker_batching import (
+    resolve_worker_batching,
+    run_batched_parallel,
+    run_worker_batch,
+)
+from datadiff.process_runtime import create_safe_executor
 from datadiff.exploration_objectives import objective_feature
 from datadiff.guidance import parse_guidance_targets
 from datadiff.preset_catalog import (
@@ -213,6 +220,71 @@ def apply_job_config_overrides(
             config.enable_parallel_backend_execution,
         )
     )
+    if job.get("enable_backend_sampling") is not None:
+        config.enable_backend_sampling = bool(job["enable_backend_sampling"])
+    if job.get("backend_sample_size") is not None:
+        config.backend_sample_size = max(2, int(job["backend_sample_size"]))
+    if job.get("backend_full_sweep_interval") is not None:
+        config.backend_full_sweep_interval = max(0, int(job["backend_full_sweep_interval"]))
+    if job.get("backend_sampling_calibration_cases") is not None:
+        config.backend_sampling_calibration_cases = max(
+            0,
+            int(job["backend_sampling_calibration_cases"]),
+        )
+    if job.get("backend_sampling_candidate_burst_cases") is not None:
+        config.backend_sampling_candidate_burst_cases = max(
+            0,
+            int(job["backend_sampling_candidate_burst_cases"]),
+        )
+    if job.get("backend_sampling_candidate_burst_novel_only") is not None:
+        config.backend_sampling_candidate_burst_novel_only = bool(
+            job["backend_sampling_candidate_burst_novel_only"]
+        )
+    if job.get("backend_sample_confirmation_recheck_count") is not None:
+        config.backend_sample_confirmation_recheck_count = max(
+            0,
+            int(job["backend_sample_confirmation_recheck_count"]),
+        )
+    if job.get("backend_sample_confirm_candidates") is not None:
+        config.backend_sample_confirm_candidates = bool(job["backend_sample_confirm_candidates"])
+    if job.get("enable_adaptive_candidate_pool") is not None:
+        config.enable_adaptive_candidate_pool = bool(job["enable_adaptive_candidate_pool"])
+    if job.get("adaptive_candidate_pool_min_size") is not None:
+        config.adaptive_candidate_pool_min_size = max(
+            1,
+            int(job["adaptive_candidate_pool_min_size"]),
+        )
+    if job.get("adaptive_candidate_pool_full_sweep_interval") is not None:
+        config.adaptive_candidate_pool_full_sweep_interval = max(
+            0,
+            int(job["adaptive_candidate_pool_full_sweep_interval"]),
+        )
+    if job.get("adaptive_candidate_pool_calibration_cases") is not None:
+        config.adaptive_candidate_pool_calibration_cases = max(
+            0,
+            int(job["adaptive_candidate_pool_calibration_cases"]),
+        )
+    if job.get("adaptive_candidate_pool_candidate_burst_cases") is not None:
+        config.adaptive_candidate_pool_candidate_burst_cases = max(
+            0,
+            int(job["adaptive_candidate_pool_candidate_burst_cases"]),
+        )
+    if job.get("adaptive_candidate_pool_candidate_burst_novel_only") is not None:
+        config.adaptive_candidate_pool_candidate_burst_novel_only = bool(
+            job["adaptive_candidate_pool_candidate_burst_novel_only"]
+        )
+    if job.get("adaptive_candidate_pool_preserve_seed_stride") is not None:
+        config.adaptive_candidate_pool_preserve_seed_stride = bool(
+            job["adaptive_candidate_pool_preserve_seed_stride"]
+        )
+    if job.get("adaptive_candidate_pool_compensate_seed_horizon") is not None:
+        config.adaptive_candidate_pool_compensate_seed_horizon = bool(
+            job["adaptive_candidate_pool_compensate_seed_horizon"]
+        )
+        if config.adaptive_candidate_pool_compensate_seed_horizon:
+            config.adaptive_candidate_pool_preserve_seed_stride = True
+    if not config.adaptive_candidate_pool_preserve_seed_stride:
+        config.adaptive_candidate_pool_compensate_seed_horizon = False
     relation_order = parse_guidance_targets_func(str(job.get("metamorphic_relation_order", "") or ""))
     if relation_order:
         config.metamorphic_relation_order = relation_order
@@ -259,6 +331,42 @@ def populate_job_learning_metadata(
     job["backend_pair_learning_weight"] = float(config.backend_pair_learning_weight)
     job["backend_pair_priority_limit"] = int(config.backend_pair_priority_limit)
     job["enable_parallel_backend_execution"] = bool(config.enable_parallel_backend_execution)
+    job["enable_backend_sampling"] = bool(config.enable_backend_sampling)
+    job["backend_sample_size"] = int(config.backend_sample_size)
+    job["backend_full_sweep_interval"] = int(config.backend_full_sweep_interval)
+    job["backend_sampling_calibration_cases"] = int(config.backend_sampling_calibration_cases)
+    job["backend_sampling_candidate_burst_cases"] = int(
+        config.backend_sampling_candidate_burst_cases
+    )
+    job["backend_sampling_candidate_burst_novel_only"] = bool(
+        config.backend_sampling_candidate_burst_novel_only
+    )
+    job["backend_sample_confirmation_recheck_count"] = (
+        None
+        if config.backend_sample_confirmation_recheck_count is None
+        else int(config.backend_sample_confirmation_recheck_count)
+    )
+    job["backend_sample_confirm_candidates"] = bool(config.backend_sample_confirm_candidates)
+    job["enable_adaptive_candidate_pool"] = bool(config.enable_adaptive_candidate_pool)
+    job["adaptive_candidate_pool_min_size"] = int(config.adaptive_candidate_pool_min_size)
+    job["adaptive_candidate_pool_full_sweep_interval"] = int(
+        config.adaptive_candidate_pool_full_sweep_interval
+    )
+    job["adaptive_candidate_pool_calibration_cases"] = int(
+        config.adaptive_candidate_pool_calibration_cases
+    )
+    job["adaptive_candidate_pool_candidate_burst_cases"] = int(
+        config.adaptive_candidate_pool_candidate_burst_cases
+    )
+    job["adaptive_candidate_pool_candidate_burst_novel_only"] = bool(
+        config.adaptive_candidate_pool_candidate_burst_novel_only
+    )
+    job["adaptive_candidate_pool_preserve_seed_stride"] = bool(
+        config.adaptive_candidate_pool_preserve_seed_stride
+    )
+    job["adaptive_candidate_pool_compensate_seed_horizon"] = bool(
+        config.adaptive_candidate_pool_compensate_seed_horizon
+    )
     job["scheduler_enable_feedback"] = bool(config.enable_feedback)
     job["scheduler_enable_metamorphic_oracle"] = bool(config.enable_metamorphic_oracle)
     job["scheduler_effective_metamorphic_variant_limit"] = (
@@ -582,6 +690,21 @@ def resolve_experiment_parallelism(
     }
 
 
+def resolve_experiment_worker_batching(
+    args: argparse.Namespace,
+    planned_runs: list[dict[str, Any]],
+    *,
+    jobs: int,
+    schedule: str,
+) -> dict[str, Any]:
+    return resolve_worker_batching(
+        args,
+        planned_runs,
+        jobs=jobs,
+        schedule=schedule,
+    )
+
+
 def run_experiment_adaptive_parallel(
     executor_cls: type,
     worker_count: int,
@@ -592,7 +715,7 @@ def run_experiment_adaptive_parallel(
     complete_adaptive_round_func: Callable[[Any, list[dict[str, Any]], list[Any]], list[dict[str, Any]]],
 ) -> list[dict[str, Any]]:
     completed_runs: list[dict[str, Any]] = []
-    with executor_cls(max_workers=worker_count) as executor:
+    with create_safe_executor(executor_cls, max_workers=worker_count) as executor:
         while scheduler.has_budget():
             batches = scheduler.next_round(worker_count)
             if not batches:
@@ -819,13 +942,34 @@ def run_experiment_jobs_parallel(
     next_schedulable_job_index_func: Callable[[list[dict], float], int | None],
     job_estimated_cost_func: Callable[[dict], float],
     run_experiment_job_func: Callable[[dict], dict],
+    run_experiment_job_batch_func: Callable[[dict], dict] | None = None,
+    worker_batch_size: int = 0,
+    worker_max_rss_kib: int = 0,
+    worker_retry_limit: int = 0,
+    worker_batch_manifest: dict[str, Any] | None = None,
 ) -> list[dict]:
+    if int(worker_batch_size) > 0 and run_experiment_job_batch_func is not None:
+        return run_batched_parallel(
+            executor_cls,
+            worker_count,
+            planned_runs,
+            max_parallel_cost=max_parallel_cost,
+            worker_batch_size=int(worker_batch_size),
+            worker_max_rss_kib=int(worker_max_rss_kib),
+            worker_retry_limit=int(worker_retry_limit),
+            experiment_job_sort_key_func=experiment_job_sort_key_func,
+            job_estimated_cost_func=job_estimated_cost_func,
+            run_experiment_job_batch_func=run_experiment_job_batch_func,
+            worker_batch_manifest=(
+                worker_batch_manifest if worker_batch_manifest is not None else {}
+            ),
+        )
     completed_runs = []
     scheduled_runs = sorted(planned_runs, key=experiment_job_sort_key_func)
     queued_runs = list(scheduled_runs)
     running = {}
     running_cost = 0.0
-    with executor_cls(max_workers=worker_count) as executor:
+    with create_safe_executor(executor_cls, max_workers=worker_count) as executor:
         while queued_runs or running:
             while len(running) < worker_count and queued_runs:
                 available_cost = max_parallel_cost - running_cost
@@ -850,6 +994,17 @@ def run_experiment_jobs_parallel(
                 completed_runs.append(result)
                 print(result["message"], flush=True)
     return completed_runs
+
+
+def run_experiment_job_batch(
+    batch: dict[str, Any],
+    *,
+    run_experiment_job_func: Callable[[dict[str, Any]], dict[str, Any]],
+) -> dict[str, Any]:
+    return run_worker_batch(
+        batch,
+        run_experiment_job_func=run_experiment_job_func,
+    )
 
 
 def next_schedulable_job_index(
@@ -1093,16 +1248,32 @@ def run_experiment_job(
     }
 
 
+NATIVE_THREAD_LIMIT_ENV_NAMES = (
+    "DATADIFF_DUCKDB_THREADS",
+    "POLARS_MAX_THREADS",
+    "RAYON_NUM_THREADS",
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+    "ARROW_NUM_THREADS",
+)
+
+
+def capture_native_thread_limits() -> dict[str, str | None]:
+    return {name: os.environ.get(name) for name in NATIVE_THREAD_LIMIT_ENV_NAMES}
+
+
+def restore_native_thread_limits(previous: Mapping[str, str | None]) -> None:
+    for name in NATIVE_THREAD_LIMIT_ENV_NAMES:
+        value = previous.get(name)
+        if value is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = str(value)
+
+
 def apply_native_thread_limits(thread_limit: int) -> None:
     value = str(max(1, int(thread_limit)))
-    for name in [
-        "DATADIFF_DUCKDB_THREADS",
-        "POLARS_MAX_THREADS",
-        "RAYON_NUM_THREADS",
-        "OMP_NUM_THREADS",
-        "OPENBLAS_NUM_THREADS",
-        "MKL_NUM_THREADS",
-        "NUMEXPR_NUM_THREADS",
-        "ARROW_NUM_THREADS",
-    ]:
+    for name in NATIVE_THREAD_LIMIT_ENV_NAMES:
         os.environ[name] = value

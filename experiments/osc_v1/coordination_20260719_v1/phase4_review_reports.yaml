@@ -1,0 +1,348 @@
+schema_version: osc-phase4-review-reports-v1
+phase: 4
+source_aggregate_before_and_after: d183cd96fbfe57878410b8b5f1dc0032d05b7dc83507c7284b0fbe6f307d58d6
+freeze_manifest_sha256: 669816be0f913def018518ea85d2cc03b517453cc8e5ba764908dc3c3f42920f
+tracked_diff_stat_sha256: 341553eede7eb403553383d713f9a803207214388e7b1c0378d78b74445b45d9
+staged_paths: 0
+reviewer_writes: 0
+pilot_started: false
+campaign_started: false
+twenty_four_hour_run_authorized: false
+twenty_four_hour_run_started: false
+
+reports:
+  - task_id: OSC-4-A
+    agent: /root/osc_contract_review
+    role: contract
+    reviews_owner: search
+    mode: review
+    status: complete
+    summary: >-
+      Confirmed fresh 16/232/384/502 and regression 9/144/228 denominators and
+      no family runtime evaluator; found two blocker and three high Search
+      soundness findings. The first transmission failed after verification, so
+      the same reviewer resent a compact report without rerunning or editing.
+    inputs_read:
+      - experiments/osc_v1/coordination_20260719_v1/phase4_task_contracts.yaml@a52f62913d9068098d4b93680ddfe62428b633886a73df575c6f77ed02998814
+      - docs/codex_multi_agent_development_runbook.md@a17a62d7937f5ff4755d8925dc6dd64c25946516a80f82466ddeda1ee8d845f9
+      - experiments/final_bug_discovery_protocol_v3/TODO.md@1ad989d412651f5cc9ae3c3ac5d7d7207176557e0bcdcfb449788f016d607419
+      - docs/fine_grained_discovery_architecture.md@58d0e11a3cd3c2ea9b7096449f9beafae756b94cae3e41f04d4377b2b4d6dbf2
+      - docs/discovery_search_and_parallel_architecture.md@7af5fb51be2de1e0162ffb4a2db2bf40df050f35c0446bcae707e419936cf1b9
+      - docs/semantic_hypercontract_architecture.md@20a5e22513c64c60e77b115233b28fdca2591081f08d5f2945a15dda18442dae
+      - current Search source and scoped tests
+    allowed_write_paths: []
+    changed_files: []
+    forbidden_paths_modified: []
+    interfaces_consumed:
+      - osc-public-api-freeze-v1
+      - TargetFingerprint
+      - SemanticAtom
+      - SeedLineage
+      - LedgerEvent
+    change_requests: []
+    finding_ids: [OSC-4-A-F1, OSC-4-A-F2, OSC-4-A-F3, OSC-4-A-F4, OSC-4-A-F5]
+    tests:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_targets_*.py tests/osc/test_generation_*.py tests/osc/test_search_*.py tests/osc/test_scheduler_*.py
+        exit_code: 0
+        result: 34 passed in 44.35s
+      - command: independent counterexamples
+        exit_code: 0
+        result: forged ledger evidence, endpoint-swapped edge activation, fresh root provenance, scheduler group, and probe-contract collapses reproduced
+    requirements:
+      satisfied:
+        - denominators independently recompute
+        - runtime contains no family-specific evaluator
+        - reviewer made zero writes
+      unsatisfied:
+        - ledger evidence soundness
+        - edge endpoint/direction binding
+        - fresh provenance closure
+        - frozen scheduler groups
+        - explicit probe contract binding
+    risks:
+      - severity: blocker
+        detail: Current 232/384/502 activation and observation cannot be Phase 6 authority evidence.
+    deviations: []
+    recommended_next_step: Search owner fixes F1-F4; root coordinates F5.
+
+  - task_id: OSC-4-B
+    agent: /root/osc_search_review
+    role: search
+    reviews_owner: runtime
+    mode: review
+    status: complete
+    summary: >-
+      Found one blocker and three high Runtime findings. Current gate reports are
+      forgeable without raw artifacts; cache entries, failed dependencies, and
+      invariance reports do not preserve required authority bindings.
+    inputs_read:
+      - experiments/osc_v1/coordination_20260719_v1/phase4_task_contracts.yaml@a52f62913d9068098d4b93680ddfe62428b633886a73df575c6f77ed02998814
+      - docs/codex_multi_agent_development_runbook.md@a17a62d7937f5ff4755d8925dc6dd64c25946516a80f82466ddeda1ee8d845f9
+      - experiments/final_bug_discovery_protocol_v3/TODO.md@1ad989d412651f5cc9ae3c3ac5d7d7207176557e0bcdcfb449788f016d607419
+      - docs/discovery_search_and_parallel_architecture.md@7af5fb51be2de1e0162ffb4a2db2bf40df050f35c0446bcae707e419936cf1b9
+      - docs/semantic_hypercontract_architecture.md@20a5e22513c64c60e77b115233b28fdca2591081f08d5f2945a15dda18442dae
+      - current Runtime source, scripts, and scoped tests
+    allowed_write_paths: []
+    changed_files: []
+    forbidden_paths_modified: []
+    interfaces_consumed:
+      - osc-public-api-freeze-v1
+      - EvidenceTier and RuntimeCacheKey
+      - StructuredExecutionOutcome
+      - TaskIdentity and TaskSpec
+      - StagedComparisonRequest and StagedComparisonResult
+    change_requests: []
+    finding_ids: [OSC-4-B-F1, OSC-4-B-F2, OSC-4-B-F3, OSC-4-B-F4]
+    tests:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_comparison_*.py tests/osc/test_parallel_*.py tests/osc/test_runtime_*.py
+        exit_code: 0
+        result: 53 passed in 2.96s
+      - command: independent counterexamples
+        exit_code: 0
+        result: 41/41 forged gates, cross-tier cache, failed-dependency execution, and incomplete invariance reproduced
+    requirements:
+      satisfied:
+        - scoped helper/unit suite passes
+        - structured statuses remain distinct at worker boundary
+        - reviewer made zero writes
+      unsatisfied:
+        - gate evidence is not structurally or cryptographically bound
+        - cache value is not bound to key/tier
+        - failed prerequisites do not block descendants
+        - invariance omits assignment/verdict/ledger/certificate state
+    risks:
+      - severity: blocker
+        detail: Current GateReport.all_gates_pass cannot authorize Phase 6 or 24h.
+    deviations: []
+    recommended_next_step: Runtime owner fixes all four findings before Phase 6.
+
+  - task_id: OSC-4-C
+    agent: /root/osc_runtime_review
+    role: runtime
+    reviews_owner: contract
+    mode: review
+    status: complete
+    summary: >-
+      Found two blocker, three high, and one low Contract findings. An injected
+      evaluator can rewrite exact authority and applicability evidence can be
+      rebound across endpoint scope; top-k, containment, and status semantics
+      also have reproducible authority discrepancies.
+    inputs_read:
+      - experiments/osc_v1/coordination_20260719_v1/phase4_task_contracts.yaml@a52f62913d9068098d4b93680ddfe62428b633886a73df575c6f77ed02998814
+      - docs/codex_multi_agent_development_runbook.md@a17a62d7937f5ff4755d8925dc6dd64c25946516a80f82466ddeda1ee8d845f9
+      - experiments/final_bug_discovery_protocol_v3/TODO.md@1ad989d412651f5cc9ae3c3ac5d7d7207176557e0bcdcfb449788f016d607419
+      - docs/semantic_hypercontract_architecture.md@20a5e22513c64c60e77b115233b28fdca2591081f08d5f2945a15dda18442dae
+      - docs/architecture_credibility_and_alternatives.md@95bd949dba93d41d9b2594122fc49766164008c5de8df6aec91dc88f2afa0762
+      - current Contract source and scoped tests
+    allowed_write_paths: []
+    changed_files: []
+    forbidden_paths_modified: []
+    interfaces_consumed:
+      - osc-public-api-freeze-v1
+      - exact comparator as sole authority
+      - four-valued verdict and failure taxonomy
+      - HyperContract and three certificate bindings
+    change_requests: []
+    finding_ids: [OSC-4-C-F1, OSC-4-C-F2, OSC-4-C-F3, OSC-4-C-F4, OSC-4-C-F5, OSC-4-C-F6]
+    tests:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_contract_*.py
+        exit_code: 0
+        result: 102 passed in 0.59s
+      - command: independent counterexamples
+        exit_code: 0
+        result: registry injection, endpoint-scope rebinding, top-k multiplicity, containment contradiction, and status taxonomy reproduced
+    requirements:
+      satisfied:
+        - timeout/crash/adapter/missing remain structured INCONCLUSIVE
+        - no default fingerprint false-SATISFIED counterexample survived verification
+        - reviewer made zero writes
+      unsatisfied:
+        - exact authority registry binding
+        - endpoint scope/version applicability binding
+        - top-k multiplicity
+        - orthogonal containment compilation
+        - explicit status relation semantics
+        - raw Phase 6 parity/performance evidence
+    risks:
+      - severity: blocker
+        detail: Exact/audit verdict can be changed by an injected evaluator.
+      - severity: blocker
+        detail: Out-of-scope endpoint version can be rebound to a satisfied certificate.
+    deviations: []
+    recommended_next_step: Contract owner fixes F1-F5; F6 remains a measured low performance item.
+
+findings:
+  - finding_id: OSC-4-A-F1
+    severity: blocker
+    claim: CoverageLedger accepts forged activation and placeholder applicability/observation/outcome digests, permitting unsupported, failed, or unexecuted targets to receive observed credit.
+    evidence:
+      path: src/datadiff_osc/search/ledger.py
+      symbol_or_line: CoverageLedger.admit
+    reproduction: A valid-looking certificate with the wrong universe fingerprint and empty observed atoms advances one cell through all four levels when arbitrary matching digest strings are supplied.
+    violated_invariant: Observed credit must bind valid activation/applicability/observation certificates and OK execution outcomes; unsupported/infeasible work earns no credit.
+    minimal_fix_owner: search
+    required_test: Reject wrong universe/assignment/atom bindings, placeholder digests, and non-OK outcomes at executed/observed admission.
+    status: open
+  - finding_id: OSC-4-A-F2
+    severity: blocker
+    claim: Contrast endpoint atoms are merged without endpoint or direction identity, so swapping monotonic base/sibling produces the same valid activation certificate.
+    evidence:
+      path: src/datadiff_osc/generation/extraction.py
+      symbol_or_line: merge_extractions
+    reproduction: Swap both sides of a directional boundary edge; merged extraction and activation certificate digests remain identical and contain no endpoint IDs.
+    violated_invariant: All 384 edge endpoints must activate separately and bind endpoint, atoms, seed lineage, and relation direction.
+    minimal_fix_owner: search
+    required_test: Endpoint swap, cross-endpoint atom borrowing, and one-sided activation must fail, including directional edges.
+    status: open
+  - finding_id: OSC-4-A-F3
+    severity: high
+    claim: Fresh provenance validation omits definition.root_id before hashing it, allowing known-root/replay identity into the fresh registry.
+    evidence:
+      path: src/datadiff_osc/semantic_targets/declarations.py
+      symbol_or_line: _legacy_templates_for
+    reproduction: Change a coverage-expansion root_id to a known-root/replay marker; fresh compilation still succeeds.
+    violated_invariant: Fresh, regression, known-root, and issue-inspired provenance must be physically and semantically separated.
+    minimal_fix_owner: search
+    required_test: Reject root markers, cross-partition duplicate root identity, and regression provider/evidence in fresh declarations.
+    status: open
+  - finding_id: OSC-4-A-F4
+    severity: high
+    claim: Scheduler group identity and denominators are caller supplied; unknown groups default to maximum debt and can shrink or invent max-min groups.
+    evidence:
+      path: src/datadiff_osc/scheduler/policy.py
+      symbol_or_line: ScheduleCandidate, _validate_candidate, _group_debt
+    reproduction: An 18-cell family accepts coverage 1/1 and an unknown group outranks an otherwise equal valid candidate.
+    violated_invariant: Fixed denominators and max-min groups must be recomputed from the frozen universe and ledger.
+    minimal_fix_owner: search
+    required_test: Reject unknown groups and incorrect totals/membership; derive denominators only from the universe.
+    status: open
+  - finding_id: OSC-4-A-F5
+    severity: high
+    claim: Twenty-four fresh probe cells spanning five probe operations collapse to one generic bag-equality observation digest per family and have no explicit predicate/HyperContract binding.
+    evidence:
+      path: src/datadiff_osc/semantic_targets/compiler.py
+      symbol_or_line: _compile_cells observation_contract
+    reproduction: Polars has 12 cells/two probes/one contract and PyArrow 12 cells/three probes/one contract; Contract has no corresponding explicit probe plugin.
+    violated_invariant: A probe is admissible only through an explicit lossless predicate; every target must carry a faithful HyperContract.
+    minimal_fix_owner: root
+    required_test: Each probe resolves to a versioned contract fingerprint; missing plugins fail closed and distinct probe semantics cannot collapse.
+    status: open
+  - finding_id: OSC-4-B-F1
+    severity: blocker
+    claim: Gate calculation trusts arbitrary metrics and nonempty evidence strings without artifact existence/hash/schema/source binding or recomputation.
+    evidence:
+      path: src/datadiff_osc/runtime/gates.py
+      symbol_or_line: _calculate_one and GateReport.__post_init__
+    reproduction: Threshold-shaped metrics plus 41 nonexistent evidence strings produce all_gates_pass=true and 41/41 passing results.
+    violated_invariant: Raw gate evidence must fail closed and be independently recomputable; denominators and coverage cannot be fabricated.
+    minimal_fix_owner: runtime
+    required_test: Missing/wrong hash/schema/source, metric mismatch, and denominator shrinkage all fail; only verified typed manifests can pass.
+    status: open
+  - finding_id: OSC-4-B-F2
+    severity: high
+    claim: RuntimeResultCache does not bind cached values to key endpoint, contract, schema, or evidence tier.
+    evidence:
+      path: src/datadiff_osc/comparison/cache.py
+      symbol_or_line: RuntimeResultCache.get and put
+    reproduction: A FINDING key stores and returns a SCREENING non-exact StagedComparisonResult.
+    violated_invariant: Screening/finding/fresh/native evidence tiers cannot contaminate each other and every non-screening result is exact.
+    minimal_fix_owner: runtime
+    required_test: Reject cross-tier, cross-endpoint, cross-contract insertion and revalidate binding on lookup.
+    status: open
+  - finding_id: OSC-4-B-F3
+    severity: high
+    claim: The DAG executor schedules descendants after failed prerequisites because dependency outcomes are passed to workers but never gate scheduling.
+    evidence:
+      path: src/datadiff_osc/parallel/executor.py
+      symbol_or_line: DeterministicTaskExecutor._execute_layer
+    reproduction: A timeout parent is followed by an invoked OK child in a two-layer DAG.
+    violated_invariant: Failed preflight/activation cannot produce backend execution or observed credit.
+    minimal_fix_owner: runtime
+    required_test: Failed prerequisites block authority descendants and emit auditable INCONCLUSIVE records without executed/observed ledger credit.
+    status: open
+  - finding_id: OSC-4-B-F4
+    severity: high
+    claim: Parallel invariance ignores assignment/epoch and does not compare authority verdict, coverage bitmap, ledger, or certificate digests.
+    evidence:
+      path: src/datadiff_osc/parallel/invariance.py
+      symbol_or_line: InvarianceReport and audit_execution_runs
+    reproduction: Replacing only assignment_digest still yields passed=true; divergent unbound verdict/ledger state is invisible when payload digests match.
+    violated_invariant: Worker/retry/order/cache changes cannot alter assignments, selected task multiset, coverage, authority verdict, or evidence.
+    minimal_fix_owner: runtime
+    required_test: Assignment/epoch/verdict/ledger/certificate changes each make invariance fail.
+    status: open
+  - finding_id: OSC-4-C-F1
+    severity: blocker
+    claim: RelationRegistry.digest omits evaluator identity and authority APIs accept an injected registry, so an evaluator replacement can turn exact VIOLATED into SATISFIED under the same digest.
+    evidence:
+      path: src/datadiff_osc/contract_engine/relations.py
+      symbol_or_line: RelationRegistry.digest and evaluate
+    reproduction: Replace bag_equal evaluator with constant SATISFIED while preserving metadata; registry digests remain equal and audit/exact verdict changes.
+    violated_invariant: Exact authority and its relation registry/version must be stably contract-bound.
+    minimal_fix_owner: contract
+    required_test: Same-metadata/different-evaluator registry injection must be rejected by exact and audit paths.
+    status: open
+  - finding_id: OSC-4-C-F2
+    severity: blocker
+    claim: ApplicabilityCertificate can be rebound to endpoints outside frozen backend/version/mode/layout scope; monitor observations are not tied to endpoint digests.
+    evidence:
+      path: src/datadiff_osc/contract_engine/applicability.py
+      symbol_or_line: evaluate_applicability, applicability_binding_errors, applicability_contract_binding_errors
+    reproduction: Replace satisfied v1 endpoint digests with v2 endpoint digests under a v1-only requirement; binding errors remain empty and equal observations pass.
+    violated_invariant: Certificates bind contract, endpoint scope/version, applicability, observation, and provenance end to end.
+    minimal_fix_owner: contract
+    required_test: Backend/version/mode/layout rebinding each fails closed; request a minimal root interface change only if existing schema cannot bind observations.
+    status: open
+  - finding_id: OSC-4-C-F3
+    severity: high
+    claim: partial_order_topk reduces allowed, fixed, and actual rows to sets, losing duplicate multiplicity and accepting repeated fixed rows that displace legal choices.
+    evidence:
+      path: src/datadiff_osc/contract_engine/relations.py
+      symbol_or_line: validate_relation_obligation and _partial_order_topk
+    reproduction: For n=2, allowed 1/2/3, fixed 1, output (1,1) is accepted as SATISFIED.
+    violated_invariant: Tie freedom cannot relax cardinality, duplicate multiplicity, or admit values outside the legal boundary.
+    minimal_fix_owner: contract
+    required_test: Fixed-row duplication, multiplicity exhaustion, and legal tie choices use Counter-aware semantics.
+    status: open
+  - finding_id: OSC-4-C-F4
+    severity: high
+    claim: Compiling containment injects cardinality_equal through a broad default demand, turning valid strict containment into VIOLATED.
+    evidence:
+      path: src/datadiff_osc/contract_engine/demand.py
+      symbol_or_line: demand_for_relation
+    reproduction: Compiled containment of (1) within (1,2) has a satisfied containment component but fails only cardinality_equal.
+    violated_invariant: Orthogonal relation components cannot silently rewrite refinement/containment semantics.
+    minimal_fix_owner: contract
+    required_test: Frozen relation obligation-shape tests prevent contradictory equality obligations.
+    status: open
+  - finding_id: OSC-4-C-F5
+    severity: high
+    claim: Explicit status_ok cannot evaluate semantic_error because monitor preclassifies it as a value relation and returns INCONCLUSIVE instead of its defined VIOLATED.
+    evidence:
+      path: src/datadiff_osc/contract_engine/monitor.py
+      symbol_or_line: _ERROR_RELATIONS and non-OK precheck
+    reproduction: Registry status_ok returns VIOLATED for semantic_error, while monitor_exact returns INCONCLUSIVE on the same observations.
+    violated_invariant: Only explicit relations interpret semantic errors; timeout/crash/adapter/missing remain INCONCLUSIVE.
+    minimal_fix_owner: contract
+    required_test: Explicit status semantic-error matrix plus ordinary value relation and execution-failure negative cases.
+    status: open
+  - finding_id: OSC-4-C-F6
+    severity: low
+    claim: partial_order fingerprint uses raw row sequence, forcing exact escalation for valid tie permutations and weakening performance goals without changing verdict soundness.
+    evidence:
+      path: src/datadiff_osc/contract_engine/observers.py
+      symbol_or_line: observe_component partial_order
+    reproduction: Two tie-equivalent endpoint permutations pass exact but always split fingerprints and escalate S3.
+    violated_invariant: Fingerprint observers should canonicalize relation-permitted freedom and prove measured savings without altering verdicts.
+    minimal_fix_owner: contract
+    required_test: Tie-permutation fingerprint test plus Phase 6 raw performance benchmark.
+    status: open
+
+phase_4_exit:
+  blocker_count: 5
+  high_count: 9
+  medium_count: 0
+  low_count: 1
+  blocker_and_high_with_owner: 14
+  unsupported_style_findings_admitted: 0
+  status: pass

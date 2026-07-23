@@ -8,7 +8,11 @@ from typing import Any
 from datadiff.config import DEFAULT_KNOWN_SATURATED_BUG_FAMILIES
 from datadiff.classification_oracle import classify_finding
 from datadiff.dsl import Case
-from datadiff.final_readiness import CONFIRMED_LATEST_UPSTREAM_STATUSES, DEFAULT_LATEST_CONFIRMATIONS_FILE
+from datadiff.final_readiness import (
+    DEFAULT_LATEST_CONFIRMATIONS_FILE,
+    latest_confirmation_family,
+    owned_latest_confirmation_family,
+)
 from datadiff.normalizer import NormalizedResult
 from datadiff.oracle import classify_root_cause
 from datadiff.pathing import project_display_path as _project_display_path_impl
@@ -30,6 +34,7 @@ def build_issue_status(
     new_issue_dir: Path | None = None,
     old_issue_dir: Path | None = None,
     generated_issue_dir: Path | None = None,
+    scan_generated_workflow_evidence: bool = True,
 ) -> dict[str, Any]:
     latest_confirmation_files = latest_confirmation_files or _default_latest_confirmation_files()
     new_issue_dir = _resolve_project_path(new_issue_dir or DEFAULT_NEW_ISSUE_DIR)
@@ -38,14 +43,27 @@ def build_issue_status(
 
     confirmations = _load_latest_confirmations(latest_confirmation_files)
     confirmed_latest = [_confirmation_summary(item) for item in confirmations if _confirmation_family(item)]
+    registered_latest = [
+        _confirmation_summary(item, family=latest_confirmation_family(item))
+        for item in confirmations
+        if latest_confirmation_family(item)
+    ]
     confirmed_latest_families = sorted({item["family"] for item in confirmed_latest})
     manual_issue_drafts = _collect_markdown_issue_drafts(new_issue_dir)
     generated_issue_drafts = _collect_markdown_issue_drafts(generated_issue_dir)
     pending_issue_drafts = [item for item in manual_issue_drafts if _is_pending_issue_status(item.get("status", ""))]
     audit_manifest = _load_audit_manifest(generated_issue_dir)
-    fresh_evidence = _collect_fresh_candidate_evidence(generated_issue_dir)
-    discovery_run_manifests = _collect_discovery_run_manifests(generated_issue_dir)
-    discovery_campaign_manifests = _collect_discovery_campaign_manifests(generated_issue_dir)
+    if scan_generated_workflow_evidence:
+        fresh_evidence = _collect_fresh_candidate_evidence(generated_issue_dir)
+        discovery_run_manifests = _collect_discovery_run_manifests(generated_issue_dir)
+        discovery_campaign_manifests = _collect_discovery_campaign_manifests(generated_issue_dir)
+    else:
+        # Candidate processing only needs confirmations and issue documents for
+        # deduplication.  Historical discovery evidence can be many gigabytes,
+        # so do not repeatedly deserialize it on that latency-sensitive path.
+        fresh_evidence = []
+        discovery_run_manifests = []
+        discovery_campaign_manifests = []
     issue_bundle_manifest = _load_issue_bundle_manifest(generated_issue_dir)
     old_known = _collect_old_known_issues(old_issue_dir)
 
@@ -67,6 +85,7 @@ def build_issue_status(
             "new_issue_dir": _project_display_path(new_issue_dir),
             "old_issue_dir": _project_display_path(old_issue_dir),
             "generated_issue_dir": _project_display_path(generated_issue_dir),
+            "scan_generated_workflow_evidence": bool(scan_generated_workflow_evidence),
         },
         "summary": {
             "confirmed_latest_count": len(confirmed_latest_families),
@@ -123,6 +142,7 @@ def build_issue_status(
             "old_known_upstream_issue_count": len(old_known["upstream_issue_urls"]),
         },
         "latest_confirmations": confirmed_latest,
+        "registered_latest_confirmations": registered_latest,
         "manual_issue_drafts": manual_issue_drafts,
         "generated_issue_drafts": generated_issue_drafts,
         "audit_manifest": audit_manifest,
@@ -233,34 +253,24 @@ def _load_latest_confirmations(paths: list[Path]) -> list[dict[str, Any]]:
     return confirmations
 
 
-def _confirmation_summary(item: dict[str, Any]) -> dict[str, Any]:
+def _confirmation_summary(item: dict[str, Any], *, family: str | None = None) -> dict[str, Any]:
     return {
-        "family": _confirmation_family(item),
+        "family": family if family is not None else _confirmation_family(item),
         "issue_url": str(item.get("issue_url", "")),
         "issue_title": str(item.get("issue_title", "")),
         "upstream_status": str(item.get("upstream_status", "")),
         "state": str(item.get("state", "")),
         "labels": list(item.get("labels", []) or []),
         "assignee": str(item.get("assignee", "")),
+        "discovery_credit": str(item.get("discovery_credit", "")),
+        "submitted_by": str(item.get("submitted_by", "")),
         "checked_at": str(item.get("checked_at", "")),
         "source_file": str(item.get("_confirmation_file", "")),
     }
 
 
 def _confirmation_family(item: dict[str, Any]) -> str:
-    if str(item.get("upstream_status", "")).strip() not in CONFIRMED_LATEST_UPSTREAM_STATUSES:
-        return ""
-    if not str(item.get("issue_url", "")).strip():
-        return ""
-    family = str(item.get("family", "")).strip()
-    if family:
-        return family
-    root = str(item.get("root_cause", "")).strip()
-    suspicious = item.get("suspicious_backends", [])
-    if not root or not isinstance(suspicious, list):
-        return ""
-    backends = ",".join(sorted(str(backend).strip() for backend in suspicious if str(backend).strip()))
-    return f"{root}@{backends}" if backends else ""
+    return owned_latest_confirmation_family(item)
 
 
 def _collect_markdown_issue_drafts(directory: Path) -> list[dict[str, str]]:
@@ -580,3 +590,7 @@ def _is_pending_issue_status(status: str) -> bool:
 def _extract_upstream_issue_urls(text: str) -> list[str]:
     return re.findall(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/\d+", text)
 
+
+build_bug_status = build_issue_status
+write_bug_status_outputs = write_issue_status_outputs
+render_bug_status_markdown = render_issue_status_markdown

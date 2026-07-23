@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import struct
 import time
 from typing import Any
 
@@ -8,26 +9,22 @@ from datadiff.backends.base import Backend, BackendResult, PreparedTable, prepar
 from datadiff.backends.probe_semantics import EXTENDED_FALSE_PROBE_KINDS
 from datadiff.backends.sql_lowering import (
     SqlDialect,
+    cast_logical_expression,
     render_aggregate_sql,
     render_case_when_expr,
     render_coalesce_expr,
+    render_filter_condition,
     render_fill_null_expr,
-    render_groupby_sql,
+    render_join_condition,
+    render_join_right_projection,
     render_mutate_expr,
+    render_semi_anti_join_condition,
+    typed_column_sql,
 )
 from datadiff.backends.sql_runtime import build_subquery_runtime
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
-from datadiff.filtering import sql_filter_condition
 from datadiff.join_keys import join_key_pairs
 from datadiff.operation_semantics import (
-    aggregate_column,
-    aggregate_alias,
-    aggregate_func,
-    aggregate_specs,
-    case_else_value,
-    case_then_value,
-    expr_kind,
-    expr_target_type,
     groupby_keys,
     is_default_false_probe_kind,
     op_ascending,
@@ -37,8 +34,11 @@ from datadiff.operation_semantics import (
     op_n,
     op_nulls,
     op_output_alias,
+    op_source,
     op_table,
 )
+from datadiff.program_state import ProgramState, state_after_operation
+from datadiff.running import running_sum_partition_columns, running_sum_sort_keys
 
 
 def _quote(name: str) -> str:
@@ -49,7 +49,6 @@ def _quote(name: str) -> str:
 
 
 def _lit(value: Any) -> str:
-    import math
     if value is None:
         return "NULL"
     if isinstance(value, (list, tuple)):
@@ -59,30 +58,34 @@ def _lit(value: Any) -> str:
     if isinstance(value, int):
         return str(value)
     if isinstance(value, float):
-        if math.isnan(value):
-            return "nan"
-        if math.isinf(value):
-            return "inf" if value > 0 else "-inf"
-        return repr(value)
+        raw_hex = struct.pack("<d", value).hex()
+        return f"reinterpretAsFloat64(unhex('{raw_hex}'))"
     return "'" + str(value).replace("\\", "\\\\").replace("'", "\\'") + "'"
 
 
 def _ch_type(kind: str) -> str:
-    # All columns wrapped in Nullable since our DSL allows NULLs everywhere
-    if kind == "int":
-        return "Nullable(Int64)"
-    if kind == "float":
-        return "Nullable(Float64)"
-    if kind == "bool":
-        return "Nullable(Bool)"
-    return "Nullable(String)"
+    return CHDB_DIALECT.cast_type(kind)
 
 
-def _order_clause(sort_keys: list[SortKey]) -> str:
+def _order_clause(
+    sort_keys: list[SortKey],
+    column_types: dict[str, str] | None = None,
+) -> str:
     # ClickHouse supports NULLS FIRST/LAST natively since 18.x
     return ", ".join(
-        f"{_quote(key.column)} {'ASC' if key.ascending else 'DESC'} NULLS {key.nulls.upper()}"
+        f"{_typed_column_sql('', key.column, (column_types or {}).get(key.column))} "
+        f"{'ASC' if key.ascending else 'DESC'} NULLS {key.nulls.upper()}"
         for key in sort_keys
+    )
+
+
+def _typed_column_sql(alias: str, column: str, logical_type: str | None) -> str:
+    prefix = f"{alias}." if alias else ""
+    source = f"{prefix}{_quote(column)}"
+    return (
+        typed_column_sql(alias, column, logical_type, CHDB_DIALECT, _quote)
+        if logical_type
+        else source
     )
 
 
@@ -108,11 +111,68 @@ def _agg_expr(column: str, func: str) -> str:
     return f"{func}({quoted})"
 
 
+def _running_sum_projection(
+    columns: list[str],
+    op: dict[str, Any],
+    column_types: dict[str, str],
+) -> tuple[str, list[str]]:
+    output_column = op_column(op)
+    kept_columns = [column for column in columns if column != output_column]
+    select_parts = [f"q.{_quote(column)}" for column in kept_columns]
+    partition_columns = running_sum_partition_columns(op)
+    partition_sql = ""
+    if partition_columns:
+        partition_sql = "PARTITION BY " + ", ".join(
+            _typed_column_sql("q", column, column_types.get(column))
+            for column in partition_columns
+        ) + " "
+    source_sql = cast_logical_expression(
+        f"q.{_quote(op_source(op))}",
+        "float",
+        CHDB_DIALECT,
+    )
+    order_sql = _order_clause(running_sum_sort_keys(op), column_types)
+    select_parts.append(
+        f"sum({source_sql}) OVER ("
+        f"{partition_sql}ORDER BY {order_sql} "
+        "ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"
+        f") AS {_quote(output_column)}"
+    )
+    return ", ".join(select_parts), [*kept_columns, output_column]
+
+
+def _semantic_cast_sql(
+    source_sql: str,
+    source_type: str | None,
+    target_type: str,
+) -> str:
+    if source_type == "float" and target_type == "str":
+        float_sql = cast_logical_expression(source_sql, "float", CHDB_DIALECT)
+        text_sql = f"toString({float_sql})"
+        python_style_text = (
+            f"CASE WHEN {source_sql} IS NULL THEN NULL "
+            f"WHEN isFinite({float_sql}) "
+            f"AND position({text_sql}, '.') = 0 "
+            f"AND position({text_sql}, 'e') = 0 "
+            f"AND position({text_sql}, 'E') = 0 "
+            f"THEN concat({text_sql}, '.0') ELSE {text_sql} END"
+        )
+        return cast_logical_expression(python_style_text, "str", CHDB_DIALECT)
+    return cast_logical_expression(source_sql, target_type, CHDB_DIALECT)
+
+
 CHDB_DIALECT = SqlDialect(
-    float_cast_type="Float64",
-    int_cast_type="Int64",
-    str_cast_type="String",
+    logical_type_sql={
+        "bool": "Nullable(Bool)",
+        "float": "Nullable(Float64)",
+        "int": "Nullable(Int64)",
+        "str": "Nullable(String)",
+    },
     string_slice_fn="substring",
+    string_length_sql=lambda source: f"lengthUTF8({source})",
+    string_contains_sql=lambda source, needle: (
+        f"CASE WHEN {source} IS NULL THEN NULL ELSE position({source}, {needle}) > 0 END"
+    ),
     string_startswith_fn=lambda source, needle: (
         f"CASE WHEN {source} IS NULL THEN NULL ELSE startsWith({source}, {needle}) END"
     ),
@@ -129,51 +189,8 @@ CHDB_DIALECT = SqlDialect(
     ),
     division_sql=lambda source, value: f"toFloat64({source}) / ({value})",
     reverse_division_sql=lambda numerator, source: f"toFloat64({numerator}) / ({source})",
+    semantic_cast_sql=_semantic_cast_sql,
 )
-
-
-def _join_condition(op: dict[str, Any]) -> str:
-    left_keys, right_keys = join_key_pairs(op)
-    return " AND ".join(
-        f"q.{_quote(left)} = r.{_quote(right)}" for left, right in zip(left_keys, right_keys)
-    )
-
-
-def _semi_anti_join_condition(op: dict[str, Any], kind: str) -> str:
-    left_keys, right_keys = join_key_pairs(op)
-    predicates = [
-        *(f"r.{_quote(right)} IS NOT NULL" for right in right_keys),
-        *(
-            f"q.{_quote(left)} = r.{_quote(right)}"
-            for left, right in zip(left_keys, right_keys)
-        ),
-    ]
-    exists_sql = (
-        f"EXISTS (SELECT 1 FROM {_quote(op_table(op))} r WHERE {' AND '.join(predicates)})"
-    )
-    return exists_sql if kind == "semi_join" else f"NOT {exists_sql}"
-
-
-def _agg_result_type(column_types: dict[str, str], agg: Any) -> str:
-    func = aggregate_func(agg)
-    if func in {"count", "nunique"}:
-        return "int"
-    if func in {"any", "all"}:
-        return "bool"
-    if func == "mean":
-        return "float"
-    return column_types.get(aggregate_column(agg), "float")
-
-
-def _case_when_chdb_type(then_value: Any, else_value: Any) -> str:
-    values = [then_value, else_value]
-    if all(isinstance(value, bool) for value in values):
-        return "bool"
-    if all(isinstance(value, int) and not isinstance(value, bool) for value in values):
-        return "int"
-    if all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in values):
-        return "float"
-    return "str"
 
 
 def _open_session() -> Any:
@@ -221,7 +238,10 @@ def _materialize_dataframe(pd: Any, session: Any, query_sql: str, column_types: 
     """Run query, return a pandas DataFrame with dtype=object to preserve int64 ranges."""
     columns = _describe_columns(session, query_sql)
     # Use JSONCompactColumns for column-major fetch (more compact than row-major)
-    result = session.query(query_sql, "JSONCompactColumns")
+    result = session.query(
+        f"{query_sql} SETTINGS output_format_json_quote_64bit_floats = 1",
+        "JSONCompactColumns",
+    )
     text = str(result)
     if not text.strip():
         return pd.DataFrame({col: [] for col in columns}, dtype=object)
@@ -277,7 +297,7 @@ class ChDBBackend(Backend):
 
     name = "chdb"
 
-    def run(
+    def execute_lowered(
         self,
         tables: list[TableData | PreparedTable],
         program: Program,
@@ -290,7 +310,7 @@ class ChDBBackend(Backend):
 
             prepared_tables = [prepare_table(table) for table in tables]
             table_by_name = {table.name: table for table in prepared_tables}
-            column_types = {c.name: c.type for table in prepared_tables for c in table.columns}
+            semantic_state = ProgramState.from_table(prepared_tables[0])
             current_cols = [c.name for c in prepared_tables[0].columns]
             session = _open_session()
 
@@ -317,7 +337,7 @@ class ChDBBackend(Backend):
                 query,
                 current_cols,
                 quote=_quote,
-                order_clause=_order_clause,
+                order_clause=lambda keys: _order_clause(keys, semantic_state.column_types),
             )
 
             def _reset_probe_query(alias: str, query_sql: str) -> None:
@@ -343,28 +363,29 @@ class ChDBBackend(Backend):
 
             for op in program.operations:
                 kind = op_kind(op)
+                next_semantic_state = state_after_operation(
+                    semantic_state,
+                    op,
+                    tables=table_by_name,
+                )
                 if kind == "join":
                     drop_hidden_order_cols()
                     right = table_by_name[op_table(op)]
                     _, right_keys = join_key_pairs(op)
-                    right_key_set = set(right_keys)
-                    right_cols = [
-                        f"r.{_quote(c.name)} AS {_quote(c.name)}"
-                        for c in right.columns
-                        if c.name not in right_key_set
-                    ]
-                    select_right = ", " + ", ".join(right_cols) if right_cols else ""
+                    right_types = {column.name: column.type for column in right.columns}
+                    select_right, projected_right = render_join_right_projection(
+                        right.column_names,
+                        right_keys,
+                        semantic_state.columns,
+                        _quote,
+                    )
                     join_kind = "LEFT JOIN" if op["how"] == "left" else "INNER JOIN"
                     query = runtime.assign_source(
                         f"SELECT q.*{select_right} FROM ({query}) q {join_kind} "
-                        f"{_quote(right.name)} r ON {_join_condition(op)}"
+                        f"{_quote(right.name)} r ON "
+                        f"{render_join_condition(op, CHDB_DIALECT, _quote, semantic_state.column_types, right_types)}"
                     )
-                    runtime.state.current_cols.extend(
-                        c.name
-                        for c in right.columns
-                        if c.name not in right_key_set
-                        and c.name not in runtime.state.current_cols
-                    )
+                    runtime.state.current_cols.extend(projected_right)
                     runtime.state.visible_cols = list(runtime.state.current_cols)
                     runtime.state.pending_order = None
                 elif kind == "union_all":
@@ -379,7 +400,16 @@ class ChDBBackend(Backend):
                     runtime.state.current_cols = list(runtime.state.visible_cols)
                     runtime.state.pending_order = None
                 elif kind in {"semi_join", "anti_join"}:
-                    condition = _semi_anti_join_condition(op, kind)
+                    right = table_by_name[op_table(op)]
+                    right_types = {column.name: column.type for column in right.columns}
+                    condition = render_semi_anti_join_condition(
+                        op,
+                        kind,
+                        CHDB_DIALECT,
+                        _quote,
+                        semantic_state.column_types,
+                        right_types,
+                    )
                     query = runtime.assign_source(
                         f"SELECT * FROM ({query}) q WHERE {condition}"
                     )
@@ -391,12 +421,33 @@ class ChDBBackend(Backend):
                         f"SELECT * FROM ({query}) q WHERE {condition}"
                     )
                 elif kind == "filter":
-                    condition = sql_filter_condition(
-                        _quote(op["column"]), _lit(op["value"]), op["cmp"]
+                    condition = render_filter_condition(
+                        f"q.{_quote(op_column(op))}",
+                        _lit(op.get("value")),
+                        op.get("cmp"),
+                        CHDB_DIALECT,
                     )
                     query = runtime.assign_source(
                         f"SELECT * FROM ({query}) q WHERE {condition}"
                     )
+                elif kind == "running_sum":
+                    drop_hidden_order_cols()
+                    order_keys = running_sum_sort_keys(op)
+                    projection, runtime.state.current_cols = _running_sum_projection(
+                        runtime.state.current_cols,
+                        op,
+                        semantic_state.column_types,
+                    )
+                    query = runtime.assign_source(
+                        f"SELECT {projection} FROM ({query}) q"
+                    )
+                    output_column = op_column(op)
+                    runtime.state.visible_cols = [
+                        column
+                        for column in runtime.state.visible_cols
+                        if column != output_column
+                    ] + [output_column]
+                    runtime.state.pending_order = order_keys
                 elif kind == "select":
                     cols = op_columns(op)
                     projection = select_with_pending_order(cols)
@@ -409,13 +460,11 @@ class ChDBBackend(Backend):
                         f"SELECT DISTINCT {projection} FROM ({query}) q"
                     )
                     runtime.state.reset_projection(cols)
-                    column_types = {
-                        column: column_types[column]
-                        for column in cols
-                        if column in column_types
-                    }
                 elif kind == "fill_null":
                     column, expr_sql = render_fill_null_expr(op, _quote, _lit)
+                    output_type = next_semantic_state.column_types.get(column)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, CHDB_DIALECT)
                     if runtime.state.pending_order_mentions(column):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(column, expr_sql, _quote)
@@ -426,28 +475,27 @@ class ChDBBackend(Backend):
                         drop_hidden_order_cols()
                 elif kind == "coalesce":
                     alias, expr_sql = render_coalesce_expr(op, _quote, _lit)
+                    output_type = next_semantic_state.column_types.get(alias)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, CHDB_DIALECT)
                     if runtime.state.pending_order_mentions(alias):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(alias, expr_sql, _quote)
                     query = runtime.assign_source(f"SELECT {projection} FROM ({query}) q")
                     runtime.state.replace_visible_column(alias)
-                    sources = op_columns(op)
-                    column_types[alias] = (
-                        column_types.get(str(sources[0]), "str") if sources else "str"
-                    )
                     if runtime.state.pending_order_mentions(alias):
                         runtime.state.clear_pending_order()
                         drop_hidden_order_cols()
                 elif kind == "case_when":
-                    alias, expr_sql = render_case_when_expr(op, _quote, _lit)
+                    alias, expr_sql = render_case_when_expr(op, CHDB_DIALECT, _quote, _lit)
+                    output_type = next_semantic_state.column_types.get(alias)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, CHDB_DIALECT)
                     if runtime.state.pending_order_mentions(alias):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(alias, expr_sql, _quote)
                     query = runtime.assign_source(f"SELECT {projection} FROM ({query}) q")
                     runtime.state.replace_visible_column(alias)
-                    column_types[alias] = _case_when_chdb_type(
-                        case_then_value(op), case_else_value(op)
-                    )
                     if runtime.state.pending_order_mentions(alias):
                         runtime.state.clear_pending_order()
                         drop_hidden_order_cols()
@@ -458,7 +506,7 @@ class ChDBBackend(Backend):
                     if runtime.state.pending_order is not None:
                         query = runtime.assign_source(
                             f"SELECT * FROM ({query}) q "
-                            f"ORDER BY {_order_clause(runtime.state.pending_order)} LIMIT {op_n(op)}"
+                            f"ORDER BY {_order_clause(runtime.state.pending_order, semantic_state.column_types)} LIMIT {op_n(op)}"
                         )
                     else:
                         query = runtime.assign_source(
@@ -468,7 +516,7 @@ class ChDBBackend(Backend):
                     if runtime.state.pending_order is not None:
                         query = runtime.assign_source(
                             f"SELECT * FROM ({query}) q "
-                            f"ORDER BY {_order_clause(runtime.state.pending_order)} "
+                            f"ORDER BY {_order_clause(runtime.state.pending_order, semantic_state.column_types)} "
                             f"LIMIT 18446744073709551615 OFFSET {op_n(op)}"
                         )
                     else:
@@ -477,45 +525,43 @@ class ChDBBackend(Backend):
                             f"LIMIT 18446744073709551615 OFFSET {op_n(op)}"
                         )
                 elif kind == "mutate":
-                    out_column, expr_sql = render_mutate_expr(op, CHDB_DIALECT, _quote, _lit)
+                    out_column, expr_sql = render_mutate_expr(
+                        op,
+                        CHDB_DIALECT,
+                        _quote,
+                        _lit,
+                        semantic_state.column_types,
+                    )
+                    output_type = next_semantic_state.column_types.get(out_column)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, CHDB_DIALECT)
                     if runtime.state.pending_order_mentions(out_column):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(out_column, expr_sql, _quote)
                     query = runtime.assign_source(f"SELECT {projection} FROM ({query}) q")
                     runtime.state.replace_visible_column(out_column)
-                    if expr_kind(op) in {
-                        "bool_not",
-                        "string_contains",
-                        "string_starts_with",
-                        "string_ends_with",
-                    }:
-                        column_types[out_column] = "bool"
-                    elif expr_kind(op) == "cast":
-                        column_types[out_column] = expr_target_type(op) or column_types.get(
-                            out_column, "str"
-                        )
-                    elif expr_kind(op) == "date_part":
-                        column_types[out_column] = "int"
                     if runtime.state.pending_order_mentions(out_column):
                         runtime.state.clear_pending_order()
                         drop_hidden_order_cols()
                 elif kind == "groupby":
                     drop_hidden_order_cols()
                     keys = groupby_keys(op)
-                    select_sql, aliases = render_groupby_sql(op, _agg_expr, _quote, keys)
+                    agg_sql, aliases = render_aggregate_sql(op, _agg_expr, _quote)
+                    key_sql = [
+                        f"{_typed_column_sql('q', key, semantic_state.column_types.get(key))} "
+                        f"AS {_quote(key)}"
+                        for key in keys
+                    ]
+                    select_sql = ", ".join([*key_sql, *agg_sql])
                     query = runtime.assign_source(
                         f"SELECT {select_sql} FROM ({query}) q "
                         f"GROUP BY {', '.join(_quote(key) for key in keys)}"
                     )
-                    for agg in aggregate_specs(op):
-                        column_types[aggregate_alias(agg)] = _agg_result_type(column_types, agg)
                     runtime.state.reset_projection(keys + aliases)
                 elif kind == "aggregate":
                     drop_hidden_order_cols()
                     agg_sql, aliases = render_aggregate_sql(op, _agg_expr, _quote)
                     query = runtime.assign_source(f"SELECT {', '.join(agg_sql)} FROM ({query}) q")
-                    for agg in aggregate_specs(op):
-                        column_types[aggregate_alias(agg)] = _agg_result_type(column_types, agg)
                     runtime.state.reset_projection(aliases)
                 elif (
                     kind in EXTENDED_FALSE_PROBE_KINDS
@@ -525,7 +571,6 @@ class ChDBBackend(Backend):
                     # implement deterministically return 0 so the case completes.
                     alias = op_output_alias(op)
                     _reset_probe_query(alias, f"SELECT 0 AS {_quote(alias)}")
-                    column_types[alias] = "bool"
                 else:
                     return BackendResult(
                         self.name,
@@ -534,9 +579,10 @@ class ChDBBackend(Backend):
                         error=f"chdb backend does not yet support op kind={kind}",
                         duration_ms=(time.perf_counter() - start) * 1000,
                     )
+                semantic_state = next_semantic_state
 
             query = runtime.assign_source(runtime.finalize_source())
-            out = _materialize_dataframe(pd, session, query, column_types)
+            out = _materialize_dataframe(pd, session, query, semantic_state.column_types)
             return BackendResult(
                 self.name,
                 "ok",

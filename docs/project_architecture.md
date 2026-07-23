@@ -14,25 +14,51 @@ DataDiffFuzz 的目标不是只测试某一个数据库，也不是只复现已�
 
 ## 分层架构
 
+细粒度 discovery target 的下一阶段重构以
+[`fine_grained_discovery_architecture.md`](fine_grained_discovery_architecture.md)
+为规范。该设计把 family 降为声明/报表视图，以通用 semantic atoms、target
+compiler、matcher、coverage ledger 和 debt scheduler 取代逐 family 运行时判别；
+并把 16 个 fresh coverage-expansion family（232 cells）与 9 个 confirmed-root
+regression family（144 cells）物理分区。
+配套的 [`discovery_search_and_parallel_architecture.md`](discovery_search_and_parallel_architecture.md)
+进一步冻结独立 seed 子流、无放回 epoch、contrast graph heat、多目标公平调度、
+typed backward synthesis、target-preserving mutation、staged comparison 和确定性并行 DAG。
+语义 oracle 的 v2 规范见
+[`semantic_hypercontract_architecture.md`](semantic_hypercontract_architecture.md)：它以
+前向属性推导和后向 observability 分析取代全局最宽松 policy join，并把 differential、
+metamorphic、witness、reference、mode/layout/version comparison 编译为同一有限
+HyperContract。所有复杂模块在实现前及小规模验证后都必须通过
+[`architecture_credibility_and_alternatives.md`](architecture_credibility_and_alternatives.md)
+的替代方案审查和淘汰门。论文主张、基线、消融、统计和 artifact 规范由
+[`competitive_paper_experiment_blueprint.md`](competitive_paper_experiment_blueprint.md)
+统一约束。
+使用 Codex 多 Agent 实现这些模块时，统一遵循
+[`codex_multi_agent_development_runbook.md`](codex_multi_agent_development_runbook.md)；
+该手册冻结主 Agent/子 Agent 的目录所有权、阶段屏障、交付格式和 24h 授权边界。
+
 ```text
-L0 Target Registry
-  pandas / Polars / PyArrow / DuckDB / SQLite / DataFusion
-        |
-L1 Case Generation
-  random workflow / guided profile / deep organic profile / issue focus profile
-        |
-L2 Execution Adapter
-  DataFrame API / Arrow Table compute / SQL query / query-engine interface
-        |
-L3 Oracle
-  differential oracle / metamorphic oracle / deterministic audit probe
-        |
-L4 Triage And Classification
-  fresh candidate / issue-inspired candidate / known saturated / false positive
-        |
-L5 Evidence Artifact
-  discovery-run manifest / fresh-candidates JSON / generated issue drafts
+semantic_core -> generation -> execution_core -> evidence
+                         |              |
+                      adapters      experiment
+
+research_controls (legacy/P2/P4/P5) 与 rlcmf shadow 不进入 live 默认路径
 ```
+
+`p8_candidate_v1` 是唯一 live default。非默认单因素候选 `p8_semantic_witness_v1`
+只改变 generation mode，并在现有 goal-first trace 上增加确定性 semantic-activation
+witness/enforcement。正式 5x500 fresh-only backend 筛选确认其 activation 提升，但没有产生
+fresh candidate family，且预注册 CPU non-inferiority gate 未通过，因此它只保留为
+evidence-quality arm，不进入 live default。方法 manifest 由 semantic、generation、execution、
+evidence、resource 五个结构化 policy 组成。CLI 不接受临时 method override；历史消融必须通过
+已注册的 `--research-control-arm` 运行，因此不会把任意布尔组合伪装成正式 arm。
+
+执行层只有一个 cache key 边界，并把 evidence tier 纳入 complete key。screening、finding、
+fresh confirmation、native reproduction 不会错误共享结果。screening 物理计划采用 compact
+fingerprint；完整计划从 finding 的 fresh recheck 提取为 sidecar，不新增只为日志服务的执行。
+
+finding、candidate、candidate family、real root 和 independently confirmed root 使用统一
+evidence envelope，但保持独立计数。成功 recheck 只证明 candidate 可复现，不会自动创建 real
+root，更不会自动标记 upstream confirmation。
 
 ## 各层职责
 
@@ -100,7 +126,7 @@ L5 Evidence Artifact 负责把一次运行变成可复现证据。`datadiff disc
 为后续继续演进，当前代码最好固定成下面这组边界：
 
 1. 表示边界：
-   `dsl.Program` 持有 typed IR-compatible operations，但继续兼容旧 dict 形状。
+   `dsl.Program` 是 lowering 目标；核心语义表示由 CCS-IR relational SSA 持有。
 2. 语义边界：
    `operation_semantics.py` 和 `case_features.py` 是共享语义单一来源。
 3. 模式边界：

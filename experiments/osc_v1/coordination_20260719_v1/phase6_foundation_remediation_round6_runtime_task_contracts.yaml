@@ -1,0 +1,176 @@
+schema_version: osc-remediation-task-contract-v1
+phase: 6
+round: private_foundation_remediation_r6_runtime_exact_evidence_binding
+status: contract_created_implementation_not_started
+entry_authority:
+  completed_search_remediation_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_search_reports.yaml
+    sha256: ddb0a23cfa2488068b16cf93cefc69993e83296239cfda1049fea5fe853ea003
+  r5_remediation_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round5_task_contracts.yaml
+    sha256: 706ddd532c0bd756d93340d7c2dc87f662b8330fd88725a9ce22b81a344eb7cf
+  r5_remediation_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round5_reports.yaml
+    sha256: f4f67ed4c3359c7d7f6013f91dbb9594da65d2579fdf3bf5c9876da9ed2ca3fa
+  r5_review_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_contracts.yaml
+    sha256: c1e70ee5663173294545b4c8966d138debb718238b6da2a9c68001ad5680f5fa
+  r5_review_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_reports.yaml
+    sha256: 1bc36fd45b4349dff67438d79afae1c3f753ca3eb08c3dd3c0ce20933c104fbb
+  r6_review_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_contracts.yaml
+    sha256: 8ecbe889ba06cedbe4d23eab95f9b0702a051cd70948eee9bf7084845aa84cdd
+  r6_review_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_reports.yaml
+    sha256: 664d151e31f46a5352cd0d649703f8e4d26e0b3dca56b7055e4798d806f1a1a1
+  coordination_ledger:
+    path: experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    sha256: 8beff9c98e8da93e8eaccb5209d99100e371338883128553179f46f9c432dc6c
+sha_rebind_after_serial_search_remediation:
+  reason: >-
+    The Search remediation completed under its separately created contract before
+    Runtime implementation. These two paths are now frozen Runtime inputs at the
+    exact completed Search output SHA; Runtime product scope is unchanged.
+  prior_runtime_contract_sha256: 8eb9bb9cce94663a74f0155fe676dacc8212bf8503205e1df9960116557d0803
+workspace_before_contract:
+  head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  tracked_modified_paths: 141
+  staged_paths: 0
+  status_short_entries: 24235
+  status_all_untracked_entries: 24094
+  status_all_sha256: 4feb017dfce2e37176b811f33858ee03f132c9d95d2b282b82d48f511f7066ba
+coordination:
+  owner: root
+  implementation_child_agents: 0
+  remediation_is_serial: true
+  review_after_remediation: exactly_three_direct_read_only_reviewers_in_r7
+  grandchildren_allowed: false
+  review_language: "负向复核、独立反例验证、异常输入验证"
+authority_write_paths:
+  - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_runtime_task_contracts.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_runtime_reports.yaml
+  - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+task:
+  task_id: OSC-6-FOUNDATION-REMEDIATE-RUNTIME-R6
+  role: root
+  mode: bounded_private_remediation_serial
+  finding:
+    id: OSC-6-FOUNDATION-RUNTIME-R6-M1
+    severity: medium
+  objective: >-
+    Validate exact source + campaign3 + pipeline3 typed execution and EvidenceEnvelope
+    result/task/spec/result-ID/seed/outcome binding before every source or recheck verdict,
+    reproduced decision, and 3/3 plus 3/3 threshold decision.
+  allowed_product_write_paths:
+    - src/datadiff_osc/runtime/_receipt_producers.py
+    - tests/osc/test_runtime_receipt_producers.py
+  allowed_repository_write_paths:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_runtime_task_contracts.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_runtime_reports.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    - src/datadiff_osc/runtime/_receipt_producers.py
+    - tests/osc/test_runtime_receipt_producers.py
+  before_sha256:
+    src/datadiff_osc/runtime/_receipt_producers.py: 922afa81b750905e0aaa6fc096d4b1176be2112269f119da81cc5aa72d09230d
+    tests/osc/test_runtime_receipt_producers.py: 41c15578eebb43f90a244f94562a8473301503a646f4eb5754853a99991c56c6
+  frozen_sha256:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  forbidden_write_paths:
+    - src/datadiff_osc/__init__.py
+    - src/datadiff_osc/public_api_freeze.json
+    - src/datadiff_osc/runtime/_producer_provenance.py
+    - src/datadiff_osc/search/**
+    - tests/osc/test_search_*.py
+    - src/datadiff_osc/contract_engine/**
+    - tests/osc/test_contract_*.py
+    - tests/osc/test_runtime_producer_provenance.py
+    - "**/public exports/**"
+  required_invariants:
+    - >-
+      Before any source/recheck verdict, reproduced evaluation, or 3/3 campaign plus
+      3/3 pipeline threshold, validate exact typed source + campaign3 + pipeline3
+      result/task/spec/result-ID/seed/outcome and EvidenceEnvelope binding.
+    - >-
+      The required precheck verifies exact result group, task ID, complete TaskSpec
+      digest, result ID, seed-lineage digest, contract fingerprint, target fingerprint,
+      execution outcome, EvidenceEnvelope result/task binding, and all existing global
+      uniqueness/disjointness constraints.
+    - >-
+      For source verdict INCONCLUSIVE and SATISFIED, with campaign and pipeline as
+      separate stages, all seven identity/digest values remain unique while only the
+      selected stage EvidenceEnvelope.task_id is wrong; the first failure is exact
+      binding failure, never candidate source lacks a typed VIOLATED witness.
+    - >-
+      Cover result-group, seed, and outcome variants without weakening typed binding,
+      provenance origin, replay policy, or admission authority.
+    - >-
+      Seven legitimate distinct typed VIOLATED executions remain STABLE_SURVIVOR,
+      non-confirmed, and bug_claimed=false; confirmed/caller reproduced/diagnostic
+      promotion remain rejected.
+    - >-
+      Diagnostic refs remain permanently diagnostic-only; missing exact typed context
+      is fail closed or not_evaluated; no receipt, coverage, evidence, candidate, bug,
+      gate, or execution authorization authority is fabricated.
+    - >-
+      Public API/export/freeze, thresholds, denominators, comparator semantics, and
+      all frozen paths remain byte-identical.
+  required_negative_review_and_regressions:
+    - >-
+      INCONCLUSIVE and SATISFIED source verdicts crossed with campaign and pipeline
+      EvidenceEnvelope.task_id misbinding; preserve all seven uniqueness values and
+      require exact binding failure first in all four cases.
+    - >-
+      Result-group, seed, and outcome variants of that exact task/result binding attack.
+    - >-
+      Collision checks for task ID, complete TaskSpec digest, result ID, seed lineage,
+      and EvidenceEnvelope digest remain before all verdict/reproduced/threshold logic.
+    - >-
+      Legal seven distinct typed VIOLATED case remains STABLE_SURVIVOR/non-confirmed/
+      bug_claimed=false; confirmed, caller-reproduced, and diagnostic attempts reject.
+  validation:
+    authorization: >-
+      This exact scoped suite is authorized only once, after implementation and
+      pre-suite SHA verification. It is not authorized before implementation.
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+    execution_count: exactly_once_after_implementation
+    required_result: complete terminal exit code and complete result retained
+    sha_rule: re-hash both allowed product paths and every frozen/public target before and after the suite
+  stop_conditions:
+    - any frozen or public API SHA mismatch
+    - source/recheck verdict, reproduced, or threshold masks an exact binding failure
+    - an exact EvidenceEnvelope result/task/spec/result-ID/seed/outcome misbinding is accepted
+    - a scoped-suite failure or missing complete terminal result
+    - any required negative review, independent counterexample validation, or abnormal-input validation failure
+    - any request to expand allowed paths, public API, exports, thresholds, denominators, authority, Phase 7, 2h, or 24h
+  completion_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_runtime_reports.yaml
+    required_fields:
+      - exact before/after SHA for allowed product paths and all frozen/public targets
+      - exact one-time scoped command, exit code, and full result
+      - negative review, independent counterexample validation, and abnormal-input validation outcomes
+      - findings without downgrade or concealment
+      - writes limited to the authorized paths, implementation_child_agents=0, forbidden_paths_modified=[]
+decision:
+  foundation_barrier: pending
+  foundation_barrier_passed: false
+  combined_six_file_scoped_suite_authorized: false
+  tests_osc_authorized: false
+  full_repository_tests_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_entry_authorized: false
+  phase7_pilot_2h_authorized: false
+  twenty_four_hour_run_authorized: false

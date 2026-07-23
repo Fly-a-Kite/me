@@ -1,0 +1,89 @@
+schema_version: osc-phase-barrier-v1
+phase: 6
+change_request: CR-OSC-6-001
+barrier: three_domain_typed_semantic_replay
+status: pass_root_verified
+execution_policy:
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_paired_pilot_authorized: false
+  twenty_four_hour_run_authorized: false
+inputs:
+  task_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_cr001_domain_task_contracts.yaml
+    sha256: d74dede1e1912230036525c09ceed5a9f047cebef1166f679267c46e2d8be8cd
+  prewrite_review:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_cr001_prewrite_review.yaml
+    sha256: 3c9e347068654890a44acc49d709ed8ad2be0359cd7919b53cb1ecaaada6e9d7
+  shared_replay_support:
+    path: src/datadiff_osc/_replay_support.py
+    sha256: 6f52a8836288cb0e7578c984a8f0c3c26661a17d648050912c07a54515192dc1
+implementations:
+  contract:
+    agent: /root/phase5_authority_audit
+    status: complete_root_verified
+    files:
+      - path: src/datadiff_osc/contract_engine/replay.py
+        sha256: f7289bfe133611b50b14676697d3ef97c02e5f77162ad0cdf9fb9e11b654c615
+      - path: tests/osc/test_contract_semantic_replay.py
+        sha256: a56545b658fc35ad463159da8199271dcf7cc7c90ba434bf4c0a33ae15466979
+    scoped_result: 14 passed in 0.11s
+  search:
+    agent: /root/phase5_consumer_audit
+    status: complete_root_verified
+    files:
+      - path: src/datadiff_osc/search/semantic_replay.py
+        sha256: af65bd9f1f06a3a2555b33dd2c38d574ed03d0ab70ed5dcee035099e3364b28b
+      - path: tests/osc/test_search_semantic_replay.py
+        sha256: 31127935baa845e5458ea46ae2d6ae753b943c7a779641fe1e40863acf5494c1
+    scoped_result: 34 passed in 0.86s
+  runtime:
+    agent: /root/phase5_evidence_audit
+    status: complete_root_verified
+    files:
+      - path: src/datadiff_osc/runtime/_private_receipts.py
+        sha256: 490c7f7f076fb65c75cc577831fab508f6d9dcb0820422170169b274e50af07f
+      - path: src/datadiff_osc/runtime/_semantic_replay.py
+        sha256: 0b5ec02b247d718d4258dada0fb59493081f258cc1e49913c1d294c7c9e062b9
+      - path: tests/osc/test_runtime_private_receipts.py
+        sha256: 13a4a3607faaa8a98a241b66aaf6309ff7882ec87a7c3ad3c8bb17ac108ca24b
+      - path: tests/osc/test_runtime_semantic_replay.py
+        sha256: dce47e72b3b64c198a9605ab1156e97b59bdecad1a1322f28ebbad6d86b91c57
+    scoped_result: 26 passed in 0.22s
+root_verification:
+  combined_command: >-
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+    -p no:cacheprovider tests/osc/test_replay_support.py
+    tests/osc/test_contract_semantic_replay.py
+    tests/osc/test_search_semantic_replay.py
+    tests/osc/test_runtime_private_receipts.py
+    tests/osc/test_runtime_semantic_replay.py
+    tests/osc/test_public_api_freeze.py
+  combined_result: 88 passed in 1.30s
+  exact_sha_match: true
+  forbidden_paths_modified_by_agents: []
+  public_exports_changed: false
+  public_api_freeze:
+    path: src/datadiff_osc/public_api_freeze.json
+    sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  canonical_core:
+    path: src/datadiff_osc/_canonical.py
+    sha256: 97b995ff22eef099ceaab5e22d02b92078549ccb08f3023c63ec02ea32c0eba3
+verified_semantics:
+  - decoded payloads are rebuilt as real typed objects and constructor invariants rerun
+  - reconstructed objects exactly round-trip to the decoded canonical payload
+  - subject identities are independently derived and caller identities are comparison-only
+  - context-dependent authority remains fail closed
+  - candidate receipts cannot represent confirmed states and bug_claimed is literally false
+  - runtime replay success does not establish real producer provenance
+residual_blockers:
+  - root dispatch is not yet connected to typed admission verification
+  - producer provenance and receipt-set cross-binding remain pending CR-OSC-6-004
+  - Contract corpora and exact producers remain pending CR-OSC-6-002
+  - Search context, formal lanes and focus bindings remain pending CR-OSC-6-003A and CR-OSC-6-003
+decision:
+  root_dispatch_integration_authorized: true
+  unconditional_semantic_replay_sentinel_may_be_removed_only_after_dispatch_tests: true
+  phase6_gate_execution_authorized: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

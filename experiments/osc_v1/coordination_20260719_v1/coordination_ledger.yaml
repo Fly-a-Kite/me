@@ -1,0 +1,1652 @@
+run_id: osc-20260719T144951+0800
+source_status_hash: 412b44e310c39733699da4ce552c21a94fa81d8d22d3126303c6fa71bd1a1315
+source_status_full_untracked_hash: b04ebdff749d1412f3ee1b179a5b1a9a4533aa1e5767ec587e71e21e5ac5e839
+phase: 6
+twenty_four_hour_run_authorized: false
+phase6_authorization:
+  user_instruction: "授权进入 Phase 6"
+  phase6_authorized_by_user: true
+  phase6_started: true
+  evidence: experiments/osc_v1/coordination_20260719_v1/phase6_authorization_and_preflight.yaml
+  phase7_paired_pilot_authorized: false
+  twenty_four_hour_run_authorized: false
+workspace:
+  cwd: /data1/lbw/xjx/datadiff_fuzz_lab
+  git_root: /data1/lbw/xjx/datadiff_fuzz_lab
+  python: /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python
+  python_version: 3.12.3
+dirty_worktree:
+  tracked_modified_paths: 139
+  staged_paths: 0
+  status_short_entries: 2904
+  status_all_untracked_entries: 24061
+  status_snapshot: experiments/osc_v1/coordination_20260719_v1/phase0_git_status_short.txt
+  status_snapshot_sha256: 412b44e310c39733699da4ce552c21a94fa81d8d22d3126303c6fa71bd1a1315
+  diff_stat_snapshot: experiments/osc_v1/coordination_20260719_v1/phase0_git_diff_stat.txt
+  diff_stat_snapshot_sha256: 341553eede7eb403553383d713f9a803207214388e7b1c0378d78b74445b45d9
+  preservation_rule: existing modified and untracked files are user work; never delete, reset, clean, overwrite, or bulk-format
+inputs:
+  - path: experiments/final_bug_discovery_protocol_v3/TODO.md
+    sha256: 1ad989d412651f5cc9ae3c3ac5d7d7207176557e0bcdcfb449788f016d607419
+    fully_read: true
+  - path: docs/project_architecture.md
+    sha256: 5fc31c1c2c4bf1241e41cc966f8d56abc890259a8577fe756076b490e3698d9f
+    fully_read: true
+  - path: docs/fine_grained_discovery_architecture.md
+    sha256: 58d0e11a3cd3c2ea9b7096449f9beafae756b94cae3e41f04d4377b2b4d6dbf2
+    fully_read: true
+  - path: docs/discovery_search_and_parallel_architecture.md
+    sha256: 7af5fb51be2de1e0162ffb4a2db2bf40df050f35c0446bcae707e419936cf1b9
+    fully_read: true
+  - path: docs/semantic_hypercontract_architecture.md
+    sha256: 20a5e22513c64c60e77b115233b28fdca2591081f08d5f2945a15dda18442dae
+    fully_read: true
+  - path: docs/architecture_credibility_and_alternatives.md
+    sha256: 95bd949dba93d41d9b2594122fc49766164008c5de8df6aec91dc88f2afa0762
+    fully_read: true
+  - path: docs/competitive_paper_experiment_blueprint.md
+    sha256: e2537e9ec03f5222321af7ae11491341f402d6e294c19ae4c8c3d397c4c1cd18
+    fully_read: true
+baseline:
+  initial_command: pytest -q tests/osc
+  initial_exit_code: 127
+  initial_result: pytest was not on the shell PATH
+  authoritative_command: .venv/bin/pytest -q tests/osc
+  authoritative_exit_code: 0
+  authoritative_result: 66 passed in 0.22s
+inventory:
+  path: experiments/osc_v1/coordination_20260719_v1/phase0_osc_inventory.txt
+  sha256: 808ab675954d67b5dc3885728f8e819f407d63c59330b749cc9846ce39a45836
+tasks:
+  - task_id: OSC-0-ROOT
+    owner: root
+    mode: preflight
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/**
+    status: complete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase0_git_status_short.txt
+      - experiments/osc_v1/coordination_20260719_v1/phase0_git_diff_stat.txt
+      - experiments/osc_v1/coordination_20260719_v1/phase0_osc_inventory.txt
+      - experiments/osc_v1/coordination_20260719_v1/phase0_spec_sha256.txt
+      - experiments/osc_v1/coordination_20260719_v1/phase0_existing_osc_sha256.txt
+  - task_id: OSC-1-A
+    owner: contract_agent
+    mode: read_only_audit
+    allowed_write_paths: []
+    status: complete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase1_contract_audit.md
+  - task_id: OSC-1-B
+    owner: search_agent
+    mode: read_only_audit
+    allowed_write_paths: []
+    status: complete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase1_search_audit.md
+  - task_id: OSC-1-C
+    owner: runtime_agent
+    mode: read_only_audit
+    allowed_write_paths: []
+    status: complete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase1_runtime_audit.md
+  - task_id: OSC-2-ROOT
+    owner: root
+    mode: interface_freeze
+    allowed_write_paths:
+      - src/datadiff_osc/__init__.py
+      - src/datadiff_osc/_canonical.py
+      - src/datadiff_osc/api.py
+      - src/datadiff_osc/schemas.py
+      - src/datadiff_osc/public_api_freeze.json
+      - src/datadiff_osc/contract_engine/model.py
+      - src/datadiff_osc/semantic_targets/model.py
+      - src/datadiff_osc/semantic_targets/compiler.py
+      - tests/osc/test_public_api_freeze.py
+      - experiments/osc_v1/coordination_20260719_v1/**
+    status: complete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase1_dependency_dag.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase2_interface_freeze.md
+      - experiments/osc_v1/coordination_20260719_v1/phase2_consumer_confirmations.yaml
+  - task_id: OSC-3-A
+    owner: contract_agent
+    mode: implementation
+    allowed_write_paths:
+      - src/datadiff_osc/contract_engine/**
+      - tests/osc/test_contract_*.py
+    status: complete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase3_prewrite_declarations.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase3_completion_summary.md
+  - task_id: OSC-3-B
+    owner: search_agent
+    mode: implementation
+    allowed_write_paths:
+      - src/datadiff_osc/semantic_targets/**
+      - src/datadiff_osc/generation/**
+      - src/datadiff_osc/search/**
+      - src/datadiff_osc/scheduler/**
+      - tests/osc/test_targets_*.py
+      - tests/osc/test_generation_*.py
+      - tests/osc/test_search_*.py
+      - tests/osc/test_scheduler_*.py
+    status: complete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase3_prewrite_declarations.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase3_completion_summary.md
+  - task_id: OSC-3-C
+    owner: runtime_agent
+    mode: implementation
+    allowed_write_paths:
+      - src/datadiff_osc/comparison/**
+      - src/datadiff_osc/parallel/**
+      - src/datadiff_osc/runtime/**
+      - scripts/osc/**
+      - tests/osc/test_comparison_*.py
+      - tests/osc/test_parallel_*.py
+      - tests/osc/test_runtime_*.py
+    status: complete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase3_prewrite_declarations.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase3_completion_summary.md
+  - task_id: OSC-4-A
+    owner: contract_agent
+    mode: read_only_review
+    allowed_write_paths: []
+    status: complete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase4_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase4_review_reports.yaml
+  - task_id: OSC-4-B
+    owner: search_agent
+    mode: read_only_review
+    allowed_write_paths: []
+    status: complete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase4_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase4_review_reports.yaml
+  - task_id: OSC-4-C
+    owner: runtime_agent
+    mode: read_only_review
+    allowed_write_paths: []
+    status: complete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase4_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase4_review_reports.yaml
+  - task_id: OSC-5-A
+    owner: contract_agent
+    mode: implementation_serial
+    allowed_write_paths: exact list in phase5_prewrite_declarations.yaml
+    status: complete_root_verified
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase5_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_prewrite_declarations.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_contract_barrier.yaml
+  - task_id: OSC-5-A-ROOT-BINDING
+    owner: root
+    mode: cross_subsystem_integration_serial
+    allowed_write_paths:
+      - src/datadiff_osc/comparison/staged.py
+      - scripts/osc/audit_staged_parity.py
+      - tests/osc/test_comparison_staged.py
+    status: complete_root_verified
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_contract_barrier.yaml
+  - task_id: OSC-5-B
+    owner: search_agent
+    mode: implementation_serial_after_contract
+    allowed_write_paths: exact list in phase5_prewrite_declarations.yaml
+    status: complete_root_verified_after_authority_followup
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase5_task_contracts.yaml
+  - task_id: OSC-5-ROOT-OBSERVATION-AUTHORITY
+    owner: root
+    mode: shared_binding_integration_serial
+    allowed_write_paths:
+      - src/datadiff_osc/probe_contracts.py
+      - src/datadiff_osc/semantic_targets/compiler.py
+      - tests/osc/test_probe_contract_integration.py
+    status: complete_root_verified
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_observation_contract_barrier.yaml
+  - task_id: OSC-5-B-AUTHORITY-FOLLOWUP
+    owner: search_agent
+    mode: implementation_serial_after_root_observation_contract_barrier
+    allowed_write_paths:
+      - src/datadiff_osc/search/ledger.py
+      - tests/osc/test_search_ledger.py
+    status: complete_root_verified
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase5_observation_contract_barrier.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_search_barrier.yaml
+  - task_id: OSC-5-C
+    owner: runtime_agent
+    mode: implementation_serial_after_search
+    allowed_write_paths: exact list in phase5_prewrite_declarations.yaml
+    status: superseded_by_osc_5_c_authority_followup
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase5_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_search_barrier.yaml
+  - task_id: OSC-5-C-AUTHORITY-FOLLOWUP
+    owner: runtime_agent
+    mode: implementation_serial_after_root_counterexample_and_cr_acceptance
+    allowed_write_paths: exact six-path list in phase5_prewrite_declarations.yaml
+    status: complete_root_verified_runtime_consumer
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_prewrite_declarations.yaml
+  - task_id: OSC-5-ROOT-003-DESIGN-REVIEW
+    owner: contract_agent
+    mode: read_only_review_parallel_with_disjoint_runtime_writer
+    allowed_write_paths: []
+    status: complete_read_only_report_received
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase5_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase1_contract_audit.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_runtime_audit.md
+  - task_id: OSC-5-ROOT-004-UNIVERSE-REVIEW
+    owner: search_agent
+    mode: read_only_review_parallel_with_disjoint_runtime_writer
+    allowed_write_paths: []
+    status: complete_read_only_messages_received_final_transport_error
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase5_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+  - task_id: OSC-5-C-BINDING-FOLLOWUP
+    owner: runtime_agent
+    mode: implementation_serial_after_authority_followup_root_verification
+    allowed_write_paths: exact eleven-path list in phase5_prewrite_declarations.yaml
+    status: complete_root_verified
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_prewrite_declarations.yaml
+  - task_id: OSC-5-A-OUTCOME-ADMISSION
+    owner: contract_agent
+    mode: implementation_serial_after_runtime_owner_barrier
+    allowed_write_paths: exact three-path list in phase5_prewrite_declarations.yaml
+    status: complete_root_verified
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_task_contracts.yaml
+      - OSC-5-ROOT-003-DESIGN-REVIEW appendix
+      - experiments/osc_v1/coordination_20260719_v1/phase5_contract_outcome_barrier.yaml
+  - task_id: OSC-5-C-OUTCOME-ROUTING
+    owner: runtime_agent
+    mode: implementation_serial_after_contract_outcome_barrier
+    allowed_write_paths: exact four-path list in phase5_prewrite_declarations.yaml
+    status: complete_root_verified
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_prewrite_declarations.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_contract_outcome_barrier.yaml
+  - task_id: OSC-5-ROOT-004-AUTHORITY-CONTROL-PLANE
+    owner: root
+    mode: root_owned_integration_serial_after_outcome_routing_barrier
+    allowed_write_paths: exact four-path list in phase5_prewrite_declarations.yaml
+    status: complete_root_verified
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase5_runtime_barrier.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_outcome_routing_barrier.yaml
+      - OSC-5-ROOT-004-IMPLEMENTATION-CONTRACT-RECHECK section-12 report
+      - experiments/osc_v1/coordination_20260719_v1/phase5_root_authority_control_barrier.yaml
+  - task_id: OSC-5-ROOT-LEGACY-DIAGNOSTIC-FACADE
+    owner: root
+    mode: implementation_serial_after_replacement_session_recovery_audits
+    allowed_write_paths:
+      - src/datadiff/osc_diagnostic_facade.py
+      - tests/osc/test_legacy_diagnostic_facade.py
+    status: complete_root_and_independent_review_verified
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase5_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_prewrite_declarations.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_legacy_diagnostic_facade_barrier.yaml
+  - task_id: OSC-5-ROOT-OPAQUE-DIAGNOSTIC-CONSUMERS
+    owner: root
+    mode: implementation_serial_after_legacy_diagnostic_facade_barrier
+    allowed_write_paths: exact eleven-path list in phase5_prewrite_declarations.yaml
+    status: complete_root_and_three_exact_sha_reviews_verified
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase5_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_prewrite_declarations.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_legacy_diagnostic_facade_barrier.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase5_opaque_diagnostic_consumer_barrier.yaml
+  - task_id: OSC-6-CONTRACT-AUDIT
+    owner: /root/phase5_authority_audit
+    mode: read_only_audit
+    allowed_write_paths: []
+    status: complete_blocked_findings_persisted
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_audit_findings.yaml
+  - task_id: OSC-6-GRANULARITY-AUDIT
+    owner: /root/phase5_consumer_audit
+    mode: read_only_audit
+    allowed_write_paths: []
+    status: complete_blocked_findings_persisted
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_audit_findings.yaml
+  - task_id: OSC-6-RUNTIME-AUDIT
+    owner: /root/phase5_evidence_audit
+    mode: read_only_audit
+    allowed_write_paths: []
+    status: complete_blocked_ignored_cache_deviation_root_reviewed
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_audit_findings.yaml
+  - task_id: OSC-6-CR001-CONTRACT-PREWRITE
+    owner: /root/phase5_authority_audit
+    mode: implementation_prewrite_design_only
+    allowed_write_paths: []
+    status: complete_zero_writes_root_reviewed
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_task_contracts.yaml
+  - task_id: OSC-6-CR001-SEARCH-PREWRITE
+    owner: /root/phase5_consumer_audit
+    mode: implementation_prewrite_design_only
+    allowed_write_paths: []
+    status: complete_zero_writes_root_reviewed
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_task_contracts.yaml
+  - task_id: OSC-6-CR001-RUNTIME-PREWRITE
+    owner: /root/phase5_evidence_audit
+    mode: implementation_prewrite_design_only
+    allowed_write_paths: []
+    status: complete_zero_writes_root_reviewed
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_task_contracts.yaml
+  - task_id: OSC-6-CR001-ROOT-SUPPORT
+    owner: /root
+    mode: implementation
+    allowed_write_paths:
+      - src/datadiff_osc/_replay_support.py
+      - tests/osc/test_replay_support.py
+    status: complete_scoped_and_freeze_tests_pass
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_prewrite_review.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dependency_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_support_barrier.yaml
+  - task_id: OSC-6-CR001-CONTRACT-IMPLEMENT
+    owner: /root/phase5_authority_audit
+    mode: implementation
+    allowed_write_paths:
+      - src/datadiff_osc/contract_engine/replay.py
+      - tests/osc/test_contract_semantic_replay.py
+    status: complete_root_verified
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_domain_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_domain_barrier.yaml
+  - task_id: OSC-6-CR001-SEARCH-IMPLEMENT
+    owner: /root/phase5_consumer_audit
+    mode: implementation
+    allowed_write_paths:
+      - src/datadiff_osc/search/semantic_replay.py
+      - tests/osc/test_search_semantic_replay.py
+    status: complete_root_verified
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_domain_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_domain_barrier.yaml
+  - task_id: OSC-6-CR001-RUNTIME-IMPLEMENT
+    owner: /root/phase5_evidence_audit
+    mode: implementation
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_private_receipts.py
+      - src/datadiff_osc/runtime/_semantic_replay.py
+      - tests/osc/test_runtime_private_receipts.py
+      - tests/osc/test_runtime_semantic_replay.py
+    status: complete_root_verified
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_domain_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_domain_barrier.yaml
+  - task_id: OSC-6-CR001-ROOT-DISPATCH
+    owner: /root
+    mode: implementation_serial_after_three_domain_barrier
+    allowed_write_paths:
+      - src/datadiff_osc/_phase6_gate_authority.py
+      - tests/osc/test_phase6_gate_authority_integration.py
+    status: complete_three_exact_sha_reviews_blocker_high_medium_zero
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_domain_barrier.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_contracts.yaml
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-A
+    owner: /root/phase5_authority_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_read_only_findings_remediated_target_obsolete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_contracts.yaml
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-B
+    owner: /root/phase5_consumer_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: incomplete_agent_usage_limit_target_obsolete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_contracts.yaml
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-C
+    owner: /root/phase5_evidence_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_read_only_pass_target_obsolete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_contracts.yaml
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-A-R2
+    owner: /root/phase5_authority_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_read_only_pass_test_target_obsolete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_round2_contracts.yaml
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-B-R2
+    owner: /root/phase5_consumer_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_read_only_medium_remediated_test_target_obsolete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_round2_contracts.yaml
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-C-R2
+    owner: /root/phase5_evidence_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_read_only_pass_test_target_obsolete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_round2_contracts.yaml
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-A-R3
+    owner: /root/phase5_authority_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_read_only_pass
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_round3_contracts.yaml
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-B-R3
+    owner: /root/phase5_consumer_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_read_only_pass
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_round3_contracts.yaml
+  - task_id: OSC-6-CR001-ROOT-DISPATCH-REVIEW-C-R3
+    owner: /root/phase5_evidence_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_read_only_pass
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_root_dispatch_review_round3_contracts.yaml
+  - task_id: OSC-6-CR001-BARRIER
+    owner: /root
+    mode: exact_sha_barrier
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/**
+    status: complete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_exit_barrier.yaml
+  - task_id: OSC-6-CR002-PREWRITE
+    owner: /root/phase5_authority_audit
+    mode: read_only_prewrite
+    allowed_write_paths: []
+    status: complete_read_only_blocked_missing_approved_corpora
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_next_change_prewrite_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_prewrite_review.yaml
+  - task_id: OSC-6-CR003A-PREWRITE
+    owner: /root/phase5_consumer_audit
+    mode: read_only_prewrite
+    allowed_write_paths: []
+    status: complete_read_only_ready_for_private_foundation
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_next_change_prewrite_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_next_change_prewrite_task_contracts_erratum.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_prewrite_review.yaml
+  - task_id: OSC-6-CR004-PREWRITE
+    owner: /root/phase5_evidence_audit
+    mode: read_only_prewrite
+    allowed_write_paths: []
+    status: complete_read_only_ready_for_typed_provenance_foundation
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_next_change_prewrite_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_prewrite_review.yaml
+  - task_id: OSC-6-CR002-CORPUS-FOUNDATION
+    owner: /root/phase5_authority_audit
+    mode: bounded_private_implementation
+    allowed_write_paths:
+      - src/datadiff_osc/contract_engine/_phase6_corpora.py
+      - tests/osc/test_contract_phase6_corpora.py
+    status: remediation_complete_root_verified_pending_rotated_review
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_implementation_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_implementation_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_reports.yaml
+  - task_id: OSC-6-CR003A-SEARCH-FOUNDATION
+    owner: /root/phase5_consumer_audit
+    mode: bounded_private_implementation
+    allowed_write_paths:
+      - src/datadiff_osc/search/lane_registry.py
+      - src/datadiff_osc/search/context_receipts.py
+      - src/datadiff_osc/search/context_replay.py
+      - tests/osc/test_search_lane_registry.py
+      - tests/osc/test_search_context_receipts.py
+      - tests/osc/test_search_gate_crosswalk.py
+    status: exact_sha_review_r3_failed_0_blocker_1_high_0_medium_remediation_active
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_implementation_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_implementation_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round2_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round3_reports.yaml
+  - task_id: OSC-6-CR004-RUNTIME-FOUNDATION
+    owner: /root/phase5_evidence_audit
+    mode: bounded_private_implementation
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_producer_provenance.py
+      - src/datadiff_osc/runtime/_receipt_producers.py
+      - tests/osc/test_runtime_producer_provenance.py
+      - tests/osc/test_runtime_receipt_producers.py
+    status: exact_sha_review_r3_failed_0_blocker_1_high_0_medium_remediation_active
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_implementation_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_implementation_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round2_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round3_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-A-SEARCH
+    owner: /root/phase5_authority_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_failed_0_blocker_4_high_1_medium
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-B-RUNTIME
+    owner: /root/phase5_consumer_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_failed_2_blocker_3_high_0_medium
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-C-CONTRACT
+    owner: /root/phase5_evidence_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_failed_0_blocker_5_high_1_medium
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-CONTRACT-R1
+    owner: /root/phase5_authority_audit
+    mode: bounded_private_remediation
+    allowed_write_paths:
+      - src/datadiff_osc/contract_engine/_phase6_corpora.py
+      - tests/osc/test_contract_phase6_corpora.py
+    status: complete_root_verified_19_scoped_and_82_combined_pass
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-SEARCH-R1
+    owner: /root/phase5_consumer_audit
+    mode: bounded_private_remediation
+    allowed_write_paths:
+      - src/datadiff_osc/search/lane_registry.py
+      - src/datadiff_osc/search/context_receipts.py
+      - src/datadiff_osc/search/context_replay.py
+      - tests/osc/test_search_lane_registry.py
+      - tests/osc/test_search_context_receipts.py
+      - tests/osc/test_search_gate_crosswalk.py
+    status: complete_root_verified_27_scoped_and_82_combined_pass
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-RUNTIME-R1
+    owner: /root/phase5_evidence_audit
+    mode: bounded_private_remediation
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_producer_provenance.py
+      - src/datadiff_osc/runtime/_receipt_producers.py
+      - tests/osc/test_runtime_producer_provenance.py
+      - tests/osc/test_runtime_receipt_producers.py
+    status: complete_root_verified_36_scoped_and_82_combined_pass
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R2-A-RUNTIME
+    owner: /root/phase5_authority_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_failed_2_blocker_1_high_0_medium
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round2_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round2_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R2-B-CONTRACT
+    owner: /root/phase5_consumer_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_pass_0_blocker_0_high_0_medium
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round2_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round2_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R2-C-SEARCH
+    owner: /root/phase5_evidence_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_failed_0_blocker_1_high_0_medium
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round2_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round2_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-SEARCH-R2
+    owner: /root/phase5_consumer_audit
+    mode: bounded_private_remediation
+    allowed_write_paths:
+      - src/datadiff_osc/search/context_receipts.py
+      - src/datadiff_osc/search/context_replay.py
+      - tests/osc/test_search_context_receipts.py
+      - tests/osc/test_search_gate_crosswalk.py
+    status: complete_root_verified_29_scoped_and_88_combined_pass
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round2_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round2_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round2_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-RUNTIME-R2
+    owner: /root/phase5_evidence_audit
+    mode: bounded_private_remediation
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_producer_provenance.py
+      - src/datadiff_osc/runtime/_receipt_producers.py
+      - tests/osc/test_runtime_producer_provenance.py
+      - tests/osc/test_runtime_receipt_producers.py
+    status: complete_root_verified_40_scoped_and_88_combined_pass
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round2_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round2_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round2_reports.yaml
+  - task_id: OSC-6-FOUNDATION-CONTRACT-FROZEN-R2
+    owner: /root/phase5_authority_audit
+    mode: frozen_read_only_sentinel
+    allowed_write_paths: []
+    status: complete_frozen_read_only_sha_sentinel_pass
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round2_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round2_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R3-A-SEARCH
+    owner: /root/phase5_authority_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_failed_0_blocker_1_high_0_medium
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round3_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round3_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R3-B-RUNTIME
+    owner: /root/phase5_consumer_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_failed_0_blocker_1_high_0_medium
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round3_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round3_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R3-C-CONTRACT
+    owner: /root/phase5_evidence_audit
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_pass_0_blocker_0_high_0_medium
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round3_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round3_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-SEARCH-R3
+    owner: /root/phase5_consumer_audit
+    mode: bounded_private_remediation
+    allowed_write_paths:
+      - src/datadiff_osc/search/context_receipts.py
+      - src/datadiff_osc/search/context_replay.py
+      - tests/osc/test_search_context_receipts.py
+      - tests/osc/test_search_gate_crosswalk.py
+    status: implementation_complete_root_verified_50_scoped_and_118_combined_pass_pending_rotated_review_r4
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round3_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round3_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round3_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-RUNTIME-R3
+    owner: /root/phase5_evidence_audit
+    mode: bounded_private_remediation
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_receipt_producers.py
+      - tests/osc/test_runtime_receipt_producers.py
+    status: implementation_complete_root_verified_49_scoped_and_118_combined_pass_pending_rotated_review_r4
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round3_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round3_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round3_reports.yaml
+  - task_id: OSC-6-FOUNDATION-CONTRACT-FROZEN-R3
+    owner: /root/phase5_authority_audit
+    mode: frozen_read_only_sentinel
+    allowed_write_paths: []
+    status: complete_frozen_read_only_sha_sentinel_pass_pending_rotated_review_r4
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round3_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round3_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R4-A-SEARCH
+    owner: /root/r3_contract_sentinel
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_single_agent_serial_negative_review_2_high_not_rotated_independent
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R4-B-RUNTIME
+    owner: /root/r3_search_owner
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_single_agent_serial_negative_review_1_medium_not_rotated_independent
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R4-C-CONTRACT
+    owner: /root/r3_runtime_owner
+    mode: exact_sha_read_only_review
+    allowed_write_paths: []
+    status: complete_scoped_sentinel_only_not_rotated_independent
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-SEARCH-R4
+    owner: /root
+    mode: bounded_private_remediation_single_agent_serial
+    allowed_write_paths:
+      - src/datadiff_osc/search/context_receipts.py
+      - src/datadiff_osc/search/context_replay.py
+      - tests/osc/test_search_context_receipts.py
+      - tests/osc/test_search_gate_crosswalk.py
+    status: implementation_complete_root_independent_counterexample_validation_53_scoped_and_125_combined_pass_pending_rotated_independent_review
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round4_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round4_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-RUNTIME-R4
+    owner: /root
+    mode: bounded_private_remediation_single_agent_serial
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_receipt_producers.py
+      - tests/osc/test_runtime_receipt_producers.py
+    status: implementation_complete_root_independent_counterexample_validation_53_scoped_and_125_combined_pass_pending_rotated_independent_review
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round4_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round4_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R5-A-SEARCH
+    owner: /root/r5_search_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: complete_failed_0_blocker_1_high_0_medium_scoped_result_unrecoverable
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R5-B-RUNTIME
+    owner: /root/r5_runtime_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: complete_pass_0_blocker_0_high_0_medium
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R5-C-CONTRACT
+    owner: /root/r5_contract_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: complete_pass_0_blocker_0_high_0_medium
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R5-ROOT-AUTHORITY
+    owner: /root
+    mode: root_authority_aggregation_no_product_write
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    status: complete_barrier_pending_new_remediation_contract_required
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-SEARCH-R5
+    owner: /root
+    mode: bounded_private_remediation_serial
+    allowed_write_paths:
+      - src/datadiff_osc/search/context_receipts.py
+      - tests/osc/test_search_context_receipts.py
+    status: complete_remediation_scoped_suite_passed_pending_r6_independent_review
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round5_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round5_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R6-A-SEARCH
+    owner: /root/r6_search_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: complete_failed_0_blocker_1_high_0_medium
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R6-B-RUNTIME
+    owner: /root/r6_runtime_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: complete_failed_0_blocker_0_high_1_medium
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R6-C-CONTRACT
+    owner: /root/r6_contract_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: complete_pass_0_blocker_0_high_0_medium
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R6-ROOT-AUTHORITY
+    owner: /root
+    mode: root_authority_aggregation_no_product_write
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    status: complete_barrier_pending_new_remediation_contract_required
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_reports.yaml
+  - task_id: OSC-6-NORMATIVE-GATE-CROSSWALK-PREWRITE
+    owner: /root
+    mode: root_coordination_prewrite
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/**
+    status: complete_missing_threshold_blockers_explicit
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_normative_gate_crosswalk_prewrite.yaml
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-SEARCH-R6
+    owner: /root
+    mode: bounded_private_remediation_serial
+    allowed_write_paths:
+      - src/datadiff_osc/search/context_receipts.py
+      - tests/osc/test_search_context_receipts.py
+    status: complete_root_validation_56_scoped_pass_pending_runtime_remediation_and_r7_independent_review
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_search_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_search_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-RUNTIME-R6
+    owner: /root
+    mode: bounded_private_remediation_serial
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_receipt_producers.py
+      - tests/osc/test_runtime_receipt_producers.py
+    status: complete_root_validation_63_scoped_pass_pending_r7_independent_review
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_runtime_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_runtime_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R7-A-SEARCH
+    owner: /root/r7_search_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: complete_incomplete_scoped_terminal_evidence_combined_not_authorized
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R7-B-RUNTIME
+    owner: /root/r7_runtime_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: complete_medium_finding_pending_new_remediation_contract
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R7-C-CONTRACT
+    owner: /root/r7_contract_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: complete_pass_0_blocker_0_high_0_medium
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R7-ROOT-AUTHORITY
+    owner: /root
+    mode: root_authority_aggregation_no_product_write
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    status: complete_barrier_pending_runtime_r7_m1_and_search_terminal_evidence_missing
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-RUNTIME-R7
+    owner: /root
+    mode: bounded_private_remediation_serial
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_receipt_producers.py
+      - tests/osc/test_runtime_receipt_producers.py
+    status: scoped_suite_failed_new_remediation_task_contract_required
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round7_runtime_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round7_runtime_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-RUNTIME-R7B
+    owner: /root
+    mode: bounded_private_remediation_serial
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_receipt_producers.py
+      - tests/osc/test_runtime_receipt_producers.py
+    status: complete_root_validation_83_scoped_pass_pending_fresh_independent_review
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round7b_runtime_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round7b_runtime_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8-A-SEARCH
+    owner: /root/r7_search_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: complete_authority_mismatch_blocker_scoped_suite_not_run
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8-B-RUNTIME
+    owner: /root/r7_runtime_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: complete_authority_mismatch_blocker_scoped_suite_completed_before_stop
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8-C-CONTRACT
+    owner: /root/r7_contract_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: complete_authority_mismatch_blocker_scoped_suite_not_run
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8-ROOT-AUTHORITY
+    owner: /root
+    mode: root_authority_aggregation_no_product_write
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    status: complete_barrier_pending_r8_authority_discrepancy_new_unambiguous_review_authority_required
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8B-A-SEARCH
+    owner: /root/r7_search_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: incomplete_external_agent_usage_limit_no_independent_report
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8b_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8b_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8B-B-RUNTIME
+    owner: /root/r7_runtime_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: incomplete_terminal_evidence_exactly_once_suite_not_rerun
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8b_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8b_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8B-C-CONTRACT
+    owner: /root/r7_contract_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: incomplete_external_429_no_independent_report
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8b_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8b_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8B-ROOT-AUTHORITY
+    owner: /root
+    mode: root_authority_aggregation_no_product_write
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8b_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8b_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    status: complete_barrier_pending_incomplete_r8b_reports_new_authority_required
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8b_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8b_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8C-A-SEARCH
+    owner: /root/r7_search_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: complete_pass_0_blocker_0_high_0_medium_56_scoped_terminal_complete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8C-B-RUNTIME
+    owner: /root/r7_runtime_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: complete_pass_0_blocker_0_high_0_medium_83_scoped_terminal_complete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8C-C-CONTRACT
+    owner: /root/r7_contract_reviewer
+    mode: exact_sha_read_only_negative_review
+    allowed_write_paths: []
+    status: complete_pass_0_blocker_0_high_0_medium_19_scoped_terminal_complete
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_reports.yaml
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8C-ROOT-AUTHORITY
+    owner: /root
+    mode: root_authority_aggregation_no_product_write
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    status: complete_three_independent_reports_clear_158_combined_pass_foundation_barrier_pass
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_reports.yaml
+  - task_id: OSC-6-CONTRACT-GATE-DEFINITIONS
+    owner: /root
+    mode: root_owned_definition_freeze_no_product_write
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    status: complete_definition_freeze_no_product_write_contract_gate_pending
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_report.yaml
+  - task_id: OSC-6-CONTRACT-COMPARISON-EVIDENCE-R1
+    owner: /root
+    mode: root_serial_private_typed_evidence_implementation
+    allowed_write_paths:
+      - src/datadiff_osc/contract_engine/_phase6_comparison_receipts.py
+      - src/datadiff_osc/contract_engine/replay.py
+      - src/datadiff_osc/_phase6_gate_authority.py
+      - tests/osc/test_contract_phase6_comparison_receipts.py
+      - tests/osc/test_contract_semantic_replay.py
+      - tests/osc/test_phase6_gate_authority_integration.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_evidence_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_evidence_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    status: complete_scoped_62_passed_private_evidence_only_contract_gate_pending
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_evidence_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_evidence_report.yaml
+  - task_id: OSC-6-CONTRACT-COMPARISON-ROOT-BINDING-R2
+    owner: /root
+    mode: root_serial_private_dynamic_binding_implementation
+    allowed_write_paths:
+      - src/datadiff_osc/_phase6_gate_authority.py
+      - src/datadiff_osc/contract_engine/replay.py
+      - tests/osc/test_contract_phase6_comparison_receipts.py
+      - tests/osc/test_contract_semantic_replay.py
+      - tests/osc/test_phase6_gate_authority_integration.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    status: complete_scoped_83_passed_root_dynamic_binding_contract_gate_pending
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_report.yaml
+  - task_id: OSC-6-CONTRACT-RAW-PAIR-RECEIPT-R3
+    owner: /root
+    mode: root_serial_private_raw_pair_receipt_and_exact_root_binding
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_phase6_contract_performance_receipts.py
+      - src/datadiff_osc/runtime/_semantic_replay.py
+      - src/datadiff_osc/_phase6_gate_authority.py
+      - tests/osc/test_runtime_phase6_contract_performance_receipts.py
+      - tests/osc/test_runtime_semantic_replay.py
+      - tests/osc/test_phase6_gate_authority_integration.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_receipt_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_receipt_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    status: complete_scoped_78_passed_private_raw_pair_and_root_binding_contract_gate_pending
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_receipt_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_receipt_report.yaml
+  - task_id: OSC-6-CONTRACT-RAW-PAIR-TYPED-PRODUCER-R4
+    owner: /root
+    mode: root_serial_private_typed_raw_pair_producer
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_phase6_contract_performance_producers.py
+      - tests/osc/test_runtime_phase6_contract_performance_producers.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_typed_producer_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_typed_producer_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    status: complete_scoped_34_passed_private_typed_raw_pair_producer_contract_gate_pending
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_typed_producer_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_typed_producer_report.yaml
+  - task_id: OSC-6-CONTRACT-PARALLEL-SCALING-RECEIPT-R5
+    owner: /root
+    mode: root_serial_private_parallel_scaling_receipt_and_root_binding
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_phase6_parallel_scaling_receipts.py
+      - src/datadiff_osc/runtime/_semantic_replay.py
+      - src/datadiff_osc/_phase6_gate_authority.py
+      - tests/osc/test_runtime_phase6_parallel_scaling_receipts.py
+      - tests/osc/test_runtime_semantic_replay.py
+      - tests/osc/test_phase6_gate_authority_integration.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_receipt_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_receipt_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    status: scoped_validation_failed_1_failed_95_passed_r5f1_pending_new_task_contract
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_receipt_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_receipt_report.yaml
+  - task_id: OSC-6-CONTRACT-PARALLEL-SCALING-FIRST-ERROR-R5A
+    owner: /root
+    mode: root_serial_test_contract_remediation
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - tests/osc/test_runtime_phase6_parallel_scaling_receipts.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_first_error_remediation_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_first_error_remediation_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    status: complete_scoped_96_passed_test_only_first_error_remediation_contract_gate_pending
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_first_error_remediation_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_first_error_remediation_report.yaml
+  - task_id: OSC-6-CONTRACT-PARALLEL-SCALING-TYPED-PRODUCER-R6
+    owner: /root
+    mode: root_serial_private_typed_parallel_scaling_producer
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_phase6_parallel_scaling_producers.py
+      - tests/osc/test_runtime_phase6_parallel_scaling_producers.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_typed_producer_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_typed_producer_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    status: complete_scoped_54_passed_private_typed_parallel_scaling_producer_contract_gate_pending
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_typed_producer_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_typed_producer_report.yaml
+  - task_id: OSC-6-CONTRACT-PARALLEL-SCALING-PROVENANCE-BRIDGE-R7
+    owner: /root
+    mode: root_serial_private_parallel_scaling_provenance_bridge
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_phase6_parallel_scaling_provenance.py
+      - src/datadiff_osc/_phase6_gate_authority.py
+      - tests/osc/test_runtime_phase6_parallel_scaling_provenance.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    status: complete_scoped_98_passed_private_parallel_scaling_provenance_bridge_contract_gate_pending
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_report.yaml
+  - task_id: OSC-6-GRANULARITY-REACHABILITY-EXECUTION-BINDING-R1
+    owner: /root
+    mode: root_serial_private_implementation
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_phase6_reachability_execution_binding.py
+      - tests/osc/test_runtime_phase6_reachability_execution_binding.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    task_contract_sha256: edc8d81aa2c30958d63e5c05d808c11561ae51b60b505540baf341d34362c25f
+    report_sha256: 3e65845cc204a548642543f281b7ae97e3e8437cbc143b4f371c04d50f978c40
+    status: complete_private_context_binding_scoped_6_passed_no_gate_credit
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_report.yaml
+    barrier:
+      phase_6_granularity_reachability: pending
+      phase_6_private_foundation_barrier: pass_unchanged
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
+  - task_id: OSC-6-GRANULARITY-REAL-ADAPTER-DIAGNOSTIC-SAMPLE-R2
+    owner: /root
+    mode: root_serial_private_real_adapter_diagnostic_sample
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_phase6_real_adapter_execution_sample.py
+      - tests/osc/test_runtime_phase6_real_adapter_execution_sample.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    task_contract_sha256: 82dd8763427e21bf6304af20a5ec00a93fc2db3886c79a67106e614d408b0423
+    report_sha256: 32695912b2e5cd866932c877992ac54998030f92ab0a3f2d6ac5ca17adb35b81
+    status: scoped_validation_failed_1_passed_3_errors_pre_adapter_context_mismatch_pending_new_task_contract
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_report.yaml
+    findings:
+      - id: OSC-6-G-R2-M1
+        severity: medium
+        disposition: recorded_barrier_pending_new_test_only_contract_required
+    barrier:
+      phase_6_granularity_reachability: pending
+      phase_6_private_foundation_barrier: pass_unchanged
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
+  - task_id: OSC-6-GRANULARITY-REAL-ADAPTER-DIAGNOSTIC-SAMPLE-R2A-TEST-ONLY
+    owner: /root
+    mode: root_serial_test_only_remediation
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - tests/osc/test_runtime_phase6_real_adapter_execution_sample.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_r2a_test_only_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_r2a_test_only_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    task_contract_sha256: 253de4feff70ae20dff8729c2f62ab403ee06e29235577848724b937d8c62460
+    report_sha256: a805b30a078c62e9e2c511236be4a9c676df6c6b81e30c96f33dd4e410cbf44d
+    status: complete_scoped_4_passed_one_real_adapter_pair_diagnostic_only_no_gate_credit
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_r2a_test_only_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_r2a_test_only_report.yaml
+    remediated_findings:
+      - id: OSC-6-G-R2-M1
+        disposition: test_only_endpoint_scope_metadata_aligned_and_scoped_suite_passed
+    barrier:
+      phase_6_granularity_reachability: pending
+      phase_6_private_foundation_barrier: pass_unchanged
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
+  - task_id: OSC-6-SOURCE-SNAPSHOT-ELIGIBILITY-R1
+    owner: /root
+    mode: root_serial_private_source_eligibility_guard
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - src/datadiff_osc/_phase6_source_snapshot_eligibility.py
+      - tests/osc/test_phase6_source_snapshot_eligibility.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_eligibility_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_eligibility_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    task_contract_sha256: 8b31f1d5269c01aa7470a795aa627d26e2f5b7c786bd3a2a0df59ced00fee5d4
+    report_sha256: 7af03b14b10439bc3ab4fb78a0636f668683c2bdb3b3de40494e3645c65c33a6
+    status: complete_private_eligibility_guard_scoped_4_passed_no_source_authority
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_eligibility_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_eligibility_report.yaml
+    barrier:
+      phase_6_granularity_reachability: pending
+      phase_6_contract: pending
+      phase_6_runtime_correctness: pending
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
+interface_freeze:
+  version: osc-public-api-freeze-v1
+  hash: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  prior_hash: 669816be0f913def018518ea85d2cc03b517453cc8e5ba764908dc3c3f42920f
+  status: frozen_after_phase5_cr_osc_5_001_cr_osc_5_002_no_manifest_change
+open_change_requests:
+  - id: CR-OSC-ROOT-001
+    requester: contract/search/runtime
+    scope: canonical, public atom/seed/task/outcome/evidence/ledger/comparison/cache/resource schemas
+    owner: root
+    status: closed_phase_2
+  - id: CR-OSC-ROOT-002
+    requester: search
+    scope: separately typed fresh and regression backend-pair obligation collections
+    owner: root
+    status: closed_phase_2
+  - id: CR-OSC-ROOT-003
+    requester: contract/runtime
+    scope: root-owned legacy adapter/oracle facade and structured status translation
+    owner: root
+    status: closed_phase5_legacy_facade_and_opaque_consumers_verified
+  - id: CR-OSC-ROOT-004
+    requester: runtime
+    scope: fail-closed gate manifest and 2h/24h authorization preflight
+    owner: root
+    status: closed_phase5_fail_closed_control_plane_phase6_semantic_replay_pending
+  - id: CR-OSC-5-001
+    requester: contract
+    scope: HyperContract.registry_digest and ContractFingerprint.registry_digest bind authority RelationRegistry evaluator identity; no field-shape change
+    owner: root_then_contract
+    status: closed_all_consumers_confirmed
+  - id: CR-OSC-5-002
+    requester: root_contract_barrier_review
+    scope: require original Endpoint authority and observation endpoint-digest binding; exact-path expansion only
+    owner: contract_then_root
+    status: closed_root_verified_no_frozen_manifest_change
+  - id: CR-OSC-5-003
+    requester: root_search_barrier_review
+    scope: unique target observation-policy identity and trusted Endpoint-scoped HyperContract resolver; no field-shape change
+    owner: root_then_search
+    status: closed_root_and_search_consumers_verified
+  - id: CR-OSC-5-004
+    requester: root_runtime_barrier_review
+    scope: independently frozen source/spec/universe/artifact plan for complete authoritative gate calculation; custom evaluations are permanently non-authoritative
+    owner: runtime_consumer_then_root_authority_producer
+    status: closed_phase5_runtime_consumer_and_root_control_plane_phase6_evidence_pending
+  - id: CR-OSC-5-005
+    requester: root_runtime_barrier_review
+    scope: request-authoritative cache exactness plus execution-run worker-count provenance and non-vacuous 1-versus-N audits
+    owner: runtime
+    status: closed_root_verified
+  - id: CR-OSC-ROOT-003-A
+    requester: root_legacy_facade_design_review
+    scope: execution-outcome admission before staged screening plus serial wrapper and consumer routing
+    owner: contract_then_runtime_then_root_and_search_consumers
+    status: closed_phase5_all_typed_outcome_and_opaque_consumers_verified
+  - id: CR-OSC-ROOT-003-B
+    requester: root_replacement_session_recovery
+    scope: Root-local opaque diagnostic-only reference shape and serial legacy consumer migration
+    owner: root
+    status: closed_phase5_facade_and_opaque_consumers_verified
+open_review_findings:
+  - {id: OSC-4-A-F1, severity: blocker, owner: search, status: closed_root_verified}
+  - {id: OSC-4-A-F2, severity: blocker, owner: search, status: closed_root_verified}
+  - {id: OSC-4-A-F3, severity: high, owner: search, status: closed_root_verified}
+  - {id: OSC-4-A-F4, severity: high, owner: search, status: closed_root_verified}
+  - {id: OSC-4-A-F5, severity: high, owner: root, status: closed_root_verified}
+  - {id: OSC-4-B-F1, severity: blocker, owner: root, status: closed_phase5_fail_closed_control_plane}
+  - {id: OSC-4-B-F2, severity: high, owner: runtime, status: closed_root_verified}
+  - {id: OSC-4-B-F3, severity: high, owner: runtime, status: closed_root_verified}
+  - {id: OSC-4-B-F4, severity: high, owner: runtime, status: closed_root_verified}
+  - {id: OSC-4-C-F1, severity: blocker, owner: contract, status: closed_root_verified}
+  - {id: OSC-4-C-F2, severity: blocker, owner: contract, status: closed_root_verified}
+  - {id: OSC-4-C-F3, severity: high, owner: contract, status: closed_root_verified}
+  - {id: OSC-4-C-F4, severity: high, owner: contract, status: closed_root_verified}
+  - {id: OSC-4-C-F5, severity: high, owner: contract, status: closed_root_verified}
+  - {id: OSC-4-C-F6, severity: low, owner: contract, status: deferred_to_phase6_measurement}
+  - {id: OSC-5-ROOT-003-A-F1, severity: blocker, owner: root, status: closed_root_verified}
+  - {id: OSC-6-FOUNDATION-SEARCH-R3-H1, severity: high, owner: search, status: remediation_complete_root_attack_rejected_pending_rotated_review_r4}
+  - {id: OSC-6-FOUNDATION-RUNTIME-R3-H1, severity: high, owner: runtime, status: remediation_complete_root_attack_rejected_pending_rotated_review_r4}
+  - {id: OSC-6-FOUNDATION-SEARCH-R4-H1, severity: high, owner: root, status: remediation_complete_root_independent_counterexample_validation_pending_rotated_independent_review}
+  - {id: OSC-6-FOUNDATION-SEARCH-R4-H2, severity: high, owner: root, status: remediation_complete_root_independent_counterexample_validation_pending_rotated_independent_review}
+  - {id: OSC-6-FOUNDATION-RUNTIME-R4-M1, severity: medium, owner: root, status: remediation_complete_root_independent_counterexample_validation_pending_rotated_independent_review}
+  - {id: OSC-6-FOUNDATION-SEARCH-R5-H1, severity: high, owner: root, status: remediation_verified_by_r6_seedlineage_rebind_review_separate_r6_h1_pending}
+  - {id: OSC-6-FOUNDATION-SEARCH-R6-H1, severity: high, owner: root, status: closed_r8c_independent_search_review_and_combined_pass}
+  - {id: OSC-6-FOUNDATION-RUNTIME-R6-M1, severity: medium, owner: root, status: closed_r8c_independent_runtime_review_and_combined_pass}
+  - {id: OSC-6-FOUNDATION-RUNTIME-R7-M1, severity: medium, owner: root, status: closed_r8c_independent_runtime_review_and_combined_pass}
+  - {id: OSC-6-FOUNDATION-RUNTIME-R7-M2, severity: medium, owner: root, status: closed_r8c_independent_runtime_review_and_combined_pass}
+  - {id: OSC-6-FOUNDATION-REVIEW-R8-A-SEARCH-AUTHORITY-SHA-MISMATCH, severity: blocker, owner: root, status: closed_process_authority_clarified_by_r8b_r8c}
+  - {id: OSC-6-FOUNDATION-R8-RUNTIME-AUTH-B1, severity: blocker, owner: root, status: closed_process_authority_clarified_by_r8b_r8c}
+  - {id: OSC-6-FOUNDATION-REVIEW-R8-C-AUTHORITY-SHA-001, severity: blocker, owner: root, status: closed_process_authority_clarified_by_r8b_r8c}
+  - {id: OSC-6-FOUNDATION-ROOT-R8B-RUNTIME-TERMINAL-001, severity: blocker, owner: root, status: closed_by_fresh_complete_r8c_runtime_review}
+  - {id: OSC-6-FOUNDATION-ROOT-R8B-SEARCH-REPORT-001, severity: blocker, owner: root, status: closed_by_fresh_complete_r8c_search_review}
+  - {id: OSC-6-FOUNDATION-ROOT-R8B-CONTRACT-REPORT-001, severity: blocker, owner: root, status: closed_by_fresh_complete_r8c_contract_review}
+gates:
+  - name: phase_0_dirty_paths_registered_and_preserved
+    threshold: complete snapshot and no existing dirty path overwritten
+    observed: initial status frozen; all existing OSC hashes verify; tracked diff and staged state unchanged
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase0_existing_osc_sha256.txt
+    status: pass
+  - name: phase_0_seven_inputs_hashed_and_read
+    threshold: 7 of 7
+    observed: 7 of 7
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase0_spec_sha256.txt
+    status: pass
+  - name: phase_0_osc_baseline
+    threshold: explicit result
+    observed: 66 passed in 0.22s using repository .venv
+    evidence: coordination ledger baseline record
+    status: pass
+  - name: phase_0_audit_boundaries_non_overlapping
+    threshold: three complete read-only task contracts with disjoint audit focus
+    observed: three read-only contracts; each has allowed_write_paths empty, forbidden_write_paths glob-all, and distinct audit focus
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase1_task_contracts.yaml
+    status: pass
+  - name: phase_1_three_read_only_audits
+    threshold: three complete reports with file/symbol/test evidence and zero child writes
+    observed: 3 complete reports; 0 child writes; frozen OSC hashes, tracked diff hash and status hash unchanged
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase1_dependency_dag.yaml
+    status: pass
+  - name: phase_1_dependency_dag
+    threshold: one deduplicated DAG with explicit uncertainties
+    observed: dependency DAG frozen; four unresolved semantic boundaries are explicit
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase1_dependency_dag.yaml
+    status: pass
+  - name: phase_2_public_interface_freeze
+    threshold: unique schema sources, canonical field/order/hash/version rules, import/serialization round-trip smoke, and all consumer confirmations
+    observed: unique sources and versioned canonical/public schemas frozen; 7 freeze tests and 73 OSC tests pass; all three consumers confirmed with no change request
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase2_interface_freeze.md
+    status: pass
+  - name: phase_3_three_exclusive_implementations
+    threshold: three complete reports, declared paths only, scoped tests pass, no unresolved silent change request
+    observed: contract 102, search 34, runtime 53 scoped tests pass; root workspace tests 196 pass; strict freeze and tracked diff fingerprints preserved; no undeclared paths or silent change requests
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase3_completion_summary.md
+    status: pass
+  - name: phase_4_ring_read_only_review
+    threshold: three complete evidence-backed reviews; every blocker/high has an owner; no style-only finding admitted; zero reviewer writes
+    observed: 3 reports; 5 blocker, 9 high, 1 low; all 14 blocker/high assigned; source aggregate/freeze/tracked diff unchanged; staged paths 0
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase4_review_reports.yaml
+    status: pass
+  - name: phase_5_contract_barrier
+    threshold: C-F1 through C-F5 closed with negative regressions, original Endpoint authority, unchanged freeze, and root full-suite verification
+    observed: C-F1 through C-F5 closed; 123 contract, 9 wrapper, 4 script, 7 freeze, and 218 full OSC tests passed; tracked diff and staged state preserved
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase5_contract_barrier.yaml
+    status: pass
+  - name: phase_5_observation_contract_barrier
+    threshold: unique resolvable cell/edge policies, versioned probe predicates, and exact case/backend/edge Endpoint binding without frozen schema change
+    observed: 376/376 unique cell policies; 384/384 unique directional edge policies; 24 probe cells resolve to 5 witness_false plugins; 60 scoped tests pass
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase5_observation_contract_barrier.yaml
+    status: pass
+  - name: phase_5_search_barrier
+    threshold: A-F1 through A-F5 closed with real activation/execution/observation authority, directional edge binding, provenance closure and universe-derived denominators
+    observed: 7/7 forgery regressions rejected; 384/384 unique edge HyperContracts materializable; 248 full OSC tests pass
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase5_search_barrier.yaml
+    status: pass
+  - name: phase_5_root_authority_control_plane
+    threshold: independently bound 41/38 authority build and preflight reject all incomplete, forged, synthetic, racing or untyped evidence without publishing or authorizing 24h
+    observed: 27 scoped and 76 Runtime-wildcard tests pass; three exact-SHA reviews report no blocker/high/medium; typed Phase6 semantic replay remains an explicit publication blocker
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase5_root_authority_control_barrier.yaml
+    status: pass
+  - name: phase_5_opaque_diagnostic_consumers
+    threshold: diagnostic-only facade plus base/metamorphic opaque refs preserved through every declared legacy consumer with zero decision authority and all scoped/repository tests passing
+    observed: 268 scoped, 379 OSC and 3080 repository tests pass with 1 repository skip; three direct exact-SHA reviews report blocker/high/medium=0
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase5_opaque_diagnostic_consumer_barrier.yaml
+    status: pass
+  - name: phase_5_exit
+    threshold: all Phase 5 sub-barriers pass, three direct exact-SHA reviews pass, no blocker/high remains, public freeze unchanged and no Phase 6/2h/24h execution
+    observed: all Phase 5 sub-barriers and three direct exact-SHA reviews pass; blocker/high/medium=0; public freeze unchanged; Phase 6/2h/24h not started
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase5_exit_barrier.yaml
+    status: pass
+  - name: phase_6_contract
+    threshold: all frozen contract gates
+    observed: >-
+      Root froze the missing full-canonical, equal-fingerprint, full-diff,
+      clustering, and paired-efficiency definitions under an explicit 2026-07-23
+      user authorization. R1 then added a private semantically replayable
+      full-canonical comparison receipt and Root context-pending boundary; its
+      one scoped suite passed 62 tests in 45.35s with all frozen/public SHA
+      values exact. R2 then bound the private receipt to an exact dynamic
+      comparison-decision record and trusted producer; its one scoped suite
+      passed 83 tests in 24.26s. The binding is not raw gate evidence: no gate
+      spec change, raw metric producer, or real evidence execution exists; the
+      gate remains pending. R3 added a private raw-pair receipt, Runtime strict
+      reconstruction, and Root v3 exact record/R2-decision binding; its only
+      scoped suite passed 78 tests in 25.23s with frozen/public SHA exact.
+      This remains structural plumbing: no raw producer, parallel-scaling
+      replacement, 1000-pair cohort, corpus execution, artifact, bootstrap, or
+      gate calculation exists. R4 then added a private pure typed raw-pair
+      builder that derives the R3 receipt from a real R1 comparison and exact
+      Runtime execution/evidence/counter input; its one scoped suite passed 34
+      tests in 0.48s with all frozen/public SHA values exact. It creates no
+      artifact/provenance admission and does not replace the fail-closed parallel
+      path, so the gate remains pending. R5 then introduced a private replacement
+      parallel-scaling receipt and Root dynamic binding, but its single scoped
+      suite failed 1 test while 95 passed: the post-admission byte-mutation
+      regression required a singleton diagnostic even though the correct first
+      hash mismatch was followed by a fail-closed record-not-admitted diagnostic.
+      R5 is recorded as failed. R5A then changed only that regression to assert
+      the required first error and nonempty fail-closed result; its one new
+      scoped suite passed 96 tests in 25.15s with all immutable R5 and
+      frozen/public SHA values exact. R6 then added a private typed
+      parallel-scaling producer which independently reconstructs the R5 sample
+      from frozen observations, exact typed evidence and raw counters; its one
+      scoped suite passed 54 tests in 0.63s with all frozen/public SHA values
+      exact. R7 now has a narrow authority only for a private re-readable
+      parallel provenance bridge; its one scoped suite passed 98 tests in
+      25.41s with all frozen/public SHA values exact. R7 binds one receipt to a
+      re-readable typed proof but deliberately creates no real raw artifact or
+      execution-provenance admission. This is private construction evidence
+      only, not a Contract gate: real artifact/provenance admission, cohort,
+      corpus, bootstrap, metric, and gate calculation remain absent and pending.
+      R8 has opened only a Root-owned definition boundary for execution
+      provenance and raw-artifact production; it authorizes no product write,
+      test, source snapshot, artifact, execution, or pass claim.
+      Its completed definition report records blocker OSC-6-CONTRACT-R8-B1:
+      receipt-index provenance remains digest-only until a new narrow
+      implementation authority supplies a Root-reconstructed process and
+      raw-artifact binding.
+      The R8 mapping also retains the protocol's clean-worktree requirement:
+      the current dirty workspace cannot yield paper-authoritative raw evidence.
+      R9 completed its separate private Contract-performance provenance bridge
+      authority with one scoped suite passing 100 in 25.95s and exact frozen,
+      R3/R4/R7 input, and staged-state checks before and after. It exact-pairs
+      a ContractPerformanceEvidenceReceipt to a re-readable private proof only;
+      it admitted no raw artifact, execution, cohort, corpus, metric, bundle,
+      manifest, or Contract-gate pass. OSC-6-CONTRACT-R8-B1 and the dirty
+      worktree paper-authority boundary remain open.
+      R10 has opened one further private Contract-performance execution-
+      provenance/raw-artifact structural bridge only. It has not run a test or
+      created a real launcher, paper-authoritative source snapshot, persisted
+      authority artifact, cohort, corpus, metric, bundle, manifest, or pass.
+      R10 completed that private bridge with one scoped suite passing 118 in
+      33.16s and exact frozen/R3/R4/R9 input checks before and after. Its
+      temporary test-only snapshot/artifact path exact-binds one Contract proof,
+      transcript output/zero exit and raw bytes, but creates no real launcher,
+      isolated-clean-worktree paper authority, complete producer set, corpus,
+      cohort, metric, bundle, manifest or Contract-gate pass. R8-B1 remains
+      open, partially structural-addressed only for this fixture.
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_evidence_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_evidence_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_receipt_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_receipt_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_typed_producer_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_typed_producer_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_receipt_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_receipt_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_first_error_remediation_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_first_error_remediation_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_typed_producer_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_typed_producer_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_execution_provenance_raw_artifact_boundary_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_execution_provenance_raw_artifact_boundary_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_performance_provenance_bridge_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_performance_provenance_bridge_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_performance_execution_provenance_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_contract_performance_execution_provenance_report.yaml
+    status: pending
+  - name: phase_6_private_foundation_barrier
+    threshold: >-
+      all three R8 negative-review reports have complete terminal results, aggregate
+      blocker=0 high=0 medium=0,
+      all thirteen target SHA values match, the exact six-file combined scoped suite passes,
+      and frozen Contract and public API SHA values remain exact
+    observed: >-
+      R8C reused exactly the same three direct read-only reviewer slots under a fresh current
+      ledger binding. It returned three complete reports, all pre/post authority and target SHA
+      exact, aggregate blocker=0/high=0/medium=0, Search 56 passed in 243.98s, Runtime 83
+      passed in 5.15s, and Contract 19 passed in 0.52s. Root then reverified all 13 targets
+      before and after the single authorized six-file suite, which passed 158 in 240.28s.
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round7b_runtime_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8b_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8b_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_reports.yaml
+    status: pass
+  - name: phase_6_private_foundation_remediation_r6
+    threshold: >-
+      both isolated R6 remediation reports have complete one-time scoped-suite terminal
+      results and exact post-suite frozen/public SHA values; R7 then requires three
+      direct independent reports with blocker=0/high=0/medium=0 and exact target SHA
+    observed: >-
+      The R6 remediation suites completed with exact frozen/public SHA. R7 identified Runtime
+      M1/M2 and missing Search terminal evidence; R7B fixed Runtime. Fresh R8C independent
+      Search/Runtime/Contract reports were all complete with blocker=0/high=0/medium=0, followed
+      by the one authorized six-file combined suite passing 158 in 240.28s; no Phase 7, 2h, or
+      24h execution occurred.
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_search_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_search_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_runtime_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_runtime_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_reports.yaml
+    status: pass
+  - name: phase_6_private_foundation_remediation_r7_runtime
+    threshold: >-
+      R7-M1 and all canonical typed-case and recheck exact-context regressions pass under a
+      newly authorized Runtime-only remediation contract with one complete scoped-suite result
+      and exact frozen/public SHA values.
+    observed: >-
+      R7 initially exposed M2 after the R7 Runtime suite failed 1 failed, 80 passed. The isolated
+      R7B remediation then passed 83 scoped tests. R8C independently rechecked M1/M2 and all
+      typed-context precedence with 83 passed in 5.15s; the one authorized six-file combined
+      suite then passed 158 in 240.28s.
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round7_runtime_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round7_runtime_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round7b_runtime_task_contracts.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round7b_runtime_reports.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_reports.yaml
+    status: pass
+  - name: phase_6_cr001_typed_semantic_replay
+    threshold: all 25 allowed typed envelopes have one real-object replayer; malformed, substituted, context-only and unproven Runtime admissions fail closed; three exact-SHA reviews have no blocker/high/medium
+    observed: 6 Contract, 7 Search and 12 Runtime pairs have one owner; 41 scoped, 129 combined, 474 OSC and 3175 repository tests pass with 1 repository skip; three exact-SHA reviews report blocker/high/medium=0
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase6_cr001_exit_barrier.yaml
+    status: pass
+  - name: phase_6_granularity_reachability
+    threshold: all 232/384/502 and activation gates
+    observed: >-
+      R1 completed one private one-cell/one-fresh-backend-pair structural
+      Search-to-Runtime context binding with one scoped suite passing 6 in
+      4.13s. R2A then completed one direct serial uncached pandas/polars
+      adapter-pair diagnostic sample with 4 scoped tests passing in 6.37s.
+      The sample has no source snapshot, persistent raw artifact,
+      CoverageLedger event, producer/provenance receipt, observed aggregate
+      coverage, authority eligibility, or gate credit, so it does not satisfy
+      any 232/384/502 or activation threshold.
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_r2a_test_only_report.yaml
+    status: pending
+  - name: phase_6_runtime_correctness
+    threshold: all exactness, parallel, v3 2200-case, and repository gates
+    observed: >-
+      R1 added a private source-input clean/dirty eligibility guard and passed
+      4 scoped tests, but it creates no actual source snapshot, artifact,
+      producer/provenance record, parallel evidence, v3 run, or repository
+      receipt. It therefore contributes no runtime-correctness gate credit.
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_eligibility_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_eligibility_report.yaml
+    status: pending
+  - name: phase_7_paired_pilot
+    threshold: phase 6 passed, preregistered equal-budget 2h paired pilot completed
+    observed: null
+    evidence: null
+    status: pending
+  - name: phase_8_user_authorization
+    threshold: explicit authorization after phases 0-7 pass
+    observed: not granted
+    evidence: current user instruction explicitly forbids unauthorized 24h launch
+    status: pending

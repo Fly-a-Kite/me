@@ -31,6 +31,7 @@ def _restore_closed_loop_state(
     feedback = None
     guidance = None
     if feedback_enabled:
+        corpus_mode = config.method_policy.generation.corpus_mode
         scheduler_state = _restore_source_scheduler_state(
             state,
             config=config,
@@ -44,6 +45,7 @@ def _restore_closed_loop_state(
                 max_persisted=config.feedback_persist_limit,
                 max_cases_per_profile=config.feedback_max_cases_per_profile,
                 source_scheduler=scheduler_state,
+                corpus_mode=corpus_mode,
                 enable_mutation_operator_learning=config.enable_mutation_operator_learning,
                 enable_operator_swarm=config.enable_operator_swarm,
                 enable_ir_rewrite_mutations=config.enable_ir_rewrite_mutations,
@@ -72,6 +74,7 @@ def _restore_closed_loop_state(
                 max_persisted=config.feedback_persist_limit,
                 max_cases_per_profile=config.feedback_max_cases_per_profile,
                 source_scheduler=scheduler_state,
+                corpus_mode=corpus_mode,
                 enable_mutation_operator_learning=config.enable_mutation_operator_learning,
                 enable_operator_swarm=config.enable_operator_swarm,
                 enable_ir_rewrite_mutations=config.enable_ir_rewrite_mutations,

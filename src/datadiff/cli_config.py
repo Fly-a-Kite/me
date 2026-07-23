@@ -11,6 +11,7 @@ from datadiff.exploration_objectives import (
     merge_exploration_objective_rules,
 )
 from datadiff.guidance import parse_guidance_targets
+from datadiff.method_arms import DEFAULT_METHOD_ARM_ID
 from datadiff.util import load_json
 
 
@@ -274,7 +275,12 @@ def config_from_args(args: argparse.Namespace) -> ExperimentConfig:
     disabled_adaptive_components = parse_adaptive_components(
         getattr(args, "disable_adaptive_components", "")
     )
+    research_control_arm = str(getattr(args, "research_control_arm", "") or "")
     return ExperimentConfig(
+        method_arm=(
+            research_control_arm
+            or str(getattr(args, "method_arm", DEFAULT_METHOD_ARM_ID) or DEFAULT_METHOD_ARM_ID)
+        ),
         enable_type_aware_generation=not args.disable_type_aware_generation,
         enable_normalizer=not args.disable_normalizer,
         enable_differential_oracle=not args.disable_differential_oracle,
@@ -284,8 +290,99 @@ def config_from_args(args: argparse.Namespace) -> ExperimentConfig:
         enable_replay_bug=bool(getattr(args, "enable_replay_bug", False)),
         enable_reducer=args.enable_reducer,
         enable_artifact=not args.disable_artifact,
-        enable_parallel_backend_execution=not bool(
-            getattr(args, "disable_parallel_backend_execution", False)
+        enable_parallel_backend_execution=(
+            bool(getattr(args, "enable_parallel_backend_execution", False))
+            and not bool(getattr(args, "disable_parallel_backend_execution", False))
+        ),
+        enable_backend_session_reuse=not bool(
+            getattr(args, "disable_backend_session_reuse", False)
+        ),
+        enable_backend_sampling=bool(getattr(args, "enable_backend_sampling", False)),
+        backend_sample_size=max(2, int(getattr(args, "backend_sample_size", None) or 3)),
+        backend_full_sweep_interval=max(
+            0,
+            int(
+                16
+                if getattr(args, "backend_full_sweep_interval", None) is None
+                else args.backend_full_sweep_interval
+            ),
+        ),
+        backend_sample_confirm_candidates=(
+            True
+            if getattr(args, "backend_sample_confirm_candidates", None) is None
+            else bool(args.backend_sample_confirm_candidates)
+        ),
+        backend_sampling_calibration_cases=max(
+            0,
+            int(
+                8
+                if getattr(args, "backend_sampling_calibration_cases", None) is None
+                else args.backend_sampling_calibration_cases
+            ),
+        ),
+        backend_sampling_candidate_burst_cases=max(
+            0,
+            int(
+                8
+                if getattr(args, "backend_sampling_candidate_burst_cases", None) is None
+                else args.backend_sampling_candidate_burst_cases
+            ),
+        ),
+        backend_sampling_candidate_burst_novel_only=bool(
+            getattr(args, "backend_sampling_candidate_burst_novel_only", False)
+        ),
+        backend_sample_confirmation_recheck_count=(
+            None
+            if getattr(args, "backend_sample_confirmation_recheck_count", None) is None
+            else max(0, int(args.backend_sample_confirmation_recheck_count))
+        ),
+        enable_adaptive_candidate_pool=bool(
+            getattr(args, "enable_adaptive_candidate_pool", False)
+        ),
+        adaptive_candidate_pool_min_size=max(
+            1,
+            int(getattr(args, "adaptive_candidate_pool_min_size", None) or 4),
+        ),
+        adaptive_candidate_pool_full_sweep_interval=max(
+            0,
+            int(
+                12
+                if getattr(args, "adaptive_candidate_pool_full_sweep_interval", None) is None
+                else args.adaptive_candidate_pool_full_sweep_interval
+            ),
+        ),
+        adaptive_candidate_pool_calibration_cases=max(
+            0,
+            int(
+                8
+                if getattr(args, "adaptive_candidate_pool_calibration_cases", None) is None
+                else args.adaptive_candidate_pool_calibration_cases
+            ),
+        ),
+        adaptive_candidate_pool_candidate_burst_cases=max(
+            0,
+            int(
+                8
+                if getattr(args, "adaptive_candidate_pool_candidate_burst_cases", None) is None
+                else args.adaptive_candidate_pool_candidate_burst_cases
+            ),
+        ),
+        adaptive_candidate_pool_candidate_burst_novel_only=bool(
+            getattr(
+                args,
+                "adaptive_candidate_pool_candidate_burst_novel_only",
+                False,
+            )
+        ),
+        adaptive_candidate_pool_preserve_seed_stride=bool(
+            getattr(args, "adaptive_candidate_pool_preserve_seed_stride", False)
+        ),
+        adaptive_candidate_pool_compensate_seed_horizon=bool(
+            getattr(
+                args,
+                "adaptive_candidate_pool_compensate_seed_horizon",
+                False,
+            )
         ),
         enable_preflight_validation=not args.disable_preflight_validation,
         enable_preflight_repair=not args.disable_preflight_repair,

@@ -8,26 +8,22 @@ from datadiff.backends.dataframe_semantics import running_sum_plan, tuple_absenc
 from datadiff.backends.probe_semantics import EXTENDED_FALSE_PROBE_KINDS
 from datadiff.backends.sql_lowering import (
     SqlDialect,
+    cast_logical_expression,
     render_aggregate_sql,
     render_case_when_expr,
     render_coalesce_expr,
+    render_filter_condition,
     render_fill_null_expr,
     render_groupby_sql,
+    render_join_condition,
+    render_join_right_projection,
     render_mutate_expr,
+    render_semi_anti_join_condition,
 )
 from datadiff.backends.sql_runtime import build_subquery_runtime
 from datadiff.dsl import Program, SortKey, TableData, normalize_sort_keys
-from datadiff.filtering import sql_filter_condition
 from datadiff.join_keys import join_key_pairs
 from datadiff.operation_semantics import (
-    aggregate_column,
-    aggregate_alias,
-    aggregate_func,
-    aggregate_specs,
-    case_else_value,
-    case_then_value,
-    expr_kind,
-    expr_target_type,
     groupby_keys,
     is_default_false_probe_kind,
     op_ascending,
@@ -42,6 +38,7 @@ from datadiff.operation_semantics import (
     op_value,
 )
 from datadiff.pathing import path_basename
+from datadiff.program_state import ProgramState, state_after_operation
 from datadiff.running import running_sum_partition_columns, running_sum_sort_keys
 from datadiff.sortedness import is_sorted_values
 from datadiff.sqlite_runtime import sqlite3
@@ -73,13 +70,7 @@ def _lit(value: Any) -> str:
 
 
 def _sql_type(kind: str) -> str:
-    if kind == "int":
-        return "INTEGER"
-    if kind == "float":
-        return "REAL"
-    if kind == "bool":
-        return "INTEGER"
-    return "TEXT"
+    return SQLITE_DIALECT.cast_type(kind)
 
 
 def _order_clause(sort_keys: list[SortKey]) -> str:
@@ -115,10 +106,17 @@ def _agg_expr(column: str, func: str) -> str:
 
 
 SQLITE_DIALECT = SqlDialect(
-    float_cast_type="REAL",
-    int_cast_type="INTEGER",
-    str_cast_type="TEXT",
+    logical_type_sql={
+        "bool": "INTEGER",
+        "float": "REAL",
+        "int": "INTEGER",
+        "str": "TEXT",
+    },
     string_slice_fn="SUBSTR",
+    string_length_sql=lambda source: f"LENGTH({source})",
+    string_contains_sql=lambda source, needle: (
+        f"CASE WHEN {source} IS NULL THEN NULL ELSE INSTR({source}, {needle}) > 0 END"
+    ),
     string_startswith_fn=lambda source, needle: (
         f"CASE WHEN {source} IS NULL THEN NULL ELSE SUBSTR({source}, 1, LENGTH({needle})) = {needle} END"
     ),
@@ -135,43 +133,6 @@ SQLITE_DIALECT = SqlDialect(
     division_sql=lambda source, value: f"1.0 * {source} / {value}",
     reverse_division_sql=lambda numerator, source: f"1.0 * {numerator} / {source}",
 )
-
-
-def _join_condition(op: dict[str, Any]) -> str:
-    left_keys, right_keys = join_key_pairs(op)
-    return " AND ".join(f"q.{_quote(left)} = r.{_quote(right)}" for left, right in zip(left_keys, right_keys))
-
-
-def _semi_anti_join_condition(op: dict[str, Any], kind: str) -> str:
-    left_keys, right_keys = join_key_pairs(op)
-    predicates = [
-        *(f"r.{_quote(right)} IS NOT NULL" for right in right_keys),
-        *(f"q.{_quote(left)} = r.{_quote(right)}" for left, right in zip(left_keys, right_keys)),
-    ]
-    exists_sql = f"EXISTS (SELECT 1 FROM {_quote(op_table(op))} r WHERE {' AND '.join(predicates)})"
-    return exists_sql if kind == "semi_join" else f"NOT {exists_sql}"
-
-
-def _agg_result_type(column_types: dict[str, str], agg: Any) -> str:
-    func = aggregate_func(agg)
-    if func in {"count", "nunique"}:
-        return "int"
-    if func in {"any", "all"}:
-        return "bool"
-    if func == "mean":
-        return "float"
-    return column_types.get(aggregate_column(agg), "float")
-
-
-def _case_when_sqlite_type(then_value: Any, else_value: Any) -> str:
-    values = [then_value, else_value]
-    if all(isinstance(value, bool) for value in values):
-        return "bool"
-    if all(isinstance(value, int) and not isinstance(value, bool) for value in values):
-        return "int"
-    if all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in values):
-        return "float"
-    return "str"
 
 
 def _dataframe_preserving_sqlite_scalars(pd: Any, rows: list[tuple[Any, ...]], columns: list[str]):
@@ -235,7 +196,7 @@ def _scalar_subquery_probe_sql(op: dict[str, Any]) -> str:
 class SQLiteBackend(Backend):
     name = "sqlite"
 
-    def run(
+    def execute_lowered(
         self,
         tables: list[TableData | PreparedTable],
         program: Program,
@@ -247,7 +208,7 @@ class SQLiteBackend(Backend):
 
             prepared_tables = [prepare_table(table) for table in tables]
             table_by_name = {table.name: table for table in prepared_tables}
-            column_types = {c.name: c.type for table in prepared_tables for c in table.columns}
+            semantic_state = ProgramState.from_table(prepared_tables[0])
             current_cols = [c.name for c in prepared_tables[0].columns]
             con = sqlite3.connect(":memory:")
             con.create_function("__datadiff_basename", 1, path_basename)
@@ -298,27 +259,28 @@ class SQLiteBackend(Backend):
 
             for op in program.operations:
                 kind = op_kind(op)
+                next_semantic_state = state_after_operation(
+                    semantic_state,
+                    op,
+                    tables=table_by_name,
+                )
                 if kind == "join":
                     drop_hidden_order_cols()
                     right = table_by_name[op_table(op)]
                     _, right_keys = join_key_pairs(op)
-                    right_key_set = set(right_keys)
-                    right_cols = [
-                        f"r.{_quote(c.name)} AS {_quote(c.name)}"
-                        for c in right.columns
-                        if c.name not in right_key_set
-                    ]
-                    select_right = ", " + ", ".join(right_cols) if right_cols else ""
+                    right_types = {column.name: column.type for column in right.columns}
+                    select_right, projected_right = render_join_right_projection(
+                        right.column_names,
+                        right_keys,
+                        semantic_state.columns,
+                        _quote,
+                    )
                     join_kind = "LEFT JOIN" if op["how"] == "left" else "INNER JOIN"
                     query = runtime.assign_source(
                         f"SELECT q.*{select_right} FROM ({query}) q {join_kind} {_quote(right.name)} r "
-                        f"ON {_join_condition(op)}"
+                        f"ON {render_join_condition(op, SQLITE_DIALECT, _quote, semantic_state.column_types, right_types)}"
                     )
-                    runtime.state.current_cols.extend(
-                        c.name
-                        for c in right.columns
-                        if c.name not in right_key_set and c.name not in runtime.state.current_cols
-                    )
+                    runtime.state.current_cols.extend(projected_right)
                     runtime.state.visible_cols = list(runtime.state.current_cols)
                     runtime.state.pending_order = None
                 elif kind == "union_all":
@@ -331,13 +293,27 @@ class SQLiteBackend(Backend):
                     runtime.state.current_cols = list(runtime.state.visible_cols)
                     runtime.state.pending_order = None
                 elif kind in {"semi_join", "anti_join"}:
-                    condition = _semi_anti_join_condition(op, kind)
+                    right = table_by_name[op_table(op)]
+                    right_types = {column.name: column.type for column in right.columns}
+                    condition = render_semi_anti_join_condition(
+                        op,
+                        kind,
+                        SQLITE_DIALECT,
+                        _quote,
+                        semantic_state.column_types,
+                        right_types,
+                    )
                     query = runtime.assign_source(f"SELECT * FROM ({query}) q WHERE {condition}")
                 elif kind == "drop_nulls":
                     condition = " AND ".join(f"q.{_quote(column)} IS NOT NULL" for column in op["columns"])
                     query = runtime.assign_source(f"SELECT * FROM ({query}) q WHERE {condition}")
                 elif kind == "filter":
-                    condition = sql_filter_condition(_quote(op["column"]), _lit(op["value"]), op["cmp"])
+                    condition = render_filter_condition(
+                        f"q.{_quote(op_column(op))}",
+                        _lit(op_value(op)),
+                        op_comparator(op),
+                        SQLITE_DIALECT,
+                    )
                     query = runtime.assign_source(
                         f"SELECT * FROM ({query}) q "
                         f"WHERE {condition}"
@@ -378,15 +354,12 @@ class SQLiteBackend(Backend):
                     )
                     alias = op_output_alias(op)
                     _reset_probe_query(alias, f"SELECT {1 if ok else 0} AS {_quote(alias)}")
-                    column_types[alias] = "bool"
                 elif kind == "scalar_subquery_probe":
                     alias = op_output_alias(op)
                     _reset_probe_query(alias, _scalar_subquery_probe_sql(op))
-                    column_types[alias] = "bool"
                 elif kind in EXTENDED_FALSE_PROBE_KINDS or is_default_false_probe_kind(kind):
                     alias = op_output_alias(op)
                     _reset_probe_query(alias, f"SELECT 0 AS {_quote(alias)}")
-                    column_types[alias] = "bool"
                 elif kind == "select":
                     cols = op_columns(op)
                     projection = select_with_pending_order(cols)
@@ -397,9 +370,11 @@ class SQLiteBackend(Backend):
                     projection = ", ".join(f"q.{_quote(c)}" for c in cols)
                     query = runtime.assign_source(f"SELECT DISTINCT {projection} FROM ({query}) q")
                     runtime.state.reset_projection(cols)
-                    column_types = {column: column_types[column] for column in cols if column in column_types}
                 elif kind == "fill_null":
                     column, expr_sql = render_fill_null_expr(op, _quote, _lit)
+                    output_type = next_semantic_state.column_types.get(column)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, SQLITE_DIALECT)
                     if runtime.state.pending_order_mentions(column):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(column, expr_sql, _quote)
@@ -410,24 +385,27 @@ class SQLiteBackend(Backend):
                         drop_hidden_order_cols()
                 elif kind == "coalesce":
                     alias, expr_sql = render_coalesce_expr(op, _quote, _lit)
+                    output_type = next_semantic_state.column_types.get(alias)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, SQLITE_DIALECT)
                     if runtime.state.pending_order_mentions(alias):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(alias, expr_sql, _quote)
                     query = runtime.assign_source(f"SELECT {projection} FROM ({query}) q")
                     runtime.state.replace_visible_column(alias)
-                    sources = op_columns(op)
-                    column_types[alias] = column_types.get(str(sources[0]), "str") if sources else "str"
                     if runtime.state.pending_order_mentions(alias):
                         runtime.state.clear_pending_order()
                         drop_hidden_order_cols()
                 elif kind == "case_when":
-                    alias, expr_sql = render_case_when_expr(op, _quote, _lit)
+                    alias, expr_sql = render_case_when_expr(op, SQLITE_DIALECT, _quote, _lit)
+                    output_type = next_semantic_state.column_types.get(alias)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, SQLITE_DIALECT)
                     if runtime.state.pending_order_mentions(alias):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(alias, expr_sql, _quote)
                     query = runtime.assign_source(f"SELECT {projection} FROM ({query}) q")
                     runtime.state.replace_visible_column(alias)
-                    column_types[alias] = _case_when_sqlite_type(case_then_value(op), case_else_value(op))
                     if runtime.state.pending_order_mentions(alias):
                         runtime.state.clear_pending_order()
                         drop_hidden_order_cols()
@@ -451,19 +429,21 @@ class SQLiteBackend(Backend):
                     else:
                         query = runtime.assign_source(f"SELECT * FROM ({query}) q LIMIT -1 OFFSET {op_n(op)}")
                 elif kind == "mutate":
-                    out_column, expr_sql = render_mutate_expr(op, SQLITE_DIALECT, _quote, _lit)
+                    out_column, expr_sql = render_mutate_expr(
+                        op,
+                        SQLITE_DIALECT,
+                        _quote,
+                        _lit,
+                        semantic_state.column_types,
+                    )
+                    output_type = next_semantic_state.column_types.get(out_column)
+                    if output_type is not None:
+                        expr_sql = cast_logical_expression(expr_sql, output_type, SQLITE_DIALECT)
                     if runtime.state.pending_order_mentions(out_column):
                         freeze_pending_order()
                     projection = runtime.state.replace_projection_expr(out_column, expr_sql, _quote)
                     query = runtime.assign_source(f"SELECT {projection} FROM ({query}) q")
                     runtime.state.replace_visible_column(out_column)
-                    if kind == "mutate":
-                        if expr_kind(op) in {"bool_not", "string_contains", "string_starts_with", "string_ends_with"}:
-                            column_types[out_column] = "bool"
-                        elif expr_kind(op) == "cast":
-                            column_types[out_column] = expr_target_type(op) or column_types.get(out_column, "str")
-                        elif expr_kind(op) == "date_part":
-                            column_types[out_column] = "int"
                     if runtime.state.pending_order_mentions(out_column):
                         runtime.state.clear_pending_order()
                         drop_hidden_order_cols()
@@ -475,24 +455,21 @@ class SQLiteBackend(Backend):
                         f"SELECT {select_sql} "
                         f"FROM ({query}) q GROUP BY {', '.join(_quote(key) for key in keys)}"
                     )
-                    for agg in aggregate_specs(op):
-                        column_types[aggregate_alias(agg)] = _agg_result_type(column_types, agg)
                     runtime.state.reset_projection(keys + aliases)
                 elif kind == "aggregate":
                     drop_hidden_order_cols()
                     agg_sql, aliases = render_aggregate_sql(op, _agg_expr, _quote)
                     query = runtime.assign_source(f"SELECT {', '.join(agg_sql)} FROM ({query}) q")
-                    for agg in aggregate_specs(op):
-                        column_types[aggregate_alias(agg)] = _agg_result_type(column_types, agg)
                     runtime.state.reset_projection(aliases)
                 else:
                     raise ValueError(kind)
+                semantic_state = next_semantic_state
             query = runtime.assign_source(runtime.finalize_source())
             cur = con.execute(query)
             columns = [desc[0] for desc in cur.description]
             out = _dataframe_preserving_sqlite_scalars(pd, cur.fetchall(), columns)
             for col in out.columns:
-                if column_types.get(str(col)) == "bool":
+                if semantic_state.column_types.get(str(col)) == "bool":
                     out[col] = out[col].map(lambda v: None if pd.isna(v) else bool(v))
             con.close()
             return BackendResult(self.name, "ok", data=out, duration_ms=(time.perf_counter() - start) * 1000)

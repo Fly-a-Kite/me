@@ -1,0 +1,68 @@
+schema_version: osc-phase5-observation-contract-barrier-v1
+task_id: OSC-5-ROOT-OBSERVATION-AUTHORITY
+status: passed_root_verified
+finding_disposition:
+  OSC-4-A-F5: closed_root_verified
+  OSC-4-A-F1: root_dependency_closed_search_ledger_followup_required
+change_request:
+  id: CR-OSC-5-003
+  status: root_binding_complete_pending_search_consumer
+scope:
+  exact_changed_files:
+    - src/datadiff_osc/probe_contracts.py
+    - src/datadiff_osc/semantic_targets/compiler.py
+    - tests/osc/test_probe_contract_integration.py
+  forbidden_paths_modified: []
+  frozen_field_shape_changed: false
+  frozen_schema_version_changed: false
+  public_manifest_changed: false
+authority_results:
+  compiled_cells:
+    fresh: 232
+    regression: 144
+    unique_observation_policy_ids: 376
+  fresh_edges:
+    total: 384
+    unique_direction_bound_policy_ids: 384
+  backend_pair_obligations:
+    fresh: 502
+    regression: 228
+    policy: pair identity resolves through its target cell policy
+  probe_predicates:
+    covered_cells: 24
+    versioned_plugins: 5
+    relation: witness_false
+  negative_regressions:
+    - unrelated case digest rejected
+    - unrelated backend role rejected
+    - missing base or sibling backend pair rejected
+    - reversed edge with retained policy ID rejected
+    - unregistered probe predicate rejected
+    - target physical-layout rebinding rejected
+    - non-probe monotonic edge has no fallback and fails closed
+tests:
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider
+      tests/osc/test_probe_contract_integration.py
+      tests/osc/test_targets_compiler_properties.py
+      tests/osc/test_public_api_freeze.py
+    exit_code: 0
+    result: 16 passed in 2.33s
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider
+      tests/osc/test_targets_*.py tests/osc/test_generation_*.py
+      tests/osc/test_search_*.py tests/osc/test_scheduler_*.py
+      tests/osc/test_probe_contract_integration.py
+      tests/osc/test_public_api_freeze.py
+    exit_code: 0
+    result: 60 passed in 52.28s
+hashes:
+  src/datadiff_osc/probe_contracts.py: 8dd4ce0978de3ff6294b2a96faf723160be0767b74101a80e232323cea7798e9
+  src/datadiff_osc/semantic_targets/compiler.py: ff7e0ca9287769fc5e4ed8e76518cf1d543e4bb99198335ed41a2f10eba29e83
+  tests/osc/test_probe_contract_integration.py: d258adcb46990fa7ef3db212c2808eb9c32e348cb91ccff8523c5d6a8468ac5e
+  src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  tracked_diff_stat: 341553eede7eb403553383d713f9a803207214388e7b1c0378d78b74445b45d9
+staged_paths: 0
+pilot_started: false
+twenty_four_hour_run_authorized: false
+next_barrier: Search may modify only ledger.py and test_search_ledger.py to consume the trusted resolver; Runtime remains locked.

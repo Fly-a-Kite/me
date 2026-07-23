@@ -1,0 +1,276 @@
+schema_version: osc-review-report-set-v1
+phase: 6
+round: private_foundation_remediation_exact_sha_ring_review_r8
+status: complete_authority_stopped_pending_unambiguous_fresh_review_authority
+review_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_contracts.yaml
+  sha256: 633ba886b2b9c425f478e3e1d5b4a1bb32e123897199d0cb2a7eb065ff0850dc
+entry_authority:
+  r5_remediation_contract: {sha256: 706ddd532c0bd756d93340d7c2dc87f662b8330fd88725a9ce22b81a344eb7cf}
+  r5_remediation_report: {sha256: f4f67ed4c3359c7d7f6013f91dbb9594da65d2579fdf3bf5c9876da9ed2ca3fa}
+  r5_review_contract: {sha256: c1e70ee5663173294545b4c8966d138debb718238b6da2a9c68001ad5680f5fa}
+  r5_review_report: {sha256: 1bc36fd45b4349dff67438d79afae1c3f753ca3eb08c3dd3c0ce20933c104fbb}
+  r6_review_contract: {sha256: 8ecbe889ba06cedbe4d23eab95f9b0702a051cd70948eee9bf7084845aa84cdd}
+  r6_review_report: {sha256: 664d151e31f46a5352cd0d649703f8e4d26e0b3dca56b7055e4798d806f1a1a1}
+  r6_search_remediation_contract: {sha256: 2417a53c91e407e17d0bfb689721c070b8c75a828ce472bc312daa221ac84006}
+  r6_search_remediation_report: {sha256: ddb0a23cfa2488068b16cf93cefc69993e83296239cfda1049fea5fe853ea003}
+  r6_runtime_remediation_contract: {sha256: 3ea22a3856303f8f2b136d7f853fd2012fe43d0a8218c7c9790da05d40ae7b59}
+  r6_runtime_remediation_report: {sha256: 968906715399e57c39b7acabefcdf7405614812cb6b99661416e764764338596}
+  r7_review_contract: {sha256: 7f5111e0d2bb4906b1c037441c7c7aa27843664e30b029807eb9464ceacf7a8d}
+  r7_review_report: {sha256: 2dc9f31509079969e9ec8240ca8cff983e315eda89994c74918b710203ac25d9}
+  r7_runtime_remediation_contract: {sha256: 6438e63dee4f6e92febda6c584d4a6bea83503fa64bd3efb33097039cec6b113}
+  r7_runtime_remediation_report: {sha256: 65040f5646216b8dd57c53354ff1903a130c2f9fa3822c5ddd88f9ea876d34a2}
+  r7b_runtime_remediation_contract: {sha256: 02209f714201e42e7fdfa9a793c1e1484be9d76cf95c8b3a26d479d41b1e5212}
+  r7b_runtime_remediation_report: {sha256: 140de7b17eda214a53aa6e8f3b8a27b965fe5c88c61bf805e4aa276253c6ca68}
+  contract_historical_ledger_snapshot:
+    path: experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    sha256: f30cc602c5b1882ede511b343f020a3310816e880b4c28698cf5248426f62cd4
+  ledger_observed_at_r8_review:
+    path: experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    sha256: 29bb82f0931db1f5248c9ccb99119e07c313312ff47aa9a7f19be80767a4d9fc
+workspace_after_all_reviewer_reports:
+  head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  staged_paths: 0
+  status_entries: 2908
+  root_target_sha_reverification: exact_for_all_thirteen_targets
+  preservation_check: >-
+    Root made no product or frozen-file changes. The three reused direct reviewers separately
+    reported writes=0, child_agents=0, forbidden_paths_modified=[], and no repository write.
+coordination:
+  direct_agent_count: 3
+  reviewer_slots_reused_from_r7: true
+  additional_agents_created: 0
+  grandchildren_allowed: false
+  reviewer_writes_allowed: false
+  root_is_not_an_independent_reviewer: true
+  review_language: "负向复核、独立反例验证、异常输入验证"
+  aggregation_note: >-
+    This Root aggregation preserves the three independent reports and does not present Root's
+    authority interpretation as an independent review conclusion.
+reports:
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8-A-SEARCH
+    reviewer: r8_search_independent_reviewer
+    mode: read_only_exact_sha_negative_review
+    status: stopped_authority_sha_mismatch
+    inputs_read_to_eof: true
+    authority_sha_verification:
+      r8_contract: exact
+      r5_r6_r7_r7b_authority: exact
+      coordination_ledger:
+        contract_expected: f30cc602c5b1882ede511b343f020a3310816e880b4c28698cf5248426f62cd4
+        current_observed: 29bb82f0931db1f5248c9ccb99119e07c313312ff47aa9a7f19be80767a4d9fc
+        result: mismatch_stop
+    target_sha256:
+      pre_stop:
+        src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+        tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+        src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+        tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+        src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+        tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+      post_stop: not_performed_due_to_authority_stop
+    scoped_test:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py
+        tests/osc/test_search_gate_crosswalk.py
+      execution_count: 0
+      exit_code: not_run
+      complete_terminal_result: not_applicable
+    review_results:
+      负向复核: not_performed_due_to_authority_stop
+      独立反例验证: not_performed_due_to_authority_stop
+      异常输入验证: not_performed_due_to_authority_stop
+    findings:
+      - id: OSC-6-FOUNDATION-REVIEW-R8-A-SEARCH-AUTHORITY-SHA-MISMATCH
+        severity: blocker
+        claim: R8 contract's coordination_ledger_before_r8_contract SHA does not equal the current ledger SHA.
+        reproduction: >-
+          Contract lines 54-56 bind f30cc602c5b1882ede511b343f020a3310816e880b4c28698cf5248426f62cd4;
+          sha256sum of coordination_ledger.yaml returned
+          29bb82f0931db1f5248c9ccb99119e07c313312ff47aa9a7f19be80767a4d9fc.
+        violated_invariant: R8 requires authority SHA verification before semantic validation or scoped pytest.
+        required_test: Re-establish valid unambiguous R8 authority, then issue fresh independent review authorization.
+    counts: {blocker: 1, high: 0, medium: 0, low: 0}
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations: []
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8-B-RUNTIME
+    reviewer: r8_runtime_independent_reviewer
+    mode: read_only_exact_sha_negative_review
+    status: authority_stopped_after_completed_once_scoped_suite
+    inputs_read_to_eof: true
+    authority_sha_verification:
+      r8_contract: exact
+      r5_r6_r7_r7b_authority: exact
+      coordination_ledger:
+        contract_expected: f30cc602c5b1882ede511b343f020a3310816e880b4c28698cf5248426f62cd4
+        current_observed: 29bb82f0931db1f5248c9ccb99119e07c313312ff47aa9a7f19be80767a4d9fc
+        result: mismatch_stop
+        reviewer_note: >-
+          The field label makes this a historical-snapshot semantic ambiguity, but the
+          reviewer retained it as an authority finding and did not treat this report as pass.
+    target_sha256:
+      pre_and_post: exact_for_all_thirteen_targets
+      src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+      tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+      src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+      tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    scoped_test:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+      execution_count: 1
+      exit_code: 0
+      complete_terminal_result: |
+        ........................................................................ [ 86%]
+        ...........                                                              [100%]
+        83 passed in 0.66s
+    review_results:
+      负向复核:
+        r7_m1_context_precedence: pass
+        r7_m2_canonical_case_precedence: pass
+        r6_binding_collision_threshold_candidate_boundary: pass
+      独立反例验证:
+        r7_m1_matrix: pass
+        r7_m2_matrix: pass
+        r6_exact_envelope_matrix: pass
+      异常输入验证:
+        malformed_provenance: pass
+        diagnostic_promotion: pass
+        confirmed_or_bug_claimed_candidate: pass
+        non_ok_and_wrong_case_context: pass
+        missing_or_wrong_typed_binding: fail_closed
+    findings:
+      - id: OSC-6-FOUNDATION-R8-RUNTIME-AUTH-B1
+        severity: blocker
+        claim: The current coordination ledger SHA does not equal the R8 contract entry-authority SHA.
+        reproduction: >-
+          R8 contract lines 54-56 specify f30cc602c5b1882ede511b343f020a3310816e880b4c28698cf5248426f62cd4;
+          current sha256sum of coordination_ledger.yaml is
+          29bb82f0931db1f5248c9ccb99119e07c313312ff47aa9a7f19be80767a4d9fc.
+        violated_invariant: R8 requires stopping on authority/SHA mismatch before accepting review evidence.
+        required_test: Create an unambiguous authority contract and perform a fresh reviewer SHA verification; do not reuse this as passing authority.
+    counts: {blocker: 1, high: 0, medium: 0, low: 0}
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations:
+      - >-
+        The initially interpreted historical snapshot permitted one Runtime suite to finish
+        before the later authority-stop instruction; it was not rerun.
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8-C-CONTRACT
+    reviewer: r8_contract_independent_reviewer
+    mode: read_only_independent_negative_review
+    status: stopped_authority_sha_mismatch
+    inputs_read_to_eof: true
+    authority_sha_verification:
+      matched_authority_files: 16
+      mismatched_authority_files: 1
+      mismatch:
+        path: experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+        expected_sha256: f30cc602c5b1882ede511b343f020a3310816e880b4c28698cf5248426f62cd4
+        observed_sha256: 29bb82f0931db1f5248c9ccb99119e07c313312ff47aa9a7f19be80767a4d9fc
+    target_sha256:
+      pre: not_run_due_to_authority_mismatch
+      post: not_run_due_to_authority_mismatch
+    scoped_test:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_contract_phase6_corpora.py
+      execution_count: 0
+      exit_code: not_run
+      complete_terminal_result: not_run_due_to_mandatory_authority_stop
+    review_results:
+      负向复核: not_performed_due_to_authority_stop
+      独立反例验证: not_performed_due_to_authority_stop
+      异常输入验证: not_performed_due_to_authority_stop
+    findings:
+      - id: OSC-6-FOUNDATION-REVIEW-R8-C-AUTHORITY-SHA-001
+        severity: blocker
+        claim: R8 entry authority is not reproducible because coordination_ledger.yaml differs from the SHA bound by the R8 contract.
+        reproduction: >-
+          sha256sum coordination_ledger.yaml returns
+          29bb82f0931db1f5248c9ccb99119e07c313312ff47aa9a7f19be80767a4d9fc,
+          not the contract-bound f30cc602c5b1882ede511b343f020a3310816e880b4c28698cf5248426f62cd4.
+        violated_invariant: authority_chain_must_match_exact_contract_sha_before_review
+        required_test: Reissue or reconcile R8 authority with an exact ledger SHA, then restart independent review from authority verification.
+    counts: {blocker: 1, high: 0, medium: 0, low: 0}
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations: []
+aggregate_counts:
+  reviewer_reported: {blocker: 3, high: 0, medium: 0, low: 0}
+  unique_root_cause_candidates: 1
+  deduplication_for_gate: prohibited
+review_completion:
+  reports_returned: 3
+  reports_with_complete_scoped_terminal_evidence: 1
+  reviewer_writes_zero: true
+  reviewer_child_agents_zero: true
+  forbidden_paths_modified_empty: true
+  root_post_report_target_sha_exact: true
+  semantic_reviews_accepted_for_barrier: false
+root_sha_reverification_after_all_reports:
+  src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+  tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+  src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+  tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+  src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+  tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+  src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+  tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+  src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+  tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+  src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+  tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+  src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+root_aggregation_authority_interpretation:
+  status: process_defect_requires_new_authority_not_product_finding_adjudication
+  observation: >-
+    R8 named its ledger value coordination_ledger_before_r8_contract, while the ledger was
+    necessarily updated to register R8. The exact byte discrepancy is real; the name leaves
+    the temporal role insufficiently explicit for independent reviewers. This Root statement
+    is an aggregation judgment, not an independent reviewer conclusion, and does not erase,
+    downgrade, or close any R8 finding.
+  remediation: >-
+    A new review authority must bind both a non-gating historical pre-registration snapshot
+    and an explicitly gating current ledger SHA at review dispatch. No product code change is
+    authorized or required by this process defect.
+combined_scoped_test:
+  status: not_run
+  authorization: false
+  reason:
+    - Aggregate reviewer-reported blocker=3, so the R8 combined-suite precondition is not met.
+    - Search and Contract scoped suites were not run due to authority stop.
+    - Runtime terminal evidence is preserved but is not accepted as a passing fresh review under stopped authority.
+authority_boundaries:
+  diagnostic_refs_authority_eligible: false
+  missing_exact_typed_context: fail_closed_or_not_evaluated
+  candidate_promoted_to_confirmed: false
+  bug_claimed: false
+  public_api_freeze_changed: false
+  public_exports_changed: false
+  phase7_entry_authorized: false
+  two_hour_run_authorized: false
+  twenty_four_hour_run_authorized: false
+decision:
+  all_three_reports_received: true
+  all_three_complete_terminal_results_received: false
+  aggregate_findings_clear: false
+  combined_scoped_test_authorized: false
+  combined_scoped_pass: false
+  foundation_barrier: pending
+  foundation_barrier_passed: false
+  new_review_authority_required: true
+  new_remediation_contract_required_before_product_code_change: true
+  tests_osc_authorized: false
+  full_repository_tests_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

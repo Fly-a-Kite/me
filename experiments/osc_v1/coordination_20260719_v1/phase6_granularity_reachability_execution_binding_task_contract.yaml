@@ -1,0 +1,147 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-GRANULARITY-REACHABILITY-EXECUTION-BINDING-R1
+owner: /root
+mode: root_serial_private_implementation
+implementation_child_agents: 0
+change_request: CR-OSC-6-003
+objective: >-
+  Add one private, fail-closed exact binding between a frozen Search scheduled
+  target/observation context and typed Runtime task, outcome, evidence,
+  applicability, and observation objects. This is structural context binding
+  only; it must neither run a real adapter nor create raw-artifact, gate, or
+  execution authority.
+authorization_boundary:
+  authorized_product_writes:
+    - src/datadiff_osc/runtime/_phase6_reachability_execution_binding.py
+    - tests/osc/test_runtime_phase6_reachability_execution_binding.py
+  authorized_authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  all_other_paths: forbidden
+verified_preconditions:
+  head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  staged_paths: 0
+  dirty_worktree_preserved:
+    tracked_status_entries: 141
+    untracked_status_entries: 2767
+  prior_authority:
+    r10_task_contract:
+      path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_performance_execution_provenance_task_contract.yaml
+      sha256: 82c0c92003322455dc7adfb028043727b2f19a3aea6f359a9816dc4243f30c68
+    r10_report:
+      path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_performance_execution_provenance_report.yaml
+      sha256: c0ba99eebe28518e8fa176e1820e850b9c7a7f933f8efc7712ae66a55de5b201
+    ledger:
+      path: experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+      sha256_before_contract_write: 6037a314a56358ae35049cf5b4af036d9248deee83b8d16ab2fbac43e006ea0a
+  frozen_public_targets:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+required_inputs_read:
+  - docs/codex_multi_agent_development_runbook.md
+  - experiments/final_bug_discovery_protocol_v3/TODO.md
+  - docs/project_architecture.md
+  - docs/fine_grained_discovery_architecture.md
+  - docs/discovery_search_and_parallel_architecture.md
+  - docs/semantic_hypercontract_architecture.md
+  - docs/architecture_credibility_and_alternatives.md
+  - docs/competitive_paper_experiment_blueprint.md
+  - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_audit_findings.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_exit_barrier.yaml
+  - src/datadiff_osc/search/context_receipts.py
+  - src/datadiff_osc/search/context_replay.py
+  - src/datadiff_osc/search/ledger.py
+  - src/datadiff_osc/runtime/_receipt_producers.py
+  - src/datadiff_osc/runtime/_producer_provenance.py
+required_invariants:
+  - >-
+    Bind one ScheduledTargetAttemptReceipt, CanonicalCaseBinding, construction
+    outcome, extracted atoms, activation certificate, selected fresh backend-pair
+    obligation, materialized HyperContract, endpoint tuple, applicability
+    certificate, typed Runtime results, EvidenceEnvelope values, and
+    ObservationCertificate exactly and fail closed on any substitution.
+  - >-
+    The formal plan/case/run/block/assignment/cell/family identities and all
+    opaque observation-context refs must be recomputed as exact runtime task,
+    outcome, activation, and observation identities; no caller string may earn
+    context credit by itself.
+  - >-
+    Require real typed object invariants before any verdict branch: source Case
+    bytes/extraction/activation, contract materialization, endpoint order,
+    applicability binding, task/result-group/seed/outcome/evidence binding, and
+    exact escalation for a VIOLATED observation.
+  - >-
+    Reject non-OK outcomes, INAPPLICABLE or INCONCLUSIVE observation, stale or
+    swapped task/result/evidence references, wrong seed stage, wrong pair,
+    malformed or unresolved construction, and any independently-confirmed
+    evidence state.
+  - >-
+    The private binding must expose authority_eligible=false and gate_credit=false
+    unconditionally. It creates no CoverageLedger event, no artifact receipt,
+    no producer provenance claim, no candidate promotion, and bug_claimed remains
+    false.
+  - >-
+    The scope is one cell/pair context only. It does not claim 232/384/502,
+    scheduled activation, mutation preservation, focus, dimensions, performance,
+    real-adapter execution, raw artifacts, or Phase-6 gate completion.
+negative_review_requirements:
+  负向复核:
+    - planned-case, lane/run/block, cell/family, assignment, pair, contract, endpoint, and ref substitution
+    - non-OK outcome and INAPPLICABLE/INCONCLUSIVE/unelevated-VIOLATED observation rejection
+  独立反例验证:
+    - task/result-group/seed/outcome/evidence swaps must fail before a verdict can mask them
+    - opaque-ref-only contexts and caller-confirmed evidence must not become admissible
+  异常输入验证:
+    - malformed construction, extraction drift, activation drift, duplicate task/evidence IDs, wrong stage, and unsupported proof state fail closed
+forbidden:
+  - public exports
+  - src/datadiff_osc/public_api_freeze.json
+  - all listed frozen_public_targets
+  - src/datadiff_osc/_phase6_gate_authority.py
+  - src/datadiff_osc/runtime/_receipt_producers.py
+  - src/datadiff_osc/runtime/_producer_provenance.py
+  - src/datadiff_osc/search/context_receipts.py
+  - src/datadiff_osc/search/context_replay.py
+  - tests/osc/test_search_context_receipts.py
+  - tests/osc/test_search_gate_crosswalk.py
+  - all existing tests except the one new authorized test path
+  - tests/osc whole directory
+  - full repository suite
+  - 100000 parity
+  - v3 2200
+  - Phase 7, 2h pilot, 24h execution
+validation:
+  execution_count_before_implementation: 0
+  exactly_one_authorized_scoped_suite_after_implementation: >-
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+    tests/osc/test_runtime_phase6_reachability_execution_binding.py
+  expected_exit_code: 0
+  combined_suite: unauthorized
+  phase6_gate_claim: pending
+stop_conditions:
+  - any frozen/public SHA mismatch
+  - any scoped-suite failure
+  - any binding accepts opaque refs without exact typed context
+  - any candidate becomes confirmed or bug_claimed becomes true
+  - any request to broaden into real adapter/raw artifact/gate execution
+completion_report_requirements:
+  - exact pre/post SHA for the two product paths and all frozen/public targets
+  - exact one-time command, exit code, complete terminal result
+  - 负向复核, 独立反例验证, 异常输入验证 results
+  - explicit remaining blocker OSC-6-G-B1 and barrier pending statement
+  - writes and forbidden_paths_modified fields
+  - no prewritten pass claim

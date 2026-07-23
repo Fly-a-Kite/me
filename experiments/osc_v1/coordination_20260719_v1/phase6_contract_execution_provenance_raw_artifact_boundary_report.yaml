@@ -1,0 +1,267 @@
+schema_version: osc-phase6-contract-execution-provenance-raw-artifact-boundary-report-v1
+phase: 6
+status: complete_definition_freeze_no_product_write_contract_gate_pending
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_execution_provenance_raw_artifact_boundary_task_contract.yaml
+  sha256: c35bcd9f1e1585454f0a2e303abe3a409e37654b9b0d0076fe8802878502efda
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  forbidden_paths_modified: []
+  predecessor_r7_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_task_contract.yaml
+    sha256: c582a5edd5a3ac160d4b9484207586d3d0166a1377307e602db68624cae84349
+  predecessor_r7_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_report.yaml
+    sha256: 8bda392d7be17c03d0f6eb1eca985f895720f4787590f6f55e8e2aa58c970052
+  foundation_barrier: pass_unchanged
+source_state:
+  before_contract_write:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    untracked_path_count: 24140
+    coordination_ledger_sha256: 8b522768209bad0ea3a766acbfe23aaef2bc62e0f6457d991c5df620a7332746
+  after_contract_before_report:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    product_paths_written: []
+    tests_run: []
+    source_snapshot_created: false
+    raw_artifacts_created: []
+    authority_published: false
+seam_crosswalk:
+  source_snapshot:
+    owner: src/datadiff_osc/_phase6_gate_authority.py
+    symbols:
+      - source_snapshot_payload
+      - verify_source_snapshot
+      - VerifiedSourceSnapshot
+    observation: >-
+      The existing snapshot can bind discovered executable source files, public
+      freeze, dependency lock, protocol, Git HEAD and a deterministic Git-status
+      digest. It becomes invalid on any bound-byte or status change. No snapshot
+      was captured here, and a later producer must take one before—not after—the
+      measured process and prove it still verifies after that process returns.
+  typed_execution_and_r7_proof:
+    owner: src/datadiff_osc/_phase6_gate_authority.py
+    symbols:
+      - _verify_typed_admission
+      - _verify_parallel_scaling_provenance_binding
+      - verify_artifact_receipt_index
+    observation: >-
+      Generic Runtime admissions remain rejected as root provenance pending.
+      The sole R7 exception re-reads ParallelScalingProductionProvenance and
+      exact-pairs it to one ParallelScalingEvidenceReceipt. It has no process
+      transcript, raw-artifact hash, complete producer set, or publication
+      authority; it must remain only an input to the later boundary.
+  producer_receipts_and_dynamic_plan:
+    owner: src/datadiff_osc/_phase6_gate_authority.py
+    symbols:
+      - VerifiedProducerReceipt.digest
+      - VerifiedArtifactReceiptIndex.producer_receipts_digest
+      - verify_dynamic_gate_plan
+    observation: >-
+      Producer receipts are constructed before the dynamic plan, allowing the
+      plan to bind their deterministic set digest. The receipt index then binds
+      the completed dynamic-plan byte SHA. This permits an acyclic sequence and
+      forbids an index or dynamic plan from manufacturing an earlier receipt.
+  raw_artifact_transport:
+    owner: src/datadiff_osc/runtime/gate_artifacts.py
+    symbols:
+      - RawMetricSeries
+      - VerifiedRawGateArtifact
+      - verify_gate_artifact_manifest
+    observation: >-
+      RawMetricSeries transports canonical record identities and values, and
+      the manifest rechecks raw artifact bytes against a separately verified
+      authority plan. It does not by itself prove the process that produced
+      those bytes.
+  artifact_receipt_gap:
+    owner: src/datadiff_osc/_phase6_gate_authority.py
+    symbols:
+      - VerifiedArtifactReceipt.provenance_digest
+      - verify_artifact_receipt_index
+    observation: >-
+      The present receipt-index schema reads provenance_digest as a syntactically
+      valid declared digest but does not read, hash, reconstruct, or exact-bind
+      an execution transcript to the artifact, typed admission, source snapshot,
+      output bytes, and exit status. Therefore it cannot admit real execution
+      evidence yet.
+  frozen_provenance_core_limit:
+    owner: src/datadiff_osc/runtime/_producer_provenance.py
+    observation: >-
+      The frozen private core already models immutable records, exact policy,
+      source views, commands, environments, exits, raw parents and typed
+      outputs, but its closed raw typed-output rebuilder registry currently
+      supplies only repository_test_replay. It cannot be modified under the
+      frozen-path rule and therefore cannot itself reconstruct a
+      ParallelScalingEvidenceReceipt or ContractPerformanceEvidenceReceipt.
+      A successor must own a separate private replayer rather than relax or
+      bypass this closed registry.
+  clean_worktree_limit:
+    owner: experiments/final_bug_discovery_protocol_v3/TODO.md
+    observation: >-
+      The protocol permits an exact dirty-worktree snapshot only for a
+      non-authoritative engineering run; paper authority requires an isolated
+      clean worktree or commit. The present worktree has pre-existing dirty and
+      untracked state, so no real authority artifact may be claimed here even
+      after future private infrastructure tests pass.
+  final_authority_and_manifest:
+    owners:
+      - src/datadiff_osc/_phase6_gate_authority.py
+      - src/datadiff_osc/runtime/gate_artifacts.py
+    symbols:
+      - build_phase6_gate_authority_bundle
+      - publish_phase6_gate_authority_bundle
+      - verify_gate_artifact_manifest
+    observation: >-
+      Root first builds only an unpublished bundle after all prior proof layers
+      verify. A later independently hashed authority plan and manifest recheck
+      artifact bytes and denominator identities. Neither function supplies the
+      missing execution provenance, so neither is authorized by this report.
+acyclic_construction_order:
+  - order: 1
+    action: Freeze the future producer implementation and independently capture a verified source snapshot.
+    dependency: no execution output, receipt, plan, artifact, or manifest exists yet.
+  - order: 2
+    action: Run one authorized bounded real producer and persist its canonical process transcript plus typed output envelope.
+    dependency: exact pre-capture source snapshot and implementation hashes.
+  - order: 3
+    action: Reconstruct a private execution-provenance envelope from transcript, typed output, source, implementation and output bytes.
+    dependency: order 2 output only; no dynamic plan or artifact admission.
+  - order: 4
+    action: Derive Root-verifiable typed producer receipts and exact admission/provenance bindings.
+    dependency: order 3 exact proof; no artifact index or authority plan.
+  - order: 5
+    action: Construct a dynamic plan binding the deterministic producer-receipt-set digest.
+    dependency: order 4 receipt set.
+  - order: 6
+    action: Produce canonical raw artifacts and a receipt index that binds the order-5 dynamic-plan SHA and order-4 receipts.
+    dependency: order 5 plan and independently re-readable order-3 execution provenance.
+  - order: 7
+    action: Build an unpublished Root authority payload from the verified source, plan, receipts and artifacts.
+    dependency: orders 1 through 6 all exact and complete.
+  - order: 8
+    action: Under a separate future authority only, externally hash/publish a manifest and recompute gates.
+    dependency: order 7 publishable result; no current authorization.
+minimum_future_implementation_surface_not_authorized_by_this_report:
+  private_execution_provenance:
+    candidate_path: src/datadiff_osc/runtime/_phase6_execution_provenance.py
+    responsibility: >-
+      Strictly reconstruct one canonical process transcript and typed execution
+      output, bind source/implementation/output/artifact bytes and exact exit
+      status, and reject absent, nonzero, truncated, swapped, or post-capture
+      changed inputs.
+  private_raw_artifact_producer:
+    candidate_path: src/datadiff_osc/runtime/_phase6_raw_artifact_producer.py
+    responsibility: >-
+      Serialize canonical raw metric records only from a reconstructed execution
+      provenance object; no caller-authored raw values, scalar aggregate, or
+      opaque declared provenance can substitute.
+  root_admission:
+    candidate_path: src/datadiff_osc/_phase6_gate_authority.py
+    responsibility: >-
+      Require a uniquely sorted execution-provenance binding for every newly
+      authorized artifact/admission pair, re-hash and reconstruct it before
+      retaining producer evidence, and include its verified compact binding in
+      the receipt digest.
+  focused_tests:
+    candidate_paths:
+      - tests/osc/test_runtime_phase6_execution_provenance.py
+      - tests/osc/test_runtime_phase6_raw_artifact_producer.py
+      - tests/osc/test_phase6_gate_authority_integration.py
+    responsibility: >-
+      Cover legal re-reading plus source/status/implementation/output/exit/
+      artifact/admission mutation before any future real execution is authorized.
+  separately_scoped_later:
+    - A real execution launcher or artifact storage location, if one is needed, requires its own exact-path contract.
+    - A clean isolated worktree/commit is a prerequisite for any later paper-authoritative source snapshot and evidence run.
+    - Full producer-set, 100000-decision corpus, 1000-pair cohort, bootstrap, manifest publication, and gate calculation each require later authority.
+required_successor_validation:
+  负向复核:
+    - Swap only source snapshot, typed receipt, raw artifact, producer implementation hash, output hash, or admission ID; Root must reject before retaining evidence.
+    - Change Git status or any bound source byte after snapshot capture; re-verification must fail closed before artifact admission.
+    - Supply declared-only provenance, a synthetic fixture, a scalar aggregate, an index/manifest self-reference, or a same-cardinality substitute; none may become evidence.
+  独立反例验证:
+    - Use one legal bounded process record whose exact source, typed output, raw artifact, and exit-zero transcript reconstruct; it remains non-publishable until all later required producers and authority layers exist.
+    - Mutate exactly one process output byte, stderr hash, command/allowlisted environment identity, exit status, or artifact byte and demonstrate rejection at the first binding boundary.
+  异常输入验证:
+    - Reject missing/extra fields, malformed hashes, duplicate or unordered identities, path escape, unreadable/truncated output, nonzero exit, unexpected process type, stale schema, and post-capture worktree change without throwing or publishing.
+    - Preserve candidate non-confirmed, bug_claimed=false, diagnostic-only refs, and fail-closed/not_evaluated behavior in every success-shaped and failure fixture.
+findings:
+  - id: OSC-6-CONTRACT-R8-B1
+    severity: blocker
+    owner: root
+    claim: >-
+      Current artifact receipt provenance is an opaque declaration rather than
+      a Root-reconstructed execution transcript bound to source, process,
+      typed output and raw artifact bytes.
+    reproduction: >-
+      Read verify_artifact_receipt_index: artifact entries require a
+      provenance_digest string, but the verifier does not read a provenance
+      path or canonical envelope for it; compare the explicit re-read path in
+      _verify_parallel_scaling_provenance_binding.
+    violated_invariant: >-
+      Real execution requires Root-verified producer provenance and raw artifact
+      binding; a digest-only assertion cannot supply it.
+    required_test: >-
+      A future scoped test must reject a valid-looking artifact/index when only
+      its transcript/source/output/exit/artifact binding changes, before any
+      producer receipt or authority result retains it.
+counts:
+  blocker: 1
+  high: 0
+  medium: 0
+  low: 0
+  writes: 3
+  product_writes: 0
+  tests_run: 0
+  child_agents: 0
+  forbidden_paths_modified: []
+execution:
+  product_paths_written: []
+  test_commands_run: []
+  source_snapshot_created: false
+  raw_artifacts_created: []
+  artifact_receipt_index_created: false
+  authority_plan_published: false
+  parity_100000_run: false
+  v3_2200_run: false
+  repository_suite_run: false
+  combined_suite_run: false
+  phase7_pilot_2h_run: false
+  twenty_four_hour_run: false
+sha_verification:
+  frozen_target_sha256_pre_and_post_exact:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+decision:
+  phase_6_contract: pending
+  foundation_barrier: pass_unchanged
+  real_execution_provenance_admitted: false
+  raw_artifact_admitted: false
+  candidate_confirmed: false
+  bug_claimed: false
+  combined_suite_authorized: false
+  phase7_pilot_2h_authorized: false
+  twenty_four_hour_run_authorized: false
+next_step_requires_new_task_contract:
+  - >-
+    A narrowly scoped Root-owned implementation contract must first add strict
+    private execution provenance and raw-artifact production/reconstruction for
+    one bounded producer kind, then Root must independently re-read it before
+    retaining an artifact receipt. No corpus/cohort execution or gate activity
+    is authorized by this R8 definition report.

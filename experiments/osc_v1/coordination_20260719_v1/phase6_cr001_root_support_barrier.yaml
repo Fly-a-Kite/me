@@ -1,0 +1,33 @@
+schema_version: osc-phase6-cr001-root-support-barrier-v1
+phase: 6
+task_id: OSC-6-CR001-ROOT-SUPPORT
+status: pass
+changed_files:
+  - path: src/datadiff_osc/_replay_support.py
+    sha256: 6f52a8836288cb0e7578c984a8f0c3c26661a17d648050912c07a54515192dc1
+  - path: tests/osc/test_replay_support.py
+    sha256: b7a114caa0b9ec606a8b43861ae0dcdcd78af4c2763f3b3d2365e10c904d8e89
+forbidden_paths_modified: []
+public_api_freeze:
+  path: src/datadiff_osc/public_api_freeze.json
+  sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  changed: false
+tests:
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/osc/test_replay_support.py
+    result: 7 passed in 0.06s
+    exit_code: 0
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/osc/test_public_api_freeze.py
+    result: 7 passed in 0.28s
+    exit_code: 0
+  - command: git diff --check
+    result: clean
+    exit_code: 0
+authority_effect:
+  grants_gate_credit: false
+  removes_semantic_replay_sentinel: false
+  authorizes_long_gate: false
+

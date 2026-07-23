@@ -1,0 +1,65 @@
+schema_version: osc-change-request-v1
+phase: 6
+requests:
+  - id: CR-OSC-6-001
+    requester: three_direct_phase6_audits
+    owner: root_then_contract_search_runtime_consumers
+    scope: private typed semantic replay and missing private receipt types
+    status: semantic_replay_core_closed_residual_context_and_provenance_transferred
+    public_api_change_required: false
+    frozen_gate_threshold_change_required: false
+    requirements:
+      - reconstruct and validate allowed canonical typed objects rather than trusting envelope names or shaped JSON
+      - recompute object digests and bind exact subject identities
+      - unknown, malformed, incomplete, aggregate, self-authored and unauthorized synthetic evidence fails closed
+      - legitimate preregistered synthetic parity inputs remain distinguishable from fabricated authority
+      - remove the unconditional sentinel only after all real-type positive and forgery-negative tests pass
+      - public exports and public_api_freeze.json remain byte-identical
+    subrequests:
+      - id: CR-OSC-6-001-ROOT-SHARED-DECODER
+        owner: root
+        status: closed_7_scoped_and_7_freeze_tests_pass
+        path: src/datadiff_osc/_replay_support.py
+      - id: CR-OSC-6-001-ROOT-DISPATCH
+        owner: root
+        status: closed_three_exact_sha_reviews_blocker_high_medium_zero
+      - id: CR-OSC-6-001-ROOT-PROVENANCE
+        owner: root_then_runtime
+        status: pending_CR_OSC_6_004
+      - id: CR-OSC-6-001-SEARCH-CONTEXT
+        owner: root_then_search
+        status: pending_after_intrinsic_replay
+      - id: CR-OSC-6-001-SEARCH-ATTEMPT
+        owner: root_then_search_runtime
+        status: pending_private_attempt_receipt_design
+      - id: CR-OSC-6-001-SEARCH-OBSERVATION
+        owner: root
+        status: pending_receipt_set_cross_binding
+      - id: CR-OSC-6-003A
+        owner: root_then_search
+        status: private_foundation_exact_sha_review_r3_failed_callable_context_remediation_active
+        scope: independently freeze declaration-derived 11-lane and focus registry
+  - id: CR-OSC-6-002
+    requester: contract_audit
+    owner: root_then_contract
+    scope: freeze root, false-positive, compatibility, mutant-witness, parity and performance corpora and implement exact producers
+    status: corpus_foundation_rotated_review_pass_pending_whole_foundation_barrier
+    public_api_change_required: false
+  - id: CR-OSC-6-003
+    requester: granularity_audit
+    owner: root_then_search_runtime
+    scope: freeze declaration-derived 11-lane/focus universes and complete normative hard-gate crosswalk without lowering thresholds
+    status: pending_after_CR_OSC_6_003A_and_real_runtime_producers
+    public_api_change_required: false
+  - id: CR-OSC-6-004
+    requester: runtime_audit
+    owner: root_then_runtime
+    scope: implement real typed evidence producers, OSC execution bridge and complete authority artifact chain
+    status: typed_provenance_foundation_exact_sha_review_r3_failed_source_recheck_disjointness_remediation_active
+    public_api_change_required: false
+    execution_authorization:
+      scoped_tests: allowed_after_prewrite_approval
+      parity_100000: false
+      v3_2200: false
+      phase7_pilot_2h: false
+      twenty_four_hour: false

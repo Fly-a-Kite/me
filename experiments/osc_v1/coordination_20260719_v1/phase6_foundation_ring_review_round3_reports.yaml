@@ -1,0 +1,203 @@
+schema_version: osc-review-report-set-v1
+phase: 6
+round: private_foundation_remediation_exact_sha_ring_review_r3
+status: complete_failed_remediation_required
+review_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round3_contracts.yaml
+  sha256: 7bf3581beaf4d66b6acb21a4b7ab321c51384ffcb5049fedba09bf90da4d4c80
+entry_report:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round2_reports.yaml
+  sha256: 388228e919f7920d4bb5de81f62b4696be50ab0403e97ba8d8da1237c37be1c6
+reviews:
+  - task_id: OSC-6-FOUNDATION-REVIEW-R3-A-SEARCH
+    reviewer: /root/phase5_authority_audit
+    target_owner: /root/phase5_consumer_audit
+    decision: fail
+    exact_sha_verified_pre_and_post_test: true
+    target_sha256:
+      src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+      src/datadiff_osc/search/context_receipts.py: cc573077433458031661a52b9e540266eb3d9d036f7cd378a2c43f7bd4169b59
+      src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+      tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+      tests/osc/test_search_context_receipts.py: e8680db1793945d3e884edb36e092c712412f8f28daad90418b48085eb613aac
+      tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    scoped_test:
+      command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py tests/osc/test_search_gate_crosswalk.py
+      exit_code: 0
+      result: 29 passed
+      note: elapsed text was lost in repeated final-response transport disconnects; count and exit code were retained and target SHAs were reverified
+    prior_r2_finding:
+      id: OSC-6-FOUNDATION-SEARCH-R2-H1
+      disposition: resolved_for_static_registered_operator_and_full_outcome_replay
+      counterexample: value outcome under nullify_value rejects with mutation outcome does not reproduce from the selected operator
+      adjacent_issue: OSC-6-FOUNDATION-SEARCH-R3-H1
+    attack_results:
+      - static operator/outcome, assignment, source, seed and certificate substitutions reject
+      - unknown, uninspectable, execution-failing and nondeterministic operators fail closed
+      - fresh Context and double full-outcome reconstruction remain enforced
+      - live same-code callable global substitution with a warm identity cache is accepted under the frozen baseline digest
+    findings:
+      - id: OSC-6-FOUNDATION-SEARCH-R3-H1
+        severity: high
+        claim: >-
+          The selected operator identity and execution remain substitutable because
+          callable identity omits globals, defaults, keyword defaults and closure
+          values, while the registry-derived digest is cached independently of the
+          live profile. Full outcome equality can therefore prove only replacement
+          self-consistency rather than execution of the frozen operator.
+        evidence:
+          path: src/datadiff_osc/search/context_receipts.py
+          symbol_or_line: _callable_implementation_digest line 819, registered_mutation_operator_digest line 866, reconstruct_registered_mutation_outcome line 1007
+        reproduction: >-
+          Warm registered_mutation_operator_digest("value"); clone value.apply with
+          identical code, filename, source, module and qualname but rebind its
+          _mutate_value global to deterministic alternate behavior; install a
+          same-name/profile replacement in the module registry. The cached digest
+          remains the baseline digest, causal reconstruction returns the distinct
+          replacement outcome twice, and MutationAttemptReceipt.build accepts that
+          outcome under the baseline operator digest.
+        violated_invariant: >-
+          The exact frozen selected operator, including all live behavior-affecting
+          callable context and profile fields, must be identity-bound before causal
+          replay; cache state cannot select authority semantics.
+        minimal_fix_owner: search
+        required_test: >-
+          Add cold- and warm-cache substitutions for globals, defaults, keyword
+          defaults, closure values and profile fields; every substitution must
+          change the live identity and reject before replacement execution, and a
+          replacement outcome must reject under the frozen value identity.
+    counts: {blocker: 0, high: 1, medium: 0, low: 0}
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations: []
+    transport_notes:
+      - three final-response streams disconnected after work completed
+      - the reviewer recovered the required result through a bounded direct message
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R3-B-RUNTIME
+    reviewer: /root/phase5_consumer_audit
+    target_owner: /root/phase5_evidence_audit
+    decision: fail
+    exact_sha_verified_pre_and_post_test: true
+    target_sha256:
+      src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+      src/datadiff_osc/runtime/_receipt_producers.py: 6a3eedd911096c54923709b59fb4f7ae3c97ecf54bca7cbef53174466f577683
+      tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+      tests/osc/test_runtime_receipt_producers.py: 5276f580256c28fb710ea369aa21b5c2e9c4d29bfe684a1f53b5cb3e416dc053
+    scoped_test:
+      command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+      exit_code: 0
+      result: 40 passed in 0.38s
+    prior_r2_findings:
+      OSC-6-FOUNDATION-RUNTIME-R2-B1: resolved
+      OSC-6-FOUNDATION-RUNTIME-R2-B2: resolved
+      OSC-6-FOUNDATION-RUNTIME-R2-H1: resolved_for_caller_bool_and_typed_verdict_derivation
+    required_r2_counterexamples:
+      malformed_repository_raw_parents: rejected with provenance_typed_raw_rebuild_failed
+      frozen_to_real_origin_relabel: rejected with provenance_origin_not_allowed
+      six_satisfied_rechecks: rejected with candidate campaign reproduction threshold not met
+      backend_execution_to_localization: rejected with parallel logical task-set projection mismatch
+    attack_results:
+      - reordered, duplicate, missing, extra, relabeled and cross-bound raw parents reject
+      - changed raw JUnit/log bytes, canonical context, typed subject or verdict semantics reject
+      - changed task kind, epoch, seed, case, endpoint, backend, payload, resources or dependency graph reject one/N equality
+      - caller reproduced, partial verdicts, confirmed states and bug_claimed true reject
+      - source result/evidence reused as one campaign recheck is accepted and still earns 3/3 plus 3/3 reproduction
+    findings:
+      - id: OSC-6-FOUNDATION-RUNTIME-R3-H1
+        severity: high
+        claim: >-
+          A candidate source execution can be reused as a campaign or pipeline
+          recheck and counted toward the 3+3 threshold because global disjointness
+          includes only the six recheck observations and excludes source identities.
+        evidence:
+          path: src/datadiff_osc/runtime/_receipt_producers.py
+          symbol_or_line: build_candidate_classification_receipt lines 870-907, especially all_observations lines 888-900
+        reproduction: >-
+          In the valid STABLE_SURVIVOR fixture, replace campaign ordinal 1 result
+          and evidence with source_result and source_evidence while retaining the
+          other five unique rechecks. All six recheck-only identity collections
+          remain unique, both thresholds pass, and a receipt is emitted with every
+          binding reproduced=true although only five distinct rechecks occurred.
+        violated_invariant: >-
+          Source, campaign and pipeline executions and evidence must be globally
+          disjoint; only six distinct completed rechecks may satisfy 3+3.
+        minimal_fix_owner: runtime
+        required_test: >-
+          Reuse source result/evidence and independently collide source task ID,
+          TaskSpec digest, result ID, seed lineage or evidence digest in either
+          stage; every case must reject before threshold evaluation.
+    counts: {blocker: 0, high: 1, medium: 0, low: 0}
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations: []
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R3-C-CONTRACT
+    reviewer: /root/phase5_evidence_audit
+    target_owner: /root/phase5_authority_audit
+    decision: pass
+    exact_sha_verified_pre_and_post_test: true
+    target_sha256:
+      src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+      tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    scoped_test:
+      command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_contract_phase6_corpora.py
+      exit_code: 0
+      result: 19 passed in 0.51s
+    prior_findings:
+      OSC-6-C-H1: resolved
+      OSC-6-C-H2: resolved
+      OSC-6-C-H3: resolved
+      OSC-6-C-H4: resolved
+      OSC-6-C-H5: resolved
+      OSC-6-C-M1: resolved
+    attack_results:
+      - arbitrary reviewers and repeated structural approvals remain context-pending and non-authoritative
+      - unknown or pending roots, cross-root signatures and non-VIOLATED verdicts reject
+      - component/global false-positive suppression and compatibility context swaps reject
+      - mutant pair reuse, category predicate substitution and generic/source-only evidence reject
+      - C0, traversal, separator, symlink-escape and resolver failures fail closed
+    findings: []
+    counts: {blocker: 0, high: 0, medium: 0, low: 0}
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations: []
+
+root_independent_reproduction:
+  search_r3_h1:
+    command_class: PYTHONDONTWRITEBYTECODE=1 bounded inline Python using the frozen Search fixture
+    exact_results:
+      baseline_digest_reused: true
+      replacement_outcome_distinct: true
+      receipt_accepted_under_baseline_digest: true
+      baseline_status: rejected
+      replacement_status: rejected
+  runtime_r3_h1:
+    command_class: PYTHONDONTWRITEBYTECODE=1 bounded inline Python using the frozen Runtime fixture
+    exact_results:
+      emitted_state: stable_survivor
+      campaign_reproduced: [true, true, true]
+      pipeline_reproduced: [true, true, true]
+      source_result_reused: true
+  public_api_freeze_sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  staged_paths: 0
+aggregate_counts: {blocker: 0, high: 2, medium: 0, low: 0}
+authority_boundaries:
+  diagnostic_refs_authority_eligible: false
+  missing_exact_typed_context: not_evaluated_or_rejected
+  candidate_promoted_to_confirmed_bug: false
+  fabricated_coverage_or_evidence_authority: false
+  public_api_freeze_changed: false
+decision:
+  exact_sha_ring_review_r3_passed: false
+  remediation_required: true
+  foundation_barrier_passed: false
+  tests_osc_authorized: false
+  full_repository_tests_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

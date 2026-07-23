@@ -1,0 +1,181 @@
+schema_version: osc-task-contract-v1
+phase: 4
+mode: read_only_review
+global_rules:
+  parallel_writes_paused: true
+  allowed_write_paths: []
+  forbidden_write_paths:
+    - "**"
+  public_api_freeze_sha256: 669816be0f913def018518ea85d2cc03b517453cc8e5ba764908dc3c3f42920f
+  review_categories:
+    - correctness
+    - soundness
+    - reproducibility
+    - performance_gate
+    - missing_tests
+  prohibited_review_content:
+    - unsupported style-only opinions
+    - direct edits to reviewed files
+    - treating helper tests as Phase 6 raw evidence
+    - treating a candidate or expected semantic divergence as a bug
+    - launching a pilot, campaign, or 24h run
+  finding_schema:
+    severity: blocker | high | medium | low
+    claim: concrete falsifiable problem
+    evidence:
+      path: repository-relative path
+      symbol_or_line: symbol or current line
+    reproduction: command or logical counterexample
+    violated_invariant: invariant or specification section
+    minimal_fix_owner: contract | search | runtime | root
+    required_test: regression test
+
+tasks:
+  - task_id: OSC-4-A
+    role: contract
+    reviewer: /root/osc_contract
+    reviews_owner: search
+    objective: >-
+      Determine whether target declarations faithfully express the frozen contract
+      semantics and whether Search contains family-specific dispatch, denominator
+      fabrication, self-evidencing activation, or unsupported reachability credit.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - docs/fine_grained_discovery_architecture.md
+      - docs/discovery_search_and_parallel_architecture.md
+      - docs/semantic_hypercontract_architecture.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_search_audit.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_dependency_dag.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase2_interface_freeze.md
+      - experiments/osc_v1/coordination_20260719_v1/phase3_completion_summary.md
+      - src/datadiff_osc/semantic_targets/**
+      - src/datadiff_osc/generation/**
+      - src/datadiff_osc/search/**
+      - src/datadiff_osc/scheduler/**
+      - tests/osc/test_targets_*.py
+      - tests/osc/test_generation_*.py
+      - tests/osc/test_search_*.py
+      - tests/osc/test_scheduler_*.py
+    allowed_write_paths: []
+    forbidden_write_paths:
+      - "**"
+    frozen_interfaces:
+      - osc-public-api-freeze-v1
+      - contract authority and four-valued outcome policy
+      - fresh 16/232/384/502 and regression 9/144/228 typed partitions
+    required_invariants:
+      - atoms are supported by CCS-IR/data/contract evidence, never assignment or family metadata
+      - runtime dispatch is generic and family views are ledger projections only
+      - fixed denominators cannot be shrunk by reachability or capability observations
+      - unsupported/infeasible evidence cannot be credited as activated or observed
+      - known regression seeds cannot establish fresh reachability
+    deliverables:
+      - complete evidence-backed finding list, including an explicit no-finding result if empty
+      - full Phase 4 completion report
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_targets_*.py tests/osc/test_generation_*.py tests/osc/test_search_*.py tests/osc/test_scheduler_*.py
+        expected: exit 0; use only as reproduction/support, not as Phase 6 raw evidence
+      - command: git diff --stat and freeze hash verification
+        expected: no reviewer write and frozen interface unchanged
+    stop_conditions:
+      - any requested source or test modification
+      - any need to change a frozen public interface
+      - any pilot, campaign, or 24h execution request
+    completion_report: use runbook section 12 plus the mandatory finding schema
+
+  - task_id: OSC-4-B
+    role: search
+    reviewer: /root/osc_search
+    reviews_owner: runtime
+    objective: >-
+      Determine whether Runtime gates genuinely measure activation and observation,
+      and whether scheduling, retry, cache, grouping, or missing evidence can bias
+      credited samples, denominators, task identity, or authority outcomes.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - docs/discovery_search_and_parallel_architecture.md
+      - docs/semantic_hypercontract_architecture.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_runtime_audit.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_dependency_dag.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase2_interface_freeze.md
+      - experiments/osc_v1/coordination_20260719_v1/phase3_completion_summary.md
+      - src/datadiff_osc/comparison/**
+      - src/datadiff_osc/parallel/**
+      - src/datadiff_osc/runtime/**
+      - scripts/osc/**
+      - tests/osc/test_comparison_*.py
+      - tests/osc/test_parallel_*.py
+      - tests/osc/test_runtime_*.py
+    allowed_write_paths: []
+    forbidden_write_paths:
+      - "**"
+    frozen_interfaces:
+      - osc-public-api-freeze-v1
+      - four-level coverage ledger and certificate bindings
+      - deterministic seed lineage, task identity, and fixed gate denominators
+    required_invariants:
+      - constructed, activated, executed, and observed evidence remain distinct
+      - gate reports fail closed on missing or malformed raw evidence
+      - cache keys and evidence-tier policy prevent screening/native/fresh contamination
+      - worker count, retry, completion order, and cache do not change selected task multiset or verdicts
+      - timeout/crash/adapter/missing outcomes remain structured INCONCLUSIVE
+    deliverables:
+      - complete evidence-backed finding list, including an explicit no-finding result if empty
+      - full Phase 4 completion report
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_comparison_*.py tests/osc/test_parallel_*.py tests/osc/test_runtime_*.py
+        expected: exit 0; use only as reproduction/support, not as Phase 6 raw evidence
+      - command: git diff --stat and freeze hash verification
+        expected: no reviewer write and frozen interface unchanged
+    stop_conditions:
+      - any requested source or test modification
+      - any need to change a frozen public interface
+      - any pilot, campaign, or 24h execution request
+    completion_report: use runbook section 12 plus the mandatory finding schema
+
+  - task_id: OSC-4-C
+    role: runtime
+    reviewer: /root/osc_runtime
+    reviews_owner: contract
+    objective: >-
+      Determine whether staged pruning, fingerprints, relations, certificates, and
+      error taxonomy can change, bypass, or overstate the exact authority verdict.
+    required_inputs:
+      - docs/codex_multi_agent_development_runbook.md
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - docs/semantic_hypercontract_architecture.md
+      - docs/architecture_credibility_and_alternatives.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_contract_audit.md
+      - experiments/osc_v1/coordination_20260719_v1/phase1_dependency_dag.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase2_interface_freeze.md
+      - experiments/osc_v1/coordination_20260719_v1/phase3_completion_summary.md
+      - src/datadiff_osc/contract_engine/**
+      - tests/osc/test_contract_*.py
+    allowed_write_paths: []
+    forbidden_write_paths:
+      - "**"
+    frozen_interfaces:
+      - osc-public-api-freeze-v1
+      - exact comparator as sole authority
+      - structured four-valued verdict and failure taxonomy
+    required_invariants:
+      - every non-screening path reaches exact authority comparison
+      - fingerprints and entailment cannot establish equality without compatible bound evidence
+      - relation parameters and numeric values are canonical and lossless
+      - certificates bind contract, endpoint, applicability, observations, provenance, and version
+      - unsupported requires bound capability evidence; timeout/crash/adapter/missing remain INCONCLUSIVE
+    deliverables:
+      - complete evidence-backed finding list, including an explicit no-finding result if empty
+      - full Phase 4 completion report
+    validation:
+      - command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_contract_*.py
+        expected: exit 0; use only as reproduction/support, not as Phase 6 raw evidence
+      - command: git diff --stat and freeze hash verification
+        expected: no reviewer write and frozen interface unchanged
+    stop_conditions:
+      - any requested source or test modification
+      - any need to change a frozen public interface
+      - any pilot, campaign, or 24h execution request
+    completion_report: use runbook section 12 plus the mandatory finding schema

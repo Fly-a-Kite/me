@@ -5,6 +5,9 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from datadiff.backend_sampling_cli import add_backend_sampling_flags
+from datadiff.candidate_pool_sampling_cli import add_candidate_pool_sampling_flags
+
 
 CommandHandler = Callable[[argparse.Namespace], int]
 
@@ -121,10 +124,17 @@ def register(
     p_discovery_run.add_argument("--artifact-limit", type=int, default=None)
     p_discovery_run.add_argument("--no-compress-run-log", action="store_true")
     p_discovery_run.add_argument(
+        "--enable-parallel-backend-execution",
+        action="store_true",
+        help="enable the non-promoted parallel backend arm",
+    )
+    p_discovery_run.add_argument(
         "--disable-parallel-backend-execution",
         action="store_true",
-        help="run fresh fuzz backends sequentially for runtime ablation or debugging",
+        help="explicitly retain sequential backend execution",
     )
+    add_backend_sampling_flags(p_discovery_run)
+    add_candidate_pool_sampling_flags(p_discovery_run)
     p_discovery_run.add_argument(
         "--log-level",
         choices=["full", "compact", "minimal"],
@@ -216,10 +226,17 @@ def register(
     p_discovery_campaign.add_argument("--artifact-limit", type=int, default=None)
     p_discovery_campaign.add_argument("--no-compress-run-log", action="store_true")
     p_discovery_campaign.add_argument(
+        "--enable-parallel-backend-execution",
+        action="store_true",
+        help="enable the non-promoted parallel backend arm",
+    )
+    p_discovery_campaign.add_argument(
         "--disable-parallel-backend-execution",
         action="store_true",
-        help="run lane backends sequentially for runtime ablation or debugging",
+        help="explicitly retain sequential backend execution",
     )
+    add_backend_sampling_flags(p_discovery_campaign)
+    add_candidate_pool_sampling_flags(p_discovery_campaign)
     p_discovery_campaign.add_argument(
         "--log-level",
         choices=["full", "compact", "minimal"],

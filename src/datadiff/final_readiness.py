@@ -81,6 +81,14 @@ CONFIRMED_LATEST_UPSTREAM_STATUSES = frozenset(
         "fixed_upstream",
     }
 )
+OWNED_LATEST_DISCOVERY_CREDITS = frozenset(
+    {
+        "datadiff_found",
+        "datadiff_submitted",
+        "user_found",
+        "user_submitted",
+    }
+)
 
 
 def _default_required_live_suites() -> tuple[str, ...]:
@@ -2248,6 +2256,7 @@ def _quality_archive_health_from_summary(summary: Any) -> dict[str, Any]:
     if isinstance(archive, dict) and str(archive.get("schema_version", "") or "") in {
         "quality-diversity-archive-v1",
         "quality-diversity-archive-v2",
+        "quality-diversity-archive-v3",
     }:
         cells = [cell for cell in archive.get("cells", []) or [] if isinstance(cell, dict)]
         return {
@@ -2396,13 +2405,24 @@ def _mapping_copy(value: Any) -> dict[str, Any]:
 def _confirmed_latest_family_counter(confirmations: list[dict[str, Any]]) -> Counter[str]:
     counter: Counter[str] = Counter()
     for confirmation in confirmations:
-        family = _latest_confirmation_family(confirmation)
+        family = owned_latest_confirmation_family(confirmation)
         if family:
             counter[family] += 1
     return counter
 
 
-def _latest_confirmation_family(confirmation: dict[str, Any]) -> str:
+def owned_latest_confirmation_family(confirmation: dict[str, Any]) -> str:
+    if not is_owned_latest_confirmation(confirmation):
+        return ""
+    return latest_confirmation_family(confirmation)
+
+
+def is_owned_latest_confirmation(confirmation: dict[str, Any]) -> bool:
+    credit = str(confirmation.get("discovery_credit", "")).strip()
+    return credit in OWNED_LATEST_DISCOVERY_CREDITS
+
+
+def latest_confirmation_family(confirmation: dict[str, Any]) -> str:
     status = str(confirmation.get("upstream_status", "")).strip()
     if status not in CONFIRMED_LATEST_UPSTREAM_STATUSES:
         return ""
@@ -2508,6 +2528,10 @@ def _is_postprocess_evidence_run(run: dict[str, Any]) -> bool:
 
 def _is_baseline_scope_comparison_run(run: dict[str, Any]) -> bool:
     return _is_contrast_scope_run(run)
+
+
+_is_reference_scope_comparison_run = _is_contrast_scope_run
+_is_comparison_scope_reference_run = _is_contrast_scope_run
 
 
 
@@ -3182,6 +3206,10 @@ def _stage_profile_issues(runs: list[dict[str, Any]]) -> list[str]:
     return sorted(set(issues))
 
 
+_structured_identity_missing = _structured_identity_issues
+_stage_profile_missing = _stage_profile_issues
+
+
 def _stage_profile_totals(meta: dict[str, Any]) -> dict[str, float]:
     stage_profile = meta.get("stage_profile", {})
     if not isinstance(stage_profile, dict):
@@ -3491,4 +3519,3 @@ def _render_markdown(audit: dict[str, Any]) -> str:
         )
     lines.append("")
     return "\n".join(lines)
-

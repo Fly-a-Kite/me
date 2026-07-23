@@ -1,0 +1,131 @@
+schema_version: osc-remediation-report-v1
+phase: 6
+round: private_foundation_remediation_r6_search_active_contextvar_live_identity
+status: implementation_complete_scoped_suite_passed_pending_runtime_remediation_and_r7_independent_review
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_search_task_contracts.yaml
+  sha256: 2417a53c91e407e17d0bfb689721c070b8c75a828ce472bc312daa221ac84006
+entry_authority:
+  r6_review_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_contracts.yaml
+    sha256: 8ecbe889ba06cedbe4d23eab95f9b0702a051cd70948eee9bf7084845aa84cdd
+  r6_review_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_reports.yaml
+    sha256: 664d151e31f46a5352cd0d649703f8e4d26e0b3dca56b7055e4798d806f1a1a1
+finding:
+  id: OSC-6-FOUNDATION-SEARCH-R6-H1
+  severity: high
+  status: remediated_by_root_validation_not_independently_closed
+implementation:
+  owner: root
+  implementation_child_agents: 0
+  changed_paths:
+    - src/datadiff_osc/search/context_receipts.py
+    - tests/osc/test_search_context_receipts.py
+  summary:
+    - >-
+      ContextVar live identity now binds both its fresh-empty default and its
+      current active value. Any active value that is mutable, cyclic, unresolved,
+      uninspectable, dynamic, or unsupported continues to fail closed through the
+      existing recursive live-context encoder.
+    - >-
+      The ContextVar-aware live-context, policy callable, external dependency,
+      mutation application-policy, mutation receipt, and mutation attempt-ID private
+      digest/schema domains were versioned. A receipt carrying the prior policy
+      semantics therefore cannot be accepted as current.
+    - >-
+      The regression clones derive_stage_lineage while retaining code/source/module/
+      qualname, changes only its SeedLineage global to an inspectable ContextVar.get()
+      callable, and verifies default=0 versus active=1 cold/warm policy separation.
+target_sha256:
+  before_implementation:
+    src/datadiff_osc/search/context_receipts.py: 3e974bf5d0cccb7ab84ea21bafd95e5cf730ed8797c9b6ede177de684f81de44
+    tests/osc/test_search_context_receipts.py: 64cbae1091d1c8bcac48c4a03780a3d136af3f8c1efacde14662e8a9360825eb
+  before_scoped_suite:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+  after_scoped_suite_and_validation:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+frozen_sha256:
+  src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+  tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+  src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+  tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+  src/datadiff_osc/runtime/_receipt_producers.py: 922afa81b750905e0aaa6fc096d4b1176be2112269f119da81cc5aa72d09230d
+  tests/osc/test_runtime_receipt_producers.py: 41c15578eebb43f90a244f94562a8473301503a646f4eb5754853a99991c56c6
+  src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+  tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+  src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+  tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+  src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+validation:
+  scoped_suite:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py
+      tests/osc/test_search_gate_crosswalk.py
+    execution_count: 1
+    exit_code: 0
+    result: 56 passed in 246.27s (0:04:06)
+    exact_sha_verified_pre_and_post: true
+  negative_review:
+    active_contextvar_default_and_warm_rebind: >-
+      pass: default=0 and active=1 produced stable distinct policy IDs within their
+      respective contexts; the cloned derive_stage_lineage retained code/module/
+      qualname and only its SeedLineage global changed.
+    stale_receipt_boundary: >-
+      pass: a receipt captured at default=0 raised mutation operator application
+      policy mismatch after active=1 before replay could reconstruct an outcome.
+    seed_behavior: >-
+      pass: active=1 changed the derived MUTATION SeedLineage counter and subseed.
+    prior_r5_and_r4_regressions: >-
+      pass through the one scoped suite: SeedLineage global rebind, MutationOutcome
+      global, defaults, kwdefaults, closure, same-module recursion, Holder.STATE/
+      module.STATE, registry/profile/callable substitutions, and fail-closed
+      abnormal contexts.
+  independent_counterexample_validation:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python - <<'PY' ... PY
+      (load the regression helpers, trace _r6_contextvar_seed_lineage during
+      stale receipt validation, and assert the policy mismatch)
+    exit_code: 0
+    result: active_contextvar_policy_mismatch_before_seedlineage_calls=pass
+    exact_result:
+      stale_policy_rejected_before_mutation_or_seedlineage_call: true
+      traced_seedlineage_calls_before_mismatch: 0
+  abnormal_input_validation:
+    mutable: fail_closed
+    cyclic: fail_closed
+    unresolved: fail_closed
+    uninspectable: fail_closed
+    dynamic: fail_closed
+    unsupported: fail_closed
+authority_boundaries:
+  diagnostic_refs_authority_eligible: false
+  missing_exact_typed_context: fail_closed_or_not_evaluated
+  candidate_promoted_to_confirmed: false
+  bug_claimed: false
+  public_exports_changed: false
+  public_api_freeze_changed: false
+  fabricated_coverage_or_receipt_or_evidence_authority: false
+findings: []
+counts: {blocker: 0, high: 0, medium: 0, low: 0}
+forbidden_paths_modified: []
+deviations: []
+manual_repository_writes_used_apply_patch: true
+decision:
+  remediation_code_complete: true
+  runtime_remediation_complete: false
+  r7_authority_contract_created: false
+  independent_review_complete: false
+  foundation_barrier: pending
+  foundation_barrier_passed: false
+  combined_six_file_scoped_suite_authorized: false
+  tests_osc_authorized: false
+  full_repository_tests_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_entry_authorized: false
+  phase7_pilot_2h_authorized: false
+  twenty_four_hour_run_authorized: false

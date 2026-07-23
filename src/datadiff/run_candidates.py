@@ -5,11 +5,22 @@ from typing import Any, Callable
 
 from datadiff.bandit_selection import _select_generator_profile
 from datadiff.case_policy import known_replay_source_filter_reason
+from datadiff.case_policy import case_discovery_origin
 from datadiff.config import ExperimentConfig
 from datadiff.datagen import generate_case
+from datadiff.boundary_values import apply_targeted_boundary_profile
 from datadiff.dsl import Case
+from datadiff.goal_first import (
+    generate_goal_first_case,
+    refresh_goal_semantic_activation,
+    semantic_witness_epoch_key,
+)
+from datadiff.metamorphic import all_metamorphic_variants
 from datadiff.preflight import preflight_case
 from datadiff.run_metadata import _candidate_quality_context, _generated_candidate_metadata
+from datadiff.family_witness_registry import (
+    generate_registered_family_witness_case,
+)
 
 REPLAY_FILTER_EXTRA_ATTEMPTS_PER_CANDIDATE = 20
 SATURATED_FAMILY_FILTER_EXTRA_ATTEMPTS_PER_CANDIDATE = 20
@@ -25,6 +36,10 @@ def _known_replay_source_filter_reason(case_item: Case, config: ExperimentConfig
         enable_replay_bug=config.enable_replay_bug,
         replay_bug_source_issues=config.replay_bug_source_issues,
     )
+
+
+_replay_bug_filter_reason = _known_replay_source_filter_reason
+
 
 @dataclass(slots=True)
 class CandidateBatch:
@@ -48,12 +63,14 @@ class CandidateBatch:
 @dataclass(slots=True)
 class _CandidateBuildState:
     seed_cursor: int
+    generation_epoch_seed: int | None
     replay_filtered_candidates: int = 0
     replay_fallback_candidates: int = 0
     saturated_family_filtered_candidates: int = 0
     saturated_family_fallback_candidates: int = 0
     candidates: list[Case] = field(default_factory=list)
     candidate_meta: dict[int, dict[str, Any]] = field(default_factory=dict)
+    reserved_generator_profiles: set[str] = field(default_factory=set)
 
 
 def generate_candidate_batch(
@@ -70,8 +87,24 @@ def generate_candidate_batch(
     schema_spec_for_seed: SchemaSpecFn,
     generate_case_fn: GenerateCaseFn = generate_case,
     replay_filter_fn: ReplayFilterFn = _known_replay_source_filter_reason,
+    force_fresh_source: bool = False,
+    generation_epoch_seed: int | None = None,
 ) -> CandidateBatch:
-    state = _CandidateBuildState(seed_cursor=int(seed_start))
+    resolved_generation_epoch_seed = generation_epoch_seed
+    if (
+        resolved_generation_epoch_seed is None
+        and config.method_policy.generation.mode
+        in {"goal_first_witness_v2", "goal_first_witness_v3"}
+    ):
+        resolved_generation_epoch_seed = semantic_witness_epoch_key(seed_start)
+    state = _CandidateBuildState(
+        seed_cursor=int(seed_start),
+        generation_epoch_seed=(
+            None
+            if resolved_generation_epoch_seed is None
+            else int(resolved_generation_epoch_seed)
+        ),
+    )
     target_pool = max(1, int(candidate_pool))
     while len(state.candidates) < target_pool:
         _append_candidate(
@@ -87,6 +120,7 @@ def generate_candidate_batch(
             schema_spec_for_seed=schema_spec_for_seed,
             generate_case_fn=generate_case_fn,
             replay_filter_fn=replay_filter_fn,
+            force_fresh_source=force_fresh_source,
         )
     return CandidateBatch(
         candidates=state.candidates,
@@ -113,6 +147,7 @@ def _append_candidate(
     schema_spec_for_seed: SchemaSpecFn,
     generate_case_fn: GenerateCaseFn,
     replay_filter_fn: ReplayFilterFn,
+    force_fresh_source: bool,
 ) -> None:
     skipped_replay_candidates = 0
     last_replay_skip_reason = ""
@@ -120,12 +155,30 @@ def _append_candidate(
     skipped_saturated_family_candidates = 0
     last_saturated_family_skip_reason = ""
     saturated_family_fallback_used = False
+    rejected_profiles: set[str] = set()
     while True:
         case_seed = state.seed_cursor
         state.seed_cursor += 1
+        available_profiles = tuple(
+            profile
+            for profile in generator_profile_pool
+            if profile not in state.reserved_generator_profiles
+            and profile not in rejected_profiles
+        )
+        if not available_profiles:
+            available_profiles = tuple(
+                profile
+                for profile in generator_profile_pool
+                if profile not in rejected_profiles
+            ) or generator_profile_pool
+        rotation = case_seed % len(available_profiles)
+        available_profiles = (
+            *available_profiles[rotation:],
+            *available_profiles[:rotation],
+        )
         selected_profile, profile_selection = _select_generator_profile(
             feedback,
-            generator_profile_pool,
+            available_profiles,
             context_features=generator_profile_context_features,
             learning_weight=(
                 config.generator_profile_learning_weight
@@ -134,17 +187,21 @@ def _append_candidate(
             ),
             pool_metadata=generator_profile_pool_metadata,
         )
-        pending = _pop_pending_feedback_candidate(feedback)
+        pending = None if force_fresh_source else _pop_pending_feedback_candidate(feedback)
         if pending is None:
             generated = _generate_case_with_optional_schema(
                 case_seed,
                 type_aware=config.enable_type_aware_generation,
                 profile=selected_profile,
                 schema_spec=schema_spec_for_seed(case_seed),
+                generation_mode=config.method_policy.generation.mode,
+                boundary_mode=config.method_policy.generation.boundary_mode,
+                witness_epoch_seed=state.generation_epoch_seed,
                 generate_case_fn=generate_case_fn,
             )
             generated_replay_skip_reason = replay_filter_fn(generated, config)
             if generated_replay_skip_reason:
+                rejected_profiles.add(selected_profile)
                 last_replay_skip_reason = generated_replay_skip_reason
                 state.replay_filtered_candidates += 1
                 skipped_replay_candidates += 1
@@ -176,13 +233,21 @@ def _append_candidate(
                 )
                 break
             selected, source, metadata = _select_feedback_candidate(
-                feedback,
+                None if force_fresh_source else feedback,
                 case_seed,
                 generated,
                 max_batch=candidate_slots_remaining,
             )
         else:
             selected, source, metadata = pending
+        selected, source, metadata = _resolve_explicit_candidate_source(
+            selected,
+            source=source,
+            metadata=metadata,
+            seed=case_seed,
+            config=config,
+            force_fresh_source=force_fresh_source,
+        )
         preflight = preflight_case(
             selected,
             enable_validation=config.enable_preflight_validation,
@@ -195,6 +260,7 @@ def _append_candidate(
             if not saturated_roots:
                 break
             last_saturated_family_skip_reason = ",".join(saturated_roots)
+            rejected_profiles.add(selected_profile)
             state.saturated_family_filtered_candidates += 1
             skipped_saturated_family_candidates += 1
             if skipped_saturated_family_candidates <= SATURATED_FAMILY_FILTER_EXTRA_ATTEMPTS_PER_CANDIDATE:
@@ -225,6 +291,7 @@ def _append_candidate(
             )
             break
         last_replay_skip_reason = replay_skip_reason
+        rejected_profiles.add(selected_profile)
         state.replay_filtered_candidates += 1
         skipped_replay_candidates += 1
         if skipped_replay_candidates <= REPLAY_FILTER_EXTRA_ATTEMPTS_PER_CANDIDATE:
@@ -254,6 +321,7 @@ def _append_candidate(
             previous_saturation_reason=last_saturated_family_skip_reason,
         )
         break
+    semantic_activation = refresh_goal_semantic_activation(candidate)
     quality_archive_context = _candidate_quality_context(
         feedback,
         candidate,
@@ -270,6 +338,17 @@ def _append_candidate(
         "feedback_decision": metadata.get("feedback_decision", {}),
         "quality_archive_context": quality_archive_context,
         "generator_profile_selection": profile_selection,
+        "goal_first_generation": dict(
+            candidate.metadata.get("goal_first_generation", {})
+            if isinstance(candidate.metadata, dict)
+            else {}
+        ),
+        "semantic_activation": dict(semantic_activation),
+        "boundary_application": dict(
+            candidate.metadata.get("boundary_application", {})
+            if isinstance(candidate.metadata, dict)
+            else {}
+        ),
         "preflight": preflight.to_dict(),
         "replay_filter": {
             "enabled": not config.enable_replay_bug,
@@ -284,6 +363,9 @@ def _append_candidate(
             "last_skip_reason": last_saturated_family_skip_reason,
         },
     }
+    reserved_profile = str(profile_selection.get("profile", "") or "").strip()
+    if reserved_profile:
+        state.reserved_generator_profiles.add(reserved_profile)
     state.candidates.append(candidate)
 
 
@@ -309,6 +391,9 @@ def _fallback_candidate(
         type_aware=config.enable_type_aware_generation,
         profile="common",
         schema_spec=schema_spec_for_seed(case_seed),
+        generation_mode=config.method_policy.generation.mode,
+        boundary_mode=config.method_policy.generation.boundary_mode,
+        witness_epoch_seed=state.generation_epoch_seed,
         generate_case_fn=generate_case_fn,
     )
     profile_selection = _fallback_profile_selection(
@@ -362,7 +447,11 @@ def _select_feedback_candidate(
         )
         selected = selected_batch[0] if selected_batch else generated
     else:
-        feedback_selector = getattr(feedback, "select_case")
+        feedback_selector = getattr(feedback, "select_case", None)
+        if not callable(feedback_selector):
+            feedback_selector = getattr(feedback, "choose_case", None)
+        if not callable(feedback_selector):
+            raise AttributeError("feedback state must provide select_case/select_case_batch")
         selected = feedback_selector(case_seed, generated)
     source = getattr(feedback, "last_candidate_source", "generated")
     metadata = (
@@ -371,6 +460,82 @@ def _select_feedback_candidate(
         or _generated_candidate_metadata(generated)
     )
     return selected, source, metadata
+
+
+def _resolve_explicit_candidate_source(
+    case: Case,
+    *,
+    source: str,
+    metadata: dict[str, Any],
+    seed: int,
+    config: ExperimentConfig,
+    force_fresh_source: bool,
+) -> tuple[Case, str, dict[str, Any]]:
+    """Materialize non-feedback campaign sources with explicit provenance."""
+
+    resolved_source = str(source or "generated")
+    resolved_metadata = dict(metadata or {})
+    if force_fresh_source:
+        return case, resolved_source, resolved_metadata
+    if (
+        config.enable_known_regression_source
+        and resolved_source == "generated"
+        and case_discovery_origin(case) == "issue_replay"
+    ):
+        return case, "known_regression_replay", _source_metadata(
+            resolved_metadata,
+            source="known_regression_replay",
+            seed=seed,
+            detail="known_issue_replay",
+        )
+    if (
+        config.enable_semantic_metamorphic_source
+        and resolved_source == "generated"
+    ):
+        variants = all_metamorphic_variants(case)
+        if variants:
+            variant = variants[seed % len(variants)]
+            return variant.case, "semantic_metamorphic_mutation", _source_metadata(
+                resolved_metadata,
+                source="semantic_metamorphic_mutation",
+                seed=seed,
+                detail=variant.name,
+                relation=variant.relation,
+                parent=case,
+            )
+    return case, resolved_source, resolved_metadata
+
+
+def _source_metadata(
+    metadata: dict[str, Any],
+    *,
+    source: str,
+    seed: int,
+    detail: str,
+    relation: str = "",
+    parent: Case | None = None,
+) -> dict[str, Any]:
+    out = dict(metadata)
+    lineage = dict(out.get("seed_lineage", {}) or {})
+    if parent is not None:
+        lineage.update(
+            {
+                "root_seed": parent.seed,
+                "parent_seed": parent.seed,
+                "parent_case_id": parent.case_id,
+                "mutation_seed": seed,
+                "depth": int(lineage.get("depth", 0) or 0) + 1,
+            }
+        )
+    out["source"] = source
+    out["seed_lineage"] = lineage
+    out["mutation"] = {
+        "operator": source,
+        "detail": detail,
+        "relation": relation,
+        "changed": True,
+    }
+    return out
 
 
 def _pop_pending_feedback_candidate(feedback: Any) -> tuple[Case, str, dict[str, Any]] | None:
@@ -421,12 +586,89 @@ def _generate_case_with_optional_schema(
     type_aware: bool,
     profile: str,
     schema_spec: Any | None,
+    generation_mode: str = "forward_random",
+    boundary_mode: str = "disabled",
+    witness_epoch_seed: int | None = None,
     generate_case_fn: GenerateCaseFn = generate_case,
+) -> Case:
+    family_witness_case = generate_registered_family_witness_case(
+        generation_mode,
+        seed,
+        profile=profile,
+    )
+    if family_witness_case is not None:
+        return family_witness_case
+    if generation_mode in {
+        "goal_first",
+        "goal_first_witness",
+        "goal_first_witness_v2",
+        "goal_first_witness_v3",
+    }:
+        generated = generate_goal_first_case(
+            seed,
+            profile=profile,
+            schema_spec=schema_spec,
+            boundary_mode=boundary_mode,
+            require_semantic_activation=generation_mode
+            in {
+                "goal_first_witness",
+                "goal_first_witness_v2",
+                "goal_first_witness_v3",
+            },
+            diversity_preserving_witness=generation_mode
+            in {"goal_first_witness_v2", "goal_first_witness_v3"},
+            diversity_epoch_seed=(
+                witness_epoch_seed
+                if generation_mode
+                in {"goal_first_witness_v2", "goal_first_witness_v3"}
+                else None
+            ),
+            witness_variant_family=(
+                "v3" if generation_mode == "goal_first_witness_v3" else "v2"
+            ),
+        )
+        if generated.case is not None:
+            return generated.case
+        fallback = _generate_forward_case(
+            seed,
+            type_aware=type_aware,
+            profile=profile,
+            schema_spec=schema_spec,
+            generate_case_fn=generate_case_fn,
+        )
+        fallback.metadata = dict(fallback.metadata or {})
+        fallback.metadata["goal_first_generation"] = generated.trace
+        fallback.metadata["generation_mode"] = "forward_fallback"
+        return fallback
+    generated = _generate_forward_case(
+        seed,
+        type_aware=type_aware,
+        profile=profile,
+        schema_spec=schema_spec,
+        generate_case_fn=generate_case_fn,
+    )
+    if boundary_mode == "fault_model_targeted":
+        return apply_targeted_boundary_profile(generated, seed=seed).case
+    return generated
+
+
+def _generate_forward_case(
+    seed: int,
+    *,
+    type_aware: bool,
+    profile: str,
+    schema_spec: Any | None,
+    generate_case_fn: GenerateCaseFn,
 ) -> Case:
     if schema_spec is None:
         return generate_case_fn(seed, type_aware=type_aware, profile=profile)
     try:
-        return generate_case_fn(seed, type_aware=type_aware, profile=profile, schema_spec=schema_spec)
+        return generate_case_fn(
+            seed,
+            type_aware=type_aware,
+            profile=profile,
+            schema_spec=schema_spec,
+        )
     except TypeError as exc:
         if "unexpected keyword argument" not in str(exc):
             raise

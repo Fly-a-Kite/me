@@ -1,0 +1,60 @@
+schema_version: osc-task-contract-v1
+phase: 6
+change_request: CR-OSC-6-001
+task_id: OSC-6-CR001-ROOT-SUPPORT
+role: root
+mode: implementation
+objective: Add private strict canonical replay primitives without changing canonical transport or public interfaces.
+required_inputs:
+  - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_prewrite_review.yaml
+  - src/datadiff_osc/_canonical.py
+  - src/datadiff_osc/public_api_freeze.json
+allowed_write_paths:
+  - src/datadiff_osc/_replay_support.py
+  - tests/osc/test_replay_support.py
+forbidden_write_paths:
+  - src/datadiff_osc/_canonical.py
+  - src/datadiff_osc/api.py
+  - src/datadiff_osc/__init__.py
+  - src/datadiff_osc/public_api_freeze.json
+  - src/datadiff_osc/contract_engine/**
+  - src/datadiff_osc/search/**
+  - src/datadiff_osc/runtime/**
+frozen_interfaces:
+  - osc-canonical-json-v1
+  - osc-public-api-freeze-v1
+required_symbols:
+  - ReplayValidationError
+  - require_exact_mapping
+  - require_text
+  - require_nonnegative_int
+  - require_bool
+  - require_finite_number
+  - require_tuple
+  - replay_enum
+  - replay_immutable_value
+  - assert_payload_roundtrip
+required_invariants:
+  - bool is never accepted as int or finite number
+  - mappings reject missing and extra fields
+  - enums accept exact frozen values only
+  - tagged float and bytes values are decoded exactly and reject lookalikes
+  - immutable replay never leaves a mutable list or mapping
+  - reconstructed values must exactly reproduce the decoded canonical payload
+  - no object registry and no authority decision exists in shared support
+deliverables:
+  - private support module
+  - positive and forgery-negative scoped tests
+validation:
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/osc/test_replay_support.py
+    expected: exit 0
+  - command: git diff --check
+    expected: exit 0
+stop_conditions:
+  - any public export or freeze change
+  - any domain-owned path change
+  - any long gate execution
+completion_report: root records exact paths, SHA-256 values and scoped results before authorizing domain writers
+

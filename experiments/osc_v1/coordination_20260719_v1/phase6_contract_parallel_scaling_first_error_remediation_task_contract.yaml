@@ -1,0 +1,173 @@
+schema_version: osc-phase6-contract-parallel-scaling-first-error-remediation-task-contract-v1
+phase: 6
+authority:
+  task_id: OSC-6-CONTRACT-PARALLEL-SCALING-FIRST-ERROR-R5A
+  owner: /root
+  role: root
+  mode: root_serial_test_contract_remediation
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  grandchildren_allowed: false
+  remediation_is_serial: true
+  user_authorization:
+    date: 2026-07-23
+    instruction: "授权; 继续"
+    interpretation: >-
+      The user authorized continued bounded Phase-6 Contract work.  This
+      isolated remediation may correct only the R5 regression's assertion of
+      first-error semantics after a byte-mutated private admission.  It does
+      not authorize a product-code change, interface change, frozen-path edit,
+      artifact/provenance admission, cohort, gate calculation, combined suite,
+      Phase 7, a 2h pilot, or a 24h run.
+  authority_write_paths:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_first_error_remediation_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_first_error_remediation_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  source_state_before_write:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    untracked_path_count: 24130
+    coordination_ledger_sha256: 8d07c5a41f2aa8c6f78edfabcade3b928320151f1ee007b10463e9a76a285736
+  required_input_sha256:
+    docs/codex_multi_agent_development_runbook.md: a17a62d7937f5ff4755d8925dc6dd64c25946516a80f82466ddeda1ee8d845f9
+    experiments/final_bug_discovery_protocol_v3/TODO.md: 1ad989d412651f5cc9ae3c3ac5d7d7207176557e0bcdcfb449788f016d607419
+    docs/project_architecture.md: 5fc31c1c2c4bf1241e41cc966f8d56abc890259a8577fe756076b490e3698d9f
+    docs/fine_grained_discovery_architecture.md: 58d0e11a3cd3c2ea9b7096449f9beafae756b94cae3e41f04d4377b2b4d6dbf2
+    docs/discovery_search_and_parallel_architecture.md: 7af5fb51be2de1e0162ffb4a2db2bf40df050f35c0446bcae707e419936cf1b9
+    docs/semantic_hypercontract_architecture.md: 20a5e22513c64c60e77b115233b28fdca2591081f08d5f2945a15dda18442dae
+    docs/architecture_credibility_and_alternatives.md: 95bd949dba93d41d9b2594122fc49766164008c5de8df6aec91dc88f2afa0762
+    docs/competitive_paper_experiment_blueprint.md: e2537e9ec03f5222321af7ae11491341f402d6e294c19ae4c8c3d397c4c1cd18
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_receipt_task_contract.yaml: 86cad586419e533ff46d7b5892fdd169ba5e10df2065d35e185139a861540e71
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_receipt_report.yaml: ec5c5c26f93615921b0b4aabdc9b2496058427cba89e34e457f28f5e34857c40
+    src/datadiff_osc/runtime/_phase6_parallel_scaling_receipts.py: 0c65ff117b8a15a9ac7b0d6f5841475f02db7019a6825218a90faf37d2daaf71
+    src/datadiff_osc/runtime/_semantic_replay.py: ded341713ae92ecda70032bbeeee570e68802e8aed63c35c18af9f8f59663dd8
+    src/datadiff_osc/_phase6_gate_authority.py: 16ebc364ca521aee547a809a7a0906d4d150a42258be6ab31943e79c171d21fc
+    tests/osc/test_runtime_phase6_parallel_scaling_receipts.py: a8ba9437112aa697705e1fcf1c7e19805aed699f9e4cbca2bdbc35f76fb29aaa
+    tests/osc/test_runtime_semantic_replay.py: 40f2a7db1cea6956ec869368c827653b582e84aea340c50c15d028f6de8348df
+    tests/osc/test_phase6_gate_authority_integration.py: 0e9e40c2cd1a783d3a0513c1fdec267427cbb12ec72955960631277eed56495a
+  frozen_target_sha256:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+task:
+  task_id: OSC-6-CONTRACT-PARALLEL-SCALING-FIRST-ERROR-R5A
+  role: root
+  mode: root_serial_test_contract_remediation
+  objective: >-
+    Repair only the R5 byte-mutation regression so it proves the required first
+    Root exact binding failure rather than falsely requiring that a fail-closed
+    error accumulator contain no later diagnostic.  Retain the fact that the
+    private receipt remains non-authoritative and the Contract gate pending.
+  allowed_write_paths:
+    - tests/osc/test_runtime_phase6_parallel_scaling_receipts.py
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_first_error_remediation_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_first_error_remediation_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  forbidden_write_paths:
+    - src/**
+    - tests/osc/test_runtime_semantic_replay.py
+    - tests/osc/test_phase6_gate_authority_integration.py
+    - tests/osc/test_runtime_phase6_contract_performance_receipts.py
+    - tests/osc/test_runtime_phase6_contract_performance_producers.py
+    - tests/osc/test_runtime_receipt_producers.py
+    - tests/osc/test_runtime_producer_provenance.py
+    - tests/osc/test_search_context_receipts.py
+    - tests/osc/test_search_gate_crosswalk.py
+    - tests/osc/test_search_lane_registry.py
+    - docs/**
+    - scripts/**
+    - experiments/final_bug_discovery_protocol_v3/**
+  frozen_interfaces:
+    - osc-public-api-freeze-v1:cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    - osc-pre24-gate-spec-set-d9792996cacb6fc6e47bce602d5f7ab6d6382c62ba9e1ac6bc1f8003ecbec552
+    - all thirteen frozen_target_sha256 entries above
+    - R5 private implementation hashes in required_input_sha256
+    - legacy PairedBenchmarkReceipt remains diagnostic-only
+  required_invariants:
+    - >-
+      After mutating only the stored admission bytes, the first Root error is
+      exactly parallel_scaling_admission_hash_mismatch for that admission ID.
+      Any later accumulator diagnostics must remain fail-closed and must never
+      be interpreted as successful admission, dynamic binding, provenance,
+      authority, gate credit, or publication.
+    - >-
+      The change is test-only.  The R5 receipt, Runtime replay, Root binding,
+      and all other tests retain their exact pre-remediation SHA values.
+    - >-
+      Diagnostic refs remain diagnostic-only; missing exact typed context is
+      fail-closed/not_evaluated; no candidate becomes confirmed and
+      bug_claimed remains false.
+    - >-
+      This is not a typed parallel producer, artifact/provenance admission,
+      cohort, corpus execution, bootstrap, metric, gate-spec edit, Contract
+      pass, combined suite, Phase 7, 2h pilot, or 24h run.
+  required_tests:
+    负向复核:
+      - >-
+        Preserve every existing R5 mutation, substitution, duplicate, source,
+        legacy receipt, malformed payload, and no-authority rejection; only the
+        byte-mutation assertion may change from singleton-list to first-error
+        semantics plus a nonempty fail-closed result.
+    独立反例验证:
+      - >-
+        Mutate only the admission bytes after record construction and prove
+        errors[0] is the exact hash-mismatch identifier while the record cannot
+        become admitted or publishable.
+    异常输入验证:
+      - >-
+        Preserve missing/extra payload, schema, invalid subject, duplicate,
+        unreadable, and byte-modified rejection without a thrown escape,
+        candidate confirmation, bug claim, publication, or execution authority.
+  scoped_validation:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_runtime_phase6_parallel_scaling_receipts.py
+      tests/osc/test_runtime_phase6_contract_performance_receipts.py
+      tests/osc/test_runtime_semantic_replay.py
+      tests/osc/test_phase6_gate_authority_integration.py
+    timing: exactly once, only after the one allowed test write and pre-suite SHA checks
+    forbidden_substitutes:
+      - tests/osc
+      - repository suite
+      - six-file combined suite
+      - 100000 parity execution
+      - v3 2200
+      - Phase 7
+      - 2h pilot
+      - 24h run
+  completion_requirements:
+    - reverify the allowed test, each immutable R5 implementation path, and all thirteen frozen/public SHA values before the scoped suite
+    - retain the exact command, exit code, and complete terminal result in the report
+    - reverify the same SHA values after the scoped suite
+    - use apply_patch for the report and ledger only after the real terminal result is known
+    - retain phase_6_contract as pending regardless of scoped-suite outcome
+  stop_conditions:
+    - any product-code, public export, frozen path, gate-spec, artifact, provenance, metric, docs, or script write
+    - any frozen/public or immutable R5 implementation SHA mismatch, staged user path, pre-existing target report, or scope expansion
+    - any non-hash-mismatch first error for the byte mutation, accepted legacy receipt, admitted mutated bytes, authority, publication, candidate confirmation, or bug_claimed=true
+    - failed scoped suite or incomplete terminal test evidence
+decision:
+  product_code_change_authorized: false
+  test_only_remediation_authorized: true
+  phase_6_contract: pending
+  typed_parallel_producer_authorized: false
+  artifact_or_provenance_authorized: false
+  cohort_or_bootstrap_authorized: false
+  gate_spec_edit_authorized: false
+  real_gate_evidence_authorized: false
+  combined_suite_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_pilot_2h_authorized: false
+  twenty_four_hour_run_authorized: false

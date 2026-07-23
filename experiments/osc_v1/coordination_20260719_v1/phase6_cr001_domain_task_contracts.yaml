@@ -1,0 +1,156 @@
+schema_version: osc-task-contract-v1
+phase: 6
+change_request: CR-OSC-6-001
+execution_policy:
+  mode: bounded_parallel_implementation
+  writes_authorized: true
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  simultaneous_writers: 3
+  shared_files_writable_by_agents: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_paired_pilot_authorized: false
+  twenty_four_hour_run_authorized: false
+frozen_internal_consumer_signature: >-
+  replay_<domain>_admission(*, envelope_type: str, schema_version: str,
+  payload: object, subject_kind: str, subject_ids: tuple[str, ...])
+  -> tuple[str, ...]
+return_semantics: deterministic error tuple; empty means exact reconstruction and exact intrinsic subject match only
+shared_replay_support:
+  path: src/datadiff_osc/_replay_support.py
+  sha256: 6f52a8836288cb0e7578c984a8f0c3c26661a17d648050912c07a54515192dc1
+  writable: false
+tasks:
+  - task_id: OSC-6-CR001-CONTRACT-IMPLEMENT
+    role: contract
+    agent: /root/phase5_authority_audit
+    mode: implementation
+    objective: Strictly reconstruct and semantically validate all six Contract-owned allowed envelope types and derive only intrinsic identities.
+    required_inputs:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_prewrite_review.yaml
+      - src/datadiff_osc/_replay_support.py
+      - src/datadiff_osc/contract_engine/**
+      - src/datadiff_osc/schemas.py
+    allowed_write_paths:
+      - src/datadiff_osc/contract_engine/replay.py
+      - tests/osc/test_contract_semantic_replay.py
+    forbidden_write_paths:
+      - src/datadiff_osc/_replay_support.py
+      - src/datadiff_osc/_phase6_gate_authority.py
+      - src/datadiff_osc/contract_engine/__init__.py
+      - src/datadiff_osc/schemas.py
+      - src/datadiff_osc/api.py
+      - src/datadiff_osc/public_api_freeze.json
+      - src/datadiff_osc/search/**
+      - src/datadiff_osc/runtime/**
+    owned_types:
+      - HyperContract
+      - Endpoint
+      - ResultGroup
+      - ApplicabilityCertificate
+      - ObservationCertificate
+      - ExactEscalationCertificate
+    required_invariants:
+      - exact fields, nested enums/dataclasses and canonical immutable values are reconstructed
+      - real constructors plus valid/well_formed/registry checks run
+      - reconstructed value exactly round-trips to payload
+      - ExactEscalationCertificate maps privately to existing ExactEscalation
+      - confirmed root, mutant and false-positive subjects fail closed pending CR-OSC-6-002
+      - public interfaces remain unchanged
+    validation:
+      - command: >-
+          PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+          -p no:cacheprovider tests/osc/test_contract_semantic_replay.py
+        expected: exit 0
+    stop_conditions: [shared path needed, public change needed, context-only authority requested, long gate]
+    completion_report: runbook section 12 with exact SHA-256 values
+
+  - task_id: OSC-6-CR001-SEARCH-IMPLEMENT
+    role: search
+    agent: /root/phase5_consumer_audit
+    mode: implementation
+    objective: Strictly reconstruct and semantically validate all seven Search-owned allowed envelope types while failing closed on identities requiring absent replay-set context.
+    required_inputs:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_prewrite_review.yaml
+      - src/datadiff_osc/_replay_support.py
+      - src/datadiff_osc/semantic_targets/**
+      - src/datadiff_osc/generation/**
+      - src/datadiff_osc/search/**
+    allowed_write_paths:
+      - src/datadiff_osc/search/semantic_replay.py
+      - tests/osc/test_search_semantic_replay.py
+    forbidden_write_paths:
+      - src/datadiff_osc/_replay_support.py
+      - src/datadiff_osc/_phase6_gate_authority.py
+      - src/datadiff_osc/schemas.py
+      - src/datadiff_osc/api.py
+      - src/datadiff_osc/public_api_freeze.json
+      - src/datadiff_osc/contract_engine/**
+      - src/datadiff_osc/runtime/**
+    owned_types:
+      - ConstructionOutcome
+      - MutationOutcome
+      - TargetAssignment
+      - ExtractionResult
+      - ContrastExtraction
+      - ActivationCertificate
+      - FormalLanePlan
+    required_invariants:
+      - real Case/nested typed objects and immutable values are reconstructed
+      - all locally available valid/digest/field invariants run
+      - reconstructed value exactly round-trips to payload
+      - family can only be a compiler-derived denominator projection
+      - scheduled/mutation/observed/lane/focus subjects fail closed until recorded context dependencies land
+      - no verdict, candidate, bug, gate or 24h authority is created
+    validation:
+      - command: >-
+          PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+          -p no:cacheprovider tests/osc/test_search_semantic_replay.py
+        expected: exit 0
+    stop_conditions: [shared path needed, public change needed, caller identity would be trusted, long gate]
+    completion_report: runbook section 12 with exact SHA-256 values
+
+  - task_id: OSC-6-CR001-RUNTIME-IMPLEMENT
+    role: runtime
+    agent: /root/phase5_evidence_audit
+    mode: implementation
+    objective: Add five private receipt families and strict replay for the twelve Runtime-owned allowed envelope types without granting shape-only authority.
+    required_inputs:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_prewrite_review.yaml
+      - src/datadiff_osc/_replay_support.py
+      - src/datadiff_osc/schemas.py
+      - src/datadiff_osc/parallel/**
+      - src/datadiff_osc/runtime/**
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_private_receipts.py
+      - src/datadiff_osc/runtime/_semantic_replay.py
+      - tests/osc/test_runtime_private_receipts.py
+      - tests/osc/test_runtime_semantic_replay.py
+    forbidden_write_paths:
+      - src/datadiff_osc/_replay_support.py
+      - src/datadiff_osc/_phase6_gate_authority.py
+      - src/datadiff_osc/runtime/__init__.py
+      - src/datadiff_osc/parallel/invariance.py
+      - src/datadiff_osc/schemas.py
+      - src/datadiff_osc/api.py
+      - src/datadiff_osc/public_api_freeze.json
+      - src/datadiff_osc/contract_engine/**
+      - src/datadiff_osc/search/**
+    required_invariants:
+      - all exact fields and nested types are strict and round-trip canonical
+      - candidate receipt has bug_claimed false and cannot represent confirmed states
+      - recheck ordinals are exactly campaign 1/2/3 and pipeline 1/2/3
+      - paired metrics derive from finite raw samples rather than caller scalars
+      - repository and target identities are exact, unique and sorted
+      - shape-valid synthetic runtime objects remain authority-ineligible pending Root provenance
+      - every Python command sets PYTHONDWRITEBYTECODE=1
+    validation:
+      - command: >-
+          PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+          -p no:cacheprovider tests/osc/test_runtime_private_receipts.py
+          tests/osc/test_runtime_semantic_replay.py
+        expected: exit 0
+    stop_conditions: [shared path needed, public change needed, provenance would be inferred, long gate]
+    completion_report: runbook section 12 with exact SHA-256 values
+

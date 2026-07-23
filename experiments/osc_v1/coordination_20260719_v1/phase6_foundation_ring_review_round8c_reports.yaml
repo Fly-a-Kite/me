@@ -1,0 +1,258 @@
+schema_version: osc-review-report-set-v1
+phase: 6
+round: private_foundation_remediation_exact_sha_ring_review_r8c
+status: complete_three_independent_reports_clear_combined_suite_passed_foundation_barrier_passed
+review_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_contracts.yaml
+  sha256: 264e222b7fa3dff91122743627bcc744af559c715085e630ef21d27b59eb3e36
+authority_chain:
+  r5_r6_r7_r7b_r8_r8b: exact_pre_and_post_for_all_three_reviewers
+  r8b_report_sha256: 08915a7cd5d4478f1f5ca21f08bf6f7750d6de95e5cca5428b8f83b85d7842ff
+  r8c_current_dispatch_ledger:
+    expected_pre_post_sha256: 49dcc61818e6f7c50221559f3ba49c1e5e152e0866d808e286af94155514de8d
+    all_reviewers: exact_pre_and_post
+  historical_pre_r8c_registration_snapshot:
+    sha256: d5970169faeadc9e2987a44261ac4fda262c909fda7f9e564152e4686822abbd
+    gating: false
+    compared_to_current: false
+  r8c_contract_pre_post: 264e222b7fa3dff91122743627bcc744af559c715085e630ef21d27b59eb3e36
+workspace_after_all_reviewer_reports:
+  head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  staged_paths: 0
+  root_pre_aggregate_target_sha_reverification: exact_for_all_thirteen_targets
+  preservation_check: >-
+    All three reused direct reviewers separately state writes=0, child_agents=0, and
+    forbidden_paths_modified=[]. Root created only authorized R8C authority/report/ledger files;
+    no product, public, or frozen target changed.
+coordination:
+  direct_agent_count: 3
+  reviewer_slots_reused_from_r7_r8_r8b: true
+  additional_agents_created: 0
+  grandchildren_allowed: false
+  reviewer_writes_allowed: false
+  root_is_not_an_independent_reviewer: true
+  review_language: "负向复核、独立反例验证、异常输入验证"
+  aggregation_note: >-
+    The following are three separately returned independent reports. Root's aggregation only
+    records their evidence and is not represented as a fourth independent review.
+reports:
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8C-A-SEARCH
+    reviewer: r8c_search_independent_reviewer
+    mode: read_only_exact_sha_negative_review
+    status: complete
+    decision: pass_for_search_review_only
+    inputs_read_to_eof: true
+    head_pre_post: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    authority_pre_post: all_r5_r6_r7_r7b_r8_r8b_r8c_entries_exact
+    target_sha256:
+      pre:
+        src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+        tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+        src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+        tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+        src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+        tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+      post: exact_same_as_pre
+    scoped_test:
+      execution_count: 1
+      original_terminal_session: 3477
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py
+        tests/osc/test_search_gate_crosswalk.py
+      exit_code: 0
+      complete_terminal_result: |-
+        ........................................................                 [100%]
+        56 passed in 243.98s (0:04:03)
+    review_results:
+      负向复核:
+        r5_seedlineage_global_rebind: pass
+        r6_contextvar_default_active_cold_warm: pass
+        r4_identity_replay_and_authority_boundary: pass
+      独立反例验证:
+        stale_policy_pre_execution_boundary: >-
+          R5/R6 clone code/source/module/qualname stayed equal while only SeedLineage changed;
+          both old receipts raised `mutation operator application policy mismatch` with
+          derive_stage_lineage=0 and reconstruct_registered_mutation_outcome=0.
+        r4_replay: >-
+          Recursive globals/defaults/kwdefaults/closure/Holder.STATE/module.STATE/registry drift
+          rejected between replays and at the fourth revalidation boundary.
+      异常输入验证:
+        mutable_cyclic_unresolved_uninspectable_dynamic_unsupported: fail_closed
+        forged_coverage_evidence_candidate_bug_gate_execution_subjects: rejected
+    findings: []
+    counts: {blocker: 0, high: 0, medium: 0, low: 0}
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations: []
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8C-B-RUNTIME
+    reviewer: r8c_runtime_independent_reviewer
+    mode: read_only_exact_sha_negative_review
+    status: complete
+    decision: pass_for_runtime_review_only
+    inputs_read_to_eof: true
+    head_pre_post: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    authority_pre_post: all_r5_r6_r7_r7b_r8_r8b_r8c_entries_exact
+    target_sha256:
+      pre:
+        src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+        tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+        src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+        tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+      post: exact_same_as_pre
+      all_thirteen_targets_pre_post: exact
+    scoped_test:
+      execution_count: 1
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+      exit_code: 0
+      complete_terminal_result: |-
+        ........................................................................ [ 86%]
+        ...........                                                              [100%]
+        83 passed in 5.15s
+    review_results:
+      负向复核:
+        r7_m1_typed_context_precedence: pass
+        r7_m2_canonical_case_precedence: pass
+        r6_exact_binding_collision_threshold_candidate_boundary: pass
+      独立反例验证:
+        r7_m1_matrix: >-
+          INCONCLUSIVE/SATISFIED × campaign/pipeline × case/result-group/non-OK-outcome/ordinal
+          retains seven unique identities and raises exact typed-context failure before source witness.
+        r7_m2_matrix: >-
+          Forged TypedCaseObservation.case_id under INCONCLUSIVE/SATISFIED first raises caller
+          case ID conflicts.
+        r6_matrix: >-
+          Task/result-group/seed/outcome substitutions and collisions reject; legal typed
+          VIOLATED remains STABLE_SURVIVOR, non-confirmed, bug_claimed=false.
+      异常输入验证:
+        malformed_provenance_and_raw_parent_forms: fail_closed
+        confirmed_caller_diagnostic_and_missing_typed_context: rejected_or_fail_closed
+    findings: []
+    counts: {blocker: 0, high: 0, medium: 0, low: 0}
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations: []
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8C-C-CONTRACT
+    reviewer: r8c_contract_independent_reviewer
+    mode: read_only_negative_review
+    status: complete
+    decision: pass_for_contract_review_only
+    inputs_read_to_eof: true
+    head_pre_post: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    authority_pre_post: all_r5_r6_r7_r7b_r8_r8b_r8c_entries_exact
+    target_sha256:
+      pre:
+        src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+        tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+        src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+      post: exact_same_as_pre
+    scoped_test:
+      execution_count: 1
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_contract_phase6_corpora.py
+      exit_code: 0
+      complete_terminal_result: |-
+        ...................                                                      [100%]
+        19 passed in 0.52s
+    review_results:
+      负向复核:
+        identity_approval_cross_root_compatibility_mutant_public_gate_execution: pass
+      独立反例验证:
+        c0_path_resolver: 32_of_32_controls_and_5_of_5_escape_forms_rejected
+        forged_authority_gate_bug_claim_and_evidence_state: rejected
+        generic_evidence_and_missing_material: root_ineligible
+      异常输入验证:
+        self_approval_duplicate_identity_seed_mutant_payload: fail_closed
+        candidate_confirmation_gate_credit_execution_authorization: absent
+    findings: []
+    counts: {blocker: 0, high: 0, medium: 0, low: 0}
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations: []
+aggregate_counts: {blocker: 0, high: 0, medium: 0, low: 0}
+review_completion:
+  reports_returned: 3
+  reports_with_complete_scoped_terminal_evidence: 3
+  reviewer_writes_zero: true
+  reviewer_child_agents_zero: true
+  forbidden_paths_modified_empty: true
+  reviewer_pre_post_authority_sha_exact: true
+  reviewer_pre_post_target_sha_exact: true
+  root_pre_aggregate_target_sha_exact: true
+r8b_history:
+  status: audit_history_only_not_substituted_for_r8c
+  note: >-
+    R8B process gaps are preserved in its report. Contract's later unreported `19 passed in
+    0.52s` fact is history only; R8C did not reuse any R8B terminal evidence.
+root_pre_combined_sha_reverification:
+  src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+  tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+  src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+  tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+  src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+  tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+  src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+  tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+  src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+  tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+  src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+  tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+  src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+combined_scoped_test:
+  status: complete_pass
+  authorization: true_after_root_pretest_sha_reverification
+  command: >-
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+    tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py
+    tests/osc/test_search_gate_crosswalk.py tests/osc/test_runtime_producer_provenance.py
+    tests/osc/test_runtime_receipt_producers.py tests/osc/test_contract_phase6_corpora.py
+  execution_count: 1
+  exit_code: 0
+  complete_terminal_result: |-
+    ........................................................................ [ 45%]
+    ........................................................................ [ 91%]
+    ..............                                                           [100%]
+    158 passed in 240.28s (0:04:00)
+root_post_combined_sha_reverification:
+  src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+  tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+  src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+  tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+  src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+  tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+  src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+  tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+  src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+  tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+  src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+  tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+  src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+authority_boundaries:
+  diagnostic_refs_authority_eligible: false
+  missing_exact_typed_context: fail_closed_or_not_evaluated
+  candidate_promoted_to_confirmed: false
+  bug_claimed: false
+  public_api_freeze_changed: false
+  public_exports_changed: false
+  phase7_entry_authorized: false
+  two_hour_run_authorized: false
+  twenty_four_hour_run_authorized: false
+decision:
+  all_three_reports_received: true
+  all_three_complete_terminal_results_received: true
+  aggregate_findings_clear: true
+  combined_scoped_test_authorized: true
+  combined_scoped_pass: true
+  foundation_barrier: pass
+  foundation_barrier_passed: true
+  remaining_phase6_gates_pending: [phase_6_contract, phase_6_granularity_reachability, phase_6_runtime_correctness]
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

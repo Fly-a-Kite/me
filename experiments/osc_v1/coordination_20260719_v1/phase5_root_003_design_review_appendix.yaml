@@ -1,0 +1,46 @@
+schema_version: osc-phase5-root-003-design-review-appendix-v1
+review_id: OSC-5-ROOT-003-DESIGN-REVIEW
+status: reconstructed_and_closed_by_persisted_evidence
+provenance:
+  original_conversation_messages_available: false
+  replacement_session_summary_trusted_without_verification: false
+  reconstruction_sources:
+    - experiments/osc_v1/coordination_20260719_v1/phase5_task_contracts.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase5_change_requests.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase5_legacy_diagnostic_facade_barrier.yaml
+    - tests/osc/test_legacy_diagnostic_facade.py
+  closure_rule: every reconstructed concern must be independently supported by final source SHA and a passing negative regression
+reconstructed_findings:
+  - finding: unsupported outcome was not bound to recomputed UnsupportedEvidence
+    disposition: closed
+  - finding: caller-authored OK nullability and row-order claims could create typed success
+    disposition: closed_current_legacy_ok_is_not_evaluated
+  - finding: missing, malformed or hostile top-level context could escape instead of failing closed
+    disposition: closed
+  - finding: raw/normalized status mismatch and non-SPI semantic or crash status could be accepted
+    disposition: closed
+  - finding: target registry, environment version/source, optimizer config and case payload were not independently rebound
+    disposition: closed
+  - finding: malformed backend sets, cross-case replay and invented serialized evaluated claims could be trusted
+    disposition: closed
+final_boundary:
+  diagnostic_only: true
+  authority_eligible: false
+  generic_legacy_error: ADAPTER_ERROR
+  normalization_error: ADAPTER_ERROR
+  missing_exact_typed_context: not_evaluated
+  caller_claimed_ok_context_accepted: false
+  evaluated_serialized_claim_authenticated_without_typed_producer: false
+  admission_coverage_evidence_candidate_bug_gate_24h_authority: false
+hashes:
+  src/datadiff/osc_diagnostic_facade.py: 139545e03db5fbf9178907a57e37d6889e8d82a2e9e36e5d5f358293f98391bf
+  tests/osc/test_legacy_diagnostic_facade.py: e8ad6381029d826e6521db7e27922cd7ce144ec328474f0f5af09d3caabd8b9c
+  src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+review_result:
+  blocker: 0
+  high: 0
+  medium: 0
+  phase6_authorized: false
+  two_hour_started: false
+  twenty_four_hour_authorized: false
+  twenty_four_hour_started: false

@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable
 
+from datadiff.backend_sampling_cli import apply_backend_sampling_args
+from datadiff.candidate_pool_sampling_cli import apply_candidate_pool_sampling_args
 from datadiff.candidate_pipeline import DEFAULT_CANDIDATE_PIPELINE_DIR, build_candidate_pipeline
 from datadiff.config import ExperimentConfig, merge_discovery_biases
 from datadiff.discovery_campaign_summary import DEFAULT_DISCOVERY_CAMPAIGN_SCORE_WEIGHTS
@@ -14,6 +17,7 @@ from datadiff.finding_outcomes import (
     is_rewardable_candidate_issue_finding,
 )
 from datadiff.guidance import parse_guidance_targets
+from datadiff.osc_diagnostic_facade import consume_opaque_diagnostic_ref_set
 from datadiff.strategy_registry import (
     DEFAULT_DISCOVERY_LANE_IDS,
     discovery_lane_catalog,
@@ -88,6 +92,81 @@ def aggregate_candidate_pipeline_summary(items: list[dict[str, Any]]) -> dict[st
             }
         )
     return {"pipeline_count": pipeline_count, **dict(aggregate)}
+
+
+def _candidate_diagnostic_manifest(row: Mapping[str, Any]) -> dict[str, Any]:
+    try:
+        manifest = row.get("experiment_manifest")
+        return dict(manifest) if isinstance(manifest, Mapping) else {}
+    except Exception:
+        return {}
+
+
+def _candidate_diagnostic_backend_status(
+    row: Mapping[str, Any],
+) -> dict[str, str]:
+    for key in ("normalized", "raw_results", "backend_status"):
+        try:
+            payload = row.get(key)
+            items = tuple(payload.items()) if isinstance(payload, Mapping) else ()
+        except Exception:
+            continue
+        status_by_backend: dict[str, str] = {}
+        for backend, value in items:
+            if not isinstance(backend, str) or not backend:
+                continue
+            try:
+                status = value.get("status") if isinstance(value, Mapping) else value
+            except Exception:
+                status = None
+            status_by_backend[backend] = (
+                status if isinstance(status, str) and status else "unknown"
+            )
+        if status_by_backend:
+            return status_by_backend
+    return {}
+
+
+def _candidate_diagnostic_backends(row: Mapping[str, Any]) -> list[str]:
+    return list(_candidate_diagnostic_backend_status(row))
+
+
+def _candidate_diagnostic_case_digest(row: Mapping[str, Any]) -> str:
+    manifest = _candidate_diagnostic_manifest(row)
+    case_digest = manifest.get("case_digest")
+    return case_digest if isinstance(case_digest, str) else ""
+
+
+def _candidate_opaque_diagnostic_refs(row: Mapping[str, Any]) -> dict[str, Any]:
+    return consume_opaque_diagnostic_ref_set(
+        row.get("osc_diagnostic_refs"),
+        expected_backends=_candidate_diagnostic_backends(row),
+        case_digest=_candidate_diagnostic_case_digest(row),
+    )
+
+
+def _candidate_opaque_metamorphic_diagnostic_refs(
+    row: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    source = row.get("osc_metamorphic_diagnostic_refs")
+    if not isinstance(source, Mapping):
+        source = row.get("metamorphic")
+    if not isinstance(source, Mapping):
+        return {}
+    projections: dict[str, dict[str, Any]] = {}
+    try:
+        items = tuple(source.items())
+    except Exception:
+        return {}
+    for name, variant in items:
+        if not isinstance(name, str) or not name or not isinstance(variant, Mapping):
+            continue
+        projections[name] = {
+            "experiment_manifest": _candidate_diagnostic_manifest(variant),
+            "backend_status": _candidate_diagnostic_backend_status(variant),
+            "osc_diagnostic_refs": _candidate_opaque_diagnostic_refs(variant),
+        }
+    return projections
 
 
 def build_discovery_campaign_manifest(
@@ -207,9 +286,11 @@ def discovery_campaign_config_from_args(
     config = preset_config_func(preset)
     config.log_level = str(getattr(args, "log_level", "compact"))
     config.compress_run_log = not bool(getattr(args, "no_compress_run_log", False))
-    config.enable_parallel_backend_execution = not bool(
-        getattr(args, "disable_parallel_backend_execution", False)
-    )
+    config.enable_parallel_backend_execution = bool(
+        getattr(args, "enable_parallel_backend_execution", False)
+    ) and not bool(getattr(args, "disable_parallel_backend_execution", False))
+    apply_backend_sampling_args(config, args)
+    apply_candidate_pool_sampling_args(config, args)
     config.artifact_limit = getattr(args, "artifact_limit", None)
     if getattr(args, "candidate_recheck_count", None) is not None:
         config.candidate_recheck_count = max(0, int(args.candidate_recheck_count))
@@ -242,9 +323,11 @@ def discovery_run_config_from_args(
     config = preset_config_func(str(getattr(args, "preset", "live_deep_organic")))
     config.log_level = str(getattr(args, "log_level", "compact"))
     config.compress_run_log = not bool(getattr(args, "no_compress_run_log", False))
-    config.enable_parallel_backend_execution = not bool(
-        getattr(args, "disable_parallel_backend_execution", False)
-    )
+    config.enable_parallel_backend_execution = bool(
+        getattr(args, "enable_parallel_backend_execution", False)
+    ) and not bool(getattr(args, "disable_parallel_backend_execution", False))
+    apply_backend_sampling_args(config, args)
+    apply_candidate_pool_sampling_args(config, args)
     config.artifact_limit = getattr(args, "artifact_limit", None)
     if getattr(args, "candidate_recheck_count", None) is not None:
         config.candidate_recheck_count = max(0, int(args.candidate_recheck_count))
@@ -332,6 +415,7 @@ def write_discovery_run_fresh_candidate_evidence(
                         "findings": matching_findings,
                         "normalized": row.get("normalized", {}),
                         "raw_results": row.get("raw_results", {}),
+                        "backend_status": row.get("backend_status", {}),
                         "config": row.get("config", {}),
                         "candidate_recheck": row.get("candidate_recheck", {}),
                         "bug_dir": row.get("bug_dir", ""),
@@ -339,6 +423,11 @@ def write_discovery_run_fresh_candidate_evidence(
                         "case_index": row.get("case_index", ""),
                         "elapsed_s": row.get("elapsed_s", ""),
                         "candidate_bug_families": dict(row_family_counts),
+                        "experiment_manifest": row.get("experiment_manifest", {}),
+                        "osc_diagnostic_refs": _candidate_opaque_diagnostic_refs(row),
+                        "osc_metamorphic_diagnostic_refs": (
+                            _candidate_opaque_metamorphic_diagnostic_refs(row)
+                        ),
                     }
                 )
     evidence = {

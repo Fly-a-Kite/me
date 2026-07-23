@@ -1,0 +1,131 @@
+schema_version: osc-review-contract-v1
+phase: 6
+round: private_foundation_remediation_exact_sha_ring_review_r4_final
+mode: three_parallel_rotated_read_only_reviews
+entry_report:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round3_reports.yaml
+  sha256: 088445a9a98c465d106d40b52749123988772f71ecd0463f153b07bb39f64a2d
+entry_remediation_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round3_task_contracts.yaml
+  sha256: f3eedb23acdca7eccea25a2b12599d6ae75ce553bb07fae102e0eff88cd07901
+entry_review:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round3_reports.yaml
+  sha256: fbe7bf75ba049254ca9aa0a6956eb2470c2959a3e92f1aae88864546281beb19
+normative_inputs:
+  runbook:
+    path: docs/codex_multi_agent_development_runbook.md
+    sha256: a17a62d7937f5ff4755d8925dc6dd64c25946516a80f82466ddeda1ee8d845f9
+  architecture:
+    path: docs/project_architecture.md
+    sha256: 5fc31c1c2c4bf1241e41cc966f8d56abc890259a8577fe756076b490e3698d9f
+  public_api_freeze:
+    path: src/datadiff_osc/public_api_freeze.json
+    sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+coordination:
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  writes_allowed: false
+  preserve_dirty_worktree: true
+  reviewers_must_not_review_own_implementation: true
+global_requirements:
+  - hash every entry artifact and every assigned target before semantic inspection or tests; any mismatch stops that review
+  - inspect correctness, soundness, reproducibility, authority boundaries and missing negative tests; style findings are out of scope
+  - independently replay the assigned R3 attack and at least two adjacent attacks from causal typed inputs
+  - unknown, malformed, incomplete, mutable, dynamic, relabeled, swapped, nondeterministic or caller-authored context fails closed or remains not_evaluated
+  - diagnostic refs remain diagnostic-only and candidate remains non-confirmed with bug_claimed false
+  - no threshold, denominator, comparator, public export or public API freeze change is permitted
+  - pass requires blocker=0, high=0 and medium=0; report low separately
+  - use PYTHONDONTWRITEBYTECODE=1 for every Python command and run only the assigned scoped command
+  - do not run tests/osc, full repository, parity 100000, v3 2200, Phase 7, 2h or 24h
+tasks:
+  - task_id: OSC-6-FOUNDATION-REVIEW-R4-A-SEARCH
+    reviewer: /root/r3_contract_sentinel
+    target_owner: /root/r3_search_owner
+    allowed_write_paths: []
+    target_files:
+      - path: src/datadiff_osc/search/lane_registry.py
+        sha256: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+      - path: src/datadiff_osc/search/context_receipts.py
+        sha256: e59bee28afc89cc58706eecc9168043e18fe7c74bf40f4d66e515a1a2a7673bd
+      - path: src/datadiff_osc/search/context_replay.py
+        sha256: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+      - path: tests/osc/test_search_lane_registry.py
+        sha256: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+      - path: tests/osc/test_search_context_receipts.py
+        sha256: 6b472c41e46aa9cc1bd46453dd273204cf82670cf4522944d62c658af6a6873f
+      - path: tests/osc/test_search_gate_crosswalk.py
+        sha256: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    required_attack_families:
+      - cold and warm same-code global rebinding plus defaults, keyword defaults, closure and every profile-field substitution
+      - callable object, mutable dependency, globals/locals/vars/getattr/eval/exec/import and unresolved/cyclic dependency fail-closed behavior
+      - registry/profile/callable swaps after capture and between the two fresh replays
+      - attempt private Search receipt promotion into coverage, evidence, candidate, bug, gate or authorization authority
+    review_focus:
+      - complete live callable and profile identity with no cache-state authority
+      - exact isolated replay twice with stable identity before, between and after
+      - full MutationOutcome equality and accepted/repaired/rejected causal boundaries
+    scoped_test: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py tests/osc/test_search_gate_crosswalk.py
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R4-B-RUNTIME
+    reviewer: /root/r3_search_owner
+    target_owner: /root/r3_runtime_owner
+    allowed_write_paths: []
+    target_files:
+      - path: src/datadiff_osc/runtime/_producer_provenance.py
+        sha256: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+      - path: src/datadiff_osc/runtime/_receipt_producers.py
+        sha256: 4e939d0d8dd30858a60109318c12ceb4614e8848816761b1ccdbc772986ae9d6
+      - path: tests/osc/test_runtime_producer_provenance.py
+        sha256: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+      - path: tests/osc/test_runtime_receipt_producers.py
+        sha256: dccb5339abea3f4f92c41113766a36e7d25f30db0dc3df03d4275200d5404caf
+    required_attack_families:
+      - source result and evidence reuse independently in campaign ordinal 1 and pipeline ordinal 1
+      - source collision for task ID, complete TaskSpec digest, result ID, seed lineage and EvidenceEnvelope digest
+      - cross-stage reuse, wrong exact result/task binding and collision combined with INCONCLUSIVE or partial verdict
+      - confirmed states, bug_claimed true, caller reproduced and any diagnostic-only authority promotion
+    review_focus:
+      - global seven-execution and seven-envelope disjointness before verdict/reproduced/threshold evaluation
+      - exact evidence/result/task/seed/contract/target/outcome bindings on every accepted observation
+      - typed VIOLATED derivation, exact 3/3 plus 3/3 thresholds and non-bug boundary
+    scoped_test: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R4-C-CONTRACT
+    reviewer: /root/r3_runtime_owner
+    target_owner: /root/phase5_authority_audit
+    allowed_write_paths: []
+    target_files:
+      - path: src/datadiff_osc/contract_engine/_phase6_corpora.py
+        sha256: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+      - path: tests/osc/test_contract_phase6_corpora.py
+        sha256: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    required_attack_families:
+      - arbitrary reviewer/root identities, repeated approvals and C0/path/resolver aliases
+      - cross-root signatures, component/global false-positive suppression and compatibility context swaps
+      - mutant pair reuse, predicate substitution and generic or source-only evidence
+    review_focus:
+      - byte-identical frozen source and test pair with all prior Contract findings still closed
+      - no self-authored denominator, reviewer independence, signature, verdict or category authority
+      - private Contract foundation creates no public export, gate credit or execution authorization
+    scoped_test: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_contract_phase6_corpora.py
+report_requirements:
+  - exact reviewed target SHA set and every entry/normative SHA, reverified after the scoped test
+  - writes=0, child_agents=0, forbidden_paths_modified=[] and deviations=[]
+  - exact scoped command, exit code and result
+  - every required attack with exact accepted, rejected or error result
+  - each finding uses runbook severity, claim, evidence, reproduction, violated invariant, owner and required test fields
+  - blocker, high, medium and low counts plus unconditional pass or fail
+exit:
+  foundation_review_passes_only_if:
+    - all three exact-SHA reports are received
+    - aggregate blocker, high and medium counts are zero
+    - Root re-verifies all SHAs, both R3 attacks and the six-file combined scoped suite
+    - public API freeze remains cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+execution_authorization:
+  scoped_tests_only: true
+  tests_osc: false
+  full_repository_tests: false
+  parity_100000: false
+  v3_2200: false
+  phase7_pilot_2h: false
+  twenty_four_hour: false

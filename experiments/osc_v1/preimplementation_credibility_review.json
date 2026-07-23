@@ -1,0 +1,353 @@
+{
+  "schema_version": "osc-preimplementation-credibility-review-v1",
+  "generated_at": "2026-07-19T02:54:37+08:00",
+  "review_scope": "OSC core implementation authority only; this is not 24h launch authority",
+  "review_status": "passed_for_low_complexity_core_implementation",
+  "authority": {
+    "core_implementation_authorized": true,
+    "complex_enhancements_authorized_as_prerequisites": false,
+    "interaction_tiles_primary_authorized": false,
+    "twenty_four_hour_run_authorized": false
+  },
+  "input_sha256": {
+    "experiments/final_bug_discovery_protocol_v3/TODO.md": "0b3c252bfca70a30cb74a4f86a902f9289e531d68c39b73896b882de7c0f99c2",
+    "docs/project_architecture.md": "833d0f6009a303ab0f20d22403f5f568c0d5aa878d8fb04f01aa6ce40222015b",
+    "docs/fine_grained_discovery_architecture.md": "58d0e11a3cd3c2ea9b7096449f9beafae756b94cae3e41f04d4377b2b4d6dbf2",
+    "docs/discovery_search_and_parallel_architecture.md": "7af5fb51be2de1e0162ffb4a2db2bf40df050f35c0446bcae707e419936cf1b9",
+    "docs/semantic_hypercontract_architecture.md": "20a5e22513c64c60e77b115233b28fdca2591081f08d5f2945a15dda18442dae",
+    "docs/architecture_credibility_and_alternatives.md": "95bd949dba93d41d9b2594122fc49766164008c5de8df6aec91dc88f2afa0762",
+    "docs/competitive_paper_experiment_blueprint.md": "e2537e9ec03f5222321af7ae11491341f402d6e294c19ae4c8c3d397c4c1cd18",
+    "src/datadiff/semantic_contracts.py": "6667d99feec03f085ef78ea1d8b253768587339706f73b0fb49db3ace409a866",
+    "src/datadiff/contract_comparison.py": "48e4cdc1dd3a2bf6e0450ff168fa7d80cf73aedd534b0ef560f81738b897a049",
+    "src/datadiff/semantic_family_universe.py": "30d9f339d238b8e79922d7a5c0e45ed1b409e5c3b40e9737f4762155329bafc6",
+    "src/datadiff/semantic_family_universe_v2.py": "62da9afabd9d125a8b6d1f8fab6147a2c406b342bc7ff715091a82213b702949",
+    "src/datadiff/semantic_family_universe_v3.py": "b69e87660a5e44e26e9973ccc3343286eb77e0c60d8123ea9bc7e793c9a054e9",
+    "src/datadiff/family_witness_registry.py": "477409fe5104cb45a7c3ab6804056cabd92e09d248e4bc4cccebbb9e3f7ebb3c"
+  },
+  "confirmed_facts": {
+    "strict_confirmed_roots": 9,
+    "running_sum_precision_rows": 4,
+    "running_sum_precision_disposition": "one local presentation-order false-positive root; zero new upstream roots",
+    "legacy_post_triage_gate": {
+      "runs_completed": 22,
+      "cases_executed": 2200,
+      "backend_results_ok": 6296,
+      "iteration_failures": 0,
+      "candidate_families": 0,
+      "semantic_activated": 533,
+      "semantic_scheduled": 1929,
+      "semantic_activation_rate": 0.2763,
+      "authorizes_24h": false
+    }
+  },
+  "universe_audit": {
+    "fresh": {"families": 16, "cells": 232},
+    "regression": {"families": 9, "cells": 144},
+    "backend_pair_obligations": 502,
+    "single_axis_edges": 384,
+    "edge_count_method": "For each categorical axis a with cardinality n_a, sum (n_a-1)*product(other axis cardinalities) within each fresh family.",
+    "edges_by_family": {
+      "pandas_nullable_bool_reduction": 20,
+      "sqlite_affinity_null_ordered_cut": 20,
+      "polars_lazy_filter_groupby_window": 20,
+      "polars_lazy_temporal_cast_boundary": 20,
+      "pyarrow_encoded_nested_compute": 20,
+      "datafusion_window_order_join_interaction": 20,
+      "pandas_nullable_string_normalization": 20,
+      "pyarrow_string_layout_predicate": 33,
+      "polars_arithmetic_cast_sortedness": 20,
+      "polars_lazy_case_string_membership": 20,
+      "duckdb_union_duplicate_global_aggregate": 20,
+      "sqlite_three_valued_membership": 20,
+      "datafusion_null_setop_aggregate": 20,
+      "cross_backend_issue_risk_pipeline": 52,
+      "cross_backend_exact_dtype_pipeline": 13,
+      "pyarrow_layout_interaction_pipeline": 46
+    },
+    "edge_relation_expressibility": {
+      "all_384_expressible": true,
+      "default_for_semantics_changing_axis": "differential_isolation",
+      "layout_or_execution_mode_only": "metamorphic_equivalence when program, logical input, seed lineage, and every non-target axis are identical",
+      "boundary_axis_with_proven_direction": "monotonic_boundary",
+      "fail_closed_rule": "An edge without one registered relation and complete endpoint preconditions is excluded from the formal registry rather than treated as equivalent."
+    },
+    "interaction_tile_shadow_bound": {
+      "raw_admissible_tiles": 202,
+      "endpoint_instances_without_reuse": 808,
+      "backend_executions_without_reuse": 2224,
+      "unique_cell_endpoints_if_perfectly_reused": 232,
+      "enumeration": "For each pair of axes a,b, enumerate (n_a-1)(n_b-1)*product(other axis cardinalities) baseline-star 2x2 tiles.",
+      "decision": "shadow",
+      "promotion_rule": "Only stable joint-only violations, higher issue-ready root yield, or materially faster localization at acceptable cost can promote tiles; cell and edge gates remain unchanged."
+    }
+  },
+  "workflow_derivations": [
+    {
+      "id": "W01_sort_total_limit",
+      "workflow": "sort(k,id total key) -> limit(n)",
+      "forward": ["sort establishes total evaluation and presentation order", "tie_determinism=total because (k,id) is unique", "limit preserves the ordered prefix and sets exact bounded cardinality"],
+      "backward": ["final sequence observer demands values, schema, cardinality, and presentation order", "limit propagates evaluation-order demand to sort", "sort discharges it with a total key"],
+      "compiled_relation": "sequence exact + schema exact + cardinality exact",
+      "unknown_or_failure": "duplicate total keys or unknown uniqueness downgrades tie_determinism; it does not silently switch the whole result to bag"
+    },
+    {
+      "id": "W02_sort_tie_limit",
+      "workflow": "sort(k non-total) -> limit(n) with a tie crossing n",
+      "forward": ["sort establishes key partial order", "tie_determinism=non_total", "limit cuts an observable tie class"],
+      "backward": ["limit demands evaluation order and exact n", "observer demands membership in the legal top-k set but not a particular within-tie row", "rows outside the boundary tie remain fixed"],
+      "compiled_relation": "partial-order legal-top-k membership + exact cardinality + exact non-tie components",
+      "unknown_or_failure": "bag equality is too strict for legal tie choices and ignoring all rows is too weak"
+    },
+    {
+      "id": "W03_limit_without_order",
+      "workflow": "limit(n) on an input with no cross-backend order contract",
+      "forward": ["evaluation_order=unknown", "presentation_order=unknown", "cardinality is bounded but membership is not uniquely determined"],
+      "backward": ["limit requires an upstream evaluation order to prove cross-backend membership", "no rule discharges that demand"],
+      "compiled_relation": "cardinality-only observation; value equivalence is INCONCLUSIVE unless an endpoint-scoped input-order rule applies",
+      "unknown_or_failure": "must not label arbitrary differing prefixes SATISFIED"
+    },
+    {
+      "id": "W04_running_sum_then_join",
+      "workflow": "running_sum(partition, order_by) -> join with duplicate matches",
+      "forward": ["running_sum consumes partition/evaluation order and computes exact cumulative values", "join preserves computed values and multiplicity semantics but kills final presentation order", "tie determinism remains an internal precondition only"],
+      "backward": ["final bag observer does not demand presentation order", "it still demands exact running_sum values", "running_sum propagates partition/evaluation-order demand to its input"],
+      "compiled_relation": "bag exact values + exact join multiplicities; no final row-sequence relation",
+      "unknown_or_failure": "this is the approved precision fix for the four running_sum_precision rows"
+    },
+    {
+      "id": "W05_running_sum_final_sort",
+      "workflow": "running_sum(partition, order_by) -> join -> sort(total key)",
+      "forward": ["running_sum has internal ordered evaluation", "join kills prior presentation order", "final total sort re-establishes presentation order"],
+      "backward": ["sequence observer demands the final sort order", "numeric values still demand the running_sum partition order", "the two order demands remain distinct"],
+      "compiled_relation": "sequence exact + numeric exact + independent evaluation-order precondition"
+    },
+    {
+      "id": "W06_groupby_null_aggregate",
+      "workflow": "groupby(g).agg(sum,mean,min,max,count,any,all) with null and all-null groups",
+      "forward": ["groupby kills input/presentation order", "group membership uses an explicit NULL grouping relation", "each aggregate has its own null-skip, empty/all-null, dtype, and numeric rule"],
+      "backward": ["bag observer demands exact group keys and one output row per group", "aggregate outputs demand only their input columns and declared null policy", "input duplicate multiplicity remains observable through aggregate values/counts"],
+      "compiled_relation": "bag exact groups + per-aggregate component relations + exact cardinality",
+      "unknown_or_failure": "a backend without the declared aggregate/null semantics is INAPPLICABLE, not tolerated globally"
+    },
+    {
+      "id": "W07_distinct_multiplicity",
+      "workflow": "distinct(columns)",
+      "forward": ["input duplicate multiplicity is killed", "output uniqueness postcondition requires multiplicity exactly one per projected row", "presentation order is generally unobserved"],
+      "backward": ["observer demands set membership and output uniqueness", "it does not demand preservation of input counts", "cardinality equals the number of unique projected rows"],
+      "compiled_relation": "set membership + uniqueness postcondition + exact cardinality",
+      "unknown_or_failure": "plain set comparison alone would hide a backend that incorrectly emits duplicates"
+    },
+    {
+      "id": "W08_inner_join",
+      "workflow": "inner_join(left,right,on=keys) with duplicate and unmatched keys",
+      "forward": ["matched multiplicity is the product of left/right key multiplicities", "unmatched rows are absent", "presentation order is killed", "NULL-key equality is a separately selected relation"],
+      "backward": ["bag observer demands exact joined values and multiplicities", "key/value demand propagates to both inputs", "no sequence demand propagates without a final order observer"],
+      "compiled_relation": "bag exact + join multiplicity + explicit NULL-key relation"
+    },
+    {
+      "id": "W09_semi_join",
+      "workflow": "semi_join(left,right,on=keys) with duplicate right keys",
+      "forward": ["each qualifying left row is emitted once", "right multiplicity is semantically ignored", "left multiplicity is preserved", "NULL membership is explicit"],
+      "backward": ["observer demands left-row bag membership", "right side is demanded only as an existence predicate", "right payload and duplicate counts are unobserved"],
+      "compiled_relation": "left-bag filtering by existential membership + right-duplicate invariance"
+    },
+    {
+      "id": "W10_anti_join",
+      "workflow": "anti_join(left,right,on=keys)",
+      "forward": ["left rows without a match are emitted once per left occurrence", "right duplicates do not change output", "anti_join semantics are not automatically SQL NOT IN semantics"],
+      "backward": ["observer demands complement membership and left multiplicity", "right side is demanded only for existence/non-existence", "NULL policy is operation-specific"],
+      "compiled_relation": "left-bag complement + right-duplicate invariance + explicit NULL membership"
+    },
+    {
+      "id": "W11_cast_success",
+      "workflow": "mutate(cast(s -> int)) where every value is in the common domain",
+      "forward": ["definedness=defined under lexical/range preconditions", "result logical dtype and nullability are known", "value conversion is exact"],
+      "backward": ["value/dtype observer demands source values and cast rule", "unobserved source columns can be projected away"],
+      "compiled_relation": "exact tagged values + exact logical dtype/nullability"
+    },
+    {
+      "id": "W12_cast_error",
+      "workflow": "mutate(cast(s -> int)) with invalid or out-of-range input",
+      "forward": ["definedness is semantic-domain-error only when the common contract specifies rejection", "unsupported capability, timeout, crash, and adapter failure remain distinct"],
+      "backward": ["status observer requests error category and relevant input/range facts", "value rows are not requested for a rejected endpoint"],
+      "compiled_relation": "exact accept/reject plus scoped semantic-error category",
+      "unknown_or_failure": "different undocumented behavior yields INCONCLUSIVE; timeout/crash never becomes unsupported"
+    },
+    {
+      "id": "W13_signed_zero_numeric",
+      "workflow": "numeric expression/comparison over -0.0 and +0.0",
+      "forward": ["lossless observations retain sign bit", "arithmetic, equality, ordering, grouping, and serialization roles are separate facts"],
+      "backward": ["exact numeric observer demands sign when the operation can expose it", "an equality-predicate observer may legally identify the zeros only under its own rule"],
+      "compiled_relation": "role-specific tagged exact or explicit signed-zero equivalence",
+      "unknown_or_failure": "no global -0 -> +0 canonicalization"
+    },
+    {
+      "id": "W14_nan_inf_roles",
+      "workflow": "filter/sort/group/aggregate with NaN and +/-Inf",
+      "forward": ["NaN, infinities, NULL, and finite values remain distinct tagged classes", "predicate truth, ordering, grouping, aggregate propagation, and conversion are independent components"],
+      "backward": ["only roles feeding the final observer are demanded", "a NaN sort rule cannot weaken aggregate or NULL equality"],
+      "compiled_relation": "role-specific NaN/Inf relations; otherwise INCONCLUSIVE",
+      "unknown_or_failure": "v1 case-level nan=boundary is deleted"
+    },
+    {
+      "id": "W15_arrow_sliced_layout",
+      "workflow": "same Arrow logical table, contiguous vs non-zero-offset slice",
+      "forward": ["layout changes offset/buffer view", "logical schema, values, cardinality, and order are preserved by the layout transform"],
+      "backward": ["layout-equivalence observer demands exact logical values/schema and activation evidence that slice_offset>0", "physical offset is the changed axis, not a permitted value difference"],
+      "compiled_relation": "layout equivalence with exact logical sequence/bag selected by the program contract"
+    },
+    {
+      "id": "W16_arrow_chunked_layout",
+      "workflow": "same Arrow logical table split into multiple chunks",
+      "forward": ["chunk boundaries change physical partitioning only", "logical concatenated values and schema are preserved"],
+      "backward": ["observer demands chunk_count>=2 activation plus exact logical output", "partition order of chunks is retained unless a later semantic operation changes order"],
+      "compiled_relation": "chunk-layout invariance + exact logical result"
+    },
+    {
+      "id": "W17_arrow_dictionary_layout",
+      "workflow": "plain vs dictionary-encoded column with the same decoded values",
+      "forward": ["indices/dictionary are physical representation", "decoded value sequence, null bitmap semantics, and logical field semantics are demanded", "dictionary ordering flag is not row presentation order"],
+      "backward": ["observer demands dictionary activation and decoded exact values", "dictionary index assignments and dictionary entry order are unobserved unless the tested kernel explicitly exposes them"],
+      "compiled_relation": "dictionary representation invariance + exact decoded values/schema"
+    },
+    {
+      "id": "W18_eager_lazy_streaming",
+      "workflow": "same typed workflow executed eager, lazy, and streaming",
+      "forward": ["execution mode changes planning/materialization metadata", "semantic value/order/schema facts follow the operation rules", "unsupported operations are capability evidence"],
+      "backward": ["mode-equivalence observer demands the same semantic components for all applicable modes", "plan text and timing are evidence metadata, not equality components"],
+      "compiled_relation": "mode equivalence under capability/version scope",
+      "unknown_or_failure": "a streaming mode missing a required operation is INAPPLICABLE with frozen evidence"
+    }
+  ],
+  "relation_four_way_examples": [
+    {"relation": "sequence", "satisfied": "[a,b]=[a,b]", "violated": "[a,b] vs [b,a]", "inapplicable": "one endpoint unsupported", "inconclusive": "lossless rows missing"},
+    {"relation": "bag", "satisfied": "[a,b,a] vs [a,a,b]", "violated": "[a,b] vs [a,a,b]", "inapplicable": "schema outside common scope", "inconclusive": "opaque value has no registered canonical observer"},
+    {"relation": "set_with_uniqueness", "satisfied": "distinct outputs [a,b] and [b,a]", "violated": "one output is [a,a,b]", "inapplicable": "operation is not DISTINCT/set-producing", "inconclusive": "nested value equality rule unknown"},
+    {"relation": "partial_order_topk", "satisfied": "different members of the boundary tie, same fixed prefix and n", "violated": "row below the tie boundary selected", "inapplicable": "no sort/limit obligation", "inconclusive": "sort keys or tie classes unavailable"},
+    {"relation": "numeric", "satisfied": "values within an explicit ULP/forward-error bound", "violated": "bound exceeded or signed-zero bit differs under exact rule", "inapplicable": "non-numeric component", "inconclusive": "tolerance rule has no proof/scope"},
+    {"relation": "error", "satisfied": "both reject with the scoped semantic category", "violated": "one accepts and one rejects", "inapplicable": "capability explicitly unsupported", "inconclusive": "unclassified exception without a versioned rule"},
+    {"relation": "layout_equivalence", "satisfied": "different activated layouts decode to identical logical output", "violated": "logical value/schema differs", "inapplicable": "requested layout cannot be constructed", "inconclusive": "layout activation metadata absent"},
+    {"relation": "differential_isolation", "satisfied": "both endpoints independently satisfy their backend contracts", "violated": "changed-axis endpoint has a new component violation", "inapplicable": "required control backend unsupported", "inconclusive": "one endpoint lacks exact escalation"},
+    {"relation": "monotonic_boundary", "satisfied": "declared direction and bound hold", "violated": "direction reverses or bound is exceeded", "inapplicable": "axis lacks a monotonic rule", "inconclusive": "cardinality/value needed for direction is missing"},
+    {"relation": "interaction_tile", "satisfied": "A+B has no joint-only violation after subtracting base/A/B components", "violated": "stable A+B-only component remains", "inapplicable": "A-only or B-only control cannot be constructed", "inconclusive": "non-target axes or lineage differ"}
+  ],
+  "v1_policy_crosswalk": [
+    {"id": "P01_limit_offset_without_order", "v1_policy": "ordering:boundary", "v2_disposition": "exact_component_relation", "component": "evaluation_order", "relation": "required upstream order; value membership INCONCLUSIVE when unknown; cardinality remains exact"},
+    {"id": "P02_sort_nullable_key", "v1_policy": "null:boundary", "v2_disposition": "exact_component_relation", "component": "NULL sort placement", "relation": "per-key first/last plus partial-order tie relation; never whole-case boundary"},
+    {"id": "P03_running_sum_row_number_sortedness", "v1_policy": "ordering/null:boundary", "v2_disposition": "exact_component_relation", "component": "evaluation_order, partition_order, tie_determinism", "relation": "internal order precondition separated from presentation order"},
+    {"id": "P04_join_family_null", "v1_policy": "null:boundary", "v2_disposition": "exact_component_relation", "component": "key membership/equality", "relation": "inner/semi/anti-specific nullable key semantics"},
+    {"id": "P05_join_family_layout", "v1_policy": "layout_sensitivity:tolerated", "v2_disposition": "delete", "component": "layout", "relation": "join may change representation but values/schema stay under their own strict relations; no generic tolerance"},
+    {"id": "P06_filter_null_truth", "v1_policy": "null:boundary", "v2_disposition": "exact_component_relation", "component": "predicate truth", "relation": "explicit three-valued/nullable-boolean truth table"},
+    {"id": "P07_filter_special_float", "v1_policy": "nan:boundary", "v2_disposition": "exact_component_relation", "component": "predicate truth for NaN/Inf", "relation": "operation-specific truth relation"},
+    {"id": "P08_null_rewrite_ops", "v1_policy": "null:boundary", "v2_disposition": "exact_component_relation", "component": "drop/fill/coalesce/case output", "relation": "exact row/value/nullability postcondition"},
+    {"id": "P09_groupby_aggregate_null", "v1_policy": "null:boundary", "v2_disposition": "exact_component_relation", "component": "group equality and per-aggregate null skipping", "relation": "aggregate-specific rules including empty/all-null"},
+    {"id": "P10_groupby_aggregate_dtype", "v1_policy": "dtype_coercion:boundary", "v2_disposition": "versioned_backend_overlay_or_exact", "component": "logical dtype/nullability", "relation": "exact common dtype; documented version overlay may permit only the affected dtype component"},
+    {"id": "P11_float_aggregate_nan", "v1_policy": "nan:boundary", "v2_disposition": "exact_component_relation", "component": "aggregate NaN/Inf propagation", "relation": "per-aggregate special-float rule"},
+    {"id": "P12_cast_datepart_dtype", "v1_policy": "dtype_coercion:boundary", "v2_disposition": "exact_component_relation", "component": "converted value and logical dtype", "relation": "domain-scoped exact conversion"},
+    {"id": "P13_cast_datepart_error", "v1_policy": "error_equivalence:boundary", "v2_disposition": "exact_component_relation", "component": "accept/reject and semantic error category", "relation": "timeout/crash/unsupported remain distinct"},
+    {"id": "P14_numeric_expression_dtype", "v1_policy": "dtype_coercion:tolerated", "v2_disposition": "versioned_backend_overlay_or_exact", "component": "logical dtype", "relation": "no default coercion; exact common dtype or narrowly evidenced overlay"},
+    {"id": "P15_numeric_special_float", "v1_policy": "nan:boundary", "v2_disposition": "exact_component_relation", "component": "NaN/Inf/signed-zero arithmetic", "relation": "role-specific tagged relation"},
+    {"id": "P16_div_mod_error", "v1_policy": "error_equivalence:boundary", "v2_disposition": "exact_component_relation", "component": "domain error/status", "relation": "operator/type/value scoped accept/reject relation"},
+    {"id": "P17_nullable_bool_expr", "v1_policy": "null:boundary", "v2_disposition": "exact_component_relation", "component": "nullable scalar truth", "relation": "explicit bool_not/null-if-empty truth/value table"},
+    {"id": "P18_string_api_error", "v1_policy": "error_equivalence:tolerated", "v2_disposition": "explicit_unsupported", "component": "error", "relation": "until each API has a scoped error-domain rule, cross-backend error equivalence is INCONCLUSIVE"},
+    {"id": "P19_case_special_float", "v1_policy": "nan:boundary", "v2_disposition": "delete", "component": "none globally", "relation": "special values alone grant no permission; operation rules select relevant roles"},
+    {"id": "P20_root_cause_axis_map", "v1_policy": "root/family string -> boundary axis", "v2_disposition": "delete", "component": "verdict authority", "relation": "root strings remain report/triage context only"},
+    {"id": "P21_root_substring_heuristics", "v1_policy": "substring -> boundary axis", "v2_disposition": "delete", "component": "verdict authority", "relation": "no family/root/candidate string may select a semantic permission"},
+    {"id": "P22_mismatch_class_axis_map", "v1_policy": "mismatch string -> boundary axis", "v2_disposition": "exact_component_relation", "component": "observer selection only", "relation": "structured first-failing component selects evidence; it grants no permission"},
+    {"id": "P23_reference_nan_precedence", "v1_policy": "nan boundary may outrank DSL reference", "v2_disposition": "versioned_backend_overlay_or_inconclusive", "component": "specific NaN role", "relation": "only documentary/reference evidence within exact scope may override; mixed axes remain strict"},
+    {"id": "P24_pandas_nan_null_projection", "v1_policy": "default pandas-only NaN->NULL projection", "v2_disposition": "versioned_backend_overlay", "component": "adapter materialization of nullable non-floating scalar", "relation": "only exact dtype/column/precondition/version scope; actual float NaN remains distinct"},
+    {"id": "P25_numeric_tolerant_round_decimals", "v1_policy": "requested numeric_tolerant with decimal rounding", "v2_disposition": "explicit_unsupported_until_parameterized", "component": "numeric", "relation": "requires abs/rel/ULP/forward-error parameters and scope; decimal rounding is not a general permission"},
+    {"id": "P26_error_equivalent_text_categories", "v1_policy": "requested error_equivalent by error text", "v2_disposition": "versioned_backend_overlay_or_inconclusive", "component": "semantic error category", "relation": "structured adapter error categories; text matching cannot be authority"},
+    {"id": "P27_probe_wildcard", "v1_policy": "every *_probe gets error_equivalence:probe", "v2_disposition": "delete", "component": "verdict authority", "relation": "known probes require explicit plugins; unknown probes fail closed"},
+    {"id": "P28_probe_case_boundary_bypass", "v1_policy": "probe-containing case bypasses boundary classification", "v2_disposition": "delete", "component": "verdict authority", "relation": "probe identity neither suppresses nor creates a violation"}
+  ],
+  "probe_policy_crosswalk": {
+    "explicit_witness_predicate_plugins": [
+      "arrow_bool_groupby_reduction_probe", "arrow_string_contains_na_probe", "arrow_string_eq_sum_probe", "arrow_timestamp_index_attr_probe", "arrow_timestamp_loc_slice_probe", "bit_compare_probe", "bool_reduction_skipna_probe", "csv_long_numeric_roundtrip_probe", "datafusion_grouped_null_topk_probe", "dataset_isin_all_match_probe", "empty_literal_groupby_probe", "eval_inplace_alias_probe", "float_literal_precision_probe", "float_wrap_probe", "group_quantile_probe", "hash_pivot_wider_probe", "index_bool_probe", "json_predicate_order_probe", "large_string_partition_probe", "list_flatten_parent_indices_probe", "polars_timezone_filter_probe", "random_case_probe", "rolling_mean_by_null_count_probe", "round_even_probe", "run_end_null_compute_probe", "scalar_subquery_probe", "series_reflected_arithmetic_probe", "series_rtruediv_probe", "setop_all_duplicate_probe", "sparse_mask_probe", "struct_distinct_probe", "timestamp_precision_filter_probe", "tuple_anti_null_probe", "uint64_isin_probe", "window_avg_probe"
+    ],
+    "plugin_relation": "lossless scalar witness predicate with exact status/value/schema components; operation identity selects a registered semantic predicate, never a boundary permission",
+    "regression_only_pending_decomposition": ["confirmed_root_witness_probe"],
+    "regression_rule": "not permitted in fresh registry; decompose into nine explicit semantic predicates before v1 authority removal",
+    "unknown_probe": "explicit_unsupported_and_fail_closed"
+  },
+  "layer_alternatives": [
+    {"layer": "contract representation", "simple_baseline": "explicit small relation registry", "current_candidate": "finite compositional HyperContract", "strongest_feasible_alternative": "full executable cross-ecosystem reference semantics", "decision": "adopt HyperContract core; keep reference semantics as scoped plugin; fall back to explicit registry if mutation/recall gates fail"},
+    {"layer": "contract analysis", "simple_baseline": "one forward pass plus explicit final observer", "current_candidate": "forward abstract interpretation plus backward demand", "strongest_feasible_alternative": "SMT/mechanized relational proof", "decision": "adopt two-pass finite analysis; unknown fails closed; bounded solver is non-critical shadow only"},
+    {"layer": "target space", "simple_baseline": "232 cell round robin", "current_candidate": "cells plus 384 baseline-star edges", "strongest_feasible_alternative": "constrained 2x2 tiles selected by covering arrays", "decision": "adopt cells/edges; compile tiles but shadow until yield/localization evidence"},
+    {"layer": "generation", "simple_baseline": "typed random and legacy goal-first", "current_candidate": "typed oracle-tail-first constructor plus generic repair", "strongest_feasible_alternative": "constructive -> evolutionary repair -> bounded SMT", "decision": "adopt constructor+repair; solver/evolutionary fallback only after measured hard-clause benefit"},
+    {"layer": "rewrite representation", "simple_baseline": "sequential rewrite list", "current_candidate": "proof-gated bounded rewrite DAG", "strongest_feasible_alternative": "Rust egg equality saturation", "decision": "implement bounded DAG; no e-graph dependency before profiling"},
+    {"layer": "archive/search", "simple_baseline": "no-replacement epoch queue/single champion", "current_candidate": "bounded certificate-carrying Pareto front", "strongest_feasible_alternative": "generic MAP-Elites/quality-diversity archive", "decision": "epoch queue is authority baseline; bounded archive implemented behind switch and promoted only by paired evidence"},
+    {"layer": "scheduler", "simple_baseline": "round robin coverage floor", "current_candidate": "max-min debt then Pareto/lazy greedy", "strongest_feasible_alternative": "bandit/online stochastic control across all decisions", "decision": "adopt hard floor and max-min; lazy greedy/adaptation bounded with epsilon and cannot affect verdict"},
+    {"layer": "comparison", "simple_baseline": "all-pairs full exact", "current_candidate": "component fingerprints, O(B) clustering, exact escalation", "strongest_feasible_alternative": "native Rust/Arrow diff kernel", "decision": "adopt Python staged planner with exact authority comparator; Rust rejected until comparator profiling is a bottleneck"},
+    {"layer": "backend evidence", "simple_baseline": "fixed all endpoints", "current_candidate": "provenance-aware endpoint cover", "strongest_feasible_alternative": "single complete reference interpreter", "decision": "lineage may select/weight evidence only; no majority-vote verdict; exact/native confirmation remains authority"},
+    {"layer": "parallelism", "simple_baseline": "static deterministic shards", "current_candidate": "keyed immutable task DAG with epoch barriers and resource tokens", "strongest_feasible_alternative": "asynchronous work stealing with online learning", "decision": "adopt deterministic DAG; reject completion-order-dependent learning"}
+  ],
+  "technology_decisions": [
+    {"technology": "e-graph", "decision": "reject_as_pre24h_dependency", "shadow": "only if bounded rewrite DAG profiling shows saturation/duplication bottleneck", "reason": "no current paired or profiling evidence"},
+    {"technology": "SMT", "decision": "shadow", "scope": "bounded decidable clauses after constructive and repair failures", "reason": "timeout is unknown and never a witness"},
+    {"technology": "MAP-Elites", "decision": "reject_generic_adoption", "shadow": "bounded certificate-keyed Pareto archive comparison", "reason": "compiled obligations already define niches; generic descriptors risk proxy optimization"},
+    {"technology": "CEGAR", "decision": "adopt_offline_process_only", "scope": "counterexample-guided contract hardening between protocol versions", "reason": "never mutates a frozen/live contract"},
+    {"technology": "covering_arrays", "decision": "adopt_for_shadow_tile_selection", "scope": "compiler-generated constrained pair denominator", "reason": "established CIT mechanism, not novelty and not a primary scheduler gate"},
+    {"technology": "submodular_selection", "decision": "shadow_then_promote", "scope": "endpoint/batch cover after hard floors", "reason": "simple max-min/round-robin remains the authority fallback"},
+    {"technology": "native_Rust_kernel", "decision": "reject_as_pre24h_dependency", "shadow": "none until Python comparator violates a measured budget", "reason": "offline evidence supports staging, not FFI complexity"}
+  ],
+  "planner_offline_shadow": {
+    "source": "experiments/next_architecture_capability_audit_v6/shard_results/*.json",
+    "source_file_count": 9,
+    "result_groups": 156,
+    "backend_results": 312,
+    "mismatch_groups_conservatively_escalated": 33,
+    "full_materialized_bytes": 492081,
+    "exact_escalation_bytes": 62499,
+    "materialized_bytes_avoided": 429582,
+    "materialized_reduction_ratio": 0.8729904223085224,
+    "compact_fingerprint_transport_bytes_estimate": 107664,
+    "total_staged_transport_estimate": 170163,
+    "total_transport_reduction_ratio_estimate": 0.6541971748553592,
+    "limitations": ["offline structural estimate, not a throughput benchmark", "mismatch_class comes from frozen v1 artifacts and is conservatively escalated", "all reportable candidates still require exact materialized comparison"]
+  },
+  "implementation_provenance_audit": [
+    {"endpoint": "pandas", "frontend": "DataDiff pandas adapter", "engine": "pandas", "kernel": "pandas/NumPy or Arrow-backed dtype depending on input", "shared_risk": "may share Arrow/NumPy dependencies with other endpoints", "independence": "partial"},
+    {"endpoint": "pyarrow", "frontend": "DataDiff PyArrow adapter", "engine": "PyArrow Table/compute/Acero", "kernel": "Apache Arrow C++", "shared_risk": "DataFusion and Arrow-backed pandas may share Arrow representations/kernels", "independence": "partial"},
+    {"endpoint": "polars/polars_lazy/polars_streaming", "frontend": "same DataDiff Polars adapter family", "engine": "Polars eager/lazy/streaming", "kernel": "shared Polars engine", "shared_risk": "three modes are correlated endpoints", "independence": "same_lineage"},
+    {"endpoint": "duckdb", "frontend": "shared DataDiff SQL lowering/runtime", "engine": "DuckDB", "kernel": "DuckDB native", "shared_risk": "shares lowering and pandas result transport with SQL endpoints", "independence": "engine_independent_adapter_correlated"},
+    {"endpoint": "sqlite", "frontend": "shared DataDiff SQL lowering/runtime", "engine": "SQLite/pysqlite3", "kernel": "SQLite", "shared_risk": "shares lowering and pandas result transport with SQL endpoints", "independence": "engine_independent_adapter_correlated"},
+    {"endpoint": "datafusion", "frontend": "shared DataDiff SQL lowering/runtime", "engine": "Apache DataFusion", "kernel": "DataFusion plus Arrow", "shared_risk": "shares lowering with SQL endpoints and Arrow with PyArrow", "independence": "partial"},
+    {"endpoint": "chdb", "frontend": "shared DataDiff SQL lowering/runtime", "engine": "chDB/ClickHouse", "kernel": "ClickHouse", "shared_risk": "shares SQL lowering and pandas transport", "independence": "engine_independent_adapter_correlated"}
+  ],
+  "primary_source_boundary_checks": [
+    {"topic": "SemConT", "url": "https://www.vldb.org/pvldb/vol18/p850-liu.pdf", "conclusion": "executable SQL semantics-guided conformance testing already exists; OSC must not claim first semantics-guided DB testing"},
+    {"topic": "NOETHER", "url": "https://arxiv.org/abs/2605.17390", "conclusion": "mechanical metamorphic pattern construction from operator algebras is prior work; OSC rewrite/relations are not claimed as first"},
+    {"topic": "Semantic Mutation Score", "url": "https://arxiv.org/abs/2605.17437", "conclusion": "domain-semantic mutation adequacy is prior work; OSC uses a narrower engineering fault-sensitivity gate"},
+    {"topic": "Metamorphic Coverage", "url": "https://arxiv.org/abs/2508.16307", "conclusion": "paired differential-code coverage is prior work; OSC observed semantic contrast is black-box and requires certificates"},
+    {"topic": "FANDANGO", "url": "https://conf.researchr.org/details/issta-2025/issta-2025-papers/40/FANDANGO-Evolving-Language-Based-Testing", "conclusion": "search-based semantic constraint satisfaction can beat symbolic solving in its evaluated scope; solver is not the default"},
+    {"topic": "covering arrays", "url": "https://www.nist.gov/publications/combinatorial-coverage-measurement", "conclusion": "pairwise/t-way coverage is established; OSC tile compilation is an application, not a new general CIT concept"},
+    {"topic": "AFLRUN", "url": "https://www.usenix.org/system/files/usenixsecurity24-rong.pdf", "conclusion": "multi-target fairness is prior work; OSC's distinction is the certified semantic obligation state, subject to experiment"},
+    {"topic": "Arrow layout", "url": "https://arrow.apache.org/docs/format/Columnar.html", "conclusion": "slice/chunk/dictionary are representation/layout facts; logical values remain independently observable"},
+    {"topic": "DuckDB order", "url": "https://duckdb.org/docs/lts/sql/dialect/order_preservation", "conclusion": "JOIN does not guarantee row order, supporting the approved running_sum presentation-order precision fix"}
+  ],
+  "preimplementation_checks": {
+    "required_documents_read_completely": true,
+    "workflow_forward_backward_count": 18,
+    "relation_four_way_examples_complete": true,
+    "v1_boundary_tolerated_probe_crosswalk_complete": true,
+    "edge_relation_expressibility_checked": 384,
+    "tile_bound_computed": true,
+    "planner_offline_simulation_complete": true,
+    "backend_provenance_audited": true,
+    "three_way_layer_alternatives_complete": true,
+    "advanced_technology_decisions_complete": true
+  },
+  "blocking_gates_remaining": [
+    "implement and test the independent OSC packages",
+    "v1/v2 compatibility plus approved precision-fix audit",
+    "9-root recall and false-positive precision corpus",
+    "100% high-risk mutant/fault/hyperedge kills",
+    "232/384/502 reachability and scheduled activation gates",
+    "100k exact-comparator equivalence",
+    "compile/match and paired throughput gates",
+    "worker 1/2/4/6 replay and full repository pytest",
+    "paired 2h pilot and post-pilot credibility review",
+    "source/method/statistics/seeds/counting freeze"
+  ]
+}

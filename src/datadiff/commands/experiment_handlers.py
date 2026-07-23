@@ -26,6 +26,7 @@ def cmd_experiment_impl(
     job_config_func: Callable[[dict[str, Any]], Any],
     experiment_job_weight_func: Callable[[dict[str, Any]], float],
     resolve_experiment_parallelism_func: Callable[..., dict[str, Any]],
+    resolve_experiment_worker_batching_func: Callable[..., dict[str, Any]],
     resolve_experiment_schedule_func: Callable[..., str],
     invalid_live_adaptive_experiment_presets_func: Callable[[list[dict[str, Any]]], list[str]],
     effective_job_local_source_scheduler_func: Callable[[dict[str, Any]], tuple[bool, float]],
@@ -114,8 +115,79 @@ def cmd_experiment_impl(
                 int(getattr(args, "backend_pair_priority_limit", 3) or 3),
             ),
             "metamorphic_relation_order": str(getattr(args, "metamorphic_relation_order", "") or ""),
-            "enable_parallel_backend_execution": not bool(
-                getattr(args, "disable_parallel_backend_execution", False)
+            "enable_parallel_backend_execution": (
+                bool(getattr(args, "enable_parallel_backend_execution", False))
+                and not bool(
+                    getattr(args, "disable_parallel_backend_execution", False)
+                )
+            ),
+            "enable_backend_sampling": getattr(args, "enable_backend_sampling", None),
+            "backend_sample_size": getattr(args, "backend_sample_size", None),
+            "backend_full_sweep_interval": getattr(args, "backend_full_sweep_interval", None),
+            "backend_sampling_calibration_cases": getattr(
+                args,
+                "backend_sampling_calibration_cases",
+                None,
+            ),
+            "backend_sampling_candidate_burst_cases": getattr(
+                args,
+                "backend_sampling_candidate_burst_cases",
+                None,
+            ),
+            "backend_sampling_candidate_burst_novel_only": getattr(
+                args,
+                "backend_sampling_candidate_burst_novel_only",
+                None,
+            ),
+            "backend_sample_confirmation_recheck_count": getattr(
+                args,
+                "backend_sample_confirmation_recheck_count",
+                None,
+            ),
+            "backend_sample_confirm_candidates": getattr(
+                args,
+                "backend_sample_confirm_candidates",
+                None,
+            ),
+            "enable_adaptive_candidate_pool": getattr(
+                args,
+                "enable_adaptive_candidate_pool",
+                None,
+            ),
+            "adaptive_candidate_pool_min_size": getattr(
+                args,
+                "adaptive_candidate_pool_min_size",
+                None,
+            ),
+            "adaptive_candidate_pool_full_sweep_interval": getattr(
+                args,
+                "adaptive_candidate_pool_full_sweep_interval",
+                None,
+            ),
+            "adaptive_candidate_pool_calibration_cases": getattr(
+                args,
+                "adaptive_candidate_pool_calibration_cases",
+                None,
+            ),
+            "adaptive_candidate_pool_candidate_burst_cases": getattr(
+                args,
+                "adaptive_candidate_pool_candidate_burst_cases",
+                None,
+            ),
+            "adaptive_candidate_pool_candidate_burst_novel_only": getattr(
+                args,
+                "adaptive_candidate_pool_candidate_burst_novel_only",
+                None,
+            ),
+            "adaptive_candidate_pool_preserve_seed_stride": getattr(
+                args,
+                "adaptive_candidate_pool_preserve_seed_stride",
+                None,
+            ),
+            "adaptive_candidate_pool_compensate_seed_horizon": getattr(
+                args,
+                "adaptive_candidate_pool_compensate_seed_horizon",
+                None,
             ),
             "run_theme": str(getattr(args, "run_theme", "") or ""),
             "paper_notes": str(getattr(args, "paper_notes", "") or ""),
@@ -148,6 +220,12 @@ def cmd_experiment_impl(
         job["worker_thread_limit"] = parallelism["worker_thread_limit"]
     jobs = int(parallelism["worker_count"])
     schedule = resolve_experiment_schedule_func(args, jobs=jobs)
+    worker_batching = resolve_experiment_worker_batching_func(
+        args,
+        planned_runs,
+        jobs=jobs,
+        schedule=schedule,
+    )
     invalid_live_adaptive_presets = invalid_live_adaptive_experiment_presets_func(planned_runs)
     if schedule == "adaptive" and evidence_mode == "live" and invalid_live_adaptive_presets:
         names = ",".join(invalid_live_adaptive_presets)
@@ -199,6 +277,7 @@ def cmd_experiment_impl(
         },
         "jobs": jobs,
         "parallelism": parallelism,
+        "worker_batching": worker_batching,
         "schedule": schedule,
         "local_source_scheduler": {
             "enabled": local_source_enabled,
@@ -238,14 +317,25 @@ def cmd_experiment_impl(
                 worker_count,
                 planned_runs,
                 max_parallel_cost=float(parallelism["max_parallel_cost"]),
+                worker_batch_size=int(worker_batching["effective_batch_size"]),
+                worker_max_rss_kib=int(worker_batching["max_rss_kib"]),
+                worker_retry_limit=int(worker_batching["retry_limit"]),
+                worker_batch_manifest=worker_batching,
             )
         except PermissionError:
             print("process parallelism unavailable; falling back to threaded workers", flush=True)
+            worker_batching["enabled"] = False
+            worker_batching["reason"] = "process_pool_unavailable_thread_fallback"
+            worker_batching["effective_batch_size"] = 0
             completed_runs = run_experiment_jobs_parallel_func(
                 thread_pool_executor_cls,
                 worker_count,
                 planned_runs,
                 max_parallel_cost=float(parallelism["max_parallel_cost"]),
+                worker_batch_size=0,
+                worker_max_rss_kib=0,
+                worker_retry_limit=0,
+                worker_batch_manifest=worker_batching,
             )
     for result in sorted(completed_runs, key=lambda item: item["order"]):
         manifest["runs"].append(result["run"])

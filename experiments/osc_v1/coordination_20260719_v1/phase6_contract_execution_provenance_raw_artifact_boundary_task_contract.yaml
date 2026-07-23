@@ -1,0 +1,177 @@
+schema_version: osc-phase6-contract-execution-provenance-raw-artifact-boundary-task-contract-v1
+phase: 6
+authority:
+  task_id: OSC-6-CONTRACT-EXECUTION-PROVENANCE-RAW-ARTIFACT-BOUNDARY-R8
+  owner: /root
+  role: root
+  mode: root_owned_definition_freeze_no_product_write
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  grandchildren_allowed: false
+  remediation_is_serial: true
+  user_authorization:
+    date: 2026-07-23
+    instruction: "授权; 继续"
+    interpretation: >-
+      The user authorized Root to continue the next bounded Phase-6 Contract
+      slice after R7. This authority is definition-only: it records the exact
+      producer boundary that must precede any real raw-artifact admission. It
+      does not authorize product code, a test run, source snapshot capture,
+      raw artifact production, corpus/cohort execution, metric reduction, a
+      gate calculation, Phase 7, a 2h pilot, or a 24h run.
+  authority_write_paths:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_execution_provenance_raw_artifact_boundary_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_execution_provenance_raw_artifact_boundary_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  source_state_before_write:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    untracked_path_count: 24140
+    coordination_ledger_sha256: 8b522768209bad0ea3a766acbfe23aaef2bc62e0f6457d991c5df620a7332746
+  required_input_sha256:
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_task_contract.yaml: c582a5edd5a3ac160d4b9484207586d3d0166a1377307e602db68624cae84349
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_provenance_bridge_report.yaml: 8bda392d7be17c03d0f6eb1eca985f895720f4787590f6f55e8e2aa58c970052
+    src/datadiff_osc/_phase6_gate_authority.py: 38660065f8c98d98d9d835dc065c969803950cc47342dba8b2f75ef5f5b536d7
+    src/datadiff_osc/runtime/gate_artifacts.py: 1eed10563c076514acb12259ddef44698510f49f34c13e4e54e1e4bd1e07743a
+    src/datadiff_osc/runtime/_phase6_parallel_scaling_provenance.py: 799ddfbdaa883ce79cc8fba5ebc9b03898f5d0d4f767dfe14570ec7715dbca25
+    src/datadiff_osc/runtime/_phase6_parallel_scaling_producers.py: 14c6b912b02622aebe17b9e84d818e8523f1f6c8b7899c364f9f0c7178d8bfd3
+    tests/osc/test_phase6_gate_authority_integration.py: 0e9e40c2cd1a783d3a0513c1fdec267427cbb12ec72955960631277eed56495a
+    tests/osc/test_runtime_gate_artifacts.py: 5261992a58666d3b4fd8e6d684613e982aa7bde8ec484a89e1ffbe4f6c7a0050
+  frozen_target_sha256:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+task:
+  task_id: OSC-6-CONTRACT-EXECUTION-PROVENANCE-RAW-ARTIFACT-BOUNDARY-R8
+  objective: >-
+    Freeze the minimal independent Root-owned execution-provenance and
+    raw-artifact producer boundary required before future artifact admission
+    can be considered. Map the existing source-snapshot, dynamic-plan,
+    typed-receipt-index, raw-artifact, manifest, and R7 private-proof seams;
+    identify the required acyclic construction order and exact future
+    implementation surface. This task creates no product object and no real
+    evidence.
+  allowed_write_paths:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_execution_provenance_raw_artifact_boundary_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_execution_provenance_raw_artifact_boundary_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  forbidden_write_paths:
+    - src/**
+    - tests/**
+    - scripts/**
+    - docs/**
+    - experiments/final_bug_discovery_protocol_v3/**
+    - src/datadiff_osc/public_api_freeze.json
+    - src/datadiff_osc/search/context_replay.py
+    - tests/osc/test_search_gate_crosswalk.py
+    - src/datadiff_osc/search/lane_registry.py
+    - tests/osc/test_search_lane_registry.py
+    - src/datadiff_osc/runtime/_receipt_producers.py
+    - tests/osc/test_runtime_receipt_producers.py
+    - src/datadiff_osc/runtime/_producer_provenance.py
+    - tests/osc/test_runtime_producer_provenance.py
+    - src/datadiff_osc/contract_engine/_phase6_corpora.py
+    - tests/osc/test_contract_phase6_corpora.py
+  frozen_interfaces:
+    - osc-public-api-freeze-v1:cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    - osc-pre24-gate-spec-set-d9792996cacb6fc6e47bce602d5f7ab6d6382c62ba9e1ac6bc1f8003ecbec552
+    - all thirteen frozen_target_sha256 entries above
+    - R7 ParallelScalingProductionProvenance private proof
+  required_invariants:
+    - >-
+      Future admission requires a Root-owned canonical execution-provenance
+      envelope, not a caller-authored digest. It must bind the verified source
+      snapshot digest and bytes, exact producer implementation-byte hashes,
+      declared command/arguments and an allowlisted environment identity,
+      process exit status, immutable stdout/stderr or structured-output byte
+      hashes, typed receipt-envelope byte hash, raw-artifact byte hash, and an
+      exact producer/admission/artifact identity tuple. Every field must be
+      re-readable and re-derived before Root retains evidence.
+    - >-
+      Construction is acyclic: independently capture a verified source
+      snapshot; create typed execution output and its private Root-verifiable
+      provenance; derive producer receipts; bind their digest into the dynamic
+      plan; create raw artifacts and the receipt index using that plan hash;
+      only then build an unpublished Root authority payload and, under a later
+      authority, an externally hashed manifest. No output may self-authorize
+      an earlier step, and no index, manifest, receipt, or digest may substitute
+      for a real process record.
+    - >-
+      A source snapshot remains valid only while its exact source-byte and Git
+      status binding verifies. An execution producer must capture it before the
+      measured process and reject post-capture source/status change; a later
+      artifact cannot be rebound to a changed snapshot, dynamic plan, producer
+      receipt, or raw-artifact byte string.
+    - >-
+      The existing RawMetricSeries artifact schema may transport canonical raw
+      metric records only after a future producer proves their execution origin.
+      A fixture, word scan, scalar aggregate, synthetic label, same-cardinality
+      substitute, or opaque provenance digest is permanently insufficient for
+      real execution evidence.
+    - >-
+      R7's ParallelScalingProductionProvenance stays a private exact-pairing
+      proof. It is one input to a future execution-provenance envelope, not a
+      raw artifact, a complete producer set, a cohort/corpus result, a metric,
+      or authority to publish.
+    - >-
+      Diagnostic refs remain permanently diagnostic-only. Missing exact typed
+      context is fail-closed/not_evaluated; candidate remains non-confirmed,
+      bug_claimed remains false, and no gate/Phase-7/2h/24h authority is
+      created.
+  required_analysis:
+    - >-
+      Record why source_snapshot_payload/verify_source_snapshot, the dynamic
+      plan, receipt index, and gate-artifact manifest form distinct proof
+      layers, and record their exact dependency order.
+    - >-
+      Map the smallest future implementation surface without authorizing it:
+      a private execution-provenance replayer/producer, a private raw-artifact
+      producer, Root receipt-index admission checks, and focused unit/integration
+      tests. Existing frozen producers and public interfaces remain excluded.
+    - >-
+      Specify the future negative-review, independent-counterexample, and
+      abnormal-input obligations for swapped source/receipt/artifact bindings,
+      hash/status/output mutation, nonzero exit, truncated output, duplicate
+      identities, path escape, and post-capture source change.
+  validation:
+    - command: read-only SHA-256 verification for predecessor authority and all thirteen frozen/public targets before and after authority writes
+      expected: every frozen/public value remains exact
+    - command: git diff --cached --name-only
+      expected: zero staged paths
+    - command: no product test or execution command
+      expected: no scoped suite, corpus, v3, repository test, or artifact producer runs
+  completion_requirements:
+    - create a root-owned report with the seam crosswalk and acyclic order
+    - state explicitly that zero product paths, zero tests, zero source snapshots, and zero raw artifacts were created
+    - synchronize ledger while retaining phase_6_contract as pending
+    - retain findings without downgrade or concealment
+  stop_conditions:
+    - any frozen/public SHA mismatch or staged user path
+    - any need to edit a product/test path, public export, gate spec, frozen file, docs, or scripts
+    - any attempt to treat a fixture as execution evidence, create a source snapshot, run a test/corpus/cohort, calculate metrics, or publish an authority
+    - any candidate confirmation, bug_claimed=true, Phase 7, 2h, or 24h implication
+decision:
+  phase_6_contract: pending
+  execution_provenance_definition_authorized: true
+  product_implementation_authorized: false
+  source_snapshot_capture_authorized: false
+  raw_artifact_admission_authorized: false
+  corpus_or_cohort_execution_authorized: false
+  raw_metric_or_bootstrap_authorized: false
+  gate_spec_or_gate_calculation_authorized: false
+  combined_suite_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_pilot_2h_authorized: false
+  twenty_four_hour_run_authorized: false

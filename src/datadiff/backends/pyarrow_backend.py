@@ -4,7 +4,7 @@ import time
 from contextlib import contextmanager
 from typing import Any
 
-from datadiff.backends.base import Backend, BackendResult, PreparedTable, prepare_table
+from datadiff.backends.base import Backend, BackendResult, NativeRows, PreparedTable, prepare_table
 from datadiff.backends.dataframe_semantics import (
     aggregate_triplets,
     case_when_plan,
@@ -53,30 +53,85 @@ def _single_bool_table(pa: Any, alias: str, value: bool):
     return pa.Table.from_pydict({alias: [value]})
 
 
+def _layout_array(
+    pa: Any,
+    values: list[Any],
+    *,
+    arrow_type: Any,
+    logical_type: str,
+    layout: str,
+):
+    resolved_layout = str(layout or "contiguous")
+    if resolved_layout in {"default", "contiguous"}:
+        return pa.array(values, type=arrow_type)
+    if resolved_layout == "chunked":
+        split = len(values) // 2
+        return pa.chunked_array(
+            [
+                pa.array(values[:split], type=arrow_type),
+                pa.array(values[split:], type=arrow_type),
+            ],
+            type=arrow_type,
+        )
+    if resolved_layout == "sliced":
+        padding = {
+            "int": 0,
+            "float": 0.0,
+            # A true prefix is intentionally invisible after slicing, while
+            # exercising Boolean value-bitmap offset handling in hash any/all.
+            "bool": True,
+            "str": "",
+        }[logical_type]
+        return pa.array([padding, *values], type=arrow_type).slice(1)
+    if resolved_layout == "dictionary":
+        if logical_type != "str":
+            return pa.array(values, type=arrow_type)
+        return pa.array(values, type=arrow_type).dictionary_encode()
+    raise ValueError(f"unsupported pyarrow physical layout: {resolved_layout}")
+
+
 def _pyarrow_probe_handlers(pa: Any, op: dict[str, Any]) -> dict[str, Any]:
     return {
         "dataset_isin_all_match_probe": lambda: _pyarrow_dataset_isin_all_match_mismatch(pa),
-        "run_end_null_compute_probe": lambda: _pyarrow_run_end_null_compute_mismatch(pa),
-        "large_string_partition_probe": lambda: _pyarrow_large_string_partition_mismatch(pa),
+        "run_end_null_compute_probe": lambda: _pyarrow_run_end_null_compute_mismatch(pa, op),
+        "large_string_partition_probe": lambda: _pyarrow_large_string_partition_mismatch(pa, op),
         "hash_pivot_wider_probe": lambda: _pyarrow_hash_pivot_wider_mismatch(pa),
-        "list_flatten_parent_indices_probe": lambda: _pyarrow_list_flatten_parent_indices_mismatch(pa),
+        "list_flatten_parent_indices_probe": lambda: _pyarrow_list_flatten_parent_indices_mismatch(pa, op),
         "csv_long_numeric_roundtrip_probe": lambda: _pyarrow_csv_long_numeric_roundtrip_mismatch(pa, op),
     }
 
 
 class PyArrowBackend(Backend):
     name = "pyarrow"
+    input_physical_layout = "contiguous"
+    supported_physical_layouts = (
+        "contiguous",
+        "sliced",
+        "chunked",
+        "dictionary",
+    )
 
     def _to_table(self, table: TableData | PreparedTable):
         import pyarrow as pa
 
         prepared = prepare_table(table)
-        schema = pa.schema(
-            [pa.field(column.name, _arrow_type(pa, column.type), nullable=column.nullable) for column in prepared.columns]
-        )
-        return pa.Table.from_pydict(prepared.columns_data, schema=schema)
+        arrays = []
+        fields = []
+        for column in prepared.columns:
+            arrow_type = _arrow_type(pa, column.type)
+            values = prepared.columns_data[column.name]
+            array = _layout_array(
+                pa,
+                values,
+                arrow_type=arrow_type,
+                logical_type=column.type,
+                layout=self.input_physical_layout,
+            )
+            arrays.append(array)
+            fields.append(pa.field(column.name, array.type, nullable=column.nullable))
+        return pa.Table.from_arrays(arrays, schema=pa.schema(fields))
 
-    def run(
+    def execute_lowered(
         self,
         tables: list[TableData | PreparedTable],
         program: Program,
@@ -91,6 +146,11 @@ class PyArrowBackend(Backend):
 
                 table_by_name = {table.name: table for table in tables}
                 arrow_tables = {table.name: self._to_table(table) for table in tables}
+                if self.input_physical_layout == "dictionary":
+                    arrow_tables = {
+                        name: _decode_dictionary_columns(pa, table)
+                        for name, table in arrow_tables.items()
+                    }
                 current_cols = [column.name for column in tables[0].columns]
                 current = arrow_tables[tables[0].name]
 
@@ -204,7 +264,7 @@ class PyArrowBackend(Backend):
                             alias, sources, has_fallback, fallback = coalesce_plan(op)
                             values = [current[column] for column in sources]
                             if has_fallback:
-                                values.append(pa.scalar(fallback))
+                                values.append(pa.scalar(fallback, type=values[0].type))
                             current, current_cols = _replace_column(current, current_cols, alias, pc.coalesce(*values))
                         elif kind == "case_when":
                             alias, column, comparator, value, then_value, else_value = case_when_plan(op)
@@ -226,9 +286,13 @@ class PyArrowBackend(Backend):
                             keys, triplets = groupby_plan(op)
                             aggregates = [(column, _arrow_aggregate_func(func)) for column, func, _alias in triplets]
                             current = current.group_by(keys, use_threads=False).aggregate(aggregates)
-                            source_names = [*keys, *[f"{column}_{_arrow_aggregate_func(func)}" for column, func, _alias in triplets]]
                             target_names = [*keys, *[alias for _column, _func, alias in triplets]]
-                            current = _select_existing(current, source_names).rename_columns(target_names)
+                            if current.num_columns != len(target_names):
+                                current = _select_existing(
+                                    current,
+                                    [*keys, *[f"{column}_{_arrow_aggregate_func(func)}" for column, func, _alias in triplets]],
+                                )
+                            current = current.rename_columns(target_names)
                             current_cols = target_names
                         elif kind == "aggregate":
                             values = {}
@@ -250,7 +314,7 @@ class PyArrowBackend(Backend):
                         else:
                             raise ValueError(kind)
 
-                data = current.to_pandas(use_threads=False)
+                data = _arrow_native_rows(current)
 
             return BackendResult(
                 self.name,
@@ -268,6 +332,20 @@ class PyArrowBackend(Backend):
             )
 
 
+def _decode_dictionary_columns(pa: Any, table: Any):
+    arrays = []
+    fields = []
+    for field, column in zip(table.schema, table.columns, strict=True):
+        if pa.types.is_dictionary(field.type):
+            decoded_type = field.type.value_type
+            arrays.append(column.cast(decoded_type))
+            fields.append(pa.field(field.name, decoded_type, nullable=field.nullable))
+        else:
+            arrays.append(column)
+            fields.append(field)
+    return pa.Table.from_arrays(arrays, schema=pa.schema(fields))
+
+
 def _pyarrow_dataset_isin_all_match_mismatch(pa) -> bool:
     import tempfile
 
@@ -283,13 +361,21 @@ def _pyarrow_dataset_isin_all_match_mismatch(pa) -> bool:
     return observed.to_pydict() != expected.to_pydict()
 
 
-def _pyarrow_run_end_null_compute_mismatch(pa) -> bool:
+def _pyarrow_run_end_null_compute_mismatch(
+    pa, op: dict[str, Any] | None = None
+) -> bool:
     import pyarrow.compute as pc
 
-    run_ends = pa.array([1, 2, 4, 5], type=pa.int16())
-    values = pa.array([True, None, False, True], type=pa.bool_())
+    pattern = str((op or {}).get("data_pattern", "") or "")
+    if (op or {}).get("family_id") == "pyarrow_encoded_nested_compute" and pattern == "duplicate_boundary":
+        run_ends = pa.array([2, 4, 5], type=pa.int16())
+        values = pa.array([True, None, False], type=pa.bool_())
+        expected = [True, True, None, None, True]
+    else:
+        run_ends = pa.array([1, 2, 4, 5], type=pa.int16())
+        values = pa.array([True, None, False, True], type=pa.bool_())
+        expected = [True, None, True, True, True]
     encoded = pa.RunEndEncodedArray.from_arrays(run_ends, values)
-    expected = [True, None, True, True, True]
     try:
         observed = pc.true_unless_null(encoded).to_pylist()
     except Exception:  # noqa: BLE001
@@ -297,17 +383,26 @@ def _pyarrow_run_end_null_compute_mismatch(pa) -> bool:
     return observed != expected
 
 
-def _pyarrow_large_string_partition_mismatch(pa) -> bool:
+def _pyarrow_large_string_partition_mismatch(
+    pa, op: dict[str, Any] | None = None
+) -> bool:
     import tempfile
     from pathlib import Path
 
     import pyarrow.dataset as ds
     import pyarrow.parquet as pq
 
+    duplicate = (
+        (op or {}).get("family_id") == "pyarrow_encoded_nested_compute"
+        and (op or {}).get("data_pattern") == "duplicate_boundary"
+    )
     expected = pa.table(
         {
-            "part": pa.array(["a", "a", "b", "b"], type=pa.large_string()),
-            "col": [1, 2, 3, 4],
+            "part": pa.array(
+                ["a", "a", "b", "b", *( ["b"] if duplicate else [])],
+                type=pa.large_string(),
+            ),
+            "col": [1, 2, 3, 4, *([4] if duplicate else [])],
         }
     )
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -317,7 +412,7 @@ def _pyarrow_large_string_partition_mismatch(pa) -> bool:
         part_a.parent.mkdir(parents=True)
         part_b.parent.mkdir(parents=True)
         pq.write_table(expected.slice(0, 2), part_a)
-        pq.write_table(expected.slice(2, 2), part_b)
+        pq.write_table(expected.slice(2), part_b)
         try:
             observed = ds.dataset(root, partitioning=["part"], partition_base_dir=str(root)).to_table()
         except pa.ArrowTypeError:
@@ -353,11 +448,22 @@ def _pyarrow_hash_pivot_wider_mismatch(pa) -> bool:
     return observed != expected
 
 
-def _pyarrow_list_flatten_parent_indices_mismatch(pa) -> bool:
+def _pyarrow_list_flatten_parent_indices_mismatch(
+    pa, op: dict[str, Any] | None = None
+) -> bool:
     import pyarrow.compute as pc
 
-    values = pa.array([[1, 2], None, [], [None, 3]], type=pa.list_(pa.int64()))
-    expected_flattened = [1, 2, None, 3]
+    duplicate = (
+        (op or {}).get("family_id") == "pyarrow_encoded_nested_compute"
+        and (op or {}).get("data_pattern") == "duplicate_boundary"
+    )
+    raw_values = (
+        [[1, 1], [], None, [2, None]]
+        if duplicate
+        else [[1, 2], None, [], [None, 3]]
+    )
+    values = pa.array(raw_values, type=pa.list_(pa.int64()))
+    expected_flattened = [1, 1, 2, None] if duplicate else [1, 2, None, 3]
     expected_parent_indices = [0, 0, 3, 3]
     try:
         flattened = pc.list_flatten(values).to_pylist()
@@ -377,6 +483,15 @@ def _pyarrow_csv_long_numeric_roundtrip_mismatch(pa, op: dict[str, Any]) -> bool
     return csv_long_numeric_roundtrip_mismatch(observed_values, expected_values)
 
 
+def _arrow_native_rows(table: Any) -> NativeRows:
+    columns = [str(column) for column in table.column_names]
+    return NativeRows(
+        columns=columns,
+        row_values=[[row.get(column) for column in columns] for row in table.to_pylist()],
+        column_types=[str(field.type) for field in table.schema],
+    )
+
+
 def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):
     parsed = parse_filter_comparator(comparator)
     if parsed is None:
@@ -393,7 +508,9 @@ def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):
         return _apply_boolean_truth_test(pc, array, parsed.truth_test)
     if parsed.base == "range_closed":
         lower, upper = value
-        return pc.and_(pc.greater_equal(array, lower), pc.less_equal(array, upper))
+        lower_scalar = _comparison_literal(pa, array, lower)
+        upper_scalar = _comparison_literal(pa, array, upper)
+        return pc.and_(pc.greater_equal(array, lower_scalar), pc.less_equal(array, upper_scalar))
     if parsed.base == "str_contains":
         return pc.fill_null(pc.match_substring(array, pattern=value), False)
     if parsed.base == "str_starts_with":
@@ -404,17 +521,17 @@ def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):
     if scalar is None:
         mask = pa.array([None] * len(array), type=pa.bool_())
     elif parsed.base == ">":
-        mask = pc.greater(array, scalar)
+        mask = pc.greater(array, _comparison_literal(pa, array, scalar))
     elif parsed.base == ">=":
-        mask = pc.greater_equal(array, scalar)
+        mask = pc.greater_equal(array, _comparison_literal(pa, array, scalar))
     elif parsed.base == "<":
-        mask = pc.less(array, scalar)
+        mask = pc.less(array, _comparison_literal(pa, array, scalar))
     elif parsed.base == "<=":
-        mask = pc.less_equal(array, scalar)
+        mask = pc.less_equal(array, _comparison_literal(pa, array, scalar))
     elif parsed.base == "==":
-        mask = pc.equal(array, scalar)
+        mask = pc.equal(array, _comparison_literal(pa, array, scalar))
     elif parsed.base == "!=":
-        mask = pc.not_equal(array, scalar)
+        mask = pc.not_equal(array, _comparison_literal(pa, array, scalar))
     else:
         raise ValueError(parsed.base)
     if parsed.truth_test is None:
@@ -432,6 +549,12 @@ def _comparison_mask(pa, pc, array: Any, comparator: str, value: Any):
     if parsed.truth_test == "is_not_unknown":
         return pc.invert(pc.is_null(mask))
     raise ValueError(parsed.truth_test)
+
+
+def _comparison_literal(pa, array: Any, value: Any) -> Any:
+    if isinstance(value, int) and not isinstance(value, bool) and pa.types.is_floating(array.type):
+        return float(value)
+    return value
 
 
 def _membership_mask(pa, pc, array: Any, values: Any):
@@ -474,7 +597,13 @@ def _eval_expr_plan(pa, pc, table: Any, plan: Any):
         if operator == "div":
             return pc.divide(pc.cast(source, "float64"), plan.value)
         if operator == "mod":
-            raise ValueError("pyarrow backend does not support modulo in the common DSL subset")
+            values = [
+                None
+                if value is None or plan.value == 0
+                else value % plan.value
+                for value in source.to_pylist()
+            ]
+            return pa.array(values, type=source.type)
         raise ValueError(operator)
     if plan.kind == "reverse_division_columns":
         return pc.divide(pc.cast(table[plan.numerator], "float64"), pc.cast(source, "float64"))
@@ -493,10 +622,15 @@ def _eval_expr_plan(pa, pc, table: Any, plan: Any):
         if plan.target_type == "int":
             return pc.cast(source, "int64")
         if plan.target_type == "str":
+            if pa.types.is_floating(source.type):
+                return pa.array(
+                    [None if value is None else str(value) for value in source.to_pylist()],
+                    type=pa.string(),
+                )
             return pc.cast(source, "string")
         raise ValueError(plan.target_type)
     if plan.kind == "string_length":
-        return pc.utf8_length(source)
+        return pc.cast(pc.utf8_length(source), "int64")
     if plan.kind == "string_lower":
         return pc.utf8_lower(source)
     if plan.kind == "string_upper":
@@ -569,22 +703,19 @@ def _arrow_aggregate_func(func: str) -> str:
 
 
 def _sort_table(pa: Any, table: Any, sort_keys: list[SortKey]) -> Any:
-    null_placements = {key.nulls for key in sort_keys}
-    if len(null_placements) <= 1:
-        return table.sort_by(
-            [(key.column, "ascending" if key.ascending else "descending") for key in sort_keys],
-            null_placement="at_start" if sort_keys and sort_keys[0].nulls == "first" else "at_end",
-        )
+    if not sort_keys:
+        return table
 
-    df = table.to_pandas(use_threads=False)
-    for key in reversed(sort_keys):
-        df = df.sort_values(
-            key.column,
-            ascending=key.ascending,
-            na_position=key.nulls,
-            kind="mergesort",
-        )
-    return pa.Table.from_pandas(df, schema=table.schema, preserve_index=False)
+    return table.sort_by(
+        [
+            (
+                key.column,
+                "ascending" if key.ascending else "descending",
+                "at_start" if key.nulls == "first" else "at_end",
+            )
+            for key in sort_keys
+        ]
+    )
 
 
 def _replace_column(table: Any, cols: list[str], column: str, values: Any) -> tuple[Any, list[str]]:

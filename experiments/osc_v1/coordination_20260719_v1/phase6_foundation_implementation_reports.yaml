@@ -1,0 +1,83 @@
+schema_version: osc-implementation-report-v1
+phase: 6
+round: cr002_cr003a_cr004_private_foundations
+status: implementation_complete_pending_exact_sha_ring_review
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_implementation_task_contracts.yaml
+  sha256: 9c7c41f75cc6082124f8fa4b78f083a0c65d076c5e8db2f4619706e171b12fdc
+implementations:
+  - task_id: OSC-6-CR002-CORPUS-FOUNDATION
+    owner: /root/phase5_authority_audit
+    writes_within_allowlist: true
+    files:
+      - path: src/datadiff_osc/contract_engine/_phase6_corpora.py
+        sha256: 7102b3d0967a2daeda5b50f59e5d06f740774b8f0376a9c70952bebf57e74245
+      - path: tests/osc/test_contract_phase6_corpora.py
+        sha256: f56c58fc575f4a292102148e9226778caec5e9486b17e74fcf9004e71dbd87b7
+    owner_test: 18 passed in 0.20s
+    root_test: 18 passed in 0.32s
+    authority_boundary: >-
+      Structural candidate and independent-review validation only; Root
+      denominator and authority eligibility are always false.
+  - task_id: OSC-6-CR003A-SEARCH-FOUNDATION
+    owner: /root/phase5_consumer_audit
+    writes_within_allowlist: true
+    files:
+      - path: src/datadiff_osc/search/lane_registry.py
+        sha256: e4d19e8536309b374c351855d0dcf416459e6042526e5bbc67f7299870fbbdcc
+      - path: src/datadiff_osc/search/context_receipts.py
+        sha256: 2d6459cc1427052ce8bcec42cbe34ce7d24d89999f1f2999a95ed44e71686529
+      - path: src/datadiff_osc/search/context_replay.py
+        sha256: 4701eb347e3f2694cdf032af24c44b02a75d97fc32a3985c00891822258e697c
+      - path: tests/osc/test_search_lane_registry.py
+        sha256: 383d25d0911e8abc0e9e702d018fd9ba481d3dffbc0f3fb08af373515a5acb84
+      - path: tests/osc/test_search_context_receipts.py
+        sha256: bd245ea72ee9980196f8db77f11dbaa67a3b05424eb45e5b6bb15019554e4512
+      - path: tests/osc/test_search_gate_crosswalk.py
+        sha256: 4a917e27a9b38235141644bfc14c877ecf04d56b9de26c5432740a48728462dc
+    owner_test: 16 passed in 1.15s
+    root_test: 16 passed in 1.14s
+    authority_boundary: >-
+      Intrinsic declarations can be reconstructed; attempt, mutation,
+      observation and focus subjects remain context-required and admitted=false.
+  - task_id: OSC-6-CR004-RUNTIME-FOUNDATION
+    owner: /root/phase5_evidence_audit
+    writes_within_allowlist: true
+    files:
+      - path: src/datadiff_osc/runtime/_producer_provenance.py
+        sha256: 74130d2eee419b106253e765f33a49f2cbda51dad23eab81ff70f50a06ca5a30
+      - path: src/datadiff_osc/runtime/_receipt_producers.py
+        sha256: 5d892ce1a8186d005067ae110439dcf47144c51f95c77274cfe3b6ff9f31d711
+      - path: tests/osc/test_runtime_producer_provenance.py
+        sha256: aecccb8441340715a03ec9842e890a02fd9a24ca064d791faf6afedfd612ab18
+      - path: tests/osc/test_runtime_receipt_producers.py
+        sha256: 802c55fb456e01a99750910137d4480790acdea41177df0aa7640f554e0c9e1e
+    owner_test: 24 passed in 0.20s
+    root_test: 24 passed in 0.20s
+    authority_boundary: >-
+      Provenance verification is structural/contextual; no trusted source view,
+      real producer execution, semantic replay or Root admission exists yet.
+root_boundary_reverification:
+  legacy_strategy_registry_sha256: dfba85d3cefb93c9b8732748f15a80987887eb6886d5f91f84f5be924dd29cec
+  prior_search_semantic_replay_sha256: af65bd9f1f06a3a2555b33dd2c38d574ed03d0ab70ed5dcee035099e3364b28b
+  prior_runtime_semantic_replay_sha256: 0b5ec02b247d718d4258dada0fb59493081f258cc1e49913c1d294c7c9e062b9
+  root_authority_sha256: 03b6ef9323f38fee8cb9daafffd2a309818953fbc78fa2ae0cd2c99b1503bbd7
+  public_api_freeze_sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  git_diff_check: clean
+  staged_paths: 0
+root_preliminary_review_focus:
+  - Search convenience builders must not silently erase duplicate plan, runtime-ref or evidence identities
+  - formal plans must eventually bind exact run IDs and connect seed lineages to frozen seed blocks
+  - mutation preservation cannot be credited without typed mutation outcome and activation context
+  - a caller-created SourceSnapshotView cannot establish Runtime provenance authority
+  - generic corpus approval cannot prove false-positive adjudication, compatibility equivalence or mutant kill semantics
+round_limits:
+  - no new type is admitted through Root semantic replay or authority
+  - no gate spec, public export, legacy default or public freeze was changed
+  - no 100000 parity, 2200 V3, Phase 7 pilot, 2h or 24h execution occurred
+decision:
+  foundation_round_passed: false
+  reason: exact_sha_ring_review_pending
+  phase6_overall_passed: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

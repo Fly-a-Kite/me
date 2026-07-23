@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -21,7 +22,14 @@ from datadiff.case_features import (
     case_uses_unicode_case_mapping as _case_uses_unicode_case_mapping,
     last_probe_root as _last_probe_root,
 )
+from datadiff.classification_signals import is_float_precision_boundary_mismatch
 from datadiff.dsl import Case, normalize_sort_keys
+from datadiff.contract_comparison import (
+    ContractComparisonProfile,
+    compare_results_under_contract,
+    comparison_payload_for_case,
+    comparison_profile_for_case,
+)
 from datadiff.expression_semantics import cast_output_type, eval_expr_on_row, expr_output_type
 from datadiff.filtering import evaluate_filter_predicate, parse_filter_comparator
 from datadiff.join_keys import join_key_pairs, join_key_value
@@ -96,15 +104,39 @@ class Finding:
         return asdict(self)
 
 
-def _payload(norm: NormalizedResult) -> dict[str, Any]:
-    return norm.comparison_payload()
+def _payload(
+    case: Case,
+    norm: NormalizedResult,
+    *,
+    profile: ContractComparisonProfile,
+    comparison_mode: str,
+) -> dict[str, Any]:
+    if comparison_mode == "legacy":
+        return norm.comparison_payload()
+    return comparison_payload_for_case(case, norm, profile=profile)
 
 
-def _signature(case: Case, normalized: dict[str, NormalizedResult], kind: str) -> str:
+def _signature(
+    case: Case,
+    normalized: dict[str, NormalizedResult],
+    kind: str,
+    *,
+    profile: ContractComparisonProfile | None = None,
+    comparison_mode: str = "contract",
+) -> str:
+    resolved_profile = profile or comparison_profile_for_case(case)
     payload = {
         "kind": kind,
         "ops": case.program.op_sequence(),
-        "results": {k: _payload(v) for k, v in sorted(normalized.items())},
+        "results": {
+            key: _payload(
+                case,
+                value,
+                profile=resolved_profile,
+                comparison_mode=comparison_mode,
+            )
+            for key, value in sorted(normalized.items())
+        },
     }
     return short_canonical_hash(payload, 16)
 
@@ -130,19 +162,51 @@ def classify_root_cause(case: Case, normalized: dict[str, NormalizedResult], kin
                 "float_group_key_instability": lambda: _case_has_float_group_key_instability(case, normalized),
                 "negative_zero_comparison": lambda: _case_has_negative_zero_comparison(case),
                 "tuple_absence_filter": lambda: _case_has_tuple_absence_filter(case),
+                "tuple_absence_nullable_row_value": lambda: _case_has_tuple_absence_nullable_row_value(case),
                 "unicode_case_mapping": lambda: (
                     _case_uses_unicode_case_mapping(case)
                     and _case_contains_non_ascii_string(case)
+                ),
+                "float_precision_boundary": lambda: is_float_precision_boundary_mismatch(
+                    case,
+                    normalized,
                 ),
                 "outer_join_truth_filter": lambda: _case_has_outer_join_truth_filter(case),
                 "post_topk_filter": lambda: _case_has_post_topk_filter(case),
                 "joined_order_offset_projection": lambda: _case_has_joined_order_offset_projection(case),
                 "ordered_topk_projection": lambda: _case_has_ordered_topk_projection(case),
+                "pyarrow_sliced_bool_groupby": lambda: (
+                    _case_has_pyarrow_sliced_bool_groupby_witness(case)
+                ),
                 "ok_result_columns_differ": lambda: _ok_result_columns_differ(normalized),
                 "contains_null": lambda: _case_contains_null(case),
             },
         )
     )
+
+
+def _case_has_pyarrow_sliced_bool_groupby_witness(case: Case) -> bool:
+    metadata = case.metadata if isinstance(case.metadata, dict) else {}
+    witness = metadata.get("physical_layout_witness", {})
+    if not isinstance(witness, dict):
+        return False
+    if str(witness.get("layout", "") or "") != "sliced":
+        return False
+    root_ids = {str(value) for value in witness.get("root_ids", ()) or ()}
+    if "pyarrow-sliced-bool-hash-aggregate-001" not in root_ids:
+        return False
+    for operation in case.program.operations:
+        if op_kind(operation) != "groupby":
+            continue
+        functions = {
+            str(aggregate.get("func", "") or "")
+            for aggregate in operation.get("aggs", ()) or ()
+            if isinstance(aggregate, Mapping)
+            and str(aggregate.get("column", "") or "") == "flag"
+        }
+        if {"any", "all"} <= functions:
+            return True
+    return False
 
 
 def _ok_result_columns_differ(normalized: dict[str, NormalizedResult]) -> bool:
@@ -364,6 +428,35 @@ def _case_has_tuple_absence_filter(case: Case) -> bool:
     return "tuple_absence_filter" in operation_names(case.program.operations)
 
 
+def _case_has_tuple_absence_nullable_row_value(case: Case) -> bool:
+    if not case.tables:
+        return False
+    table_by_name = {table.name: table for table in case.tables}
+    left_table = case.tables[0]
+    for op in case.program.operations:
+        if op_kind(op) != "tuple_absence_filter":
+            continue
+        right_table = table_by_name.get(op_table(op))
+        if _table_columns_have_nulls(left_table, op_columns(op)):
+            return True
+        if _table_columns_have_nulls(right_table, op_right_columns(op)):
+            return True
+    return False
+
+
+def _table_columns_have_nulls(table: Any, columns: list[str]) -> bool:
+    if table is None or not columns:
+        return False
+    column_set = set(columns)
+    column_specs = {column.name: column for column in getattr(table, "columns", ())}
+    if any(bool(column_specs.get(column) and column_specs[column].nullable) for column in column_set):
+        return True
+    for row in getattr(table, "rows", ()) or ():
+        if any(row.get(column) is None for column in column_set):
+            return True
+    return False
+
+
 def _case_has_grouped_topk_null_sort_key(case: Case) -> bool:
     if not case.tables:
         return False
@@ -503,14 +596,35 @@ def _compare_value(left: Any, comparator: str, right: Any) -> bool:
         return False
 
 
-def evaluate_case(case: Case, normalized: dict[str, NormalizedResult]) -> list[Finding]:
+def evaluate_case(
+    case: Case,
+    normalized: dict[str, NormalizedResult],
+    *,
+    comparison_mode: str = "contract",
+) -> list[Finding]:
+    if comparison_mode not in {"legacy", "contract"}:
+        raise ValueError(f"unsupported comparison mode: {comparison_mode}")
     findings: list[Finding] = []
-    statuses = {b: r.status for b, r in normalized.items()}
-    ok = {b: r for b, r in normalized.items() if r.status == "ok"}
-    non_ok = {b: r for b, r in normalized.items() if r.status != "ok"}
+    comparable = {
+        backend: result
+        for backend, result in normalized.items()
+        if not _is_explicit_capability_skip(result)
+    }
+    if len(comparable) < 2:
+        return findings
+    comparison_profile = comparison_profile_for_case(case)
+    statuses = {b: r.status for b, r in comparable.items()}
+    ok = {b: r for b, r in comparable.items() if r.status == "ok"}
+    non_ok = {b: r for b, r in comparable.items() if r.status != "ok"}
 
     if ok and non_ok:
-        sig = _signature(case, normalized, "accept_reject_mismatch")
+        sig = _signature(
+            case,
+            comparable,
+            "accept_reject_mismatch",
+            profile=comparison_profile,
+            comparison_mode=comparison_mode,
+        )
         kind = "accept_reject_mismatch"
         findings.append(Finding(
             finding_id=f"finding-{sig}",
@@ -519,15 +633,21 @@ def evaluate_case(case: Case, normalized: dict[str, NormalizedResult]) -> list[F
             suspicious_backends=list(non_ok),
             evidence=f"Some backends accepted while others rejected: {statuses}",
             signature=sig,
-            root_cause=classify_root_cause(case, normalized, kind),
+            root_cause=classify_root_cause(case, comparable, kind),
             oracle="differential",
             confidence="high",
             mismatch_class="accept_reject",
         ))
         return findings
 
-    if len(non_ok) == len(normalized) and len(set((r.status, r.error_type) for r in non_ok.values())) > 1:
-        sig = _signature(case, normalized, "exception_mismatch")
+    if len(non_ok) == len(comparable) and len(set((r.status, r.error_type) for r in non_ok.values())) > 1:
+        sig = _signature(
+            case,
+            comparable,
+            "exception_mismatch",
+            profile=comparison_profile,
+            comparison_mode=comparison_mode,
+        )
         kind = "exception_mismatch"
         findings.append(Finding(
             finding_id=f"finding-{sig}",
@@ -536,7 +656,7 @@ def evaluate_case(case: Case, normalized: dict[str, NormalizedResult]) -> list[F
             suspicious_backends=list(non_ok),
             evidence=f"All backends rejected but with different errors: { {b: r.error_type for b, r in non_ok.items()} }",
             signature=sig,
-            root_cause=classify_root_cause(case, normalized, kind),
+            root_cause=classify_root_cause(case, comparable, kind),
             oracle="differential",
             confidence="medium",
             mismatch_class="exception_taxonomy",
@@ -546,21 +666,46 @@ def evaluate_case(case: Case, normalized: dict[str, NormalizedResult]) -> list[F
     if len(ok) >= 2:
         ok_items = list(ok.items())
         ok_backends = [backend for backend, _ in ok_items]
-        comparison = compare_result_batch([result for _, result in ok_items])
+        contract_comparison = None
+        if comparison_mode == "legacy":
+            comparison = compare_result_batch([result for _, result in ok_items])
+        else:
+            contract_comparison = compare_results_under_contract(
+                case,
+                [result for _, result in ok_items],
+                profile=comparison_profile,
+            )
+            comparison = contract_comparison.comparison
         if comparison.has_mismatch:
             suspicious = sorted(comparison.suspicious_labels(ok_backends))
-            sig = _signature(case, normalized, "semantic_output_mismatch")
+            sig = _signature(
+                case,
+                comparable,
+                "semantic_output_mismatch",
+                profile=comparison_profile,
+                comparison_mode=comparison_mode,
+            )
             kind = "semantic_output_mismatch"
             shapes = {b: (len(r.rows), len(r.columns)) for b, r in ok.items()}
             mismatch_class = comparison.mismatch_class
+            evidence = (
+                f"Backends returned different canonical tables; "
+                f"mismatch_class={mismatch_class}; shapes={shapes}"
+                if comparison_mode == "legacy"
+                else (
+                    "Backends returned different contract-derived comparison views; "
+                    f"view={contract_comparison.profile.view}; "
+                    f"mismatch_class={mismatch_class}; shapes={shapes}"
+                )
+            )
             findings.append(Finding(
                 finding_id=f"finding-{sig}",
                 kind=kind,
                 severity="critical",
                 suspicious_backends=suspicious,
-                evidence=f"Backends returned different canonical tables; mismatch_class={mismatch_class}; shapes={shapes}",
+                evidence=evidence,
                 signature=sig,
-                root_cause=classify_root_cause(case, normalized, kind),
+                root_cause=classify_root_cause(case, comparable, kind),
                 oracle="differential",
                 confidence=comparison.default_confidence(),
                 mismatch_class=mismatch_class,
@@ -568,9 +713,27 @@ def evaluate_case(case: Case, normalized: dict[str, NormalizedResult]) -> list[F
     return findings
 
 
-def _semantic_mismatch_class(ok_results: dict[str, NormalizedResult]) -> str:
+def _is_explicit_capability_skip(result: NormalizedResult) -> bool:
+    decision = result.capability_decision
+    return bool(
+        result.status == "missing"
+        and isinstance(decision, dict)
+        and decision.get("supported") is False
+        and str(decision.get("skip_reason", "")).startswith(
+            "unsupported_capability:"
+        )
+    )
+
+
+def _semantic_mismatch_class(
+    case: Case,
+    ok_results: dict[str, NormalizedResult],
+    *,
+    comparison_mode: str = "contract",
+) -> str:
     result_rows = list(ok_results.values())
     if len(result_rows) < 2:
         return "none"
-    comparison = compare_result_batch(result_rows)
-    return comparison.mismatch_class
+    if comparison_mode == "legacy":
+        return compare_result_batch(result_rows).mismatch_class
+    return compare_results_under_contract(case, result_rows).mismatch_class

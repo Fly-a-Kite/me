@@ -1,0 +1,110 @@
+schema_version: osc-phase5-opaque-diagnostic-consumer-barrier-v1
+task_id: OSC-5-ROOT-OPAQUE-DIAGNOSTIC-CONSUMERS
+status: pass_root_and_three_direct_exact_sha_reviews
+phase5_exit_gate_passed: true
+phase5_exit_blocker: none
+finding_disposition:
+  OSC-5-ROOT-003-A-F1: closed_root_verified
+change_requests:
+  - id: CR-OSC-ROOT-003
+    status: closed_phase5_legacy_facade_and_opaque_consumers_verified
+  - id: CR-OSC-ROOT-003-A
+    status: closed_phase5_all_typed_outcome_and_opaque_consumers_verified
+  - id: CR-OSC-ROOT-003-B
+    status: closed_phase5_facade_and_opaque_consumers_verified
+consumer_results:
+  public_facade_helpers_only: true
+  base_ref_set_case_bound: true
+  every_executed_metamorphic_variant_independently_case_bound: true
+  full_log_validated_and_preserved: true
+  compact_finding_log_validated_and_preserved: true
+  compact_nonfinding_log_validated_and_preserved: true
+  minimal_log_validated_and_preserved: true
+  summary_discovery_candidate_revalidate_and_copy_only: true
+  recheck_success_and_error_attempts_fail_closed: true
+  processed_skipped_and_error_candidates_receive_projection: true
+  old_missing_malformed_cross_case_backend_mismatch_not_evaluated: true
+  serialized_evaluated_claim_downgraded: true
+  diagnostic_ref_affects_branch_filter_rank_triage_recheck_reduction_dedup_draft_readiness: false
+  candidate_promoted_to_confirmed_bug: false
+  fabricated_coverage_receipt_evidence_envelope_authority: false
+  public_exports_or_freeze_changed: false
+storage:
+  run_jsonl_gzip_compresslevel: 2
+  semantic_content_changed_by_compression: false
+  compact_io_budget_regression_closed_without_dropping_refs: true
+tests:
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/test_execution.py tests/test_run_loaded.py
+      tests/test_runner.py tests/test_discovery_runtime.py
+      tests/test_candidate_pipeline.py tests/osc/test_legacy_diagnostic_facade.py
+    exit_code: 0
+    result: 268 passed in 44.98s
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/osc
+    exit_code: 0
+    result: 379 passed in 111.29s
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider
+    exit_code: 0
+    result: 3080 passed, 1 skipped in 250.91s
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider
+      tests/test_next_architecture.py::test_compact_event_evidence_stays_below_the_normal_case_io_budget
+    exit_code: 0
+    result: 1 passed in 5.04s
+reviews:
+  - agent: /root/phase5_authority_audit
+    scope: final facade and all consumer SHA authority-boundary review
+    result: pass
+    blocker: 0
+    high: 0
+    medium: 0
+    changed_files: []
+  - agent: /root/phase5_consumer_audit
+    scope: final base/metamorphic consumer dataflow, log levels, candidate branches and compression-only delta
+    result: pass
+    blocker: 0
+    high: 0
+    medium: 0
+    changed_files: []
+  - agent: /root/phase5_evidence_audit
+    scope: final production/test/freeze exact-SHA evidence, declared path correspondence, dirty-worktree preservation and execution prohibitions
+    result: pass
+    blocker: 0
+    high: 0
+    medium: 0
+    changed_files: []
+    independent_tests: 52_passed_in_1.71s
+hashes:
+  src/datadiff/osc_diagnostic_facade.py: 139545e03db5fbf9178907a57e37d6889e8d82a2e9e36e5d5f358293f98391bf
+  src/datadiff/execution.py: cf570fca915338e2a46e4ec69c2739313e53bde8b61ebf1ee1cfc6dbecb7fad8
+  src/datadiff/run_loaded.py: 8eb0330efbe1e164506c02c71510db1ca0e8ed526aa44ed5c9c5d92166e3a723
+  src/datadiff/runner.py: c40d79ef6bbce619bf3b7e5453934ddd92cb8a028e83e9227d4458db4b84dcbf
+  src/datadiff/run_summaries.py: 3d4377c951ae1f8f0957cbd40fd575b067d38c161bbbc2a5d9b7ba993c45c795
+  src/datadiff/discovery_runtime.py: 77b1aad054d622741f842b48ef6f7db9a606905bbc150c0499c6cbf96d78d86f
+  src/datadiff/candidate_pipeline.py: bb4302d658d1812dbb82c6ade3e91644ed87820c129a2f36d5b19456ccb4971c
+  tests/osc/test_legacy_diagnostic_facade.py: e8ad6381029d826e6521db7e27922cd7ce144ec328474f0f5af09d3caabd8b9c
+  tests/test_execution.py: dffaba0e069968fdafff23e9ecf6751adcdb77106256c8c50ac6b956da7a601c
+  tests/test_run_loaded.py: c3793132a97e04b56d4a0ea02f186659c4a7b7c53059b5e7d8216ce908c108be
+  tests/test_runner.py: c58c74ed89516d7543fe0e3ea96089689aa7a95e8ac3fcebd269ac5d2ad2a4c6
+  tests/test_discovery_runtime.py: ae71913ff814eb35a830ef4cad319b9ee359f2d7bcb66226c1f018b95a5559e1
+  tests/test_candidate_pipeline.py: 0ad414f6aabe28c2dc76f201857aa4e4ba969f806c916bfe23593660f195de56
+  src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+integrity:
+  git_head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  staged_paths: 0
+  git_diff_check: pass
+barrier_decision:
+  opaque_consumer_migration_closed: true
+  final_evidence_review_complete: true
+  phase5_closed: true
+  phase6_started: false
+  pilot_started: false
+  two_hour_run_started: false
+  twenty_four_hour_run_authorized: false
+  twenty_four_hour_run_started: false

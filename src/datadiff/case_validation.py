@@ -47,6 +47,9 @@ BOOL_ALIAS_PROBES = frozenset(
         "round_even_probe",
         "run_end_null_compute_probe",
         "series_rtruediv_probe",
+        "series_reflected_arithmetic_probe",
+        "datafusion_grouped_null_topk_probe",
+        "confirmed_root_witness_probe",
         "setop_all_duplicate_probe",
         "sparse_mask_probe",
         "struct_distinct_probe",
@@ -90,6 +93,15 @@ def validate_case_program(case: Case) -> list[str]:
     if not case.tables:
         return ["case has no tables"]
     errors: list[str] = []
+    table_names = [table.name for table in case.tables]
+    duplicate_table_names = _duplicates(table_names)
+    for name in duplicate_table_names:
+        errors.append(f"case has duplicate table name {name!r}")
+    for table in case.tables:
+        for column in _duplicates([column.name for column in table.columns]):
+            errors.append(f"table {table.name!r} contains duplicate column {column!r}")
+    if errors:
+        return errors
     tables = {table.name: table for table in case.tables}
     state = ProgramState.from_table(case.tables[0])
 
@@ -117,6 +129,16 @@ def validate_case_program(case: Case) -> list[str]:
         else:
             errors.append(f"op {idx}: unknown operation {kind!r}")
     return errors
+
+
+def _duplicates(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for value in values:
+        if value in seen and value not in duplicates:
+            duplicates.append(value)
+        seen.add(value)
+    return duplicates
 
 
 def _extend_join_state(state: ProgramState, tables: dict[str, Any], op: Any) -> None:

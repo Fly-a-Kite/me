@@ -1,0 +1,232 @@
+schema_version: osc-review-report-set-v1
+phase: 6
+round: private_foundation_remediation_exact_sha_negative_review_r4
+status: complete_findings_recorded_remediation_required
+execution_mode: single_agent_serial_override
+rotated_independent_review_complete: false
+review_scope: >-
+  单 Agent 串行负向复核与独立反例验证；这不是 rotated independent review，
+  不能作为 foundation barrier 的独立终审证据。
+entry_artifacts:
+  remediation_report:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round3_reports.yaml
+    sha256: 088445a9a98c465d106d40b52749123988772f71ecd0463f153b07bb39f64a2d
+  remediation_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round3_task_contracts.yaml
+    sha256: f3eedb23acdca7eccea25a2b12599d6ae75ce553bb07fae102e0eff88cd07901
+  r4_review_contract:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round4_contracts.yaml
+    sha256: da353826860e85188107714d67007ec60285a987b606cca36d3b04191a7fbe1c
+  public_api_freeze:
+    path: src/datadiff_osc/public_api_freeze.json
+    sha256: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+workspace_before_authority_write:
+  head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  tracked_modified_paths: 141
+  staged_paths: 0
+  status_short_entries: 2908
+  status_short_sha256: afdb15e19bb98330957e06d648cc141e7167357bbb71604c5aa0b4c824ca1cee
+  status_all_untracked_entries: 24226
+  status_all_untracked_sha256: 10bad310aa0d3377d3bc827e506764ab8cf6e472ebd2996a752fc53207a50a37
+  r4_report_preexisting: false
+reviews:
+  - task_id: OSC-6-FOUNDATION-REVIEW-R4-A-SEARCH
+    reviewer: /root
+    target_owner: /root/r3_search_owner
+    execution_mode: single_agent_serial_override
+    reviewer_independent_of_target_owner: false
+    decision: fail
+    exact_sha_verified_pre_and_post_test: true
+    target_sha256:
+      src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+      src/datadiff_osc/search/context_receipts.py: e59bee28afc89cc58706eecc9168043e18fe7c74bf40f4d66e515a1a2a7673bd
+      src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+      tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+      tests/osc/test_search_context_receipts.py: 6b472c41e46aa9cc1bd46453dd273204cf82670cf4522944d62c658af6a6873f
+      tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    scoped_test:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py
+        tests/osc/test_search_gate_crosswalk.py
+      exit_code: 0
+      result: 50 passed in 127.79s
+    independent_counterexample_validation:
+      r4_h1:
+        result: vulnerable
+        exact_results:
+          baseline_status: rejected
+          baseline_attempts: 2
+          replacement_status: rejected
+          replacement_attempts: 1
+          outcome_changed: true
+          code_identity_same: true
+          module_same: true
+          qualname_same: true
+          policy_id_unchanged: true
+          receipt_accepted_under_prior_policy_id: true
+      r4_h2:
+        result: vulnerable
+        exact_results:
+          class_terminal_digest_unchanged_after_state_replacement: true
+          class_behavior_changed: true
+          module_terminal_digest_unchanged_after_state_replacement: true
+          module_behavior_changed: true
+          mutable_intermediate_owner_accepted: true
+          cyclic_intermediate_owner_accepted: true
+          unresolved_intermediate_owner_rejected: true
+          uninspectable_intermediate_owner_rejected: true
+    findings:
+      - id: OSC-6-FOUNDATION-SEARCH-R4-H1
+        severity: high
+        claim: >-
+          application-policy callable identity is static-only. Cloning
+          TargetPreservingMutator.mutate with identical code/source/module/qualname
+          while replacing its MutationOutcome global leaves the policy ID unchanged;
+          a rejected outcome with attempts=1 is then accepted under the prior policy ID.
+        evidence:
+          path: src/datadiff_osc/search/context_receipts.py
+          symbol_or_line: _policy_callable_implementation_digest lines 1639-1648; mutation_operator_application_policy_id lines 1845-1863
+        reproduction: >-
+          独立反例验证：克隆 TargetPreservingMutator.mutate，仅将其 globals 中的
+          MutationOutcome 替换为把 attempts 固定为 1 的构造器；基线与替换均为
+          rejected，但 policy ID 不变且 MutationAttemptReceipt.build 接受替换 outcome。
+        violated_invariant: >-
+          application-policy callable 必须绑定完整 live context；任何影响行为的
+          globals/defaults/kwdefaults/closure/递归依赖替换不得沿用旧 policy identity。
+        minimal_fix_owner: search
+        required_test: >-
+          增加 cold/warm MutationOutcome-global 替换和 prior-ID replacement-outcome
+          回归；每种替换必须在 replay 前 fail closed。
+      - id: OSC-6-FOUNDATION-SEARCH-R4-H2
+        severity: high
+        claim: >-
+          module/class attribute path binds only the terminal descriptor. Replacing
+          Holder.STATE or module.STATE changes STATE.get behavior while the callable
+          digest remains unchanged; mutable and cyclic intermediate owners also pass.
+        evidence:
+          path: src/datadiff_osc/search/context_receipts.py
+          symbol_or_line: _resolve_attribute_path lines 1024-1037; _live_context_digest module/class terminal binding
+        reproduction: >-
+          独立反例验证：分别调用 Holder.STATE.get 与 module.STATE.get，替换 STATE 后
+          terminal digest 不变而返回值改变；异常输入验证显示 mutable/cyclic 中间 owner
+          被接受。
+        violated_invariant: >-
+          attribute path 必须绑定每个中间 owner；mutable、cyclic、unresolved 或
+          uninspectable owner 必须 fail closed。
+        minimal_fix_owner: search
+        required_test: >-
+          增加 module/class 中间 owner 替换、mutable/cyclic fail-closed，以及
+          unresolved/uninspectable fail-closed 回归。
+    counts: {blocker: 0, high: 2, medium: 0, low: 0}
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations:
+      - rotated independent review unavailable in single_agent_serial_override
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R4-B-RUNTIME
+    reviewer: /root
+    target_owner: /root/r3_runtime_owner
+    execution_mode: single_agent_serial_override
+    reviewer_independent_of_target_owner: false
+    decision: fail
+    exact_sha_verified_pre_and_post_test: true
+    target_sha256:
+      src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+      src/datadiff_osc/runtime/_receipt_producers.py: 4e939d0d8dd30858a60109318c12ceb4614e8848816761b1ccdbc772986ae9d6
+      tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+      tests/osc/test_runtime_receipt_producers.py: dccb5339abea3f4f92c41113766a36e7d25f30db0dc3df03d4275200d5404caf
+    scoped_test:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+      exit_code: 0
+      result: 49 passed in 1.32s
+    independent_counterexample_validation:
+      r4_m1:
+        result: vulnerable
+        combinations:
+          - {source_verdict: INCONCLUSIVE, reused_stage: campaign, first_error: candidate source lacks a typed VIOLATED witness}
+          - {source_verdict: INCONCLUSIVE, reused_stage: pipeline, first_error: candidate source lacks a typed VIOLATED witness}
+          - {source_verdict: SATISFIED, reused_stage: campaign, first_error: candidate source lacks a typed VIOLATED witness}
+          - {source_verdict: SATISFIED, reused_stage: pipeline, first_error: candidate source lacks a typed VIOLATED witness}
+    findings:
+      - id: OSC-6-FOUNDATION-RUNTIME-R4-M1
+        severity: medium
+        claim: >-
+          Source verdict evaluation precedes seven-execution/seven-envelope global
+          disjointness. With a source result/evidence reused in campaign or pipeline
+          and source verdict INCONCLUSIVE or SATISFIED, the first error is the
+          typed-VIOLATED witness failure rather than the required identity collision.
+        evidence:
+          path: src/datadiff_osc/runtime/_receipt_producers.py
+          symbol_or_line: build_candidate_classification_receipt lines 882-891 before disjointness at lines 923-928
+        reproduction: >-
+          独立反例验证：source verdict 取 INCONCLUSIVE/SATISFIED，分别在 campaign 与
+          pipeline 复用 source result/evidence，四种组合均先报 typed-VIOLATED witness。
+        violated_invariant: >-
+          source、campaign、pipeline 的七执行和七 EvidenceEnvelope 必须在任何
+          source/recheck verdict、reproduced 或 threshold 判断前完成全局不相交验证。
+        minimal_fix_owner: runtime
+        required_test: >-
+          增加 INCONCLUSIVE/SATISFIED × campaign/pipeline source reuse 的四项
+          顺序回归，首个错误必须为 globally disjoint。
+    counts: {blocker: 0, high: 0, medium: 1, low: 0}
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations:
+      - rotated independent review unavailable in single_agent_serial_override
+
+  - task_id: OSC-6-FOUNDATION-REVIEW-R4-C-CONTRACT
+    reviewer: /root
+    target_owner: /root/phase5_authority_audit
+    execution_mode: single_agent_serial_override
+    reviewer_independent_of_target_owner: false
+    decision: not_independently_reviewed
+    exact_sha_verified_pre_and_post_test: true
+    target_sha256:
+      src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+      tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    scoped_test:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_contract_phase6_corpora.py
+      exit_code: 0
+      result: 19 passed in 4.13s
+    findings: []
+    counts: {blocker: 0, high: 0, medium: 0, low: 0}
+    writes: 0
+    child_agents: 0
+    forbidden_paths_modified: []
+    deviations:
+      - no independent Contract reviewer exists in this single-Agent session
+
+aggregate_counts: {blocker: 0, high: 2, medium: 1, low: 0}
+aggregate:
+  blocker: 0
+  high: 2
+  medium: 1
+  low: 0
+authority_boundaries:
+  diagnostic_refs_authority_eligible: false
+  missing_exact_typed_context: not_evaluated_or_rejected
+  candidate_promoted_to_confirmed_bug: false
+  bug_claimed: false
+  fabricated_coverage_or_receipt_or_evidence_authority: false
+  public_api_freeze_changed: false
+decision:
+  implementation_round_complete: false
+  root_independent_counterexample_validation: true
+  rotated_independent_review_required: true
+  rotated_independent_review_complete: false
+  foundation_barrier: false
+  foundation_barrier_passed: false
+  remediation_required: true
+  tests_osc_authorized: false
+  full_repository_tests_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

@@ -41,6 +41,7 @@ def build_issue_readiness(
     old_issue_dir: Path | None = None,
     generated_issue_dir: Path | None = None,
     include_generated: bool = False,
+    scan_generated_workflow_evidence: bool = True,
 ) -> dict[str, Any]:
     latest_confirmation_files = latest_confirmation_files or _default_latest_confirmation_files()
     new_issue_dir = _resolve_project_path(new_issue_dir or PROJECT_ROOT / "new_issue")
@@ -52,12 +53,17 @@ def build_issue_readiness(
         new_issue_dir=new_issue_dir,
         old_issue_dir=old_issue_dir,
         generated_issue_dir=generated_issue_dir,
+        scan_generated_workflow_evidence=scan_generated_workflow_evidence,
+    )
+    registered_confirmations = status.get(
+        "registered_latest_confirmations",
+        status.get("latest_confirmations", []),
     )
     confirmed_by_url = {
-        str(item.get("issue_url", "")).strip(): item for item in status.get("latest_confirmations", [])
+        str(item.get("issue_url", "")).strip(): item for item in registered_confirmations
     }
     confirmed_by_family = {
-        str(item.get("family", "")).strip(): item for item in status.get("latest_confirmations", [])
+        str(item.get("family", "")).strip(): item for item in registered_confirmations
     }
     old_known_urls = set(status.get("old_known", {}).get("upstream_issue_urls", []) or [])
     audit_families = list(status.get("summary", {}).get("audit_candidate_families", []) or [])
@@ -88,6 +94,7 @@ def build_issue_readiness(
             "old_issue_dir": _project_display_path(old_issue_dir),
             "generated_issue_dir": _project_display_path(generated_issue_dir),
             "include_generated": include_generated,
+            "scan_generated_workflow_evidence": bool(scan_generated_workflow_evidence),
         },
         "summary": summary,
         "submission_groups": submission_groups,

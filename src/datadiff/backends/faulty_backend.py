@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from numbers import Number
 from typing import Any
 
-from datadiff.backends.base import BackendResult
+from datadiff.backends.base import BackendResult, PreparedTable
 from datadiff.backends.pandas_backend import PandasBackend
 from datadiff.dsl import Program, TableData
 from datadiff.operation_semantics import op_column, op_kind
@@ -13,8 +14,13 @@ class FaultyPandasBackend(PandasBackend):
         self.name = name
         self.fault = fault
 
-    def run(self, tables: list[TableData], program: Program, timeout_s: float = 5.0) -> BackendResult:
-        result = super().run(tables, program, timeout_s=timeout_s)
+    def execute_lowered(
+        self,
+        tables: list[TableData | PreparedTable],
+        program: Program,
+        timeout_s: float = 5.0,
+    ) -> BackendResult:
+        result = super().execute_lowered(tables, program, timeout_s=timeout_s)
         result.backend = self.name
         if result.status != "ok":
             return result
@@ -72,7 +78,7 @@ def _inject_fault(df: Any, program: Program, fault: str) -> Any:
 def _first_numeric_column(df: Any) -> str | None:
     for column in df.columns:
         try:
-            if str(df[column].dtype).startswith(("int", "float")):
+            if str(df[column].dtype).lower().startswith(("int", "float")):
                 return str(column)
         except Exception:  # noqa: BLE001
             continue
@@ -103,6 +109,6 @@ def _perturb_value(value: Any) -> Any:
         return "__fault__"
     if isinstance(value, bool):
         return not value
-    if isinstance(value, (int, float)):
+    if isinstance(value, Number):
         return value + 1
     return f"{value}__fault__"

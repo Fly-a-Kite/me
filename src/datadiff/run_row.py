@@ -12,7 +12,11 @@ from datadiff.run_metadata import (
     _attach_disagreement_descriptor_to_row_case,
     _attach_semantic_contract_lattice_to_row_case,
 )
-from datadiff.run_signatures import signal_signature
+from datadiff.run_signatures import (
+    coverage_discovery_signature,
+    coverage_signal_signature,
+    signal_signature,
+)
 from datadiff.semantic_contracts import semantic_contract_lattice_payload
 
 
@@ -45,10 +49,23 @@ def apply_iteration_row_updates(
     elapsed_s: float,
 ) -> IterationRowUpdate:
     sig = str(row["behavior_signature"])
-    discovery_sig = str(row.get("discovery_signature", sig))
+    backend_sampling = row.get("backend_sampling", {}) or {}
+    coverage_sampled_campaign = bool(backend_sampling.get("sampled", False))
+    discovery_sig = (
+        coverage_discovery_signature(row)
+        if coverage_sampled_campaign
+        else str(row.get("discovery_signature", sig))
+    )
+    if coverage_sampled_campaign:
+        row["coverage_discovery_signature"] = discovery_sig
+        row["discovery_signature"] = discovery_sig
     row["is_new_behavior"] = discovery_sig not in seen
     seen.add(discovery_sig)
-    signal_sig = signal_signature(row)
+    signal_sig = (
+        coverage_signal_signature(row)
+        if coverage_sampled_campaign
+        else signal_signature(row)
+    )
     row["signal_signature"] = signal_sig
     row["signal_new_behavior"] = bool(row["is_new_behavior"]) and signal_sig not in signal_seen
     if row["is_new_behavior"]:
@@ -139,6 +156,10 @@ def _attach_selection_metadata(row: dict[str, Any], selected_meta: dict[str, Any
     row["mutation"] = selected_meta["mutation"]
     row["feedback_decision"] = selected_meta.get("feedback_decision", {})
     row["quality_archive_context"] = selected_meta.get("quality_archive_context", {})
+    row["goal_first_generation"] = selected_meta.get("goal_first_generation", {})
+    row["semantic_activation"] = selected_meta.get("semantic_activation", {})
+    row["boundary_application"] = selected_meta.get("boundary_application", {})
+    row["semantic_novelty"] = selected_meta.get("semantic_novelty", {})
     row["generator_profile_selection"] = selected_meta.get("generator_profile_selection", {})
     row["selected_generator_profile"] = str(row["generator_profile_selection"].get("profile", "") or "")
     row["semantic_objective_selection"] = selected_meta.get("semantic_objective_selection", {})

@@ -1,0 +1,237 @@
+schema_version: osc-phase6-contract-raw-pair-typed-producer-task-contract-v1
+phase: 6
+authority:
+  task_id: OSC-6-CONTRACT-RAW-PAIR-TYPED-PRODUCER-R4
+  owner: /root
+  role: root
+  mode: root_serial_private_typed_raw_pair_producer
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  grandchildren_allowed: false
+  remediation_is_serial: true
+  user_authorization:
+    date: 2026-07-23
+    instruction: "授权; 继续"
+    interpretation: >-
+      The user authorized the next bounded Phase-6 Contract slice.  It may add
+      only a private pure builder that derives the existing R3 raw-pair receipt
+      from exact R1 comparison context, two typed Runtime executions and raw
+      counter observations.  It does not authorize changing a public interface,
+      a frozen producer/provenance path, a Root authority path, an artifact,
+      a corpus/cohort execution, a gate calculation, Phase 7, a 2h pilot, or a
+      24h run.
+  authority_write_paths:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_typed_producer_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_typed_producer_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  source_state_before_write:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    untracked_path_count: 24122
+    coordination_ledger_sha256: 7be883a6aa8ef43719227c680839c161d34bb0ef72e14cd35ef47a13ea167825
+  required_input_sha256:
+    docs/codex_multi_agent_development_runbook.md: a17a62d7937f5ff4755d8925dc6dd64c25946516a80f82466ddeda1ee8d845f9
+    experiments/final_bug_discovery_protocol_v3/TODO.md: 1ad989d412651f5cc9ae3c3ac5d7d7207176557e0bcdcfb449788f016d607419
+    docs/project_architecture.md: 5fc31c1c2c4bf1241e41cc966f8d56abc890259a8577fe756076b490e3698d9f
+    docs/fine_grained_discovery_architecture.md: 58d0e11a3cd3c2ea9b7096449f9beafae756b94cae3e41f04d4377b2b4d6dbf2
+    docs/discovery_search_and_parallel_architecture.md: 7af5fb51be2de1e0162ffb4a2db2bf40df050f35c0446bcae707e419936cf1b9
+    docs/semantic_hypercontract_architecture.md: 20a5e22513c64c60e77b115233b28fdca2591081f08d5f2945a15dda18442dae
+    docs/architecture_credibility_and_alternatives.md: 95bd949dba93d41d9b2594122fc49766164008c5de8df6aec91dc88f2afa0762
+    docs/competitive_paper_experiment_blueprint.md: e2537e9ec03f5222321af7ae11491341f402d6e294c19ae4c8c3d397c4c1cd18
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_task_contract.yaml: 5734d1a3ae5673fb1b4adc04c63d86761dd85112f29da36305381ec3cc9a0a04
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_report.yaml: 778c54465013f2892387a1909fd62330388e95ba2c415aee6af5f5fc00793118
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_evidence_task_contract.yaml: df8118dadc5102203ee2e7a9a3efe754f3bba4c95fa430ef582f5d37de4e50dc
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_evidence_report.yaml: 56cca3cc7077df35008e354e2df0d0ca474d1ae6efcac5eb295dc60cea70d5a6
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_task_contract.yaml: e2d26e04495cc628fe72dc900bb40f20e53c08282f0792c264d007448b7f53c7
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_report.yaml: 26cc78f7e0809d2cb5c71faa94d1b74515d03485651573bf6133afd06248e863
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_receipt_task_contract.yaml: f2c39256878802ff22e4fc3d99224939e9e8f880a772a24eac496242fa7a43eb
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_receipt_report.yaml: 376a7d42d32b2a64a633572dbcca2ef3bc062340c94feb2b6e92739bbc54c5d1
+    experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_contracts.yaml: 264e222b7fa3dff91122743627bcc744af559c715085e630ef21d27b59eb3e36
+    experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_reports.yaml: 58832ef90d0ce50907fc7e9a9d2f0ccfe874427ea1951c889ec09d49c3a9ca56
+    src/datadiff_osc/runtime/_phase6_contract_performance_receipts.py: cf2b1500a97a884f396eacc0f6354a2d47ae59cc4a480e4119ad9c2515431cf1
+    tests/osc/test_runtime_phase6_contract_performance_receipts.py: c7465ae21dd2ea124163395d9bb32adff4f30dda9c403fc47110d956ee08f1a9
+    src/datadiff_osc/runtime/_semantic_replay.py: 8926a2c42d657f8637244c14fc17ee0be6a67e162e63c87be02a439276b95aaa
+    src/datadiff_osc/_phase6_gate_authority.py: 36f1a2f78bddf95408a4babdcf96d22e44d8401729da4ed6bc65558c68ef4f2d
+    tests/osc/test_runtime_semantic_replay.py: 40f2a7db1cea6956ec869368c827653b582e84aea340c50c15d028f6de8348df
+    tests/osc/test_phase6_gate_authority_integration.py: d0190dac75c5a70f4fb5ab46fe4b1389fa3b7719b3f4cf7c106cb09231363288
+  frozen_target_sha256:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+task:
+  task_id: OSC-6-CONTRACT-RAW-PAIR-TYPED-PRODUCER-R4
+  role: root
+  mode: root_serial_private_typed_raw_pair_producer
+  objective: >-
+    Add a private pure producer that can derive exactly one existing R3
+    ContractPerformanceEvidenceReceipt from a real R1 ContractComparisonReceipt,
+    exact baseline/treatment TypedExecutionResult and EvidenceEnvelope pairs,
+    immutable benchmark context, and typed raw counters.  The builder is a
+    prerequisite only: it cannot create a canonical artifact, provenance
+    admission, parallel-scaling authority, cohort, metric, publication, or gate
+    decision.
+  allowed_write_paths:
+    - src/datadiff_osc/runtime/_phase6_contract_performance_producers.py
+    - tests/osc/test_runtime_phase6_contract_performance_producers.py
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_typed_producer_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_typed_producer_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  forbidden_write_paths:
+    - src/datadiff_osc/__init__.py
+    - src/datadiff_osc/public_api_freeze.json
+    - src/datadiff_osc/search/**
+    - src/datadiff_osc/contract_engine/**
+    - src/datadiff_osc/runtime/_receipt_producers.py
+    - tests/osc/test_runtime_receipt_producers.py
+    - src/datadiff_osc/runtime/_producer_provenance.py
+    - tests/osc/test_runtime_producer_provenance.py
+    - src/datadiff_osc/runtime/_phase6_contract_performance_receipts.py
+    - tests/osc/test_runtime_phase6_contract_performance_receipts.py
+    - src/datadiff_osc/runtime/_semantic_replay.py
+    - tests/osc/test_runtime_semantic_replay.py
+    - src/datadiff_osc/_phase6_gate_authority.py
+    - tests/osc/test_phase6_gate_authority_integration.py
+    - src/datadiff_osc/runtime/_private_receipts.py
+    - tests/osc/test_runtime_private_receipts.py
+    - src/datadiff_osc/runtime/gates.py
+    - src/datadiff_osc/runtime/gate_artifacts.py
+    - src/datadiff_osc/contract_engine/_phase6_corpora.py
+    - tests/osc/test_contract_phase6_corpora.py
+    - tests/osc/test_search_context_receipts.py
+    - tests/osc/test_search_gate_crosswalk.py
+    - tests/osc/test_search_lane_registry.py
+    - docs/**
+    - scripts/**
+    - experiments/final_bug_discovery_protocol_v3/**
+  frozen_interfaces:
+    - osc-public-api-freeze-v1:cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    - osc-pre24-gate-spec-set-d9792996cacb6fc6e47bce602d5f7ab6d6382c62ba9e1ac6bc1f8003ecbec552
+    - all thirteen frozen_target_sha256 entries above
+    - R1 ContractComparisonReceipt v1
+    - R3 ContractPerformanceEvidenceReceipt v1
+  required_invariants:
+    - >-
+      The new module is private and pure.  It accepts no caller-authored
+      receipt/sample/decision/result/task/config/environment/algorithm digest;
+      every returned receipt identity is derived from typed objects and immutable
+      canonical context.  The sole opaque locator is the R2 Contract producer
+      receipt digest, which is carried only for the already-existing R3 Root
+      cross-object check and is never treated as provenance by this builder.  It
+      adds no public export.
+    - >-
+      A production observation must contain a real R1 ContractComparisonReceipt,
+      two distinct TypedExecutionResult objects, and two distinct EvidenceEnvelope
+      objects.  Both executions must be OK, have the same non-empty case ID,
+      ResultGroup, ordered endpoint set, contract fingerprint, seed lineage,
+      protocol, outcome endpoint, and resource envelope; their TaskSpec, result,
+      outcome, evidence, and configuration identities must be distinct.
+    - >-
+      The comparison receipt is the sole source for source snapshot/case,
+      comparison decision, ResultGroup/contract/endpoints, fingerprint/exact
+      task/result, and partition fields.  The typed pair must bind exactly to
+      that same ResultGroup and its exact verdict.  Evidence must bind exact
+      result/task/seed/contract/target/outcome context, carry the same exact
+      verdict, and remain NOT_A_CANDIDATE; no candidate may become confirmed and
+      bug_claimed is never created or changed.
+    - >-
+      Benchmark plan, environment, and arm configuration are immutable uniquely
+      sorted field tuples.  Strategy labels are not caller-selectable: baseline
+      is always_materialize_pairwise and treatment is staged_exact_escalation.
+      The derived arm configuration binds the corresponding TaskSpec payload and
+      resource envelope.  The comparison algorithm identity is derived from the
+      R1 comparison object, never supplied as a digest-only assertion.
+    - >-
+      Raw counters are typed integers only.  The builder derives bytes,
+      backend-pair comparisons, and comparison CPU nanoseconds; all baseline
+      values must be positive and all treatment values non-negative.  Booleans,
+      floats, negatives, missing/duplicate/unordered context, mismatched source
+      or verdict, unsupported evidence state, same identities, and stale or
+      uninspectable inputs fail closed before a receipt is returned.
+    - >-
+      This contract deliberately does not alter R3 Runtime replay/Root binding,
+      the frozen producer-provenance registry, or legacy PairedBenchmarkReceipt.
+      The old parallel_scaling_samples path remains fail closed and cannot be
+      silently filled, relaxed, or re-admitted by this implementation.
+    - >-
+      No raw artifact/provenance admission, 1000-pair cohort, 100000 corpus,
+      bootstrap, metric reduction, gate spec, gate calculation, performance
+      pass, Contract pass, combined suite, Phase 7, 2h pilot, or 24h run is
+      authorized.  Missing exact typed context remains fail-closed/not_evaluated.
+  required_tests:
+    负向复核:
+      - >-
+        Reject an execution or evidence binding that no longer matches the
+        comparison ResultGroup/endpoint/contract/fingerprint/exact task/result/
+        partition context, plus case/seed/protocol/resource divergence, duplicate
+        task/result/outcome/evidence/configuration, wrong evidence
+        task/result/seed/outcome/verdict/state, and any raw-counter type or range
+        violation before returning a receipt.  A separately valid changed source
+        comparison may only derive a distinct receipt identity, never the old one.
+      - >-
+        Reject unordered, duplicated, empty, or strategy-spoofed benchmark,
+        environment, and arm configuration context; no digest-only or
+        caller-authored receipt identity may substitute for typed input.
+    独立反例验证:
+      - >-
+        Build one legal R1 receipt and two legal typed executions, then mutate
+        precisely one binding at a time.  Verify the returned R3 receipt derives
+        all comparison and execution fields, changes identity when a raw
+        observation changes, and never makes a bundle, candidate, or gate
+        publishable.
+    异常输入验证:
+      - >-
+        Exercise null-like/missing typed context, wrong object types, non-OK
+        outcomes, non-NOT_A_CANDIDATE evidence, unequal exact verdicts, boolean/
+        float/negative counters, zero baseline counters, and zero treatment
+        counters without confirmation, bug claim, publication, or authorization.
+  scoped_validation:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_runtime_phase6_contract_performance_producers.py
+      tests/osc/test_runtime_phase6_contract_performance_receipts.py
+    timing: exactly once, only after all allowed implementation writes and SHA checks
+    forbidden_substitutes:
+      - tests/osc
+      - repository suite
+      - six-file combined suite
+      - 100000 parity execution
+      - v3 2200
+      - Phase 7
+      - 2h pilot
+      - 24h run
+  completion_requirements:
+    - reverify both product paths and all thirteen frozen/public SHA values before the scoped suite
+    - retain the exact command, exit code, and complete terminal result in the report
+    - reverify both product paths and all thirteen frozen/public SHA values after the scoped suite
+    - use apply_patch for the report and ledger only after the real terminal result is known
+    - retain phase_6_contract as pending regardless of scoped-suite outcome
+  stop_conditions:
+    - any frozen/public SHA mismatch, staged user path, pre-existing target path, or scope expansion
+    - any need to modify a public export, R1/R3 receipt/replay/Root, frozen producer/provenance/test, gate spec, docs, or script
+    - any caller-authored digest identity, accepted misbound typed input, accepted old paired receipt, accepted parallel authority, publishable bundle, gate pass, candidate confirmation, or bug_claimed=true
+    - failed scoped suite or incomplete terminal test evidence
+decision:
+  product_write_authorized_only_for_allowed_paths: true
+  phase_6_contract: pending
+  private_typed_raw_pair_producer_authorized: true
+  artifact_or_provenance_authorized: false
+  parallel_scaling_replacement_authorized: false
+  cohort_or_bootstrap_authorized: false
+  gate_spec_edit_authorized: false
+  real_gate_evidence_authorized: false
+  combined_suite_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_pilot_2h_authorized: false
+  twenty_four_hour_run_authorized: false

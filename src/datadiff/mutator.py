@@ -1215,8 +1215,8 @@ def _mutation_attempt_order(
     ranked = sorted(
         order,
         key=lambda operator: (
-            float((applicability_scores or {}).get(operator.name, 0.0)),
             float(operator_scores.get(operator.name, untried_score)),
+            float((applicability_scores or {}).get(operator.name, 0.0)),
             rnd.random(),
         ),
         reverse=True,
@@ -1264,12 +1264,12 @@ def _annealed_operator_tail(
         proposal_index = rnd.randrange(len(remaining))
         proposal = remaining[proposal_index]
         best_score = (
-            float((applicability_scores or {}).get(best.name, 0.0)),
             float(operator_scores.get(best.name, untried_score)),
+            float((applicability_scores or {}).get(best.name, 0.0)),
         )
         proposal_score = (
-            float((applicability_scores or {}).get(proposal.name, 0.0)),
             float(operator_scores.get(proposal.name, untried_score)),
+            float((applicability_scores or {}).get(proposal.name, 0.0)),
         )
         delta = (proposal_score[0] - best_score[0]) + (proposal_score[1] - best_score[1])
         accept = proposal_index == 0 or delta >= 0.0 or rnd.random() < math.exp(delta / current_temperature)
@@ -1289,8 +1289,8 @@ def _mutation_annealing_temperature(
         return 0.0
     scores = [
         (
-            float((applicability_scores or {}).get(operator.name, 0.0)),
             float(operator_scores.get(operator.name, untried_score)),
+            float((applicability_scores or {}).get(operator.name, 0.0)),
         )
         for operator in ranked_tail
     ]

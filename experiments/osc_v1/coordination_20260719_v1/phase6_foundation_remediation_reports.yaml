@@ -1,0 +1,150 @@
+schema_version: osc-implementation-report-v1
+phase: 6
+round: private_foundation_remediation_r1
+status: implementation_complete_root_scoped_pass_pending_rotated_review
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_task_contracts.yaml
+  sha256: 25d71cd5811c08f004520d6032c984aee0e38836743b722ad630390cdb0eb7e9
+entry_review:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_reports.yaml
+  sha256: e60565932153ec3eda397903e01e675ac60a11ff48e10c232801b9ccc8eeee38
+implementations:
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-CONTRACT-R1
+    owner: /root/phase5_authority_audit
+    findings_addressed: [OSC-6-C-H1, OSC-6-C-H2, OSC-6-C-H3, OSC-6-C-H4, OSC-6-C-H5, OSC-6-C-M1]
+    changed_files:
+      - path: src/datadiff_osc/contract_engine/_phase6_corpora.py
+        before_sha256: 7102b3d0967a2daeda5b50f59e5d06f740774b8f0376a9c70952bebf57e74245
+        after_sha256: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+      - path: tests/osc/test_contract_phase6_corpora.py
+        before_sha256: f56c58fc575f4a292102148e9226778caec5e9486b17e74fcf9004e71dbd87b7
+        after_sha256: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    owner_test:
+      command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider tests/osc/test_contract_phase6_corpora.py
+      result: 19 passed in 0.51s
+      exit_code: 0
+    implementation_summary:
+      - structural review remains context-pending and can never claim trusted independent approval or a denominator
+      - confirmed roots bind frozen VIOLATED verdicts and recomputed domain-separated expected-signature digests
+      - false-positive adjudication, v1/v2 compatibility and mutant kills use specialized typed documents and exact cross-bindings
+      - generic or source-only evidence shells reject and absent approved corpora remain MISSING_INPUT
+      - NUL/C0 and resolver errors fail closed as structured corpus-source rejection
+    deviations:
+      - >-
+        One read-only stdlib-only Python inspection omitted the explicit
+        PYTHONDONTWRITEBYTECODE environment variable. It imported no workspace
+        module, wrote no workspace file and produced no pyc/pyo; all later Python
+        commands used the required variable.
+    transport_notes:
+      - two long section-12 report attempts failed during remote compaction after stable completion; stable SHAs and test result were received and Root independently verified them
+
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-SEARCH-R1
+    owner: /root/phase5_consumer_audit
+    findings_addressed: [OSC-6-FOUNDATION-SEARCH-H1, OSC-6-FOUNDATION-SEARCH-H2, OSC-6-FOUNDATION-SEARCH-H3, OSC-6-FOUNDATION-SEARCH-H4, OSC-6-FOUNDATION-SEARCH-M1]
+    changed_files:
+      - path: src/datadiff_osc/search/lane_registry.py
+        before_sha256: e4d19e8536309b374c351855d0dcf416459e6042526e5bbc67f7299870fbbdcc
+        after_sha256: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+      - path: src/datadiff_osc/search/context_receipts.py
+        before_sha256: 2d6459cc1427052ce8bcec42cbe34ce7d24d89999f1f2999a95ed44e71686529
+        after_sha256: 2759a4fc837323c9f02ce1905dc22fea9806eea7f4a0e9d5806b2e52bd7c3b31
+      - path: src/datadiff_osc/search/context_replay.py
+        before_sha256: 4701eb347e3f2694cdf032af24c44b02a75d97fc32a3985c00891822258e697c
+        after_sha256: 75b087f908c153b72aabe5484550931a4b0b839864ae918834e7f552548211ca
+      - path: tests/osc/test_search_lane_registry.py
+        before_sha256: 383d25d0911e8abc0e9e702d018fd9ba481d3dffbc0f3fb08af373515a5acb84
+        after_sha256: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+      - path: tests/osc/test_search_context_receipts.py
+        before_sha256: bd245ea72ee9980196f8db77f11dbaa67a3b05424eb45e5b6bb15019554e4512
+        after_sha256: 3e06d62355d4e84ca88fe045763e2c2d558a6753e5f60bf7fa499efdfa5e5273
+      - path: tests/osc/test_search_gate_crosswalk.py
+        before_sha256: 4a917e27a9b38235141644bfc14c877ecf04d56b9de26c5432740a48728462dc
+        after_sha256: 8af147b11283c5973e50ab69e279612a7b332acb300d57a6ebe55eddd20ea959
+    owner_test:
+      command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py tests/osc/test_search_gate_crosswalk.py
+      result: 27 passed in 6.80s
+      exit_code: 0
+    implementation_summary:
+      - duplicates reject before canonical ordering
+      - exact formal run, seed-block, master-seed and case SeedLineage bindings reject cross-run replay
+      - mutation receipts bind canonical source Case, registered operator, derived MUTATION lineage/seed, typed MutationOutcome and ActivationCertificate
+      - focus evidence uses frozen rules, deterministic Case reconstruction, typed ExtractionResult and recomputed structural features
+      - Runtime-dependent subjects remain context-required and admitted=false
+    deviations: []
+
+  - task_id: OSC-6-FOUNDATION-REMEDIATE-RUNTIME-R1
+    owner: /root/phase5_evidence_audit
+    findings_addressed: [OSC-6-FOUNDATION-RUNTIME-B1, OSC-6-FOUNDATION-RUNTIME-B2, OSC-6-FOUNDATION-RUNTIME-H1, OSC-6-FOUNDATION-RUNTIME-H2, OSC-6-FOUNDATION-RUNTIME-H3]
+    changed_files:
+      - path: src/datadiff_osc/runtime/_producer_provenance.py
+        before_sha256: 74130d2eee419b106253e765f33a49f2cbda51dad23eab81ff70f50a06ca5a30
+        after_sha256: e49dc7655a10b9f705a89062ff62db61049b6f689eb34ddc9819122926575d3a
+      - path: src/datadiff_osc/runtime/_receipt_producers.py
+        before_sha256: 5d892ce1a8186d005067ae110439dcf47144c51f95c77274cfe3b6ff9f31d711
+        after_sha256: 2525652d88f08c1407d8836c502ff35c1a0cc803a2b23d22c91e0187120214e4
+      - path: tests/osc/test_runtime_producer_provenance.py
+        before_sha256: aecccb8441340715a03ec9842e890a02fd9a24ca064d791faf6afedfd612ab18
+        after_sha256: c9f9a738573c4709b3ac5db68b39cfa2e5ede826958de3b179933607c093bd31
+      - path: tests/osc/test_runtime_receipt_producers.py
+        before_sha256: 802c55fb456e01a99750910137d4480790acdea41177df0aa7640f554e0c9e1e
+        after_sha256: 99634e6e28d5b6c3135ed2c4d619b2b5cdf19c7daf677cfce2998ec5c0e34fe2
+    owner_test:
+      command: PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+      result: 36 passed in 0.30s
+      exit_code: 0
+    implementation_summary:
+      - provenance schema v2 binds exact per-record policy, independently frozen SHAs, raw parents and canonical real typed replay
+      - paired metrics derive only from typed raw monotonic intervals/counters and exact shared task/result/outcome context
+      - candidate states require state-specific reproduction and disjoint typed campaign/pipeline rechecks
+      - installed/latest versions derive from strict raw metadata and frozen public JSON
+      - repository outcomes derive from strict JUnit/log/exit agreement
+    deviations: []
+root_verification:
+  combined_scoped:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q
+      -p no:cacheprovider tests/osc/test_contract_phase6_corpora.py
+      tests/osc/test_search_lane_registry.py
+      tests/osc/test_search_context_receipts.py
+      tests/osc/test_search_gate_crosswalk.py
+      tests/osc/test_runtime_producer_provenance.py
+      tests/osc/test_runtime_receipt_producers.py
+    result: 82 passed in 7.69s
+    exit_code: 0
+  original_counterexamples_now_rejected_by:
+    - test_all_nine_confirmed_verdict_and_signature_substitutions_reject
+    - test_structural_review_never_becomes_independent_approval
+    - test_all_source_only_mutants_and_cross_mutant_swaps_reject
+    - Search duplicate, run-lineage, mutation-swap and focus-source negative parameterizations
+    - test_category_relabel_cannot_escape_exact_record_policy
+    - test_stable_survivor_zero_or_insufficient_reproduction_rejects
+    - test_paired_seed_context_task_result_and_non_ok_swaps_reject
+  forbidden_sha_checks:
+    public_api_freeze: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    root_gate_authority: 03b6ef9323f38fee8cb9daafffd2a309818953fbc78fa2ae0cd2c99b1503bbd7
+    shared_replay_support: 6f52a8836288cb0e7578c984a8f0c3c26661a17d648050912c07a54515192dc1
+    contract_semantic_replay: f7289bfe133611b50b14676697d3ef97c02e5f77162ad0cdf9fb9e11b654c615
+    search_semantic_replay: af65bd9f1f06a3a2555b33dd2c38d574ed03d0ab70ed5dcee035099e3364b28b
+    runtime_semantic_replay: 0b5ec02b247d718d4258dada0fb59493081f258cc1e49913c1d294c7c9e062b9
+    runtime_gates: c6051320db1583b83972cd05d0b776cb0d39c472f139ec01cd04471ef9df7c4e
+    legacy_strategy_registry: dfba85d3cefb93c9b8732748f15a80987887eb6886d5f91f84f5be924dd29cec
+  changed_paths_within_allowlists: true
+  child_agents: 0
+  staged_paths: 0
+  git_diff_check: clean_for_declared_paths
+authority_boundaries:
+  - all foundation types remain private and unexported
+  - exact missing context remains context-required, not_evaluated, MISSING_INPUT or rejected
+  - no diagnostic ref participates in admission, evidence, coverage, candidate, bug, gate or authorization
+  - candidate remains candidate and bug_claimed remains false
+  - no Root integration or Phase-6 hard gate is authorized by this implementation report
+decision:
+  implementation_round_complete: true
+  rotated_exact_sha_review_required: true
+  foundation_barrier_passed: false
+  tests_osc_authorized: false
+  full_repository_tests_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_entry_authorized: false
+  twenty_four_hour_run_authorized: false

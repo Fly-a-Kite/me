@@ -16,6 +16,7 @@ from datadiff.synthesis.typed_state import (
     TypedProgramState,
     compatible_join_key_pairs,
 )
+from datadiff.reproducibility import canonical_candidates
 from datadiff.util import unique_preserve_order
 
 
@@ -104,7 +105,7 @@ def _adaptive_step_weights(
 
 
 def _gen_filter(rnd: random.Random, state: TypedProgramState, context: SynthesisContext) -> dict[str, Any]:
-    column = rnd.choice(list(state.comparable))
+    column = rnd.choice(canonical_candidates(state.comparable))
     column_type = state.column_types.get(column, "int")
     if column in state.nullable_columns and rnd.random() < 0.20:
         return {"op": "filter", "column": column, "cmp": rnd.choice(["is_null", "is_not_null"]), "value": None}
@@ -132,23 +133,28 @@ def _gen_filter(rnd: random.Random, state: TypedProgramState, context: Synthesis
 
 
 def _gen_drop_nulls(rnd: random.Random, state: TypedProgramState, context: SynthesisContext) -> dict[str, Any]:
-    columns = list(state.nullable_columns & state.available) or list(state.columns)
+    columns = canonical_candidates(state.nullable_columns & state.available) or canonical_candidates(state.columns)
     width = rnd.randint(1, min(3, len(columns)))
     return {"op": "drop_nulls", "columns": sorted(rnd.sample(columns, width))}
 
 
 def _gen_select(rnd: random.Random, state: TypedProgramState, context: SynthesisContext) -> dict[str, Any]:
-    width = rnd.randint(1, len(state.columns))
-    return {"op": "select", "columns": sorted(rnd.sample(list(state.columns), width))}
+    columns = canonical_candidates(state.columns)
+    width = rnd.randint(1, len(columns))
+    return {"op": "select", "columns": sorted(rnd.sample(columns, width))}
 
 
 def _gen_distinct(rnd: random.Random, state: TypedProgramState, context: SynthesisContext) -> dict[str, Any]:
-    width = rnd.randint(1, min(3, len(state.columns)))
-    return {"op": "distinct", "columns": sorted(rnd.sample(list(state.columns), width))}
+    columns = canonical_candidates(state.columns)
+    width = rnd.randint(1, min(3, len(columns)))
+    return {"op": "distinct", "columns": sorted(rnd.sample(columns, width))}
 
 
 def _gen_fill_null(rnd: random.Random, state: TypedProgramState, context: SynthesisContext) -> dict[str, Any]:
-    column = rnd.choice(list(state.nullable_columns & state.available) or list(state.columns))
+    column = rnd.choice(
+        canonical_candidates(state.nullable_columns & state.available)
+        or canonical_candidates(state.columns)
+    )
     return {"op": "fill_null", "column": column, "value": _literal_for_type(rnd, state.column_types.get(column, "int"))}
 
 
@@ -168,7 +174,7 @@ def _gen_coalesce(rnd: random.Random, state: TypedProgramState, context: Synthes
 
 
 def _gen_case_when(rnd: random.Random, state: TypedProgramState, context: SynthesisContext) -> dict[str, Any]:
-    column = rnd.choice(list(state.comparable))
+    column = rnd.choice(canonical_candidates(state.comparable))
     column_type = state.column_types.get(column, "int")
     cmp = rnd.choice(["==", "!="] if column_type in {"str", "bool"} else [">", ">=", "<", "<=", "==", "!="])
     if column in state.nullable_columns and rnd.random() < 0.25:
@@ -201,7 +207,7 @@ def _gen_mutate(rnd: random.Random, state: TypedProgramState, context: Synthesis
         choices.append("bool_not")
     kind = rnd.choice(choices)
     if kind == "arith_const":
-        source = rnd.choice(list(state.numeric))
+        source = rnd.choice(canonical_candidates(state.numeric))
         expr = {
             "kind": "arith_const",
             "source": source,
@@ -209,26 +215,26 @@ def _gen_mutate(rnd: random.Random, state: TypedProgramState, context: Synthesis
             "value": rnd.choice([2, 3, 5, 10]),
         }
     elif kind == "abs":
-        expr = {"kind": "abs", "source": rnd.choice(list(state.numeric))}
+        expr = {"kind": "abs", "source": rnd.choice(canonical_candidates(state.numeric))}
     elif kind == "cast_float":
-        expr = {"kind": "cast", "source": rnd.choice(list(state.numeric)), "to": "float"}
+        expr = {"kind": "cast", "source": rnd.choice(canonical_candidates(state.numeric)), "to": "float"}
     elif kind == "cast_string":
-        expr = {"kind": "cast", "source": rnd.choice(list(state.numeric)), "to": "str"}
+        expr = {"kind": "cast", "source": rnd.choice(canonical_candidates(state.numeric)), "to": "str"}
     elif kind == "string_length":
-        expr = {"kind": "string_length", "source": rnd.choice(list(state.strings))}
+        expr = {"kind": "string_length", "source": rnd.choice(canonical_candidates(state.strings))}
     elif kind == "string_lower":
-        expr = {"kind": "string_lower", "source": rnd.choice(list(state.strings))}
+        expr = {"kind": "string_lower", "source": rnd.choice(canonical_candidates(state.strings))}
     elif kind == "string_upper":
-        expr = {"kind": "string_upper", "source": rnd.choice(list(state.strings))}
+        expr = {"kind": "string_upper", "source": rnd.choice(canonical_candidates(state.strings))}
     elif kind == "string_contains":
-        expr = {"kind": "string_contains", "source": rnd.choice(list(state.strings)), "needle": rnd.choice(["a", "A", "0"])}
+        expr = {"kind": "string_contains", "source": rnd.choice(canonical_candidates(state.strings)), "needle": rnd.choice(["a", "A", "0"])}
     else:
-        expr = {"kind": "bool_not", "source": rnd.choice(list(state.booleans))}
+        expr = {"kind": "bool_not", "source": rnd.choice(canonical_candidates(state.booleans))}
     return {"op": "mutate", "column": _safe_alias("m", str(len(state.operations_so_far)), state), "expr": expr}
 
 
 def _gen_sort(rnd: random.Random, state: TypedProgramState, context: SynthesisContext) -> dict[str, Any]:
-    columns = list(state.comparable or state.columns)
+    columns = canonical_candidates(state.comparable or state.columns)
     first = rnd.choice(columns)
     width = rnd.randint(1, min(3, len(columns)))
     selected = unique_preserve_order([first, *rnd.sample([column for column in columns if column != first], max(0, width - 1))])
@@ -254,9 +260,11 @@ def _can_groupby(state: TypedProgramState) -> bool:
 
 
 def _gen_groupby(rnd: random.Random, state: TypedProgramState, context: SynthesisContext) -> dict[str, Any]:
-    key_candidates = [column for column in state.columns if state.column_types.get(column) in {"int", "str", "bool"}]
-    keys = sorted(rnd.sample(key_candidates or list(state.columns), 1))
-    aggregate_candidates = list(state.numeric or state.booleans)
+    key_candidates = canonical_candidates(
+        column for column in state.columns if state.column_types.get(column) in {"int", "str", "bool"}
+    )
+    keys = sorted(rnd.sample(key_candidates or canonical_candidates(state.columns), 1))
+    aggregate_candidates = canonical_candidates(state.numeric or state.booleans)
     width = rnd.randint(1, min(3, len(aggregate_candidates)))
     used_aliases = set(keys)
     aggs: list[dict[str, Any]] = []
@@ -272,8 +280,8 @@ def _gen_groupby(rnd: random.Random, state: TypedProgramState, context: Synthesi
 
 
 def _gen_join(rnd: random.Random, state: TypedProgramState, context: SynthesisContext) -> dict[str, Any]:
-    table = rnd.choice(list(state.compatible_join_tables()))
-    pairs = list(compatible_join_key_pairs(state, table))
+    table = rnd.choice(canonical_candidates(state.compatible_join_tables(), key=lambda value: value.name))
+    pairs = canonical_candidates(compatible_join_key_pairs(state, table))
     left, right = rnd.choice(pairs)
     return {
         "op": "join",
@@ -290,7 +298,11 @@ def _same_type_column_groups(state: TypedProgramState) -> list[tuple[str, list[s
         column_type = state.column_types.get(column)
         if column_type:
             groups.setdefault(column_type, []).append(column)
-    return [(column_type, columns) for column_type, columns in groups.items() if len(columns) >= 2]
+    return [
+        (column_type, canonical_candidates(columns))
+        for column_type, columns in sorted(groups.items())
+        if len(columns) >= 2
+    ]
 
 
 def _safe_alias(prefix: str, suffix: str, state: TypedProgramState) -> str:

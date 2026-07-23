@@ -1,0 +1,111 @@
+schema_version: osc-phase6-read-only-audit-findings-v1
+phase: 6
+overall_status: blocked_before_long_gate_execution
+phase6_exit_gate_passed: false
+phase7_paired_pilot_authorized: false
+twenty_four_hour_run_authorized: false
+audits:
+  - task_id: OSC-6-CONTRACT-AUDIT
+    agent: /root/phase5_authority_audit
+    status: complete_blocked
+    changed_files: []
+    forbidden_paths_modified: []
+    bounded_validation:
+      - 28 contract/control-plane tests passed in 2.32s
+      - canonical v2 corpus structurally valid with 9 confirmed roots
+      - 100-group parity smoke had zero discrepancies but was not Phase6 eligible
+  - task_id: OSC-6-GRANULARITY-AUDIT
+    agent: /root/phase5_consumer_audit
+    status: complete_blocked
+    changed_files: []
+    forbidden_paths_modified: []
+    bounded_validation:
+      - declaration/compiler count micro-smoke recomputed 16/232, 9/144, 384 and 502
+      - dimensions independently recomputed as 21/21/8/7/18
+      - two targeted registry/compiler tests passed
+  - task_id: OSC-6-RUNTIME-AUDIT
+    agent: /root/phase5_evidence_audit
+    status: complete_blocked_with_reviewed_ignored_cache_deviation
+    changed_files:
+      - src/datadiff/__pycache__/candidate_pipeline.cpython-312.pyc
+      - src/datadiff/__pycache__/discovery_runtime.cpython-312.pyc
+      - src/datadiff/__pycache__/run_summaries.cpython-312.pyc
+      - src/datadiff/__pycache__/runner.cpython-312.pyc
+      - src/datadiff_osc/__pycache__/_phase6_gate_authority.cpython-312.pyc
+    forbidden_paths_modified:
+      - five pre-existing git-ignored bytecode caches refreshed by help commands
+    root_deviation_review:
+      git_check_ignore: all_five_match_.gitignore___pycache__
+      git_visible_status_entries: 0
+      source_or_coordination_changes: 0
+      disposition: reviewed_not_integrated_not_deleted_not_reverted
+findings:
+  - id: OSC-6-C-B1
+    severity: blocker
+    owner: root
+    claim: no approved frozen false-positive corpus or reproducible identity denominator
+  - id: OSC-6-C-B2
+    severity: blocker
+    owner: root
+    claim: verify_artifact_receipt_index unconditionally rejects every receipt index pending Phase6 semantic replay
+    evidence: src/datadiff_osc/_phase6_gate_authority.py:verify_artifact_receipt_index
+  - id: OSC-6-C-B3
+    severity: blocker
+    owner: root_contract
+    claim: no non-test contract_exact_replay producer for 9-root, 32-mutant, 100000 parity or paired performance evidence
+  - id: OSC-6-C-B4
+    severity: blocker
+    owner: root
+    claim: the frozen 41-gate set does not cover every normative Contract/Search performance and resource hard gate
+  - id: OSC-6-G-B1
+    severity: blocker
+    owner: root_search
+    claim: no real-adapter 232/384/502 observation, fresh-seed, mutation, focus, dimension or search-performance producer
+  - id: OSC-6-G-B2
+    severity: blocker
+    owner: root
+    claim: formal lane and focus denominators are caller-authored dynamic-plan sections rather than an independently frozen 11-lane registry
+  - id: OSC-6-G-B3
+    severity: blocker
+    owner: root
+    claim: DEFAULT_DISCOVERY_LANE_IDS has 9 entries while the formal Phase6 rotation requires an independently frozen 11-lane universe
+  - id: OSC-6-R-B1
+    severity: blocker
+    owner: root_runtime
+    claim: existing worker invariance and scaling scripts explicitly emit synthetic, Phase6-ineligible evidence
+  - id: OSC-6-R-B2
+    severity: blocker
+    owner: root_runtime
+    claim: no actual OSC typed 22-run/2200-case runner or V3RunReceipt producer exists
+  - id: OSC-6-R-B3
+    severity: blocker
+    owner: root_runtime
+    claim: source snapshot, complete dynamic plan, typed receipt index, raw artifacts and artifact-manifest producers are absent
+  - id: OSC-6-R-B4
+    severity: blocker
+    owner: root_runtime
+    claim: required private RepositoryTestReceipt, TargetVersionReceipt, CandidateClassificationReceipt and PairedBenchmarkReceipt types/producers are absent
+  - id: OSC-6-H1
+    severity: high
+    owner: root
+    claim: planned performance sample identities are not cross-bound to scalar raw metric series
+  - id: OSC-6-H2
+    severity: high
+    owner: root_runtime
+    claim: candidate-pipeline default rechecks are 2; Phase6 requires an explicit 3/3 campaign and 3/3 pipeline plan
+  - id: OSC-6-H3
+    severity: high
+    owner: root
+    claim: blanket rejection of the word synthetic conflicts with the normative allowance for a frozen synthetic/real 100000-group parity corpus
+safe_partial_results:
+  static_counts: [16, 232, 9, 144, 384, 502]
+  dimension_counts: [21, 21, 8, 7, 18]
+  latest_target_versions_match_todo: true
+  public_api_freeze_changed: false
+  long_gate_executed: false
+  pilot_or_campaign_started: false
+decision:
+  status: bounded_implementation_change_request_required
+  reason: running long gates now would create diagnostic-only evidence that cannot enter authority
+  next_gate: semantic_replay_and_private_receipt_types
+

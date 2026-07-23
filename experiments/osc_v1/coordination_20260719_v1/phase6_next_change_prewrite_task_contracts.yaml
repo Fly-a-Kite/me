@@ -1,0 +1,103 @@
+schema_version: osc-task-contract-v1
+phase: 6
+mode: three_parallel_zero_write_prewrite_designs
+execution_policy:
+  direct_agent_count: 3
+  grandchildren_allowed: false
+  writes_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_paired_pilot_authorized: false
+  twenty_four_hour_run_authorized: false
+entry_barrier:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_cr001_exit_barrier.yaml
+  sha256: e6f16e5281a24b62d30640c3ba4fd4b96cbe1ac275ab4841175ff24b7c2965b0
+shared_requirements:
+  - fully read the runbook and architecture specifications relevant to the assigned domain
+  - verify every proposed input by path and SHA-256; conversation summaries are non-authoritative
+  - distinguish existing authoritative data, diagnostic data, historical data and missing data
+  - propose exact non-overlapping implementation paths, interfaces, tests and serial barriers
+  - do not invent corpus identities, coverage, receipts, evidence, provenance or authority
+  - retain candidate as candidate and never create confirmed-bug authority
+  - do not change public exports or public_api_freeze.json
+tasks:
+  - task_id: OSC-6-CR002-PREWRITE
+    change_request: CR-OSC-6-002
+    agent: /root/phase5_authority_audit
+    role: contract_corpus_and_exact_producers
+    mode: read_only_prewrite
+    objective: Design an independently frozen 9-root, false-positive, 32-mutant, staged-parity and paired-performance corpus/producer chain with exact dynamic-record cross-binding.
+    required_inputs:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_audit_findings.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_exit_barrier.yaml
+      - experiments/canonical_confirmed_bug_corpus/v2/manifest.json
+      - src/datadiff_osc/contract_engine/**
+      - scripts/osc/**
+      - tests/osc/test_contract_*.py
+    allowed_write_paths: []
+    forbidden_write_paths: ["**"]
+    required_analysis:
+      - identify the exact authoritative source for all 9 confirmed roots and exclude pending cases
+      - search for an independently existing false-positive corpus; if absent, report the blocker and a non-fabricating collection protocol
+      - derive the exact 32 mutant identities from source and define kill-witness bindings
+      - define staged ResultGroup, contract-fingerprint, endpoint-set and exact-task cross-bindings
+      - define raw paired performance sample bindings and every missing normative Contract performance gate
+      - propose exact producer schemas, private paths, tests, resource estimates and serial dependencies
+    output: runbook section-12 message report with no repository writes
+
+  - task_id: OSC-6-CR003A-PREWRITE
+    change_request: CR-OSC-6-003A
+    agent: /root/phase5_consumer_audit
+    role: frozen_lane_focus_registry_and_granularity_context
+    mode: read_only_prewrite
+    objective: Design a declaration-derived authoritative 11-lane/focus registry and exact Search context receipts without trusting caller-authored dynamic-plan identities.
+    required_inputs:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_audit_findings.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_exit_barrier.yaml
+      - experiments/yield_gate_v3_post_triage/manifest.json
+      - src/datadiff/discovery_profiles.py
+      - src/datadiff_osc/semantic_targets/**
+      - src/datadiff_osc/generation/**
+      - src/datadiff_osc/search/**
+      - tests/osc/test_search_*.py
+    allowed_write_paths: []
+    forbidden_write_paths: ["**"]
+    required_analysis:
+      - independently rederive the exact formal 11 lane identities and every focus signal from executable declarations, not merely from the historic manifest
+      - reconcile DEFAULT_DISCOVERY_LANE_IDS with the formal universe without changing unrelated legacy defaults
+      - design private scheduled-attempt, mutation-attempt, observation, lane and focus receipt/context bindings
+      - map every 232/384/502, activation, reachability, mutation, dimension and Search performance criterion to an exact producer and raw metric
+      - enumerate missing normative gate specs and propose frozen thresholds without lowering the runbook
+      - propose exact paths, tests, resource estimates and serial dependencies
+    output: runbook section-12 message report with no repository writes
+
+  - task_id: OSC-6-CR004-PREWRITE
+    change_request: CR-OSC-6-004
+    agent: /root/phase5_evidence_audit
+    role: real_runtime_producers_and_provenance
+    mode: read_only_prewrite
+    objective: Design the real execution producer chain from preregistered protocol through source snapshot, typed receipts, raw artifacts and authority manifest, including the 22-run/2200-case bridge.
+    required_inputs:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_audit_findings.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_cr001_exit_barrier.yaml
+      - experiments/final_bug_discovery_protocol_v3/TODO.md
+      - src/datadiff_osc/runtime/**
+      - src/datadiff_osc/parallel/**
+      - scripts/osc/**
+      - src/datadiff/candidate_pipeline.py
+      - src/datadiff/discovery_runtime.py
+      - tests/osc/test_runtime_*.py
+    allowed_write_paths: []
+    forbidden_write_paths: ["**"]
+    required_analysis:
+      - define explicit real-producer provenance that does not depend on a synthetic word scan
+      - define source snapshot, complete dynamic plan, typed receipt index, raw artifacts and manifest cross-bindings
+      - design the actual OSC 22-run/2200-case runner and V3RunReceipt producer with zero-failure status checks
+      - define RepositoryTestReceipt, TargetVersionReceipt, CandidateClassificationReceipt and PairedBenchmarkReceipt producers
+      - require explicit campaign 3/3 and pipeline 3/3 rechecks while candidate remains non-bug
+      - propose exact paths, tests, resource limits, serial barriers and commands; no execution yet
+    output: runbook section-12 message report with no repository writes
+stop_conditions:
+  - a required authority corpus or provenance source does not exist
+  - public API or frozen threshold change appears necessary
+  - any proposed action would execute 100000 parity, 2200 cases, a pilot, 2h or 24h

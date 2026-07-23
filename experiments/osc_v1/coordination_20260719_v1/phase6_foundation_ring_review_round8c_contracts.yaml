@@ -1,0 +1,203 @@
+schema_version: osc-ring-review-contract-set-v1
+phase: 6
+round: private_foundation_remediation_exact_sha_ring_review_r8c
+status: authority_finalized_ready_for_immediate_dispatch_three_reused_direct_read_only_reviewer_slots
+retry_of: private_foundation_remediation_exact_sha_ring_review_r8b
+purpose: >-
+  Fresh R8B retry authority after R8B's one-time Runtime terminal evidence was unrecoverable and
+  Search/Contract reports were absent due external agent capacity errors. R8B remains immutable;
+  this contract has an entirely new exactly-once test allowance. No product remediation is authorized.
+entry_authority:
+  r5_remediation_contract: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round5_task_contracts.yaml, sha256: 706ddd532c0bd756d93340d7c2dc87f662b8330fd88725a9ce22b81a344eb7cf}
+  r5_remediation_report: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round5_reports.yaml, sha256: f4f67ed4c3359c7d7f6013f91dbb9594da65d2579fdf3bf5c9876da9ed2ca3fa}
+  r5_review_contract: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_contracts.yaml, sha256: c1e70ee5663173294545b4c8966d138debb718238b6da2a9c68001ad5680f5fa}
+  r5_review_report: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round5_reports.yaml, sha256: 1bc36fd45b4349dff67438d79afae1c3f753ca3eb08c3dd3c0ce20933c104fbb}
+  r6_review_contract: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_contracts.yaml, sha256: 8ecbe889ba06cedbe4d23eab95f9b0702a051cd70948eee9bf7084845aa84cdd}
+  r6_review_report: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round6_reports.yaml, sha256: 664d151e31f46a5352cd0d649703f8e4d26e0b3dca56b7055e4798d806f1a1a1}
+  r6_search_remediation_contract: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_search_task_contracts.yaml, sha256: 2417a53c91e407e17d0bfb689721c070b8c75a828ce472bc312daa221ac84006}
+  r6_search_remediation_report: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_search_reports.yaml, sha256: ddb0a23cfa2488068b16cf93cefc69993e83296239cfda1049fea5fe853ea003}
+  r6_runtime_remediation_contract: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_runtime_task_contracts.yaml, sha256: 3ea22a3856303f8f2b136d7f853fd2012fe43d0a8218c7c9790da05d40ae7b59}
+  r6_runtime_remediation_report: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round6_runtime_reports.yaml, sha256: 968906715399e57c39b7acabefcdf7405614812cb6b99661416e764764338596}
+  r7_review_contract: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_contracts.yaml, sha256: 7f5111e0d2bb4906b1c037441c7c7aa27843664e30b029807eb9464ceacf7a8d}
+  r7_review_report: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round7_reports.yaml, sha256: 2dc9f31509079969e9ec8240ca8cff983e315eda89994c74918b710203ac25d9}
+  r7_runtime_remediation_contract: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round7_runtime_task_contracts.yaml, sha256: 6438e63dee4f6e92febda6c584d4a6bea83503fa64bd3efb33097039cec6b113}
+  r7_runtime_remediation_report: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round7_runtime_reports.yaml, sha256: 65040f5646216b8dd57c53354ff1903a130c2f9fa3822c5ddd88f9ea876d34a2}
+  r7b_runtime_remediation_contract: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round7b_runtime_task_contracts.yaml, sha256: 02209f714201e42e7fdfa9a793c1e1484be9d76cf95c8b3a26d479d41b1e5212}
+  r7b_runtime_remediation_report: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_remediation_round7b_runtime_reports.yaml, sha256: 140de7b17eda214a53aa6e8f3b8a27b965fe5c88c61bf805e4aa276253c6ca68}
+  r8_review_contract: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_contracts.yaml, sha256: 633ba886b2b9c425f478e3e1d5b4a1bb32e123897199d0cb2a7eb065ff0850dc}
+  r8_review_report: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8_reports.yaml, sha256: ba677869909db8f3663632910f92495ad59e88d70044d6865c5afc30fa404222}
+  r8b_review_contract: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8b_contracts.yaml, sha256: 4a9cc4603e8d4d308831267337bf7d5c04d68772b18576351c15aca51051007c}
+  r8b_review_report: {path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8b_reports.yaml, sha256: 08915a7cd5d4478f1f5ca21f08bf6f7750d6de95e5cca5428b8f83b85d7842ff}
+  coordination_ledger_pre_r8c_registration_snapshot:
+    path: experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    sha256: d5970169faeadc9e2987a44261ac4fda262c909fda7f9e564152e4686822abbd
+    semantic_role: historical_pre_registration_snapshot_only
+    gating: false
+    rule: This historical value must never be compared to the current ledger by a reviewer.
+  coordination_ledger_at_r8c_review_dispatch:
+    path: experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    sha256: 49dcc61818e6f7c50221559f3ba49c1e5e152e0866d808e286af94155514de8d
+    semantic_role: current_review_dispatch_binding
+    gating: true
+    rule: >-
+      This final value is the sole current-ledger comparison; any ledger mutation after contract
+      finalization and before reports return invalidates R8C.
+workspace_pre_contract:
+  head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  staged_paths: 0
+  preservation_rule: >-
+    Existing dirty and untracked work remains user work. No delete, reset, clean, checkout,
+    overwrite, bulk-format, or out-of-contract write is permitted.
+coordination:
+  direct_reviewer_count_required: 3
+  reviewer_slots_reused_from_r7_r8_r8b: true
+  additional_agents_created: 0
+  reviewer_writes_allowed: false
+  reviewer_child_agents_allowed: false
+  grandchildren_allowed: false
+  root_is_not_an_independent_reviewer: true
+  review_language: "负向复核、独立反例验证、异常输入验证"
+  root_authority_write_paths:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_contracts.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_reports.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  no_product_write_authorized: true
+target_sha256:
+  search:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+  runtime:
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+  contract:
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+global_requirements:
+  - >-
+    Each reviewer reads the runbook, project architecture, all listed authority, this contract,
+    and assigned target files to EOF. Verify all authority and assigned target SHA before and
+    after the exactly-once scoped suite; stop on an actual current authority or target mismatch.
+  - >-
+    Reviews are read-only 负向复核、独立反例验证、异常输入验证 only. writes=0,
+    child_agents=0, forbidden_paths_modified=[] are mandatory; no reviewer can delegate.
+  - >-
+    Every Python command uses PYTHONDONTWRITEBYTECODE=1. No directory/full-repo suite,
+    parity-100000, v3-2200, Phase 7, 2h, or 24h command is authorized.
+  - >-
+    Each listed scoped pytest is authorized exactly once under R8C, separate from R8B. Retain
+    the original terminal session to complete exit and full result; if unavailable, do not rerun.
+  - >-
+    No public exports, public freeze, frozen targets, thresholds, denominators, comparator,
+    replay, provenance, admission, or execution authority changes are allowed. Diagnostics stay
+    diagnostic-only; missing context fails closed/not_evaluated; candidate is non-confirmed and
+    bug_claimed=false.
+  - >-
+    No review grants barrier pass, gate credit, candidate confirmation, combined-suite, Phase 7,
+    2h, or 24h authorization. Root aggregation is not an independent reviewer report.
+reviewers:
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8C-A-SEARCH
+    task_title: Search R8C 负向复核、独立反例验证、异常输入验证
+    role: independent_reviewer
+    mode: read_only_exact_sha_negative_review
+    writes: 0
+    child_agents: 0
+    allowed_write_paths: []
+    required_reads_to_eof:
+      - docs/codex_multi_agent_development_runbook.md
+      - docs/project_architecture.md
+      - R5/R6/R7/R7B/R8/R8B authority as listed above
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_contracts.yaml
+      - src/datadiff_osc/search/context_receipts.py
+      - src/datadiff_osc/search/context_replay.py
+      - src/datadiff_osc/search/lane_registry.py
+      - tests/osc/test_search_context_receipts.py
+      - tests/osc/test_search_gate_crosswalk.py
+      - tests/osc/test_search_lane_registry.py
+    required_negative_review_and_regressions:
+      - R5 SeedLineage global rebind rejects stale policy before mutation/SeedLineage calls.
+      - R6 ContextVar default/active cold/warm rebind rejects old receipt before mutation/SeedLineage calls.
+      - mutable/cyclic/unresolved/uninspectable/dynamic/unsupported dependencies fail closed.
+      - R4 globals/defaults/kwdefaults/closure/recursion/Holder.STATE/module.STATE/registry replay and authority boundaries hold.
+    scoped_test:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py
+        tests/osc/test_search_gate_crosswalk.py
+      execution_count: exactly_once
+      complete_terminal_evidence_required: true
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8C-B-RUNTIME
+    task_title: Runtime R8C 负向复核、独立反例验证、异常输入验证
+    role: independent_reviewer
+    mode: read_only_exact_sha_negative_review
+    writes: 0
+    child_agents: 0
+    allowed_write_paths: []
+    required_reads_to_eof:
+      - docs/codex_multi_agent_development_runbook.md
+      - docs/project_architecture.md
+      - R5/R6/R7/R7B/R8/R8B authority as listed above
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_contracts.yaml
+      - src/datadiff_osc/runtime/_receipt_producers.py
+      - src/datadiff_osc/runtime/_producer_provenance.py
+      - tests/osc/test_runtime_receipt_producers.py
+      - tests/osc/test_runtime_producer_provenance.py
+    required_negative_review_and_regressions:
+      - R7-M1 INCONCLUSIVE/SATISFIED × campaign/pipeline typed recheck context precedes source witness error.
+      - R7-M2 forged TypedCaseObservation case_id first raises caller case ID conflicts under INCONCLUSIVE/SATISFIED.
+      - R6 binding/collision/threshold/legal typed candidate/confirmed-caller-diagnostic/malformed coverage remains intact.
+    scoped_test:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_runtime_producer_provenance.py tests/osc/test_runtime_receipt_producers.py
+      execution_count: exactly_once
+      complete_terminal_evidence_required: true
+  - task_id: OSC-6-FOUNDATION-REVIEW-R8C-C-CONTRACT
+    task_title: Contract R8C 冻结负向复核、独立反例验证、异常输入验证
+    role: independent_reviewer
+    mode: read_only_exact_sha_negative_review
+    writes: 0
+    child_agents: 0
+    allowed_write_paths: []
+    required_reads_to_eof:
+      - docs/codex_multi_agent_development_runbook.md
+      - docs/project_architecture.md
+      - R5/R6/R7/R7B/R8/R8B authority as listed above
+      - experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_contracts.yaml
+      - src/datadiff_osc/contract_engine/_phase6_corpora.py
+      - tests/osc/test_contract_phase6_corpora.py
+      - src/datadiff_osc/public_api_freeze.json
+    required_negative_review_and_regressions:
+      - identity/approval/C0/path/resolver/cross-root/compatibility/mutant-pair/predicate/generic-evidence/public/gate/execution authorization negative review.
+      - Contract freeze cannot create public export, gate credit, candidate confirmation, or execution authorization.
+    scoped_test:
+      command: >-
+        PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+        tests/osc/test_contract_phase6_corpora.py
+      execution_count: exactly_once
+      complete_terminal_evidence_required: true
+report_requirements:
+  - exact pre/post authority and assigned-target SHA
+  - exact command, exit code, and complete original terminal result
+  - 负向复核、独立反例验证、异常输入验证 results
+  - findings id, severity, claim, reproduction, violated invariant, required test; counts
+  - writes=0, child_agents=0, forbidden_paths_modified=[]
+root_aggregation_and_combined_suite:
+  report_path: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_reports.yaml
+  combined_allowed_only_if: >-
+    three fresh complete independent reports, blocker=0/high=0/medium=0, reviewer and Root
+    pre/post all-13 SHA exact, and frozen/public SHA exact.
+  combined_command: >-
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+    tests/osc/test_search_lane_registry.py tests/osc/test_search_context_receipts.py
+    tests/osc/test_search_gate_crosswalk.py tests/osc/test_runtime_producer_provenance.py
+    tests/osc/test_runtime_receipt_producers.py tests/osc/test_contract_phase6_corpora.py
+  otherwise: >-
+    Do not run combined suite. Preserve all findings and process gaps; barrier remains pending and
+    another fresh authority is required before any retry or product code change.

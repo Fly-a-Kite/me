@@ -34,4 +34,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+# Tests import a small number of checked-in command helpers as ``scripts.*``.
+# Adding the repository root is the package-level fix that makes ``pytest``
+# and ``python -m pytest`` resolve the same modules from a clean shell.
+pythonpath = [".", "src"]

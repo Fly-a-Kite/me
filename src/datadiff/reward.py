@@ -25,6 +25,7 @@ from datadiff.finding_outcomes import (
     candidate_issue_family_key,
     candidate_issue_family_keys,
     candidate_issue_signatures,
+    evidence_lane_for_row,
     family_key_matches_known_family,
     is_candidate_issue_finding,
     is_false_positive_finding,
@@ -84,6 +85,11 @@ def online_case_reward(
     return reward
 
 
+def evidence_lane_from_row(row: dict[str, Any]) -> str:
+    """Classify accounting lanes before any reward is calculated."""
+    return evidence_lane_for_row(row)
+
+
 def feedback_summary_for_case(
     row: dict[str, Any],
     known_saturated_bug_families: list[str] | tuple[str, ...] | None = None,
@@ -105,9 +111,11 @@ def feedback_summary_for_case(
     else:
         signals = dict(EMPTY_FINDING_REWARD_SIGNALS)
     quality = _quality_oracle_signals(row.get("quality_oracles") or [])
+    evidence_lane = evidence_lane_from_row(row)
     summary = {
         **signals,
         "candidate_source": str(row.get("candidate_source", "generated")),
+        "evidence_lane": evidence_lane,
         "has_finding": bool(findings),
         "is_new_behavior": bool(row.get("is_new_behavior")),
         "raw_signal_new_behavior": bool(row.get("signal_new_behavior", row.get("is_new_behavior"))),
@@ -280,7 +288,10 @@ def source_reward_adjustment_from_summary(summary: dict[str, Any], *, candidate_
     mutation_verdict = str(summary.get("mutation_oracle_verdict", ""))
     feedback_verdict = str(summary.get("feedback_oracle_verdict", ""))
     guidance_verdict = str(summary.get("guidance_oracle_verdict", ""))
-    suppress_positive_signal = _suppress_auxiliary_positive_feedback(summary)
+    suppress_positive_signal = _suppress_auxiliary_positive_feedback(summary) or (
+        str(summary.get("evidence_lane", "fresh"))
+        in {"seeded_sensitivity", "replay", "known_regression"}
+    )
     if candidate_source == "feedback_mutation":
         if mutation_verdict == "productive_mutation" and not suppress_positive_signal:
             adjustment += 0.35
@@ -315,7 +326,10 @@ def guidance_reward_adjustment_from_summary(summary: dict[str, Any]) -> float:
 
 def seed_schedule_delta_from_summary(summary: dict[str, Any]) -> float:
     signal_new_behavior = bool(summary.get("signal_new_behavior", summary.get("is_new_behavior")))
-    suppress_positive_signal = _suppress_auxiliary_positive_feedback(summary)
+    suppress_positive_signal = _suppress_auxiliary_positive_feedback(summary) or (
+        str(summary.get("evidence_lane", "fresh"))
+        in {"seeded_sensitivity", "replay", "known_regression"}
+    )
     discovery_signal = min(1.0, 0.70 * float(summary.get("candidate_bug_count", 0)))
     semantic_signal = min(
         1.0,
@@ -419,8 +433,9 @@ def _quality_oracle_signals(oracles: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _feedback_decision_summary(row: dict[str, Any]) -> dict[str, Any]:
     selection = row.get("feedback_decision", {})
-    if not isinstance(selection, dict):
-        selection = {}
+    if not isinstance(selection, dict) or not selection:
+        legacy_selection = row.get("feedback_selection", {})
+        selection = legacy_selection if isinstance(legacy_selection, dict) else {}
     target_keys = [_canonical_feedback_target_key(item) for item in selection.get("target_keys", []) or []]
     target_keys = [item for item in target_keys if item]
     semantic_family_targets: list[str] = []

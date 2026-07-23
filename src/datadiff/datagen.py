@@ -6,10 +6,14 @@ from typing import Any, Callable, Literal
 
 from .common_api_workflow import COMMON_API_WORKFLOW_TEMPLATES, generate_common_api_workflow_case
 from .discovery_profiles import (
+    datafusion_targeted_rotation_case as _datafusion_targeted_rotation_profile_case,
     deep_probe_rotation_case as _deep_probe_rotation_profile_case,
     discovery_issue_inspired_case as _discovery_issue_inspired_profile_case,
     discovery_no_groupby_issue_inspired_case as _discovery_no_groupby_issue_inspired_profile_case,
     issue_focus_case as _issue_focus_profile_case,
+    orthogonal_stress_rotation_case as _orthogonal_stress_rotation_profile_case,
+    pandas_targeted_rotation_case as _pandas_targeted_rotation_profile_case,
+    polars_targeted_rotation_case as _polars_targeted_rotation_profile_case,
 )
 from .dsl import Case, ColumnSpec, TableData
 from .program_generation import generate_program, repair_operations
@@ -37,6 +41,53 @@ from .profile_generators import (
     generate_large_int_filter_groupby_case,
     generate_set_membership_filter_case,
     generate_pyarrow_groupby_filter_cast_membership_case,
+    generate_case_when_join_key_membership_case,
+    generate_coalesce_union_distinct_type_boundary_case,
+    generate_multi_key_anti_join_null_guard_case,
+    generate_empty_then_union_groupby_case,
+    generate_boolean_coalesce_case_membership_case,
+    generate_numeric_text_cast_membership_aggregation_case,
+    generate_string_token_join_distinct_case,
+    generate_date_part_row_number_union_case,
+    generate_post_groupby_join_global_aggregate_case,
+    generate_distinct_anti_join_case_topk_case,
+    generate_coalesce_row_number_topk_case,
+    generate_union_distinct_anti_running_sum_case,
+    generate_null_case_semi_join_groupby_case,
+    generate_date_string_cast_row_number_case,
+    generate_drop_nulls_coalesce_distinct_join_topk_case,
+    generate_date_part_distinct_offset_case,
+    generate_bool_fill_null_membership_row_number_case,
+    generate_string_numeric_cast_anti_join_aggregate_case,
+    generate_post_aggregate_case_membership_case,
+    generate_multi_key_nullable_membership_window_case,
+    generate_string_empty_pattern_membership_distinct_case,
+    generate_date_cast_union_running_sum_topk_case,
+    generate_coalesce_anti_join_union_topk_case,
+    generate_bool_null_distinct_running_sum_case,
+    generate_date_string_membership_offset_window_case,
+    generate_empty_union_window_aggregate_case,
+    generate_duplicate_key_join_distinct_anti_topk_case,
+    generate_large_int_text_membership_window_case,
+    generate_nested_topk_offset_aggregate_case,
+    generate_union_distinct_empty_string_window_case,
+    generate_multi_key_semi_join_window_aggregate_case,
+    generate_string_contains_anti_join_offset_case,
+    generate_bool_case_distinct_groupby_union_case,
+    generate_left_join_filter_distinct_window_case,
+    generate_cast_groupby_membership_case,
+    generate_null_sort_window_union_case,
+    generate_date_part_membership_distinct_join_case,
+    generate_coalesce_case_anti_join_aggregate_case,
+    generate_string_token_transform_join_window_case,
+    generate_prefix_suffix_bool_membership_case,
+    generate_numeric_clip_division_anti_window_case,
+    generate_bool_not_union_distinct_aggregate_case,
+    generate_outer_join_coalesce_distinct_topk_case,
+    generate_chained_string_cleanup_membership_window_case,
+    generate_cast_date_union_anti_running_case,
+    generate_post_groupby_filter_membership_topk_case,
+    generate_duplicate_key_left_join_window_aggregate_case,
     generate_null_predicate_filter_case,
     generate_boolean_predicate_filter_case,
     generate_post_topk_range_filter_case,
@@ -78,6 +129,12 @@ from .profile_generators import (
     generate_pyarrow_list_flatten_parent_indices_semantics_case,
     generate_polars_rolling_mean_by_null_count_semantics_case,
     generate_csv_long_numeric_roundtrip_case,
+    generate_bitmap_boundary_bool_aggregate_case,
+    generate_vector_boundary_groupby_distinct_case,
+    generate_wide_schema_projection_boundary_case,
+    generate_skewed_join_multiplicity_case,
+    generate_utf8_slice_length_groupby_case,
+    generate_unique_order_window_tiebreak_case,
 )
 from .synthesis.lhs_sampler import SchemaSpec
 from .synthesis.typed_case import build_typed_grammar_case
@@ -94,6 +151,10 @@ GeneratorProfile = Literal[
     "common_api_workflow",
     "issue_focus",
     "deep_probe_rotation",
+    "orthogonal_stress_rotation",
+    "pandas_targeted_rotation",
+    "polars_targeted_rotation",
+    "datafusion_targeted_rotation",
     "null_groupby_topk",
     "null_agg_topk",
     "filter_null_agg_topk",
@@ -117,6 +178,53 @@ GeneratorProfile = Literal[
     "large_int_filter_groupby",
     "set_membership_filter",
     "pyarrow_groupby_filter_cast_membership",
+    "case_when_join_key_membership",
+    "coalesce_union_distinct_type_boundary",
+    "multi_key_anti_join_null_guard",
+    "empty_then_union_groupby",
+    "boolean_coalesce_case_membership",
+    "numeric_text_cast_membership_aggregation",
+    "string_token_join_distinct",
+    "date_part_row_number_union",
+    "post_groupby_join_global_aggregate",
+    "distinct_anti_join_case_topk",
+    "coalesce_row_number_topk",
+    "union_distinct_anti_running_sum",
+    "null_case_semi_join_groupby",
+    "date_string_cast_row_number",
+    "drop_nulls_coalesce_distinct_join_topk",
+    "date_part_distinct_offset",
+    "bool_fill_null_membership_row_number",
+    "string_numeric_cast_anti_join_aggregate",
+    "post_aggregate_case_membership",
+    "multi_key_nullable_membership_window",
+    "string_empty_pattern_membership_distinct",
+    "date_cast_union_running_sum_topk",
+    "coalesce_anti_join_union_topk",
+    "bool_null_distinct_running_sum",
+    "date_string_membership_offset_window",
+    "empty_union_window_aggregate",
+    "duplicate_key_join_distinct_anti_topk",
+    "large_int_text_membership_window",
+    "nested_topk_offset_aggregate",
+    "union_distinct_empty_string_window",
+    "multi_key_semi_join_window_aggregate",
+    "string_contains_anti_join_offset",
+    "bool_case_distinct_groupby_union",
+    "left_join_filter_distinct_window",
+    "cast_groupby_membership",
+    "null_sort_window_union",
+    "date_part_membership_distinct_join",
+    "coalesce_case_anti_join_aggregate",
+    "string_token_transform_join_window",
+    "prefix_suffix_bool_membership",
+    "numeric_clip_division_anti_window",
+    "bool_not_union_distinct_aggregate",
+    "outer_join_coalesce_distinct_topk",
+    "chained_string_cleanup_membership_window",
+    "cast_date_union_anti_running",
+    "post_groupby_filter_membership_topk",
+    "duplicate_key_left_join_window_aggregate",
     "null_predicate_filter",
     "boolean_predicate_filter",
     "post_topk_range_filter",
@@ -158,6 +266,12 @@ GeneratorProfile = Literal[
     "pyarrow_list_flatten_parent_indices_semantics",
     "polars_rolling_mean_by_null_count_semantics",
     "csv_long_numeric_roundtrip",
+    "bitmap_boundary_bool_aggregate",
+    "vector_boundary_groupby_distinct",
+    "wide_schema_projection_boundary",
+    "skewed_join_multiplicity",
+    "utf8_slice_length_groupby",
+    "unique_order_window_tiebreak",
 ]
 
 
@@ -344,8 +458,6 @@ def _augment_join_table_with_primary_compat_columns(primary: TableData, right: T
     return TableData(right.name, [*right.columns, *mirrored], rows)
 
 
-
-
 _TYPE_AWARE_PROFILE_GENERATORS: dict[str, Callable[[int], Case]] | None = None
 _GENERIC_CASE_SUFFIXES = {
     "typed_grammar": "-typed-grammar",
@@ -355,8 +467,28 @@ _GENERIC_CASE_SUFFIXES = {
     "common_api_workflow": "-common-api-workflow",
     "issue_focus": "-issue-focus",
     "deep_probe_rotation": "-deep-probe-rotation",
+    "orthogonal_stress_rotation": "-orthogonal-stress-rotation",
+    "pandas_targeted_rotation": "-pandas-targeted-rotation",
+    "polars_targeted_rotation": "-polars-targeted-rotation",
+    "datafusion_targeted_rotation": "-datafusion-targeted-rotation",
 }
 
+_GENERIC_GENERATOR_PROFILES = (
+    "common",
+    "edge_float",
+    "typed_grammar",
+    "discovery",
+    "discovery_fresh",
+    "discovery_no_groupby",
+    "workflow",
+    "common_api_workflow",
+    "issue_focus",
+    "deep_probe_rotation",
+    "orthogonal_stress_rotation",
+    "pandas_targeted_rotation",
+    "polars_targeted_rotation",
+    "datafusion_targeted_rotation",
+)
 
 def _type_aware_profile_generators() -> dict[str, Callable[[int], Case]]:
     global _TYPE_AWARE_PROFILE_GENERATORS
@@ -385,6 +517,53 @@ def _type_aware_profile_generators() -> dict[str, Callable[[int], Case]]:
             "large_int_filter_groupby": generate_large_int_filter_groupby_case,
             "set_membership_filter": generate_set_membership_filter_case,
             "pyarrow_groupby_filter_cast_membership": generate_pyarrow_groupby_filter_cast_membership_case,
+            "case_when_join_key_membership": generate_case_when_join_key_membership_case,
+            "coalesce_union_distinct_type_boundary": generate_coalesce_union_distinct_type_boundary_case,
+            "multi_key_anti_join_null_guard": generate_multi_key_anti_join_null_guard_case,
+            "empty_then_union_groupby": generate_empty_then_union_groupby_case,
+            "boolean_coalesce_case_membership": generate_boolean_coalesce_case_membership_case,
+            "numeric_text_cast_membership_aggregation": generate_numeric_text_cast_membership_aggregation_case,
+            "string_token_join_distinct": generate_string_token_join_distinct_case,
+            "date_part_row_number_union": generate_date_part_row_number_union_case,
+            "post_groupby_join_global_aggregate": generate_post_groupby_join_global_aggregate_case,
+            "distinct_anti_join_case_topk": generate_distinct_anti_join_case_topk_case,
+            "coalesce_row_number_topk": generate_coalesce_row_number_topk_case,
+            "union_distinct_anti_running_sum": generate_union_distinct_anti_running_sum_case,
+            "null_case_semi_join_groupby": generate_null_case_semi_join_groupby_case,
+            "date_string_cast_row_number": generate_date_string_cast_row_number_case,
+            "drop_nulls_coalesce_distinct_join_topk": generate_drop_nulls_coalesce_distinct_join_topk_case,
+            "date_part_distinct_offset": generate_date_part_distinct_offset_case,
+            "bool_fill_null_membership_row_number": generate_bool_fill_null_membership_row_number_case,
+            "string_numeric_cast_anti_join_aggregate": generate_string_numeric_cast_anti_join_aggregate_case,
+            "post_aggregate_case_membership": generate_post_aggregate_case_membership_case,
+            "multi_key_nullable_membership_window": generate_multi_key_nullable_membership_window_case,
+            "string_empty_pattern_membership_distinct": generate_string_empty_pattern_membership_distinct_case,
+            "date_cast_union_running_sum_topk": generate_date_cast_union_running_sum_topk_case,
+            "coalesce_anti_join_union_topk": generate_coalesce_anti_join_union_topk_case,
+            "bool_null_distinct_running_sum": generate_bool_null_distinct_running_sum_case,
+            "date_string_membership_offset_window": generate_date_string_membership_offset_window_case,
+            "empty_union_window_aggregate": generate_empty_union_window_aggregate_case,
+            "duplicate_key_join_distinct_anti_topk": generate_duplicate_key_join_distinct_anti_topk_case,
+            "large_int_text_membership_window": generate_large_int_text_membership_window_case,
+            "nested_topk_offset_aggregate": generate_nested_topk_offset_aggregate_case,
+            "union_distinct_empty_string_window": generate_union_distinct_empty_string_window_case,
+            "multi_key_semi_join_window_aggregate": generate_multi_key_semi_join_window_aggregate_case,
+            "string_contains_anti_join_offset": generate_string_contains_anti_join_offset_case,
+            "bool_case_distinct_groupby_union": generate_bool_case_distinct_groupby_union_case,
+            "left_join_filter_distinct_window": generate_left_join_filter_distinct_window_case,
+            "cast_groupby_membership": generate_cast_groupby_membership_case,
+            "null_sort_window_union": generate_null_sort_window_union_case,
+            "date_part_membership_distinct_join": generate_date_part_membership_distinct_join_case,
+            "coalesce_case_anti_join_aggregate": generate_coalesce_case_anti_join_aggregate_case,
+            "string_token_transform_join_window": generate_string_token_transform_join_window_case,
+            "prefix_suffix_bool_membership": generate_prefix_suffix_bool_membership_case,
+            "numeric_clip_division_anti_window": generate_numeric_clip_division_anti_window_case,
+            "bool_not_union_distinct_aggregate": generate_bool_not_union_distinct_aggregate_case,
+            "outer_join_coalesce_distinct_topk": generate_outer_join_coalesce_distinct_topk_case,
+            "chained_string_cleanup_membership_window": generate_chained_string_cleanup_membership_window_case,
+            "cast_date_union_anti_running": generate_cast_date_union_anti_running_case,
+            "post_groupby_filter_membership_topk": generate_post_groupby_filter_membership_topk_case,
+            "duplicate_key_left_join_window_aggregate": generate_duplicate_key_left_join_window_aggregate_case,
             "null_predicate_filter": generate_null_predicate_filter_case,
             "boolean_predicate_filter": generate_boolean_predicate_filter_case,
             "post_topk_range_filter": generate_post_topk_range_filter_case,
@@ -428,13 +607,34 @@ def _type_aware_profile_generators() -> dict[str, Callable[[int], Case]]:
             "pyarrow_list_flatten_parent_indices_semantics": generate_pyarrow_list_flatten_parent_indices_semantics_case,
             "polars_rolling_mean_by_null_count_semantics": generate_polars_rolling_mean_by_null_count_semantics_case,
             "csv_long_numeric_roundtrip": generate_csv_long_numeric_roundtrip_case,
+            "bitmap_boundary_bool_aggregate": generate_bitmap_boundary_bool_aggregate_case,
+            "vector_boundary_groupby_distinct": generate_vector_boundary_groupby_distinct_case,
+            "wide_schema_projection_boundary": generate_wide_schema_projection_boundary_case,
+            "skewed_join_multiplicity": generate_skewed_join_multiplicity_case,
+            "utf8_slice_length_groupby": generate_utf8_slice_length_groupby_case,
+            "unique_order_window_tiebreak": generate_unique_order_window_tiebreak_case,
             "workflow": generate_workflow_case,
             "common_api_workflow": generate_common_api_workflow_case,
             "deep_probe_rotation": _deep_probe_rotation_case,
+            "orthogonal_stress_rotation": _orthogonal_stress_rotation_case,
+            "pandas_targeted_rotation": _pandas_targeted_rotation_case,
+            "polars_targeted_rotation": _polars_targeted_rotation_case,
+            "datafusion_targeted_rotation": _datafusion_targeted_rotation_case,
             "issue_focus": _issue_focus_case,
         }
     return _TYPE_AWARE_PROFILE_GENERATORS
 
+def available_generator_profiles() -> tuple[str, ...]:
+    """Return every deterministic profile accepted by the type-aware generator."""
+
+    return tuple(
+        sorted(
+            {
+                *_GENERIC_GENERATOR_PROFILES,
+                *_type_aware_profile_generators(),
+            }
+        )
+    )
 
 def _profile_dispatch_case(seed: int, profile: str, *, type_aware: bool) -> Case | None:
     if not type_aware:
@@ -448,10 +648,8 @@ def _profile_dispatch_case(seed: int, profile: str, *, type_aware: bool) -> Case
     generator = _type_aware_profile_generators().get(profile)
     return generator(seed) if generator is not None else None
 
-
 def _generic_case_suffix(profile: str) -> str:
     return _GENERIC_CASE_SUFFIXES.get(profile, "")
-
 
 def generate_case(
     seed: int,
@@ -513,13 +711,35 @@ def generate_case(
         metadata=metadata,
     )
 
-
 def _deep_probe_rotation_case(seed: int) -> Case:
     return _deep_probe_rotation_profile_case(
         seed,
         generate_profile_case=lambda case_seed, profile: generate_case(case_seed, profile=profile),  # type: ignore[arg-type]
     )
 
+def _orthogonal_stress_rotation_case(seed: int) -> Case:
+    return _orthogonal_stress_rotation_profile_case(
+        seed,
+        generate_profile_case=lambda case_seed, profile: generate_case(case_seed, profile=profile),  # type: ignore[arg-type]
+    )
+
+def _pandas_targeted_rotation_case(seed: int) -> Case:
+    return _pandas_targeted_rotation_profile_case(
+        seed,
+        generate_profile_case=lambda case_seed, profile: generate_case(case_seed, profile=profile),  # type: ignore[arg-type]
+    )
+
+def _polars_targeted_rotation_case(seed: int) -> Case:
+    return _polars_targeted_rotation_profile_case(
+        seed,
+        generate_profile_case=lambda case_seed, profile: generate_case(case_seed, profile=profile),  # type: ignore[arg-type]
+    )
+
+def _datafusion_targeted_rotation_case(seed: int) -> Case:
+    return _datafusion_targeted_rotation_profile_case(
+        seed,
+        generate_profile_case=lambda case_seed, profile: generate_case(case_seed, profile=profile),  # type: ignore[arg-type]
+    )
 
 def _issue_focus_case(seed: int) -> Case:
     return _issue_focus_profile_case(
@@ -528,13 +748,11 @@ def _issue_focus_case(seed: int) -> Case:
         profile_generators=_type_aware_profile_generators(),
     )
 
-
 def _discovery_issue_inspired_case(seed: int) -> Case | None:
     return _discovery_issue_inspired_profile_case(
         seed,
         profile_generators=_type_aware_profile_generators(),
     )
-
 
 def _discovery_no_groupby_issue_inspired_case(seed: int) -> Case | None:
     return _discovery_no_groupby_issue_inspired_profile_case(

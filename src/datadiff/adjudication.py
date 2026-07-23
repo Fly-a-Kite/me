@@ -37,6 +37,13 @@ _VERDICT_POLICIES: dict[str, dict[str, Any]] = {
         "attribution_gate": "normalizer_or_adapter_fault",
         "needs_manual_review": False,
     },
+    "harness_lowering_error": {
+        **_DEFAULT_POLICY,
+        "validity_gate": "harness_failure",
+        "semantic_gate": "out_of_scope",
+        "attribution_gate": "shared_sql_lowering_fault",
+        "needs_manual_review": False,
+    },
     "documented_semantic_divergence": {
         **_DEFAULT_POLICY,
         "validity_gate": "valid_case",

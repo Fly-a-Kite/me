@@ -58,6 +58,7 @@ from datadiff.operation_semantics import (
     op_table,
     op_value,
 )
+from datadiff.operation_type_semantics import case_when_output_type
 from datadiff.pathing import path_basename
 from datadiff.running import (
     running_sum_partition_columns,
@@ -107,8 +108,8 @@ def _pandas_bool_probe_handlers(pd: Any, op: dict[str, Any]) -> dict[str, Any]:
         "arrow_timestamp_loc_slice_probe": lambda: _pandas_arrow_timestamp_loc_slice_mismatch(pd),
         "arrow_timestamp_index_attr_probe": lambda: _pandas_arrow_timestamp_index_attr_mismatch(pd),
         "eval_inplace_alias_probe": lambda: _pandas_eval_inplace_alias_mismatch(pd),
-        "bool_reduction_skipna_probe": lambda: _pandas_bool_reduction_skipna_mismatch(pd),
-        "arrow_bool_groupby_reduction_probe": lambda: _pandas_arrow_bool_groupby_reduction_mismatch(pd),
+        "bool_reduction_skipna_probe": lambda: _pandas_bool_reduction_skipna_mismatch(pd, op),
+        "arrow_bool_groupby_reduction_probe": lambda: _pandas_arrow_bool_groupby_reduction_mismatch(pd, op),
         "csv_long_numeric_roundtrip_probe": lambda: _pandas_csv_long_numeric_roundtrip_mismatch(pd, op),
     }
 
@@ -124,6 +125,8 @@ class PandasBackend(Backend):
             values = prepared.columns_data[column.name]
             if column.type == "int":
                 data[column.name] = pd.array(values, dtype="Int64")
+            elif column.type == "float":
+                data[column.name] = pd.array(values, dtype="Float64")
             elif column.type == "bool":
                 data[column.name] = pd.array(values, dtype="boolean")
             elif column.type == "str":
@@ -132,13 +135,13 @@ class PandasBackend(Backend):
                 data[column.name] = values
         return pd.DataFrame(data, columns=[c.name for c in prepared.columns])
 
-    def run(
+    def execute_lowered(
         self,
         tables: list[TableData | PreparedTable],
         program: Program,
         timeout_s: float = 5.0,
     ) -> BackendResult:
-        start = time.perf_counter()
+        started_at = time.perf_counter()
         try:
             import pandas as pd  # noqa: F401
             frames = {table.name: self._to_df(table) for table in tables}
@@ -263,12 +266,28 @@ class PandasBackend(Backend):
                         alias = op_output_alias(op)
                         condition_values = _predicate_values(df[condition_column(op)])
                         df = df.copy()
-                        df[alias] = [
+                        values = [
                             case_then_value(op)
                             if evaluate_filter_predicate(value, condition_cmp(op), condition_value(op))
                             else case_else_value(op)
                             for value in condition_values
                         ]
+                        if values:
+                            df[alias] = values
+                        else:
+                            dtype = {
+                                "bool": "boolean",
+                                "float": "float64",
+                                "int": "Int64",
+                                "str": "string",
+                            }.get(
+                                case_when_output_type(
+                                    case_then_value(op),
+                                    case_else_value(op),
+                                ),
+                                "object",
+                            )
+                            df[alias] = pd.Series(index=df.index, dtype=dtype)
                     elif kind == "sort":
                         for key in reversed(normalize_sort_keys(op)):
                             df = df.sort_values(
@@ -305,7 +324,18 @@ class PandasBackend(Backend):
                         elif expr_kind(op) == "clip":
                             df[out_column] = df[source].clip(lower=expr_lower(op), upper=expr_upper(op))
                         elif expr_kind(op) == "bool_not":
-                            df[out_column] = ~df[source]
+                            # Relational operations such as a left join or the
+                            # row-oriented running-sum implementation can turn a
+                            # nullable BooleanDtype column into ``object``.  Python
+                            # applies ``~`` element-wise to object values, so an
+                            # unmatched ``None`` raises TypeError (and bools become
+                            # integers).  Restore pandas' three-valued boolean
+                            # representation before applying logical NOT.
+                            boolean_values = pd.array(
+                                _predicate_values(df[source]),
+                                dtype="boolean",
+                            )
+                            df[out_column] = ~boolean_values
                         elif expr_kind(op) == "cast":
                             if expr_target_type(op) == "float":
                                 if expr_input_domain(op) in {"numeric_string", "integer_string"}:
@@ -331,8 +361,11 @@ class PandasBackend(Backend):
                         elif expr_kind(op) == "string_replace":
                             df[out_column] = df[source].str.replace(expr_old(op), expr_new(op), regex=False)
                         elif expr_kind(op) == "string_slice":
-                            start = int(expr_start(op))
-                            df[out_column] = df[source].str.slice(start, start + int(expr_length(op)))
+                            slice_start = int(expr_start(op))
+                            df[out_column] = df[source].str.slice(
+                                slice_start,
+                                slice_start + int(expr_length(op)),
+                            )
                         elif expr_kind(op) == "string_split_part":
                             df[out_column] = df[source].str.split(expr_separator(op), n=1, regex=False).str[int(expr_index(op))]
                         elif expr_kind(op) == "string_concat":
@@ -393,9 +426,15 @@ class PandasBackend(Backend):
                         df = pd.DataFrame([values], columns=columns)
                     else:
                         raise ValueError(kind)
-            return BackendResult(self.name, "ok", data=df, duration_ms=(time.perf_counter()-start)*1000)
+            return BackendResult(self.name, "ok", data=df, duration_ms=(time.perf_counter() - started_at) * 1000)
         except Exception as exc:  # noqa: BLE001
-            return BackendResult(self.name, "error", error_type=type(exc).__name__, error=str(exc), duration_ms=(time.perf_counter()-start)*1000)
+            return BackendResult(
+                self.name,
+                "error",
+                error_type=type(exc).__name__,
+                error=str(exc),
+                duration_ms=(time.perf_counter() - started_at) * 1000,
+            )
 
 
 def _predicate_values(series):
@@ -499,7 +538,11 @@ def _pandas_eval_inplace_alias_mismatch(pd) -> bool:
     return not np.array_equal(frame["nums"].to_numpy(), original)
 
 
-def _pandas_bool_reduction_skipna_mismatch(pd) -> bool:
+def _pandas_bool_reduction_skipna_mismatch(
+    pd, op: dict[str, Any] | None = None
+) -> bool:
+    if (op or {}).get("family_id") == "pandas_nullable_bool_reduction":
+        return _pandas_nullable_bool_family_mismatch(pd, op or {}, groupby=False)
     frame = pd.DataFrame(
         {
             "has_signal": pd.array([True, pd.NA], dtype="boolean"),
@@ -515,7 +558,12 @@ def _pandas_bool_reduction_skipna_mismatch(pd) -> bool:
     return False
 
 
-def _pandas_arrow_bool_groupby_reduction_mismatch(pd) -> bool:
+def _pandas_arrow_bool_groupby_reduction_mismatch(
+    pd, op: dict[str, Any] | None = None
+) -> bool:
+    if (op or {}).get("family_id") == "pandas_nullable_bool_reduction":
+        return _pandas_nullable_bool_family_mismatch(pd, op or {}, groupby=True)
+
     def normalize(mapping: dict[str, Any]) -> dict[str, bool | None]:
         normalized: dict[str, bool | None] = {}
         for key, value in mapping.items():
@@ -551,3 +599,37 @@ def _pandas_arrow_bool_groupby_reduction_mismatch(pd) -> bool:
     except Exception:  # noqa: BLE001
         return True
     return observed != expected
+
+
+def _pandas_nullable_bool_family_mismatch(
+    pd,
+    op: dict[str, Any],
+    *,
+    groupby: bool,
+) -> bool:
+    reducer = str(op.get("reduction", "") or "")
+    values = list(op.get("values", []) or [])
+    if reducer not in {"any", "all"} or not values:
+        return True
+    has_true = any(value is True for value in values)
+    has_false = any(value is False for value in values)
+    has_null = any(value is None or value is pd.NA for value in values)
+    if reducer == "any":
+        expected: bool | None = True if has_true else None if has_null else False
+    else:
+        expected = False if has_false else None if has_null else True
+    try:
+        flags = pd.array(values, dtype="bool[pyarrow]" if groupby else "boolean")
+        if groupby:
+            frame = pd.DataFrame(
+                {"g": pd.array(["a"] * len(values), dtype="string"), "flag": flags}
+            )
+            observed = getattr(frame.groupby("g")["flag"], reducer)(
+                skipna=False
+            ).iloc[0]
+        else:
+            observed = getattr(pd.Series(flags), reducer)(skipna=False)
+    except Exception:  # noqa: BLE001
+        return True
+    normalized = None if pd.isna(observed) else bool(observed)
+    return normalized is not expected

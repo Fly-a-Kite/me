@@ -1,0 +1,91 @@
+schema_version: osc-phase5-exit-barrier-v1
+status: pass_three_direct_exact_sha_reviews
+phase5_exit_gate_passed: true
+pending_requirement: none
+sub_barriers:
+  contract: pass
+  observation_contract: pass
+  search: pass
+  runtime: pass
+  contract_outcome: pass
+  outcome_routing: pass
+  root_authority_control_plane: pass
+  legacy_diagnostic_facade: pass
+  opaque_diagnostic_consumers: pass
+terminal_checks:
+  scoped_tests: pass_268
+  osc_tests: pass_379
+  full_repository_tests: pass_3080_skip_1
+  compact_io_budget: pass
+  authority_exact_sha_review: pass
+  consumer_exact_sha_review: pass
+  evidence_exact_sha_review: pass
+  blocker_findings_remaining: 0
+  high_findings_remaining: 0
+  medium_findings_remaining: 0
+  low_findings_remaining: 1_deferred_to_phase6_measurement
+  public_api_freeze_changed: false
+  staged_paths: 0
+authority_boundary:
+  legacy_facade_scope: diagnostic_only
+  authority_eligible: false
+  admission_authority: false
+  coverage_authority: false
+  evidence_authority: false
+  candidate_authority: false
+  bug_authority: false
+  gate_authority: false
+  twenty_four_hour_authority: false
+  missing_exact_typed_context: not_evaluated
+  generic_legacy_error: ADAPTER_ERROR
+  normalization_error: ADAPTER_ERROR
+  candidate_promoted_to_confirmed_bug: false
+  fabricated_coverage_receipt_evidence_envelope_authority: false
+reviews:
+  - agent: /root/phase5_authority_audit
+    result: pass
+    blocker: 0
+    high: 0
+    medium: 0
+    changed_files: []
+  - agent: /root/phase5_consumer_audit
+    result: pass
+    blocker: 0
+    high: 0
+    medium: 0
+    changed_files: []
+  - agent: /root/phase5_evidence_audit
+    result: pass
+    blocker: 0
+    high: 0
+    medium: 0
+    changed_files: []
+    independent_tests: 52_passed_in_1.71s
+residual_findings:
+  - id: OSC-4-C-F6
+    severity: low
+    status: deferred_to_phase6_measurement
+hashes:
+  src/datadiff/osc_diagnostic_facade.py: 139545e03db5fbf9178907a57e37d6889e8d82a2e9e36e5d5f358293f98391bf
+  src/datadiff/execution.py: cf570fca915338e2a46e4ec69c2739313e53bde8b61ebf1ee1cfc6dbecb7fad8
+  src/datadiff/run_loaded.py: 8eb0330efbe1e164506c02c71510db1ca0e8ed526aa44ed5c9c5d92166e3a723
+  src/datadiff/runner.py: c40d79ef6bbce619bf3b7e5453934ddd92cb8a028e83e9227d4458db4b84dcbf
+  src/datadiff/run_summaries.py: 3d4377c951ae1f8f0957cbd40fd575b067d38c161bbbc2a5d9b7ba993c45c795
+  src/datadiff/discovery_runtime.py: 77b1aad054d622741f842b48ef6f7db9a606905bbc150c0499c6cbf96d78d86f
+  src/datadiff/candidate_pipeline.py: bb4302d658d1812dbb82c6ade3e91644ed87820c129a2f36d5b19456ccb4971c
+  tests/osc/test_legacy_diagnostic_facade.py: e8ad6381029d826e6521db7e27922cd7ce144ec328474f0f5af09d3caabd8b9c
+  tests/test_execution.py: dffaba0e069968fdafff23e9ecf6751adcdb77106256c8c50ac6b956da7a601c
+  tests/test_run_loaded.py: c3793132a97e04b56d4a0ea02f186659c4a7b7c53059b5e7d8216ce908c108be
+  tests/test_runner.py: c58c74ed89516d7543fe0e3ea96089689aa7a95e8ac3fcebd269ac5d2ad2a4c6
+  tests/test_discovery_runtime.py: ae71913ff814eb35a830ef4cad319b9ee359f2d7bcb66226c1f018b95a5559e1
+  tests/test_candidate_pipeline.py: 0ad414f6aabe28c2dc76f201857aa4e4ba969f806c916bfe23593660f195de56
+  src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  src/datadiff_osc/api.py: 54ddc035fa9b948e7c4d41da555cbf035c89916bed51143f16d1cb74e1b47d5c
+  src/datadiff_osc/__init__.py: 5ebd0dca86745a6991f102086e85db03791986dd5c894af5ea35574d32d67726
+execution_authorization:
+  phase6_started: false
+  phase6_authorized_by_user: false
+  pilot_started: false
+  two_hour_run_started: false
+  twenty_four_hour_run_authorized: false
+  twenty_four_hour_run_started: false

@@ -1,0 +1,231 @@
+schema_version: osc-phase6-contract-parallel-scaling-receipt-task-contract-v1
+phase: 6
+authority:
+  task_id: OSC-6-CONTRACT-PARALLEL-SCALING-RECEIPT-R5
+  owner: /root
+  role: root
+  mode: root_serial_private_parallel_scaling_receipt_and_root_binding
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  grandchildren_allowed: false
+  remediation_is_serial: true
+  user_authorization:
+    date: 2026-07-23
+    instruction: "授权; 继续"
+    interpretation: >-
+      The user authorized the next bounded Phase-6 Contract slice.  It may add
+      one private replacement receipt for legacy parallel-scaling data, strict
+      Runtime replay, and Root's exact dynamic-record binding.  It does not
+      authorize a typed execution producer, an artifact/provenance admission,
+      a public interface change, a frozen producer/provenance edit, a cohort,
+      a gate calculation, Phase 7, a 2h pilot, or a 24h run.
+  authority_write_paths:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_receipt_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_receipt_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  source_state_before_write:
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths: 0
+    tracked_dirty_path_count: 141
+    untracked_path_count: 24126
+    coordination_ledger_sha256: f899e3856ca41d114dbaa68c8f2ed5558a2e30a544a0592dadfa87f02111bd70
+  required_input_sha256:
+    docs/codex_multi_agent_development_runbook.md: a17a62d7937f5ff4755d8925dc6dd64c25946516a80f82466ddeda1ee8d845f9
+    experiments/final_bug_discovery_protocol_v3/TODO.md: 1ad989d412651f5cc9ae3c3ac5d7d7207176557e0bcdcfb449788f016d607419
+    docs/project_architecture.md: 5fc31c1c2c4bf1241e41cc966f8d56abc890259a8577fe756076b490e3698d9f
+    docs/fine_grained_discovery_architecture.md: 58d0e11a3cd3c2ea9b7096449f9beafae756b94cae3e41f04d4377b2b4d6dbf2
+    docs/discovery_search_and_parallel_architecture.md: 7af5fb51be2de1e0162ffb4a2db2bf40df050f35c0446bcae707e419936cf1b9
+    docs/semantic_hypercontract_architecture.md: 20a5e22513c64c60e77b115233b28fdca2591081f08d5f2945a15dda18442dae
+    docs/architecture_credibility_and_alternatives.md: 95bd949dba93d41d9b2594122fc49766164008c5de8df6aec91dc88f2afa0762
+    docs/competitive_paper_experiment_blueprint.md: e2537e9ec03f5222321af7ae11491341f402d6e294c19ae4c8c3d397c4c1cd18
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_task_contract.yaml: 5734d1a3ae5673fb1b4adc04c63d86761dd85112f29da36305381ec3cc9a0a04
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_report.yaml: 778c54465013f2892387a1909fd62330388e95ba2c415aee6af5f5fc00793118
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_evidence_task_contract.yaml: df8118dadc5102203ee2e7a9a3efe754f3bba4c95fa430ef582f5d37de4e50dc
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_evidence_report.yaml: 56cca3cc7077df35008e354e2df0d0ca474d1ae6efcac5eb295dc60cea70d5a6
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_task_contract.yaml: e2d26e04495cc628fe72dc900bb40f20e53c08282f0792c264d007448b7f53c7
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_comparison_root_binding_report.yaml: 26cc78f7e0809d2cb5c71faa94d1b74515d03485651573bf6133afd06248e863
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_receipt_task_contract.yaml: f2c39256878802ff22e4fc3d99224939e9e8f880a772a24eac496242fa7a43eb
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_receipt_report.yaml: 376a7d42d32b2a64a633572dbcca2ef3bc062340c94feb2b6e92739bbc54c5d1
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_typed_producer_task_contract.yaml: ccb1980bd1be6f042f7d89ae700b49886986becc2557f6d0f8889954818429f2
+    experiments/osc_v1/coordination_20260719_v1/phase6_contract_raw_pair_typed_producer_report.yaml: 05b0b8d7250e48e408f69a2cda61ce3d7f903d1980aa9ed136497c30f59c56b1
+    experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_contracts.yaml: 264e222b7fa3dff91122743627bcc744af559c715085e630ef21d27b59eb3e36
+    experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_reports.yaml: 58832ef90d0ce50907fc7e9a9d2f0ccfe874427ea1951c889ec09d49c3a9ca56
+    src/datadiff_osc/runtime/_phase6_contract_performance_receipts.py: cf2b1500a97a884f396eacc0f6354a2d47ae59cc4a480e4119ad9c2515431cf1
+    src/datadiff_osc/runtime/_phase6_contract_performance_producers.py: 417f5552a040f74b884bedb23838f27684e0868ff59819c32735fd408f1b0d5b
+    src/datadiff_osc/runtime/_semantic_replay.py: 8926a2c42d657f8637244c14fc17ee0be6a67e162e63c87be02a439276b95aaa
+    src/datadiff_osc/_phase6_gate_authority.py: 36f1a2f78bddf95408a4babdcf96d22e44d8401729da4ed6bc65558c68ef4f2d
+    tests/osc/test_runtime_semantic_replay.py: 40f2a7db1cea6956ec869368c827653b582e84aea340c50c15d028f6de8348df
+    tests/osc/test_phase6_gate_authority_integration.py: d0190dac75c5a70f4fb5ab46fe4b1389fa3b7719b3f4cf7c106cb09231363288
+  frozen_target_sha256:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+task:
+  task_id: OSC-6-CONTRACT-PARALLEL-SCALING-RECEIPT-R5
+  role: root
+  mode: root_serial_private_parallel_scaling_receipt_and_root_binding
+  objective: >-
+    Replace the diagnostic-only legacy PairedBenchmarkReceipt parallel sample
+    as the Phase-6 performance admission shape with one private versioned
+    ParallelScalingEvidenceReceipt.  Bind it exactly through Runtime replay to
+    the existing parallel_scaling_samples dynamic record and its trusted
+    performance_paired_replay producer receipt, without treating that plumbing
+    as a typed execution producer, provenance admission, raw artifact, cohort,
+    metric, or gate pass.
+  allowed_write_paths:
+    - src/datadiff_osc/runtime/_phase6_parallel_scaling_receipts.py
+    - src/datadiff_osc/runtime/_semantic_replay.py
+    - src/datadiff_osc/_phase6_gate_authority.py
+    - tests/osc/test_runtime_phase6_parallel_scaling_receipts.py
+    - tests/osc/test_runtime_semantic_replay.py
+    - tests/osc/test_phase6_gate_authority_integration.py
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_receipt_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_contract_parallel_scaling_receipt_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  forbidden_write_paths:
+    - src/datadiff_osc/__init__.py
+    - src/datadiff_osc/public_api_freeze.json
+    - src/datadiff_osc/search/**
+    - src/datadiff_osc/contract_engine/**
+    - src/datadiff_osc/runtime/_receipt_producers.py
+    - tests/osc/test_runtime_receipt_producers.py
+    - src/datadiff_osc/runtime/_producer_provenance.py
+    - tests/osc/test_runtime_producer_provenance.py
+    - src/datadiff_osc/runtime/_private_receipts.py
+    - tests/osc/test_runtime_private_receipts.py
+    - src/datadiff_osc/runtime/_phase6_contract_performance_receipts.py
+    - src/datadiff_osc/runtime/_phase6_contract_performance_producers.py
+    - tests/osc/test_runtime_phase6_contract_performance_receipts.py
+    - tests/osc/test_runtime_phase6_contract_performance_producers.py
+    - src/datadiff_osc/runtime/gates.py
+    - src/datadiff_osc/runtime/gate_artifacts.py
+    - src/datadiff_osc/contract_engine/_phase6_corpora.py
+    - tests/osc/test_contract_phase6_corpora.py
+    - tests/osc/test_search_context_receipts.py
+    - tests/osc/test_search_gate_crosswalk.py
+    - tests/osc/test_search_lane_registry.py
+    - docs/**
+    - scripts/**
+    - experiments/final_bug_discovery_protocol_v3/**
+  frozen_interfaces:
+    - osc-public-api-freeze-v1:cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+    - osc-pre24-gate-spec-set-d9792996cacb6fc6e47bce602d5f7ab6d6382c62ba9e1ac6bc1f8003ecbec552
+    - all thirteen frozen_target_sha256 entries above
+    - frozen ParallelScalingObservation / WorkerBoundExecutionResult / RawCounterMeasurement
+    - legacy PairedBenchmarkReceipt remains diagnostic-only
+  required_invariants:
+    - >-
+      The replacement receipt is private, versioned, canonical, and has a
+      derived sample identity.  It carries source snapshot, workload,
+      benchmark/environment and distinct one-worker/six-worker configuration
+      context, exact logical task-set and result/evidence digests, worker counts
+      fixed at 1 and 6, and the complete raw monotonic task-counter start/end/
+      clock/interval context for both arms.
+    - >-
+      All digest fields use the canonical SHA-256/namespaced-digest grammar;
+      task sets are equal, result/evidence/configuration identities are distinct,
+      both raw task counts are positive and equal, both intervals are positive,
+      timestamps never run backwards, and the two arms share one clock domain.
+      Caller-provided sample IDs, elapsed scalars, efficiencies, aggregates,
+      booleans, floats, negatives, malformed digests, stale schemas, or missing
+      fields fail closed.
+    - >-
+      Runtime alone performs strict exact-field reconstruction and canonical
+      round-trip of the new receipt.  It exposes exactly the
+      parallel_scaling_samples intrinsic subject.  Legacy PairedBenchmarkReceipt
+      remains unowned and fails closed for both contract performance and parallel
+      scaling admission subjects.
+    - >-
+      Root re-reads every admitted new receipt byte, verifies SHA, canonical
+      type/version/digest and Runtime-owned reconstruction, checks the source
+      snapshot before the record can contribute, and compares every derived
+      dynamic field against exactly one parallel_scaling_samples record.  Missing,
+      duplicate, substituted, wrong-subject, wrong-producer, same-cardinality,
+      or post-admission byte-mutated records fail closed.
+    - >-
+      R3 ContractPerformanceEvidenceReceipt and R4 typed raw-pair producer keep
+      their existing behavior.  This task must not weaken their source/R2
+      cross-binding, modify the frozen producer/provenance registry, or regard a
+      locally reconstructed receipt as artifact provenance.
+    - >-
+      Diagnostic refs remain permanently diagnostic-only; missing exact typed
+      context is fail-closed/not_evaluated.  No candidate becomes confirmed,
+      bug_claimed remains false, and no fixture publishes or authorizes a gate.
+    - >-
+      No typed parallel producer, raw artifact/provenance admission, 1000-pair
+      cohort, 100000 corpus, bootstrap, metric reduction, gate-spec change,
+      Contract pass, combined suite, Phase 7, 2h pilot, or 24h run is authorized.
+  required_tests:
+    负向复核:
+      - >-
+        Reject each changed source/workload/config/task-set/result/evidence/raw
+        counter/clock/timestamp/worker-count field, unequal task counts/sets,
+        duplicate identities, zero/non-integer/negative counters, malformed
+        digest, wrong envelope type/version/subject, legacy paired receipt, and
+        every dynamic-record or producer-digest substitution before authority.
+    独立反例验证:
+      - >-
+        Construct one canonical private parallel receipt and matching dynamic
+        record, mutate exactly one binding at a time, and assert the first Root
+        exact binding failure.  Verify a same-cardinality substitute and a
+        source rebound cannot bind to the original record or make a bundle
+        publishable.
+    异常输入验证:
+      - >-
+        Reject missing/extra payload fields, unknown schemas, unreadable or
+        byte-modified admissions, invalid canonical forms, caller-supplied
+        elapsed/efficiency claims, and invalid runtime subject IDs without a
+        throw escaping, candidate confirmation, bug claim, publication, or
+        authorization.
+  scoped_validation:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+      tests/osc/test_runtime_phase6_parallel_scaling_receipts.py
+      tests/osc/test_runtime_phase6_contract_performance_receipts.py
+      tests/osc/test_runtime_semantic_replay.py
+      tests/osc/test_phase6_gate_authority_integration.py
+    timing: exactly once, only after all allowed implementation writes and SHA checks
+    forbidden_substitutes:
+      - tests/osc
+      - repository suite
+      - six-file combined suite
+      - 100000 parity execution
+      - v3 2200
+      - Phase 7
+      - 2h pilot
+      - 24h run
+  completion_requirements:
+    - reverify every allowed product path and all thirteen frozen/public SHA values before the scoped suite
+    - retain the exact command, exit code, and complete terminal result in the report
+    - reverify every allowed product path and all thirteen frozen/public SHA values after the scoped suite
+    - use apply_patch for the report and ledger only after the real terminal result is known
+    - retain phase_6_contract as pending regardless of scoped-suite outcome
+  stop_conditions:
+    - any frozen/public SHA mismatch, staged user path, pre-existing target path, or scope expansion
+    - any need to modify a public export, frozen producer/provenance/test, gate spec, raw metric reducer, docs, or script
+    - any accepted legacy paired receipt, unbound parallel receipt, caller-authored sample/elapsed/efficiency, source rebind, duplicate/substituted record, publishable bundle, gate pass, candidate confirmation, or bug_claimed=true
+    - failed scoped suite or incomplete terminal test evidence
+decision:
+  product_write_authorized_only_for_allowed_paths: true
+  phase_6_contract: pending
+  private_parallel_scaling_receipt_authorized: true
+  typed_parallel_producer_authorized: false
+  artifact_or_provenance_authorized: false
+  cohort_or_bootstrap_authorized: false
+  gate_spec_edit_authorized: false
+  real_gate_evidence_authorized: false
+  combined_suite_authorized: false
+  parity_100000_authorized: false
+  v3_2200_authorized: false
+  phase7_pilot_2h_authorized: false
+  twenty_four_hour_run_authorized: false

@@ -20,6 +20,22 @@ from datadiff.operation_semantics import (
     op_table,
 )
 from datadiff.operation_type_semantics import aggregate_result_type
+from datadiff.program_state import state_before_operation
+
+
+def numeric_cast_string_columns(case: Case) -> set[str]:
+    columns: set[str] = set()
+    for index, operation in enumerate(case.program.operations):
+        if op_kind(operation) != "mutate":
+            continue
+        column = op_column(operation)
+        columns.discard(column)
+        if expr_kind(operation) != "cast" or expr_target_type(operation) != "str":
+            continue
+        state = state_before_operation(case, index)
+        if state.column_types.get(expr_source(operation)) in {"int", "float"}:
+            columns.add(column)
+    return columns
 
 
 def case_uses_precision_sensitive_float_arithmetic(case: Case) -> bool:
@@ -174,9 +190,14 @@ def _float_precision_aggregate_outputs(
         if not output_column:
             continue
         source_type = column_types.get(source_name)
-        if aggregate_function in {"sum", "mean"} and (
+        precision_sensitive_sum = aggregate_function == "sum" and (
             source_name in precision_columns or source_type == "float"
-        ):
+        )
+        precision_sensitive_mean = (
+            aggregate_function == "mean"
+            and source_type in {"int", "float"}
+        )
+        if precision_sensitive_sum or precision_sensitive_mean:
             outputs.add(output_column)
     return outputs
 

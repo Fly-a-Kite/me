@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from datadiff.ccs_ir import ContractCarryingRelationalIR
 from datadiff.config import ExperimentConfig
 from datadiff.dsl import Case
 from datadiff.env import collect_environment
@@ -17,16 +18,27 @@ def save_issue_artifact(
     normalized: dict[str, dict[str, Any]],
     findings: list[Finding],
     config: dict[str, Any] | None = None,
+    base_dir: Path | None = None,
+    ccs_ir: ContractCarryingRelationalIR | None = None,
 ) -> Path:
     sig = findings[0].signature if findings else case.case_id
-    bug_dir = BUGS_DIR / f"bug_{sig}"
+    artifact_root = base_dir or BUGS_DIR
+    bug_dir = artifact_root / f"bug_{sig}"
     bug_dir.mkdir(parents=True, exist_ok=True)
     dump_json(case.to_dict(), bug_dir / "case.json")
     dump_json(raw_results, bug_dir / "results.json")
     dump_json(normalized, bug_dir / "normalized.json")
     dump_json([f.to_dict() for f in findings], bug_dir / "findings.json")
     dump_json(config or {}, bug_dir / "config.json")
+    if ccs_ir is not None:
+        dump_json(ccs_ir.to_dict(), bug_dir / "ccs_ir.json")
     if isinstance(config, dict):
+        method_arm_manifest = config.get("method_arm_manifest")
+        if isinstance(method_arm_manifest, dict):
+            dump_json(method_arm_manifest, bug_dir / "method_arm.json")
+        experiment_manifest = config.get("experiment_manifest")
+        if isinstance(experiment_manifest, dict):
+            dump_json(experiment_manifest, bug_dir / "experiment_manifest.json")
         strategy_manifest = {
             "strategy_snapshot_path": str(config.get("strategy_snapshot_path", "") or ""),
             "strategy_learning_path": str(config.get("strategy_learning_path", "") or ""),
@@ -62,7 +74,26 @@ def _render_issue_artifact_report(case: Case, findings: list[Finding]) -> str:
     lines = [f"# Bug Artifact: {case.case_id}", "", f"Seed: `{case.seed}`", "", "## Program", "", "```json"]
     import json
     lines.append(json.dumps(case.program.to_dict(), ensure_ascii=False, indent=2))
-    lines.extend(["```", "", "## Findings"])
+    lines.append("```")
+    activation = (
+        case.metadata.get("semantic_activation", {})
+        if isinstance(case.metadata, dict)
+        else {}
+    )
+    if isinstance(activation, dict) and activation:
+        lines.extend(
+            [
+                "",
+                "## Semantic Activation",
+                "",
+                f"- Goal: `{activation.get('goal_id', '')}`",
+                f"- Status: `{activation.get('evaluation_status', 'not_evaluated')}`",
+                f"- Reason: `{activation.get('reason', '')}`",
+                f"- Witness tokens: `{', '.join(activation.get('activation_tokens', []) or [])}`",
+                f"- Missing tokens: `{', '.join(activation.get('missing_tokens', []) or [])}`",
+            ]
+        )
+    lines.extend(["", "## Findings"])
     for f in findings:
         lines.append(
             f"- **{f.kind}** severity={f.severity} root={f.root_cause} "

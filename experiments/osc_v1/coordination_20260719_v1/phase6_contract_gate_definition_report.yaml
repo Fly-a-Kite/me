@@ -1,0 +1,208 @@
+schema_version: osc-phase6-contract-gate-definition-report-v1
+phase: 6
+status: complete_definition_freeze_no_product_write_contract_gate_pending
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_task_contract.yaml
+  sha256: 5734d1a3ae5673fb1b4adc04c63d86761dd85112f29da36305381ec3cc9a0a04
+authority_chain:
+  user_authorization: >-
+    The 2026-07-23 user instruction `授权` authorized the previously disclosed,
+    conservative definition freeze. Root recorded the new definitions rather
+    than treating an unspecified qualitative metric as passed.
+  prior_crosswalk:
+    path: experiments/osc_v1/coordination_20260719_v1/phase6_normative_gate_crosswalk_prewrite.yaml
+    sha256: 29ce87d733ecb0a155fc8fae69c34d105deaf16dbae366df5c5eb33dfc3e2675
+    status_before: root_reviewed_not_yet_frozen_for_implementation
+  foundation_barrier:
+    status: pass
+    evidence: experiments/osc_v1/coordination_20260719_v1/phase6_foundation_ring_review_round8c_reports.yaml
+  contract_gate_status_after_this_report: pending
+source_mapping:
+  existing_authoritative_gate_set:
+    path: src/datadiff_osc/runtime/gates.py
+    sha256: c6051320db1583b83972cd05d0b776cb0d39c472f139ec01cd04471ef9df7c4e
+    count: 41
+    frozen_digest: osc-pre24-gate-spec-set-d9792996cacb6fc6e47bce602d5f7ab6d6382c62ba9e1ac6bc1f8003ecbec552
+    covered_contract_gates:
+      - contract.confirmed_root_recall
+      - contract.false_positive_precision
+      - contract.mutants_killed
+      - contract.staged_exact_discrepancies
+      - contract.compile_match_budget
+      - contract.throughput_regression
+  root_authority_current_limit:
+    path: src/datadiff_osc/_phase6_gate_authority.py
+    sha256: 03b6ef9323f38fee8cb9daafffd2a309818953fbc78fa2ae0cd2c99b1503bbd7
+    observation: >-
+      The current dynamic plan has staged_parity_groups and at-least-1000
+      contract_performance_samples, but neither schema commits the complete
+      full-canonical/equal-fingerprint/mismatch/full-diff/cluster partition
+      facts nor the three raw paired efficiency measurements required by the
+      new definitions. It also asserts the old 41-spec/38-denominator shape.
+  raw_artifact_current_limit:
+    path: src/datadiff_osc/runtime/gate_artifacts.py
+    sha256: 1eed10563c076514acb12259ddef44698510f49f34c13e4e54e1e4bd1e07743a
+    observation: >-
+      The current scalar RawMetricSeries model can prove count and scalar
+      reducers, but does not yet encode an exact baseline/treatment raw pair
+      identity, cohort selection, or the deterministic paired-bootstrap rule.
+  private_performance_current_limit:
+    paths:
+      src/datadiff_osc/runtime/_private_receipts.py: 490c7f7f076fb65c75cc577831fab508f6d9dcb0820422170169b274e50af07f
+      src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    observation: >-
+      Existing paired benchmark receipts bind compile/wall/throughput samples,
+      but do not yet expose the complete frozen cohort identity plus raw
+      materialized-byte, backend-pair-count, and comparison-CPU pairs.
+  replay_schema_dependency:
+    paths:
+      src/datadiff_osc/runtime/_semantic_replay.py: 0b5ec02b247d718d4258dada0fb59493081f258cc1e49913c1d294c7c9e062b9
+      tests/osc/test_runtime_semantic_replay.py: dce47e72b3b64c198a9605ab1156e97b59bdecad1a1322f28ebbad6d86b91c57
+    observation: >-
+      A new PairedBenchmarkReceipt schema for the required raw paired metrics
+      must be strictly reconstructed by the private runtime semantic replay
+      owner. The successor contract must update this path and its focused test
+      together with the receipt schema, while old receipt schemas fail closed;
+      it must not treat an admission-only envelope check as typed evidence.
+definitions_frozen:
+  full_canonical_corpus:
+    schema_id: osc-phase6-contract-full-canonical-v1
+    exact_decision_count: 100000
+    full_identity_binding: >-
+      ResultGroup, ordered endpoint set, contract fingerprint, source case,
+      source snapshot, comparator identity, fingerprint task/result and exact
+      task/result are all typed and independently bound.
+  correctness_and_audit:
+    - contract.fingerprint_full_canonical_equivalence: 100 percent of all 100000 decisions
+    - contract.mismatch_full_diff_escalation: 100 percent of the exact mismatch subset
+    - contract.equal_fingerprint_full_audit_deviations: zero across every equal-fingerprint decision
+    - contract.backend_clustering_pairwise_equivalence: 100 percent of all 100000 partitions
+  paired_efficiency:
+    cohort: exactly 1000 deterministic no-replacement eligible decisions selected from the full corpus
+    baseline: always-materialize explicit pairwise comparison
+    treatment: staged planner with exact escalation
+    raw_metrics:
+      - materialized_bytes
+      - backend_pair_comparisons
+      - comparison_cpu_ns
+    thresholds:
+      comparison_cpu_reduction: aggregate reduction >= 30 percent
+      materialized_bytes_reduction: aggregate reduction >= 30 percent and deterministic paired 95 percent lower bound > 0
+      backend_pair_comparison_reduction: aggregate reduction >= 30 percent and deterministic paired 95 percent lower bound > 0
+    bootstrap: >-
+      10000 deterministic resamples of the 1000 sorted pairs, SHA-256-derived
+      seed, nearest-rank 2.5th percentile index 249; any non-positive baseline
+      observation, missing pair, context mismatch, or invalid raw value is
+      not_evaluated/fail closed.
+minimum_successor_implementation_surface_to_reconfirm_in_its_own_contract:
+  product_paths:
+    - src/datadiff_osc/runtime/gate_artifacts.py
+    - src/datadiff_osc/runtime/gates.py
+    - src/datadiff_osc/_phase6_gate_authority.py
+    - src/datadiff_osc/runtime/_private_receipts.py
+    - src/datadiff_osc/runtime/_receipt_producers.py
+    - src/datadiff_osc/runtime/_semantic_replay.py
+  test_paths:
+    - tests/osc/test_runtime_gate_artifacts.py
+    - tests/osc/test_runtime_gates.py
+    - tests/osc/test_phase6_gate_authority_integration.py
+    - tests/osc/test_runtime_private_receipts.py
+    - tests/osc/test_runtime_receipt_producers.py
+    - tests/osc/test_runtime_semantic_replay.py
+  excluded_without_a_separate_contract:
+    - src/datadiff_osc/public_api_freeze.json
+    - src/datadiff_osc/search/context_receipts.py
+    - tests/osc/test_search_context_receipts.py
+    - src/datadiff_osc/search/context_replay.py
+    - tests/osc/test_search_gate_crosswalk.py
+    - src/datadiff_osc/search/lane_registry.py
+    - tests/osc/test_search_lane_registry.py
+    - src/datadiff_osc/runtime/_producer_provenance.py
+    - tests/osc/test_runtime_producer_provenance.py
+    - src/datadiff_osc/contract_engine/_phase6_corpora.py
+    - tests/osc/test_contract_phase6_corpora.py
+required_successor_validation:
+  负向复核:
+    status: not_yet_run
+    requirements:
+      - forged/missing/duplicate full-corpus IDs and a same-cardinality substitute must fail closed
+      - self-authored equality booleans, scalar-only evidence, and omitted zero series must fail closed
+      - a mismatch without its bound full-diff execution and an equal fingerprint without full audit must fail closed
+      - non-equivalent cluster partitions, a collision, or an approximate verdict substituted for exact must fail closed
+  独立反例验证:
+    status: not_yet_run
+    requirements:
+      - mutate only one pair identity, task/result/context binding, cohort rank, raw metric, bootstrap seed, or percentile index at a time
+      - demonstrate that each mutation rejects before any gate pass or authority eligibility
+      - retain legal typed same-verdict baseline/treatment pairs as non-authorizing evidence only
+  异常输入验证:
+    status: not_yet_run
+    requirements:
+      - zero/negative/non-finite counters, duplicate IDs, empty subsets, fewer than 1000 eligible observations, and invalid context fail closed
+      - malformed source snapshots, stale spec digest, changed authority universe, and old receipt schemas fail closed
+      - candidate remains non-confirmed and bug_claimed remains false in every failure and success-shaped fixture
+frozen_target_sha256:
+  pre_report:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  post_report:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+execution:
+  product_paths_written: []
+  test_commands_run: []
+  long_gate_commands_run: []
+  parity_100000_run: false
+  v3_2200_run: false
+  tests_osc_run: false
+  repository_suite_run: false
+  phase7_pilot_2h_run: false
+  twenty_four_hour_run: false
+blocking_conditions:
+  - >-
+    The newly frozen gate definitions do not create raw typed producers, alter
+    the frozen spec set, or generate verified evidence. Phase 6 Contract remains
+    pending until a new exact-path implementation contract, scoped implementation
+    validation, independent negative review, and real gate evidence exist.
+  - >-
+    No conclusion of `phase_6_contract=pass`, `not_authorized_for_24h` transition,
+    candidate confirmation, or execution authorization is available from this report.
+findings: []
+counts: {blocker: 0, high: 0, medium: 0, low: 0}
+writes:
+  - experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_task_contract.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_report.yaml
+  - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+implementation_child_agents: 0
+forbidden_paths_modified: []
+decision:
+  phase_6_contract: pending
+  foundation_barrier: pass_unchanged
+  gate_spec_edit_completed: false
+  producer_edit_completed: false
+  raw_evidence_complete: false
+  combined_suite_authorized: false
+  phase7_pilot_2h_authorized: false
+  twenty_four_hour_run_authorized: false

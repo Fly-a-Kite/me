@@ -1,0 +1,69 @@
+schema_version: osc-phase5-search-barrier-v1
+task_ids:
+  - OSC-5-B
+  - OSC-5-ROOT-OBSERVATION-AUTHORITY
+  - OSC-5-B-AUTHORITY-FOLLOWUP
+status: passed_root_verified
+finding_disposition:
+  OSC-4-A-F1: closed_root_verified
+  OSC-4-A-F2: closed_root_verified
+  OSC-4-A-F3: closed_root_verified
+  OSC-4-A-F4: closed_root_verified
+  OSC-4-A-F5: closed_root_verified
+change_request:
+  id: CR-OSC-5-003
+  status: closed_root_and_search_consumers_verified
+authority_results:
+  forged_ledger_counterexamples: 7/7 rejected
+  cell_pair_observed_reachable: true
+  pair_only_observed_reachable: true
+  full_directional_edge_observed_reachable: true
+  materializable_edges: 384/384
+  unique_edge_hypercontracts: 384/384
+  cell_observation_policies: 376/376 unique
+  edge_observation_policies: 384/384 unique
+  fresh_backend_pair_denominator: 502
+  probe_cells: 24
+  versioned_probe_predicates: 5
+  scheduler_denominators_source: CompiledTargetUniverse
+  fresh_regression_partition: physical_and_provenance_closed
+negative_regressions:
+  - internally SAT generic left_backend/right_backend Contract cannot credit a declared target pair
+  - cell-only and edge-only execution cannot earn authority credit
+  - one-sided edge pair cannot earn edge credit
+  - case/backend rebinding cannot borrow pair authority
+  - changed HyperContract derivation cannot equal the recomputed authority object
+  - reversed edge with retained policy cannot reach execution
+  - swapped edge extraction direction cannot activate
+  - caller-provided scheduler groups and denominators are not accepted
+tests:
+  - command: targeted Search Agent red authority counterexamples
+    exit_code: 1
+    result: 7 failed before resolver consumption as required
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider
+      tests/osc/test_search_ledger.py
+    exit_code: 0
+    result: 17 passed in 31.39s (Agent and Root identical result)
+  - command: Search Agent full target/generation/search/scheduler/probe/public-freeze scope
+    exit_code: 0
+    result: 71 passed in 82.73s
+  - command: >-
+      PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests/osc
+    exit_code: 0
+    result: 248 passed in 85.13s (Root)
+hashes:
+  src/datadiff_osc/generation/extraction.py: 516942dbf0bf352ea7bcc9ca2a9413a5b37d3f584363850df9ef321fecad0463
+  src/datadiff_osc/search/matcher.py: 9edfd678838afe512404477bedf161f9e2fda2ef859eeddb3e3cdfdc74219b31
+  src/datadiff_osc/search/ledger.py: 5d14b830581a375ef763f2a4cf7773bf00d04bc57bf5c71a42d5544457d56d98
+  src/datadiff_osc/semantic_targets/declarations.py: cd824eceb4576a181a22c0acea77538b994ab347a4de6ac0de5a1072f55c53f0
+  src/datadiff_osc/scheduler/policy.py: 95642878277df141934c903f3eb35ba2c26c4c8ee597cab89484e2ee55cd4639
+  src/datadiff_osc/probe_contracts.py: 8dd4ce0978de3ff6294b2a96faf723160be0767b74101a80e232323cea7798e9
+  src/datadiff_osc/semantic_targets/compiler.py: ff7e0ca9287769fc5e4ed8e76518cf1d543e4bb99198335ed41a2f10eba29e83
+  tests/osc/test_search_ledger.py: 788d76d3ec9434f0a1c502f9aae6931603ad700b19ae758160ccb7576f2119ee
+  src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  tracked_diff_stat: 341553eede7eb403553383d713f9a803207214388e7b1c0378d78b74445b45d9
+staged_paths: 0
+pilot_started: false
+twenty_four_hour_run_authorized: false
+next_barrier: Runtime may begin its exact predeclared OSC-5-C paths; Search and Contract writers are stopped.
