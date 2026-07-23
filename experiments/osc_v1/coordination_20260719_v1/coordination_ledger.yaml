@@ -1557,6 +1557,34 @@ tasks:
       combined_suite: unauthorized
       phase7_paired_pilot: unauthorized
       twenty_four_hour: unauthorized
+  - task_id: OSC-6-BOUNDED-DIAGNOSTIC-ARTIFACT-REVALIDATION-R1
+    owner: /root
+    mode: root_serial_isolated_private_diagnostic_artifact_revalidation
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_phase6_bounded_diagnostic_artifact_revalidation.py
+      - tests/osc/test_runtime_phase6_bounded_diagnostic_artifact_revalidation.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_diagnostic_artifact_revalidation_r1_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_diagnostic_artifact_revalidation_r1_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    task_contract_sha256: 19795934f513ac42512447aa5f485769e72cc9a646d4a56a21494f5c21cb216e
+    report_sha256: 1a47d23ed6b9f47593dbff9ce9a3c455379336afc487a77146d67493d8cea0dd
+    status: complete_private_revalidation_scoped_validation_pass_no_gate_credit
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_diagnostic_artifact_revalidation_r1_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_diagnostic_artifact_revalidation_r1_report.yaml
+    barrier:
+      phase_6_private_foundation_barrier: pass_unchanged
+      phase_6_contract: pending
+      phase_6_granularity_reachability: pending
+      phase_6_runtime_correctness: pending
+      bounded_diagnostic_artifact_revalidation: complete_one_artifact_not_evaluated_no_gate_credit
+      dynamic_plan: absent_fail_closed
+      artifact_receipt_index: absent_fail_closed
+      gate_credit: false
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
 interface_freeze:
   version: osc-public-api-freeze-v1
   hash: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131

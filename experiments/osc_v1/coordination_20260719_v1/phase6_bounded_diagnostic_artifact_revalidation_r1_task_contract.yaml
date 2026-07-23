@@ -1,0 +1,225 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-BOUNDED-DIAGNOSTIC-ARTIFACT-REVALIDATION-R1
+owner: /root
+role: root
+mode: root_serial_isolated_private_diagnostic_artifact_revalidation
+implementation_child_agents: 0
+reviewer_child_agents_created: 0
+grandchildren_allowed: false
+objective: >-
+  Add one private, read-only revalidation boundary for the already-created R1
+  bounded pandas/polars diagnostic artifact. The boundary must re-read exact
+  artifact bytes and reconstruct the frozen declaration-derived private typed
+  Search/Runtime context and sample identities without launching an adapter or
+  creating any durable evidence. It must return only not_evaluated,
+  diagnostic-only state and cannot create a typed producer receipt, formal raw
+  artifact, receipt index, dynamic plan, coverage event, gate result,
+  candidate confirmation, or bug claim.
+user_authorization:
+  date: 2026-07-24
+  exact_confirmation: 继续
+  interpreted_scope: >-
+    Continue the immediately preceding bounded real-evidence chain with a
+    smaller private revalidation slice. The authorization does not lift the
+    prohibition on formal producer receipts, raw-gate artifacts, dynamic plans,
+    100000 parity, v3 2200, repository tests, combined suites, Phase 7, 2h,
+    or 24h work.
+authorization_boundary:
+  authorized_product_writes:
+    - src/datadiff_osc/runtime/_phase6_bounded_diagnostic_artifact_revalidation.py
+    - tests/osc/test_runtime_phase6_bounded_diagnostic_artifact_revalidation.py
+  authorized_authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_diagnostic_artifact_revalidation_r1_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_diagnostic_artifact_revalidation_r1_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  authorized_external_writes: []
+  existing_external_read_only_inputs:
+    source_snapshot: /tmp/phase6_source_snapshot_r5_validation.jyT1fn/source-snapshot.json
+    diagnostic_artifact: /tmp/phase6_bounded_real_adapter_artifact_r1.Mhodhy/real-adapter-execution-artifact.json
+  all_other_paths: forbidden
+verified_preconditions:
+  original_workspace:
+    path: /data1/lbw/xjx/datadiff_fuzz_lab
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    index_staged_paths: 0
+    status_entries_observed: 2908
+  authority_clone:
+    path: /tmp/phase6_authority_real_evidence_chain_r1.WcCIEK
+    head_before_contract: 89226632c1389442707b0cd0b0059258c5ce5c5c
+    status_entries: 0
+    remote_count: 0
+    coordination_ledger_sha256_before_contract: 6c7536fcce7beb60bcf385526f5346c3ff29c528f4aac9682f4fdaa0403c6c3f
+  r5_source_snapshot:
+    source_clone: /tmp/phase6_source_snapshot_r5.jUnpUd/source
+    source_commit: b80dd03db0c54d18fafb3dbed00bfe50fcc9e224
+    source_snapshot_sha256: 6a4f059bfddb73d32b3a1d38405c09ff72dfa43533f7300fb383492bc98af3d2
+    source_digest: osc-phase6-source-snapshot-4a72791b80c05fd3609cd10c88c8f04544df37acb6c6c3bf5dc365cf8ddacd9c
+    status: clean
+    remote_count: 0
+  existing_r1_diagnostic_artifact:
+    path: /tmp/phase6_bounded_real_adapter_artifact_r1.Mhodhy/real-adapter-execution-artifact.json
+    sha256: 7bce7fd65c9afd2fc3d5fa8f1a446388208111b25818d26e1bdf27a69359058e
+    artifact_id: osc-private-bounded-real-adapter-artifact-id-a78c270f8c3d25b6df710a72767a86870f6a5df1551c2b415890f18f7e9bdaa6
+    schema_version: osc-private-bounded-real-adapter-artifact-v1
+    diagnostic_only: true
+    gate_credit: false
+    typed_receipt_index_emitted: false
+    candidate_confirmed: false
+    bug_claimed: false
+  immutable_writer_runner:
+    writer_path: src/datadiff_osc/runtime/_phase6_bounded_real_adapter_artifact.py
+    writer_sha256: dc2bfb564cda3a2c38f1212d1fc3718431e23f32d64fabe19252a445167fd6e2
+    runner_path: scripts/osc/run_phase6_bounded_real_adapter_artifact.py
+    runner_sha256: 6a5d33bdf7e3e97515a1801b0b446820f7e56a4be142b70abec886492be00a46
+  new_paths_required_absent_before_write:
+    - src/datadiff_osc/runtime/_phase6_bounded_diagnostic_artifact_revalidation.py
+    - tests/osc/test_runtime_phase6_bounded_diagnostic_artifact_revalidation.py
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_diagnostic_artifact_revalidation_r1_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_diagnostic_artifact_revalidation_r1_report.yaml
+  frozen_public_targets:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+required_inputs:
+  - docs/codex_multi_agent_development_runbook.md
+  - experiments/final_bug_discovery_protocol_v3/TODO.md
+  - docs/project_architecture.md
+  - docs/fine_grained_discovery_architecture.md
+  - docs/discovery_search_and_parallel_architecture.md
+  - docs/semantic_hypercontract_architecture.md
+  - docs/architecture_credibility_and_alternatives.md
+  - docs/competitive_paper_experiment_blueprint.md
+  - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_execution_r1_task_contract.yaml
+  - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_execution_r1_report.yaml
+  - src/datadiff_osc/runtime/_phase6_bounded_real_adapter_artifact.py
+  - src/datadiff_osc/runtime/_phase6_real_adapter_execution_sample.py
+  - src/datadiff_osc/runtime/_phase6_reachability_execution_binding.py
+  - src/datadiff_osc/_phase6_gate_authority.py
+frozen_interfaces:
+  - osc-public-api-freeze-v1:cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  - SourceSnapshotBinding and BoundedRealAdapterArtifact private writer schema
+  - ReachabilityExecutionBinding and RealAdapterExecutionSample private schemas
+  - all thirteen frozen_public_targets above
+required_invariants:
+  - >-
+    Revalidation must first verify exact artifact bytes, source snapshot, and
+    runner SHA, then rebuild the fixed declaration-derived fresh cell/pair,
+    typed results, evidence, sample, and every serialized context identity.
+    It must fail closed before returning any revalidated object for a changed
+    task, result, seed, outcome, evidence, sample, record, or source binding.
+  - >-
+    Revalidation must not invoke capture_real_adapter_execution_sample,
+    make_backend, execute_case, subprocess, a runner, or any external writer.
+    Tests may construct only in-memory fake records and pytest-temporary
+    diagnostic files; the existing external R1 artifact is read-only.
+  - >-
+    The returned state remains permanently private and not_evaluated with
+    diagnostic_only=true, authority_eligible=false, gate_credit=false,
+    dynamic_plan_emitted=false, typed_receipt_index_emitted=false,
+    coverage_event_created=false, candidate_confirmed=false, and
+    bug_claimed=false. It cannot serialize a receipt, raw-gate artifact,
+    producer receipt, index, plan, coverage event, authority bundle, or gate.
+  - >-
+    One revalidated artifact cannot satisfy any formal producer kind by itself;
+    the 10-kind receipt-index requirement, 18-section dynamic plan, 232/384/502
+    denominators, 100000 comparisons, v3 2200, repository gate, and all formal
+    Phase-6 barriers remain pending.
+  - >-
+    No public export, public API freeze, frozen target, writer/runner, gate
+    authority, existing source snapshot, existing artifact, or external path
+    may be modified.
+negative_review_requirements:
+  负向复核:
+    - >-
+      Artifact SHA/source/runner substitutions and exact task/result/seed/
+      outcome/evidence/sample/record context substitutions must fail closed in
+      a deterministic first-error order.
+    - >-
+      A current artifact with a valid private schema must still be rejected as
+      a formal receipt-index substitute because it is not the raw-gate schema
+      and no complete 10-kind producer set exists.
+  独立反例验证:
+    - >-
+      A legal temporary private sample revalidates exactly but remains
+      not_evaluated with all authority, promotion, and bug flags false.
+  异常输入验证:
+    - >-
+      Missing/unreadable/relative/tampered artifact input, malformed canonical
+      records, changed binding identities, and stale source/runner inputs fail
+      closed without adapter execution or durable output.
+forbidden:
+  - src/datadiff_osc/__init__.py
+  - src/datadiff_osc/public_api_freeze.json
+  - src/datadiff_osc/search/**
+  - src/datadiff_osc/contract_engine/**
+  - src/datadiff_osc/runtime/_receipt_producers.py
+  - tests/osc/test_runtime_receipt_producers.py
+  - src/datadiff_osc/runtime/_producer_provenance.py
+  - tests/osc/test_runtime_producer_provenance.py
+  - src/datadiff_osc/runtime/_phase6_bounded_real_adapter_artifact.py
+  - scripts/osc/run_phase6_bounded_real_adapter_artifact.py
+  - src/datadiff_osc/runtime/_phase6_real_adapter_execution_sample.py
+  - src/datadiff_osc/runtime/_phase6_reachability_execution_binding.py
+  - src/datadiff_osc/_phase6_gate_authority.py
+  - tests/osc/test_runtime_phase6_bounded_real_adapter_artifact.py
+  - docs/**
+  - experiments/final_bug_discovery_protocol_v3/**
+  - all external paths, including the existing R1 artifact and R5 source snapshot
+  - public exports, typed producer receipts, formal raw-gate artifacts, receipt index,
+    dynamic plan, coverage, authority bundle, gate calculation, candidate confirmation,
+    bug_claimed=true, tests/osc, six-file combined suite, repository suite, 100000 parity,
+    v3 2200, Phase 7, 2h, and 24h work
+validation:
+  scoped_suite_runs: exactly_1_after_implementation
+  command: >-
+    PYTHONDONTWRITEBYTECODE=1 /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python -m pytest -q -p no:cacheprovider
+    tests/osc/test_runtime_phase6_bounded_diagnostic_artifact_revalidation.py
+  expected_exit_code: 0
+  actual_adapter_pair_invocations: 0
+  external_durable_output_writes: 0
+  combined_suite: unauthorized
+completion_requirements:
+  - >-
+    Reverify allowed product paths, immutable writer/runner, existing R1
+    artifact, R5 source snapshot, and all thirteen frozen/public targets before
+    and after the scoped suite.
+  - >-
+    Retain the exact command, exit code, and complete terminal result in the
+    successor report. Use apply_patch for the report and ledger only after the
+    terminal result is known.
+  - >-
+    Re-read the existing R1 external artifact only after the test, with no
+    writes, and record its unchanged SHA and diagnostic-only flags.
+stop_conditions:
+  - >-
+    Any frozen/public SHA mismatch, original-worktree mutation, source/artifact
+    mutation, nonzero scoped-suite result, incomplete terminal result, preexisting
+    new path, unlisted write, or need to change a forbidden path.
+  - >-
+    Any adapter launch, subprocess/runner execution, external durable output,
+    formal receipt/index/plan/raw artifact emission, authority credit,
+    confirmation, or bug claim.
+decision:
+  private_revalidation_authorized: true
+  formal_typed_receipt_authorized: false
+  formal_raw_gate_artifact_authorized: false
+  dynamic_plan_authorized: false
+  artifact_receipt_index_authorized: false
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false

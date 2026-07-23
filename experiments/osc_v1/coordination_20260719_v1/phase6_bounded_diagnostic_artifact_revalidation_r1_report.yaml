@@ -1,0 +1,197 @@
+schema_version: osc-phase6-bounded-diagnostic-artifact-revalidation-r1-report-v1
+phase: 6
+task_id: OSC-6-BOUNDED-DIAGNOSTIC-ARTIFACT-REVALIDATION-R1
+status: complete_private_revalidation_scoped_validation_pass_no_gate_credit
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_bounded_diagnostic_artifact_revalidation_r1_task_contract.yaml
+  sha256: 19795934f513ac42512447aa5f485769e72cc9a646d4a56a21494f5c21cb216e
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  external_durable_writes: []
+  forbidden_paths_modified: []
+  authority_clone:
+    path: /tmp/phase6_authority_real_evidence_chain_r1.WcCIEK
+    head_before_contract: 89226632c1389442707b0cd0b0059258c5ce5c5c
+    status_before_contract: clean
+    remote_count_before_contract: 0
+  original_workspace:
+    head_before_and_after: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths_before_and_after: 0
+    status_entries_before_and_after: 2908
+  r5_source_clone:
+    path: /tmp/phase6_source_snapshot_r5.jUnpUd/source
+    commit_before_and_after: b80dd03db0c54d18fafb3dbed00bfe50fcc9e224
+    status_before_and_after: clean
+    remote_count_before_and_after: 0
+    untracked_pycache_files_after: 0
+contract_operational_correction_before_scoped_suite:
+  initial_contract_sha256: 1af33e1c2096320c1434de9bbc6825c41a0acf4ddf8929f220eaf0a3bf92e3d6
+  corrected_contract_sha256: 19795934f513ac42512447aa5f485769e72cc9a646d4a56a21494f5c21cb216e
+  reason: >-
+    The isolated authority clone intentionally has no local .venv. Before any
+    scoped suite was run, the contract's relative interpreter reference was
+    changed only to the existing workspace venv path. Product scope, test path,
+    one-run budget, and every authorization/prohibition remained unchanged.
+  scoped_suite_runs_before_correction: 0
+  product_writes_before_correction: 0
+precontract_read_only_audit:
+  initial_source_snapshot_call:
+    exit_code: 1
+    result: >-
+      TypeError: verify_source_snapshot() missing 1 required keyword-only
+      argument: repo_root.
+    disposition: >-
+      This happened before the task contract and performed no write, test,
+      adapter execution, or artifact operation. The same read-only inspection
+      was retried with the required repo_root and exited 0.
+  corrected_read_only_result:
+    exit_code: 0
+    result: >-
+      R5 source snapshot was valid; the existing R1 artifact SHA was exact and
+      diagnostic_only=true/gate_credit=false/typed_receipt_index_emitted=false/
+      candidate_confirmed=false/bug_claimed=false. Formal receipt-index
+      admission requires all 10 producer kinds.
+implementation:
+  product_paths:
+    src/datadiff_osc/runtime/_phase6_bounded_diagnostic_artifact_revalidation.py:
+      pre: absent_new_authorized_path
+      pre_and_post_scoped_suite_sha256: 1fb60a69042ca44d33ebeb3a77fa7db798949f02448d00269e545c8a4e1c5d23
+      result: >-
+        Added a private read-only revalidator that first verifies artifact
+        bytes/source/runner, rebuilds the fixed declaration-derived
+        ReachabilityExecutionBinding and in-memory RealAdapterExecutionSample,
+        and exact-compares every serialized family/cell/pair/seed/task/result/
+        outcome/evidence/sample/record identity. It has no writer, runner,
+        subprocess, adapter-capture, receipt, plan, index, or public-export
+        path.
+    tests/osc/test_runtime_phase6_bounded_diagnostic_artifact_revalidation.py:
+      pre: absent_new_authorized_path
+      pre_and_post_scoped_suite_sha256: abd2f55ccdd2b022c9de40c8e5b01c2ebb24420b9bed1b6ae1113812edd44c07
+      result: >-
+        Added ten in-memory/pytest-temporary assertions for legal revalidation,
+        task/result/seed/outcome/evidence/sample substitutions, a valid but
+        altered record, SHA/source/runner/path failures, and absence of direct
+        adapter-capture or durable-output APIs.
+  immutable_dependencies_pre_and_post:
+    src/datadiff_osc/runtime/_phase6_bounded_real_adapter_artifact.py: dc2bfb564cda3a2c38f1212d1fc3718431e23f32d64fabe19252a445167fd6e2
+    scripts/osc/run_phase6_bounded_real_adapter_artifact.py: 6a5d33bdf7e3e97515a1801b0b446820f7e56a4be142b70abec886492be00a46
+source_snapshot:
+  path: /tmp/phase6_source_snapshot_r5_validation.jyT1fn/source-snapshot.json
+  sha256_pre_and_post: 6a4f059bfddb73d32b3a1d38405c09ff72dfa43533f7300fb383492bc98af3d2
+  source_digest: osc-phase6-source-snapshot-4a72791b80c05fd3609cd10c88c8f04544df37acb6c6c3bf5dc365cf8ddacd9c
+  verification: valid
+existing_r1_diagnostic_artifact:
+  path: /tmp/phase6_bounded_real_adapter_artifact_r1.Mhodhy/real-adapter-execution-artifact.json
+  sha256_pre_and_post: 7bce7fd65c9afd2fc3d5fa8f1a446388208111b25818d26e1bdf27a69359058e
+  artifact_id: osc-private-bounded-real-adapter-artifact-id-a78c270f8c3d25b6df710a72767a86870f6a5df1551c2b415890f18f7e9bdaa6
+  post_suite_read_only_revalidation:
+    exit_code: 0
+    status: not_evaluated
+    result: >-
+      The exact bytes/source/runner revalidated against rebuilt typed context;
+      status=not_evaluated, binding_digest=osc-private-reachability-execution-binding-6bcef1f2fa41c1d8eafa0fb42a850adf82e2976781f70560c904a42b308a6e40,
+      sample_id=osc-private-real-adapter-execution-sample-id-v1-2bf14a52bc1f34e06abf53d24a83f694ec3dbbdd30448e3e007afc1d6fa04ef2,
+      sample_digest=osc-private-real-adapter-execution-sample-430af0b0ff975f0ed4b733fd879edc1cd4a9d2796fb830e735911013e51e7114.
+    diagnostic_only: true
+    authority_eligible: false
+    gate_credit: false
+    formal_raw_gate_artifact_emitted: false
+    typed_producer_receipt_emitted: false
+    artifact_receipt_index_emitted: false
+    dynamic_plan_emitted: false
+    coverage_event_created: false
+    authority_bundle_emitted: false
+    candidate_confirmed: false
+    bug_claimed: false
+validation:
+  scoped_suite_runs: 1
+  command: >-
+    cwd=/tmp/phase6_authority_real_evidence_chain_r1.WcCIEK;
+    PYTHONDONTWRITEBYTECODE=1
+    /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python -m pytest -q
+    -p no:cacheprovider
+    tests/osc/test_runtime_phase6_bounded_diagnostic_artifact_revalidation.py
+  exit_code: 0
+  complete_terminal_result: |-
+    ..........                                                               [100%]
+    10 passed in 19.54s
+  actual_adapter_pair_invocations: 0
+  runner_invocations: 0
+  external_durable_output_writes: 0
+  temporary_test_artifacts: pytest_tmp_only
+  combined_suite: not_run_unauthorized
+frozen_public_targets: 13_of_13_exact_pre_and_post_scoped_suite
+coverage:
+  负向复核: >-
+    The suite rejected every declared substituted typed context and record
+    identity. Byte/SHA, source, runner, missing-path, and relative-path
+    failures occur before a revalidated object is returned. The post-suite
+    re-read independently confirmed the real R1 artifact still binds exactly.
+  独立反例验证: >-
+    A valid temporary private artifact produced a matching revalidation object,
+    but its status is not_evaluated and every formal artifact, producer receipt,
+    plan, index, authority, promotion, and bug flag is false. It therefore
+    cannot be counted as a formal producer or a Phase-6 result.
+  异常输入验证: >-
+    Malformed/missing/relative paths, altered records, stale source/runner,
+    and changed task/result/seed/outcome/evidence/sample fields all fail closed
+    without invoking the adapter capture API or writing any durable external
+    artifact.
+findings:
+  - id: OSC-6-DYNAMIC-PLAN-B1
+    severity: blocker
+    claim: >-
+      One revalidated diagnostic artifact still cannot create the 18-section
+      dynamic plan or the 100000-comparison, 22/2200, repository, performance,
+      and recheck evidence it requires.
+    disposition: open_unchanged_no_formal_execution_authorized
+  - id: OSC-6-R-B3
+    severity: blocker
+    claim: >-
+      Revalidation improves the exact private context binding of one artifact,
+      but no formal TypedProducerReceipt, RawGateArtifact, or complete
+      10-producer artifact receipt index exists.
+    disposition: open_unchanged_private_revalidation_is_not_formal_receipt_chain
+  - id: OSC-6-G-B1
+    severity: blocker
+    claim: >-
+      One diagnostic pair still cannot meet the declaration-derived 232/384/502
+      denominators, activation/reachability, focus, mutation, or performance
+      requirements.
+    disposition: open_unchanged_no_gate_eligible_aggregate_evidence
+counts:
+  blocker_open: 3
+  high_open: 0
+  medium_open: 0
+  product_writes: 2
+  authority_writes: 3
+  external_durable_output_writes: 0
+  actual_adapter_pair_invocations: 0
+  runner_invocations: 0
+  scoped_suite_runs: 1
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  forbidden_paths_modified: []
+barrier:
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  bounded_diagnostic_artifact_revalidation: complete_one_artifact_not_evaluated_no_gate_credit
+  dynamic_plan: absent_fail_closed
+  artifact_receipt_index: absent_fail_closed
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
+next_step_requires_new_task_contract: >-
+  Any transition from this private revalidated artifact to a formal raw-gate
+  artifact, typed producer receipt, receipt index, dynamic plan, 232/384/502
+  evidence, or gate calculation requires a new authority with an explicit
+  source snapshot, producer coverage, output locations, workload budget, and
+  validation plan. This report authorizes none of those transitions.
