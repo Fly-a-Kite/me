@@ -1,0 +1,146 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-BOUNDED-REAL-ADAPTER-ARTIFACT-IMPLEMENTATION-R1
+owner: /root
+mode: root_serial_isolated_bounded_real_adapter_artifact_implementation
+implementation_child_agents: 0
+reviewer_child_agents_created: 0
+objective: >-
+  Implement a private, fail-closed writer and runner for exactly one later
+  source-bound pandas/polars fresh-pair execution artifact. The implementation
+  must preserve an explicit diagnostic-only boundary: it can never create a
+  dynamic plan, typed receipt index, coverage event, formal gate result,
+  candidate confirmation, or bug claim. This contract implements and tests
+  the writer only; a successor clean-source snapshot and separate execution
+  authority are required before the reserved output is written.
+user_authorization:
+  date: 2026-07-24
+  exact_confirmation: 明确授权
+  interpreted_scope: >-
+    A bounded real-execution path is authorized after a fresh source snapshot.
+    To avoid an unbound executable writer, this first contract is limited to
+    implementation and non-executing scoped validation; it preserves the
+    separately reserved single-pair external output for the successor authority.
+authorization_boundary:
+  authorized_product_writes:
+    - src/datadiff_osc/runtime/_phase6_bounded_real_adapter_artifact.py
+    - scripts/osc/run_phase6_bounded_real_adapter_artifact.py
+    - tests/osc/test_runtime_phase6_bounded_real_adapter_artifact.py
+  authorized_authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_implementation_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_implementation_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  reserved_external_execution_output:
+    directory: /tmp/phase6_bounded_real_adapter_artifact_r1.Mhodhy
+    artifact: /tmp/phase6_bounded_real_adapter_artifact_r1.Mhodhy/real-adapter-execution-artifact.json
+    state_at_contract_creation: empty_directory
+    writes_in_this_implementation_contract: forbidden
+  all_other_paths: forbidden
+verified_preconditions:
+  original_workspace:
+    path: /data1/lbw/xjx/datadiff_fuzz_lab
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    index_staged_paths: 0
+    status_entries_observed: 2908
+  authority_clone:
+    path: /tmp/phase6_authority_real_evidence_chain_r1.WcCIEK
+    head_before_contract: 87c89874ebcb626be5b629c8547e69b064f57241
+    status_entries: 0
+    remote_count: 0
+  r4_source_snapshot:
+    source_commit: e16380e553072687e76749c2fe9316e0c1703545
+    source_digest: osc-phase6-source-snapshot-2552d88b56ad196f909d6323cf43e7ab156ae8c99181a744b326311ef27955cc
+    snapshot_byte_sha256: b48663cea1eab899aa3cb390e9a40b30dc44db3bfe5ea9699ea060c977ebf355
+    status: valid_but_precedes_this_new_writer
+  authority_ledger_sha256_before_contract_write: fcee0c73921522795dad95ffdfcc7d60fbfbfc1d50dc83d7f70640e901b11570
+  bounded_execution_registration:
+    family_id: pandas_nullable_bool_reduction
+    fresh_pair: [pandas, polars]
+    endpoint_metadata:
+      backend_version: 1.0.0
+      adapter_revision: adapter-v1
+    protocol_digest: phase6-bounded-real-adapter-artifact-r1
+    lane_selection: first_frozen_formal_lane_only
+    seed_block_id: bounded-real-adapter-seed-block-r1
+    master_seed: 29
+    excluded_master_seeds: all_except_29
+    excluded_families: all_except_pandas_nullable_bool_reduction
+    excluded_backend_pairs: all_except_pandas_polars_for_selected_fresh_cell
+    execution_budget:
+      actual_adapter_pair_invocations_in_this_contract: 0
+      future_execution_authority_pair_invocations: exactly_1
+      parallel: false
+      retries: 0
+      dynamic_plan_records: 0
+      typed_receipt_index_records: 0
+      coverage_events: 0
+  frozen_public_targets:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+required_invariants:
+  - >-
+    The writer must accept only the exact existing private real-adapter sample
+    shape generated from the selected declaration-derived fresh cell/pair, and
+    must bind source snapshot digest/bytes, exact task and seed lineage, source
+    case, result group, endpoint order, execution mode, adapter records, raw
+    and normalized bytes/digests, command digest, and target/version metadata.
+  - >-
+    Serialization must be canonical, create a new external file atomically,
+    refuse existing/symlink/escaped paths, and be re-verifiable from bytes.
+    No caller-supplied summary, seed, source, task, record, or output binding
+    may be substituted after capture.
+  - >-
+    The artifact is permanently diagnostic-only: authority_eligible=false,
+    gate_credit=false, dynamic_plan_emitted=false, typed_receipt_index_emitted=false,
+    coverage_event_created=false, candidate_confirmed=false, and bug_claimed=false.
+  - >-
+    The test suite must use injected in-memory sample data or mocks only: it
+    must launch zero adapters and create no reserved external artifact. The one
+    actual pair invocation is deferred until a successor source snapshot binds
+    this new writer and a separate execution authority names the exact command.
+negative_review_requirements:
+  负向复核:
+    - source snapshot, task/seed/result/outcome, record order/digest, command digest, and existing/symlink output substitutions fail closed
+  独立反例验证:
+    - a structurally valid private sample cannot acquire gate credit, receipt-index authority, coverage, confirmation, or bug claim by serialization
+  异常输入验证:
+    - malformed canonical JSON, unverified source snapshot, wrong family/pair/version, wrong seed, non-OK record, escaped path, and write race fail closed
+forbidden:
+  - public exports, public_api_freeze.json, all frozen target paths, existing diagnostic-sample module, existing source snapshot module, gate authority module, receipt/provenance modules, or any path outside authorization_boundary
+  - all external output writes, real adapter launch, dynamic plan, typed receipt index, formal artifact receipt, coverage event, gate calculation, candidate confirmation, or bug_claimed=true during this implementation contract
+  - tests/osc whole directory, six-file combined suite, repository suite, 100000 parity, v3 2200, Phase 7, 2h, or 24h execution
+validation:
+  scoped_suite_runs: exactly_1_after_implementation
+  command: >-
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+    tests/osc/test_runtime_phase6_bounded_real_adapter_artifact.py
+  expected_exit_code: 0
+  actual_adapter_pair_invocations: 0
+  reserved_external_artifact_writes: 0
+  combined_suite: unauthorized
+stop_conditions:
+  - any frozen/public SHA mismatch, original-worktree mutation, source snapshot mismatch, or artifact write before successor authority
+  - a test launches an adapter, accepts a negative mutation, creates gate credit, or lacks a complete terminal result
+  - any write outside the six authorized paths
+decision:
+  bounded_real_adapter_writer: pending_implementation
+  fresh_source_snapshot_for_writer: required_after_implementation
+  actual_bounded_execution: unauthorized_until_successor_authority
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false

@@ -1,0 +1,175 @@
+schema_version: osc-phase6-bounded-real-adapter-artifact-implementation-report-v1
+phase: 6
+task_id: OSC-6-BOUNDED-REAL-ADAPTER-ARTIFACT-IMPLEMENTATION-R1
+status: scoped_validation_failed_3_passed_1_failed_no_adapter_or_artifact_pending_new_task_contract
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_implementation_task_contract.yaml
+  sha256: 69f0c61cf3bf315b7c6da53cd2921363572494171551be3725682cd73922db48
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  writes:
+    - src/datadiff_osc/runtime/_phase6_bounded_real_adapter_artifact.py
+    - scripts/osc/run_phase6_bounded_real_adapter_artifact.py
+    - tests/osc/test_runtime_phase6_bounded_real_adapter_artifact.py
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_implementation_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_implementation_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  forbidden_paths_modified: []
+  original_workspace:
+    head_before_and_after: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    staged_paths_before_and_after: 0
+    status_entries_before_and_after: 2908
+  authority_clone:
+    path: /tmp/phase6_authority_real_evidence_chain_r1.WcCIEK
+    head_before_implementation: 87c89874ebcb626be5b629c8547e69b064f57241
+    remote_count: 0
+implementation:
+  product_paths:
+    src/datadiff_osc/runtime/_phase6_bounded_real_adapter_artifact.py:
+      pre: absent_new_authorized_path
+      pre_and_post_scoped_suite_sha256: dc2bfb564cda3a2c38f1212d1fc3718431e23f32d64fabe19252a445167fd6e2
+    scripts/osc/run_phase6_bounded_real_adapter_artifact.py:
+      pre: absent_new_authorized_path
+      pre_and_post_scoped_suite_sha256: 6a5d33bdf7e3e97515a1801b0b446820f7e56a4be142b70abec886492be00a46
+    tests/osc/test_runtime_phase6_bounded_real_adapter_artifact.py:
+      pre: absent_new_authorized_path
+      pre_and_post_scoped_suite_sha256: 8609623cb555e557038650a3fd598125e99e582d0750f91cf4997fefa8b47d3d
+  scope: >-
+    The private writer/runner bind one future pandas/polars diagnostic artifact
+    to a verified source snapshot, exact private task/seed/result/evidence
+    context, runner bytes, two canonical adapter records, and a no-overwrite
+    external path. The implementation intentionally exposes no public API and
+    grants no producer receipt, dynamic plan, coverage event, gate credit,
+    confirmation, or bug claim.
+validation:
+  scoped_suite_runs: 1
+  command: >-
+    cwd=/tmp/phase6_authority_real_evidence_chain_r1.WcCIEK;
+    PYTHONDONTWRITEBYTECODE=1
+    /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python -m pytest -q
+    -p no:cacheprovider tests/osc/test_runtime_phase6_bounded_real_adapter_artifact.py
+  exit_code: 1
+  complete_terminal_result: |-
+    ..F.                                                                     [100%]
+    =================================== FAILURES ===================================
+    _______ test_negative_review_rejects_record_seed_and_json_substitutions ________
+
+    tmp_path = PosixPath('/tmp/pytest-of-root/pytest-25/test_negative_review_rejects_r0')
+
+        def test_negative_review_rejects_record_seed_and_json_substitutions(tmp_path):
+            sample = _sample()
+            first, second = sample.adapter_records
+            with pytest.raises(ValueError, match="record order"):
+                replace(sample, adapter_records=(second, first))
+            with pytest.raises(ValueError, match="raw summary SHA mismatch"):
+                replace(first, raw_summary_sha256="0" * 64)
+
+            artifact = _artifact()
+            output_dir = tmp_path / "out"
+            output_dir.mkdir()
+            output = output_dir / "real-adapter-execution-artifact.json"
+            expected_sha = write_bounded_real_adapter_artifact(
+                artifact=artifact, output_path=output
+            )
+            payload = json.loads(output.read_text())
+            payload["master_seed"] = 30
+            output.write_text(canonical_json(payload) + "\n")
+    >       with pytest.raises(ValueError, match="duplicate JSON fields"):
+    E       AssertionError: Regex pattern did not match.
+    E         Expected regex: 'duplicate JSON fields'
+    E         Actual message: 'bounded artifact SHA mismatch'
+
+    tests/osc/test_runtime_phase6_bounded_real_adapter_artifact.py:152: AssertionError
+    =========================== short test summary info ============================
+    FAILED tests/osc/test_runtime_phase6_bounded_real_adapter_artifact.py::test_negative_review_rejects_record_seed_and_json_substitutions
+    1 failed, 3 passed in 8.02s
+  actual_adapter_pair_invocations: 0
+  reserved_external_artifact_writes: 0
+  untracked_pycache_directories_after_suite: 0
+  reserved_output_directory_entries_after_suite: 0
+coverage:
+  负向复核: >-
+    Record-order and record-SHA substitutions were rejected. The master-seed
+    byte mutation was correctly rejected first as bounded artifact SHA mismatch,
+    but the test incorrectly expected the later duplicate-field branch. The
+    duplicate-JSON branch therefore lacks a passing assertion under a matching
+    external SHA.
+  独立反例验证: >-
+    No adapter was launched: all four tests constructed in-memory private
+    samples and runner --help only. The reserved external output path remained
+    empty, so this is not real execution evidence and has no gate credit.
+  异常输入验证: >-
+    Relative and wrong-name outputs plus malformed source binding were rejected
+    in the passing tests. The suite failure leaves malformed duplicate JSON
+    without complete terminal validation and must not be treated as covered.
+findings:
+  - id: OSC-6-BOUNDED-ARTIFACT-R1-M1
+    severity: medium
+    claim: >-
+      The sole allowed scoped suite failed because its negative test expected
+      the duplicate-JSON error after it had already mutated the artifact bytes
+      without updating expected_sha256. The verifier correctly reports the
+      earlier bounded artifact SHA mismatch; the duplicate-field failure is not
+      completely validated by a passing suite.
+    reproduction: >-
+      Mutate master_seed in the serialized file and retain the original expected
+      SHA. verify_bounded_real_adapter_artifact raises bounded artifact SHA
+      mismatch before JSON parsing, while the test asserts duplicate JSON fields.
+    violated_invariant: >-
+      Each required negative path must have a complete, correctly ordered,
+      passing fail-closed assertion; an earlier integrity failure cannot be
+      misrepresented as validation of a later parser failure.
+    required_test: >-
+      Under a new test-only remediation contract, assert SHA mismatch for the
+      byte mutation, then create a duplicate-key payload with its matching
+      expected SHA and assert duplicate JSON fields. Run the new contract's
+      scoped suite exactly once.
+    disposition: open_pending_new_test_only_task_contract
+inherited_open_findings:
+  - id: OSC-6-DYNAMIC-PLAN-B1
+    severity: blocker
+    disposition: open_requires_separate_real_execution_authority
+  - id: OSC-6-R-B3
+    severity: blocker
+    disposition: open_unchanged
+  - id: OSC-6-G-B1
+    severity: blocker
+    disposition: open_unchanged
+counts:
+  blocker_open: 3
+  high_open: 0
+  medium_open: 1
+  scoped_tests_passed: 3
+  scoped_tests_failed: 1
+  actual_adapter_pair_invocations: 0
+  reserved_external_artifact_writes: 0
+  product_writes: 3
+  authority_writes: 3
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  forbidden_paths_modified: []
+frozen_public_targets: 13_of_13_exact_pre_and_post_suite
+barrier:
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  r4_source_snapshot: valid_but_stale_for_new_writer
+  bounded_real_adapter_writer: pending_test_only_remediation
+  actual_bounded_execution: unauthorized_until_new_contract_and_fresh_source_snapshot
+  dynamic_plan: absent_fail_closed
+  artifact_receipt_index: absent_fail_closed
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
+next_step_requires_new_task_contract: >-
+  The R1 contract consumed its one scoped suite. A new test-only remediation
+  contract is required before changing the test or running it again; only after
+  that report succeeds may a fresh source snapshot and a separate bounded
+  execution authority be considered.

@@ -1442,6 +1442,40 @@ tasks:
       combined_suite: unauthorized
       phase7_paired_pilot: unauthorized
       twenty_four_hour: unauthorized
+  - task_id: OSC-6-BOUNDED-REAL-ADAPTER-ARTIFACT-IMPLEMENTATION-R1
+    owner: /root
+    mode: root_serial_isolated_bounded_real_adapter_artifact_implementation
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - src/datadiff_osc/runtime/_phase6_bounded_real_adapter_artifact.py
+      - scripts/osc/run_phase6_bounded_real_adapter_artifact.py
+      - tests/osc/test_runtime_phase6_bounded_real_adapter_artifact.py
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_implementation_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_implementation_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    task_contract_sha256: 69f0c61cf3bf315b7c6da53cd2921363572494171551be3725682cd73922db48
+    report_sha256: 0d71895824503deaf6be19de90ca188080c083a1fe78c09dbfe4d0254953903f
+    status: scoped_validation_failed_3_passed_1_failed_no_adapter_or_artifact_pending_new_task_contract
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_implementation_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_bounded_real_adapter_artifact_implementation_report.yaml
+    findings:
+      - id: OSC-6-BOUNDED-ARTIFACT-R1-M1
+        severity: medium
+        disposition: open_pending_new_test_only_task_contract
+    barrier:
+      phase_6_private_foundation_barrier: pass_unchanged
+      phase_6_contract: pending
+      phase_6_granularity_reachability: pending
+      phase_6_runtime_correctness: pending
+      bounded_real_adapter_writer: pending_test_only_remediation
+      actual_bounded_execution: unauthorized_until_new_contract_and_fresh_source_snapshot
+      dynamic_plan: absent_fail_closed
+      artifact_receipt_index: absent_fail_closed
+      gate_credit: false
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
 interface_freeze:
   version: osc-public-api-freeze-v1
   hash: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
