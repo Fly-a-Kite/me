@@ -1682,6 +1682,44 @@ tasks:
       combined_suite: unauthorized
       phase7_paired_pilot: unauthorized
       twenty_four_hour: unauthorized
+  - task_id: OSC-6-FORMAL-LATEST-TARGET-ENVIRONMENT-REMEDIATION-R1
+    owner: /root
+    mode: root_serial_isolated_latest_target_environment_remediation
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - requirements-final.lock (in /tmp/phase6_formal_latest_target_remediation_r1.20260724/source only)
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_latest_target_environment_remediation_r1_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_latest_target_environment_remediation_r1_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+      - /tmp/phase6_formal_latest_target_remediation_r1.20260724/source/**
+      - /tmp/phase6_formal_latest_target_remediation_r1.20260724/venv/**
+      - /tmp/phase6_formal_latest_target_remediation_r1.20260724/wheel_downloads/pypi-polars-runtime-32.json
+      - /tmp/phase6_formal_latest_target_remediation_r1.20260724/wheel_downloads/pandas-3.0.5.whl
+      - /tmp/phase6_formal_latest_target_remediation_r1.20260724/wheel_downloads/polars-1.43.0.whl
+      - /tmp/phase6_formal_latest_target_remediation_r1.20260724/wheel_downloads/polars-runtime-32-1.43.0.whl
+      - /tmp/phase6_formal_latest_target_remediation_r1.20260724/wheel_downloads/duckdb-1.5.5.whl
+      - /tmp/phase6_formal_latest_target_remediation_r1.20260724/wheel_downloads/wheel-acquisition-audit.json
+      - /tmp/phase6_formal_latest_target_remediation_r1.20260724/source_snapshot/formal-source-snapshot.json
+      - /tmp/phase6_formal_latest_target_remediation_r1.20260724/target_version_revalidation/target-version-revalidation.json
+      - /tmp/phase6_formal_latest_target_remediation_r1.20260724/formal_output_layout/formal-output-layout.json
+    task_contract_sha256: 3904d2fadda5370e71b4cdd8389a43edaea437210c100cc4e1590d5a2281e3e9
+    report_sha256: pending_not_created
+    status: authorized_pending_isolated_latest_target_environment_remediation
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_formal_latest_target_environment_remediation_r1_task_contract.yaml
+    barrier:
+      phase_6_private_foundation_barrier: pass_unchanged
+      phase_6_contract: pending
+      phase_6_granularity_reachability: pending
+      phase_6_runtime_correctness: pending
+      target_version_drift: authorized_pending_isolated_remediation
+      formal_execution_workload: unauthorized
+      dynamic_plan: absent_fail_closed
+      artifact_receipt_index: absent_fail_closed
+      gate_credit: false
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
 interface_freeze:
   version: osc-public-api-freeze-v1
   hash: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131

@@ -1,0 +1,213 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-FORMAL-LATEST-TARGET-ENVIRONMENT-REMEDIATION-R1
+owner: /root
+role: root
+mode: root_serial_isolated_latest_target_environment_remediation
+implementation_child_agents: 0
+reviewer_child_agents_created: 0
+grandchildren_allowed: false
+objective: >-
+  Resolve OSC-6-FORMAL-TARGET-VERSION-R1-B1 only in a new isolated source clone
+  and virtual environment by moving pandas, polars, and duckdb to the exact
+  versions returned by the preserved official PyPI bytes. Update the lock's
+  required polars-runtime-32 transitive companion, install the full exact
+  hash-locked environment, create a new source snapshot, and revalidate the
+  seven recorded target-public-source bindings. This task grants no formal
+  workload, typed receipt, dynamic plan, receipt index, gate credit,
+  confirmation, or bug claim.
+user_authorization:
+  date: 2026-07-24
+  exact_confirmation: 升级这 3 个包
+  interpreted_scope: >-
+    Upgrade pandas to 3.0.5, polars to 1.43.0, and duckdb to 1.5.5, the exact
+    official latest versions observed by the completed public audit. Updating
+    polars-runtime-32 to its matching 1.43.0 release is an indispensable
+    transitive lock/environment change, not a fourth product target. All work
+    remains isolated; the original worktree and previous authorities/snapshots
+    remain immutable.
+parent_authority:
+  target_source_layout_contract_sha256: e622fc69f568967a41c5ed5866711b780da0def5f21339e3f602939ad4629a59
+  target_source_layout_report_sha256: c7c95a0d889ce5e5c887d04e8c46cd381da896dca2a80118e5b26ee38364c565
+  current_public_target_audit_sha256: ac70bd1744a79f8ee0c92c9996535c8ddfbd69a807ae55c5ff6423849ef55ab1
+  current_output_layout_sha256: 989b6f1e199f935aa9903926325c11e7c145c434586190da70bcb30b94ceacda
+authority_root:
+  parent_directory: /tmp/phase6_formal_execution_authority_r1.Smql7A
+  parent_authority_source: /tmp/phase6_formal_execution_authority_r1.Smql7A/source
+  parent_authority_commit_before_contract: 7016ef9e3a9547009679929eb02ab438e93b9c6c
+  remediation_root: /tmp/phase6_formal_latest_target_remediation_r1.20260724
+  remediation_source_clone: /tmp/phase6_formal_latest_target_remediation_r1.20260724/source
+  remediation_venv: /tmp/phase6_formal_latest_target_remediation_r1.20260724/venv
+  wheel_root: /tmp/phase6_formal_latest_target_remediation_r1.20260724/wheel_downloads
+  source_snapshot_root: /tmp/phase6_formal_latest_target_remediation_r1.20260724/source_snapshot
+  target_revalidation_root: /tmp/phase6_formal_latest_target_remediation_r1.20260724/target_version_revalidation
+  output_layout_root: /tmp/phase6_formal_latest_target_remediation_r1.20260724/formal_output_layout
+  reserved_formal_evidence_root: /tmp/phase6_formal_latest_target_remediation_r1.20260724/formal_evidence
+authorization_boundary:
+  authorized_product_writes:
+    - requirements-final.lock
+  authorized_authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_formal_latest_target_environment_remediation_r1_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_formal_latest_target_environment_remediation_r1_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  authorized_external_writes:
+    - /tmp/phase6_formal_latest_target_remediation_r1.20260724/source/**
+    - /tmp/phase6_formal_latest_target_remediation_r1.20260724/venv/**
+    - /tmp/phase6_formal_latest_target_remediation_r1.20260724/wheel_downloads/pypi-polars-runtime-32.json
+    - /tmp/phase6_formal_latest_target_remediation_r1.20260724/wheel_downloads/pandas-3.0.5.whl
+    - /tmp/phase6_formal_latest_target_remediation_r1.20260724/wheel_downloads/polars-1.43.0.whl
+    - /tmp/phase6_formal_latest_target_remediation_r1.20260724/wheel_downloads/polars-runtime-32-1.43.0.whl
+    - /tmp/phase6_formal_latest_target_remediation_r1.20260724/wheel_downloads/duckdb-1.5.5.whl
+    - /tmp/phase6_formal_latest_target_remediation_r1.20260724/wheel_downloads/wheel-acquisition-audit.json
+    - /tmp/phase6_formal_latest_target_remediation_r1.20260724/venv/pip-install-report.json
+    - /tmp/phase6_formal_latest_target_remediation_r1.20260724/venv/environment-audit.json
+    - /tmp/phase6_formal_latest_target_remediation_r1.20260724/source_snapshot/formal-source-snapshot.json
+    - /tmp/phase6_formal_latest_target_remediation_r1.20260724/target_version_revalidation/target-version-revalidation.json
+    - /tmp/phase6_formal_latest_target_remediation_r1.20260724/formal_output_layout/formal-output-layout.json
+  all_other_paths: forbidden
+verified_preconditions:
+  original_workspace:
+    path: /data1/lbw/xjx/datadiff_fuzz_lab
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    index_staged_paths: 0
+    status_entries_observed: 2908
+  parent_authority_source:
+    head: 7016ef9e3a9547009679929eb02ab438e93b9c6c
+    status_entries: 0
+    remote_count: 0
+  immutable_old_authority_inputs:
+    source_snapshot_sha256: 13134df2cf22758d7b4a71da74826fd3bd02d0f4cbd64ee0ad0479988a77b577
+    source_digest: osc-phase6-source-snapshot-6a7201659596c888a3efedfa9d1207cfadb2eda98f1ffd50a47c3e56405eef38
+    local_environment_audit_sha256: 26fb86e8d3d349bfd8cb19d1c65599d53c31af82d2b471025afac0567ef68f68
+    public_target_audit_sha256: ac70bd1744a79f8ee0c92c9996535c8ddfbd69a807ae55c5ff6423849ef55ab1
+    public_target_raw_sha256:
+      pandas: def430f070766d7d545517b3c2a08afbb59f865c4297281d00fafcc4e25a123f
+      polars: f9e79734733ed9c25f2c0a822a9e2f3bf8d7765201dc507293cd594d1e25e23c
+      duckdb: d2f9d34a9ba3976cae39e4bb69b464227851c907493e9d1395c91710f3a5a721
+      pyarrow: 752ee190964d03405cf7e53a2ba55c173c9f69a0f87a53383f19cd760cd80982
+      datafusion: 27287ace58a4003d8e4b5373d7c688cb0266a8e01ddc45d7f48ec803c515c42c
+      chdb: 25dfd4a21d3b82d9c83cbbe46c2965f37f9d8f8e89c5c2703dae107afd19a2b9
+      pysqlite3-binary: 250725f2b802e5d21db15739aa8ae3f18477dd27cee6803eef8f263594ab6d0c
+  old_public_latest_bindings:
+    pandas: {old_locked_version: 3.0.3, new_version: 3.0.5}
+    polars: {old_locked_version: 1.42.1, new_version: 1.43.0}
+    duckdb: {old_locked_version: 1.5.4, new_version: 1.5.5}
+    pyarrow: 25.0.0
+    datafusion: 54.0.0
+    chdb: 4.2.1
+    pysqlite3-binary: 0.5.4.post2
+  old_lock_required_lines:
+    duckdb: duckdb==1.5.4
+    pandas: pandas==3.0.3
+    polars: polars==1.42.1
+    polars_runtime_32: polars-runtime-32==1.42.1
+  external_paths_before_contract:
+    remediation_root: absent
+    reserved_formal_evidence_root: absent
+  frozen_public_targets:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+  authority_ledger_sha256_before_contract_write: dc6a2f1fe3a98a434e59fb5e2b0e086fbd35882d1146b6fdbce3dd036b8c1d15
+required_invariants:
+  - >-
+    Only requirements-final.lock may change in the remediation source clone;
+    exactly four pinned/hash-locked lines may differ: pandas 3.0.5, polars
+    1.43.0, duckdb 1.5.5, and their required polars-runtime-32 1.43.0
+    companion. All product code, tests, public exports, and thirteen frozen
+    targets remain byte-exact.
+  - >-
+    The new source clone must be clean and remote-free before/after each
+    checkpoint; its updated lock must be committed before it is snapshotted.
+    Previous authority clone, old snapshot, old public audit, and original
+    workspace are immutable inputs, never upgrade targets.
+  - >-
+    One read-only PyPI metadata response for polars-runtime-32 and four exact
+    wheel downloads may occur after contract validation. Each selected wheel
+    must be non-yanked, compatible with this Python/platform, match the public
+    response SHA-256, and be written only at its declared generic filename.
+  - >-
+    The new venv must be built only under remediation_root, install exactly the
+    full updated requirements-final.lock with --require-hashes --no-deps and no
+    cache, then pass pip check and an importlib.metadata version audit. No
+    package is installed, upgraded, removed, or cached outside that venv/root.
+  - >-
+    A fresh canonical source snapshot must bind the updated committed lock and
+    source state. The revalidation must bind that snapshot, the new venv audit,
+    and the seven preserved official raw source files; it must show all seven
+    target versions matching or fail closed. It remains a precondition, not a
+    TargetVersionReceipt.
+  - >-
+    A new canonical metadata-only output layout may be written under the new
+    remediation root and must predeclare ten producer locations and eighteen
+    plan sections while the new formal_evidence root remains absent.
+negative_review_requirements:
+  负向复核:
+    - wheel filename/tag/hash/version mismatch, missing polars runtime companion, and any extra lock diff must fail closed
+    - substituted snapshot or preserved public raw SHA, malformed environment audit, and nonmatching target version must fail closed
+  独立反例验证:
+    - >-
+      An isolated latest-target venv and revalidated source inputs still cannot
+      become a formal typed receipt, dynamic plan, receipt index, workload,
+      gate credit, candidate confirmation, or bug claim.
+  异常输入验证:
+    - >-
+      dirty/remote clone, preexisting root/output, failed pip check, package
+      drift, lock hash failure, unsupported wheel, source drift, extra output,
+      formal_evidence creation, or any scoped test/workload invocation stops.
+forbidden:
+  - /data1/lbw/xjx/datadiff_fuzz_lab and all prior authority/source snapshot/public audit roots
+  - all product paths except requirements-final.lock in the new remediation source clone
+  - src/datadiff_osc/public_api_freeze.json and all thirteen frozen_public_targets
+  - any package change outside remediation_venv, any unpinned resolver action, cache outside remediation root, or package version not declared here
+  - creation of remediation reserved_formal_evidence_root or any file below it
+  - all TargetVersionReceipt/typed producer receipt/raw execution artifact/dynamic plan/receipt index/gate calculation/candidate confirmation/bug claim
+  - tests/osc, six-file combined suite, repository suite, 100000 parity, v3 2200, Phase 7, 2h, or 24h execution
+validation:
+  test_execution_count: 0
+  formal_workload_execution_count: 0
+  product_lock_edits: 4
+  source_clone_commands: 1
+  public_metadata_get_requests: 1
+  wheel_downloads: 4
+  venv_create_commands: 1
+  hash_locked_pip_install_commands: 1
+  pip_check_commands: 1
+  fresh_source_snapshot_payloads: 1
+  target_revalidation_audits: 1
+  output_layout_manifests: 1
+  required_report_contents:
+    - exact old/new lock lines, selected upstream wheel source filename/url/hash, and lock diff scope
+    - exact new venv interpreter, pip install report SHA, pip check result, and seven package versions
+    - new source snapshot/audit/layout SHA values and full pre/post original/source/frozen state
+    - complete commands, exit codes, terminal results, and all negative checks
+    - explicit formal evidence/workload/gate/candidate/bug false state
+stop_conditions:
+  - any original/prior authority mutation, parent/new clone drift, remote, source/frozen SHA mismatch, or external path preexistence
+  - any lock diff beyond four exact lines, wheel mismatch, pip hash/install/check failure, or target revalidation mismatch
+  - any write outside authorization_boundary, formal-evidence creation, scoped test, workload, gate credit, confirmation, or bug claim
+decision:
+  latest_target_environment_remediation: authorized_pending_execution
+  old_target_version_drift: pending_isolated_remediation
+  formal_execution_workload_authorized: false
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
