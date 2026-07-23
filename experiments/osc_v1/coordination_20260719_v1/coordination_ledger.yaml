@@ -1399,10 +1399,11 @@ tasks:
       - experiments/osc_v1/coordination_20260719_v1/phase6_real_evidence_producer_chain_report.yaml
       - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
     task_contract_sha256: f8e646ebbec6ae1a51e6731b534f904ccb7e696844f6584a3e39382deb2a28e8
-    report_sha256: null
-    status: authorized_pending_implementation_no_product_write_yet
+    report_sha256: 5a76f664d36d35bed004fca6c0465fce281e395972502d2fcb56495ae13c8d65
+    status: complete_private_diagnostic_capture_boundary_scoped_68_passed_no_gate_credit
     evidence:
       - experiments/osc_v1/coordination_20260719_v1/phase6_real_evidence_producer_chain_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_real_evidence_producer_chain_report.yaml
     barrier:
       phase_6_private_foundation_barrier: pass_unchanged
       phase_6_contract: pending
@@ -1410,6 +1411,7 @@ tasks:
       phase_6_runtime_correctness: pending
       dynamic_plan: absent_fail_closed
       artifact_receipt_index: absent_fail_closed
+      diagnostic_capture_boundary: complete_no_durable_output_no_gate_credit
       gate_credit: false
       combined_suite: unauthorized
       phase7_paired_pilot: unauthorized
@@ -1512,7 +1514,7 @@ open_review_findings:
   - {id: OSC-6-R-B3, severity: blocker, owner: root, status: open_dynamic_plan_typed_receipt_raw_artifact_chain_absent_after_r3_source_snapshot}
   - {id: OSC-6-G-B1, severity: blocker, owner: root, status: open_no_gate_eligible_real_adapter_232_384_502_evidence}
   - {id: OSC-6-SOURCE-HANDOFF-R3-B1, severity: blocker, owner: root, status: remediated_by_clean_current_head_verification_no_gate_credit}
-  - {id: OSC-6-DYNAMIC-PLAN-B1, severity: blocker, owner: root, status: open_implementation_authority_created_real_execution_still_unauthorized}
+  - {id: OSC-6-DYNAMIC-PLAN-B1, severity: blocker, owner: root, status: open_diagnostic_producer_boundary_implemented_real_execution_still_unauthorized}
 gates:
   - name: phase_0_dirty_paths_registered_and_preserved
     threshold: complete snapshot and no existing dirty path overwritten
