@@ -1,0 +1,229 @@
+schema_version: osc-phase6-dynamic-plan-admission-boundary-report-v1
+phase: 6
+task_id: OSC-6-DYNAMIC-PLAN-ADMISSION-BOUNDARY-R3
+status: complete_fail_closed_real_evidence_prerequisites_absent_no_dynamic_plan_created
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_dynamic_plan_admission_boundary_task_contract.yaml
+  sha256: ba7a5fce510fa84855a9d1c282071d681977502aab5edd131ae295b664eadcd1
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  metadata_authority_clone:
+    path: /tmp/phase6_authority_dynamic_plan_r3.tk5QKV
+    head_before_authority_record_commit: 73daff5fa2625bca31a114e5445448a08ff7a591
+    remote_count: 0
+  source_handoff_dependency:
+    clean_source_head: 8367c0519d2252c3b507703114b67b474aac636c
+    source_digest: osc-phase6-source-snapshot-a4beb268b3097b194886a7f2e2e63abc8f8f1510ffa76ae0f10a8162fbfa322b
+    source_handoff_status: verified_current_head_no_gate_credit
+  writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_dynamic_plan_admission_boundary_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_dynamic_plan_admission_boundary_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  forbidden_paths_modified: []
+dynamic_plan_admission_boundary:
+  schema_version: osc-root-phase6-dynamic-plan-v3
+  expected_source_digest: osc-phase6-source-snapshot-a4beb268b3097b194886a7f2e2e63abc8f8f1510ffa76ae0f10a8162fbfa322b
+  required_section_count: 18
+  required_producer_kind_count: 10
+  target_package_identity_count: 7
+  required_sections:
+    - false_positive_fixes
+    - contract_comparison_decisions
+    - scheduled_target_attempts
+    - mutation_attempts
+    - focus_signals
+    - formal_lanes
+    - escalation_faults
+    - v3_runs
+    - v3_cases
+    - v3_executed_cases
+    - v3_backend_tasks
+    - campaign_rechecks
+    - pipeline_rechecks
+    - repository_tests
+    - target_packages
+    - candidate_records
+    - contract_performance_samples
+    - parallel_scaling_samples
+  hard_requirements:
+    contract_comparison_decisions_minimum: 100000
+    formal_lanes_exact: 11
+    v3_runs_exact: 22
+    v3_cases_exact: 2200
+    v3_executed_cases_exactly_equal_planned_cases: true
+    v3_backend_tasks_cover_every_case: true
+    target_packages_exact: 7
+    contract_performance_samples_minimum: 1000
+    parallel_scaling_samples_nonempty_and_task_set_equal: true
+    campaign_rechecks_per_candidate_ordinals: [1, 2, 3]
+    pipeline_rechecks_per_candidate_ordinals: [1, 2, 3]
+    candidate_bug_claimed: false
+  real_evidence_cross_bindings:
+    - every one of the eighteen sections requires producer_receipt_digest on each record
+    - v3_executed_cases requires task_id, result_digest, pipeline_digest, and execution_outcome_digest
+    - contract_comparison_decisions requires fingerprint/exact task and result bindings
+    - contract_performance_samples has 41 exact fields and requires distinct baseline/treatment task, config, and result bindings with equal seed lineage
+    - candidate_records requires source case, result group, evidence envelope, classification, and bug_claimed=false
+    - artifact receipt index must bind exact dynamic_plan_sha256 and the same producer_receipts_digest
+    - missing section receipt or receipt-set mismatch fails closed in gate-bundle construction
+  current_authorized_materialized_state:
+    dynamic_plan_file: absent
+    dynamic_plan_sha256: absent
+    dynamic_plan_valid: false
+    typed_producer_receipts: absent
+    artifact_receipt_index: absent
+    raw_artifacts: absent
+    execution_results: absent
+    gate_credit: false
+  first_unavailable_real_evidence_prerequisite: >-
+    Genuine typed producer receipts bound to actual exact-comparison decisions,
+    execution outcomes, backend tasks, performance pairs, repository tests,
+    target-version audit, and candidate rechecks. They cannot be predeclared
+    or substituted with syntactic digests because the artifact receipt index
+    and gate bundle cross-bind each record's producer receipt and exact plan
+    SHA. The currently prohibited 100000 and v3-2200 executions are therefore
+    prerequisites, not optional later validation.
+validation:
+  static_verifier_and_negative_test_inventory:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1
+      PYTHONPATH=/tmp/phase6_clean_source_handoff_r3.onC30x/src
+      /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python -
+    exit_code: 0
+    complete_result: >-
+      schema=osc-root-phase6-dynamic-plan-v3; sections=18;
+      producer_kinds=10; target_packages=7; exact floors are comparison=100000,
+      formal_lanes=11, performance=1000, v3_runs=22, v3_cases=2200; executed
+      cases must equal planned cases; every section has a per-record producer
+      receipt digest; artifact index must bind exact plan SHA and producer-set
+      digest; missing section receipts fail closed. Static negative test source
+      contains floor, package-identity, plan/receipt cross-binding, and
+      synthetic-typed-payload rejection coverage. No test was executed.
+  preservation_and_noncreation:
+    command: >-
+      Read-only git rev-parse/status/remote checks, exact SHA-256 checks for
+      all thirteen frozen/public targets, authority changed-path check, JSON
+      untracked-file check, and git diff --check.
+    exit_code: 0
+    complete_result: >-
+      Original HEAD=8d2b68550986dcc3ead41b4122907c7cf66a2232 with staged=0;
+      original, clean-source, and dynamic-authority frozen targets are 13/13
+      exact. Clean source and all prior authority clones are preserved; the
+      dynamic authority has only contract plus ledger before this report and
+      zero untracked JSON files. No dynamic plan payload exists.
+  validation_attempt_note:
+    initial_static_assertion_exit_code: 1
+    disposition: >-
+      Corrected without repository writes. The initial helper searched for
+      literal expanded campaign/pipeline error names, while verifier source
+      intentionally constructs them as f"{section}_ordinals_not_exactly_1_2_3".
+      The corrected static inspection above exited 0 and confirmed the real
+      generic check.
+  tests:
+    test_execution_count: 0
+    tests_not_run:
+      - tests/osc
+      - six-file combined suite
+      - repository suite
+      - 100000 parity
+      - v3 2200
+      - Phase 7
+      - 2h pilot
+      - 24h execution
+frozen_public_targets:
+  original_workspace: 13_of_13_exact
+  clean_source_worktree: 13_of_13_exact
+  dynamic_metadata_authority_clone: 13_of_13_exact
+coverage:
+  负向复核: >-
+    A source digest, syntactically shaped plan shell, planned case identifier,
+    or arbitrary producer digest cannot replace required current result,
+    outcome, and typed receipt bindings. The verifier's floors, exact sets,
+    and artifact-index cross-bindings reject the shortcut before authority.
+  独立反例验证: >-
+    The R3 clean-source payload is now current-head valid, but it carries no
+    dynamic plan, receipt index, artifact, or execution outcome. Source
+    validity alone therefore grants no dynamic-plan or Phase-6 gate authority.
+  异常输入验证: >-
+    Static negative tests establish fail-closed behavior for old schema,
+    missing/extra/duplicate/unordered decision records, insufficient floors,
+    substituted package identities, plan/receipt SHA mismatch, and synthetic
+    typed payloads. No malformed plan was created or persisted in this task.
+findings:
+  - id: OSC-6-DYNAMIC-PLAN-B1
+    severity: blocker
+    claim: >-
+      A valid dynamic plan cannot be honestly materialized while 100000 exact
+      comparisons, v3 2200 execution, repository test evidence, typed
+      producer receipts, artifacts, and candidate rechecks remain prohibited
+      or absent. The plan schema records actual evidence rather than a mere
+      future schedule.
+    reproduction: >-
+      verify_dynamic_gate_plan requires all eighteen sections, comparison
+      floor=100000, v3 runs/cases=22/2200 with executed set exactly equal to
+      planned set, per-record producer receipt digests, and exact result/outcome
+      fields. build_phase6_gate_authority_bundle rejects receipt-set mismatch
+      and missing section receipts. Current materialized plan/receipts/results
+      are all absent.
+    violated_invariant: >-
+      No caller-authored placeholder or prospective execution claim may be
+      admitted as typed Phase-6 evidence or dynamic-plan authority.
+    required_test: >-
+      Under a future explicit real-execution authority that lifts the relevant
+      hard execution prohibitions, generate real records and preserve the
+      existing fail-closed mutation coverage before attempting plan admission.
+    disposition: open_requires_explicit_real_execution_authority
+  - id: OSC-6-R-B3
+    severity: blocker
+    claim: Dynamic plan, typed receipt index, raw artifact, and producer chain remain absent.
+    disposition: open_unchanged
+  - id: OSC-6-G-B1
+    severity: blocker
+    claim: No gate-eligible real-adapter 232/384/502 evidence with fresh producer evidence exists.
+    disposition: open_unchanged
+counts:
+  blocker_new: 1
+  blocker_open: 3
+  high_open: 0
+  medium_open: 0
+  product_writes: 0
+  authority_writes: 3
+  dynamic_plan_payload_writes: 0
+  test_execution_count: 0
+  child_agents: 0
+  forbidden_paths_modified: []
+sha_verification:
+  authority_paths:
+    task_contract:
+      pre: absent
+      post: ba7a5fce510fa84855a9d1c282071d681977502aab5edd131ae295b664eadcd1
+    report:
+      pre: absent
+      post: recorded_after_write_in_ledger
+    ledger:
+      before_contract: e91499bec5eb445da19f148e1e190a61f888daf9e7380d6fde6f86c21fb34215
+      after_contract_before_report: adf810d3ef0c5a4b6a3dbf52a58ffde4e54b4fbdbaaf69dd33efbb0fe98e220c
+      final: recorded_after_report_in_ledger
+barrier:
+  r3_clean_source_handoff: verified_current_head_no_gate_credit
+  dynamic_plan: not_created_fail_closed_real_evidence_prerequisites_absent
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
+next_step_requires_explicit_user_authorization:
+  - >-
+    Authorize a bounded real-execution authority with an explicit budget,
+    allowed output locations, source/plan/receipt sequence, and permission to
+    run the currently prohibited 100000 and v3-2200 evidence-producing work.
+    It must remain separate from any Phase 7, 2h, 24h, candidate confirmation,
+    or bug-claim authority.
