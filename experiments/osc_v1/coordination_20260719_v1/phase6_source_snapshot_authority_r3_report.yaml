@@ -1,0 +1,194 @@
+schema_version: osc-phase6-source-snapshot-authority-r3-report-v1
+phase: 6
+task_id: OSC-6-SOURCE-SNAPSHOT-AUTHORITY-R3
+status: complete_verified_required_source_surface_no_gate_credit
+task_contract:
+  path: experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_task_contract.yaml
+  sha256: bd79a6b26eeb9643419d1d2cb0b56a398bdd975b1604a7a49aa1f4aea4e2c2af
+authority_chain:
+  owner: /root
+  implementation_child_agents: 0
+  reviewer_child_agents_created: 0
+  writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  external_ephemeral_validation_file: /tmp/phase6_source_snapshot_r3_validation.KtnGHV/source-snapshot.json
+  forbidden_paths_modified: []
+user_authorization:
+  exact_confirmation: >-
+    确认按上述 602 文件清单创建新的隔离 authority snapshot，R2 保留不修改
+  manifest:
+    selected_path_count: 602
+    selected_path_manifest_sha256: 5e074894a448bc46561ea81dfe05530261ebc9dc203bccd87ad328c86330a744
+    selected_content_manifest_sha256: d907e1ee6fdd0e6844cd78dc63021663c5011c2057f820b0d6b0fd2432937a54
+    scope_counts:
+      src/datadiff: 314
+      src/datadiff_osc: 78
+      tests/osc: 60
+      experiments/osc_v1: 130
+      scripts/osc: 9
+      explicit_authority_config_files: 11
+r3_source_snapshot:
+  clone: /tmp/phase6_authority_snapshot_r3.6HIpoz
+  commit: 8367c0519d2252c3b507703114b67b474aac636c
+  parent: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+  tree: 5f7ef425d6eb401e714a3078624695d5d8399cb2
+  remote_count: 0
+  source_snapshot_commit_worktree_before_authority_write: clean
+  committed_602_manifest: verified_exact
+r2_preservation:
+  r2_source_snapshot_commit: bea08cd56f8f3374664a417670bbc227b4eec502
+  r2_source_snapshot_tree: e03ec1ca6332cdf290768b5c675fa0a20a4643cc
+  r2a_scope_correction_authority_commit: 84dcece5fcedcfcc1f56640304d5208e43afce9e
+  r2a_scope_correction_report_sha256: 1abc0b493652c7b719b0d6f0102d94ed44fed63c24d77bac9917d034c759777e
+  r2_mutated: false
+  classification: R2_retained_unchanged_not_gate_compatible
+validation:
+  committed_602_manifest:
+    command: >-
+      Read R3 commit tree with git ls-tree/git show; select exactly the five
+      approved directory scopes plus eleven explicit authority/config files;
+      recompute sorted path and per-file SHA-256 manifests.
+    exit_code: 0
+    complete_result: >-
+      selected_path_count=602;
+      path_manifest_sha256=5e074894a448bc46561ea81dfe05530261ebc9dc203bccd87ad328c86330a744;
+      content_manifest_sha256=d907e1ee6fdd0e6844cd78dc63021663c5011c2057f820b0d6b0fd2432937a54.
+  source_api_validation:
+    command: >-
+      PYTHONDONTWRITEBYTECODE=1
+      PYTHONPATH=/tmp/phase6_authority_snapshot_r3.6HIpoz/src
+      /data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python -
+      /tmp/phase6_authority_snapshot_r3.6HIpoz
+      /tmp/phase6_source_snapshot_r3_validation.KtnGHV
+    exit_code: 0
+    complete_result:
+      verifier_required_path_count: 404
+      verifier_required_script: scripts/osc/build_phase6_gate_authority_bundle.py
+      git_head: 8367c0519d2252c3b507703114b67b474aac636c
+      git_status_digest: osc-git-status-porcelain-v1-29fe7ebfe8adfda597643ec6c8b5176d7963026a145420c6896d75ed113a4423
+      source_snapshot_byte_sha256: ce59034ccf4b2596fc14fa8330f7a93fc7bc00ea29079106148ce524f9779a41
+      source_digest: osc-phase6-source-snapshot-a4beb268b3097b194886a7f2e2e63abc8f8f1510ffa76ae0f10a8162fbfa322b
+      positive_valid: true
+      positive_verification_errors: []
+      negative_omission_error: >-
+        source snapshot paths missing:
+        scripts/osc/build_phase6_gate_authority_bundle.py
+      negative_substituted_expected_sha_errors:
+        - source_snapshot_hash_mismatch
+  source_api_scope: >-
+    The API payload deliberately used only _required_source_paths(repo_root).
+    The later R3 authority contract/report/ledger lie outside that verifier's
+    git-status scope; the full 602-path identity is instead bound separately
+    to immutable R3 commit 8367c0519d2252c3b507703114b67b474aac636c.
+  snapshot_diff_check_before_commit:
+    command: git diff --cached --check
+    exit_code: 2
+    complete_result: >-
+      60 inherited selected-source trailing-whitespace/new-EOF diagnostics;
+      no cleanup, formatting, deletion, or source edit was performed because
+      the user-confirmed content manifest is authoritative.
+  tests:
+    test_execution_count: 0
+    tests_not_run:
+      - tests/osc
+      - six-file combined suite
+      - repository suite
+      - 100000 parity
+      - v3 2200
+      - Phase 7
+      - 2h pilot
+      - 24h execution
+  frozen_public_targets:
+    exact_count: 13
+    pre_authority_write_result: 13_of_13_exact
+    post_authority_precommit_result: 13_of_13_exact
+sha_verification:
+  authority_paths:
+    r3_task_contract:
+      pre: absent
+      post: bd79a6b26eeb9643419d1d2cb0b56a398bdd975b1604a7a49aa1f4aea4e2c2af
+    r3_report:
+      pre: absent
+      post: recorded_after_write_in_ledger
+    ledger:
+      before_contract: 926703d26f1928ebab2a15a32c8ad01f9a184dd6801daae9180cec2b8b523a6c
+      after_contract_before_report: 27785441d86b7e7bb75bf45641e7c56352f9112fd57ea659949460fca536cb4e
+      final: recorded_after_report_in_ledger
+coverage:
+  负向复核: >-
+    A required scripts/osc path omission fails in source_snapshot_payload
+    before payload return; a substituted expected snapshot SHA yields
+    source_snapshot_hash_mismatch and no valid snapshot.
+  独立反例验证: >-
+    R2 remains clean but insufficient: its 593-path tree has no scripts/osc
+    entries, whereas R3 binds the verifier-required eligible source surface.
+  异常输入验证: >-
+    __pycache__, .pyc, and .pyo are excluded by verifier policy and cannot
+    substitute for the named required source script. The exercised substituted
+    expected-SHA input was rejected with source_snapshot_hash_mismatch; no
+    source payload mutation or malformed-byte artifact was created.
+findings:
+  - id: OSC-6-SOURCE-SNAPSHOT-R2-B1
+    severity: blocker
+    claim: >-
+      R2's 593-path source snapshot omitted scripts/osc eligible source files
+      required by the source-snapshot verifier, so it was not gate-compatible.
+    reproduction: >-
+      R2 commit bea08cd56f8f3374664a417670bbc227b4eec502 has zero
+      scripts/osc tree entries; omitting R3's named build script now fails
+      source_snapshot_payload with the required-path error.
+    violated_invariant: >-
+      Every verifier-required executable source path must be bound before a
+      source snapshot can be considered valid.
+    required_test: >-
+      Retain the exact named-script-omission fail-closed check under any later
+      source-snapshot authority.
+    disposition: remediated_by_R3_verified_required_source_surface_no_gate_credit
+  - id: OSC-6-R-B3
+    severity: blocker
+    claim: >-
+      Dynamic plan, typed receipt index, raw artifact, and artifact-manifest
+      producer chain remain absent. R3 provides only a validated source
+      boundary and cannot close the larger runtime/authority chain.
+    disposition: open_remaining_authority_chain_absent
+  - id: OSC-6-G-B1
+    severity: blocker
+    claim: >-
+      No gate-eligible real-adapter 232/384/502 evidence with fresh producer
+      evidence exists.
+    disposition: unchanged_open
+counts:
+  blocker_remediated_scope: 1
+  blocker_open: 2
+  high_open: 0
+  medium_open: 0
+  product_writes: 0
+  authority_writes: 3
+  test_execution_count: 0
+  child_agents: 0
+  forbidden_paths_modified: []
+barrier:
+  r2_source_snapshot: retained_not_gate_compatible
+  r3_source_snapshot_required_surface: verified_no_gate_credit
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  dynamic_plan_created: false
+  typed_receipt_index_created: false
+  raw_artifact_admitted: false
+  coverage_events_created: false
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false
+  combined_suite: unauthorized
+  phase7_paired_pilot: unauthorized
+  two_hour_pilot: unauthorized
+  twenty_four_hour: unauthorized
+next_step_requires_new_authority:
+  - >-
+    Any dynamic plan, typed receipt index, raw artifact, artifact-manifest
+    producer chain, real-adapter coverage evidence, or gate execution needs a
+    new narrowly scoped task contract. This R3 authority does not authorize it.

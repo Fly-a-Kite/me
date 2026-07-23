@@ -1,0 +1,164 @@
+schema_version: osc-task-contract-v1
+phase: 6
+task_id: OSC-6-SOURCE-SNAPSHOT-AUTHORITY-R3
+owner: /root
+mode: root_serial_isolated_clean_source_snapshot_authority
+implementation_child_agents: 0
+reviewer_child_agents_created: 0
+change_request: CR-OSC-6-004
+objective: >-
+  Register and narrowly verify a fresh isolated 602-path source snapshot after
+  R2A recorded that the earlier 593-path R2 source revision omitted the
+  verifier-required eligible scripts/osc source surface. R2 remains immutable
+  and untouched. This authority may verify only the source-snapshot boundary;
+  it cannot create or admit any dynamic plan, typed receipt index, raw
+  artifact, gate bundle, or gate result.
+user_authorization:
+  date: 2026-07-23
+  exact_confirmation: >-
+    确认按上述 602 文件清单创建新的隔离 authority snapshot，R2 保留不修改
+  approved_manifest:
+    selected_path_count: 602
+    selected_path_manifest_sha256: 5e074894a448bc46561ea81dfe05530261ebc9dc203bccd87ad328c86330a744
+    selected_content_manifest_sha256: d907e1ee6fdd0e6844cd78dc63021663c5011c2057f820b0d6b0fd2432937a54
+    added_surface_from_r2: scripts/osc eligible source files only
+    excluded_by_verifier:
+      - __pycache__
+      - .pyc
+      - .pyo
+authorization_boundary:
+  authorized_product_writes: []
+  authorized_authority_writes:
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_task_contract.yaml
+    - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_report.yaml
+    - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+  pre_contract_user_authorized_snapshot_commit: 8367c0519d2252c3b507703114b67b474aac636c
+  allowed_external_ephemeral_validation_output:
+    directory_pattern: /tmp/phase6_source_snapshot_r3_validation.*
+    file: source-snapshot.json
+    purpose: one source_snapshot_payload plus verify_source_snapshot validation only
+  all_other_paths: forbidden
+verified_preconditions:
+  original_workspace:
+    path: /data1/lbw/xjx/datadiff_fuzz_lab
+    head: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    index_staged_paths: 0
+    status_entries_observed: 2908
+  r3_isolated_clone:
+    path: /tmp/phase6_authority_snapshot_r3.6HIpoz
+    source_snapshot_commit: 8367c0519d2252c3b507703114b67b474aac636c
+    source_snapshot_parent: 8d2b68550986dcc3ead41b4122907c7cf66a2232
+    source_snapshot_tree: 5f7ef425d6eb401e714a3078624695d5d8399cb2
+    remote_count: 0
+    selected_path_count: 602
+    selected_path_manifest_sha256: 5e074894a448bc46561ea81dfe05530261ebc9dc203bccd87ad328c86330a744
+    selected_content_manifest_sha256: d907e1ee6fdd0e6844cd78dc63021663c5011c2057f820b0d6b0fd2432937a54
+    selected_scope_counts:
+      src/datadiff: 314
+      src/datadiff_osc: 78
+      tests/osc: 60
+      experiments/osc_v1: 130
+      scripts/osc: 9
+      explicit_authority_config_files: 11
+  r2_preserved:
+    r2_source_snapshot_commit: bea08cd56f8f3374664a417670bbc227b4eec502
+    r2_source_snapshot_tree: e03ec1ca6332cdf290768b5c675fa0a20a4643cc
+    r2a_scope_correction_commit: 84dcece5fcedcfcc1f56640304d5208e43afce9e
+    r2a_scope_correction_report_sha256: 1abc0b493652c7b719b0d6f0102d94ed44fed63c24d77bac9917d034c759777e
+    finding: OSC-6-SOURCE-SNAPSHOT-R2-B1
+    disposition: R2 retained_unchanged_not_gate_compatible
+  snapshot_diff_check:
+    command: git diff --cached --check before the R3 source snapshot commit
+    exit_code: 2
+    diagnostic_line_count: 60
+    disposition: >-
+      Inherited selected-source trailing-whitespace/new-EOF diagnostics were
+      preserved exactly. No cleanup, formatting, deletion, or source edit was
+      attempted; manifest identity, not style normalization, is authoritative.
+  authority_ledger_sha256_before_contract_write: 926703d26f1928ebab2a15a32c8ad01f9a184dd6801daae9180cec2b8b523a6c
+  frozen_public_targets:
+    src/datadiff_osc/search/context_receipts.py: 05e8815450902534d99b5e143622f150ce2033bedbc78c520c35f5abb65a9a87
+    tests/osc/test_search_context_receipts.py: e27bb47306a14079c393e54c30a85b4f15aeb3cb113f003d0a50d362904491ef
+    src/datadiff_osc/search/context_replay.py: 7b73fef2951cd52bf6de5f60641eb072bd7486dc28364b0eb5cc7d336f3943e9
+    tests/osc/test_search_gate_crosswalk.py: 4f16e24f8732b0d0b474d60c71549028a142e02d0a316ab40e870156c9ed19f2
+    src/datadiff_osc/search/lane_registry.py: 64120fde4d8df0a5c96d24eb8220f8fa3e1f1f5578fe7ce7c76942e942c558fb
+    tests/osc/test_search_lane_registry.py: 627929ca6bd25d68375a52f8de8b27aea35758da4af5776d7ff81ca1ab2fa4ae
+    src/datadiff_osc/runtime/_receipt_producers.py: 3963f122b9b1086d9fae6a7cd6cbf4c77ae9aed6f0f88ca2e7c2b4fbcd1d25dc
+    tests/osc/test_runtime_receipt_producers.py: ac55f4605d23b41dd4a2e00ef35d3ea50e25f475ded6df14878a19416ca622fa
+    src/datadiff_osc/runtime/_producer_provenance.py: fbd680d533349f5e816895b895091774b03d5277f691a588564d9ac4424924b3
+    tests/osc/test_runtime_producer_provenance.py: f52c84cc920efa4323d6ae725f77644d7bd0482e059670e7d131fd9a35fda2a1
+    src/datadiff_osc/contract_engine/_phase6_corpora.py: 64ecedb9dea03234a12464df62dc2b2742bc88a54aadee68a0178eb3aba0752d
+    tests/osc/test_contract_phase6_corpora.py: 8331ea727b9136a8861ac6c3791facd119cdf9c4405743cf2da0d631b31e9f8b
+    src/datadiff_osc/public_api_freeze.json: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
+required_inputs_read:
+  - docs/codex_multi_agent_development_runbook.md
+  - docs/project_architecture.md
+  - docs/fine_grained_discovery_architecture.md
+  - docs/discovery_search_and_parallel_architecture.md
+  - docs/semantic_hypercontract_architecture.md
+  - docs/architecture_credibility_and_alternatives.md
+  - docs/competitive_paper_experiment_blueprint.md
+  - experiments/final_bug_discovery_protocol_v3/TODO.md
+  - src/datadiff_osc/_phase6_gate_authority.py
+  - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+required_invariants:
+  - >-
+    The R3 source commit must retain exactly the confirmed 602 paths and both
+    manifest digests, have the declared parent/tree, a clean source payload
+    worktree before authority writes, and no remote.
+  - >-
+    The committed R3 tree must separately retain all 602 confirmed paths and
+    both manifest digests. The one API validation must use exactly the
+    verifier-discovered _required_source_paths subset (rather than authority
+    files added after the source commit), and verify_source_snapshot must
+    return valid=true while binding the current R3 commit and its source-status
+    digest.
+  - >-
+    Omitting exactly scripts/osc/build_phase6_gate_authority_bundle.py from
+    the selected list must fail closed in source_snapshot_payload before a
+    payload is returned, with the required-source-path error.
+  - >-
+    R2 stays immutable and cannot be relabeled gate-compatible. A successful
+    R3 source verification resolves only its missing-source-surface defect;
+    it does not create gate evidence or close OSC-6-R-B3 or OSC-6-G-B1.
+  - >-
+    All thirteen frozen/public target SHA-256 values remain exact. No public
+    export, public freeze, frozen file, candidate status, or bug claim changes.
+negative_review_requirements:
+  负向复核:
+    - exact omission of the named scripts/osc required source file fails closed
+    - malformed or substituted snapshot bytes fail verification without admission
+  独立反例验证:
+    - the clean but 593-path R2 commit remains insufficient for the current required source surface
+  异常输入验证:
+    - cache/bytecode exclusions cannot substitute for an eligible required source file
+forbidden:
+  - modification of R2, the original workspace, public exports, public API freeze, frozen targets, or any product path
+  - dynamic gate plan, typed receipt index, raw artifact, coverage event, producer/provenance record, bundle, preflight, publication, or gate calculation
+  - tests/osc, combined suite, repository suite, 100000 parity, v3 2200, Phase 7, 2h, or 24h execution
+  - candidate confirmation, diagnostic promotion, or bug_claimed=true
+validation:
+  test_execution_count: 0
+  authorized_read_only_api_validation: >-
+    One PYTHONDONTWRITEBYTECODE=1 source_snapshot_payload plus
+    verify_source_snapshot invocation against the isolated R3 clone using the
+    exact _required_source_paths subset, one external temporary
+    source-snapshot JSON, and one in-memory negative required-path omission.
+  required_result: >-
+    Record exact command, exit code, complete result, source digest, snapshot
+    byte SHA-256, git head/status digest, required-path count, positive valid
+    result, and negative fail-closed error.
+stop_conditions:
+  - any manifest, source commit, frozen/public SHA, remote, or original-worktree mismatch
+  - positive source verification failure or accepted required-path omission
+  - any write outside the three authority paths or the authorized external temporary validation file
+decision:
+  r2_preserved: true
+  r3_source_snapshot_registered: pending_verification
+  phase_6_private_foundation_barrier: pass_unchanged
+  phase_6_contract: pending
+  phase_6_granularity_reachability: pending
+  phase_6_runtime_correctness: pending
+  gate_credit: false
+  candidate_confirmed: false
+  bug_claimed: false

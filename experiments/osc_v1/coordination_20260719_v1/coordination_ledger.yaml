@@ -1283,6 +1283,34 @@ tasks:
       combined_suite: unauthorized
       phase7_paired_pilot: unauthorized
       twenty_four_hour: unauthorized
+  - task_id: OSC-6-SOURCE-SNAPSHOT-AUTHORITY-R3
+    owner: /root
+    mode: root_serial_isolated_clean_source_snapshot_authority
+    implementation_child_agents: 0
+    allowed_write_paths:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/coordination_ledger.yaml
+    source_snapshot_commit: 8367c0519d2252c3b507703114b67b474aac636c
+    source_snapshot_tree: 5f7ef425d6eb401e714a3078624695d5d8399cb2
+    selected_path_count: 602
+    selected_path_manifest_sha256: 5e074894a448bc46561ea81dfe05530261ebc9dc203bccd87ad328c86330a744
+    selected_content_manifest_sha256: d907e1ee6fdd0e6844cd78dc63021663c5011c2057f820b0d6b0fd2432937a54
+    task_contract_sha256: bd79a6b26eeb9643419d1d2cb0b56a398bdd975b1604a7a49aa1f4aea4e2c2af
+    report_sha256: abfe0154fde3b16f84d932e2d067670b809b224430f12a1dc2ed754d00c0e8b4
+    status: complete_verified_required_source_surface_no_gate_credit
+    evidence:
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_report.yaml
+    barrier:
+      phase_6_private_foundation_barrier: pass_unchanged
+      phase_6_contract: pending
+      phase_6_granularity_reachability: pending
+      phase_6_runtime_correctness: pending
+      source_revision_snapshot_registered: verified_required_surface_no_gate_credit
+      combined_suite: unauthorized
+      phase7_paired_pilot: unauthorized
+      twenty_four_hour: unauthorized
 interface_freeze:
   version: osc-public-api-freeze-v1
   hash: cb505dbe665e517e53314ddae8ba9302d05ac794d326e9be1e792f8bd4e22131
@@ -1377,6 +1405,9 @@ open_review_findings:
   - {id: OSC-6-FOUNDATION-ROOT-R8B-RUNTIME-TERMINAL-001, severity: blocker, owner: root, status: closed_by_fresh_complete_r8c_runtime_review}
   - {id: OSC-6-FOUNDATION-ROOT-R8B-SEARCH-REPORT-001, severity: blocker, owner: root, status: closed_by_fresh_complete_r8c_search_review}
   - {id: OSC-6-FOUNDATION-ROOT-R8B-CONTRACT-REPORT-001, severity: blocker, owner: root, status: closed_by_fresh_complete_r8c_contract_review}
+  - {id: OSC-6-SOURCE-SNAPSHOT-R2-B1, severity: blocker, owner: root, status: remediated_by_r3_verified_required_source_surface_no_gate_credit}
+  - {id: OSC-6-R-B3, severity: blocker, owner: root, status: open_dynamic_plan_typed_receipt_raw_artifact_chain_absent_after_r3_source_snapshot}
+  - {id: OSC-6-G-B1, severity: blocker, owner: root, status: open_no_gate_eligible_real_adapter_232_384_502_evidence}
 gates:
   - name: phase_0_dirty_paths_registered_and_preserved
     threshold: complete snapshot and no existing dirty path overwritten
@@ -1520,7 +1551,11 @@ gates:
       transcript output/zero exit and raw bytes, but creates no real launcher,
       isolated-clean-worktree paper authority, complete producer set, corpus,
       cohort, metric, bundle, manifest or Contract-gate pass. R8-B1 remains
-      open, partially structural-addressed only for this fixture.
+      open, partially structural-addressed only for this fixture. Source-R3
+      then registered a separate isolated 602-path source commit and verified
+      its 404-path required source surface only. It created no dynamic plan,
+      typed receipt index, raw artifact, cohort, metric, bundle, manifest, or
+      Contract-gate result, so this gate remains pending.
     evidence:
       - experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_task_contract.yaml
       - experiments/osc_v1/coordination_20260719_v1/phase6_contract_gate_definition_report.yaml
@@ -1546,6 +1581,8 @@ gates:
       - experiments/osc_v1/coordination_20260719_v1/phase6_contract_performance_provenance_bridge_report.yaml
       - experiments/osc_v1/coordination_20260719_v1/phase6_contract_performance_execution_provenance_task_contract.yaml
       - experiments/osc_v1/coordination_20260719_v1/phase6_contract_performance_execution_provenance_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_task_contract.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_report.yaml
     status: pending
   - name: phase_6_private_foundation_barrier
     threshold: >-
@@ -1622,12 +1659,15 @@ gates:
       The sample has no source snapshot, persistent raw artifact,
       CoverageLedger event, producer/provenance receipt, observed aggregate
       coverage, authority eligibility, or gate credit, so it does not satisfy
-      any 232/384/502 or activation threshold.
+      any 232/384/502 or activation threshold. Source-R3 separately verifies
+      only its required source surface; it adds no real-adapter execution,
+      coverage event, producer evidence, observed aggregate, or gate credit.
     evidence:
       - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_task_contract.yaml
       - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_reachability_execution_binding_report.yaml
       - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_report.yaml
       - experiments/osc_v1/coordination_20260719_v1/phase6_granularity_real_adapter_diagnostic_sample_r2a_test_only_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_report.yaml
     status: pending
   - name: phase_6_runtime_correctness
     threshold: all exactness, parallel, v3 2200-case, and repository gates
@@ -1636,9 +1676,13 @@ gates:
       4 scoped tests, but it creates no actual source snapshot, artifact,
       producer/provenance record, parallel evidence, v3 run, or repository
       receipt. It therefore contributes no runtime-correctness gate credit.
+      Source-R3 supplies a verified source boundary only; dynamic plan, typed
+      receipts, artifact chain, parallel evidence, v3 run, and repository
+      receipt remain absent and runtime-correctness stays pending.
     evidence:
       - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_eligibility_task_contract.yaml
       - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_eligibility_report.yaml
+      - experiments/osc_v1/coordination_20260719_v1/phase6_source_snapshot_authority_r3_report.yaml
     status: pending
   - name: phase_7_paired_pilot
     threshold: phase 6 passed, preregistered equal-budget 2h paired pilot completed
