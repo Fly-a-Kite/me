@@ -9,19 +9,25 @@ import subprocess
 import pytest
 
 import datadiff_osc.runtime._phase6_formal_target_version_producer as producer_module
+from datadiff_osc._canonical import canonical_json
 from datadiff_osc.runtime._phase6_formal_target_version_producer import (
     FORMAL_TARGET_VERSION_EVIDENCE_MANIFEST_SCHEMA_VERSION,
     FORMAL_TARGET_VERSION_EVIDENCE_WRITER_MODE,
     FORMAL_TARGET_VERSION_EXECUTION_CAPABILITY_MODE,
+    FORMAL_TARGET_VERSION_FORMAL_EVIDENCE_MANIFEST_SCHEMA_VERSION,
+    FORMAL_TARGET_VERSION_FORMAL_EXECUTION_MODE,
     FORMAL_TARGET_VERSION_PREPARATION_MODE,
+    TargetVersionFormalExecutionRequest,
     TargetVersionFutureExecutionAuthority,
     TargetVersionEvidenceWriteRequest,
     TargetVersionPublicSourceBinding,
     TargetVersionRawMaterial,
+    execute_formal_target_version_replay,
     inspect_target_version_execution_capability,
     prepare_target_version_replay,
     require_formal_target_version_execution_authority,
     target_version_producer_preview,
+    verify_formal_target_version_replay_evidence,
     verify_target_version_replay_evidence,
     write_target_version_replay_evidence,
 )
@@ -56,15 +62,15 @@ _FORMAL_EVIDENCE_ROOT = Path(
     "/tmp/phase6_formal_latest_target_remediation_r1.20260724/formal_evidence"
 )
 _CURRENT_SOURCE_SNAPSHOT = Path(
-    "/tmp/phase6_formal_target_version_writer_source_snapshot_r1b.JmwKM6/source-snapshot.json"
+    "/tmp/phase6_formal_target_version_execution_capability_source_snapshot_r1b.gfqAvj/source-snapshot.json"
 )
 _CURRENT_SOURCE_SNAPSHOT_SHA256 = (
-    "52560616ed557bc6a2e7a6c2df8fe80a6de95fbe27ab8b2117480dbde1adf07c"
+    "136b6c77e648907d56ad91f8e8a5dcd80b5f436182aef3aa87249109044717b3"
 )
 _CURRENT_SOURCE_DIGEST = (
-    "osc-phase6-source-snapshot-a46503ed6be524f2b84902bbf813223ef2a476031394025b3c0676070491cda9"
+    "osc-phase6-source-snapshot-8d6c67d4ee7a11c28d0d4d1c52791b27d2b16671a1f5f3a0023eb5376a5cd01c"
 )
-_CURRENT_SOURCE_GIT_HEAD = "75a99c6df1f40115edc0803b72694cedf30a6fec"
+_CURRENT_SOURCE_GIT_HEAD = "b19f10fa99715a17a917f64ba4479cb13549898e"
 _TARGET_ENVIRONMENT_ROOT = Path("/tmp/phase6_formal_latest_target_remediation_r1.20260724")
 _TARGET_INTERPRETER = _TARGET_ENVIRONMENT_ROOT / "venv/bin/python"
 _TARGET_INTERPRETER_SHA256 = (
@@ -178,6 +184,130 @@ def _execution_authority(
             execution_command_sha256=authority.expected_execution_command_sha256,
         )
     return authority
+
+
+def _formal_expected_file_paths() -> list[str]:
+    paths = {
+        "raw/target_version_replay/manifest.json",
+        "receipts/target_version_replay.json",
+    }
+    for name, _, _ in _TARGETS:
+        root = f"raw/target_version_replay/{name}"
+        paths.update((f"{root}/installed-METADATA", f"{root}/pypi.json"))
+    return sorted(paths)
+
+
+def _write_canonical_json(path: Path, value: object) -> str:
+    raw = canonical_json(value).encode("utf-8")
+    path.write_bytes(raw)
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _formal_execution_request(
+    tmp_path: Path,
+    *,
+    authority_overrides: dict[str, object] | None = None,
+    layout_overrides: dict[str, object] | None = None,
+) -> tuple[TargetVersionFormalExecutionRequest, dict[str, object], Path, Path]:
+    capability_authority = _execution_authority(tmp_path)
+    authority_path = tmp_path / "formal-target-version-authority.json"
+    layout_path = tmp_path / "formal-target-version-layout.json"
+    authority_id = "target-version-formal-authority-r2"
+    layout: dict[str, object] = {
+        "schema_version": (
+            producer_module.FORMAL_TARGET_VERSION_FORMAL_OUTPUT_LAYOUT_SCHEMA_VERSION
+        ),
+        "authority_id": authority_id,
+        "authority_path": str(authority_path),
+        "output_root": capability_authority.future_output_root,
+        "source_snapshot_sha256": capability_authority.source_snapshot_sha256,
+        "source_digest": capability_authority.source_digest,
+        "expected_file_paths": _formal_expected_file_paths(),
+        "no_overwrite": True,
+        "formal_execution_authorized": False,
+        "formal_evidence_created": False,
+        "gate_credit": False,
+        "candidate_confirmed": False,
+        "bug_claimed": False,
+    }
+    if layout_overrides:
+        layout.update(layout_overrides)
+    layout_sha256 = _write_canonical_json(layout_path, layout)
+    authority: dict[str, object] = {
+        "schema_version": (
+            producer_module.FORMAL_TARGET_VERSION_FORMAL_EXECUTION_AUTHORITY_SCHEMA_VERSION
+        ),
+        "authority_id": authority_id,
+        "authority_path": str(authority_path),
+        "execution_root": capability_authority.execution_root,
+        "output_root": capability_authority.future_output_root,
+        "source_snapshot_path": capability_authority.source_snapshot_path,
+        "source_snapshot_sha256": capability_authority.source_snapshot_sha256,
+        "source_digest": capability_authority.source_digest,
+        "source_git_head": capability_authority.source_git_head,
+        "requirements_lock_path": capability_authority.requirements_lock_path,
+        "requirements_lock_sha256": capability_authority.requirements_lock_sha256,
+        "target_revalidation_path": capability_authority.target_revalidation_path,
+        "target_revalidation_sha256": capability_authority.target_revalidation_sha256,
+        "environment_audit_path": capability_authority.environment_audit_path,
+        "environment_audit_sha256": capability_authority.environment_audit_sha256,
+        "historical_environment_source_snapshot_sha256": (
+            capability_authority.historical_environment_source_snapshot_sha256
+        ),
+        "historical_environment_source_digest": (
+            capability_authority.historical_environment_source_digest
+        ),
+        "target_interpreter": capability_authority.target_interpreter,
+        "target_interpreter_sha256": capability_authority.target_interpreter_sha256,
+        "public_source_root": capability_authority.public_source_root,
+        "public_sources": [
+            {
+                "distribution_name": item.distribution_name,
+                "path": item.path,
+                "sha256": item.sha256,
+            }
+            for item in capability_authority.public_sources
+        ],
+        "output_layout_path": str(layout_path),
+        "output_layout_sha256": layout_sha256,
+        "capability_execution_command_sha256": (
+            capability_authority.execution_command_sha256
+        ),
+        "formal_execution_command_sha256": "a" * 64,
+        "formal_execution_authorized": True,
+        "formal_evidence_created": False,
+        "gate_credit": False,
+        "candidate_confirmed": False,
+        "bug_claimed": False,
+    }
+    if authority_overrides:
+        authority.update(authority_overrides)
+    if "formal_execution_command_sha256" not in (authority_overrides or {}):
+        authority["formal_execution_command_sha256"] = (
+            producer_module._formal_execution_command_digest(authority)
+        )
+    authority_sha256 = _write_canonical_json(authority_path, authority)
+    return (
+        TargetVersionFormalExecutionRequest(
+            authority_path=str(authority_path), authority_sha256=authority_sha256
+        ),
+        authority,
+        authority_path,
+        layout_path,
+    )
+
+
+def _rewrite_formal_request(
+    authority_path: Path,
+    authority: dict[str, object],
+) -> TargetVersionFormalExecutionRequest:
+    authority["formal_execution_command_sha256"] = (
+        producer_module._formal_execution_command_digest(authority)
+    )
+    return TargetVersionFormalExecutionRequest(
+        authority_path=str(authority_path),
+        authority_sha256=_write_canonical_json(authority_path, authority),
+    )
 
 
 def test_valid_preparation_is_private_canonical_and_never_authority(tmp_path: Path):
@@ -362,6 +492,173 @@ def test_writer_failure_removes_staged_partial_tree(
         write_target_version_replay_evidence(preparation=preparation, request=request)
     assert not output_root.exists()
     assert list(tmp_path.glob(".formal_evidence.stage-*")) == []
+
+
+def test_formal_executor_requires_exact_external_authority_and_self_replays(
+    tmp_path: Path,
+):
+    request, _, _, _ = _formal_execution_request(tmp_path)
+    binding = producer_module._formal_authority_binding(request)
+    preparation = inspect_target_version_execution_capability(
+        authority=binding.capability_authority
+    ).preparation
+
+    result = execute_formal_target_version_replay(request=request)
+
+    output_root = tmp_path / "formal_evidence"
+    assert result.authority_id == "target-version-formal-authority-r2"
+    assert result.output_root == str(output_root)
+    assert result.formal_execution_authorized is True
+    assert result.authority_eligible is False
+    assert result.formal_evidence_created is True
+    assert result.gate_credit is False
+    assert result.candidate_confirmed is False
+    assert result.bug_claimed is False
+    assert sorted(
+        path.relative_to(output_root).as_posix()
+        for path in output_root.rglob("*")
+        if path.is_file()
+    ) == _formal_expected_file_paths()
+    assert verify_formal_target_version_replay_evidence(
+        preparation=preparation,
+        request=request,
+    ) == result
+    manifest = json.loads(
+        (output_root / "raw/target_version_replay/manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert manifest["schema_version"] == FORMAL_TARGET_VERSION_FORMAL_EVIDENCE_MANIFEST_SCHEMA_VERSION
+    assert manifest["mode"] == FORMAL_TARGET_VERSION_FORMAL_EXECUTION_MODE
+    assert manifest["authority"]["authority_sha256"] == request.authority_sha256
+    assert manifest["formal_execution_authorized"] is True
+    assert manifest["formal_evidence_created"] is True
+    assert manifest["gate_credit"] is False
+    assert not _FORMAL_EVIDENCE_ROOT.exists()
+
+
+@pytest.mark.parametrize(
+    ("authority_overrides", "layout_overrides", "message"),
+    [
+        ({"formal_execution_authorized": False}, None, "flag mismatch"),
+        (
+            {"source_digest": "osc-phase6-source-snapshot-" + "b" * 64},
+            None,
+            "capability command digest mismatch",
+        ),
+        ({"capability_execution_command_sha256": "b" * 64}, None, "capability command digest mismatch"),
+        ({"formal_execution_command_sha256": "b" * 64}, None, "execution command digest mismatch"),
+        (
+            None,
+            {"source_digest": "osc-phase6-source-snapshot-" + "b" * 64},
+            "output layout mismatch: source_digest",
+        ),
+    ],
+)
+def test_formal_executor_rejects_stale_authority_or_layout_before_probe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    authority_overrides: dict[str, object] | None,
+    layout_overrides: dict[str, object] | None,
+    message: str,
+):
+    request, _, _, _ = _formal_execution_request(
+        tmp_path,
+        authority_overrides=authority_overrides,
+        layout_overrides=layout_overrides,
+    )
+
+    def unexpected_probe(*args: object, **kwargs: object) -> object:
+        raise AssertionError("metadata probe must not run for a stale authority")
+
+    monkeypatch.setattr(producer_module.subprocess, "run", unexpected_probe)
+    with pytest.raises(ValueError, match=message):
+        execute_formal_target_version_replay(request=request)
+    assert not (tmp_path / "formal_evidence").exists()
+    assert not _FORMAL_EVIDENCE_ROOT.exists()
+
+
+def test_formal_executor_rejects_test_only_and_noncanonical_authority_before_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    request, authority, authority_path, _ = _formal_execution_request(tmp_path)
+
+    def unexpected_probe(*args: object, **kwargs: object) -> object:
+        raise AssertionError("metadata probe must not run without canonical authority")
+
+    monkeypatch.setattr(producer_module.subprocess, "run", unexpected_probe)
+    with pytest.raises(TypeError, match="authority request"):
+        execute_formal_target_version_replay(
+            request=_execution_authority(tmp_path)  # type: ignore[arg-type]
+        )
+    authority_path.write_bytes(b"{}")
+    malformed_request = TargetVersionFormalExecutionRequest(
+        authority_path=str(authority_path),
+        authority_sha256=hashlib.sha256(b"{}").hexdigest(),
+    )
+    with pytest.raises(ValueError, match="field set mismatch"):
+        execute_formal_target_version_replay(request=malformed_request)
+    authority_path.write_bytes(canonical_json(authority).encode("utf-8") + b"\n")
+    noncanonical_request = TargetVersionFormalExecutionRequest(
+        authority_path=str(authority_path),
+        authority_sha256=hashlib.sha256(authority_path.read_bytes()).hexdigest(),
+    )
+    with pytest.raises(ValueError, match="exact canonical JSON"):
+        execute_formal_target_version_replay(request=noncanonical_request)
+    assert request.authority_path == str(authority_path)
+    assert not (tmp_path / "formal_evidence").exists()
+
+
+def test_formal_executor_refuses_existing_output_and_cleans_interrupted_stage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    existing_request, _, _, _ = _formal_execution_request(tmp_path)
+    existing_output = tmp_path / "formal_evidence"
+    existing_output.mkdir()
+    sentinel = existing_output / "sentinel.txt"
+    sentinel.write_text("preserve", encoding="utf-8")
+    with pytest.raises(ValueError, match="output root already exists"):
+        execute_formal_target_version_replay(request=existing_request)
+    assert sentinel.read_text(encoding="utf-8") == "preserve"
+
+    staged_parent = tmp_path / "staged"
+    staged_parent.mkdir()
+    staged_request, _, _, _ = _formal_execution_request(staged_parent)
+    original = producer_module._write_new_bytes
+    calls = 0
+
+    def fail_after_first(path: Path, raw: bytes) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("injected formal staging failure")
+        original(path, raw)
+
+    monkeypatch.setattr(producer_module, "_write_new_bytes", fail_after_first)
+    with pytest.raises(OSError, match="injected formal staging failure"):
+        execute_formal_target_version_replay(request=staged_request)
+    assert not (staged_parent / "formal_evidence").exists()
+    assert list(staged_parent.glob(".formal_evidence.formal-stage-*")) == []
+    assert not _FORMAL_EVIDENCE_ROOT.exists()
+
+
+def test_formal_executor_revalidation_detects_authority_bound_manifest_mutation(
+    tmp_path: Path,
+):
+    request, _, _, _ = _formal_execution_request(tmp_path)
+    binding = producer_module._formal_authority_binding(request)
+    preparation = inspect_target_version_execution_capability(
+        authority=binding.capability_authority
+    ).preparation
+    result = execute_formal_target_version_replay(request=request)
+    manifest_path = Path(result.raw_manifest_path)
+    manifest_path.write_bytes(manifest_path.read_bytes() + b"\n")
+    with pytest.raises(ValueError, match="not exact canonical binding"):
+        verify_formal_target_version_replay_evidence(
+            preparation=preparation,
+            request=request,
+        )
+    assert not _FORMAL_EVIDENCE_ROOT.exists()
 
 
 def test_execution_capability_collects_actual_target_venv_without_authority_write(

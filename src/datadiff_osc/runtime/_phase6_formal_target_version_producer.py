@@ -1,12 +1,10 @@
-"""Private Phase-6 target-version preparation and no-write capability binding.
+"""Private Phase-6 target-version preparation and authority-bound execution.
 
-The module deliberately has no formal execution entry point.  It can prepare
-immutable installed-METADATA bytes and frozen public PyPI response bytes, and
-it can also inspect an authority-selected target interpreter under a private,
-no-write capability boundary.  Neither path creates formal evidence.  A later,
-separately authorized task must bind a fresh source snapshot, an exact output
-path, and an execution authority before it may persist a formal
-``target_version_replay`` record.
+The preparation, test-only writer, and no-write capability remain permanently
+non-authority paths. A separate executor accepts only an exact canonical
+external authority plus layout binding, rechecks the selected target
+interpreter, stages and self-replays one output, and still grants no gate,
+candidate-confirmation, or bug-claim credit. The CLI remains prepare-only.
 """
 
 from __future__ import annotations
@@ -55,6 +53,18 @@ FORMAL_TARGET_VERSION_EXECUTION_CAPABILITY_MODE = (
 )
 FORMAL_TARGET_VERSION_METADATA_PROBE_SCHEMA_VERSION = (
     "osc-private-phase6-target-version-metadata-probe-v1"
+)
+FORMAL_TARGET_VERSION_FORMAL_EXECUTION_AUTHORITY_SCHEMA_VERSION = (
+    "osc-private-phase6-target-version-formal-execution-authority-v1"
+)
+FORMAL_TARGET_VERSION_FORMAL_OUTPUT_LAYOUT_SCHEMA_VERSION = (
+    "osc-private-phase6-target-version-formal-output-layout-v1"
+)
+FORMAL_TARGET_VERSION_FORMAL_EVIDENCE_MANIFEST_SCHEMA_VERSION = (
+    "osc-private-phase6-target-version-formal-evidence-manifest-v1"
+)
+FORMAL_TARGET_VERSION_FORMAL_EXECUTION_MODE = (
+    "authority-bound-formal-target-version-replay-v1"
 )
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
 _GIT_SHA1_OBJECT_ID_RE = re.compile(r"[0-9a-f]{40}")
@@ -615,6 +625,123 @@ class TargetVersionExecutionCapability:
     @property
     def bug_claimed(self) -> bool:
         return False
+
+
+@dataclass(frozen=True, slots=True)
+class TargetVersionFormalExecutionRequest:
+    """Reference one immutable external authority document for a future write."""
+
+    authority_path: str
+    authority_sha256: str
+    schema_version: str = FORMAL_TARGET_VERSION_FORMAL_EXECUTION_AUTHORITY_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _require_absolute_path_text(
+            self.authority_path, name="formal target-version authority path"
+        )
+        _require_sha256(
+            self.authority_sha256, name="formal target-version authority SHA-256"
+        )
+        if self.schema_version != FORMAL_TARGET_VERSION_FORMAL_EXECUTION_AUTHORITY_SCHEMA_VERSION:
+            raise ValueError("formal target-version execution request schema mismatch")
+        assert_deeply_immutable(self)
+
+
+@dataclass(frozen=True, slots=True)
+class TargetVersionFormalExecutionResult:
+    """A self-replayed authority-bound target-version output, never a gate result."""
+
+    authority_id: str
+    authority_sha256: str
+    output_root: str
+    raw_manifest_path: str
+    receipt_path: str
+    raw_manifest_sha256: str
+    receipt_sha256: str
+    source_digest: str
+    source_snapshot_sha256: str
+    receipt_digest: str
+    schema_version: str = FORMAL_TARGET_VERSION_FORMAL_EVIDENCE_MANIFEST_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        for name in (
+            "authority_id",
+            "output_root",
+            "raw_manifest_path",
+            "receipt_path",
+            "source_digest",
+            "receipt_digest",
+        ):
+            _require_text(getattr(self, name), name=f"formal target-version result {name}")
+        for name in (
+            "authority_sha256",
+            "raw_manifest_sha256",
+            "receipt_sha256",
+            "source_snapshot_sha256",
+        ):
+            _require_sha256(getattr(self, name), name=f"formal target-version result {name}")
+        for name in ("output_root", "raw_manifest_path", "receipt_path"):
+            _require_absolute_path_text(
+                getattr(self, name), name=f"formal target-version result {name}"
+            )
+        if self.schema_version != FORMAL_TARGET_VERSION_FORMAL_EVIDENCE_MANIFEST_SCHEMA_VERSION:
+            raise ValueError("formal target-version result schema mismatch")
+        assert_deeply_immutable(self)
+
+    @property
+    def formal_execution_authorized(self) -> bool:
+        return True
+
+    @property
+    def authority_eligible(self) -> bool:
+        return False
+
+    @property
+    def formal_evidence_created(self) -> bool:
+        return True
+
+    @property
+    def gate_credit(self) -> bool:
+        return False
+
+    @property
+    def candidate_confirmed(self) -> bool:
+        return False
+
+    @property
+    def bug_claimed(self) -> bool:
+        return False
+
+
+@dataclass(frozen=True, slots=True)
+class _FormalTargetVersionExecutionBinding:
+    """Parsed authority/layout binding used only by the formal executor."""
+
+    authority_id: str
+    authority_path: str
+    authority_sha256: str
+    capability_authority: TargetVersionFutureExecutionAuthority
+    output_layout_path: str
+    output_layout_sha256: str
+    formal_execution_command_sha256: str
+
+    def __post_init__(self) -> None:
+        _require_text(self.authority_id, name="formal target-version authority ID")
+        for name in ("authority_path", "output_layout_path"):
+            _require_absolute_path_text(
+                getattr(self, name), name=f"formal target-version binding {name}"
+            )
+        for name in (
+            "authority_sha256",
+            "output_layout_sha256",
+            "formal_execution_command_sha256",
+        ):
+            _require_sha256(
+                getattr(self, name), name=f"formal target-version binding {name}"
+            )
+        if not isinstance(self.capability_authority, TargetVersionFutureExecutionAuthority):
+            raise TypeError("formal target-version binding requires capability authority")
+        assert_deeply_immutable(self)
 
 
 def _require_materials(value: object) -> tuple[TargetVersionRawMaterial, ...]:
@@ -1230,6 +1357,537 @@ def write_target_version_replay_evidence(
     )
 
 
+_FORMAL_AUTHORITY_FIELDS = frozenset(
+    {
+        "authority_id",
+        "authority_path",
+        "bug_claimed",
+        "candidate_confirmed",
+        "capability_execution_command_sha256",
+        "environment_audit_path",
+        "environment_audit_sha256",
+        "execution_root",
+        "formal_evidence_created",
+        "formal_execution_authorized",
+        "formal_execution_command_sha256",
+        "gate_credit",
+        "historical_environment_source_digest",
+        "historical_environment_source_snapshot_sha256",
+        "output_layout_path",
+        "output_layout_sha256",
+        "output_root",
+        "public_source_root",
+        "public_sources",
+        "requirements_lock_path",
+        "requirements_lock_sha256",
+        "schema_version",
+        "source_digest",
+        "source_git_head",
+        "source_snapshot_path",
+        "source_snapshot_sha256",
+        "target_interpreter",
+        "target_interpreter_sha256",
+        "target_revalidation_path",
+        "target_revalidation_sha256",
+    }
+)
+_FORMAL_OUTPUT_LAYOUT_FIELDS = frozenset(
+    {
+        "authority_id",
+        "authority_path",
+        "bug_claimed",
+        "candidate_confirmed",
+        "expected_file_paths",
+        "formal_evidence_created",
+        "formal_execution_authorized",
+        "gate_credit",
+        "no_overwrite",
+        "output_root",
+        "schema_version",
+        "source_digest",
+        "source_snapshot_sha256",
+    }
+)
+
+
+def _formal_expected_file_paths() -> tuple[str, ...]:
+    paths = {
+        "raw/target_version_replay/manifest.json",
+        "receipts/target_version_replay.json",
+    }
+    for distribution_name, _ in _EXPECTED_TARGETS:
+        raw_root = f"raw/target_version_replay/{distribution_name}"
+        paths.add(f"{raw_root}/installed-METADATA")
+        paths.add(f"{raw_root}/pypi.json")
+    return tuple(sorted(paths))
+
+
+def _require_exact_mapping_fields(
+    value: object,
+    *,
+    name: str,
+    expected_fields: frozenset[str],
+) -> dict[str, object]:
+    if not isinstance(value, dict) or set(value) != expected_fields:
+        raise ValueError(f"{name} field set mismatch")
+    return value
+
+
+def _formal_execution_command_digest(document: dict[str, object]) -> str:
+    """Bind the entire authority document except its self-referential digest."""
+
+    _require_exact_mapping_fields(
+        document,
+        name="formal target-version authority",
+        expected_fields=_FORMAL_AUTHORITY_FIELDS,
+    )
+    payload = {
+        key: document[key]
+        for key in sorted(_FORMAL_AUTHORITY_FIELDS - {"formal_execution_command_sha256"})
+    }
+    return _sha256(canonical_json(payload).encode("utf-8"))
+
+
+def _formal_public_source_bindings(value: object) -> tuple[TargetVersionPublicSourceBinding, ...]:
+    if not isinstance(value, list):
+        raise ValueError("formal target-version authority public sources must be a list")
+    bindings: list[TargetVersionPublicSourceBinding] = []
+    for index, item in enumerate(value):
+        mapping = _require_exact_mapping_fields(
+            item,
+            name=f"formal target-version authority public source {index}",
+            expected_fields=frozenset({"distribution_name", "path", "sha256"}),
+        )
+        bindings.append(
+            TargetVersionPublicSourceBinding(
+                distribution_name=mapping["distribution_name"],
+                path=mapping["path"],
+                sha256=mapping["sha256"],
+            )
+        )
+    return _require_public_source_bindings(tuple(bindings))
+
+
+def _formal_authority_binding(
+    request: TargetVersionFormalExecutionRequest,
+) -> _FormalTargetVersionExecutionBinding:
+    if not isinstance(request, TargetVersionFormalExecutionRequest):
+        raise TypeError("formal target-version execution requires an authority request")
+    authority_path = Path(request.authority_path)
+    _require_no_symlink_components(authority_path.parent)
+    document = _load_exact_canonical_json(
+        request.authority_path,
+        name="formal target-version authority",
+        expected_sha256=request.authority_sha256,
+    )
+    document = _require_exact_mapping_fields(
+        document,
+        name="formal target-version authority",
+        expected_fields=_FORMAL_AUTHORITY_FIELDS,
+    )
+    if document["schema_version"] != FORMAL_TARGET_VERSION_FORMAL_EXECUTION_AUTHORITY_SCHEMA_VERSION:
+        raise ValueError("formal target-version authority schema mismatch")
+    if document["authority_path"] != request.authority_path:
+        raise ValueError("formal target-version authority path mismatch")
+    for field in (
+        "formal_execution_authorized",
+        "formal_evidence_created",
+        "gate_credit",
+        "candidate_confirmed",
+        "bug_claimed",
+    ):
+        expected = field == "formal_execution_authorized"
+        if document[field] is not expected:
+            raise ValueError(f"formal target-version authority flag mismatch: {field}")
+    authority_id = _require_text(
+        document["authority_id"], name="formal target-version authority ID"
+    )
+    capability_authority = TargetVersionFutureExecutionAuthority(
+        execution_root=document["execution_root"],
+        future_output_root=document["output_root"],
+        execution_command_sha256=document["capability_execution_command_sha256"],
+        source_snapshot_path=document["source_snapshot_path"],
+        source_snapshot_sha256=document["source_snapshot_sha256"],
+        source_digest=document["source_digest"],
+        source_git_head=document["source_git_head"],
+        requirements_lock_path=document["requirements_lock_path"],
+        requirements_lock_sha256=document["requirements_lock_sha256"],
+        target_revalidation_path=document["target_revalidation_path"],
+        target_revalidation_sha256=document["target_revalidation_sha256"],
+        environment_audit_path=document["environment_audit_path"],
+        environment_audit_sha256=document["environment_audit_sha256"],
+        historical_environment_source_snapshot_sha256=document[
+            "historical_environment_source_snapshot_sha256"
+        ],
+        historical_environment_source_digest=document[
+            "historical_environment_source_digest"
+        ],
+        target_interpreter=document["target_interpreter"],
+        target_interpreter_sha256=document["target_interpreter_sha256"],
+        public_source_root=document["public_source_root"],
+        public_sources=_formal_public_source_bindings(document["public_sources"]),
+    )
+    if (
+        capability_authority.execution_command_sha256
+        != capability_authority.expected_execution_command_sha256
+    ):
+        raise ValueError("formal target-version capability command digest mismatch")
+    expected_formal_command = _formal_execution_command_digest(document)
+    if document["formal_execution_command_sha256"] != expected_formal_command:
+        raise ValueError("formal target-version execution command digest mismatch")
+    output_layout_path = _require_absolute_path_text(
+        document["output_layout_path"], name="formal target-version output layout path"
+    )
+    output_layout_sha256 = _require_sha256(
+        document["output_layout_sha256"], name="formal target-version output layout SHA-256"
+    )
+    layout_path = Path(output_layout_path)
+    _require_no_symlink_components(layout_path.parent)
+    layout = _load_exact_canonical_json(
+        output_layout_path,
+        name="formal target-version output layout",
+        expected_sha256=output_layout_sha256,
+    )
+    layout = _require_exact_mapping_fields(
+        layout,
+        name="formal target-version output layout",
+        expected_fields=_FORMAL_OUTPUT_LAYOUT_FIELDS,
+    )
+    if layout["schema_version"] != FORMAL_TARGET_VERSION_FORMAL_OUTPUT_LAYOUT_SCHEMA_VERSION:
+        raise ValueError("formal target-version output layout schema mismatch")
+    expected_layout_values = {
+        "authority_id": authority_id,
+        "authority_path": request.authority_path,
+        "output_root": capability_authority.future_output_root,
+        "source_snapshot_sha256": capability_authority.source_snapshot_sha256,
+        "source_digest": capability_authority.source_digest,
+    }
+    for field, expected in expected_layout_values.items():
+        if layout[field] != expected:
+            raise ValueError(f"formal target-version output layout mismatch: {field}")
+    if (
+        layout["no_overwrite"] is not True
+        or layout["formal_execution_authorized"] is not False
+        or layout["formal_evidence_created"] is not False
+        or layout["gate_credit"] is not False
+        or layout["candidate_confirmed"] is not False
+        or layout["bug_claimed"] is not False
+    ):
+        raise ValueError("formal target-version output layout flag mismatch")
+    paths = layout["expected_file_paths"]
+    if not isinstance(paths, list) or tuple(paths) != _formal_expected_file_paths():
+        raise ValueError("formal target-version output layout file inventory mismatch")
+    output_root = Path(capability_authority.future_output_root)
+    for path, name in ((authority_path, "authority"), (layout_path, "output layout")):
+        try:
+            path.resolve(strict=True).relative_to(output_root)
+        except ValueError:
+            continue
+        raise ValueError(f"formal target-version {name} cannot live inside output root")
+    return _FormalTargetVersionExecutionBinding(
+        authority_id=authority_id,
+        authority_path=request.authority_path,
+        authority_sha256=request.authority_sha256,
+        capability_authority=capability_authority,
+        output_layout_path=output_layout_path,
+        output_layout_sha256=output_layout_sha256,
+        formal_execution_command_sha256=expected_formal_command,
+    )
+
+
+def _formal_manifest(
+    *,
+    preparation: TargetVersionPreparation,
+    binding: _FormalTargetVersionExecutionBinding,
+    receipt_sha256: str,
+) -> dict[str, object]:
+    package_by_distribution = {
+        item.distribution_name: item for item in preparation.receipt.packages
+    }
+    if len(package_by_distribution) != len(preparation.receipt.packages):
+        raise ValueError("formal target-version receipt distributions must be unique")
+    materials: list[dict[str, object]] = []
+    for material in preparation.materials:
+        installed_path, public_path = _material_paths(material)
+        package = package_by_distribution.get(material.distribution_name)
+        if package is None or package.import_name != material.import_name:
+            raise ValueError("formal target-version receipt/material identity mismatch")
+        expected_public_sha = _EXPECTED_PUBLIC_RAW_SHA256[material.distribution_name]
+        if _sha256(material.public_version_source) != expected_public_sha:
+            raise ValueError(
+                "formal target-version public source SHA mismatch: "
+                + material.distribution_name
+            )
+        materials.append(
+            {
+                "distribution_name": material.distribution_name,
+                "import_name": material.import_name,
+                "package_id": package.package_id,
+                "installed_metadata_path": installed_path,
+                "installed_metadata_sha256": _sha256(material.installed_metadata),
+                "public_version_source_path": public_path,
+                "public_version_source_sha256": expected_public_sha,
+            }
+        )
+    return {
+        "schema_version": FORMAL_TARGET_VERSION_FORMAL_EVIDENCE_MANIFEST_SCHEMA_VERSION,
+        "mode": FORMAL_TARGET_VERSION_FORMAL_EXECUTION_MODE,
+        "authority": {
+            "authority_id": binding.authority_id,
+            "authority_path": binding.authority_path,
+            "authority_sha256": binding.authority_sha256,
+            "output_layout_path": binding.output_layout_path,
+            "output_layout_sha256": binding.output_layout_sha256,
+            "formal_execution_command_sha256": binding.formal_execution_command_sha256,
+        },
+        "source_digest": preparation.source_digest,
+        "source_snapshot_sha256": preparation.source_snapshot_sha256,
+        "requirements_lock_sha256": preparation.requirements_lock_sha256,
+        "target_revalidation_sha256": preparation.target_revalidation_sha256,
+        "environment_audit_sha256": preparation.environment_audit_sha256,
+        "receipt": {
+            "envelope_path": "receipts/target_version_replay.json",
+            "envelope_sha256": receipt_sha256,
+            "receipt_digest": preparation.receipt.digest,
+            "envelope_type": "TargetVersionReceipt",
+            "envelope_schema_version": preparation.receipt.schema_version,
+        },
+        "materials": materials,
+        "all_targets_match_latest": True,
+        "formal_execution_authorized": True,
+        "authority_eligible": False,
+        "formal_evidence_created": True,
+        "gate_credit": False,
+        "candidate_confirmed": False,
+        "bug_claimed": False,
+    }
+
+
+def _formal_output_root(binding: _FormalTargetVersionExecutionBinding) -> Path:
+    root = Path(binding.capability_authority.future_output_root)
+    execution_root = Path(binding.capability_authority.execution_root)
+    _require_no_symlink_components(execution_root)
+    if root.parent != execution_root or root.name != "formal_evidence":
+        raise ValueError("formal target-version output root is not the authorized direct child")
+    return root
+
+
+def _write_formal_stage(
+    root: Path,
+    *,
+    preparation: TargetVersionPreparation,
+    binding: _FormalTargetVersionExecutionBinding,
+) -> None:
+    if any(root.iterdir()):
+        raise ValueError("formal target-version staging root must be empty")
+    receipt_text = canonical_envelope(
+        "TargetVersionReceipt",
+        preparation.receipt.schema_version,
+        preparation.receipt,
+    )
+    receipt_raw = receipt_text.encode("utf-8")
+    _write_new_bytes(root / "receipts/target_version_replay.json", receipt_raw)
+    for material in preparation.materials:
+        installed_path, public_path = _material_paths(material)
+        _write_new_bytes(root / installed_path, material.installed_metadata)
+        _write_new_bytes(root / public_path, material.public_version_source)
+    manifest = _formal_manifest(
+        preparation=preparation,
+        binding=binding,
+        receipt_sha256=_sha256(receipt_raw),
+    )
+    _write_new_bytes(
+        root / "raw/target_version_replay/manifest.json",
+        canonical_json(manifest).encode("utf-8"),
+    )
+
+
+def _formal_result_for_existing_output(
+    root: Path,
+    *,
+    preparation: TargetVersionPreparation,
+    binding: _FormalTargetVersionExecutionBinding,
+) -> TargetVersionFormalExecutionResult:
+    manifest_path = root / "raw/target_version_replay/manifest.json"
+    receipt_path = root / "receipts/target_version_replay.json"
+    return TargetVersionFormalExecutionResult(
+        authority_id=binding.authority_id,
+        authority_sha256=binding.authority_sha256,
+        output_root=str(root),
+        raw_manifest_path=str(manifest_path),
+        receipt_path=str(receipt_path),
+        raw_manifest_sha256=_sha256(manifest_path.read_bytes()),
+        receipt_sha256=_sha256(receipt_path.read_bytes()),
+        source_digest=preparation.source_digest,
+        source_snapshot_sha256=preparation.source_snapshot_sha256,
+        receipt_digest=preparation.receipt.digest,
+    )
+
+
+def _verify_formal_target_version_output(
+    *,
+    preparation: TargetVersionPreparation,
+    binding: _FormalTargetVersionExecutionBinding,
+    root: Path,
+) -> TargetVersionFormalExecutionResult:
+    """Re-read an authority-bound stage or published output without gate admission."""
+
+    if not isinstance(preparation, TargetVersionPreparation):
+        raise TypeError("formal target-version verification requires TargetVersionPreparation")
+    authority = binding.capability_authority
+    expected_bindings = (
+        ("source digest", preparation.source_digest, authority.source_digest),
+        (
+            "source snapshot SHA-256",
+            preparation.source_snapshot_sha256,
+            authority.source_snapshot_sha256,
+        ),
+        (
+            "requirements lock SHA-256",
+            preparation.requirements_lock_sha256,
+            authority.requirements_lock_sha256,
+        ),
+        (
+            "target revalidation SHA-256",
+            preparation.target_revalidation_sha256,
+            authority.target_revalidation_sha256,
+        ),
+        (
+            "environment audit SHA-256",
+            preparation.environment_audit_sha256,
+            authority.environment_audit_sha256,
+        ),
+    )
+    for name, actual, expected in expected_bindings:
+        if actual != expected:
+            raise ValueError(f"formal target-version verification {name} mismatch")
+    _require_no_symlink_components(root.parent)
+    if not root.is_dir() or root.is_symlink():
+        raise ValueError("formal target-version output root must be an existing non-symlink directory")
+    found_paths = tuple(
+        sorted(
+            item.relative_to(root).as_posix()
+            for item in root.rglob("*")
+            if item.is_file()
+        )
+    )
+    if found_paths != _formal_expected_file_paths():
+        raise ValueError("formal target-version evidence file inventory mismatch")
+    if any(item.is_symlink() for item in root.rglob("*")):
+        raise ValueError("formal target-version evidence cannot contain a symlink")
+    receipt_path = root / "receipts/target_version_replay.json"
+    receipt_raw = receipt_path.read_bytes()
+    receipt_sha256 = _sha256(receipt_raw)
+    try:
+        receipt_text = receipt_raw.decode("utf-8")
+        envelope = decode_canonical_envelope(receipt_text)
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        raise ValueError("formal target-version receipt envelope is invalid") from exc
+    if (
+        envelope["type"] != "TargetVersionReceipt"
+        or envelope["schema_version"] != preparation.receipt.schema_version
+        or receipt_text
+        != canonical_envelope(
+            "TargetVersionReceipt",
+            preparation.receipt.schema_version,
+            preparation.receipt,
+        )
+    ):
+        raise ValueError("formal target-version receipt envelope mismatch")
+    replay_errors = replay_runtime_admission(
+        envelope_type="TargetVersionReceipt",
+        schema_version=preparation.receipt.schema_version,
+        payload=envelope["payload"],
+        subject_kind="target_packages",
+        subject_ids=preparation.receipt.package_ids,
+    )
+    if replay_errors:
+        raise ValueError(
+            "formal target-version semantic replay failed: " + ",".join(replay_errors)
+        )
+    manifest_path = root / "raw/target_version_replay/manifest.json"
+    manifest_raw = manifest_path.read_bytes()
+    manifest = _strict_json(manifest_raw, name="formal target-version evidence manifest")
+    expected_manifest = _formal_manifest(
+        preparation=preparation,
+        binding=binding,
+        receipt_sha256=receipt_sha256,
+    )
+    if manifest != expected_manifest or manifest_raw != canonical_json(expected_manifest).encode(
+        "utf-8"
+    ):
+        raise ValueError("formal target-version evidence manifest is not exact canonical binding")
+    for material in preparation.materials:
+        installed_path, public_path = _material_paths(material)
+        if (root / installed_path).read_bytes() != material.installed_metadata:
+            raise ValueError("formal target-version installed metadata bytes mismatch")
+        if (root / public_path).read_bytes() != material.public_version_source:
+            raise ValueError("formal target-version public source bytes mismatch")
+    return _formal_result_for_existing_output(
+        root,
+        preparation=preparation,
+        binding=binding,
+    )
+
+
+def verify_formal_target_version_replay_evidence(
+    *,
+    preparation: TargetVersionPreparation,
+    request: TargetVersionFormalExecutionRequest,
+) -> TargetVersionFormalExecutionResult:
+    """Re-read a published authority-bound output without admitting it to a gate."""
+
+    binding = _formal_authority_binding(request)
+    return _verify_formal_target_version_output(
+        preparation=preparation,
+        binding=binding,
+        root=_formal_output_root(binding),
+    )
+
+
+def execute_formal_target_version_replay(
+    *,
+    request: TargetVersionFormalExecutionRequest,
+) -> TargetVersionFormalExecutionResult:
+    """Publish exactly one authority-bound output after all no-write checks pass."""
+
+    binding = _formal_authority_binding(request)
+    output_root = _formal_output_root(binding)
+    if os.path.lexists(output_root):
+        raise ValueError("formal target-version output root already exists")
+    execution_root = _execution_root_for_capability(binding.capability_authority)
+    capability = inspect_target_version_execution_capability(
+        authority=binding.capability_authority
+    )
+    stage_root = Path(
+        tempfile.mkdtemp(
+            prefix=f".{output_root.name}.formal-stage-", dir=execution_root
+        )
+    )
+    try:
+        _write_formal_stage(
+            stage_root,
+            preparation=capability.preparation,
+            binding=binding,
+        )
+        _verify_formal_target_version_output(
+            preparation=capability.preparation,
+            binding=binding,
+            root=stage_root,
+        )
+        if os.path.lexists(output_root):
+            raise ValueError("formal target-version output root appeared during staging")
+        os.replace(stage_root, output_root)
+        stage_root = None
+    finally:
+        if stage_root is not None and os.path.lexists(stage_root):
+            shutil.rmtree(stage_root)
+    return verify_formal_target_version_replay_evidence(
+        preparation=capability.preparation,
+        request=request,
+    )
+
+
 def _read_exact_regular_file(
     path_text: str,
     *,
@@ -1307,6 +1965,7 @@ def _verify_source_snapshot_binding(
         "scripts/osc/run_phase6_formal_target_version_producer.py",
         "src/datadiff_osc/runtime/_phase6_formal_target_version_producer.py",
         "src/datadiff_osc/public_api_freeze.json",
+        "tests/osc/test_runtime_phase6_formal_target_version_producer.py",
     }
     if not required_paths.issubset(paths):
         raise ValueError("target-version current source snapshot required path omission")
