@@ -4,6 +4,7 @@ from dataclasses import replace
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -11,10 +12,15 @@ import datadiff_osc.runtime._phase6_formal_target_version_producer as producer_m
 from datadiff_osc.runtime._phase6_formal_target_version_producer import (
     FORMAL_TARGET_VERSION_EVIDENCE_MANIFEST_SCHEMA_VERSION,
     FORMAL_TARGET_VERSION_EVIDENCE_WRITER_MODE,
+    FORMAL_TARGET_VERSION_EXECUTION_CAPABILITY_MODE,
     FORMAL_TARGET_VERSION_PREPARATION_MODE,
+    TargetVersionFutureExecutionAuthority,
     TargetVersionEvidenceWriteRequest,
+    TargetVersionPublicSourceBinding,
     TargetVersionRawMaterial,
+    inspect_target_version_execution_capability,
     prepare_target_version_replay,
+    require_formal_target_version_execution_authority,
     target_version_producer_preview,
     verify_target_version_replay_evidence,
     write_target_version_replay_evidence,
@@ -48,6 +54,39 @@ _PUBLIC_SOURCE_ROOT = Path(
 )
 _FORMAL_EVIDENCE_ROOT = Path(
     "/tmp/phase6_formal_latest_target_remediation_r1.20260724/formal_evidence"
+)
+_CURRENT_SOURCE_SNAPSHOT = Path(
+    "/tmp/phase6_formal_target_version_writer_source_snapshot_r1b.JmwKM6/source-snapshot.json"
+)
+_CURRENT_SOURCE_SNAPSHOT_SHA256 = (
+    "52560616ed557bc6a2e7a6c2df8fe80a6de95fbe27ab8b2117480dbde1adf07c"
+)
+_CURRENT_SOURCE_DIGEST = (
+    "osc-phase6-source-snapshot-a46503ed6be524f2b84902bbf813223ef2a476031394025b3c0676070491cda9"
+)
+_CURRENT_SOURCE_GIT_HEAD = "75a99c6df1f40115edc0803b72694cedf30a6fec"
+_TARGET_ENVIRONMENT_ROOT = Path("/tmp/phase6_formal_latest_target_remediation_r1.20260724")
+_TARGET_INTERPRETER = _TARGET_ENVIRONMENT_ROOT / "venv/bin/python"
+_TARGET_INTERPRETER_SHA256 = (
+    "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118"
+)
+_TARGET_LOCK = _TARGET_ENVIRONMENT_ROOT / "source/requirements-final.lock"
+_TARGET_REVALIDATION = (
+    _TARGET_ENVIRONMENT_ROOT / "target_version_revalidation/target-version-revalidation.json"
+)
+_TARGET_ENVIRONMENT_AUDIT = _TARGET_ENVIRONMENT_ROOT / "venv/environment-audit.json"
+_TARGET_REVALIDATION_SHA256 = (
+    "c95676504232c595f1a24408f07ecd80e1c89313502da0076e5b0483210c1bbd"
+)
+_TARGET_ENVIRONMENT_AUDIT_SHA256 = (
+    "e7b5ad5b6e193fb6ffc99d1baa4235d1a3760764aaf33ab04d51002caa065389"
+)
+_TARGET_LOCK_SHA256 = "5121f122b209545f0f3b127d89faa36b59aa09c72ce0b54f5d582e7f727379dc"
+_HISTORICAL_ENVIRONMENT_SOURCE_SNAPSHOT_SHA256 = (
+    "4750e6ff7eb05a27883a667d3832b1425af0db0e65311e4905f26e4f99b9f531"
+)
+_HISTORICAL_ENVIRONMENT_SOURCE_DIGEST = (
+    "osc-phase6-source-snapshot-a598ba904fff4300704ce99a4a4f7089e2d16c821c0539bb8dc1124983b4c85d"
 )
 
 
@@ -96,6 +135,49 @@ def _write_request(preparation, output_root: Path) -> TargetVersionEvidenceWrite
         environment_audit_sha256=preparation.environment_audit_sha256,
         receipt_digest=preparation.receipt.digest,
     )
+
+
+def _execution_authority(
+    tmp_path: Path, **overrides: object
+) -> TargetVersionFutureExecutionAuthority:
+    values: dict[str, object] = {
+        "execution_root": str(tmp_path),
+        "future_output_root": str(tmp_path / "formal_evidence"),
+        "execution_command_sha256": "a" * 64,
+        "source_snapshot_path": str(_CURRENT_SOURCE_SNAPSHOT),
+        "source_snapshot_sha256": _CURRENT_SOURCE_SNAPSHOT_SHA256,
+        "source_digest": _CURRENT_SOURCE_DIGEST,
+        "source_git_head": _CURRENT_SOURCE_GIT_HEAD,
+        "requirements_lock_path": str(_TARGET_LOCK),
+        "requirements_lock_sha256": _TARGET_LOCK_SHA256,
+        "target_revalidation_path": str(_TARGET_REVALIDATION),
+        "target_revalidation_sha256": _TARGET_REVALIDATION_SHA256,
+        "environment_audit_path": str(_TARGET_ENVIRONMENT_AUDIT),
+        "environment_audit_sha256": _TARGET_ENVIRONMENT_AUDIT_SHA256,
+        "historical_environment_source_snapshot_sha256": (
+            _HISTORICAL_ENVIRONMENT_SOURCE_SNAPSHOT_SHA256
+        ),
+        "historical_environment_source_digest": _HISTORICAL_ENVIRONMENT_SOURCE_DIGEST,
+        "target_interpreter": str(_TARGET_INTERPRETER),
+        "target_interpreter_sha256": _TARGET_INTERPRETER_SHA256,
+        "public_source_root": str(_PUBLIC_SOURCE_ROOT),
+        "public_sources": tuple(
+            TargetVersionPublicSourceBinding(
+                distribution_name=name,
+                path=str(_PUBLIC_SOURCE_ROOT / f"pypi-{name}.json"),
+                sha256=_RAW_SHA[name],
+            )
+            for name, _, _ in _TARGETS
+        ),
+    }
+    values.update(overrides)
+    authority = TargetVersionFutureExecutionAuthority(**values)  # type: ignore[arg-type]
+    if "execution_command_sha256" not in overrides:
+        authority = replace(
+            authority,
+            execution_command_sha256=authority.expected_execution_command_sha256,
+        )
+    return authority
 
 
 def test_valid_preparation_is_private_canonical_and_never_authority(tmp_path: Path):
@@ -282,6 +364,133 @@ def test_writer_failure_removes_staged_partial_tree(
     assert list(tmp_path.glob(".formal_evidence.stage-*")) == []
 
 
+def test_execution_capability_collects_actual_target_venv_without_authority_write(
+    tmp_path: Path,
+):
+    authority = _execution_authority(tmp_path)
+
+    capability = inspect_target_version_execution_capability(authority=authority)
+
+    assert capability.authority_id == authority.authority_id
+    assert capability.source_digest == _CURRENT_SOURCE_DIGEST
+    assert capability.preparation.receipt.all_match_latest is True
+    assert [record.distribution_name for record in capability.metadata_records] == [
+        name for name, _, _ in _TARGETS
+    ]
+    assert [record.import_name for record in capability.metadata_records] == [
+        import_name for _, import_name, _ in _TARGETS
+    ]
+    assert all(record.installed_metadata for record in capability.metadata_records)
+    assert all(
+        Path(record.metadata_path).is_relative_to(_TARGET_ENVIRONMENT_ROOT / "venv")
+        for record in capability.metadata_records
+    )
+    assert capability.formal_execution_authorized is False
+    assert capability.authority_eligible is False
+    assert capability.formal_evidence_created is False
+    assert capability.gate_credit is False
+    assert capability.candidate_confirmed is False
+    assert capability.bug_claimed is False
+    assert not Path(authority.future_output_root).exists()
+    assert not _FORMAL_EVIDENCE_ROOT.exists()
+    with pytest.raises(PermissionError, match="separate successor authority"):
+        require_formal_target_version_execution_authority(authority)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("source_snapshot_sha256", "b" * 64),
+        ("source_digest", "osc-phase6-source-snapshot-" + "b" * 64),
+        ("source_git_head", "b" * 40),
+        ("target_revalidation_sha256", "b" * 64),
+        ("environment_audit_sha256", "b" * 64),
+        ("target_interpreter_sha256", "b" * 64),
+    ],
+)
+def test_execution_capability_rejects_provenance_substitutions_before_probe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    value: str,
+):
+    authority = _execution_authority(tmp_path, **{field: value})
+
+    def unexpected_probe(*args: object, **kwargs: object) -> object:
+        raise AssertionError("metadata probe must not run for a stale binding")
+
+    monkeypatch.setattr(producer_module.subprocess, "run", unexpected_probe)
+    with pytest.raises(ValueError, match="mismatch"):
+        inspect_target_version_execution_capability(authority=authority)
+    assert not Path(authority.future_output_root).exists()
+
+
+@pytest.mark.parametrize(
+    "source_git_head",
+    [
+        "a" * 39,
+        "a" * 41,
+        "a" * 64,
+        "A" * 40,
+        "z" * 40,
+        "synthetic-git-head",
+    ],
+)
+def test_execution_capability_rejects_malformed_git_head_before_probe(
+    tmp_path: Path, source_git_head: str
+):
+    with pytest.raises(ValueError, match="source_git_head"):
+        _execution_authority(tmp_path, source_git_head=source_git_head)
+    assert not (tmp_path / "formal_evidence").exists()
+
+
+def test_execution_capability_rejects_missing_or_malformed_authority_before_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    def unexpected_probe(*args: object, **kwargs: object) -> object:
+        raise AssertionError("metadata probe must not run without valid authority")
+
+    monkeypatch.setattr(producer_module.subprocess, "run", unexpected_probe)
+    with pytest.raises(TypeError, match="requires an authority input"):
+        inspect_target_version_execution_capability(authority=object())  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="not authorized"):
+        _execution_authority(tmp_path, formal_execution_authorized=True)
+    with pytest.raises(ValueError, match="frozen target"):
+        TargetVersionPublicSourceBinding(
+            distribution_name="pandas",
+            path=str(_PUBLIC_SOURCE_ROOT / "pypi-pandas.json"),
+            sha256="b" * 64,
+        )
+    existing_output = tmp_path / "formal_evidence"
+    existing_output.mkdir()
+    authority = _execution_authority(tmp_path)
+    with pytest.raises(ValueError, match="must be an absent direct child"):
+        inspect_target_version_execution_capability(authority=authority)
+    assert existing_output.is_dir()
+
+
+def test_execution_capability_rejects_duplicate_probe_transcript_without_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    authority = _execution_authority(tmp_path)
+    malformed = b'{"records":[],"records":[]}'
+
+    monkeypatch.setattr(
+        producer_module.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout=malformed,
+            stderr=b"",
+        ),
+    )
+    with pytest.raises(ValueError, match="duplicate JSON key"):
+        inspect_target_version_execution_capability(authority=authority)
+    assert not Path(authority.future_output_root).exists()
+    assert not _FORMAL_EVIDENCE_ROOT.exists()
+
+
 def test_unsupported_pypi_json_alias_fails_closed():
     material = _materials()[0]
 
@@ -369,6 +578,8 @@ def test_preview_and_cli_reject_execution_output_and_plan_flags(capsys: pytest.C
     assert preview["launches_subprocess"] is False
     assert preview["makes_network_request"] is False
     assert preview["test_only_staged_writer_available"] is True
+    assert preview["test_only_execution_capability_available"] is True
+    assert preview["formal_execution_authorized"] is False
 
     script = (
         Path(__file__).resolve().parents[2]
@@ -384,6 +595,8 @@ def test_preview_and_cli_reject_execution_output_and_plan_flags(capsys: pytest.C
     output = json.loads(capsys.readouterr().out)
     assert output["writes_durable_output"] is False
     assert output["test_only_staged_writer_available"] is True
+    assert output["test_only_execution_capability_available"] is True
+    assert output["formal_execution_authorized"] is False
     for forbidden in ("--execute", "--output", "out.json", "--dynamic-plan"):
         with pytest.raises(SystemExit) as raised:
             main([forbidden])
