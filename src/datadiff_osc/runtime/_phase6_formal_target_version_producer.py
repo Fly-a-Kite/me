@@ -10,15 +10,21 @@ before it may persist a formal ``target_version_replay`` record.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
 import json
+import os
+from pathlib import Path
 import re
+import shutil
+import tempfile
 
 from datadiff.target_version_audit import DEFAULT_TARGET_PACKAGES
 from datadiff_osc._canonical import (
     assert_deeply_immutable,
     canonical_json,
+    canonical_envelope,
+    decode_canonical_envelope,
     stable_digest,
 )
 from datadiff_osc.runtime._private_receipts import TargetVersionReceipt
@@ -27,12 +33,17 @@ from datadiff_osc.runtime._receipt_producers import (
     TargetVersionObservation,
     build_target_version_receipt,
 )
+from datadiff_osc.runtime._semantic_replay import replay_runtime_admission
 
 
 FORMAL_TARGET_VERSION_PREPARATION_SCHEMA_VERSION = (
     "osc-private-phase6-formal-target-version-preparation-v1"
 )
 FORMAL_TARGET_VERSION_PREPARATION_MODE = "prepare-only-no-authority-v1"
+FORMAL_TARGET_VERSION_EVIDENCE_MANIFEST_SCHEMA_VERSION = (
+    "osc-private-phase6-target-version-evidence-manifest-v1"
+)
+FORMAL_TARGET_VERSION_EVIDENCE_WRITER_MODE = "test-only-staged-no-authority-v1"
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
 
 _EXPECTED_TARGETS = tuple(
@@ -158,6 +169,118 @@ class TargetVersionPreparation:
         return stable_digest(
             "osc-private-phase6-target-version-preparation-id",
             (self.source_digest, self.receipt.digest, self.payload_json),
+        )
+
+    @property
+    def authority_eligible(self) -> bool:
+        return False
+
+    @property
+    def formal_evidence_created(self) -> bool:
+        return False
+
+    @property
+    def gate_credit(self) -> bool:
+        return False
+
+    @property
+    def candidate_confirmed(self) -> bool:
+        return False
+
+    @property
+    def bug_claimed(self) -> bool:
+        return False
+
+
+@dataclass(frozen=True, slots=True)
+class TargetVersionEvidenceWriteRequest:
+    """Exact bindings for one private, test-only target-version output tree."""
+
+    output_root: str
+    source_digest: str
+    source_snapshot_sha256: str
+    requirements_lock_sha256: str
+    target_revalidation_sha256: str
+    environment_audit_sha256: str
+    receipt_digest: str
+    schema_version: str = FORMAL_TARGET_VERSION_EVIDENCE_MANIFEST_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _require_output_root_text(self.output_root)
+        _require_text(self.source_digest, name="writer source digest")
+        for name in (
+            "source_snapshot_sha256",
+            "requirements_lock_sha256",
+            "target_revalidation_sha256",
+            "environment_audit_sha256",
+        ):
+            _require_sha256(getattr(self, name), name=name)
+        _require_text(self.receipt_digest, name="writer receipt digest")
+        if self.schema_version != FORMAL_TARGET_VERSION_EVIDENCE_MANIFEST_SCHEMA_VERSION:
+            raise ValueError("target-version evidence manifest schema version mismatch")
+        assert_deeply_immutable(self)
+
+    @property
+    def request_id(self) -> str:
+        return stable_digest(
+            "osc-private-phase6-target-version-evidence-write-request",
+            (
+                self.output_root,
+                self.source_digest,
+                self.source_snapshot_sha256,
+                self.requirements_lock_sha256,
+                self.target_revalidation_sha256,
+                self.environment_audit_sha256,
+                self.receipt_digest,
+                self.schema_version,
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class TargetVersionEvidenceWriteResult:
+    """A re-readable private test-output record, never Root authority."""
+
+    output_root: str
+    raw_manifest_path: str
+    receipt_path: str
+    raw_manifest_sha256: str
+    receipt_sha256: str
+    source_digest: str
+    source_snapshot_sha256: str
+    receipt_digest: str
+    schema_version: str = FORMAL_TARGET_VERSION_EVIDENCE_MANIFEST_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        for name in (
+            "output_root",
+            "raw_manifest_path",
+            "receipt_path",
+            "source_digest",
+            "receipt_digest",
+        ):
+            _require_text(getattr(self, name), name=f"writer result {name}")
+        for name in (
+            "raw_manifest_sha256",
+            "receipt_sha256",
+            "source_snapshot_sha256",
+        ):
+            _require_sha256(getattr(self, name), name=name)
+        if self.schema_version != FORMAL_TARGET_VERSION_EVIDENCE_MANIFEST_SCHEMA_VERSION:
+            raise ValueError("target-version evidence result schema version mismatch")
+        assert_deeply_immutable(self)
+
+    @property
+    def evidence_id(self) -> str:
+        return stable_digest(
+            "osc-private-phase6-target-version-evidence-write-result",
+            (
+                self.source_digest,
+                self.source_snapshot_sha256,
+                self.receipt_digest,
+                self.raw_manifest_sha256,
+                self.receipt_sha256,
+            ),
         )
 
     @property
@@ -377,6 +500,362 @@ def prepare_target_version_replay(
     )
 
 
+def _require_output_root_text(value: object) -> str:
+    if not isinstance(value, str) or not value or "\x00" in value:
+        raise ValueError("target-version output root must be non-empty text without NUL")
+    if "synthetic" in value.lower():
+        raise ValueError("target-version output root cannot contain a synthetic marker")
+    path = Path(value)
+    if not path.is_absolute() or not path.name:
+        raise ValueError("target-version output root must be an absolute directory path")
+    if ".." in path.parts:
+        raise ValueError("target-version output root cannot contain a parent traversal")
+    return value
+
+
+def _require_no_symlink_components(path: Path) -> None:
+    if not path.is_absolute():
+        raise ValueError("target-version output path must be absolute")
+    current = Path(path.anchor)
+    for part in path.parts[1:]:
+        current /= part
+        if os.path.islink(current):
+            raise ValueError("target-version output path cannot traverse a symlink")
+
+
+def _new_output_root(request: TargetVersionEvidenceWriteRequest) -> Path:
+    root = Path(_require_output_root_text(request.output_root))
+    if os.path.lexists(root):
+        raise ValueError("target-version output root already exists")
+    parent = root.parent
+    _require_no_symlink_components(parent)
+    if not parent.is_dir():
+        raise ValueError("target-version output parent must be an existing directory")
+    return root
+
+
+def _existing_output_root(request: TargetVersionEvidenceWriteRequest) -> Path:
+    root = Path(_require_output_root_text(request.output_root))
+    _require_no_symlink_components(root.parent)
+    if not root.is_dir() or root.is_symlink():
+        raise ValueError("target-version output root must be an existing non-symlink directory")
+    return root
+
+
+def _strict_json(raw: bytes, *, name: str) -> object:
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"{name} is not UTF-8") from exc
+
+    def reject_duplicates(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"{name} has a duplicate JSON key")
+            result[key] = value
+        return result
+
+    def reject_constant(value: str) -> object:
+        raise ValueError(f"{name} has a non-standard JSON constant: {value}")
+
+    try:
+        return json.loads(
+            text,
+            object_pairs_hook=reject_duplicates,
+            parse_constant=reject_constant,
+        )
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{name} is malformed JSON") from exc
+
+
+def _require_request_matches_preparation(
+    preparation: TargetVersionPreparation,
+    request: TargetVersionEvidenceWriteRequest,
+) -> None:
+    if not isinstance(preparation, TargetVersionPreparation):
+        raise TypeError("target-version writer requires TargetVersionPreparation")
+    if not isinstance(request, TargetVersionEvidenceWriteRequest):
+        raise TypeError("target-version writer requires TargetVersionEvidenceWriteRequest")
+    bindings = (
+        ("source digest", request.source_digest, preparation.source_digest),
+        (
+            "source snapshot SHA-256",
+            request.source_snapshot_sha256,
+            preparation.source_snapshot_sha256,
+        ),
+        (
+            "requirements lock SHA-256",
+            request.requirements_lock_sha256,
+            preparation.requirements_lock_sha256,
+        ),
+        (
+            "target revalidation SHA-256",
+            request.target_revalidation_sha256,
+            preparation.target_revalidation_sha256,
+        ),
+        (
+            "environment audit SHA-256",
+            request.environment_audit_sha256,
+            preparation.environment_audit_sha256,
+        ),
+        ("receipt digest", request.receipt_digest, preparation.receipt.digest),
+    )
+    for name, actual, expected in bindings:
+        if actual != expected:
+            raise ValueError(f"target-version writer {name} mismatch")
+    rebuilt = build_target_version_receipt(
+        _observation(
+            source_digest=preparation.source_digest,
+            materials=preparation.materials,
+            environment=preparation.environment,
+            python_runtime=preparation.python_runtime,
+        )
+    )
+    if rebuilt != preparation.receipt or rebuilt.digest != request.receipt_digest:
+        raise ValueError("target-version writer receipt cannot be rebuilt from raw material")
+    if not preparation.receipt.all_match_latest:
+        raise ValueError("target-version writer requires all targets to match latest")
+
+
+def _material_paths(material: TargetVersionRawMaterial) -> tuple[str, str]:
+    if material.distribution_name not in _EXPECTED_PUBLIC_RAW_SHA256:
+        raise ValueError("target-version writer has an unsupported distribution")
+    raw_root = f"raw/target_version_replay/{material.distribution_name}"
+    return f"{raw_root}/installed-METADATA", f"{raw_root}/pypi.json"
+
+
+def _write_new_bytes(path: Path, raw: bytes) -> None:
+    if not isinstance(raw, bytes):
+        raise TypeError("target-version writer can only write immutable bytes")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.parent.is_symlink():
+        raise ValueError("target-version writer cannot write through a symlink")
+    with path.open("xb") as handle:
+        handle.write(raw)
+
+
+def _expected_manifest(
+    *,
+    preparation: TargetVersionPreparation,
+    receipt_sha256: str,
+) -> dict[str, object]:
+    package_by_distribution = {
+        item.distribution_name: item for item in preparation.receipt.packages
+    }
+    if tuple(package_by_distribution) != tuple(
+        item.distribution_name for item in preparation.receipt.packages
+    ):
+        raise ValueError("target-version writer receipt distributions must be unique")
+    materials: list[dict[str, object]] = []
+    for material in preparation.materials:
+        installed_path, public_path = _material_paths(material)
+        package = package_by_distribution.get(material.distribution_name)
+        if package is None or package.import_name != material.import_name:
+            raise ValueError("target-version writer receipt/material identity mismatch")
+        expected_public_sha = _EXPECTED_PUBLIC_RAW_SHA256[material.distribution_name]
+        if _sha256(material.public_version_source) != expected_public_sha:
+            raise ValueError(
+                "target-version writer public source SHA mismatch: "
+                + material.distribution_name
+            )
+        materials.append(
+            {
+                "distribution_name": material.distribution_name,
+                "import_name": material.import_name,
+                "package_id": package.package_id,
+                "installed_metadata_path": installed_path,
+                "installed_metadata_sha256": _sha256(material.installed_metadata),
+                "public_version_source_path": public_path,
+                "public_version_source_sha256": expected_public_sha,
+            }
+        )
+    return {
+        "schema_version": FORMAL_TARGET_VERSION_EVIDENCE_MANIFEST_SCHEMA_VERSION,
+        "mode": FORMAL_TARGET_VERSION_EVIDENCE_WRITER_MODE,
+        "source_digest": preparation.source_digest,
+        "source_snapshot_sha256": preparation.source_snapshot_sha256,
+        "requirements_lock_sha256": preparation.requirements_lock_sha256,
+        "target_revalidation_sha256": preparation.target_revalidation_sha256,
+        "environment_audit_sha256": preparation.environment_audit_sha256,
+        "receipt": {
+            "envelope_path": "receipts/target_version_replay.json",
+            "envelope_sha256": receipt_sha256,
+            "receipt_digest": preparation.receipt.digest,
+            "envelope_type": "TargetVersionReceipt",
+            "envelope_schema_version": preparation.receipt.schema_version,
+        },
+        "materials": materials,
+        "all_targets_match_latest": True,
+        "authority_eligible": False,
+        "formal_evidence_created": False,
+        "gate_credit": False,
+        "candidate_confirmed": False,
+        "bug_claimed": False,
+    }
+
+
+def _expected_file_paths(preparation: TargetVersionPreparation) -> tuple[str, ...]:
+    paths = {
+        "raw/target_version_replay/manifest.json",
+        "receipts/target_version_replay.json",
+    }
+    for material in preparation.materials:
+        paths.update(_material_paths(material))
+    return tuple(sorted(paths))
+
+
+def _write_stage(
+    root: Path,
+    *,
+    preparation: TargetVersionPreparation,
+) -> None:
+    if any(root.iterdir()):
+        raise ValueError("target-version staging root must be empty")
+    receipt_text = canonical_envelope(
+        "TargetVersionReceipt",
+        preparation.receipt.schema_version,
+        preparation.receipt,
+    )
+    receipt_raw = receipt_text.encode("utf-8")
+    receipt_path = root / "receipts" / "target_version_replay.json"
+    _write_new_bytes(receipt_path, receipt_raw)
+    for material in preparation.materials:
+        installed_path, public_path = _material_paths(material)
+        _write_new_bytes(root / installed_path, material.installed_metadata)
+        _write_new_bytes(root / public_path, material.public_version_source)
+    manifest = _expected_manifest(
+        preparation=preparation,
+        receipt_sha256=_sha256(receipt_raw),
+    )
+    _write_new_bytes(
+        root / "raw/target_version_replay/manifest.json",
+        canonical_json(manifest).encode("utf-8"),
+    )
+
+
+def _result_for_existing_output(
+    root: Path,
+    *,
+    preparation: TargetVersionPreparation,
+) -> TargetVersionEvidenceWriteResult:
+    manifest_path = root / "raw/target_version_replay/manifest.json"
+    receipt_path = root / "receipts/target_version_replay.json"
+    return TargetVersionEvidenceWriteResult(
+        output_root=str(root),
+        raw_manifest_path=str(manifest_path),
+        receipt_path=str(receipt_path),
+        raw_manifest_sha256=_sha256(manifest_path.read_bytes()),
+        receipt_sha256=_sha256(receipt_path.read_bytes()),
+        source_digest=preparation.source_digest,
+        source_snapshot_sha256=preparation.source_snapshot_sha256,
+        receipt_digest=preparation.receipt.digest,
+    )
+
+
+def verify_target_version_replay_evidence(
+    *,
+    preparation: TargetVersionPreparation,
+    request: TargetVersionEvidenceWriteRequest,
+) -> TargetVersionEvidenceWriteResult:
+    """Re-read a private staged tree without granting it formal authority."""
+
+    _require_request_matches_preparation(preparation, request)
+    root = _existing_output_root(request)
+    found_paths = tuple(
+        sorted(
+            item.relative_to(root).as_posix()
+            for item in root.rglob("*")
+            if item.is_file()
+        )
+    )
+    if found_paths != _expected_file_paths(preparation):
+        raise ValueError("target-version evidence file inventory mismatch")
+    if any(item.is_symlink() for item in root.rglob("*")):
+        raise ValueError("target-version evidence cannot contain a symlink")
+
+    receipt_path = root / "receipts/target_version_replay.json"
+    receipt_raw = receipt_path.read_bytes()
+    receipt_sha256 = _sha256(receipt_raw)
+    try:
+        receipt_text = receipt_raw.decode("utf-8")
+        envelope = decode_canonical_envelope(receipt_text)
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        raise ValueError("target-version evidence receipt envelope is invalid") from exc
+    if (
+        envelope["type"] != "TargetVersionReceipt"
+        or envelope["schema_version"] != preparation.receipt.schema_version
+    ):
+        raise ValueError("target-version evidence receipt envelope type mismatch")
+    if receipt_text != canonical_envelope(
+        "TargetVersionReceipt",
+        preparation.receipt.schema_version,
+        preparation.receipt,
+    ):
+        raise ValueError("target-version evidence receipt bytes mismatch")
+    replay_errors = replay_runtime_admission(
+        envelope_type="TargetVersionReceipt",
+        schema_version=preparation.receipt.schema_version,
+        payload=envelope["payload"],
+        subject_kind="target_packages",
+        subject_ids=preparation.receipt.package_ids,
+    )
+    if replay_errors:
+        raise ValueError(
+            "target-version evidence semantic replay failed: " + ",".join(replay_errors)
+        )
+
+    expected_manifest = _expected_manifest(
+        preparation=preparation,
+        receipt_sha256=receipt_sha256,
+    )
+    manifest_path = root / "raw/target_version_replay/manifest.json"
+    manifest_raw = manifest_path.read_bytes()
+    manifest_value = _strict_json(manifest_raw, name="target-version evidence manifest")
+    if manifest_value != expected_manifest or manifest_raw != canonical_json(
+        expected_manifest
+    ).encode("utf-8"):
+        raise ValueError("target-version evidence manifest is not exact canonical binding")
+    for material in preparation.materials:
+        installed_path, public_path = _material_paths(material)
+        if (root / installed_path).read_bytes() != material.installed_metadata:
+            raise ValueError("target-version evidence installed metadata bytes mismatch")
+        if (root / public_path).read_bytes() != material.public_version_source:
+            raise ValueError("target-version evidence public source bytes mismatch")
+    return _result_for_existing_output(root, preparation=preparation)
+
+
+def write_target_version_replay_evidence(
+    *,
+    preparation: TargetVersionPreparation,
+    request: TargetVersionEvidenceWriteRequest,
+) -> TargetVersionEvidenceWriteResult:
+    """Stage and publish a test-only tree after all exact bindings validate."""
+
+    _require_request_matches_preparation(preparation, request)
+    output_root = _new_output_root(request)
+    stage_root = Path(
+        tempfile.mkdtemp(prefix=f".{output_root.name}.stage-", dir=output_root.parent)
+    )
+    try:
+        _write_stage(stage_root, preparation=preparation)
+        verify_target_version_replay_evidence(
+            preparation=preparation,
+            request=replace(request, output_root=str(stage_root)),
+        )
+        if os.path.lexists(output_root):
+            raise ValueError("target-version output root appeared during staging")
+        os.replace(stage_root, output_root)
+        stage_root = None  # ownership moved to output_root after successful publish
+    finally:
+        if stage_root is not None and os.path.lexists(stage_root):
+            shutil.rmtree(stage_root)
+    return verify_target_version_replay_evidence(
+        preparation=preparation,
+        request=request,
+    )
+
+
 def target_version_producer_preview() -> dict[str, object]:
     """Return the fixed declaration for the no-output implementation boundary."""
 
@@ -388,6 +867,7 @@ def target_version_producer_preview() -> dict[str, object]:
         "launches_subprocess": False,
         "makes_network_request": False,
         "writes_durable_output": False,
+        "test_only_staged_writer_available": True,
         "formal_evidence_created": False,
         "authority_eligible": False,
         "gate_credit": False,
@@ -397,10 +877,16 @@ def target_version_producer_preview() -> dict[str, object]:
 
 
 __all__ = [
+    "FORMAL_TARGET_VERSION_EVIDENCE_MANIFEST_SCHEMA_VERSION",
+    "FORMAL_TARGET_VERSION_EVIDENCE_WRITER_MODE",
     "FORMAL_TARGET_VERSION_PREPARATION_MODE",
     "FORMAL_TARGET_VERSION_PREPARATION_SCHEMA_VERSION",
+    "TargetVersionEvidenceWriteRequest",
+    "TargetVersionEvidenceWriteResult",
     "TargetVersionPreparation",
     "TargetVersionRawMaterial",
     "prepare_target_version_replay",
     "target_version_producer_preview",
+    "verify_target_version_replay_evidence",
+    "write_target_version_replay_evidence",
 ]

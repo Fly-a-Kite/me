@@ -7,13 +7,20 @@ from pathlib import Path
 
 import pytest
 
+import datadiff_osc.runtime._phase6_formal_target_version_producer as producer_module
 from datadiff_osc.runtime._phase6_formal_target_version_producer import (
+    FORMAL_TARGET_VERSION_EVIDENCE_MANIFEST_SCHEMA_VERSION,
+    FORMAL_TARGET_VERSION_EVIDENCE_WRITER_MODE,
     FORMAL_TARGET_VERSION_PREPARATION_MODE,
+    TargetVersionEvidenceWriteRequest,
     TargetVersionRawMaterial,
     prepare_target_version_replay,
     target_version_producer_preview,
+    verify_target_version_replay_evidence,
+    write_target_version_replay_evidence,
 )
 from datadiff_osc.runtime._receipt_producers import TargetPackageObservation
+from datadiff_osc.runtime._semantic_replay import replay_runtime_admission
 
 
 _SOURCE_DIGEST = "osc-phase6-source-snapshot-" + "a" * 64
@@ -38,6 +45,9 @@ _RAW_SHA = {
 }
 _PUBLIC_SOURCE_ROOT = Path(
     "/tmp/phase6_formal_execution_authority_r1.Smql7A/target_version_public_sources"
+)
+_FORMAL_EVIDENCE_ROOT = Path(
+    "/tmp/phase6_formal_latest_target_remediation_r1.20260724/formal_evidence"
 )
 
 
@@ -76,6 +86,18 @@ def _prepare(**overrides: object):
     return prepare_target_version_replay(**values)  # type: ignore[arg-type]
 
 
+def _write_request(preparation, output_root: Path) -> TargetVersionEvidenceWriteRequest:
+    return TargetVersionEvidenceWriteRequest(
+        output_root=str(output_root),
+        source_digest=preparation.source_digest,
+        source_snapshot_sha256=preparation.source_snapshot_sha256,
+        requirements_lock_sha256=preparation.requirements_lock_sha256,
+        target_revalidation_sha256=preparation.target_revalidation_sha256,
+        environment_audit_sha256=preparation.environment_audit_sha256,
+        receipt_digest=preparation.receipt.digest,
+    )
+
+
 def test_valid_preparation_is_private_canonical_and_never_authority(tmp_path: Path):
     preparation = _prepare()
 
@@ -97,6 +119,167 @@ def test_valid_preparation_is_private_canonical_and_never_authority(tmp_path: Pa
         _RAW_SHA[name] for name, _, _ in _TARGETS
     ]
     assert list(tmp_path.iterdir()) == []
+
+
+def test_writer_stages_only_canonical_temporary_tree_and_replays_exactly(
+    tmp_path: Path,
+):
+    preparation = _prepare()
+    output_root = tmp_path / "formal_evidence"
+    request = _write_request(preparation, output_root)
+
+    result = write_target_version_replay_evidence(
+        preparation=preparation,
+        request=request,
+    )
+
+    assert result.output_root == str(output_root)
+    assert result.authority_eligible is False
+    assert result.formal_evidence_created is False
+    assert result.gate_credit is False
+    assert result.candidate_confirmed is False
+    assert result.bug_claimed is False
+    assert verify_target_version_replay_evidence(
+        preparation=preparation,
+        request=request,
+    ) == result
+    assert sorted(
+        path.relative_to(output_root).as_posix()
+        for path in output_root.rglob("*")
+        if path.is_file()
+    ) == sorted(
+        [
+            "raw/target_version_replay/manifest.json",
+            "receipts/target_version_replay.json",
+            *[
+                f"raw/target_version_replay/{name}/{leaf}"
+                for name, _, _ in _TARGETS
+                for leaf in ("installed-METADATA", "pypi.json")
+            ],
+        ]
+    )
+    manifest_raw = (
+        output_root / "raw/target_version_replay/manifest.json"
+    ).read_bytes()
+    manifest = json.loads(manifest_raw)
+    assert manifest["schema_version"] == FORMAL_TARGET_VERSION_EVIDENCE_MANIFEST_SCHEMA_VERSION
+    assert manifest["mode"] == FORMAL_TARGET_VERSION_EVIDENCE_WRITER_MODE
+    assert manifest["receipt"]["receipt_digest"] == preparation.receipt.digest
+    assert manifest["authority_eligible"] is False
+    assert manifest["gate_credit"] is False
+    receipt = json.loads(
+        (output_root / "receipts/target_version_replay.json").read_text(encoding="utf-8")
+    )
+    assert replay_runtime_admission(
+        envelope_type=receipt["type"],
+        schema_version=receipt["schema_version"],
+        payload=receipt["payload"],
+        subject_kind="target_packages",
+        subject_ids=preparation.receipt.package_ids,
+    ) == ()
+    assert not _FORMAL_EVIDENCE_ROOT.exists()
+
+
+def test_writer_refuses_stale_bindings_existing_paths_and_symlink_escape(
+    tmp_path: Path,
+):
+    preparation = _prepare()
+    stale_root = tmp_path / "stale-output"
+    stale_request = _write_request(preparation, stale_root)
+    with pytest.raises(ValueError, match="source snapshot SHA-256 mismatch"):
+        write_target_version_replay_evidence(
+            preparation=preparation,
+            request=replace(stale_request, source_snapshot_sha256="b" * 64),
+        )
+    assert not stale_root.exists()
+    with pytest.raises(ValueError, match="receipt digest mismatch"):
+        write_target_version_replay_evidence(
+            preparation=preparation,
+            request=replace(stale_request, receipt_digest="wrong-receipt-digest"),
+        )
+    assert not stale_root.exists()
+
+    existing_root = tmp_path / "existing-output"
+    existing_root.mkdir()
+    sentinel = existing_root / "sentinel.txt"
+    sentinel.write_text("preserve", encoding="utf-8")
+    with pytest.raises(ValueError, match="already exists"):
+        write_target_version_replay_evidence(
+            preparation=preparation,
+            request=_write_request(preparation, existing_root),
+        )
+    assert sentinel.read_text(encoding="utf-8") == "preserve"
+
+    link = tmp_path / "linked-parent"
+    link.symlink_to(tmp_path, target_is_directory=True)
+    with pytest.raises(ValueError, match="cannot traverse a symlink"):
+        write_target_version_replay_evidence(
+            preparation=preparation,
+            request=_write_request(preparation, link / "escaped-output"),
+        )
+    with pytest.raises(ValueError, match="parent traversal"):
+        TargetVersionEvidenceWriteRequest(
+            output_root=str(tmp_path / ".." / "escaped-output"),
+            source_digest=preparation.source_digest,
+            source_snapshot_sha256=preparation.source_snapshot_sha256,
+            requirements_lock_sha256=preparation.requirements_lock_sha256,
+            target_revalidation_sha256=preparation.target_revalidation_sha256,
+            environment_audit_sha256=preparation.environment_audit_sha256,
+            receipt_digest=preparation.receipt.digest,
+        )
+
+
+def test_writer_revalidation_detects_raw_or_manifest_mutation(tmp_path: Path):
+    preparation = _prepare()
+    output_root = tmp_path / "formal_evidence"
+    request = _write_request(preparation, output_root)
+    write_target_version_replay_evidence(preparation=preparation, request=request)
+
+    metadata_path = output_root / "raw/target_version_replay/pandas/installed-METADATA"
+    metadata_path.write_bytes(metadata_path.read_bytes() + b"X")
+    with pytest.raises(ValueError, match="installed metadata bytes mismatch"):
+        verify_target_version_replay_evidence(
+            preparation=preparation,
+            request=request,
+        )
+
+
+def test_writer_revalidation_detects_manifest_byte_mutation(tmp_path: Path):
+    preparation = _prepare()
+    output_root = tmp_path / "formal_evidence"
+    request = _write_request(preparation, output_root)
+    write_target_version_replay_evidence(preparation=preparation, request=request)
+
+    manifest_path = output_root / "raw/target_version_replay/manifest.json"
+    manifest_path.write_bytes(manifest_path.read_bytes() + b"\n")
+    with pytest.raises(ValueError, match="manifest is not exact canonical binding"):
+        verify_target_version_replay_evidence(
+            preparation=preparation,
+            request=request,
+        )
+
+
+def test_writer_failure_removes_staged_partial_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    preparation = _prepare()
+    output_root = tmp_path / "formal_evidence"
+    request = _write_request(preparation, output_root)
+    original = producer_module._write_new_bytes
+    calls = 0
+
+    def fail_after_first(path: Path, raw: bytes) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("injected staging failure")
+        original(path, raw)
+
+    monkeypatch.setattr(producer_module, "_write_new_bytes", fail_after_first)
+    with pytest.raises(OSError, match="injected staging failure"):
+        write_target_version_replay_evidence(preparation=preparation, request=request)
+    assert not output_root.exists()
+    assert list(tmp_path.glob(".formal_evidence.stage-*")) == []
 
 
 def test_unsupported_pypi_json_alias_fails_closed():
@@ -185,6 +368,7 @@ def test_preview_and_cli_reject_execution_output_and_plan_flags(capsys: pytest.C
     assert preview["launches_adapter"] is False
     assert preview["launches_subprocess"] is False
     assert preview["makes_network_request"] is False
+    assert preview["test_only_staged_writer_available"] is True
 
     script = (
         Path(__file__).resolve().parents[2]
@@ -199,6 +383,7 @@ def test_preview_and_cli_reject_execution_output_and_plan_flags(capsys: pytest.C
     assert main([]) == 0
     output = json.loads(capsys.readouterr().out)
     assert output["writes_durable_output"] is False
+    assert output["test_only_staged_writer_available"] is True
     for forbidden in ("--execute", "--output", "out.json", "--dynamic-plan"):
         with pytest.raises(SystemExit) as raised:
             main([forbidden])
