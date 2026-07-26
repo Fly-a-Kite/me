@@ -71,8 +71,37 @@ def test_candidate_recheck_impl_uses_non_recursive_no_artifact_config_and_inters
     finding = _finding()
     calls: list[dict] = []
     rows = [
-        {"findings": [_finding_row()]},
-        {"findings": []},
+        {
+            "findings": [_finding_row()],
+            "raw_results": {
+                "left": {
+                    "physical_plan": {
+                        "detail": "full",
+                        "observations": [{"raw_text": "Scan t"}],
+                    }
+                }
+            },
+            "execution_profile": {
+                "combined_backend_reported_total_ms": 6.0,
+                "combined_backend_calls": 6,
+            },
+            "stage_profile": {
+                "backend_execution_ms": 4.0,
+                "oracle_classification_ms": 1.0,
+            },
+        },
+        {
+            "findings": [],
+            "execution_profile": {
+                "backend_reported_total_ms": 4.0,
+                "backend_calls": 4,
+            },
+            "stage_profile": {
+                "backend_execution_ms": 3.0,
+                "normalize_ms": 1.0,
+                "oracle_classification_ms": 2.0,
+            },
+        },
     ]
 
     def fake_run_loaded_case(case_arg, **kwargs):
@@ -81,6 +110,7 @@ def test_candidate_recheck_impl_uses_non_recursive_no_artifact_config_and_inters
                 "case": case_arg,
                 "backends": kwargs["backends"],
                 "candidate_recheck_count": kwargs["config"].candidate_recheck_count,
+                "evidence_tier": kwargs["config"].evidence_tier,
                 "enable_artifact": kwargs["config"].enable_artifact,
                 "save_artifact": kwargs["save_artifact"],
                 "backend_instances": kwargs["backend_instances"],
@@ -101,6 +131,7 @@ def test_candidate_recheck_impl_uses_non_recursive_no_artifact_config_and_inters
     assert all(call["case"] is case for call in calls)
     assert all(call["backends"] == ["left", "right"] for call in calls)
     assert all(call["candidate_recheck_count"] == 0 for call in calls)
+    assert all(call["evidence_tier"] == "fresh_confirmation" for call in calls)
     assert all(call["enable_artifact"] is False for call in calls)
     assert all(call["save_artifact"] is False for call in calls)
     assert all(call["backend_instances"] is None for call in calls)
@@ -111,6 +142,21 @@ def test_candidate_recheck_impl_uses_non_recursive_no_artifact_config_and_inters
         "semantic_output_mismatch:filter_predicate@right:row_count"
     ]
     assert result["attempt_summaries"][1]["reproduced_keys"] == []
+    assert result["attempt_summaries"][0]["backend_reported_total_ms"] == 6.0
+    assert result["attempt_summaries"][1]["backend_reported_total_ms"] == 4.0
+    assert result["backend_reported_total_ms"] == 10.0
+    assert result["attempt_summaries"][0]["backend_calls"] == 6
+    assert result["attempt_summaries"][1]["backend_calls"] == 4
+    assert result["backend_calls"] == 10
+    assert result["attempt_summaries"][0]["physical_plans"]["left"]["detail"] == (
+        "full"
+    )
+    assert result["attempt_summaries"][0]["stage_profile"]["total_case_wall_ms"] == 5.0
+    assert result["attempt_summaries"][1]["stage_profile"]["total_case_wall_ms"] == 6.0
+    assert result["stage_profile_totals"]["backend_execution_ms"] == 7.0
+    assert result["stage_profile_totals"]["normalize_ms"] == 1.0
+    assert result["stage_profile_totals"]["oracle_classification_ms"] == 3.0
+    assert result["stage_profile_totals"]["total_case_wall_ms"] == 11.0
     assert result["reproduced_keys"] == []
     assert result["non_reproduced_keys"] == [
         "semantic_output_mismatch:filter_predicate@right:row_count"

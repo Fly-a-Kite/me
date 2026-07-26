@@ -8,8 +8,10 @@ from datadiff.config import ExperimentConfig
 from datadiff.champion_corpus import ChampionRegistry
 from datadiff.datagen import COMMON_API_WORKFLOW_TEMPLATES, generate_case
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
+from datadiff.execution_cost_model import BackendCostModel
 from datadiff.normalizer import NormalizedResult
 from datadiff.oracle import Finding
+from datadiff.osc_diagnostic_facade import not_evaluated_diagnostic_ref_set
 from datadiff import runner as runner_module
 from datadiff.runner import run_fuzz, run_loaded_case
 from datadiff.targets import resolve_target_backends
@@ -86,6 +88,98 @@ def test_guidance_summary_includes_resolved_semantic_boundary_penalty():
     assert summary["matched_semantic_targets"] == ["groupby"]
     assert summary["family_diversity_guard_penalty"] == -1.0
     assert summary["family_diversity_guard_active"] == 1.0
+
+
+@pytest.mark.parametrize(
+    ("log_level", "has_findings"),
+    [
+        ("full", False),
+        ("compact", False),
+        ("compact", True),
+        ("minimal", False),
+    ],
+)
+def test_runner_preserves_only_fail_closed_opaque_diagnostics(
+    log_level, has_findings
+):
+    case_digest = "case-runner-diagnostic"
+    variant_digest = "case-runner-variant-diagnostic"
+    row = {
+        "case": {"case_id": "case-runner", "seed": 1},
+        "normalized": {"duckdb": {"status": "error"}},
+        "raw_results": {"duckdb": {"status": "error"}},
+        "experiment_manifest": {"case_digest": case_digest},
+        "osc_diagnostic_refs": not_evaluated_diagnostic_ref_set(
+            ["duckdb"],
+            case_digest=case_digest,
+            reason_code="legacy_error_diagnostic",
+        ),
+        "metamorphic": {
+            "target:b": {
+                "case": {"case_id": "case-runner-variant", "seed": 2},
+                "normalized": {"duckdb": {"status": "error"}},
+                "raw_results": {"duckdb": {"status": "error"}},
+                "experiment_manifest": {"case_digest": variant_digest},
+                "osc_diagnostic_refs": not_evaluated_diagnostic_ref_set(
+                    ["duckdb"],
+                    case_digest=variant_digest,
+                    reason_code="legacy_variant_error_diagnostic",
+                ),
+            }
+        },
+        "findings": [{"kind": "diagnostic-test"}] if has_findings else [],
+    }
+    row["osc_diagnostic_refs"]["authority_eligible"] = True
+    row["metamorphic"]["target:b"]["osc_diagnostic_refs"][
+        "authority_eligible"
+    ] = True
+
+    log_row = runner_module._compact_log_row(row, log_level)
+    runner_module._attach_opaque_diagnostic_refs_for_log(row, log_row)
+
+    refs = log_row["osc_diagnostic_refs"]
+    assert log_row["experiment_manifest"]["case_digest"] == case_digest
+    assert refs["evaluation_status"] == "not_evaluated"
+    assert refs["authority_scope"] == "diagnostic_only"
+    assert refs["authority_eligible"] is False
+    assert refs["refs"][0]["backend"] == "duckdb"
+    assert refs["refs"][0]["ref"]["reason_code"] == "invalid_diagnostic_refs"
+    variant = log_row["osc_metamorphic_diagnostic_refs"]["target:b"]
+    assert variant["experiment_manifest"]["case_digest"] == variant_digest
+    assert variant["backend_status"] == {"duckdb": "error"}
+    assert variant["osc_diagnostic_refs"]["case_digest"] == variant_digest
+    assert variant["osc_diagnostic_refs"]["authority_eligible"] is False
+    assert variant["osc_diagnostic_refs"]["refs"][0]["ref"][
+        "reason_code"
+    ] == "invalid_diagnostic_refs"
+    if "metamorphic" in log_row:
+        assert log_row["metamorphic"]["target:b"]["osc_diagnostic_refs"] == (
+            variant["osc_diagnostic_refs"]
+        )
+    assert "candidate" not in refs
+    assert "confirmed_bug" not in refs
+
+
+def test_registered_family_confirmation_skip_is_limited_to_known_saturated_findings():
+    known = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "topk_filter_pushdown",
+        "triage_verdict": "candidate_implementation_bug",
+        "suspicious_backends": ["duckdb"],
+    }
+    novel = {
+        **known,
+        "root_cause": "new_optimizer_family",
+    }
+
+    assert runner_module._row_has_only_known_saturated_candidate_findings(
+        {"findings": [known]},
+        ["topk_filter_pushdown@duckdb"],
+    ) is True
+    assert runner_module._row_has_only_known_saturated_candidate_findings(
+        {"findings": [known, novel]},
+        ["topk_filter_pushdown@duckdb"],
+    ) is False
 
 
 def test_select_adaptive_action_uses_choose_dense_for_best_action():
@@ -442,6 +536,319 @@ def test_run_loaded_case_supports_coalesce_across_latest_engines():
     any(name != "sqlite" and importlib.util.find_spec(name) is None for name in LATEST_ALL_ENGINE_PACKAGES),
     reason="latest data backends are not installed",
 )
+def test_run_loaded_case_supports_coalesce_null_fallback_across_latest_engines():
+    case = Case(
+        "case-coalesce-null-fallback-latest-engines",
+        402,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("x", "int"),
+                ],
+                [
+                    {"id": 1, "x": None},
+                    {"id": 2, "x": 20},
+                    {"id": 3, "x": None},
+                ],
+            )
+        ],
+        Program(
+            "prog-coalesce-null-fallback-latest-engines",
+            402,
+            [
+                {"op": "coalesce", "columns": ["x", "id"], "as": "x_or_id", "fallback": None},
+                {
+                    "op": "sort",
+                    "keys": [
+                        {"column": "id", "ascending": True, "nulls": "last"},
+                    ],
+                },
+                {"op": "select", "columns": ["id", "x_or_id"]},
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, COALESCE_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    assert row["raw_results"]["pyarrow"]["status"] == "ok"
+    for result in row["normalized"].values():
+        assert result["rows"] == [[1, 1], [2, 20], [3, 3]]
+
+
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in ["pandas", "duckdb"]),
+    reason="pandas and duckdb are not installed",
+)
+def test_duckdb_backends_support_nul_string_literal_in_coalesce_fallback():
+    case = Case(
+        "case-duckdb-nul-coalesce-fallback",
+        404,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("tag", "str"),
+                ],
+                [{"id": 1, "tag": None}],
+            )
+        ],
+        Program(
+            "prog-duckdb-nul-coalesce-fallback",
+            404,
+            [
+                {"op": "coalesce", "columns": ["tag"], "as": "tag_or_fallback", "fallback": "a\x00z"},
+                {"op": "select", "columns": ["id", "tag_or_fallback"]},
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, ["duckdb", "duckdb_persistent", "pandas"], save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    assert row["raw_results"]["duckdb"]["status"] == "ok"
+    assert row["raw_results"]["duckdb_persistent"]["status"] == "ok"
+    for result in row["normalized"].values():
+        assert result["rows"] == [[1, "a\x00z"]]
+
+
+@pytest.mark.skipif(
+    any(name != "sqlite" and importlib.util.find_spec(name) is None for name in LATEST_ALL_ENGINE_PACKAGES),
+    reason="latest data backends are not installed",
+)
+def test_run_loaded_case_supports_float_filter_with_extreme_int_literal_across_latest_engines():
+    case = Case(
+        "case-float-filter-extreme-int-literal-latest-engines",
+        403,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("y", "float"),
+                ],
+                [
+                    {"id": 1, "y": None},
+                    {"id": 2, "y": 0.0},
+                    {"id": 3, "y": -1.0},
+                ],
+            )
+        ],
+        Program(
+            "prog-float-filter-extreme-int-literal-latest-engines",
+            403,
+            [
+                {"op": "filter", "column": "y", "cmp": "gt_is_not_true", "value": -9223372036854775808},
+                {
+                    "op": "sort",
+                    "keys": [
+                        {"column": "id", "ascending": True, "nulls": "last"},
+                    ],
+                },
+                {"op": "select", "columns": ["id", "y"]},
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, COALESCE_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    assert row["raw_results"]["pyarrow"]["status"] == "ok"
+    for result in row["normalized"].values():
+        assert result["rows"] == [[1, None]]
+
+
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in ["pandas", "duckdb"]),
+    reason="pandas and duckdb are not installed",
+)
+def test_run_loaded_case_preserves_duckdb_huge_integer_sum_without_fetchdf_precision_loss():
+    case = Case(
+        "case-duckdb-huge-integer-sum-fetchall-precision",
+        405,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("v", "int")],
+                [
+                    {"v": -9223372036854775808},
+                    {"v": 15},
+                ],
+            )
+        ],
+        Program(
+            "prog-duckdb-huge-integer-sum-fetchall-precision",
+            405,
+            [
+                {
+                    "op": "aggregate",
+                    "aggs": [
+                        {"func": "count", "column": "v", "as": "count_v"},
+                        {"func": "sum", "column": "v", "as": "sum_v"},
+                        {"func": "mean", "column": "v", "as": "mean_v"},
+                    ],
+                }
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, ["duckdb", "pandas", "sqlite"], save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    for result in row["normalized"].values():
+        assert result["rows"] == [[2, -4.611686018427388e18, -9223372036854775793]]
+
+
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in ["pandas", "duckdb", "pyarrow"]),
+    reason="pandas, duckdb, and pyarrow are not installed",
+)
+def test_run_loaded_case_keeps_duckdb_topk_tie_probe_deterministic_by_default(monkeypatch):
+    monkeypatch.delenv("DATADIFF_DUCKDB_THREADS", raising=False)
+    case = Case(
+        "case-duckdb-topk-tie-default-single-thread",
+        406,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int"),
+                    ColumnSpec("g", "str"),
+                    ColumnSpec("x", "int"),
+                    ColumnSpec("y", "float"),
+                    ColumnSpec("flag", "bool"),
+                    ColumnSpec("s", "str"),
+                ],
+                [
+                    {"id": 0, "g": "OOI", "x": -10, "y": 0.5, "flag": False, "s": "δelta"},
+                    {"id": 1, "g": "beta", "x": 10, "y": 0.5, "flag": False, "s": "中文"},
+                    {"id": 2, "g": "space value", "x": 10, "y": 1.0, "flag": False, "s": None},
+                    {"id": 1, "g": "δelta", "x": None, "y": None, "flag": True, "s": "a"},
+                    {"id": 1, "g": None, "x": -1, "y": 0.5, "flag": True, "s": "a"},
+                    {"id": 5, "g": "a", "x": 68, "y": 0.5, "flag": False, "s": "gamma"},
+                    {"id": 1, "g": "space value", "x": -1, "y": -0.5, "flag": True, "s": "XZULm"},
+                    {"id": 1, "g": "", "x": 0, "y": 1.0, "flag": True, "s": "Z"},
+                ],
+            )
+        ],
+        Program(
+            "prog-duckdb-topk-tie-default-single-thread",
+            406,
+            [
+                {"op": "mutate", "column": "m_0", "expr": {"kind": "cast", "source": "id", "to": "str"}},
+                {
+                    "op": "case_when",
+                    "as": "cw_0",
+                    "condition": {"column": "m_0", "cmp": "is_null", "value": None},
+                    "then": True,
+                    "else": False,
+                },
+                {
+                    "op": "row_number_filter",
+                    "partition_by": ["x"],
+                    "order_by": [
+                        {"column": "y", "ascending": True, "nulls": "last"},
+                        {"column": "id", "ascending": False, "nulls": "first"},
+                        {"column": "g", "ascending": False, "nulls": "first"},
+                    ],
+                    "cmp": "==",
+                    "value": 1,
+                },
+                {
+                    "op": "groupby",
+                    "keys": ["m_0", "s"],
+                    "aggs": [{"func": "nunique", "column": "flag", "as": "nunique_flag"}],
+                },
+                {"op": "filter", "column": "nunique_flag", "cmp": "ge_is_not_true", "value": 1000000},
+                {
+                    "op": "case_when",
+                    "as": "cw_0",
+                    "condition": {"column": "m_0", "cmp": "is_null", "value": None},
+                    "then": True,
+                    "else": False,
+                },
+                {
+                    "op": "case_when",
+                    "as": "cw_0",
+                    "condition": {"column": "m_0", "cmp": "is_null", "value": None},
+                    "then": True,
+                    "else": False,
+                },
+                {"op": "filter", "column": "m_0", "cmp": "is_not_null", "value": None},
+                {"op": "filter", "column": "nunique_flag", "cmp": "range_closed", "value": [0, 10]},
+                {
+                    "op": "row_number_filter",
+                    "partition_by": [],
+                    "order_by": [{"column": "cw_0", "ascending": True, "nulls": "first"}],
+                    "cmp": "==",
+                    "value": 1,
+                },
+                {
+                    "op": "sort",
+                    "keys": [
+                        {"column": "m_0", "ascending": False, "nulls": "last"},
+                        {"column": "cw_0", "ascending": False, "nulls": "last"},
+                        {"column": "nunique_flag", "ascending": True, "nulls": "last"},
+                        {"column": "s", "ascending": False, "nulls": "last"},
+                    ],
+                },
+                {"op": "select", "columns": ["cw_0", "nunique_flag", "s"]},
+                {"op": "limit", "n": 3},
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, ["duckdb", "pandas", "pyarrow"], save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    for result in row["normalized"].values():
+        assert result["rows"] == [[False, 1, "δelta"]]
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("polars") is None,
+    reason="polars is not installed",
+)
+def test_run_loaded_case_supports_arrow_timestamp_index_attr_probe_on_polars_adapters():
+    case = Case(
+        "case-arrow-timestamp-index-attr-probe-polars-adapters",
+        404,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("probe_id", "int", nullable=False)],
+                [{"probe_id": 0}],
+            )
+        ],
+        Program(
+            "prog-arrow-timestamp-index-attr-probe-polars-adapters",
+            404,
+            [{"op": "arrow_timestamp_index_attr_probe", "as": "arrow_timestamp_index_attr_mismatch"}],
+        ),
+    )
+
+    row = run_loaded_case(case, ["polars", "polars_lazy"], save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    assert row["raw_results"]["polars"]["status"] == "ok"
+    assert row["raw_results"]["polars_lazy"]["status"] == "ok"
+    for result in row["normalized"].values():
+        assert result["rows"] == [[False]]
+
+
+@pytest.mark.skipif(
+    any(name != "sqlite" and importlib.util.find_spec(name) is None for name in LATEST_ALL_ENGINE_PACKAGES),
+    reason="latest data backends are not installed",
+)
 def test_run_loaded_case_supports_fill_null_coalesce_groupby_topk_across_latest_engines():
     case = Case(
         "case-fill-null-coalesce-groupby-topk-latest-engines",
@@ -687,7 +1094,11 @@ def test_run_fuzz_does_not_store_expected_semantic_divergence_as_feedback_seed(t
 
     monkeypatch.setattr(runner_module, "generate_case", lambda *args, **kwargs: case)
     case_log = tmp_path / "expected-semantic-feedback.cases.jsonl"
-    config = ExperimentConfig(enable_local_source_scheduler=True, candidate_recheck_count=2)
+    config = ExperimentConfig(
+        method_arm="contract_lattice_shared_cost_full",
+        enable_local_source_scheduler=True,
+        candidate_recheck_count=2,
+    )
 
     run_file = run_fuzz(cases=1, seed=431, backends=["pandas", "duckdb", "sqlite"], config=config, case_log_file=case_log)
     row = read_jsonl(run_file)[0]
@@ -1840,6 +2251,57 @@ def test_run_loaded_case_supports_union_all_after_groupby_count_nunique():
 
 
 @pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in ["pandas", "duckdb", "pyarrow", "datafusion"]),
+    reason="datafusion and pyarrow test backends are not installed",
+)
+def test_arrow_backends_preserve_nullable_large_int_after_union_all():
+    large = 9_007_199_254_740_993
+    case = Case(
+        "case-arrow-union-all-nullable-large-int",
+        2085,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int"),
+                    ColumnSpec("i2", "int"),
+                ],
+                [{"id": large, "i2": -1}],
+            ),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int")],
+                [{"id": large}],
+            ),
+            TableData(
+                "t_union",
+                [
+                    ColumnSpec("id", "int"),
+                    ColumnSpec("i2", "int"),
+                ],
+                [{"id": None, "i2": None}],
+            ),
+        ],
+        Program(
+            "prog-arrow-union-all-nullable-large-int",
+            2085,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+                {"op": "union_all", "table": "t_union"},
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, ["datafusion", "duckdb", "pandas", "pyarrow"], save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    for result in row["normalized"].values():
+        assert result["columns"] == ["i2", "id"]
+        assert result["rows"] == [[-1, large], [None, None]]
+
+
+@pytest.mark.skipif(
     any(name != "sqlite" and importlib.util.find_spec(name) is None for name in LATEST_ALL_ENGINE_PACKAGES),
     reason="latest data backends are not installed",
 )
@@ -2181,6 +2643,56 @@ def test_run_loaded_case_supports_semi_and_anti_join_across_latest_engines(kind,
         id_index = result["columns"].index("id")
         assert [record[id_index] for record in result["rows"]] == expected_ids
     assert set(row["normalized"]) == set(DROP_NULLS_BACKENDS)
+
+
+@pytest.mark.skipif(
+    any(name != "sqlite" and importlib.util.find_spec(name) is None for name in LATEST_ALL_ENGINE_PACKAGES),
+    reason="latest data backends are not installed",
+)
+def test_run_loaded_case_preserves_left_order_for_sorted_semi_join_before_limit_across_latest_engines():
+    case = Case(
+        "case-semi-join-order-before-limit-latest-engines",
+        392,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("g", "str", nullable=True),
+                    ColumnSpec("x", "int", nullable=True),
+                ],
+                [
+                    {"id": 3, "g": "c", "x": 30},
+                    {"id": 1, "g": "a", "x": 10},
+                    {"id": 4, "g": "d", "x": 40},
+                    {"id": 2, "g": "b", "x": 20},
+                    {"id": 5, "g": "e", "x": 50},
+                ],
+            ),
+            TableData(
+                "t_lookup",
+                [ColumnSpec("id", "int", nullable=False)],
+                [{"id": 4}, {"id": 1}, {"id": 3}, {"id": 2}],
+            ),
+        ],
+        Program(
+            "prog-semi-join-order-before-limit-latest-engines",
+            392,
+            [
+                {"op": "sort", "columns": ["x"], "ascending": False},
+                {"op": "semi_join", "table": "t_lookup", "left_on": "id", "right_on": "id"},
+                {"op": "limit", "n": 3},
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, SEMI_ANTI_JOIN_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["findings"] == []
+    for result in row["normalized"].values():
+        id_index = result["columns"].index("id")
+        assert [record[id_index] for record in result["rows"]] == [4, 3, 2]
 
 
 @pytest.mark.skipif(
@@ -2860,10 +3372,17 @@ def test_run_loaded_case_row_number_filter_treats_pandas_nan_as_null_order_key()
     importlib.util.find_spec("pandas") is None or importlib.util.find_spec("duckdb") is None,
     reason="pandas/duckdb backends are not installed",
 )
-def test_run_loaded_case_flags_duckdb_path_projection_keyed_pick_candidate():
+def test_run_loaded_case_tracks_duckdb_path_projection_regression_or_upstream_fix():
     case = generate_case(107, profile="path_basename_keyed_pick")
     config = ExperimentConfig(enable_artifact=False, enable_replay_bug=True)
     row = run_loaded_case(case, ["pandas", "sqlite", "duckdb"], config=config, save_artifact=False)
+
+    if row["status"] == "ok":
+        assert row["findings"] == []
+        expected_rows = row["normalized"]["pandas"]["rows"]
+        assert row["normalized"]["sqlite"]["rows"] == expected_rows
+        assert row["normalized"]["duckdb"]["rows"] == expected_rows
+        return
 
     assert row["status"] == "bug"
     assert row["findings"]
@@ -3074,7 +3593,10 @@ def test_run_loaded_case_recheck_marks_non_reproducible_candidate(monkeypatch):
     row = run_loaded_case(
         case,
         ["left", "right"],
-        config=ExperimentConfig(candidate_recheck_count=1),
+        config=ExperimentConfig(
+            method_arm="contract_lattice_shared_cost_full",
+            candidate_recheck_count=1,
+        ),
         save_artifact=False,
         target_specs=[],
     )
@@ -3087,6 +3609,84 @@ def test_run_loaded_case_recheck_marks_non_reproducible_candidate(monkeypatch):
     assert row["findings"][0]["triage_verdict"] == "non_reproducible_candidate"
     assert row["findings"][0]["false_positive"] is True
     assert row["findings"][0]["false_positive_reason"] == "candidate_not_reproduced_on_immediate_recheck"
+
+
+def test_run_loaded_case_recheck_does_not_reuse_persistent_execution_session(monkeypatch):
+    case = Case(
+        "case-stateful-recheck",
+        2,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-stateful-recheck", 2, [{"op": "select", "columns": ["x"]}]),
+    )
+
+    class StatefulSession:
+        def __init__(self):
+            self.execute_calls = 0
+
+        def execute_case(self, *args, **kwargs):
+            self.execute_calls += 1
+            return {}, {
+                "left": NormalizedResult("left", "ok", ["x"], [[1]]),
+                "right": NormalizedResult("right", "ok", ["x"], [[2]]),
+            }
+
+        def execute_cases(self, *args, **kwargs):
+            raise AssertionError("metamorphic execution is disabled")
+
+    session = StatefulSession()
+    fresh_calls = {"count": 0}
+
+    def fresh_execute_case(*args, **kwargs):
+        fresh_calls["count"] += 1
+        return {}, {
+            "left": NormalizedResult("left", "ok", ["x"], [[1]]),
+            "right": NormalizedResult("right", "ok", ["x"], [[1]]),
+        }
+
+    def fake_evaluate_case(_case, normalized):
+        if normalized["left"].comparison_key == normalized["right"].comparison_key:
+            return []
+        return [
+            Finding(
+                finding_id="finding-stateful",
+                kind="semantic_output_mismatch",
+                severity="critical",
+                suspicious_backends=["right"],
+                evidence="persistent instance only",
+                signature="stateful",
+                root_cause="filter_predicate",
+                mismatch_class="value",
+            )
+        ]
+
+    def fake_annotate_findings(case_arg, findings, **kwargs):
+        for finding in findings:
+            finding.triage_verdict = "candidate_implementation_bug"
+            finding.paper_status = "candidate_bug_needs_external_confirmation"
+            finding.triage_confidence = "high"
+
+    monkeypatch.setattr(runner_module, "_execute_case", fresh_execute_case)
+    monkeypatch.setattr(runner_module, "evaluate_case", fake_evaluate_case)
+    monkeypatch.setattr(runner_module, "annotate_findings", fake_annotate_findings)
+
+    row = run_loaded_case(
+        case,
+        ["left", "right"],
+        config=ExperimentConfig(
+            method_arm="contract_lattice_shared_cost_full",
+            candidate_recheck_count=1,
+        ),
+        save_artifact=False,
+        target_specs=[],
+        execution_session=session,
+    )
+
+    assert session.execute_calls == 1
+    assert fresh_calls["count"] == 1
+    assert row["status"] == "ok"
+    assert row["candidate_recheck"]["non_reproduced_keys"] == [
+        "semantic_output_mismatch:filter_predicate@right:value"
+    ]
 
 
 def test_run_loaded_case_emits_disagreement_descriptor_and_fingerprint(monkeypatch):
@@ -3211,7 +3811,11 @@ def test_run_loaded_case_cross_validates_differential_and_metamorphic_findings(m
     row = run_loaded_case(
         case,
         ["left", "right"],
-        config=ExperimentConfig(enable_metamorphic_oracle=True, metamorphic_variant_limit=1),
+        config=ExperimentConfig(
+            method_arm="contract_lattice_shared_cost_full",
+            enable_metamorphic_oracle=True,
+            metamorphic_variant_limit=1,
+        ),
         save_artifact=False,
         target_specs=[],
     )
@@ -4112,6 +4716,59 @@ def test_pyarrow_backend_matches_common_join_groupby_case():
     assert set(row["normalized"]) == set(PYARROW_BACKENDS)
 
 
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in ["pandas", "duckdb", "pyarrow"]),
+    reason="pyarrow test backends are not installed",
+)
+def test_pyarrow_backend_supports_duplicate_groupby_source_aggregates():
+    case = Case(
+        "case-pyarrow-duplicate-groupby-source-aggs",
+        8801,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int", nullable=False)],
+                [{"id": 1}],
+            ),
+            TableData(
+                "t1",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("j", "int"),
+                ],
+                [{"id": 1, "j": 7}],
+            ),
+        ],
+        Program(
+            "prog-pyarrow-duplicate-groupby-source-aggs",
+            8801,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+                {
+                    "op": "groupby",
+                    "keys": ["j"],
+                    "aggs": [
+                        {"column": "j", "func": "count", "as": "count_joined_rows"},
+                        {"column": "j", "func": "count", "as": "count_j"},
+                    ],
+                },
+            ],
+        ),
+    )
+
+    row = run_loaded_case(case, PYARROW_BACKENDS, save_artifact=False)
+
+    assert row["status"] == "ok"
+    assert row["raw_results"]["pyarrow"]["status"] == "ok"
+    assert set(row["normalized"]) == set(PYARROW_BACKENDS)
+    assert {tuple(result["columns"]) for result in row["normalized"].values()} == {
+        ("count_j", "count_joined_rows", "j")
+    }
+    assert {tuple(tuple(item) for item in result["rows"]) for result in row["normalized"].values()} == {
+        ((1, 1, 7),)
+    }
+
+
 @pytest.mark.skipif(importlib.util.find_spec("polars") is None, reason="polars is not installed")
 def test_polars_backend_preserves_empty_table_schema():
     case = Case(
@@ -4187,6 +4844,39 @@ def test_run_fuzz_records_duration_and_feedback():
     assert len(rows) == 2
     assert all("elapsed_s" in row for row in rows)
     assert all("stored_in_feedback_corpus" in row for row in rows)
+
+
+def test_run_fuzz_case_budget_terminates_when_every_iteration_fails(monkeypatch):
+    def fail_generation(*args, **kwargs):
+        raise RuntimeError("synthetic generation failure")
+
+    monkeypatch.setattr(runner_module, "generate_case", fail_generation)
+
+    run_file = run_fuzz(
+        cases=2,
+        seed=2100,
+        backends=[],
+        duration_s=None,
+        config=ExperimentConfig(method_arm="contract_lattice_shared_cost_full"),
+    )
+
+    rows = read_jsonl(run_file)
+    meta = load_json(run_meta_path(run_file))
+    assert len(rows) == 2
+    assert all(row["kind"] == "case_iteration_error" for row in rows)
+    assert all(
+        row["method_arm"]["arm_id"] == "contract_lattice_shared_cost_full"
+        for row in rows
+    )
+    assert all(
+        row["experiment_manifest"]["method_arm_id"]
+        == "contract_lattice_shared_cost_full"
+        for row in rows
+    )
+    assert [row["attempt_index"] for row in rows] == [0, 1]
+    assert meta["attempted_cases"] == 2
+    assert meta["executed_cases"] == 0
+    assert meta["case_iteration_failures"] == 2
 
 
 def test_feedback_storage_skips_calibration_probe_cases():
@@ -4310,6 +5000,7 @@ def test_run_fuzz_can_persist_generated_cases_and_checkpoint(tmp_path):
         seed=31,
         backends=[],
         duration_s=None,
+        config=ExperimentConfig(method_arm="contract_lattice_shared_cost_full"),
         save_cases=True,
         case_log_file=case_log,
         checkpoint_interval_s=0.0,
@@ -4381,6 +5072,290 @@ def test_run_fuzz_records_guidance_metadata(tmp_path):
     assert meta["next_seed"] == 45
 
 
+def test_run_fuzz_adapts_candidate_pool_and_records_policy_metadata(tmp_path):
+    case_log = tmp_path / "adaptive-pool.cases.jsonl"
+    config = ExperimentConfig(
+        guidance_strategy="guided",
+        guidance_candidate_pool=4,
+        enable_adaptive_candidate_pool=True,
+        adaptive_candidate_pool_min_size=2,
+        adaptive_candidate_pool_full_sweep_interval=0,
+        adaptive_candidate_pool_calibration_cases=2,
+        adaptive_candidate_pool_candidate_burst_cases=0,
+    )
+
+    run_file = run_fuzz(
+        cases=4,
+        seed=45,
+        backends=[],
+        config=config,
+        case_log_file=case_log,
+    )
+
+    rows = read_jsonl(run_file)
+    case_rows = read_jsonl(case_log)
+    meta = load_json(run_meta_path(run_file))
+
+    assert [row["candidate_pool_size"] for row in rows] == [4, 4, 2, 2]
+    assert [row["candidate_pool_size"] for row in case_rows] == [4, 4, 2, 2]
+    assert [row["candidate_pool_sampling"]["mode"] for row in rows] == [
+        "calibration_full_pool",
+        "calibration_full_pool",
+        "reduced_pool",
+        "reduced_pool",
+    ]
+    assert case_rows[2]["candidate_pool_sampling"]["sampled"] is True
+    policy = meta["guidance"]["adaptive_candidate_pool"]
+    assert policy["enabled"] is True
+    assert policy["selected_candidate_budget"] == 12
+    assert policy["mean_pool_size"] == 3.0
+    assert policy["full_pool_cases"] == 2
+    assert policy["reduced_pool_cases"] == 2
+
+
+def test_run_fuzz_adaptive_pool_can_preserve_full_pool_seed_stride(tmp_path):
+    case_log = tmp_path / "adaptive-pool-stride.cases.jsonl"
+    config = ExperimentConfig(
+        guidance_strategy="guided",
+        guidance_candidate_pool=4,
+        enable_adaptive_candidate_pool=True,
+        adaptive_candidate_pool_min_size=2,
+        adaptive_candidate_pool_full_sweep_interval=0,
+        adaptive_candidate_pool_calibration_cases=1,
+        adaptive_candidate_pool_candidate_burst_cases=0,
+        adaptive_candidate_pool_preserve_seed_stride=True,
+    )
+
+    run_file = run_fuzz(
+        cases=3,
+        seed=45,
+        backends=[],
+        config=config,
+        case_log_file=case_log,
+    )
+
+    rows = read_jsonl(run_file)
+    case_rows = read_jsonl(case_log)
+    meta = load_json(run_meta_path(run_file))
+
+    assert [row["candidate_seed_start"] for row in rows] == [45, 49, 53]
+    assert [row["candidate_seed_start"] for row in case_rows] == [45, 49, 53]
+    assert [row["candidate_pool_size"] for row in rows] == [4, 2, 2]
+    assert rows[1]["candidate_pool_sampling"]["generated_seed_advance"] == 2
+    assert rows[1]["candidate_pool_sampling"]["applied_seed_advance"] == 4
+    assert rows[1]["candidate_pool_sampling"]["skipped_seed_slots"] == 2
+    policy = meta["guidance"]["adaptive_candidate_pool"]
+    assert policy["preserve_seed_stride"] is True
+    assert policy["generated_seed_advance"] == 8
+    assert policy["applied_seed_advance"] == 12
+    assert policy["skipped_seed_slots"] == 4
+    assert meta["next_seed"] == 57
+
+
+def test_run_fuzz_records_acceptance_compensated_seed_horizon_audit(tmp_path):
+    case_log = tmp_path / "adaptive-pool-horizon.cases.jsonl"
+    config = ExperimentConfig(
+        guidance_strategy="guided",
+        guidance_candidate_pool=4,
+        enable_adaptive_candidate_pool=True,
+        adaptive_candidate_pool_min_size=2,
+        adaptive_candidate_pool_full_sweep_interval=0,
+        adaptive_candidate_pool_calibration_cases=0,
+        adaptive_candidate_pool_candidate_burst_cases=0,
+        adaptive_candidate_pool_compensate_seed_horizon=True,
+    )
+
+    run_file = run_fuzz(
+        cases=2,
+        seed=57,
+        backends=[],
+        config=config,
+        case_log_file=case_log,
+    )
+
+    rows = read_jsonl(run_file)
+    meta = load_json(run_meta_path(run_file))
+
+    assert all(
+        row["candidate_pool_sampling"]["seed_horizon_policy"]
+        == "acceptance_compensated"
+        for row in rows
+    )
+    assert all(
+        row["candidate_pool_sampling"]["full_pool_equivalent_seed_advance"]
+        >= row["candidate_pool_sampling"]["generated_seed_advance"]
+        for row in rows
+    )
+    policy = meta["guidance"]["adaptive_candidate_pool"]
+    assert policy["preserve_seed_stride"] is True
+    assert policy["compensate_seed_horizon"] is True
+    assert policy["applied_seed_advance"] >= policy["generated_seed_advance"]
+
+
+def test_sample_confirmation_can_reuse_full_confirmation_as_recheck_evidence():
+    config = ExperimentConfig(
+        candidate_recheck_count=2,
+        backend_sample_confirmation_recheck_count=1,
+    )
+    payload = config.to_dict()
+
+    confirmation, confirmation_payload = runner_module._sample_confirmation_config(
+        config,
+        payload,
+    )
+
+    assert config.candidate_recheck_count == 2
+    assert confirmation.candidate_recheck_count == 1
+    assert confirmation.backend_sample_confirmation_recheck_count == 1
+    assert confirmation_payload["candidate_recheck_count"] == 1
+
+
+def test_sample_confirmation_keeps_default_recheck_count_without_override():
+    config = ExperimentConfig(candidate_recheck_count=2)
+    payload = config.to_dict()
+
+    confirmation, confirmation_payload = runner_module._sample_confirmation_config(
+        config,
+        payload,
+    )
+
+    assert confirmation is config
+    assert confirmation_payload is payload
+
+
+def test_promoted_default_confirms_status_ok_finding_signal_on_all_backends(
+    monkeypatch,
+):
+    class FakeTargetContext:
+        common_capabilities = ("op:select", "table:single")
+
+        def target_dicts(self):
+            return [{"name": backend} for backend in configured_backends]
+
+        def to_dict(self):
+            return {"common_capabilities": list(self.common_capabilities)}
+
+    configured_backends = [
+        "pandas",
+        "polars",
+        "duckdb",
+        "pyarrow",
+        "datafusion",
+    ]
+    calls: list[tuple[str, ...]] = []
+    cost_model = BackendCostModel(
+        source_path="profile.json",
+        source_profile_id="p4.1-test",
+        source_result_digest="result-test",
+        metric="process_cpu",
+        raw_costs={backend: 1.0 for backend in configured_backends},
+        normalized_costs={backend: 1.0 for backend in configured_backends},
+        digest="cost-model-p4.1-test",
+    )
+
+    def fake_generate_case(seed, **kwargs):
+        return Case(
+            case_id=f"case-{seed}",
+            seed=seed,
+            tables=[TableData("t0", [ColumnSpec("x", "int")], [{"x": seed}])],
+            program=Program(f"prog-{seed}", seed, [{"op": "select", "columns": ["x"]}]),
+        )
+
+    def fake_run_loaded_case(
+        case,
+        backends,
+        config=None,
+        save_artifact=True,
+        backend_instances=None,
+        environment=None,
+        target_specs=None,
+        config_payload=None,
+        metamorphic_relation_order=None,
+    ):
+        calls.append(tuple(backends))
+        finding = {
+            "kind": "metamorphic_mismatch",
+            "root_cause": "status_ok_metamorphic_root",
+            "triage_verdict": "candidate_implementation_bug",
+            "suspicious_backends": ["duckdb"],
+            "signature": "status-ok-finding",
+        }
+        resolved_config = config or ExperimentConfig()
+        return {
+            "run_at": "2026-07-14T00:00:00Z",
+            "case": case.to_dict(),
+            "targets": target_specs or [],
+            "raw_results": {},
+            "normalized": {},
+            "metamorphic": {},
+            "findings": [finding],
+            "candidate_recheck": {
+                "enabled": False,
+                "attempts": 0,
+                "reproduced_keys": [],
+                "non_reproduced_keys": [],
+            },
+            "config": config_payload or resolved_config.to_dict(),
+            "method_arm": resolved_config.method_arm_manifest,
+            "experiment_manifest": {},
+            "environment": environment or {},
+            "status": "ok",
+            "duration_ms": 0.1,
+            "stage_profile": {},
+            "wall_time_profile": {},
+            "process_cpu_profile": {},
+            "execution_profile": {
+                "backend_calls": len(backends),
+                "backend_reported_total_ms": float(len(backends)),
+            },
+            "behavior_signature": f"behavior-{len(calls)}",
+            "discovery_signature": f"discovery-{len(calls)}",
+        }
+
+    monkeypatch.setattr(runner_module, "generate_case", fake_generate_case)
+    monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
+    monkeypatch.setattr(runner_module, "target_context", lambda names: FakeTargetContext())
+    monkeypatch.setattr(runner_module, "load_backend_cost_model", lambda root: cost_model)
+
+    config = ExperimentConfig(
+        enable_backend_session_reuse=False,
+        enable_feedback=False,
+        enable_artifact=False,
+        enable_champion_corpus=False,
+        enable_lhs_seeding=False,
+        compress_run_log=False,
+        log_level="full",
+    )
+    run_file = run_fuzz(
+        cases=1,
+        seed=5073,
+        backends=configured_backends,
+        config=config,
+    )
+    row = read_jsonl(run_file)[0]
+    meta = load_json(run_meta_path(run_file))
+
+    assert config.method_arm == "p8_candidate_v1"
+    assert config.enable_parallel_backend_execution is False
+    assert len(calls) == 2
+    assert 2 <= len(calls[0]) < len(configured_backends)
+    assert calls[1] == tuple(configured_backends)
+    assert row["backend_sampling"]["confirmation_executed"] is True
+    assert row["backend_sampling"]["screening"]["candidate_signal"] is True
+    assert row["backend_sampling"]["confirmation_candidate_signal"] is True
+    assert row["backend_sampling"]["candidate_burst_decision"][
+        "candidate_detected"
+    ] is True
+    lattice = row["execution_lattice_selection"]["lattice_selection"]
+    assert lattice["selector_mode"] == "shared_cost"
+    assert lattice["budget_satisfied"] is True
+    assert lattice["total_cost"] <= lattice["budget"]
+    assert meta["method_arm"]["arm_id"] == "p8_candidate_v1"
+    assert meta["execution"]["lattice"]["cost_model"]["digest"] == (
+        "cost-model-p4.1-test"
+    )
+
+
 def test_run_fuzz_does_not_filter_static_known_saturated_family_before_execution(tmp_path):
     case_log = tmp_path / "saturation-filter.cases.jsonl"
     config = ExperimentConfig(
@@ -4446,6 +5421,7 @@ def test_run_fuzz_uses_candidate_family_prefilter_interface(monkeypatch, tmp_pat
 def test_run_fuzz_fresh_policy_filters_replay_profile(tmp_path):
     case_log = tmp_path / "fresh.cases.jsonl"
     config = ExperimentConfig(
+        method_arm="contract_lattice_shared_cost_full",
         generator_profile="datafusion_setop_all_duplicate_count",
         enable_replay_bug=False,
     )
@@ -4468,7 +5444,11 @@ def test_run_fuzz_fresh_policy_filters_replay_profile(tmp_path):
 
 def test_run_fuzz_fresh_discovery_uses_generation_time_replay_gate(tmp_path):
     case_log = tmp_path / "fresh-discovery.cases.jsonl"
-    config = ExperimentConfig(generator_profile="discovery", enable_replay_bug=False)
+    config = ExperimentConfig(
+        method_arm="contract_lattice_shared_cost_full",
+        generator_profile="discovery",
+        enable_replay_bug=False,
+    )
 
     run_file = run_fuzz(cases=1, seed=20, backends=[], config=config, case_log_file=case_log)
 
@@ -4487,6 +5467,7 @@ def test_run_fuzz_fresh_discovery_uses_generation_time_replay_gate(tmp_path):
 def test_run_fuzz_custom_replay_source_gate_keeps_requested_generator_profile(tmp_path):
     case_log = tmp_path / "custom-source-gate.cases.jsonl"
     config = ExperimentConfig(
+        method_arm="contract_lattice_shared_cost_full",
         generator_profile="discovery",
         enable_replay_bug=False,
         replay_bug_source_issues=[],
@@ -4504,6 +5485,7 @@ def test_run_fuzz_custom_replay_source_gate_keeps_requested_generator_profile(tm
 def test_run_fuzz_replay_policy_allows_replay_profile(tmp_path):
     case_log = tmp_path / "replay.cases.jsonl"
     config = ExperimentConfig(
+        method_arm="contract_lattice_shared_cost_full",
         generator_profile="datafusion_setop_all_duplicate_count",
         enable_replay_bug=True,
     )
@@ -4521,7 +5503,7 @@ def test_run_fuzz_replay_policy_allows_replay_profile(tmp_path):
     assert meta["replay_bug_filter"]["filtered_candidates"] == 0
 
 
-def test_run_fuzz_uses_feedback_source_marker_for_candidate_source(tmp_path, monkeypatch):
+def test_run_fuzz_enforces_fresh_source_quota_before_feedback(tmp_path, monkeypatch):
     instances = []
 
     class FakeFeedbackState:
@@ -4611,36 +5593,40 @@ def test_run_fuzz_uses_feedback_source_marker_for_candidate_source(tmp_path, mon
     monkeypatch.setattr(runner_module, "FeedbackState", FakeFeedbackState)
 
     case_log = tmp_path / "feedback.cases.jsonl"
-    config = ExperimentConfig(enable_local_source_scheduler=True)
+    config = ExperimentConfig(
+        method_arm="contract_lattice_shared_cost_full",
+        enable_local_source_scheduler=True,
+    )
 
     run_file = run_fuzz(cases=1, seed=47, backends=[], config=config, case_log_file=case_log)
 
     row = read_jsonl(run_file)[0]
     case_log_row = read_jsonl(case_log)[0]
-    assert row["candidate_source"] == "feedback_mutation"
-    assert case_log_row["candidate_source"] == "feedback_mutation"
-    assert row["seed_lineage"]["parent_case_id"] == "case-parent"
-    assert row["mutation"]["operator"] == "value"
-    assert row["feedback_decision"]["parent_case_id"] == "case-parent"
-    assert row["feedback_decision"]["schedule_score"] == 1.0
+    # The coordinator starts below its 60% fresh-generation floor, so it
+    # deliberately bypasses a feedback mutation even when one is available.
+    assert row["candidate_source"] == "generated"
+    assert case_log_row["candidate_source"] == "generated"
+    assert row["seed_lineage"]["parent_case_id"] == ""
+    assert row["mutation"]["operator"] == "generated"
+    assert row["feedback_decision"] == {}
     assert row["quality_archive_context"]["archive_known"] is True
     assert row["quality_archive_context"]["archive_cluster_reward"] == 0.75
-    assert row["quality_archive_context"]["target_keys"][0] == "semantic_family:cast_semantics"
+    assert row["quality_archive_context"]["target_keys"]
     assert any(
         key.startswith("capability:")
         for key in row["quality_archive_context"]["target_keys"]
     )
     assert row["operation_combo"]["operation_count"] == len(row["case"]["program"]["operations"])
     assert row["source_reward"] == 1.25
-    assert row["stored_in_feedback_corpus"] is False
-    assert row["feedback_skip_reason"] == "feedback_mutation_child"
-    assert case_log_row["seed_lineage"]["parent_case_id"] == "case-parent"
-    assert case_log_row["mutation"]["operator"] == "value"
-    assert case_log_row["feedback_decision"]["selected_operator"] == "value"
+    assert row["stored_in_feedback_corpus"] is True
+    assert row["feedback_skip_reason"] == ""
+    assert case_log_row["seed_lineage"]["parent_case_id"] == ""
+    assert case_log_row["mutation"]["operator"] == "generated"
+    assert case_log_row["feedback_decision"] == {}
     assert case_log_row["quality_archive_context"] == row["quality_archive_context"]
     assert case_log_row["case"]["metadata"]["quality_archive_context"] == row["quality_archive_context"]
     assert "operation_combo" in case_log_row
-    assert instances[0].recorded_sources == ["feedback_mutation"]
+    assert instances[0].recorded_sources == ["generated"]
     assert instances[0].quality_context_calls == [
         {
             "case_id": "case-00000047",
@@ -4668,10 +5654,104 @@ def test_run_fuzz_compact_log_omits_repeated_run_metadata():
     assert row["disagreement_descriptor"]["pair_count"] == 0
     assert len(row["case_fingerprint"]["minhash_signature"]) == 64
     assert "stage_profile" in row
+    assert "wall_time_profile" in row
+    assert "process_cpu_profile" in row
+    assert row["method_arm"]["arm_id"] == "p8_candidate_v1"
+    assert row["experiment_manifest"]["method_arm_digest"] == row["method_arm"]["digest"]
+    assert meta["method_arm"] == row["method_arm"]
+    assert meta["experiment_manifest"]["method_arm_id"] == (
+        "p8_candidate_v1"
+    )
     assert row["fuzz_iteration"]["case_id"] == row["case"]["case_id"]
     assert row["fuzz_iteration"]["stage_timings"]["total_case_wall_ms"] == row["stage_profile"]["total_case_wall_ms"]
     assert meta["stage_profile"]["case_count"] == 1
     assert meta["stage_profile"]["totals_ms"]["total_case_wall_ms"] >= 0.0
+    assert meta["wall_time_profile"]["totals_ms"] == row["wall_time_profile"]
+    assert meta["process_cpu_profile"]["totals_ms"] == row["process_cpu_profile"]
+    assert row["wall_time_profile"]["total_wall_ms"] == pytest.approx(
+        sum(
+            value
+            for key, value in row["wall_time_profile"].items()
+            if key != "total_wall_ms"
+        )
+    )
+    assert row["process_cpu_profile"]["total_process_cpu_ms"] == pytest.approx(
+        sum(
+            value
+            for key, value in row["process_cpu_profile"].items()
+            if key != "total_process_cpu_ms"
+        )
+    )
+
+
+def test_run_fuzz_fresh_session_control_records_nonpersistent_mode():
+    config = ExperimentConfig(
+        enable_backend_session_reuse=False,
+        enable_parallel_backend_execution=False,
+        enable_metamorphic_oracle=False,
+        enable_feedback=False,
+        enable_artifact=False,
+    )
+
+    run_file = run_fuzz(cases=1, seed=5101, backends=[], config=config)
+    meta = load_json(run_meta_path(run_file))
+
+    assert meta["execution"]["session"]["persistent"] is False
+    assert meta["execution"]["session"]["mode"] == "fresh_per_execution"
+    assert meta["config"]["enable_backend_session_reuse"] is False
+
+
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in ["pandas", "duckdb"]),
+    reason="pandas and duckdb are not installed",
+)
+def test_run_fuzz_uses_fresh_execution_when_target_forbids_session_reuse(tmp_path):
+    def generate_case_for_storage(seed, **_kwargs):
+        return Case(
+            f"case-storage-{seed}",
+            seed,
+            [TableData("t0", [ColumnSpec("x", "int", nullable=False)], [{"x": 1}])],
+            Program(f"prog-storage-{seed}", seed, [{"op": "select", "columns": ["x"]}]),
+        )
+
+    config = ExperimentConfig(
+        candidate_recheck_count=0,
+        compress_run_log=False,
+        coordinator_candidate_pool=1,
+        enable_artifact=False,
+        enable_backend_sampling=False,
+        enable_backend_session_reuse=True,
+        enable_champion_corpus=False,
+        enable_feedback=False,
+        enable_lhs_seeding=False,
+        enable_metamorphic_oracle=False,
+        enable_parallel_backend_execution=False,
+        guidance_candidate_pool=1,
+        guidance_strategy="random",
+        log_level="full",
+    )
+
+    run_file = run_fuzz(
+        cases=1,
+        seed=5102,
+        backends=["pandas", "duckdb_persistent"],
+        config=config,
+        runs_dir=tmp_path / "runs",
+        corpus_dir=tmp_path / "corpus",
+        generate_case_fn=generate_case_for_storage,
+    )
+    meta = load_json(run_meta_path(run_file))
+    row = read_jsonl(run_file)[0]
+
+    assert meta["executed_cases"] == 1
+    assert meta["case_iteration_failures"] == 0
+    assert row["status"] == "ok"
+    resolution = meta["execution"]["session_reuse_resolution"]
+    assert resolution["requested"] is True
+    assert resolution["effective"] is False
+    assert resolution["reason"] == "fresh_only_backend_present"
+    assert resolution["fresh_only_backends"] == ["duckdb_persistent"]
+    assert meta["execution"]["session"]["mode"] == "fresh_per_execution"
 
 
 def test_run_fuzz_records_run_provenance(monkeypatch):
@@ -4738,6 +5818,28 @@ def test_run_fuzz_records_layered_config_metadata():
     assert "topk" in meta["config_layers"]["guidance"]["effective_targets"]
     assert meta["config_layers"]["feedback"]["enable_local_source_scheduler"] is True
     assert meta["config_layers"]["execution"]["enable_parallel_backend_execution"] is False
+    assert meta["config_layers"]["method"]["arm_id"] == (
+        "p8_candidate_v1"
+    )
+    assert meta["config"]["config_digest"] == meta["config_layers"]["config_digest"]
+
+
+def test_run_fuzz_records_lattice_arm_without_implicit_boolean_reconstruction():
+    config = ExperimentConfig(
+        method_arm="contract_lattice_static",
+        method_arm_overrides={"node_budget": 2},
+        log_level="minimal",
+    )
+
+    run_file = run_fuzz(cases=1, seed=5501, backends=[], config=config)
+
+    row = read_jsonl(run_file)[0]
+    meta = load_json(run_meta_path(run_file))
+    assert row["method_arm"]["base_arm_id"] == "contract_lattice_static"
+    assert row["method_arm"]["registered"] is False
+    assert row["method_arm"]["settings"]["execution_mode"] == "lattice"
+    assert meta["execution"]["lattice"]["selector_mode"] == "static"
+    assert meta["method_arm"]["digest"] == row["method_arm"]["digest"]
 
 
 def test_run_fuzz_new_behavior_uses_discovery_signature(tmp_path, monkeypatch):
@@ -5041,7 +6143,15 @@ def test_run_fuzz_passes_lhs_schema_spec_during_cold_start(monkeypatch):
     monkeypatch.setattr(runner_module, "generate_case", fake_generate_case)
     monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
 
-    run_file = run_fuzz(cases=2, seed=90, backends=[], config=ExperimentConfig(log_level="minimal"))
+    run_file = run_fuzz(
+        cases=2,
+        seed=90,
+        backends=[],
+        config=ExperimentConfig(
+            method_arm="contract_lattice_shared_cost_full",
+            log_level="minimal",
+        ),
+    )
     meta = load_json(run_meta_path(run_file))
 
     assert observed_specs
@@ -5107,6 +6217,7 @@ def test_run_fuzz_adaptive_profile_pool_learns_and_persists(monkeypatch):
     monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
 
     config = ExperimentConfig(
+        method_arm="contract_lattice_shared_cost_full",
         enable_feedback=True,
         generator_profile="common",
         generator_profile_pool=["common", "discovery_fresh"],
@@ -5203,6 +6314,7 @@ def test_run_fuzz_profile_pool_filters_profiles_by_target_capability(monkeypatch
     monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
 
     config = ExperimentConfig(
+        method_arm="contract_lattice_shared_cost_full",
         generator_profile="common",
         generator_profile_pool=["common", "partitioned_running_sum", "join_null_sort"],
         generator_profile_learning_weight=1.0,
@@ -5275,6 +6387,7 @@ def test_run_fuzz_profile_capability_filter_can_be_disabled(monkeypatch):
     monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
 
     config = ExperimentConfig(
+        method_arm="contract_lattice_shared_cost_full",
         generator_profile="common",
         generator_profile_pool=["common", "partitioned_running_sum"],
         generator_profile_learning_weight=1.0,
@@ -5343,6 +6456,7 @@ def test_run_fuzz_records_per_case_objective_mr_and_version_learning(monkeypatch
     monkeypatch.setattr(runner_module, "run_loaded_case", fake_run_loaded_case)
 
     config = ExperimentConfig(
+        method_arm="contract_lattice_shared_cost_full",
         enable_feedback=True,
         enable_metamorphic_oracle=True,
         metamorphic_variant_limit=1,
@@ -5578,6 +6692,7 @@ def test_run_fuzz_records_backend_pair_priority_and_learns_pair_rewards(monkeypa
     monkeypatch.setattr(runner_module, "target_context", lambda backends: FakeTargetContext())
 
     config = ExperimentConfig(
+        method_arm="contract_ccs_cartesian",
         enable_feedback=True,
         backend_pair_learning_weight=1.0,
         backend_pair_priority_limit=2,
@@ -5659,6 +6774,7 @@ def test_run_fuzz_signal_new_behavior_uses_coarser_signal_signature(monkeypatch)
         seed=81,
         backends=[],
         config=ExperimentConfig(
+            method_arm="contract_lattice_shared_cost_full",
             log_level="minimal",
             enable_feedback=False,
             enable_champion_corpus=False,

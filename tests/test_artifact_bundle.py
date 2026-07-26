@@ -152,17 +152,21 @@ def test_repo_ubuntu_artifact_bundle_matches_manifest_and_checksum(tmp_path):
     root = Path(__file__).resolve().parents[1]
     manifest_path = root / "reports" / "ubuntu-datafusion-artifact-manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    expected_members = bundle_members(collect_manifest_paths(manifest), root=root)
+    manifest_paths = collect_manifest_paths(manifest)
 
     bundle_path = root / "reports" / "ubuntu-datafusion-artifact-bundle.tar.gz"
+    extracted_root = tmp_path / "extracted"
+    extracted_root.mkdir()
     with tarfile.open(bundle_path, "r:gz") as tar:
+        tar.extractall(extracted_root, filter="data")
+        expected_members = bundle_members(manifest_paths, root=extracted_root)
         assert tar.getnames() == expected_members
 
     checksum_path = bundle_path.with_suffix(bundle_path.suffix + ".sha256")
     assert checksum_path.read_text(encoding="utf-8") == f"{sha256_file(bundle_path)}  {bundle_path.name}\n"
 
     rebuilt_path = tmp_path / "rebuilt-ubuntu-artifact-bundle.tar.gz"
-    write_bundle(collect_manifest_paths(manifest), rebuilt_path, root=root)
+    write_bundle(manifest_paths, rebuilt_path, root=extracted_root)
     assert sha256_file(rebuilt_path) == sha256_file(bundle_path)
 
 

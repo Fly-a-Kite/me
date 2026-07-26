@@ -274,6 +274,49 @@ def test_offline_finding_buckets_match_paper_triage_categories():
     assert buckets["semantic_divergence"] == 1
 
 
+def test_seeded_and_terminal_lifecycle_candidates_never_enter_fresh_reward_counts():
+    seeded_row = {
+        "candidate_source": "seeded_fault_sensitivity",
+        "findings": [
+            {
+                "triage_verdict": "candidate_implementation_bug",
+                "root_cause": "injected_filter",
+                "suspicious_backends": ["buggy_filter"],
+            }
+        ],
+        "preflight": {"valid": True, "fallback_used": False},
+    }
+    submitted = {
+        "triage_verdict": "candidate_implementation_bug",
+        "root_cause": "already_reported",
+        "suspicious_backends": ["duckdb"],
+        "family_lifecycle": "submitted",
+    }
+
+    seeded_signals = row_reward_signals(seeded_row)
+    submitted_signals = row_reward_signals({"findings": [submitted]})
+
+    assert seeded_signals["candidate_bug_count"] == 0
+    assert seeded_signals["seeded_candidate_bug_count"] == 1
+    assert online_case_reward(seeded_row) < 0.0
+    assert submitted_signals["candidate_bug_count"] == 0
+    assert submitted_signals["nonfresh_lifecycle_candidate_bug_count"] == 1
+    known_signals = row_reward_signals(
+        {
+            "candidate_source": "known_regression_replay",
+            "findings": [
+                {
+                    "triage_verdict": "candidate_implementation_bug",
+                    "root_cause": "known_root",
+                    "suspicious_backends": ["sqlite"],
+                }
+            ],
+        }
+    )
+    assert known_signals["candidate_bug_count"] == 0
+    assert known_signals["evidence_lane"] == "known_regression"
+
+
 def test_summarize_case_feedback_exposes_closed_loop_adjustments():
     row = {
         "candidate_source": "feedback_mutation",

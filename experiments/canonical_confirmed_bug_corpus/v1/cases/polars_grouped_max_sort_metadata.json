@@ -1,0 +1,44 @@
+{
+  "case_id": "canonical-polars-grouped-max-sort-metadata-001",
+  "seed": 27672,
+  "tables": [
+    {
+      "name": "t0",
+      "columns": [
+        {"name": "s", "type": "str", "nullable": false},
+        {"name": "z", "type": "int", "nullable": true}
+      ],
+      "rows": [
+        {"s": "a", "z": 1},
+        {"s": "b", "z": 2},
+        {"s": "b", "z": 0},
+        {"s": "b", "z": null}
+      ]
+    }
+  ],
+  "program": {
+    "program_id": "canonical-polars-grouped-max-sort-metadata-001",
+    "seed": 27672,
+    "operations": [
+      {
+        "op": "sort",
+        "keys": [{"column": "z", "ascending": true, "nulls": "last"}]
+      },
+      {
+        "op": "groupby",
+        "keys": ["s"],
+        "aggs": [{"column": "z", "func": "max", "as": "max_z"}],
+        "maintain_order": true
+      },
+      {
+        "op": "sort",
+        "keys": [{"column": "max_z", "ascending": false, "nulls": "last"}]
+      },
+      {"op": "limit", "n": 1}
+    ]
+  },
+  "metadata": {
+    "canonical_root_id": "polars-grouped-max-sort-metadata-001",
+    "fault_model": "stale_sortedness_metadata_after_noncontiguous_groupby"
+  }
+}

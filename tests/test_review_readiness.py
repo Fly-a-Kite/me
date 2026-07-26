@@ -134,6 +134,7 @@ def method_comparison_command(args):
                     {
                         "family": "confirmed_family@engine",
                         "issue_url": "https://github.com/example/project/issues/1",
+                        "discovery_credit": "datadiff_submitted",
                         "upstream_status": "upstream_labeled_bug",
                     }
                 ]

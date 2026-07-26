@@ -116,6 +116,95 @@ def test_run_counters_record_completed_case_and_summaries():
     }
 
 
+def test_run_counters_track_confirmed_candidates_and_cpu_cost_proxy():
+    counters = RunCounters()
+
+    counters.record_completed_case(
+        row={
+            "status": "bug",
+            "findings": [{"kind": "semantic_output_mismatch"}],
+            "candidate_recheck": {
+                "enabled": True,
+                "attempts": 2,
+                "reproduced_keys": ["semantic_output_mismatch:root@duckdb"],
+                "non_reproduced_keys": [],
+            },
+            "backend_sampling": {
+                "confirmation_executed": True,
+                "screening": {"status": "bug"},
+            },
+            "execution_profile": {"combined_backend_reported_total_ms": 12.5},
+        },
+        preflight={"valid": True},
+    )
+    counters.record_completed_case(
+        row={
+            "status": "ok",
+            "findings": [],
+            "candidate_recheck": {"enabled": False},
+            "backend_sampling": {
+                "confirmation_executed": True,
+                "screening": {"status": "bug"},
+            },
+            "execution_profile": {"backend_reported_total_ms": 7.5},
+        },
+        preflight={"valid": True},
+    )
+
+    assert counters.candidate_bug_cases == 1
+    assert counters.recheck_surviving_candidate_cases == 1
+    assert counters.sampled_candidate_screens == 2
+    assert counters.sampled_candidate_confirmed == 1
+    assert counters.sampled_candidate_rejected == 1
+    assert counters.backend_reported_total_ms == 20.0
+
+
+def test_run_counters_do_not_count_enabled_but_failed_recheck_as_surviving():
+    counters = RunCounters()
+
+    counters.record_completed_case(
+        row={
+            "status": "bug",
+            "findings": [{"kind": "semantic_output_mismatch"}],
+            "candidate_recheck": {
+                "enabled": True,
+                "attempts": 1,
+                "reproduced_keys": [],
+                "non_reproduced_keys": ["semantic_output_mismatch:root@duckdb"],
+            },
+        },
+        preflight={"valid": True},
+    )
+
+    assert counters.candidate_bug_cases == 1
+    assert counters.recheck_surviving_candidate_cases == 0
+
+
+def test_run_counters_use_finding_signal_even_when_status_is_ok():
+    counters = RunCounters()
+
+    counters.record_completed_case(
+        row={
+            "status": "ok",
+            "findings": [{"kind": "metamorphic_mismatch"}],
+            "candidate_recheck": {"enabled": False},
+            "backend_sampling": {
+                "confirmation_executed": True,
+                "screening": {
+                    "status": "ok",
+                    "candidate_signal": True,
+                    "finding_count": 1,
+                },
+            },
+        },
+        preflight={"valid": True},
+    )
+
+    assert counters.candidate_bug_cases == 1
+    assert counters.sampled_candidate_screens == 1
+    assert counters.sampled_candidate_confirmed == 1
+
+
 def test_run_counters_filter_non_rewardable_signal_new_behavior():
     counters = RunCounters(
         known_saturated_bug_families=("csv_long_numeric_roundtrip@duckdb",)
@@ -207,6 +296,42 @@ def test_run_counters_record_quality_oracles_and_filter_summaries():
         "filtered_candidates": 2,
         "fallback_candidates": 1,
     }
+
+
+def test_run_counters_summarize_semantic_activation_without_counting_unknown_as_false():
+    counters = RunCounters()
+    payloads = [
+        {
+            "goal_id": "nullable_membership_join",
+            "syntactic_reached": True,
+            "evaluation_status": "activated",
+        },
+        {
+            "goal_id": "nullable_grouped_topk",
+            "syntactic_reached": True,
+            "evaluation_status": "not_activated",
+        },
+        {
+            "goal_id": "union_distinct_window",
+            "syntactic_reached": True,
+            "evaluation_status": "not_evaluated",
+        },
+    ]
+    for payload in payloads:
+        counters.record_completed_case(
+            row={"findings": [], "semantic_activation": payload},
+            preflight={"valid": True},
+        )
+
+    summary = counters.semantic_activation_summary()
+    assert summary["goal_first_cases"] == 3
+    assert summary["syntactic_reached_cases"] == 3
+    assert summary["evaluated_cases"] == 2
+    assert summary["activated_cases"] == 1
+    assert summary["not_activated_cases"] == 1
+    assert summary["not_evaluated_cases"] == 1
+    assert summary["activation_rate_evaluated"] == 0.5
+    assert summary["by_goal"]["union_distinct_window"]["not_evaluated"] == 1
 
 
 def test_stage_timings_from_mapping_computes_missing_total():

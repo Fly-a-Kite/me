@@ -17,6 +17,12 @@ DEFAULT_TRIAGE_PLAN = PROJECT_ROOT / "reports" / "bug-20plus-triage-plan-2026061
 DEFAULT_MINIMIZED_DUCKDB = PROJECT_ROOT / "reports" / "duckdb-sql-reproducers" / "p0-duckdb-live-20260615-minimized" / "manifest.json"
 DEFAULT_DUCKDB_ISSUE_BUNDLE = PROJECT_ROOT / "reports" / "duckdb-issue-ready-bundles" / "p0-duckdb-live-20260615" / "manifest.json"
 DEFAULT_OUTPUT_BASE = PROJECT_ROOT / "reports" / "icse-sota-gap-audit-20260615"
+OWNED_DISCOVERY_CREDITS = {
+    "datadiff_found",
+    "datadiff_submitted",
+    "user_found",
+    "user_submitted",
+}
 
 
 def main() -> int:
@@ -452,7 +458,17 @@ def count_confirmations(payload: dict[str, Any]) -> int:
     confirmations = payload.get("confirmations", [])
     if not isinstance(confirmations, list):
         return 0
-    return len({item.get("family") for item in confirmations if isinstance(item, dict) and item.get("family")})
+    return len(
+        {
+            item.get("family")
+            for item in confirmations
+            if (
+                isinstance(item, dict)
+                and item.get("family")
+                and str(item.get("discovery_credit", "")).strip() in OWNED_DISCOVERY_CREDITS
+            )
+        }
+    )
 
 
 def confirmation_backend_counts(payload: dict[str, Any]) -> Counter[str]:
@@ -462,6 +478,8 @@ def confirmation_backend_counts(payload: dict[str, Any]) -> Counter[str]:
         return counts
     for item in confirmations:
         if not isinstance(item, dict):
+            continue
+        if str(item.get("discovery_credit", "")).strip() not in OWNED_DISCOVERY_CREDITS:
             continue
         for backend in item.get("suspicious_backends", []) or []:
             counts[str(backend)] += 1

@@ -1,0 +1,66 @@
+{
+  "case_id": "canonical-datafusion-limit-idempotence-001",
+  "seed": 22541,
+  "tables": [
+    {
+      "name": "t0",
+      "columns": [
+        {"name": "id", "type": "int", "nullable": false},
+        {"name": "g", "type": "str", "nullable": true},
+        {"name": "x", "type": "int", "nullable": true},
+        {"name": "z", "type": "int", "nullable": true},
+        {"name": "s", "type": "str", "nullable": true}
+      ],
+      "rows": [
+        {"id": 0, "g": "a", "x": null, "z": 8, "s": "A"},
+        {"id": 1, "g": "b", "x": 10, "z": null, "s": "space value"},
+        {"id": 2, "g": "c", "x": -10, "z": -3, "s": ""},
+        {"id": 3, "g": "b", "x": -2, "z": 0, "s": "space value"},
+        {"id": 4, "g": "b", "x": 10, "z": null, "s": "a"},
+        {"id": 5, "g": "a", "x": null, "z": 0, "s": ""},
+        {"id": 6, "g": null, "x": null, "z": 0, "s": "space value"},
+        {"id": 7, "g": "a", "x": 0, "z": 1, "s": "a"},
+        {"id": 8, "g": "c", "x": 0, "z": 0, "s": "A"},
+        {"id": 9, "g": "c", "x": -10, "z": 8, "s": "A"},
+        {"id": 10, "g": "c", "x": -10, "z": -3, "s": "space value"},
+        {"id": 11, "g": "b", "x": -10, "z": 8, "s": "A"},
+        {"id": 12, "g": "a", "x": -2, "z": -3, "s": ""},
+        {"id": 13, "g": "a", "x": 2, "z": 1, "s": "space value"}
+      ]
+    }
+  ],
+  "program": {
+    "program_id": "canonical-datafusion-limit-idempotence-001",
+    "seed": 22541,
+    "operations": [
+      {
+        "op": "sort",
+        "keys": [
+          {"column": "s", "ascending": true, "nulls": "first"},
+          {"column": "id", "ascending": true, "nulls": "last"}
+        ]
+      },
+      {"op": "limit", "n": 5},
+      {
+        "op": "sort",
+        "keys": [
+          {"column": "x", "ascending": false, "nulls": "first"},
+          {"column": "id", "ascending": true, "nulls": "last"}
+        ]
+      },
+      {"op": "offset", "n": 2},
+      {
+        "op": "sort",
+        "keys": [
+          {"column": "x", "ascending": false, "nulls": "first"},
+          {"column": "id", "ascending": true, "nulls": "last"}
+        ]
+      }
+    ]
+  },
+  "metadata": {
+    "canonical_root_id": "datafusion-ordered-limit-idempotence-001",
+    "fault_model": "duplicate_limit_merges_with_stale_offset",
+    "metamorphic_relation": "limit_idempotence"
+  }
+}

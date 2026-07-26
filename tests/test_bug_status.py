@@ -1,6 +1,6 @@
 import json
 
-from datadiff import cli
+from datadiff import bug_status, cli
 from datadiff.bug_status import (
     build_bug_status,
     build_issue_status,
@@ -21,18 +21,27 @@ def test_build_bug_status_summarizes_lightweight_evidence(tmp_path):
                     {
                         "family": "grouped_topk_null_sort_key@datafusion",
                         "issue_url": "https://github.com/apache/datafusion/issues/1",
+                        "discovery_credit": "datadiff_submitted",
                         "upstream_status": "upstream_labeled_bug",
                     },
                     {
                         "root_cause": "vector_division_rounding",
                         "suspicious_backends": ["polars"],
                         "issue_url": "https://github.com/pola-rs/polars/issues/2",
+                        "discovery_credit": "datadiff_submitted",
                         "upstream_status": "fixed_upstream",
                     },
                     {
                         "family": "not_confirmed@duckdb",
                         "issue_url": "https://github.com/duckdb/duckdb/issues/3",
+                        "discovery_credit": "datadiff_submitted",
                         "upstream_status": "needs_triage",
+                    },
+                    {
+                        "family": "similar_existing@pandas",
+                        "issue_url": "https://github.com/pandas-dev/pandas/issues/4",
+                        "discovery_credit": "similar_existing",
+                        "upstream_status": "upstream_labeled_bug",
                     },
                 ]
             },
@@ -459,6 +468,35 @@ def test_write_bug_status_outputs_writes_json_and_markdown(tmp_path):
     assert "Issue bundle nonzero exits" in markdown
     assert "DataDiffFuzz Bug Status" in render_bug_status_markdown(status)
     assert render_issue_status_markdown(status) == render_bug_status_markdown(status)
+
+
+def test_build_bug_status_can_skip_historical_workflow_payloads(tmp_path, monkeypatch):
+    new_issue = tmp_path / "new_issue"
+    generated = new_issue / "generated"
+    old_issue = tmp_path / "old_issue"
+    generated.mkdir(parents=True)
+    old_issue.mkdir()
+
+    def fail_if_scanned(_directory):
+        raise AssertionError("historical workflow evidence must not be scanned")
+
+    monkeypatch.setattr(bug_status, "_collect_fresh_candidate_evidence", fail_if_scanned)
+    monkeypatch.setattr(bug_status, "_collect_discovery_run_manifests", fail_if_scanned)
+    monkeypatch.setattr(bug_status, "_collect_discovery_campaign_manifests", fail_if_scanned)
+
+    status = build_issue_status(
+        latest_confirmation_files=[],
+        new_issue_dir=new_issue,
+        old_issue_dir=old_issue,
+        generated_issue_dir=generated,
+        scan_generated_workflow_evidence=False,
+    )
+
+    assert status["inputs"]["scan_generated_workflow_evidence"] is False
+    assert status["fresh_candidate_evidence"] == []
+    assert status["discovery_run_manifests"] == []
+    assert status["discovery_campaign_manifests"] == []
+    assert status["summary"]["discovery_workflow_manifest_count"] == 0
 
 
 def test_cli_parses_bug_status_options():

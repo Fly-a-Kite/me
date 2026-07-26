@@ -65,6 +65,13 @@ def test_build_issue_readiness_classifies_submission_queue(tmp_path):
                     {
                         "family": "confirmed_family@datafusion",
                         "issue_url": "https://github.com/apache/datafusion/issues/1",
+                        "discovery_credit": "datadiff_submitted",
+                        "upstream_status": "upstream_labeled_bug",
+                    },
+                    {
+                        "family": "similar_existing@pandas",
+                        "issue_url": "https://github.com/pandas-dev/pandas/issues/4",
+                        "discovery_credit": "similar_existing",
                         "upstream_status": "upstream_labeled_bug",
                     }
                 ]

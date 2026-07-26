@@ -61,6 +61,11 @@ _PUBLIC_SOURCE_ROOT = Path(
 _FORMAL_EVIDENCE_ROOT = Path(
     "/tmp/phase6_formal_latest_target_remediation_r1.20260724/formal_evidence"
 )
+# The historical formal-evidence root may legitimately exist on hosts that
+# retain the completed 20260724 target-version execution. These tests must
+# only prove that *they* did not create it, so bind the pre-existing state
+# once at import and assert it is unchanged afterwards.
+_FORMAL_EVIDENCE_ROOT_PREEXISTING = _FORMAL_EVIDENCE_ROOT.exists()
 _CURRENT_SOURCE_SNAPSHOT = Path(
     "/tmp/phase6_formal_target_version_execution_capability_source_snapshot_r1b.gfqAvj/source-snapshot.json"
 )
@@ -389,7 +394,7 @@ def test_writer_stages_only_canonical_temporary_tree_and_replays_exactly(
         subject_kind="target_packages",
         subject_ids=preparation.receipt.package_ids,
     ) == ()
-    assert not _FORMAL_EVIDENCE_ROOT.exists()
+    assert _FORMAL_EVIDENCE_ROOT.exists() is _FORMAL_EVIDENCE_ROOT_PREEXISTING
 
 
 def test_writer_refuses_stale_bindings_existing_paths_and_symlink_escape(
@@ -534,7 +539,7 @@ def test_formal_executor_requires_exact_external_authority_and_self_replays(
     assert manifest["formal_execution_authorized"] is True
     assert manifest["formal_evidence_created"] is True
     assert manifest["gate_credit"] is False
-    assert not _FORMAL_EVIDENCE_ROOT.exists()
+    assert _FORMAL_EVIDENCE_ROOT.exists() is _FORMAL_EVIDENCE_ROOT_PREEXISTING
 
 
 @pytest.mark.parametrize(
@@ -575,7 +580,7 @@ def test_formal_executor_rejects_stale_authority_or_layout_before_probe(
     with pytest.raises(ValueError, match=message):
         execute_formal_target_version_replay(request=request)
     assert not (tmp_path / "formal_evidence").exists()
-    assert not _FORMAL_EVIDENCE_ROOT.exists()
+    assert _FORMAL_EVIDENCE_ROOT.exists() is _FORMAL_EVIDENCE_ROOT_PREEXISTING
 
 
 def test_formal_executor_rejects_test_only_and_noncanonical_authority_before_probe(
@@ -639,7 +644,7 @@ def test_formal_executor_refuses_existing_output_and_cleans_interrupted_stage(
         execute_formal_target_version_replay(request=staged_request)
     assert not (staged_parent / "formal_evidence").exists()
     assert list(staged_parent.glob(".formal_evidence.formal-stage-*")) == []
-    assert not _FORMAL_EVIDENCE_ROOT.exists()
+    assert _FORMAL_EVIDENCE_ROOT.exists() is _FORMAL_EVIDENCE_ROOT_PREEXISTING
 
 
 def test_formal_executor_revalidation_detects_authority_bound_manifest_mutation(
@@ -658,7 +663,7 @@ def test_formal_executor_revalidation_detects_authority_bound_manifest_mutation(
             preparation=preparation,
             request=request,
         )
-    assert not _FORMAL_EVIDENCE_ROOT.exists()
+    assert _FORMAL_EVIDENCE_ROOT.exists() is _FORMAL_EVIDENCE_ROOT_PREEXISTING
 
 
 def test_execution_capability_collects_actual_target_venv_without_authority_write(
@@ -689,7 +694,7 @@ def test_execution_capability_collects_actual_target_venv_without_authority_writ
     assert capability.candidate_confirmed is False
     assert capability.bug_claimed is False
     assert not Path(authority.future_output_root).exists()
-    assert not _FORMAL_EVIDENCE_ROOT.exists()
+    assert _FORMAL_EVIDENCE_ROOT.exists() is _FORMAL_EVIDENCE_ROOT_PREEXISTING
     with pytest.raises(PermissionError, match="separate successor authority"):
         require_formal_target_version_execution_authority(authority)
 
@@ -785,7 +790,7 @@ def test_execution_capability_rejects_duplicate_probe_transcript_without_write(
     with pytest.raises(ValueError, match="duplicate JSON key"):
         inspect_target_version_execution_capability(authority=authority)
     assert not Path(authority.future_output_root).exists()
-    assert not _FORMAL_EVIDENCE_ROOT.exists()
+    assert _FORMAL_EVIDENCE_ROOT.exists() is _FORMAL_EVIDENCE_ROOT_PREEXISTING
 
 
 def test_unsupported_pypi_json_alias_fails_closed():

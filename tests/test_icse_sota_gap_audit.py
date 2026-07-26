@@ -145,6 +145,7 @@ def _latest_confirmations(count: int) -> dict[str, object]:
             {
                 "family": f"confirmed_{idx}@{backends[idx % len(backends)]}",
                 "suspicious_backends": [backends[idx % len(backends)]],
+                "discovery_credit": "datadiff_submitted",
             }
             for idx in range(count)
         ],

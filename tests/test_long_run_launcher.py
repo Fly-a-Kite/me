@@ -6,6 +6,7 @@ import subprocess
 import sys
 import textwrap
 import time
+from importlib.metadata import version
 from pathlib import Path
 
 import pytest
@@ -171,10 +172,21 @@ def test_discovery_longhaul_launcher_targets_high_yield_campaign_batches():
         "--candidate-recheck-count",
         "--candidate-pipeline-recheck-attempts",
         "discovery-campaign-aggregate",
-        "polars_lazy,arrow_probe_stress",
+        "DATADIFF_DISCOVERY_LONGHAUL_REQUIRE_LATEST_TARGETS",
+        "DATADIFF_DISCOVERY_LONGHAUL_TARGET_VERSION_AUDIT_SOURCE",
+        "DATADIFF_DISCOVERY_LONGHAUL_FREEZE_MANIFEST",
+        "DATADIFF_RUN_PROVENANCE_FREEZE_MANIFEST",
+        "final-bug-discovery-freeze-v1",
+        "target-version-audit",
+        "target_version_audit",
+        "pandas_targeted_boundaries",
+        "polars_targeted_boundaries",
+        "datafusion_targeted_boundaries",
+        "chdb_targeted_boundaries",
+        "orthogonal_stress",
         "embedded_sql,duckdb_storage",
-        "datafusion_common_api,datafusion_optimizer",
-        "common_api_workflow,cross_family,deep_probe_rotation",
+        "common_api_workflow,cross_family",
+        "--skip-run-report",
     ]:
         assert token in text
 
@@ -186,7 +198,82 @@ def test_discovery_longhaul_launcher_targets_high_yield_campaign_batches():
     )
     assert "duration=12h" in printed.stdout
     assert "candidate_pipeline_recheck_attempts=3" in printed.stdout
-    assert "lane_groups=polars_lazy,arrow_probe_stress;" in printed.stdout
+    assert "require_latest_targets=1" in printed.stdout
+    assert "seed_start=31000001" in printed.stdout
+    assert "target_version_audit=reports/target-version-audits/discovery-longhaul-" in printed.stdout
+    assert "lane_groups=pandas_targeted_boundaries;" in printed.stdout
+    assert "chdb_targeted_boundaries;orthogonal_stress;" in printed.stdout
+
+
+def test_discovery_longhaul_dry_run_freezes_protocol_and_source_provenance(tmp_path: Path):
+    project_root = tmp_path / "project-root"
+    project_root.mkdir(parents=True)
+    _init_git_repo(project_root)
+    canonical = project_root / "experiments" / "canonical_confirmed_bug_corpus" / "v2"
+    canonical.mkdir(parents=True)
+    (canonical / "manifest.json").write_text(
+        json.dumps({"confirmed_roots": [{"root_id": f"root-{index}"} for index in range(9)]}) + "\n",
+        encoding="utf-8",
+    )
+    cached_audit = project_root / "cached-target-version-audit.json"
+    cached_audit.write_text(
+        json.dumps(
+            {
+                "summary": {"all_target_packages_up_to_date": True},
+                "target_packages": [
+                    {
+                        "package": "pip",
+                        "installed_version": version("pip"),
+                        "latest_version": version("pip"),
+                        "latest_source": "test",
+                        "up_to_date": True,
+                    }
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    run_id = f"freeze-test-{os.getpid()}"
+    env = os.environ.copy()
+    env.update(
+        {
+            "DATADIFF_ROOT_DIR": str(project_root),
+            "DATADIFF_PYTHON": sys.executable,
+            "DATADIFF_DISCOVERY_LONGHAUL_RUN_ID": run_id,
+            "DATADIFF_DISCOVERY_LONGHAUL_REQUIRE_LATEST_TARGETS": "1",
+            "DATADIFF_DISCOVERY_LONGHAUL_TARGET_VERSION_AUDIT_SOURCE": str(cached_audit),
+            "DATADIFF_DISCOVERY_LONGHAUL_REQUIRE_CLEAN_WORKTREE": "0",
+        }
+    )
+
+    completed = subprocess.run(
+        ["bash", str(DISCOVERY_LONGHAUL_SCRIPT_PATH), "--dry-run"],
+        cwd=project_root,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    freeze_manifest = (
+        project_root
+        / "reports"
+        / "discovery-longhaul-provenance"
+        / f"discovery-longhaul-{run_id}-freeze-manifest.json"
+    )
+    payload = json.loads(freeze_manifest.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == "final-bug-discovery-freeze-v1"
+    assert payload["objective"]["confirmed_root_count_at_freeze"] == 9
+    assert payload["objective"]["remaining_root_gap_at_freeze"] == 21
+    assert payload["design"]["no_favorable_early_stopping"] is True
+    assert payload["design"]["seed_start"] == 31000001
+    assert "chdb_targeted_boundaries" in payload["design"]["lane_specs"]
+    assert "orthogonal_stress" in payload["design"]["lane_specs"]
+    assert payload["provenance"]["source_tree_sha256"]
+    assert payload["provenance"]["target_version_audit_sha256"]
+    assert payload["protocol_sha256"]
+    assert "discovery freeze manifest:" in completed.stdout
 
 
 def test_final_live_launcher_shards_campaigns_with_authority_provenance():
@@ -199,7 +286,10 @@ def test_final_live_launcher_shards_campaigns_with_authority_provenance():
         "DATADIFF_RUN_PROVENANCE_AUTHORITY=1",
         "DATADIFF_RUN_PROVENANCE_FREEZE_INTENT=1",
         "DATADIFF_RUN_PROVENANCE_LATEST_CODE_CLAIM=1",
+        "DATADIFF_FINAL_LIVE_REQUIRE_LATEST_TARGETS",
+        "DATADIFF_RUN_PROVENANCE_TARGET_VERSION_AUDIT",
         "latest_live_authority_24h",
+        "target-version-audit",
         "reports/final-live-indexes",
         "reports/final-live-provenance",
     ]:
@@ -212,6 +302,8 @@ def test_final_live_launcher_shards_campaigns_with_authority_provenance():
         text=True,
     )
     assert "duration=24h" in printed.stdout
+    assert "require_latest_targets=1" in printed.stdout
+    assert "target_version_audit=reports/final-live-provenance/final-live-" in printed.stdout
     assert "campaigns=" in printed.stdout
     assert "embedded_sql_cross:live_duckdb_issue_focus" in printed.stdout
 
@@ -232,6 +324,7 @@ def test_final_live_launcher_dry_run_writes_importable_campaign_artifacts(tmp_pa
             "DATADIFF_FINAL_LIVE_RUN_ID": run_id,
             "DATADIFF_FINAL_LIVE_STRATEGY_SNAPSHOT": str(snapshot),
             "DATADIFF_FINAL_LIVE_REQUIRE_CLEAN_WORKTREE": "0",
+            "DATADIFF_FINAL_LIVE_REQUIRE_LATEST_TARGETS": "0",
         }
     )
 
@@ -254,6 +347,7 @@ def test_final_live_launcher_dry_run_writes_importable_campaign_artifacts(tmp_pa
     assert payload["campaigns"] == ["arrow_cross:live_arrow"]
     assert payload["run_id"] == run_id
     assert payload["duration"] == "24h"
+    assert payload["target_version_audit"].endswith(f"final-live-{run_id}-target-version-audit.json")
     assert payload["git_commit"]
     assert "arrow_cross:live_arrow" in campaign_table.read_text(encoding="utf-8")
     campaign_script_text = campaign_script.read_text(encoding="utf-8")

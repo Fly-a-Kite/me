@@ -19,6 +19,8 @@ STRATEGY_SNAPSHOT="${DATADIFF_FINAL_LIVE_STRATEGY_SNAPSHOT:-reports/strategy-sna
 CONTINUAL_LEARNING_LEDGERS="${DATADIFF_FINAL_LIVE_CONTINUAL_LEARNING_LEDGERS:-}"
 REQUIRE_CLEAN_WORKTREE="${DATADIFF_FINAL_LIVE_REQUIRE_CLEAN_WORKTREE:-1}"
 PYTHON_BIN="${DATADIFF_PYTHON:-${ROOT_DIR}/.venv/bin/python}"
+REQUIRE_LATEST_TARGETS="${DATADIFF_FINAL_LIVE_REQUIRE_LATEST_TARGETS:-1}"
+TARGET_VERSION_AUDIT_FILE="${DATADIFF_FINAL_LIVE_TARGET_VERSION_AUDIT_FILE:-${PROVENANCE_DIR}/final-live-${RUN_ID}-target-version-audit.json}"
 DRY_RUN=0
 PRINT_CONFIG=0
 
@@ -100,7 +102,48 @@ print_config() {
   printf 'index_dir=%s\n' "${INDEX_DIR}"
   printf 'provenance_dir=%s\n' "${PROVENANCE_DIR}"
   printf 'strategy_snapshot=%s\n' "${STRATEGY_SNAPSHOT}"
+  printf 'require_latest_targets=%s\n' "${REQUIRE_LATEST_TARGETS}"
+  printf 'target_version_audit=%s\n' "${TARGET_VERSION_AUDIT_FILE}"
   printf 'campaigns=%s\n' "$(selected_campaigns | paste -sd, -)"
+}
+
+run_latest_target_audit() {
+  if [[ "${REQUIRE_LATEST_TARGETS}" != "1" ]]; then
+    return
+  fi
+  mkdir -p "${ROOT_DIR}/$(dirname "${TARGET_VERSION_AUDIT_FILE}")"
+  (
+    cd "${ROOT_DIR}"
+    "${PYTHON_BIN}" -m datadiff.cli target-version-audit \
+      --output "${TARGET_VERSION_AUDIT_FILE}" \
+      --json > "${TARGET_VERSION_AUDIT_FILE}.stdout.json"
+    "${PYTHON_BIN}" - "${TARGET_VERSION_AUDIT_FILE}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+summary = payload.get("summary", {})
+if summary.get("all_target_packages_up_to_date") is True:
+    print(f"latest target audit passed: {path}")
+    raise SystemExit(0)
+print(f"latest target audit failed: {path}", file=sys.stderr)
+for row in payload.get("target_packages", []):
+    if row.get("up_to_date") is True:
+        continue
+    print(
+        "package={package} installed={installed} latest={latest} source={source}".format(
+            package=row.get("package", ""),
+            installed=row.get("installed_version") or "?",
+            latest=row.get("latest_version") or "?",
+            source=row.get("latest_source") or "?",
+        ),
+        file=sys.stderr,
+    )
+raise SystemExit(2)
+PY
+  )
 }
 
 if [[ "${PRINT_CONFIG}" == "1" ]]; then
@@ -136,6 +179,8 @@ LAUNCH_ENV="${ROOT_DIR}/${PROVENANCE_DIR}/final-live-${RUN_ID}-launcher-env.txt"
 CAMPAIGN_TABLE="${ROOT_DIR}/${PROVENANCE_DIR}/final-live-${RUN_ID}-campaigns.tsv"
 CAMPAIGNS_TEXT="$(selected_campaigns)"
 
+run_latest_target_audit
+
 "${PYTHON_BIN}" -m pip freeze > "${PIP_FREEZE}"
 git -C "${ROOT_DIR}" status --short --branch > "${GIT_STATUS}"
 {
@@ -162,6 +207,7 @@ git -C "${ROOT_DIR}" status --short --branch > "${GIT_STATUS}"
   "${JOBS}" \
   "${CAMPAIGNS_TEXT}" \
   "${STRATEGY_SNAPSHOT}" \
+  "${TARGET_VERSION_AUDIT_FILE}" \
   "${PIP_FREEZE}" \
   "${GIT_STATUS}" \
   "${GIT_DIFF}" \
@@ -184,10 +230,11 @@ payload = {
     "jobs": sys.argv[7],
     "campaigns": [line.strip() for line in sys.argv[8].splitlines() if line.strip()],
     "strategy_snapshot": str(Path(sys.argv[9])),
-    "pip_freeze": sys.argv[10],
-    "git_status": sys.argv[11],
-    "git_diff": sys.argv[12],
-    "launcher_env": sys.argv[13],
+    "target_version_audit": sys.argv[10],
+    "pip_freeze": sys.argv[11],
+    "git_status": sys.argv[12],
+    "git_diff": sys.argv[13],
+    "launcher_env": sys.argv[14],
 }
 out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
@@ -223,6 +270,7 @@ export DATADIFF_RUN_PROVENANCE_GIT_STATUS=$(quote "${GIT_STATUS}")
 export DATADIFF_RUN_PROVENANCE_GIT_DIFF=$(quote "${GIT_DIFF}")
 export DATADIFF_RUN_PROVENANCE_LAUNCH_ENV=$(quote "${LAUNCH_ENV}")
 export DATADIFF_RUN_PROVENANCE_STRATEGY_SNAPSHOT=$(quote "${ROOT_DIR}/${STRATEGY_SNAPSHOT}")
+export DATADIFF_RUN_PROVENANCE_TARGET_VERSION_AUDIT=$(quote "${ROOT_DIR}/${TARGET_VERSION_AUDIT_FILE}")
 COMMAND=(
   $(quote "${PYTHON_BIN}") scripts/run_final_experiments.py
   --track live
@@ -234,6 +282,7 @@ COMMAND=(
   --artifact-limit $(quote "${ARTIFACT_LIMIT}")
   --log-level $(quote "${LOG_LEVEL}")
   --strategy-snapshot $(quote "${STRATEGY_SNAPSHOT}")
+  --target-version-audit-output $(quote "${TARGET_VERSION_AUDIT_FILE}")
   --manifest-index $(quote "${index_file}")
   --reset-manifest-index
   --skip-paper-journal

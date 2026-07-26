@@ -2,6 +2,7 @@ from datadiff.datagen import generate_case
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.normalizer import NormalizedResult
 from datadiff.oracle import evaluate_case
+from datadiff.semantic_values import LOSSLESS_VALUE_SCHEMA_VERSION, encode_semantic_value
 
 
 def test_oracle_accept_reject_mismatch():
@@ -33,6 +34,39 @@ def test_oracle_semantic_output_mismatch():
     assert findings[0].kind == "semantic_output_mismatch"
     assert findings[0].confidence in {"high", "medium"}
     assert findings[0].mismatch_class == "value"
+
+
+def test_oracle_method_arm_can_replay_legacy_nan_null_collapse():
+    case = Case(
+        "case-method-comparison",
+        1,
+        [TableData("t0", [ColumnSpec("x", "float")], [{"x": float("nan")}])],
+        Program("prog-method-comparison", 1, [{"op": "select", "columns": ["x"]}]),
+    )
+    normalized = {
+        "left": NormalizedResult(
+            "left",
+            "ok",
+            ["x"],
+            [[None]],
+            lossless_rows=[[encode_semantic_value(None)]],
+            lossless_schema_version=LOSSLESS_VALUE_SCHEMA_VERSION,
+        ),
+        "right": NormalizedResult(
+            "right",
+            "ok",
+            ["x"],
+            [[None]],
+            lossless_rows=[[encode_semantic_value(float("nan"))]],
+            lossless_schema_version=LOSSLESS_VALUE_SCHEMA_VERSION,
+        ),
+    }
+
+    assert evaluate_case(case, normalized, comparison_mode="legacy") == []
+    contract_findings = evaluate_case(case, normalized, comparison_mode="contract")
+    assert len(contract_findings) == 1
+    assert contract_findings[0].mismatch_class == "value"
+    assert "contract-derived" in contract_findings[0].evidence
 
 
 def test_oracle_uses_clear_majority_to_mark_single_suspicious_backend():
@@ -624,6 +658,59 @@ def test_oracle_classifies_tuple_absence_null_filter():
         {
             "reference": NormalizedResult("reference", "ok", ["a", "b", "payload", "row_id"], [[2, 2, "survivor", 1]]),
             "duckdb": NormalizedResult("duckdb", "ok", ["a", "b", "payload", "row_id"], []),
+        },
+    )
+
+    assert findings
+    assert findings[0].root_cause == "tuple_absence_null_filter"
+
+
+def test_oracle_prefers_nullable_tuple_absence_over_downstream_grouped_topk():
+    case = Case(
+        "case-tuple-absence-nullable-before-topk",
+        370017,
+        [
+            TableData(
+                "t0",
+                [
+                    ColumnSpec("g", "str", nullable=True),
+                    ColumnSpec("x", "int", nullable=True),
+                    ColumnSpec("payload", "str", nullable=False),
+                ],
+                [
+                    {"g": "survivor", "x": None, "payload": "survivor"},
+                    {"g": "matched", "x": 2, "payload": "matched"},
+                ],
+            ),
+            TableData(
+                "t1",
+                [
+                    ColumnSpec("g", "str", nullable=True),
+                    ColumnSpec("x", "int", nullable=True),
+                ],
+                [
+                    {"g": None, "x": -1},
+                    {"g": "matched", "x": 2},
+                ],
+            ),
+        ],
+        Program(
+            "prog-tuple-absence-nullable-before-topk",
+            370017,
+            [
+                {"op": "tuple_absence_filter", "columns": ["g", "x"], "table": "t1", "right_columns": ["g", "x"]},
+                {"op": "groupby", "keys": ["payload"], "aggs": [{"column": "x", "func": "max", "as": "max_x"}]},
+                {"op": "sort", "keys": [{"column": "max_x", "ascending": False, "nulls": "first"}]},
+                {"op": "limit", "n": 2},
+            ],
+        ),
+    )
+
+    findings = evaluate_case(
+        case,
+        {
+            "reference": NormalizedResult("reference", "ok", ["payload", "max_x"], [["survivor", None]]),
+            "duckdb": NormalizedResult("duckdb", "ok", ["payload", "max_x"], []),
         },
     )
 
@@ -1365,3 +1452,43 @@ def test_oracle_classifies_float_group_key_instability():
 
     assert findings
     assert findings[0].root_cause == "float_group_key_instability"
+
+
+def test_oracle_excludes_explicit_capability_skips_from_comparison():
+    case = generate_case(7001)
+    normalized = {
+        "supported": NormalizedResult("supported", "ok", ["x"], [[1]]),
+        "narrow": NormalizedResult(
+            "narrow",
+            "missing",
+            [],
+            [],
+            error_type="UnsupportedCapability",
+            error="unsupported_capability:operation:op:groupby",
+            capability_decision={
+                "supported": False,
+                "skip_reason": "unsupported_capability:operation:op:groupby",
+            },
+        ),
+    }
+
+    assert evaluate_case(case, normalized) == []
+
+
+def test_oracle_keeps_unexpected_missing_backend_as_accept_reject_mismatch():
+    case = generate_case(7002)
+    normalized = {
+        "supported": NormalizedResult("supported", "ok", ["x"], [[1]]),
+        "broken": NormalizedResult(
+            "broken",
+            "missing",
+            [],
+            [],
+            error_type="MissingDependency",
+            error="engine is unavailable",
+        ),
+    }
+
+    findings = evaluate_case(case, normalized)
+
+    assert [finding.kind for finding in findings] == ["accept_reject_mismatch"]

@@ -3,11 +3,18 @@ from pathlib import Path
 
 from datadiff.discovery_runtime import aggregate_candidate_pipeline_summary, write_discovery_run_fresh_candidate_evidence
 from datadiff.finding_outcomes import candidate_issue_family_key
+from datadiff.osc_diagnostic_facade import not_evaluated_diagnostic_ref_set
 from datadiff.run_summaries import _classified_candidate_rows_for_run
 from datadiff.util import append_jsonl
 
 
 def test_fresh_candidate_evidence_matches_row_level_normalized_family(tmp_path: Path):
+    variant_refs = not_evaluated_diagnostic_ref_set(
+        ["duckdb"],
+        case_digest="case-discovery-variant-diagnostic",
+        reason_code="legacy_variant_error_diagnostic",
+    )
+    variant_refs["authority_eligible"] = True
     row = {
         "case": {"case_id": "case-row-normalized", "seed": 1},
         "findings": [
@@ -30,7 +37,23 @@ def test_fresh_candidate_evidence_matches_row_level_normalized_family(tmp_path: 
         "status": "bug",
         "case_index": 7,
         "elapsed_s": 0.25,
+        "experiment_manifest": {"case_digest": "case-discovery-diagnostic"},
+        "osc_diagnostic_refs": not_evaluated_diagnostic_ref_set(
+            ["duckdb"],
+            case_digest="case-discovery-diagnostic",
+            reason_code="legacy_error_diagnostic",
+        ),
+        "osc_metamorphic_diagnostic_refs": {
+            "target:b": {
+                "experiment_manifest": {
+                    "case_digest": "case-discovery-variant-diagnostic"
+                },
+                "backend_status": {"duckdb": "error"},
+                "osc_diagnostic_refs": variant_refs,
+            }
+        },
     }
+    row["osc_diagnostic_refs"]["authority_eligible"] = True
     evidence_path = tmp_path / "fresh.json"
 
     evidence = write_discovery_run_fresh_candidate_evidence(
@@ -48,6 +71,24 @@ def test_fresh_candidate_evidence_matches_row_level_normalized_family(tmp_path: 
     assert evidence["candidate_row_count"] == 1
     assert evidence["candidate_rows"][0]["case"]["case_id"] == "case-row-normalized"
     assert len(evidence["candidate_rows"][0]["findings"]) == 2
+    refs = evidence["candidate_rows"][0]["osc_diagnostic_refs"]
+    assert refs["evaluation_status"] == "not_evaluated"
+    assert refs["authority_scope"] == "diagnostic_only"
+    assert refs["authority_eligible"] is False
+    assert refs["refs"][0]["backend"] == "duckdb"
+    assert refs["refs"][0]["ref"]["reason_code"] == "invalid_diagnostic_refs"
+    variant = evidence["candidate_rows"][0][
+        "osc_metamorphic_diagnostic_refs"
+    ]["target:b"]
+    assert variant["experiment_manifest"]["case_digest"] == (
+        "case-discovery-variant-diagnostic"
+    )
+    assert variant["osc_diagnostic_refs"]["authority_eligible"] is False
+    assert variant["osc_diagnostic_refs"]["refs"][0]["ref"][
+        "reason_code"
+    ] == "invalid_diagnostic_refs"
+    assert evidence["candidate_row_count"] == 1
+    assert "confirmed_bug" not in evidence["candidate_rows"][0]
     persisted = json.loads(evidence_path.read_text(encoding="utf-8"))
     assert persisted["candidate_row_count"] == 1
 
@@ -156,6 +197,25 @@ def test_classified_candidate_rows_for_run_honors_refreshed_findings(tmp_path: P
             "raw_results": {},
             "config": {},
             "status": "bug",
+            "experiment_manifest": {"case_digest": "case-summary-diagnostic"},
+            "osc_diagnostic_refs": not_evaluated_diagnostic_ref_set(
+                ["duckdb"],
+                case_digest="case-summary-diagnostic",
+                reason_code="legacy_error_diagnostic",
+            ),
+            "osc_metamorphic_diagnostic_refs": {
+                "target:b": {
+                    "experiment_manifest": {
+                        "case_digest": "case-summary-variant-diagnostic"
+                    },
+                    "backend_status": {"duckdb": "error"},
+                    "osc_diagnostic_refs": not_evaluated_diagnostic_ref_set(
+                        ["duckdb"],
+                        case_digest="case-summary-variant-diagnostic",
+                        reason_code="legacy_variant_error_diagnostic",
+                    ),
+                }
+            },
         },
         run_file,
     )
@@ -173,6 +233,21 @@ def test_classified_candidate_rows_for_run_honors_refreshed_findings(tmp_path: P
     assert rows[0]["findings"][0]["triage_verdict"] == "candidate_implementation_bug"
     assert rows[0]["findings"][0]["root_cause"] == "running_sum_precision"
     assert rows[0]["findings"][0]["suspicious_backends"] == ["pandas"]
+    refs = rows[0]["osc_diagnostic_refs"]
+    assert refs["case_digest"] == "case-summary-diagnostic"
+    assert refs["evaluation_status"] == "not_evaluated"
+    assert refs["authority_eligible"] is False
+    assert refs["refs"][0]["backend"] == "duckdb"
+    assert refs["refs"][0]["ref"]["reason_code"] == "legacy_error_diagnostic"
+    variant = rows[0]["osc_metamorphic_diagnostic_refs"]["target:b"]
+    assert variant["experiment_manifest"]["case_digest"] == (
+        "case-summary-variant-diagnostic"
+    )
+    assert variant["osc_diagnostic_refs"]["authority_eligible"] is False
+    assert variant["osc_diagnostic_refs"]["refs"][0]["ref"][
+        "reason_code"
+    ] == "legacy_variant_error_diagnostic"
+    assert "confirmed_bug" not in rows[0]
 
 
 def test_aggregate_candidate_pipeline_summary_keeps_duplicate_skip_metrics():

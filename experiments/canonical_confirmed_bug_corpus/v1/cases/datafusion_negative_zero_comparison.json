@@ -1,0 +1,32 @@
+{
+  "case_id": "canonical-datafusion-negative-zero-comparison-001",
+  "seed": 141204,
+  "tables": [
+    {
+      "name": "t0",
+      "columns": [
+        {"name": "id", "type": "int", "nullable": false},
+        {"name": "y", "type": "float", "nullable": true}
+      ],
+      "rows": [
+        {"id": 1, "y": 0.0}
+      ]
+    }
+  ],
+  "program": {
+    "program_id": "canonical-datafusion-negative-zero-comparison-001",
+    "seed": 141204,
+    "operations": [
+      {
+        "op": "mutate",
+        "column": "m_0",
+        "expr": {"kind": "arith_const", "op": "mul", "source": "y", "value": -1}
+      },
+      {"op": "filter", "column": "m_0", "cmp": "ge_is_not_true", "value": 0.0}
+    ]
+  },
+  "metadata": {
+    "canonical_root_id": "datafusion-negative-zero-comparison-001",
+    "fault_model": "total_order_used_for_sql_zero_comparison"
+  }
+}

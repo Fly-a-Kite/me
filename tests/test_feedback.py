@@ -24,6 +24,39 @@ def _case(seed: int) -> Case:
     )
 
 
+def _semantic_plan_case(seed: int, label: str) -> Case:
+    case = _case(seed)
+    case.metadata["interaction_descriptor"] = {
+        "tokens": [
+            {
+                "category": "semantic_physical",
+                "components": [
+                    "backend=datafusion",
+                    f"operator={label}",
+                    "op=limit",
+                ],
+            },
+            {
+                "category": "plan_state",
+                "components": [
+                    "backend=datafusion",
+                    "mode=query_engine",
+                    "kind=physical",
+                    f"operators={label}",
+                ],
+            },
+        ]
+    }
+    case.metadata["input_layouts"] = {
+        "t0": {
+            "representation": "chunked",
+            "chunk_count": seed + 1,
+            "dictionary_columns": ["x"] if seed % 2 else [],
+        }
+    }
+    return case
+
+
 def _fingerprint_payload(offset: int = 0) -> dict[str, object]:
     return {
         "minhash_signature": [offset + index for index in range(64)],
@@ -1083,6 +1116,43 @@ def test_feedback_bd_axis_bandit_can_be_disabled_for_ablation():
     assert restored.enable_bd_axis_bandit is False
 
 
+def test_feedback_bd_axis_scores_are_cached_by_learning_and_context_revision(monkeypatch):
+    state = FeedbackState()
+    assert state.record(
+        _case(1),
+        "0000000000000001",
+        False,
+        target_keys=["semantic_family:cast_semantics"],
+    )
+    state.last_feedback_parent_index = 0
+    state.record_feedback_outcome_reward("feedback_mutation", 3.0)
+
+    score_calls = 0
+    learning_type = type(state.adaptive_learning)
+    original_score_action = learning_type.score_action
+
+    def tracked_score_action(self, scope, action_id, **kwargs):
+        nonlocal score_calls
+        if scope == "bd_axis_weights":
+            score_calls += 1
+        return original_score_action(self, scope, action_id, **kwargs)
+
+    monkeypatch.setattr(learning_type, "score_action", tracked_score_action)
+
+    first = state._bd_axis_weights_for_seed(0)
+    cold_calls = score_calls
+    assert state._bd_axis_weights_for_seed(0) == first
+    state._record_mutation_seed_pull(0)
+    warm = state._bd_axis_weights_for_seed(0)
+    warm_calls = score_calls
+    state._record_mutation_seed_pull(0)
+    assert state._bd_axis_weights_for_seed(0) == warm
+
+    assert cold_calls > 0
+    assert warm_calls > cold_calls
+    assert score_calls == warm_calls
+
+
 def test_feedback_candidate_reward_updates_parent_and_operator_scores():
     state = FeedbackState()
     state.record(_case(1), "0000000000000001", False)
@@ -1376,6 +1446,92 @@ def test_feedback_seed_energy_is_visible_and_rewards_productive_diverse_seed():
     assert snapshot["frontier_head"][0]["seed_energy"] >= 1
 
 
+def test_feedback_semantic_plan_qd_protects_cold_strata_in_schedule_and_energy(monkeypatch):
+    state = FeedbackState(corpus_mode="semantic_plan_qd")
+    cold = _semantic_plan_case(1, "sort")
+    warm = _semantic_plan_case(2, "hash_join")
+    assert state.record(cold, "0000000000000101", True)
+    assert state.record(warm, "0000000000000102", True)
+    cold_index = state.interesting_cases.index(cold)
+    warm_index = state.interesting_cases.index(warm)
+    monkeypatch.setattr(
+        type(state.seed_budget_allocator),
+        "energy_for_seed",
+        lambda self, index, **kwargs: 4,
+    )
+
+    state._record_mutation_seed_pull(warm_index)
+    state._record_mutation_seed_pull(warm_index)
+    cold_trace = state._case_seed_energy_decision(cold_index)
+    warm_trace = state._case_seed_energy_decision(warm_index)
+    snapshot = state._feedback_decision_snapshot(
+        cold_index,
+        mutation_seed=101,
+        attempt=0,
+        operator_scores={},
+        plan_depth=1,
+    )
+
+    assert cold_trace["cold_debt"] > warm_trace["cold_debt"] == 0
+    assert cold_trace["adjusted_energy"] > warm_trace["adjusted_energy"]
+    assert state._case_seed_schedule_score(cold_index) > state._case_seed_schedule_score(warm_index)
+    assert snapshot["quality_diversity_energy_decision"] == cold_trace
+    assert snapshot["cold_stratum_debt"] == cold_trace["cold_debt"]
+    assert snapshot["energy_audit_floor"] > 0.0
+
+
+def test_feedback_semantic_plan_qd_round_trips_and_rebuilds_on_mode_change():
+    state = FeedbackState(corpus_mode="semantic_plan_qd")
+    case = _semantic_plan_case(3, "aggregate")
+    assert state.record(case, "0000000000000103", True)
+    payload = state.to_state_dict()
+
+    restored = FeedbackState.from_state_dict(
+        payload,
+        persist_to_disk=False,
+        max_persisted=0,
+        max_cases_per_profile=16,
+        source_scheduler=None,
+    )
+    legacy = FeedbackState.from_state_dict(
+        payload,
+        persist_to_disk=False,
+        max_persisted=0,
+        max_cases_per_profile=16,
+        source_scheduler=None,
+        corpus_mode="legacy_qd",
+    )
+
+    assert payload["corpus_mode"] == "semantic_plan_qd"
+    assert restored.corpus_mode == "semantic_plan_qd"
+    assert dict(restored.case_behavioral_descriptors[0]["axis_tuples"])["bd_plan"].startswith("plan:")
+    assert legacy.corpus_mode == "legacy_qd"
+    assert "bd_plan" not in dict(legacy.case_behavioral_descriptors[0]["axis_tuples"])
+
+
+def test_feedback_saturated_family_energy_trace_preserves_audit_opportunity():
+    state = FeedbackState(
+        corpus_mode="semantic_plan_qd",
+        max_cases_per_candidate_family=1,
+    )
+    case = _semantic_plan_case(4, "limit")
+    assert state.record(
+        case,
+        "0000000000000104",
+        True,
+        candidate_bug_families=["root:known-family"],
+    )
+    state._record_mutation_seed_pull(0)
+    state._record_mutation_seed_pull(0)
+
+    trace = state._case_seed_energy_decision(0)
+
+    assert trace["saturated_family"] is True
+    assert trace["saturation_multiplier"] < 1.0
+    assert trace["effective_energy_multiplier"] >= trace["audit_floor"]
+    assert trace["adjusted_energy"] >= 1
+
+
 def test_feedback_seed_energy_tier_scope_learns_energy_multiplier_and_round_trips():
     state = FeedbackState()
     assert state.record(_case(1), "0000000000000001", False)
@@ -1487,6 +1643,52 @@ def test_feedback_select_case_batch_uses_seed_energy(monkeypatch):
     assert state.case_mutation_pulls[0] == 3
 
 
+def test_feedback_seed_energy_batch_reuses_selection_frontier_snapshot(monkeypatch):
+    state = FeedbackState()
+    base = _case(1)
+    assert state.record(base, "0000000000000001", False)
+    monkeypatch.setattr(FeedbackState, "_case_seed_energy", lambda self, index: 3)
+
+    snapshot_calls = 0
+    original_snapshot = FeedbackState._seed_frontier_snapshot
+
+    def tracked_snapshot(self, **kwargs):
+        nonlocal snapshot_calls
+        snapshot_calls += 1
+        return original_snapshot(self, **kwargs)
+
+    def changed_mutation(case, seed, **kwargs):
+        mutated = _case(seed)
+        mutated.case_id = f"{case.case_id}-mut-{seed}"
+        return SimpleNamespace(
+            case=mutated,
+            metadata={
+                "candidate_source": "feedback_mutation",
+                "seed_lineage": {
+                    "root_seed": case.seed,
+                    "parent_seed": case.seed,
+                    "parent_case_id": case.case_id,
+                    "mutation_seed": seed,
+                    "depth": 1,
+                },
+                "mutation": {"operator": "value", "changed": True},
+                "mutation_plan": {"changed": True, "steps": []},
+            },
+        )
+
+    monkeypatch.setattr(FeedbackState, "_seed_frontier_snapshot", tracked_snapshot)
+    monkeypatch.setattr(feedback, "mutate_case_with_metadata", changed_mutation)
+
+    batch = state.select_case_batch(6, _case(9), max_batch=3)
+
+    assert len(batch) == 3
+    assert snapshot_calls == 1
+    assert {
+        metadata["feedback_decision"]["frontier_snapshot_timing"]
+        for metadata in state.last_candidate_batch_metadata
+    } == {"selection"}
+
+
 def test_feedback_select_case_batch_can_disable_seed_energy_batch(monkeypatch):
     state = FeedbackState(enable_seed_energy_batch=False)
     base = _case(1)
@@ -1543,6 +1745,69 @@ def test_feedback_operator_score_snapshot_cools_recently_reused_operator():
     scores = state._mutation_operator_score_snapshot()
 
     assert scores["append_range_filter"] < scores["__untried__"]
+
+
+def test_feedback_operator_learning_bonus_cache_survives_recent_pull(monkeypatch):
+    state = FeedbackState()
+    learning_context = state._mutation_operator_learning_context_features([])
+    state.adaptive_learning.record_outcome(
+        "mutation_operator",
+        "append_range_filter",
+        context_features=learning_context,
+        reward=3.0,
+    )
+    score_calls = 0
+    learning_type = type(state.adaptive_learning)
+    original_score_action = learning_type.score_action
+
+    def tracked_score_action(self, scope, action_id, **kwargs):
+        nonlocal score_calls
+        if scope == "mutation_operator":
+            score_calls += 1
+        return original_score_action(self, scope, action_id, **kwargs)
+
+    monkeypatch.setattr(learning_type, "score_action", tracked_score_action)
+
+    first = state._mutation_operator_score_snapshot()
+    initial_score_calls = score_calls
+    state._record_recent_operator_pull("append_range_filter")
+    second = state._mutation_operator_score_snapshot()
+
+    assert initial_score_calls > 0
+    assert score_calls == initial_score_calls
+    assert second["append_range_filter"] < first["append_range_filter"]
+
+
+def test_feedback_value_catalog_cache_is_not_invalidated_by_recent_operator(monkeypatch):
+    state = FeedbackState()
+    state.adaptive_learning.record_outcome(
+        "value_catalog_entry",
+        "int.zero",
+        context_features=(),
+        reward=3.0,
+    )
+    score_calls = 0
+    learning_type = type(state.adaptive_learning)
+    original_score_action = learning_type.score_action
+
+    def tracked_score_action(self, scope, action_id, **kwargs):
+        nonlocal score_calls
+        if scope == "value_catalog_entry":
+            score_calls += 1
+        return original_score_action(self, scope, action_id, **kwargs)
+
+    monkeypatch.setattr(learning_type, "score_action", tracked_score_action)
+
+    first = state._value_catalog_score_snapshot(target_keys=["semantic_family:numeric_semantics"])
+    initial_score_calls = score_calls
+    state._record_recent_operator_pull("append_range_filter")
+    second = state._value_catalog_score_snapshot(target_keys=["semantic_family:numeric_semantics"])
+    state._invalidate_mutation_score_caches()
+    state._value_catalog_score_snapshot(target_keys=["semantic_family:numeric_semantics"])
+
+    assert initial_score_calls > 0
+    assert second == first
+    assert score_calls == 2 * initial_score_calls
 
 
 def test_feedback_operator_score_snapshot_prefers_target_affine_operator():
@@ -1990,15 +2255,18 @@ def test_feedback_source_scheduler_prefers_productive_mutations():
     assert state.last_source_reward == -0.1
 
     second = state.select_case(8, generated)
-    assert second.case_id.endswith("-mut-8")
+    selected_mutation_seed = state.last_candidate_metadata["seed_lineage"]["mutation_seed"]
+    assert 8 <= selected_mutation_seed <= 12
+    assert second.case_id.endswith(f"-mut-{selected_mutation_seed}")
+    assert second.seed == selected_mutation_seed
     assert state.last_candidate_source == "feedback_mutation"
     assert state.last_candidate_metadata["seed_lineage"]["parent_case_id"] == "case-1"
-    assert state.last_candidate_metadata["seed_lineage"]["mutation_seed"] == 8
     assert state.last_candidate_metadata["seed_lineage"]["depth"] == 1
     assert state.last_candidate_metadata["mutation"]["operator"] in MUTATION_OPERATOR_NAMES
     decision = state.last_candidate_metadata["feedback_decision"]
     assert decision["parent_case_id"] == "case-1"
-    assert decision["mutation_seed"] == 8
+    assert decision["mutation_seed"] == selected_mutation_seed
+    assert decision["attempt"] == selected_mutation_seed - 8
     assert decision["retention_utility"] >= 1.0
     assert decision["schedule_score"] > 0.0
     assert decision["mutation_pulls"] == 1
@@ -2006,6 +2274,8 @@ def test_feedback_source_scheduler_prefers_productive_mutations():
     assert decision["frontier_head"][0]["case_id"] == "case-1"
     assert decision["planned_mutation_depth"] >= 1
     assert decision["selected_operator"] == state.last_candidate_metadata["mutation"]["operator"]
+    assert decision["mutation_plan"]["changed"] is True
+    assert any(step["productive"] for step in decision["mutation_plan"]["steps"])
 
     feedback_reward = state.record_candidate_outcome(
         "feedback_mutation",

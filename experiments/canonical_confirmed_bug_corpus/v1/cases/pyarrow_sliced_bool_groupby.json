@@ -1,0 +1,40 @@
+{
+  "case_id": "canonical-pyarrow-sliced-bool-groupby-001",
+  "seed": 50043,
+  "tables": [
+    {
+      "name": "t0",
+      "columns": [
+        {"name": "g", "type": "int", "nullable": true},
+        {"name": "flag", "type": "bool", "nullable": true}
+      ],
+      "rows": [
+        {"g": 10, "flag": false},
+        {"g": 10, "flag": null}
+      ]
+    }
+  ],
+  "program": {
+    "program_id": "canonical-pyarrow-sliced-bool-groupby-001",
+    "seed": 50043,
+    "operations": [
+      {
+        "op": "groupby",
+        "keys": ["g"],
+        "aggs": [
+          {"column": "flag", "func": "any", "as": "flag_any"},
+          {"column": "flag", "func": "all", "as": "flag_all"}
+        ]
+      }
+    ]
+  },
+  "metadata": {
+    "canonical_root_id": "pyarrow-sliced-bool-hash-aggregate-001",
+    "fault_model": "boolean_value_bitmap_ignores_slice_offset",
+    "native_input_layout": {
+      "prefix_rows": [{"g": 99, "flag": true}],
+      "slice_offset": 1,
+      "control": "zero_offset_rebuild"
+    }
+  }
+}

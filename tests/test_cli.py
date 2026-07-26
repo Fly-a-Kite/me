@@ -7,7 +7,7 @@ import pytest
 from datadiff import cli
 from datadiff.config import DiscoveryBias
 from datadiff.cli import _experiment_target_runs, _preset_config, build_parser
-from datadiff.preset_catalog import build_experiment_config
+from datadiff.preset_catalog import build_experiment_config, catalog_preset_metadata
 from datadiff.preset_catalog import PRESET_CATALOG
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.util import append_jsonl, closed_loop_state_path, dump_json, run_meta_path
@@ -82,6 +82,28 @@ def test_cli_config_parses_exploration_objective_rules():
         "adaptive_consistency"
     ]
     assert config.exploration_objective_rules[0].exact_features == frozenset({"op:join"})
+
+
+def test_cli_separates_live_method_from_registered_research_controls():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "fuzz",
+            "--research-control-arm",
+            "p4_lattice_random_cache_off",
+        ]
+    )
+
+    config = cli._config_from_args(args)
+    manifest = config.method_arm_manifest
+
+    assert config.method_arm == "p4_lattice_random_cache_off"
+    assert manifest["registered"] is True
+    assert manifest["settings"]["node_budget"] == 3.0
+    assert manifest["settings"]["selector_mode"] == "random"
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["fuzz", "--method-arm-overrides", "{}"])
 
 
 def test_cli_semantic_registry_command_emits_json(capsys):
@@ -968,6 +990,7 @@ def test_cli_discovery_campaign_watch_health_stops_remaining_lanes(tmp_path, mon
             "--output-manifest",
             str(manifest_file),
             "--watch-health",
+            "--skip-candidate-pipeline",
         ]
     )
 
@@ -1006,6 +1029,23 @@ def test_cli_discovery_campaign_lists_lanes_as_json(capsys):
     assert catalog["deep_probe_rotation"]["target_suite"] == "latest_all_engines"
     assert catalog["deep_probe_rotation"]["preset"] == "live_deep_probe_rotation_metamorphic"
     assert catalog["arrow_probe_stress"]["default"] is False
+    assert catalog["orthogonal_stress"]["target_suite"] == "latest_all_engines"
+    assert catalog["orthogonal_stress"]["preset"] == "live_orthogonal_stress"
+    assert catalog["chdb_targeted_boundaries"]["target_suite"] == "chdb_olap_cross"
+    assert catalog["chdb_targeted_boundaries"]["preset"] == "live_chdb_targeted_boundaries"
+    assert catalog["pandas_targeted_boundaries"]["target_suite"] == "arrow_cross"
+    assert catalog["polars_targeted_boundaries"]["target_suite"] == "polars_full_cross"
+    assert catalog["datafusion_targeted_boundaries"]["target_suite"] == "datafusion_cross"
+    assert all(
+        catalog[lane]["default"] is False
+        for lane in (
+            "pandas_targeted_boundaries",
+            "polars_targeted_boundaries",
+            "datafusion_targeted_boundaries",
+            "orthogonal_stress",
+            "chdb_targeted_boundaries",
+        )
+    )
 
 
 def test_cli_targets_json_exposes_hidden_methodology_and_extension_contract(capsys):
@@ -2788,6 +2828,29 @@ def test_cli_parses_non_datafusion_live_presets():
     }.issubset(deep_probe.guidance_targets)
 
 
+def test_backend_targeted_boundary_presets_use_fresh_deterministic_rotation_without_mr_noise():
+    expected_profiles = {
+        "live_orthogonal_stress": "orthogonal_stress_rotation",
+        "live_chdb_targeted_boundaries": "orthogonal_stress_rotation",
+        "live_pandas_targeted_boundaries": "pandas_targeted_rotation",
+        "live_polars_targeted_boundaries": "polars_targeted_rotation",
+        "live_datafusion_targeted_boundaries": "datafusion_targeted_rotation",
+    }
+
+    for preset, profile in expected_profiles.items():
+        config = _preset_config(preset)
+        assert config.generator_profile == profile
+        assert config.oracle_mode == "differential"
+        assert config.enable_metamorphic_oracle is False
+        assert config.enable_feedback is False
+        assert config.enable_local_source_scheduler is False
+        assert config.enable_champion_corpus is False
+        assert config.enable_champion_graft_donor_bandit is False
+        assert config.guidance_candidate_pool == 1
+        assert config.local_source_exploration_weight == 0.0
+        assert config.candidate_recheck_count == 3
+
+
 def test_discovery_campaign_config_can_merge_lane_discovery_biases():
     parser = build_parser()
     args = parser.parse_args(["discovery-campaign", "--lanes", "datafusion_optimizer"])
@@ -3786,6 +3849,25 @@ def test_cli_experiment_parses_auto_jobs_and_parallel_cost():
     assert args.max_parallel_cost == 9.5
 
 
+def test_cli_experiment_parses_persistent_worker_lifecycle_flags():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "experiment",
+            "--worker-batch-size",
+            "8",
+            "--worker-max-rss-mib",
+            "3072",
+            "--worker-retry-limit",
+            "2",
+        ]
+    )
+
+    assert args.worker_batch_size == 8
+    assert args.worker_max_rss_mib == 3072
+    assert args.worker_retry_limit == 2
+
+
 def test_cli_experiment_parses_adaptive_schedule_flags():
     parser = build_parser()
     args = parser.parse_args(
@@ -3863,12 +3945,267 @@ def test_cli_fuzz_can_disable_parallel_backend_execution():
     assert config.enable_parallel_backend_execution is False
 
 
+def test_cli_fuzz_defaults_to_sequential_and_can_enable_parallel_ablation():
+    parser = build_parser()
+
+    default = cli._config_from_args(parser.parse_args(["fuzz"]))
+    parallel = cli._config_from_args(
+        parser.parse_args(["fuzz", "--enable-parallel-backend-execution"])
+    )
+
+    assert default.enable_parallel_backend_execution is False
+    assert parallel.enable_parallel_backend_execution is True
+
+
+def test_cli_fuzz_can_disable_backend_session_reuse():
+    parser = build_parser()
+    args = parser.parse_args(["fuzz", "--disable-backend-session-reuse"])
+    config = cli._config_from_args(args)
+
+    assert args.disable_backend_session_reuse is True
+    assert config.enable_backend_session_reuse is False
+
+
 def test_cli_experiment_parses_parallel_backend_execution_ablation_flag():
     parser = build_parser()
     args = parser.parse_args(["experiment", "--disable-parallel-backend-execution"])
 
     assert args.cmd == "experiment"
     assert args.disable_parallel_backend_execution is True
+
+    enabled = parser.parse_args(
+        ["experiment", "--enable-parallel-backend-execution"]
+    )
+    assert enabled.enable_parallel_backend_execution is True
+
+
+def test_cli_fuzz_configures_coverage_aware_backend_sampling():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "fuzz",
+            "--enable-backend-sampling",
+            "--backend-sample-size",
+            "4",
+            "--backend-full-sweep-interval",
+            "0",
+            "--backend-sampling-calibration-cases",
+            "0",
+            "--backend-sampling-candidate-burst-cases",
+            "5",
+            "--backend-sampling-candidate-burst-novel-only",
+            "--backend-sample-confirmation-recheck-count",
+            "1",
+            "--no-backend-sample-confirm-candidates",
+        ]
+    )
+    config = cli._config_from_args(args)
+
+    assert config.enable_backend_sampling is True
+    assert config.backend_sample_size == 4
+    assert config.backend_full_sweep_interval == 0
+    assert config.backend_sampling_calibration_cases == 0
+    assert config.backend_sampling_candidate_burst_cases == 5
+    assert config.backend_sampling_candidate_burst_novel_only is True
+    assert config.backend_sample_confirmation_recheck_count == 1
+    assert config.backend_sample_confirm_candidates is False
+
+
+def test_cli_discovery_and_experiment_expose_backend_sampling_flags():
+    parser = build_parser()
+    discovery = parser.parse_args(
+        [
+            "discovery-run",
+            "--enable-backend-sampling",
+            "--backend-sample-size",
+            "3",
+            "--backend-sampling-candidate-burst-novel-only",
+        ]
+    )
+    experiment = parser.parse_args(
+        [
+            "experiment",
+            "--enable-backend-sampling",
+            "--backend-full-sweep-interval",
+            "8",
+            "--backend-sampling-candidate-burst-any",
+        ]
+    )
+
+    assert discovery.enable_backend_sampling is True
+    assert discovery.backend_sample_size == 3
+    assert discovery.backend_sampling_candidate_burst_novel_only is True
+    assert experiment.enable_backend_sampling is True
+    assert experiment.backend_full_sweep_interval == 8
+    assert experiment.backend_sampling_candidate_burst_novel_only is False
+
+
+def test_cli_configures_adaptive_candidate_pool_controls():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "fuzz",
+            "--strategy",
+            "guided",
+            "--candidate-pool",
+            "8",
+            "--enable-adaptive-candidate-pool",
+            "--adaptive-candidate-pool-min-size",
+            "3",
+            "--adaptive-candidate-pool-full-sweep-interval",
+            "10",
+            "--adaptive-candidate-pool-calibration-cases",
+            "6",
+            "--adaptive-candidate-pool-candidate-burst-cases",
+            "5",
+            "--adaptive-candidate-pool-candidate-burst-novel-only",
+            "--preserve-adaptive-candidate-seed-stride",
+            "--compensate-adaptive-candidate-seed-horizon",
+        ]
+    )
+
+    config = cli._config_from_args(args)
+
+    assert config.enable_adaptive_candidate_pool is True
+    assert config.adaptive_candidate_pool_min_size == 3
+    assert config.adaptive_candidate_pool_full_sweep_interval == 10
+    assert config.adaptive_candidate_pool_calibration_cases == 6
+    assert config.adaptive_candidate_pool_candidate_burst_cases == 5
+    assert config.adaptive_candidate_pool_candidate_burst_novel_only is True
+    assert config.adaptive_candidate_pool_preserve_seed_stride is True
+    assert config.adaptive_candidate_pool_compensate_seed_horizon is True
+
+
+def test_cli_discovery_and_experiment_expose_adaptive_candidate_pool_flags():
+    parser = build_parser()
+    discovery = parser.parse_args(
+        [
+            "discovery-run",
+            "--enable-adaptive-candidate-pool",
+            "--adaptive-candidate-pool-min-size",
+            "4",
+            "--preserve-adaptive-candidate-seed-stride",
+            "--adaptive-candidate-pool-candidate-burst-novel-only",
+            "--compensate-adaptive-candidate-seed-horizon",
+        ]
+    )
+    experiment = parser.parse_args(
+        [
+            "experiment",
+            "--enable-adaptive-candidate-pool",
+            "--adaptive-candidate-pool-full-sweep-interval",
+            "9",
+            "--adaptive-candidate-pool-candidate-burst-any",
+        ]
+    )
+
+    assert discovery.enable_adaptive_candidate_pool is True
+    assert discovery.adaptive_candidate_pool_min_size == 4
+    assert discovery.adaptive_candidate_pool_preserve_seed_stride is True
+    assert discovery.adaptive_candidate_pool_candidate_burst_novel_only is True
+    assert discovery.adaptive_candidate_pool_compensate_seed_horizon is True
+    assert experiment.enable_adaptive_candidate_pool is True
+    assert experiment.adaptive_candidate_pool_full_sweep_interval == 9
+    assert experiment.adaptive_candidate_pool_candidate_burst_novel_only is False
+
+
+def test_discovery_run_applies_adaptive_candidate_pool_overrides():
+    parser = build_parser()
+    enabled_args = parser.parse_args(
+        [
+            "discovery-run",
+            "--preset",
+            "coverage_throughput_metamorphic",
+            "--enable-adaptive-candidate-pool",
+            "--adaptive-candidate-pool-min-size",
+            "3",
+        ]
+    )
+    disabled_args = parser.parse_args(
+        [
+            "discovery-run",
+            "--preset",
+            "coverage_throughput_metamorphic_adaptive_pool",
+            "--disable-adaptive-candidate-pool",
+        ]
+    )
+
+    enabled = cli._discovery_run_config_from_args(enabled_args)
+    disabled = cli._discovery_run_config_from_args(disabled_args)
+
+    assert enabled.enable_adaptive_candidate_pool is True
+    assert enabled.adaptive_candidate_pool_min_size == 3
+    assert disabled.enable_adaptive_candidate_pool is False
+
+
+def test_coverage_throughput_presets_are_target_independent():
+    base = _preset_config("coverage_throughput")
+    metamorphic = _preset_config("coverage_throughput_metamorphic")
+    adaptive = _preset_config("coverage_throughput_adaptive_pool")
+    adaptive_metamorphic = _preset_config(
+        "coverage_throughput_metamorphic_adaptive_pool"
+    )
+    adaptive_metamorphic_stride = _preset_config(
+        "coverage_throughput_metamorphic_adaptive_pool_stride"
+    )
+    adaptive_metamorphic_stride_recheck1 = _preset_config(
+        "coverage_throughput_metamorphic_adaptive_pool_stride_confirmation_recheck1"
+    )
+    adaptive_metamorphic_novel_bursts = _preset_config(
+        "coverage_throughput_metamorphic_adaptive_pool_novel_bursts"
+    )
+    adaptive_metamorphic_novel_bursts_horizon = _preset_config(
+        "coverage_throughput_metamorphic_adaptive_pool_novel_bursts_horizon"
+    )
+    novel_burst_metadata = catalog_preset_metadata(
+        "coverage_throughput_metamorphic_adaptive_pool_novel_bursts"
+    )
+
+    assert base.enable_backend_sampling is True
+    assert base.backend_sample_size == 3
+    assert base.backend_full_sweep_interval == 12
+    assert base.backend_sample_confirm_candidates is True
+    assert base.backend_sampling_calibration_cases == 8
+    assert base.backend_sampling_candidate_burst_cases == 8
+    assert metamorphic.enable_backend_sampling is True
+    assert metamorphic.enable_metamorphic_oracle is True
+    assert metamorphic.metamorphic_variant_limit == 1
+    assert base.enable_adaptive_candidate_pool is False
+    assert adaptive.enable_adaptive_candidate_pool is True
+    assert adaptive.adaptive_candidate_pool_min_size == 4
+    assert adaptive.adaptive_candidate_pool_full_sweep_interval == 12
+    assert adaptive.adaptive_candidate_pool_calibration_cases == 8
+    assert adaptive.adaptive_candidate_pool_candidate_burst_cases == 8
+    assert adaptive_metamorphic.enable_backend_sampling is True
+    assert adaptive_metamorphic.enable_adaptive_candidate_pool is True
+    assert adaptive_metamorphic.enable_metamorphic_oracle is True
+    assert adaptive_metamorphic.metamorphic_variant_limit == 1
+    assert adaptive_metamorphic.adaptive_candidate_pool_preserve_seed_stride is False
+    assert adaptive_metamorphic_stride.enable_adaptive_candidate_pool is True
+    assert adaptive_metamorphic_stride.adaptive_candidate_pool_preserve_seed_stride is True
+    assert adaptive_metamorphic_stride_recheck1.backend_sample_confirmation_recheck_count == 1
+    assert adaptive_metamorphic_stride_recheck1.candidate_recheck_count == 2
+    assert adaptive_metamorphic_novel_bursts.enable_adaptive_candidate_pool is True
+    assert adaptive_metamorphic_novel_bursts.adaptive_candidate_pool_preserve_seed_stride is True
+    assert adaptive_metamorphic_novel_bursts.backend_sample_confirmation_recheck_count == 1
+    assert adaptive_metamorphic_novel_bursts.backend_sampling_candidate_burst_novel_only is True
+    assert (
+        adaptive_metamorphic_novel_bursts.adaptive_candidate_pool_candidate_burst_novel_only
+        is True
+    )
+    assert novel_burst_metadata["backend_sampling_candidate_burst_novel_only"] is True
+    assert (
+        novel_burst_metadata[
+            "adaptive_candidate_pool_candidate_burst_novel_only"
+        ]
+        is True
+    )
+    assert "novel_candidate_bursts" in novel_burst_metadata["methodology_tags"]
+    assert adaptive_metamorphic_novel_bursts_horizon.adaptive_candidate_pool_preserve_seed_stride
+    assert (
+        adaptive_metamorphic_novel_bursts_horizon.adaptive_candidate_pool_compensate_seed_horizon
+        is True
+    )
 
 
 def test_cli_experiment_parses_adaptive_component_ablation_flags():
@@ -4010,6 +4347,27 @@ def test_run_experiment_job_propagates_local_source_scheduler(monkeypatch):
     assert captured["checkpoint_interval_s"] == 60.0
     assert captured["progress_interval_s"] == 60.0
     assert result["run"]["run_file"] == "runs/fake.jsonl"
+
+
+def test_run_experiment_job_restores_native_thread_limits(monkeypatch):
+    names = cli._experiment_runtime.NATIVE_THREAD_LIMIT_ENV_NAMES
+    monkeypatch.setenv(names[0], "sentinel")
+    monkeypatch.delenv(names[1], raising=False)
+    before = {name: os.environ.get(name) for name in names}
+
+    def fake_run_experiment_job(job, *, apply_native_thread_limits_func, **kwargs):
+        apply_native_thread_limits_func(4)
+        assert {os.environ.get(name) for name in names} == {"4"}
+        return {"status": "ok"}
+
+    monkeypatch.setattr(
+        cli._experiment_runtime,
+        "run_experiment_job",
+        fake_run_experiment_job,
+    )
+
+    assert cli._run_experiment_job({"worker_thread_limit": 4}) == {"status": "ok"}
+    assert {name: os.environ.get(name) for name in names} == before
 
 
 def test_run_experiment_job_can_persist_closed_loop_state(monkeypatch):
@@ -5229,6 +5587,77 @@ def test_experiment_parallelism_auto_uses_bounded_workers(monkeypatch):
     assert parallelism["bounded_submission"] is True
     assert parallelism["cost_limited"] is True
     assert parallelism["worker_thread_limit"] == 4
+
+
+def test_cli_static_experiment_records_bounded_worker_batch_manifest(
+    tmp_path,
+    monkeypatch,
+):
+    from concurrent.futures import ThreadPoolExecutor
+
+    runs_dir = tmp_path / "runs"
+    runs_dir.mkdir(parents=True)
+    monkeypatch.setattr(cli, "RUNS_DIR", runs_dir)
+    monkeypatch.setattr(cli, "ProcessPoolExecutor", ThreadPoolExecutor)
+
+    def fake_run_fuzz(*, cases, seed, backends, config, duration_s, **kwargs):
+        run_file = runs_dir / f"run-{seed}.jsonl"
+        append_jsonl(
+            {
+                "case": {"case_id": f"case-{seed}", "seed": seed},
+                "is_new_behavior": False,
+                "findings": [],
+            },
+            run_file,
+        )
+        run_meta_path(run_file).write_text(
+            json.dumps(
+                {
+                    "elapsed_s": 0.1,
+                    "throughput_cases_s": 10.0,
+                    "next_seed": seed + cases,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return run_file
+
+    monkeypatch.setattr(cli, "run_fuzz", fake_run_fuzz)
+    monkeypatch.setattr(cli, "write_report", lambda run_file: (Path(""), Path("")))
+
+    args = build_parser().parse_args(
+        [
+            "experiment",
+            "--target-suites",
+            "core",
+            "--presets",
+            "baseline",
+            "--seeds",
+            "1,2,3,4",
+            "--cases",
+            "1",
+            "--jobs",
+            "2",
+            "--worker-batch-size",
+            "2",
+            "--worker-max-rss-mib",
+            "0",
+            "--skip-run-reports",
+            "--skip-paper-journal",
+        ]
+    )
+
+    assert args.func(args) == 0
+    manifest = json.loads(
+        sorted(runs_dir.glob("experiment-*.json"))[0].read_text(encoding="utf-8")
+    )
+    batching = manifest["worker_batching"]
+    assert batching["enabled"] is True
+    assert batching["effective_batch_size"] == 2
+    assert batching["summary"]["completed_run_count"] == 4
+    assert batching["summary"]["event_count"] == 2
+    assert batching["summary"]["replay_count"] == 0
+    assert sorted(run["seed"] for run in manifest["runs"]) == [1, 2, 3, 4]
 
 
 def test_cli_experiment_adaptive_scheduler_reuses_budget_on_high_yield_arm(tmp_path, monkeypatch, capsys):

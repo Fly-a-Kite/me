@@ -85,6 +85,7 @@ def test_restore_closed_loop_state_uses_saved_scheduler_and_injected_state_class
     _reset_fakes()
     champion_registry = object()
     config = ExperimentConfig(
+        method_arm="p5_quality_diversity",
         enable_local_source_scheduler=True,
         enable_operator_swarm=False,
         enable_ir_rewrite_mutations=False,
@@ -134,6 +135,7 @@ def test_restore_closed_loop_state_uses_saved_scheduler_and_injected_state_class
     assert FakeScheduler.restored_calls[0]["data"]["total_pulls"] == 3
     assert FakeScheduler.restored_calls[0]["kwargs"]["exploration_weight"] == 0.25
     assert FakeFeedbackState.restored_calls[0]["kwargs"]["source_scheduler"] is feedback.source_scheduler
+    assert FakeFeedbackState.restored_calls[0]["kwargs"]["corpus_mode"] == "semantic_plan_qd"
     assert FakeFeedbackState.restored_calls[0]["kwargs"]["enable_quality_archive"] is True
     assert FakeFeedbackState.restored_calls[0]["kwargs"]["enable_operator_swarm"] is False
     assert FakeFeedbackState.restored_calls[0]["kwargs"]["enable_ir_rewrite_mutations"] is False

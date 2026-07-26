@@ -1,3 +1,5 @@
+import re
+
 from datadiff.case_policy import case_discovery_origin, replay_bug_filter_reason
 from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES
 from datadiff.datagen import COMMON_API_WORKFLOW_TEMPLATES, generate_case, generate_program, repair_operations
@@ -7,6 +9,8 @@ from datadiff.dsl import Case, ColumnSpec, Program, TableData, sort_columns
 from datadiff.guidance import extract_case_features
 from datadiff.identifiers import is_reserved_output_name, make_safe_output_name
 from datadiff.join_keys import join_key_columns
+from datadiff.operation_semantics import condition_cmp
+from datadiff.preflight import preflight_case
 from datadiff.synthesis.lhs_sampler import SchemaSpec
 
 
@@ -842,6 +846,700 @@ def test_generate_case_pyarrow_groupby_filter_cast_membership_profile_is_support
     assert validate_case_program(case) == []
 
 
+def test_generate_case_boundary_combo_profiles_are_supported_and_valid():
+    expected = {
+        "case_when_join_key_membership": [
+            "mutate",
+            "mutate",
+            "join",
+            "case_when",
+            "groupby",
+            "sort",
+            "limit",
+        ],
+        "coalesce_union_distinct_type_boundary": [
+            "union_all",
+            "coalesce",
+            "fill_null",
+            "case_when",
+            "distinct",
+            "groupby",
+            "sort",
+            "limit",
+        ],
+        "multi_key_anti_join_null_guard": [
+            "filter",
+            "filter",
+            "anti_join",
+            "case_when",
+            "groupby",
+            "sort",
+        ],
+        "empty_then_union_groupby": [
+            "filter",
+            "union_all",
+            "fill_null",
+            "fill_null",
+            "groupby",
+            "sort",
+            "limit",
+        ],
+        "boolean_coalesce_case_membership": [
+            "join",
+            "coalesce",
+            "semi_join",
+            "case_when",
+            "groupby",
+            "sort",
+        ],
+        "numeric_text_cast_membership_aggregation": [
+            "mutate",
+            "filter",
+            "semi_join",
+            "case_when",
+            "groupby",
+            "sort",
+        ],
+        "string_token_join_distinct": [
+            "mutate",
+            "mutate",
+            "mutate",
+            "filter",
+            "join",
+            "case_when",
+            "distinct",
+            "sort",
+            "limit",
+        ],
+        "date_part_row_number_union": [
+            "union_all",
+            "mutate",
+            "mutate",
+            "mutate",
+            "filter",
+            "row_number_filter",
+            "sort",
+            "select",
+        ],
+        "post_groupby_join_global_aggregate": [
+            "groupby",
+            "filter",
+            "join",
+            "filter",
+            "aggregate",
+            "sort",
+        ],
+        "distinct_anti_join_case_topk": [
+            "distinct",
+            "filter",
+            "anti_join",
+            "case_when",
+            "sort",
+            "limit",
+        ],
+        "coalesce_row_number_topk": [
+            "filter",
+            "coalesce",
+            "row_number_filter",
+            "sort",
+            "select",
+        ],
+        "union_distinct_anti_running_sum": [
+            "union_all",
+            "distinct",
+            "filter",
+            "anti_join",
+            "case_when",
+            "running_sum",
+            "sort",
+            "select",
+        ],
+        "null_case_semi_join_groupby": [
+            "coalesce",
+            "case_when",
+            "semi_join",
+            "fill_null",
+            "groupby",
+            "sort",
+        ],
+        "date_string_cast_row_number": [
+            "mutate",
+            "mutate",
+            "mutate",
+            "mutate",
+            "filter",
+            "row_number_filter",
+            "sort",
+            "select",
+        ],
+        "drop_nulls_coalesce_distinct_join_topk": [
+            "coalesce",
+            "drop_nulls",
+            "distinct",
+            "join",
+            "select",
+            "drop_nulls",
+            "fill_null",
+            "case_when",
+            "sort",
+            "limit",
+        ],
+        "date_part_distinct_offset": [
+            "union_all",
+            "mutate",
+            "mutate",
+            "filter",
+            "fill_null",
+            "distinct",
+            "sort",
+            "offset",
+            "limit",
+        ],
+        "bool_fill_null_membership_row_number": [
+            "fill_null",
+            "fill_null",
+            "case_when",
+            "semi_join",
+            "row_number_filter",
+            "groupby",
+            "sort",
+        ],
+        "string_numeric_cast_anti_join_aggregate": [
+            "mutate",
+            "mutate",
+            "mutate",
+            "filter",
+            "filter",
+            "anti_join",
+            "groupby",
+            "sort",
+        ],
+        "post_aggregate_case_membership": [
+            "groupby",
+            "filter",
+            "case_when",
+            "semi_join",
+            "aggregate",
+            "sort",
+        ],
+        "multi_key_nullable_membership_window": [
+            "coalesce",
+            "fill_null",
+            "fill_null",
+            "case_when",
+            "semi_join",
+            "row_number_filter",
+            "groupby",
+            "sort",
+        ],
+        "string_empty_pattern_membership_distinct": [
+            "mutate",
+            "mutate",
+            "mutate",
+            "mutate",
+            "coalesce",
+            "mutate",
+            "case_when",
+            "semi_join",
+            "fill_null",
+            "distinct",
+            "sort",
+            "limit",
+        ],
+        "date_cast_union_running_sum_topk": [
+            "union_all",
+            "mutate",
+            "mutate",
+            "mutate",
+            "fill_null",
+            "fill_null",
+            "distinct",
+            "filter",
+            "running_sum",
+            "row_number_filter",
+            "sort",
+            "select",
+        ],
+        "coalesce_anti_join_union_topk": [
+            "union_all",
+            "coalesce",
+            "fill_null",
+            "fill_null",
+            "case_when",
+            "anti_join",
+            "distinct",
+            "sort",
+            "limit",
+        ],
+        "bool_null_distinct_running_sum": [
+            "fill_null",
+            "case_when",
+            "distinct",
+            "running_sum",
+            "row_number_filter",
+            "sort",
+        ],
+        "date_string_membership_offset_window": [
+            "mutate",
+            "mutate",
+            "mutate",
+            "mutate",
+            "coalesce",
+            "mutate",
+            "fill_null",
+            "semi_join",
+            "row_number_filter",
+            "sort",
+            "offset",
+            "limit",
+        ],
+        "empty_union_window_aggregate": [
+            "filter",
+            "union_all",
+            "fill_null",
+            "fill_null",
+            "running_sum",
+            "row_number_filter",
+            "groupby",
+            "sort",
+        ],
+        "duplicate_key_join_distinct_anti_topk": [
+            "coalesce",
+            "fill_null",
+            "fill_null",
+            "join",
+            "case_when",
+            "distinct",
+            "anti_join",
+            "sort",
+            "limit",
+        ],
+        "large_int_text_membership_window": [
+            "mutate",
+            "filter",
+            "semi_join",
+            "fill_null",
+            "fill_null",
+            "case_when",
+            "running_sum",
+            "sort",
+            "limit",
+        ],
+        "nested_topk_offset_aggregate": [
+            "fill_null",
+            "sort",
+            "limit",
+            "offset",
+            "sort",
+            "limit",
+            "groupby",
+            "sort",
+        ],
+        "union_distinct_empty_string_window": [
+            "union_all",
+            "union_all",
+            "mutate",
+            "mutate",
+            "mutate",
+            "coalesce",
+            "fill_null",
+            "distinct",
+            "running_sum",
+            "row_number_filter",
+            "sort",
+        ],
+        "multi_key_semi_join_window_aggregate": [
+            "mutate",
+            "coalesce",
+            "fill_null",
+            "fill_null",
+            "semi_join",
+            "distinct",
+            "row_number_filter",
+            "groupby",
+            "sort",
+        ],
+        "string_contains_anti_join_offset": [
+            "mutate",
+            "mutate",
+            "mutate",
+            "fill_null",
+            "fill_null",
+            "anti_join",
+            "case_when",
+            "sort",
+            "offset",
+            "limit",
+        ],
+        "bool_case_distinct_groupby_union": [
+            "union_all",
+            "case_when",
+            "fill_null",
+            "fill_null",
+            "distinct",
+            "groupby",
+            "sort",
+        ],
+        "left_join_filter_distinct_window": [
+            "mutate",
+            "coalesce",
+            "join",
+            "filter",
+            "fill_null",
+            "fill_null",
+            "distinct",
+            "running_sum",
+            "row_number_filter",
+            "sort",
+        ],
+        "cast_groupby_membership": [
+            "mutate",
+            "mutate",
+            "filter",
+            "semi_join",
+            "fill_null",
+            "fill_null",
+            "case_when",
+            "groupby",
+            "sort",
+        ],
+        "null_sort_window_union": [
+            "union_all",
+            "fill_null",
+            "sort",
+            "offset",
+            "running_sum",
+            "row_number_filter",
+            "groupby",
+            "sort",
+        ],
+        "date_part_membership_distinct_join": [
+            "mutate",
+            "mutate",
+            "filter",
+            "semi_join",
+            "coalesce",
+            "distinct",
+            "join",
+            "fill_null",
+            "groupby",
+            "sort",
+        ],
+        "coalesce_case_anti_join_aggregate": [
+            "mutate",
+            "coalesce",
+            "fill_null",
+            "fill_null",
+            "case_when",
+            "anti_join",
+            "distinct",
+            "groupby",
+            "sort",
+        ],
+        "string_token_transform_join_window": [
+            "mutate",
+            "mutate",
+            "mutate",
+            "mutate",
+            "mutate",
+            "fill_null",
+            "semi_join",
+            "fill_null",
+            "distinct",
+            "running_sum",
+            "sort",
+            "limit",
+        ],
+        "prefix_suffix_bool_membership": [
+            "mutate",
+            "mutate",
+            "mutate",
+            "fill_null",
+            "fill_null",
+            "anti_join",
+            "case_when",
+            "row_number_filter",
+            "groupby",
+            "sort",
+        ],
+        "numeric_clip_division_anti_window": [
+            "fill_null",
+            "fill_null",
+            "fill_null",
+            "mutate",
+            "mutate",
+            "case_when",
+            "anti_join",
+            "running_sum",
+            "sort",
+            "limit",
+        ],
+        "bool_not_union_distinct_aggregate": [
+            "union_all",
+            "fill_null",
+            "mutate",
+            "case_when",
+            "fill_null",
+            "fill_null",
+            "distinct",
+            "row_number_filter",
+            "groupby",
+            "sort",
+        ],
+        "outer_join_coalesce_distinct_topk": [
+            "mutate",
+            "mutate",
+            "mutate",
+            "coalesce",
+            "join",
+            "fill_null",
+            "fill_null",
+            "case_when",
+            "distinct",
+            "groupby",
+            "sort",
+            "limit",
+        ],
+        "chained_string_cleanup_membership_window": [
+            "mutate",
+            "mutate",
+            "mutate",
+            "mutate",
+            "mutate",
+            "fill_null",
+            "fill_null",
+            "case_when",
+            "semi_join",
+            "row_number_filter",
+            "sort",
+            "offset",
+        ],
+        "cast_date_union_anti_running": [
+            "union_all",
+            "mutate",
+            "mutate",
+            "mutate",
+            "fill_null",
+            "fill_null",
+            "fill_null",
+            "case_when",
+            "anti_join",
+            "running_sum",
+            "sort",
+            "limit",
+        ],
+        "post_groupby_filter_membership_topk": [
+            "fill_null",
+            "fill_null",
+            "groupby",
+            "filter",
+            "case_when",
+            "semi_join",
+            "sort",
+            "limit",
+        ],
+        "duplicate_key_left_join_window_aggregate": [
+            "mutate",
+            "coalesce",
+            "join",
+            "fill_null",
+            "fill_null",
+            "mutate",
+            "running_sum",
+            "row_number_filter",
+            "groupby",
+            "sort",
+        ],
+    }
+
+    for profile, operation_sequence in expected.items():
+        case = generate_case(124, profile=profile)
+        features = extract_case_features(case)
+
+        assert case.case_id.endswith(f"-{profile.replace('_', '-')}")
+        assert [op["op"] for op in case.program.operations] == operation_sequence
+        assert case.metadata["generator_profile"] == profile
+        assert "source_issue" not in case.metadata
+        assert f"pattern:{profile}" in features
+        assert validate_case_program(case) == []
+
+    multi_key = generate_case(124, profile="multi_key_anti_join_null_guard").program.operations[2]
+    assert multi_key["left_on"] == ["k1", "k2"]
+    assert multi_key["right_on"] == ["rk1", "rk2"]
+
+    running = generate_case(124, profile="union_distinct_anti_running_sum").program.operations[5]
+    assert running["partition_by"] == ["grp"]
+    assert [key["column"] for key in running["order_by"]] == ["seq", "sample_id"]
+
+    date_offset = generate_case(124, profile="date_part_distinct_offset").program.operations[7]
+    assert date_offset["op"] == "offset"
+    assert date_offset["n"] == 124 % 3
+
+    nullable_multi_key = generate_case(124, profile="multi_key_nullable_membership_window").program.operations[4]
+    assert nullable_multi_key["left_on"] == ["k1_norm", "k2"]
+    assert nullable_multi_key["right_on"] == ["k1_norm", "k2_norm"]
+
+    string_pattern = generate_case(124, profile="string_empty_pattern_membership_distinct").program.operations[5]
+    assert string_pattern["expr"]["kind"] == "string_contains"
+
+    date_running = generate_case(124, profile="date_cast_union_running_sum_topk").program.operations[8]
+    assert date_running["source"] == "amount_i"
+    assert date_running["partition_by"] == ["account"]
+    assert [key["column"] for key in date_running["order_by"]] == ["dt_year", "dt_month", "seq"]
+
+    coalesced_anti = generate_case(124, profile="coalesce_anti_join_union_topk").program.operations[5]
+    assert coalesced_anti["left_on"] == ["k_norm", "bucket"]
+    assert coalesced_anti["right_on"] == ["k_norm", "bucket_norm"]
+
+    bool_running = generate_case(124, profile="bool_null_distinct_running_sum").program.operations[3]
+    assert bool_running["source"] == "x"
+    assert bool_running["partition_by"] == ["grp", "truth_bucket"]
+
+    date_string = generate_case(124, profile="date_string_membership_offset_window").program.operations[7]
+    assert date_string["left_on"] == ["key_norm", "year"]
+    assert date_string["right_on"] == ["key_norm", "year"]
+
+    empty_union_running = generate_case(124, profile="empty_union_window_aggregate").program.operations[4]
+    assert empty_union_running["source"] == "amount"
+    assert empty_union_running["partition_by"] == ["grp"]
+
+    duplicate_join = generate_case(124, profile="duplicate_key_join_distinct_anti_topk").program.operations[3]
+    assert duplicate_join["how"] == "left"
+    duplicate_anti = generate_case(124, profile="duplicate_key_join_distinct_anti_topk").program.operations[6]
+    assert duplicate_anti["left_on"] == ["key_norm", "bucket"]
+    assert duplicate_anti["right_on"] == ["key_norm", "bucket_norm"]
+
+    large_int_cast = generate_case(124, profile="large_int_text_membership_window").program.operations[0]
+    assert large_int_cast["expr"]["input_domain"] == "integer_string"
+    large_int_running = generate_case(124, profile="large_int_text_membership_window").program.operations[6]
+    assert large_int_running["partition_by"] == ["acct", "magnitude_bucket"]
+
+    nested_offset = generate_case(124, profile="nested_topk_offset_aggregate").program.operations[3]
+    assert nested_offset["op"] == "offset"
+    assert nested_offset["n"] == 124 % 3
+
+    union_empty_running = generate_case(124, profile="union_distinct_empty_string_window").program.operations[8]
+    assert union_empty_running["source"] == "amount"
+    assert union_empty_running["partition_by"] == ["key_norm"]
+
+    multi_key_semi = generate_case(124, profile="multi_key_semi_join_window_aggregate").program.operations[4]
+    assert multi_key_semi["left_on"] == ["k1_norm", "k2"]
+    assert multi_key_semi["right_on"] == ["k1_norm", "k2_norm"]
+
+    string_contains_anti = generate_case(124, profile="string_contains_anti_join_offset").program.operations[5]
+    assert string_contains_anti["left_on"] == ["has_csv", "bucket"]
+    assert string_contains_anti["right_on"] == ["has_csv", "bucket_norm"]
+    string_contains_offset = generate_case(124, profile="string_contains_anti_join_offset").program.operations[8]
+    assert string_contains_offset["n"] == 124 % 2
+
+    bool_case_groupby = generate_case(124, profile="bool_case_distinct_groupby_union").program.operations[5]
+    assert bool_case_groupby["keys"] == ["grp", "flag_bucket"]
+
+    left_join_window = generate_case(124, profile="left_join_filter_distinct_window").program.operations[2]
+    assert left_join_window["how"] == "left"
+
+    cast_membership = generate_case(124, profile="cast_groupby_membership").program.operations[3]
+    assert cast_membership["left_on"] == "num_value"
+
+    null_sort_offset = generate_case(124, profile="null_sort_window_union").program.operations[3]
+    assert null_sort_offset["n"] == 124 % 3
+
+    date_membership = generate_case(124, profile="date_part_membership_distinct_join").program.operations[3]
+    assert date_membership["left_on"] == ["year", "month"]
+
+    coalesced_case_anti = generate_case(124, profile="coalesce_case_anti_join_aggregate").program.operations[5]
+    assert coalesced_case_anti["left_on"] == ["key_norm", "bucket", "band"]
+
+    token_transform = generate_case(124, profile="string_token_transform_join_window").program.operations[6]
+    assert token_transform["left_on"] == ["token", "bucket"]
+
+    prefix_suffix = generate_case(124, profile="prefix_suffix_bool_membership").program.operations[5]
+    assert prefix_suffix["left_on"] == ["starts_tmp", "ends_csv", "bucket"]
+
+    numeric_clip = generate_case(124, profile="numeric_clip_division_anti_window").program.operations[3]
+    assert numeric_clip["expr"]["kind"] == "clip"
+
+    bool_not = generate_case(124, profile="bool_not_union_distinct_aggregate").program.operations[2]
+    assert bool_not["expr"]["kind"] == "bool_not"
+
+    outer_join = generate_case(124, profile="outer_join_coalesce_distinct_topk").program.operations[4]
+    assert outer_join["how"] == "left"
+
+    chained_string = generate_case(124, profile="chained_string_cleanup_membership_window").program.operations[8]
+    assert chained_string["left_on"] == ["prefix_key", "is_csv", "bucket"]
+
+    cast_date_anti = generate_case(124, profile="cast_date_union_anti_running").program.operations[8]
+    assert cast_date_anti["left_on"] == ["acct", "year", "band"]
+    cast_date_case = generate_case(124, profile="cast_date_union_anti_running")
+    cast_date_amount_values = [
+        row["amount_s"]
+        for table in cast_date_case.tables
+        if table.name in {"t0", "t_v11_cast_date_append"}
+        for row in table.rows
+    ]
+    assert all(value is None or re.fullmatch(r"-?\d+", value) for value in cast_date_amount_values)
+    cast_date_values = [
+        row["dt"]
+        for table in cast_date_case.tables
+        if table.name in {"t0", "t_v11_cast_date_append"}
+        for row in table.rows
+    ]
+    assert all(value is None or re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) for value in cast_date_values)
+    cast_date_running = cast_date_case.program.operations[9]
+    assert cast_date_running["partition_by"] == ["acct", "band"]
+
+    post_group_membership = generate_case(124, profile="post_groupby_filter_membership_topk").program.operations[5]
+    assert post_group_membership["left_on"] == ["activity_band", "flag_seen_count"]
+
+    duplicate_window = generate_case(124, profile="duplicate_key_left_join_window_aggregate").program.operations[6]
+    assert duplicate_window["source"] == "weighted_x"
+    assert duplicate_window["partition_by"] == ["k_norm"]
+
+
+def test_repair_operations_dynamically_stabilizes_window_order_keys():
+    table = TableData(
+        "t0",
+        [
+            ColumnSpec("id", "int", nullable=False),
+            ColumnSpec("grp", "str", nullable=True),
+            ColumnSpec("seq", "int", nullable=False),
+            ColumnSpec("x", "float", nullable=True),
+        ],
+        [
+            {"id": 0, "grp": "a", "seq": 1, "x": 1.0},
+            {"id": 1, "grp": "a", "seq": 1, "x": 2.0},
+        ],
+    )
+    repaired = repair_operations(
+        table,
+        [
+            {
+                "op": "running_sum",
+                "source": "x",
+                "column": "run_x",
+                "partition_by": ["grp"],
+                "order_by": [{"column": "seq", "ascending": True, "nulls": "last"}],
+            },
+            {
+                "op": "row_number_filter",
+                "partition_by": ["grp"],
+                "order_by": [{"column": "seq", "ascending": True, "nulls": "last"}],
+                "cmp": "<=",
+                "value": 1,
+            },
+        ],
+    )
+
+    assert [op["op"] for op in repaired] == ["running_sum", "row_number_filter"]
+    assert [key["column"] for key in repaired[0]["order_by"]] == ["seq", "id", "x"]
+    assert [key["column"] for key in repaired[1]["order_by"]] == ["seq", "id", "run_x", "x"]
+    assert validate_case_program(Case("case-stable-window-repair", 0, [table], Program("prog", 0, repaired))) == []
+
+
+def test_condition_cmp_prefers_top_level_cmp_before_default_for_window_ops():
+    assert condition_cmp({"op": "row_number_filter", "cmp": "<=", "value": 2}, "==") == "<="
+
+
 def test_generate_case_null_predicate_filter_profile_is_supported_and_valid():
     even_case = generate_case(124, profile="null_predicate_filter")
     odd_case = generate_case(125, profile="null_predicate_filter")
@@ -926,7 +1624,12 @@ def test_generate_case_row_value_absence_filter_profile_is_supported_and_valid()
     assert "source_issue" not in case.metadata
     assert "pattern:row_value_absence_filter" in features
     assert "pattern:tuple_absence_filter" in features
+    assert "pattern:tuple_absence_nullable_row_value" in features
+    assert "pattern:tuple_absence_nullable_subquery" in features
     assert "filter:tuple-absence" in features
+    assert "filter:tuple-absence-nullable-right" in features
+    assert "semantic_signal:tuple_absence_nullable_row_value" in features
+    assert "semantic_signal:tuple_absence_nullable_subquery" in features
     assert validate_case_program(case) == []
 
 
@@ -2054,6 +2757,46 @@ def test_repair_operations_keeps_valid_semi_and_anti_join_only():
     assert repaired == [{"op": "semi_join", "table": "t_lookup", "left_on": "id", "right_on": "id"}]
 
 
+def test_validate_case_program_rejects_duplicate_table_columns():
+    case = Case(
+        "case-duplicate-columns",
+        1,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int"), ColumnSpec("id", "int"), ColumnSpec("x", "int")],
+                [{"id": 1, "x": 10}],
+            )
+        ],
+        Program("prog-duplicate-columns", 1, [{"op": "limit", "n": 1}]),
+    )
+
+    assert validate_case_program(case) == ["table 't0' contains duplicate column 'id'"]
+
+
+def test_preflight_fallback_dedupes_duplicate_table_columns():
+    case = Case(
+        "case-duplicate-columns-fallback",
+        1,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int"), ColumnSpec("id", "int"), ColumnSpec("x", "int")],
+                [{"id": 1, "x": 10}],
+            )
+        ],
+        Program("prog-duplicate-columns-fallback", 1, [{"op": "sort", "columns": ["id"], "ascending": True}]),
+    )
+
+    result = preflight_case(case)
+
+    assert result.valid is True
+    assert result.repaired is True
+    assert result.fallback_used is True
+    assert [column.name for column in result.case.tables[0].columns] == ["id", "x"]
+    assert validate_case_program(result.case) == []
+
+
 def test_repair_operations_keeps_valid_multi_key_semi_and_anti_join():
     case = generate_case(7)
     table = case.tables[0]
@@ -2238,6 +2981,32 @@ def test_repair_keeps_sort_keys_through_projection_before_topk():
     assert is_sort_topk_tie_cutoff_mismatch(case) is False
 
 
+def test_sort_topk_tie_signal_handles_nested_feedback_values_without_crashing():
+    table = TableData(
+        "t0",
+        [ColumnSpec("id", "int"), ColumnSpec("g", "str")],
+        [
+            {"id": 1, "g": {"nested": 2}},
+            {"id": 2, "g": {"nested": 1}},
+        ],
+    )
+    case = Case(
+        "case-nested-sort-signal",
+        2,
+        [table],
+        Program(
+            "prog-nested-sort-signal",
+            2,
+            [
+                {"op": "sort", "columns": ["g"], "ascending": True},
+                {"op": "limit", "n": 1},
+            ],
+        ),
+    )
+
+    assert is_sort_topk_tie_cutoff_mismatch(case) is False
+
+
 def test_repair_drops_groupby_aggregation_alias_colliding_with_key():
     case = generate_case(7)
     table = case.tables[0]
@@ -2381,3 +3150,55 @@ def _case_uses_modulo(case):
         and op.get("expr", {}).get("op") == "mod"
         for op in case.program.operations
     )
+
+
+def test_orthogonal_stress_rotation_covers_six_noise_controlled_search_axes():
+    expected = [
+        "bitmap_boundary_bool_aggregate",
+        "vector_boundary_groupby_distinct",
+        "wide_schema_projection_boundary",
+        "skewed_join_multiplicity",
+        "utf8_slice_length_groupby",
+        "unique_order_window_tiebreak",
+    ]
+
+    cases = [generate_case(seed, profile="orthogonal_stress_rotation") for seed in range(6)]
+
+    assert [case.metadata["mixed_generator_profile"] for case in cases] == expected
+    assert all(case.metadata["generator_profile"] == "orthogonal_stress_rotation" for case in cases)
+    assert all(validate_case_program(case) == [] for case in cases)
+    assert all(not case.metadata.get("source_issue") for case in cases)
+
+
+def test_targeted_rotations_prioritize_backend_relevant_profiles():
+    pandas_cases = [generate_case(seed, profile="pandas_targeted_rotation") for seed in range(5)]
+    polars_cases = [generate_case(seed, profile="polars_targeted_rotation") for seed in range(6)]
+    datafusion_cases = [generate_case(seed, profile="datafusion_targeted_rotation") for seed in range(6)]
+
+    assert [case.metadata["mixed_generator_profile"] for case in pandas_cases] == [
+        "wide_schema_projection_boundary",
+        "bitmap_boundary_bool_aggregate",
+        "utf8_slice_length_groupby",
+        "vector_boundary_groupby_distinct",
+        "skewed_join_multiplicity",
+    ]
+    assert polars_cases[0].metadata["mixed_generator_profile"] == "unique_order_window_tiebreak"
+    assert datafusion_cases[:2][0].metadata["mixed_generator_profile"] == "vector_boundary_groupby_distinct"
+    assert datafusion_cases[:2][1].metadata["mixed_generator_profile"] == "skewed_join_multiplicity"
+    assert all(
+        validate_case_program(case) == []
+        for case in [*pandas_cases, *polars_cases, *datafusion_cases]
+    )
+
+
+def test_new_boundary_profiles_hit_exact_physical_and_ordering_boundaries():
+    bitmap_counts = [len(generate_case(seed, profile="bitmap_boundary_bool_aggregate").tables[0].rows) for seed in range(6)]
+    vector_counts = [len(generate_case(seed, profile="vector_boundary_groupby_distinct").tables[0].rows) for seed in range(6)]
+    wide_counts = [len(generate_case(seed, profile="wide_schema_projection_boundary").tables[0].columns) - 1 for seed in range(6)]
+    window = generate_case(5, profile="unique_order_window_tiebreak")
+
+    assert bitmap_counts == [63, 64, 65, 127, 128, 129]
+    assert vector_counts == [1023, 1024, 1025, 2047, 2048, 2049]
+    assert wide_counts == [31, 32, 33, 63, 64, 65]
+    assert window.program.operations[0]["order_by"][-1]["column"] == "row_id"
+    assert window.program.operations[1]["order_by"][-1]["column"] == "row_id"

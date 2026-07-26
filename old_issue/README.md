@@ -20,6 +20,7 @@
 | --- | --- | --- | --- |
 | [apache/arrow#32171](https://github.com/apache/arrow/issues/32171) CSV unsafe conversion | `asfimport` | 2022-06-16 23:38:02 | CSV 长数字 roundtrip 已有 Arrow bug，过滤为非 fresh |
 | [apache/arrow#42231](https://github.com/apache/arrow/issues/42231) duplicate group-by keys | `FreekPaans` | 2024-06-21 05:26:05 | Arrow 既有 group-by 问题来源/历史参考 |
+| [apache/arrow#47177](https://github.com/apache/arrow/issues/47177) large-string partition schema merge | 已登记上游 issue | 已在 replay source manifest 冻结 | `pyarrow_large_string_partition_schema_semantics@pyarrow` 属于已知上游根因，不计入 fresh yield |
 | [apache/arrow#49889](https://github.com/apache/arrow/issues/49889) run-end encoded null compute | `pitrou` | 2026-04-28 22:26:53 | `pyarrow_run_end_null_compute_semantics@pyarrow` 已有上游 bug |
 | [apache/datafusion#12955](https://github.com/apache/datafusion/issues/12955) `INTERSECT ALL` wrong records | `vbarua` | 2024-10-16 06:10:36 | 既有 DataFusion 问题来源，不能计为 fresh |
 | [apache/datafusion#12956](https://github.com/apache/datafusion/issues/12956) `EXCEPT ALL` wrong records | `vbarua` | 2024-10-16 06:34:31 | 既有 DataFusion 问题来源，不能计为 fresh |
@@ -47,3 +48,9 @@
 `experiments/historical_candidates.md`。其中包含因 DSL 当前不支持所需
 操作而被排除的 Polars、DuckDB 与 DataFusion 问题；这些条目也不属于
 本项目新发现。
+
+2026-07-17 的 global-v3 结构扩围新增了 semi/anti join、tuple absence、UNION、NULL
+处理、字符串和完整 aggregate 路径，但继续应用本表的 known/replay 过滤。特别是 SQLite
+三值 membership family 与 DuckDB #22418 的多列 `NOT IN` + `NULL` 机制相邻，不会把该既有
+上游根因计为 fresh。3×306 正式筛选没有产生 recheck-surviving fresh family，因此本目录和
+countable confirmed-root 总数均不因扩围而变化。

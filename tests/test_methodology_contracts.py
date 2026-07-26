@@ -4,6 +4,7 @@ from datadiff.case_policy import case_discovery_origin, replay_bug_filter_reason
 from datadiff.cli import _preset_config
 from datadiff.config import DEFAULT_REPLAY_BUG_SOURCE_ISSUES, DiscoveryBias, ExperimentConfig
 from datadiff.datagen import generate_case
+from datadiff.discovery_profiles import ISSUE_FOCUS_MIXED_PROFILES
 from datadiff.targets import TARGETS, common_capabilities, resolve_target_backends
 
 
@@ -146,7 +147,7 @@ def test_methodology_fresh_and_replay_share_case_policy_gate():
         )
 
     fresh_policy_rejections = []
-    for seed in range(20):
+    for seed in range(len(ISSUE_FOCUS_MIXED_PROFILES)):
         fresh_case = generate_case(seed, profile="issue_focus")
         reason = replay_bug_filter_reason(
             fresh_case,
@@ -183,6 +184,11 @@ def test_methodology_experiment_config_exposes_layered_views_without_breaking_fl
         log_level="minimal",
         compress_run_log=False,
         enable_parallel_backend_execution=False,
+        enable_backend_session_reuse=False,
+        backend_sampling_candidate_burst_novel_only=True,
+        adaptive_candidate_pool_candidate_burst_novel_only=True,
+        adaptive_candidate_pool_preserve_seed_stride=True,
+        adaptive_candidate_pool_compensate_seed_horizon=True,
     )
 
     flat = config.to_dict()
@@ -213,6 +219,16 @@ def test_methodology_experiment_config_exposes_layered_views_without_breaking_fl
     assert nested["logging"]["log_level"] == "minimal"
     assert nested["logging"]["compress_run_log"] is False
     assert nested["execution"]["enable_parallel_backend_execution"] is False
+    assert nested["execution"]["enable_backend_session_reuse"] is False
+    assert nested["execution"]["backend_sampling_candidate_burst_novel_only"] is True
+    assert (
+        nested["guidance"]["adaptive_candidate_pool_candidate_burst_novel_only"]
+        is True
+    )
+    assert (
+        nested["guidance"]["adaptive_candidate_pool_compensate_seed_horizon"]
+        is True
+    )
 
 
 def test_methodology_bottom_layer_does_not_import_middle_policy_modules():

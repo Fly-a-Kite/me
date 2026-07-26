@@ -1363,7 +1363,7 @@ def test_write_experiment_summary_includes_adaptive_schedule_fields(tmp_path, mo
     assert row["feedback_operator_affinity_hit_rate"] == "0.0"
     assert aggregate_row["feedback_mutation_case_rate"] == "1.0"
     assert aggregate_row["quality_pass_rate"] == "1.0"
-    assert aggregate_row["seed_schedule_delta_per_case"] == "3.75"
+    assert float(aggregate_row["seed_schedule_delta_per_case"]) == pytest.approx(1.17)
     assert aggregate_row["avg_scheduler_reward"] == "4.25"
     assert aggregate_row["avg_scheduler_reward_signal"] == "3.75"
     assert aggregate_row["avg_scheduler_mean_reward"] == "4.5"

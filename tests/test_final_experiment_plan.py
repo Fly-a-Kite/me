@@ -635,6 +635,59 @@ def test_final_plan_execute_appends_existing_manifest_index_by_default(tmp_path,
     assert payload["commands"][0]["name"] == "short_validation_smoke"
 
 
+def test_final_plan_execute_refuses_latest_track_when_target_audit_is_not_latest(
+    tmp_path, monkeypatch, capsys
+):
+    module = _module()
+    index = tmp_path / "final-index.json"
+    audit = tmp_path / "target-version-audit.json"
+    command = module.FinalCommand(
+        track="ablation",
+        name="module_ablation",
+        command=["datadiff", "experiment"],
+        purpose="test",
+        count_as_real_bugs=False,
+        expected_output="manifest",
+    )
+    args = _args(
+        track="ablation",
+        execute=True,
+        manifest_index=str(index),
+        target_version_audit_output=str(audit),
+    )
+
+    monkeypatch.setattr(module, "build_plan", lambda parsed_args: [command])
+    monkeypatch.setattr(module, "write_plan", lambda commands, parsed_args: tmp_path / "plan.json")
+    monkeypatch.setattr(
+        module,
+        "build_target_version_audit",
+        lambda: {
+            "schema_version": "target-version-audit-v1",
+            "target_packages": [
+                {
+                    "package": "pandas",
+                    "installed_version": "3.0.2",
+                    "latest_version": "3.0.3",
+                    "latest_source": "pypi",
+                    "up_to_date": False,
+                }
+            ],
+            "summary": {"all_target_packages_up_to_date": False},
+        },
+    )
+
+    def fail_execute(item):
+        raise AssertionError("experiment command should not execute with stale target versions")
+
+    monkeypatch.setattr(module, "_execute_command_with_manifest_capture", fail_execute)
+
+    assert module.run_with_args(args) == 2
+    assert audit.is_file()
+    err = capsys.readouterr().err
+    assert "target packages are not all latest" in err
+    assert "package=pandas installed=3.0.2 latest=3.0.3 source=pypi" in err
+
+
 def test_final_plan_imports_existing_evidence_into_manifest_index_and_journal(tmp_path):
     module = _module()
     reports_dir = tmp_path / "reports"

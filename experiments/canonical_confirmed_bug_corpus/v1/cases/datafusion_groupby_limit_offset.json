@@ -1,0 +1,63 @@
+{
+  "case_id": "canonical-datafusion-groupby-limit-offset-001",
+  "seed": 22234,
+  "tables": [
+    {
+      "name": "t0",
+      "columns": [
+        {"name": "id", "type": "int", "nullable": false}
+      ],
+      "rows": [
+        {"id": 0},
+        {"id": 1}
+      ]
+    },
+    {
+      "name": "t1",
+      "columns": [
+        {"name": "id", "type": "int", "nullable": false},
+        {"name": "j", "type": "int", "nullable": true}
+      ],
+      "rows": [
+        {"id": 1, "j": 1}
+      ]
+    }
+  ],
+  "program": {
+    "program_id": "canonical-datafusion-groupby-limit-offset-001",
+    "seed": 22234,
+    "operations": [
+      {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+      {
+        "op": "groupby",
+        "keys": ["id"],
+        "aggs": [
+          {"column": "j", "func": "nunique", "as": "nunique_j"},
+          {"column": "id", "func": "count", "as": "count_id"}
+        ]
+      },
+      {
+        "op": "sort",
+        "keys": [
+          {"column": "id", "ascending": false, "nulls": "last"},
+          {"column": "count_id", "ascending": false, "nulls": "last"},
+          {"column": "nunique_j", "ascending": false, "nulls": "last"}
+        ]
+      },
+      {"op": "limit", "n": 8},
+      {
+        "op": "sort",
+        "keys": [
+          {"column": "id", "ascending": false, "nulls": "last"},
+          {"column": "count_id", "ascending": false, "nulls": "last"},
+          {"column": "nunique_j", "ascending": true, "nulls": "last"}
+        ]
+      },
+      {"op": "offset", "n": 1}
+    ]
+  },
+  "metadata": {
+    "canonical_root_id": "datafusion-limit-offset-pushdown-001",
+    "fault_model": "stale_offset_state_crosses_sort_barrier"
+  }
+}

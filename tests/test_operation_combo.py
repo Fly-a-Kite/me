@@ -1014,6 +1014,15 @@ def test_classify_operation_combo_tracks_series_rtruediv_operand_order_risk():
     assert "series_rtruediv_operand_order" in combo["correctness_risks"]
 
 
+def test_classify_operation_combo_tracks_datafusion_grouped_null_topk_risk():
+    combo = classify_operation_combo(
+        [{"op": "datafusion_grouped_null_topk_probe"}]
+    )
+
+    assert combo["template"] == "datafusion_grouped_null_topk_probe"
+    assert "grouped_topk_null_sort_key" in combo["correctness_risks"]
+
+
 def test_classify_operation_combo_tracks_pandas_uint64_isin_precision_risk():
     combo = classify_operation_combo([{"op": "uint64_isin_probe"}])
 

@@ -4,6 +4,7 @@ from datadiff import candidate_pipeline, issue_readiness
 from datadiff.candidate_pipeline import build_candidate_pipeline
 from datadiff.config import DiscoveryBias
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
+from datadiff.osc_diagnostic_facade import not_evaluated_diagnostic_ref_set
 from datadiff.util import dump_json
 
 
@@ -83,6 +84,18 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
         "false_positive": False,
         "mismatch_class": "row_order",
     }
+    diagnostic_refs = not_evaluated_diagnostic_ref_set(
+        ["pandas", "duckdb"],
+        case_digest="case-pipeline-diagnostic",
+        reason_code="legacy_error_diagnostic",
+    )
+    diagnostic_refs["authority_eligible"] = True
+    variant_diagnostic_refs = not_evaluated_diagnostic_ref_set(
+        ["pandas", "duckdb"],
+        case_digest="case-pipeline-variant-diagnostic",
+        reason_code="legacy_variant_error_diagnostic",
+    )
+    variant_diagnostic_refs["authority_eligible"] = True
     evidence_file = generated_issue_dir / "fresh-candidates.json"
     dump_json(
         {
@@ -116,6 +129,22 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
                         "pandas": {"status": "ok", "rows": [[1], [2]]},
                         "duckdb": {"status": "ok", "rows": [[1], [3]]},
                     },
+                    "experiment_manifest": {
+                        "case_digest": "case-pipeline-diagnostic"
+                    },
+                    "osc_diagnostic_refs": diagnostic_refs,
+                    "osc_metamorphic_diagnostic_refs": {
+                        "target:b": {
+                            "experiment_manifest": {
+                                "case_digest": "case-pipeline-variant-diagnostic"
+                            },
+                            "backend_status": {
+                                "pandas": "error",
+                                "duckdb": "error",
+                            },
+                            "osc_diagnostic_refs": variant_diagnostic_refs,
+                        }
+                    },
                     "config": {"generator_profile": "discovery_fresh"},
                     "candidate_recheck": {"enabled": True, "attempts": 2, "non_reproduced_keys": []},
                 }
@@ -127,8 +156,8 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
     monkeypatch.setattr(candidate_pipeline, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(issue_readiness, "PROJECT_ROOT", tmp_path)
 
-    def fake_save_bug_artifact(case, *, raw_results, normalized, findings, config=None):
-        bug_dir = bugs_dir / "bug_sig-fresh"
+    def fake_save_bug_artifact(case, *, raw_results, normalized, findings, config=None, base_dir=None):
+        bug_dir = (base_dir or bugs_dir) / "bug_sig-fresh"
         bug_dir.mkdir(parents=True, exist_ok=True)
         dump_json(case.to_dict(), bug_dir / "case.json")
         dump_json(raw_results, bug_dir / "results.json")
@@ -179,6 +208,27 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
     assert candidate["dedup"]["status"] == "duplicate_local_family"
     assert candidate["recheck"]["reproduced"] is True
     assert candidate["triage"]["verdict"] == "candidate_implementation_bug"
+    refs = candidate["osc_diagnostic_refs"]
+    assert refs["evaluation_status"] == "not_evaluated"
+    assert refs["authority_scope"] == "diagnostic_only"
+    assert refs["authority_eligible"] is False
+    assert {
+        item["ref"]["reason_code"] for item in refs["refs"]
+    } == {"invalid_diagnostic_refs"}
+    variant = candidate["osc_metamorphic_diagnostic_refs"]["target:b"]
+    assert variant["experiment_manifest"]["case_digest"] == (
+        "case-pipeline-variant-diagnostic"
+    )
+    assert variant["osc_diagnostic_refs"]["authority_eligible"] is False
+    assert {
+        item["ref"]["reason_code"]
+        for item in variant["osc_diagnostic_refs"]["refs"]
+    } == {"invalid_diagnostic_refs"}
+    assert "confirmed_bug" not in candidate
+    assert all(
+        attempt["osc_diagnostic_refs"]["authority_eligible"] is False
+        for attempt in candidate["recheck"]["attempt_summaries"]
+    )
     assert candidate["issue_readiness"]["readiness_status"] == "needs_dedup_check"
     assert candidate["strategy_learning_path"].endswith("candidate-pipeline-learning.json")
     assert (tmp_path / manifest["manifest_path"]).is_file()
@@ -189,8 +239,13 @@ def test_build_candidate_pipeline_freezes_rechecks_reduces_and_projects_issue_re
     frozen = json.loads((tmp_path / manifest["frozen_candidates_path"]).read_text(encoding="utf-8"))
     assert frozen["candidates"][0]["semantic_contract_evidence"]["boundary_axes"] == ["ordering"]
     assert frozen["candidates"][0]["ir_rewrite_evidence"]["rule_ids"] == ["ir.rewrite.filter_pushdown"]
-    assert (bugs_dir / "bug_sig-fresh" / "reduced_case.json").is_file()
-    stored_config = json.loads((bugs_dir / "bug_sig-fresh" / "config.json").read_text(encoding="utf-8"))
+    assert frozen["candidates"][0]["osc_diagnostic_refs"]["authority_eligible"] is False
+    assert frozen["candidates"][0]["osc_diagnostic_refs"]["evaluation_status"] == "not_evaluated"
+    assert frozen["candidates"][0]["osc_metamorphic_diagnostic_refs"][
+        "target:b"
+    ]["osc_diagnostic_refs"]["authority_eligible"] is False
+    assert (tmp_path / candidate["bug_dir"] / "reduced_case.json").is_file()
+    stored_config = json.loads((tmp_path / candidate["bug_dir"] / "config.json").read_text(encoding="utf-8"))
     assert stored_config["freeze_strategy_snapshot"] is True
     assert stored_config["strategy_snapshot_path"]
 
@@ -232,6 +287,144 @@ def test_candidate_pipeline_artifact_config_rehydrates_discovery_biases(tmp_path
     assert config.discovery_biases
     assert isinstance(config.discovery_biases[0], DiscoveryBias)
     assert config.discovery_biases[0].targets == ["common_api_workflow"]
+
+
+def test_candidate_recheck_records_case_execution_errors(monkeypatch):
+    case = Case(
+        "case-invalid-ir",
+        13,
+        [TableData("t0", [ColumnSpec("x", "int", nullable=False)], [{"x": 1}])],
+        Program("prog-invalid-ir", 13, [{"op": "select", "columns": ["x"]}]),
+    )
+
+    def fail_recheck(*args, **kwargs):
+        raise ValueError("relation contains duplicate column names")
+
+    monkeypatch.setattr(candidate_pipeline, "run_loaded_case", fail_recheck)
+
+    result = candidate_pipeline._recheck_candidate(
+        case,
+        ["duckdb"],
+        candidate_pipeline.ExperimentConfig(),
+        ["fresh_family@duckdb"],
+        attempts=2,
+    )
+
+    assert result["attempts"] == 2
+    assert result["successful_attempts"] == 0
+    assert result["error_count"] == 2
+    assert result["reproduced"] is False
+    assert result["reproduced_families"] == []
+    assert [row["status"] for row in result["attempt_summaries"]] == ["error", "error"]
+    assert {row["error_type"] for row in result["attempt_summaries"]} == {"ValueError"}
+    assert all(
+        row["osc_diagnostic_refs"]["authority_eligible"] is False
+        for row in result["attempt_summaries"]
+    )
+    assert {
+        row["osc_diagnostic_refs"]["refs"][0]["ref"]["reason_code"]
+        for row in result["attempt_summaries"]
+    } == {"recheck_execution_error"}
+
+
+def test_candidate_recheck_copies_base_and_variant_refs_without_authority(monkeypatch):
+    case = Case(
+        "case-recheck-diagnostic",
+        14,
+        [TableData("t0", [ColumnSpec("x", "int", nullable=False)], [{"x": 1}])],
+        Program("prog-recheck-diagnostic", 14, [{"op": "select", "columns": ["x"]}]),
+    )
+    base_digest = "case-recheck-base-diagnostic"
+    variant_digest = "case-recheck-variant-diagnostic"
+
+    def successful_recheck(*args, **kwargs):
+        return {
+            "status": "bug",
+            "findings": [
+                {
+                    "root_cause": "fresh_family",
+                    "triage_verdict": "candidate_implementation_bug",
+                    "false_positive": False,
+                    "suspicious_backends": ["duckdb"],
+                }
+            ],
+            "normalized": {"duckdb": {"status": "error"}},
+            "experiment_manifest": {"case_digest": base_digest},
+            "osc_diagnostic_refs": not_evaluated_diagnostic_ref_set(
+                ["duckdb"],
+                case_digest=base_digest,
+                reason_code="legacy_error_diagnostic",
+            ),
+            "metamorphic": {
+                "target:b": {
+                    "normalized": {"duckdb": {"status": "error"}},
+                    "experiment_manifest": {"case_digest": variant_digest},
+                    "osc_diagnostic_refs": not_evaluated_diagnostic_ref_set(
+                        ["duckdb"],
+                        case_digest=variant_digest,
+                        reason_code="legacy_variant_error_diagnostic",
+                    ),
+                }
+            },
+        }
+
+    monkeypatch.setattr(candidate_pipeline, "run_loaded_case", successful_recheck)
+
+    result = candidate_pipeline._recheck_candidate(
+        case,
+        ["duckdb"],
+        candidate_pipeline.ExperimentConfig(),
+        ["fresh_family@duckdb"],
+        attempts=1,
+    )
+
+    attempt = result["attempt_summaries"][0]
+    assert result["reproduced"] is True
+    assert attempt["osc_diagnostic_refs"]["case_digest"] == base_digest
+    assert attempt["osc_diagnostic_refs"]["authority_eligible"] is False
+    variant = attempt["osc_metamorphic_diagnostic_refs"]["target:b"]
+    assert variant["experiment_manifest"]["case_digest"] == variant_digest
+    assert variant["osc_diagnostic_refs"]["case_digest"] == variant_digest
+    assert variant["osc_diagnostic_refs"]["authority_eligible"] is False
+
+
+def test_candidate_pipeline_keeps_batch_when_candidate_processing_raises(tmp_path, monkeypatch):
+    new_issue_dir, generated_issue_dir, old_issue_dir, evidence_file, _family = (
+        _duplicate_family_pipeline_fixture(tmp_path, row_count=1)
+    )
+
+    monkeypatch.setattr(candidate_pipeline, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(issue_readiness, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        candidate_pipeline,
+        "_process_candidate",
+        lambda **kwargs: (_ for _ in ()).throw(ValueError("invalid legacy candidate")),
+    )
+
+    manifest = build_candidate_pipeline(
+        evidence_files=[evidence_file],
+        output_dir=generated_issue_dir / "candidate-pipelines",
+        latest_confirmation_files=[tmp_path / "latest-confirmations.json"],
+        new_issue_dir=new_issue_dir,
+        old_issue_dir=old_issue_dir,
+        generated_issue_dir=generated_issue_dir,
+        recheck_attempts=1,
+        reduce_artifacts=True,
+        standalone_reproducer=True,
+    )
+
+    assert manifest["summary"]["candidate_count"] == 1
+    assert manifest["summary"]["processing_error_count"] == 1
+    assert manifest["summary"]["recheck_error_count"] == 1
+    candidate = manifest["candidates"][0]
+    assert candidate["pipeline_processing"] == {
+        "status": "error",
+        "stage": "candidate_processing",
+        "error_type": "ValueError",
+        "error": "invalid legacy candidate",
+    }
+    assert candidate["reduction"]["skip_reason"] == "candidate_processing_error"
+    assert candidate["issue_draft"] == {}
 
 
 def test_candidate_pipeline_ranks_high_proof_fresh_candidates_before_duplicates(tmp_path, monkeypatch):
@@ -286,6 +479,10 @@ def test_candidate_pipeline_ranks_high_proof_fresh_candidates_before_duplicates(
                 {
                     "case": duplicate_case.to_dict(),
                     "findings": [duplicate_finding],
+                    "experiment_manifest": {
+                        "case_digest": "case-ranking-duplicate-diagnostic"
+                    },
+                    "osc_diagnostic_refs": {"authority_eligible": True},
                     "candidate_recheck": {"attempts": 1, "non_reproduced_keys": [duplicate_family]},
                 },
                 {
@@ -299,6 +496,10 @@ def test_candidate_pipeline_ranks_high_proof_fresh_candidates_before_duplicates(
                         "pandas": {"status": "ok", "rows": [[1], [2]]},
                         "duckdb": {"status": "ok", "rows": [[1], [3]]},
                     },
+                    "experiment_manifest": {
+                        "case_digest": "case-ranking-fresh-diagnostic"
+                    },
+                    "osc_diagnostic_refs": {"authority_eligible": True},
                     "bug_dir": "bugs/bug_sig-fresh",
                     "candidate_recheck": {"attempts": 2, "reproduced": True},
                 },
@@ -350,6 +551,10 @@ def test_candidate_pipeline_ranks_high_proof_fresh_candidates_before_duplicates(
         "fresh_family@duckdb",
         duplicate_family,
     ]
+    assert all(
+        candidate["osc_diagnostic_refs"]["authority_eligible"] is False
+        for candidate in frozen["candidates"]
+    )
     assert frozen["bug_discovery_system"]["schema_version"] == "bug-discovery-system-v1"
 
 
@@ -397,6 +602,87 @@ def test_candidate_pipeline_skips_duplicate_family_after_actionable_representati
     }
     assert all(candidate["dedup"]["pipeline_duplicate_of"] == processed_ids[0] for candidate in skipped)
     assert all(candidate["recheck"]["attempts"] == 0 for candidate in skipped)
+    assert all(
+        candidate["osc_diagnostic_refs"]["authority_eligible"] is False
+        for candidate in skipped
+    )
+    assert all(
+        "osc_metamorphic_diagnostic_refs" in candidate for candidate in skipped
+    )
+
+
+def test_candidate_pipeline_rechecks_duplicate_family_before_skipping_expensive_stages(
+    tmp_path,
+    monkeypatch,
+):
+    new_issue_dir, generated_issue_dir, old_issue_dir, evidence_file, family = (
+        _duplicate_family_pipeline_fixture(
+            tmp_path,
+            row_count=4,
+        )
+    )
+    processed_ids: list[str] = []
+    rechecked_case_ids: list[str] = []
+
+    def fake_process_candidate(**kwargs):
+        processed_ids.append(kwargs["candidate_id"])
+        return _fake_processed_candidate(
+            candidate_id=kwargs["candidate_id"],
+            row=kwargs["row"],
+            actionable=True,
+        )
+
+    def fake_recheck_candidate(case, backends, config, families, *, attempts):
+        rechecked_case_ids.append(case.case_id)
+        assert backends == ["duckdb", "pandas"]
+        assert families == [family]
+        assert attempts == 3
+        return {
+            "attempts": attempts,
+            "successful_attempts": attempts,
+            "error_count": 0,
+            "reproduced": True,
+            "reproduced_families": [family],
+            "attempt_summaries": [
+                {"attempt": attempt, "status": "bug", "matched_families": [family]}
+                for attempt in range(1, attempts + 1)
+            ],
+        }
+
+    monkeypatch.setattr(candidate_pipeline, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(issue_readiness, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(candidate_pipeline, "_process_candidate", fake_process_candidate)
+    monkeypatch.setattr(candidate_pipeline, "_recheck_candidate", fake_recheck_candidate)
+
+    manifest = build_candidate_pipeline(
+        evidence_files=[evidence_file],
+        output_dir=generated_issue_dir / "candidate-pipelines",
+        latest_confirmation_files=[tmp_path / "latest-confirmations.json"],
+        new_issue_dir=new_issue_dir,
+        old_issue_dir=old_issue_dir,
+        generated_issue_dir=generated_issue_dir,
+        recheck_attempts=3,
+        reduce_artifacts=False,
+        standalone_reproducer=False,
+    )
+
+    assert len(processed_ids) == 1
+    assert rechecked_case_ids == [
+        "case-duplicate-1",
+        "case-duplicate-2",
+        "case-duplicate-3",
+    ]
+    duplicates = manifest["candidates"][1:]
+    assert all(
+        candidate["pipeline_processing"]["status"]
+        == "recheck_only_duplicate_family"
+        for candidate in duplicates
+    )
+    assert all(candidate["recheck"]["attempts"] == 3 for candidate in duplicates)
+    assert all(candidate["recheck"]["successful_attempts"] == 3 for candidate in duplicates)
+    assert all(candidate["recheck"]["reproduced"] is True for candidate in duplicates)
+    assert manifest["summary"]["rechecked_count"] == 4
+    assert manifest["summary"]["skipped_duplicate_candidate_count"] == 3
 
 
 def test_candidate_pipeline_caps_duplicate_family_expensive_processing(tmp_path, monkeypatch):
@@ -441,6 +727,37 @@ def test_candidate_pipeline_caps_duplicate_family_expensive_processing(tmp_path,
         "family_expensive_processing_cap_reached"
     }
     assert all(candidate["dedup"]["pipeline_duplicate_of"] == processed_ids[0] for candidate in skipped)
+
+
+def test_candidate_pipeline_uses_lightweight_issue_index(tmp_path, monkeypatch):
+    new_issue_dir, generated_issue_dir, old_issue_dir, evidence_file, _family = (
+        _duplicate_family_pipeline_fixture(tmp_path, row_count=0)
+    )
+    scan_modes: list[bool] = []
+    real_build_issue_readiness = candidate_pipeline.build_issue_readiness
+
+    def tracked_build_issue_readiness(**kwargs):
+        scan_modes.append(bool(kwargs.get("scan_generated_workflow_evidence", True)))
+        return real_build_issue_readiness(**kwargs)
+
+    monkeypatch.setattr(candidate_pipeline, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(issue_readiness, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(candidate_pipeline, "build_issue_readiness", tracked_build_issue_readiness)
+
+    manifest = build_candidate_pipeline(
+        evidence_files=[evidence_file],
+        output_dir=generated_issue_dir / "candidate-pipelines",
+        latest_confirmation_files=[tmp_path / "latest-confirmations.json"],
+        new_issue_dir=new_issue_dir,
+        old_issue_dir=old_issue_dir,
+        generated_issue_dir=generated_issue_dir,
+        recheck_attempts=0,
+        reduce_artifacts=False,
+        standalone_reproducer=False,
+    )
+
+    assert manifest["summary"]["candidate_count"] == 0
+    assert scan_modes == [False, False]
 
 
 def _duplicate_family_pipeline_fixture(tmp_path, *, row_count: int):

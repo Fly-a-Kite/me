@@ -26,8 +26,10 @@ def test_seeded_filter_fault_is_classified_as_candidate_bug():
     )
 
     assert row["status"] == "bug"
+    assert row["findings"][0]["kind"] == "semantic_output_mismatch"
     assert row["findings"][0]["triage_verdict"] == "candidate_implementation_bug"
     assert "buggy_filter" in row["findings"][0]["triage_evidence"]
+    assert row["raw_results"]["buggy_filter"]["status"] == "ok"
 
 
 def test_seeded_groupby_fault_is_classified_as_candidate_bug():
@@ -56,8 +58,10 @@ def test_seeded_groupby_fault_is_classified_as_candidate_bug():
     )
 
     assert row["status"] == "bug"
+    assert row["findings"][0]["kind"] == "semantic_output_mismatch"
     assert row["findings"][0]["triage_verdict"] == "candidate_implementation_bug"
     assert "buggy_groupby" in row["findings"][0]["triage_evidence"]
+    assert row["raw_results"]["buggy_groupby"]["status"] == "ok"
 
 
 def test_seeded_join_fault_is_classified_as_candidate_bug():
@@ -79,8 +83,10 @@ def test_seeded_join_fault_is_classified_as_candidate_bug():
     )
 
     assert row["status"] == "bug"
+    assert row["findings"][0]["kind"] == "semantic_output_mismatch"
     assert row["findings"][0]["triage_verdict"] == "candidate_implementation_bug"
     assert "buggy_join" in row["findings"][0]["triage_evidence"]
+    assert row["raw_results"]["buggy_join"]["status"] == "ok"
 
 
 def test_seeded_mutate_fault_is_classified_as_candidate_bug():
@@ -103,5 +109,7 @@ def test_seeded_mutate_fault_is_classified_as_candidate_bug():
     )
 
     assert row["status"] == "bug"
+    assert row["findings"][0]["kind"] == "semantic_output_mismatch"
     assert row["findings"][0]["triage_verdict"] == "candidate_implementation_bug"
     assert "buggy_mutate" in row["findings"][0]["triage_evidence"]
+    assert row["raw_results"]["buggy_mutate"]["status"] == "ok"

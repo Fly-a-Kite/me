@@ -31,6 +31,8 @@ from datadiff.experiment_catalog import (  # noqa: E402
 )
 from datadiff.historical import list_historical_bugs  # noqa: E402
 from datadiff.run_journal import append_run_journal_entries, build_run_journal_entry  # noqa: E402
+from datadiff.target_version_audit import build_target_version_audit  # noqa: E402
+from datadiff.target_version_audit import write_target_version_audit  # noqa: E402
 from datadiff.triage import standalone_reproducer_rule_records  # noqa: E402
 from datadiff.util import REPORTS_DIR, load_json, read_jsonl, utc_now  # noqa: E402
 
@@ -109,6 +111,16 @@ def run_with_args(args: argparse.Namespace) -> int:
             print(f"notes: {item.notes}")
         print(shell_join(item.command))
     if args.execute:
+        if _requires_latest_target_preflight(args, commands):
+            issues = _run_latest_target_preflight(args)
+            if issues:
+                print(
+                    "refusing final experiment execution: target packages are not all latest",
+                    file=sys.stderr,
+                )
+                for issue in issues:
+                    print(f"- {issue}", file=sys.stderr)
+                return 2
         if args.track == "postprocess" and _requires_postprocess_evidence_preflight(commands):
             issues = _postprocess_evidence_preflight_issues(index_path, args=args)
             if issues:
@@ -230,6 +242,43 @@ def _requires_postprocess_evidence_preflight(commands: list[FinalCommand]) -> bo
         and "--manifest-index" in command.command
         for command in commands
     )
+
+
+def _requires_latest_target_preflight(args: argparse.Namespace, commands: list[FinalCommand]) -> bool:
+    if bool(getattr(args, "skip_latest_target_preflight", False)):
+        return False
+    strict_tracks = {"live", "ablation", "comparison"}
+    return any(
+        command.track in strict_tracks and _datadiff_subcommand(command.command) == "experiment"
+        for command in commands
+    )
+
+
+def _run_latest_target_preflight(args: argparse.Namespace) -> list[str]:
+    output = Path(
+        str(
+            getattr(args, "target_version_audit_output", "")
+            or REPORTS_DIR / "target-version-audits" / "final-experiment-target-version-audit.json"
+        )
+    )
+    if not output.is_absolute():
+        output = PROJECT_ROOT / output
+    payload = build_target_version_audit()
+    write_target_version_audit(payload, output)
+    summary = payload.get("summary", {}) if isinstance(payload.get("summary", {}), dict) else {}
+    if bool(summary.get("all_target_packages_up_to_date", False)):
+        print(f"target version audit: {output}")
+        return []
+    issues = [f"target_version_audit={output}"]
+    for row in payload.get("target_packages", []) or []:
+        if not isinstance(row, dict) or row.get("up_to_date") is True:
+            continue
+        issues.append(
+            "package="
+            f"{row.get('package', '')} installed={row.get('installed_version', '') or '?'} "
+            f"latest={row.get('latest_version', '') or '?'} source={row.get('latest_source', '') or '?'}"
+        )
+    return issues
 
 
 def _postprocess_evidence_preflight_issues(index_path: Path, *, args: argparse.Namespace) -> list[str]:
@@ -841,6 +890,16 @@ def parse_args() -> argparse.Namespace:
         "--reset-manifest-index",
         action="store_true",
         help="when executing a non-postprocess track, start a fresh manifest index before appending evidence",
+    )
+    parser.add_argument(
+        "--target-version-audit-output",
+        default=str(REPORTS_DIR / "target-version-audits" / "final-experiment-target-version-audit.json"),
+        help="latest target-package audit JSON written before live/ablation/comparison execution",
+    )
+    parser.add_argument(
+        "--skip-latest-target-preflight",
+        action="store_true",
+        help="skip the latest target-package gate for non-authority debugging only",
     )
     parser.add_argument("--execute", action="store_true", help="execute commands instead of only printing them")
     return parser.parse_args()

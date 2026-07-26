@@ -9,6 +9,8 @@
       ],
       "issue_url": "https://github.com/apache/datafusion/issues/22190",
       "issue_title": "DataFusion drops grouped MIN/MAX rows with NULL sort keys under ORDER BY + LIMIT",
+      "discovery_credit": "datadiff_submitted",
+      "submitted_by": "Fly-a-Kite",
       "upstream_status": "upstream_labeled_bug",
       "state": "open",
       "labels": [
@@ -26,6 +28,8 @@
       ],
       "issue_url": "https://github.com/apache/datafusion/issues/22489",
       "issue_title": "DataFusion drops grouped row after inner ORDER BY/LIMIT and outer ORDER BY/OFFSET",
+      "discovery_credit": "datadiff_submitted",
+      "submitted_by": "Fly-a-Kite",
       "upstream_status": "upstream_labeled_bug",
       "state": "closed",
       "labels": [
@@ -44,6 +48,8 @@
       ],
       "issue_url": "https://github.com/apache/datafusion/issues/22490",
       "issue_title": "DataFusion evaluates -0.0 >= 0.0 as false",
+      "discovery_credit": "datadiff_submitted",
+      "submitted_by": "Fly-a-Kite",
       "upstream_status": "upstream_labeled_bug",
       "state": "closed",
       "labels": [
@@ -61,6 +67,8 @@
       ],
       "issue_url": "https://github.com/apache/datafusion/issues/22554",
       "issue_title": "DISTINCT ORDER BY NULLS FIRST LIMIT returns the wrong top row",
+      "discovery_credit": "datadiff_submitted",
+      "submitted_by": "Fly-a-Kite",
       "upstream_status": "upstream_labeled_bug",
       "state": "closed",
       "labels": [
@@ -79,6 +87,8 @@
       ],
       "issue_url": "https://github.com/apache/datafusion/issues/22541",
       "issue_title": "Repeating the same ordered LIMIT over a subquery changes the result",
+      "discovery_credit": "datadiff_submitted",
+      "submitted_by": "Fly-a-Kite",
       "upstream_status": "upstream_labeled_bug",
       "state": "closed",
       "labels": [
@@ -97,6 +107,8 @@
       ],
       "issue_url": "https://github.com/pola-rs/polars/issues/27672",
       "issue_title": "Incorrect descending sort after group_by max with maintain_order=True",
+      "discovery_credit": "datadiff_submitted",
+      "submitted_by": "Fly-a-Kite",
       "upstream_status": "fixed_upstream",
       "state": "closed",
       "labels": [
@@ -117,6 +129,8 @@
       ],
       "issue_url": "https://github.com/pola-rs/polars/issues/27752",
       "issue_title": "`Series.__rsub__`, `__rtruediv__`, `__rfloordiv__`, and `__rmod__` use `self op other` instead of `other op self`; `__rpow__(Series)` errors",
+      "discovery_credit": "datadiff_submitted",
+      "submitted_by": "Fly-a-Kite",
       "upstream_status": "upstream_labeled_bug",
       "state": "open",
       "labels": [
@@ -129,6 +143,27 @@
       "notes": "GitHub issue was submitted by Fly-a-Kite from DataDiffFuzz reflected-operator evidence and is labeled bug/P-medium upstream."
     },
     {
+      "family": "polars_vector_division_rounding@polars",
+      "root_cause": "polars_vector_division_rounding",
+      "suspicious_backends": [
+        "polars"
+      ],
+      "issue_url": "https://github.com/pola-rs/polars/issues/27753",
+      "issue_title": "Vectorized expression division returns next-up float for 7 / 5, while scalar/single-row paths return nearest double",
+      "discovery_credit": "datadiff_submitted",
+      "submitted_by": "Fly-a-Kite",
+      "upstream_status": "similar_existing_upstream_issue",
+      "state": "closed",
+      "labels": [
+        "invalid",
+        "python"
+      ],
+      "assignee": "",
+      "checked_at": "2026-07-10T16:35:09+08:00",
+      "duplicate_of": "https://github.com/pola-rs/polars/issues/23741",
+      "notes": "Submitted upstream as #27753 from DataDiffFuzz evidence. Upstream closed it as a duplicate of #23741, which carries a bug label but is closed as not planned. Treat this as similar_existing_upstream_issue rather than a new confirmed latest-version bug; the family remains excluded from future fresh rewardable discovery."
+    },
+    {
       "family": "pyarrow_sliced_bool_groupby_any_all@pyarrow",
       "root_cause": "pyarrow_sliced_bool_groupby_any_all",
       "suspicious_backends": [
@@ -136,6 +171,8 @@
       ],
       "issue_url": "https://github.com/apache/arrow/issues/50043",
       "issue_title": "[Python] Table.group_by(...).aggregate([(\"flag\", \"any\")])` returns incorrect `True` on a sliced Boolean array with nulls",
+      "discovery_credit": "datadiff_submitted",
+      "submitted_by": "Fly-a-Kite",
       "upstream_status": "upstream_labeled_bug",
       "state": "closed",
       "labels": [
@@ -155,6 +192,8 @@
       ],
       "issue_url": "https://github.com/duckdb/duckdb/issues/22924",
       "issue_title": "CTE boolean INNER JOIN returns no rows while equivalent EXISTS and materialized join match",
+      "discovery_credit": "datadiff_submitted",
+      "submitted_by": "Fly-a-Kite",
       "upstream_status": "fixed_upstream",
       "state": "closed",
       "labels": [
@@ -164,6 +203,49 @@
       "checked_at": "2026-06-14T18:55:00+08:00",
       "fixed_by": "https://github.com/duckdb/duckdb/pull/22963",
       "notes": "GitHub issue was submitted by Fly-a-Kite from DataDiffFuzz metamorphic semi/anti join rewrite evidence. The issue is closed as completed, and upstream PR #22963, titled \"Avoid join filter pushdown below limits\", was merged into duckdb:main with body text \"Fixes #22924\" and a regression test for ORDER BY ... OFFSET/LIMIT shapes."
+    },
+    {
+      "family": "path_projection_keyed_pick@datafusion",
+      "root_cause": "path_projection_keyed_pick",
+      "canonical_root_id": "datafusion-order-by-offset-subquery-groupby-001",
+      "canonical_root_cause": "datafusion_order_by_offset_subquery_groupby",
+      "observed_families": [
+        "path_projection_keyed_pick@datafusion",
+        "groupby_aggregation@datafusion"
+      ],
+      "candidate_signatures": [
+        "2b144283099efb76",
+        "4aef7cea0b6f55b8"
+      ],
+      "suspicious_backends": [
+        "datafusion"
+      ],
+      "issue_url": "https://github.com/apache/datafusion/issues/23534",
+      "issue_title": "Returns the wrong grouped row when an outer `GROUP BY` consumes a subquery containing `ORDER BY ... OFFSET`.",
+      "discovery_credit": "datadiff_submitted",
+      "submitted_by": "Fly-a-Kite",
+      "submitted_at": "2026-07-13T21:32:07+08:00",
+      "upstream_status": "submitted_pending_independent_confirmation",
+      "state": "open",
+      "labels": [
+        "bug"
+      ],
+      "label_provenance": [
+        {
+          "label": "bug",
+          "actor": "Fly-a-Kite",
+          "created_at": "2026-07-13T21:32:09+08:00",
+          "independent_maintainer_action": false
+        }
+      ],
+      "independent_maintainer_confirmation": false,
+      "assignee": "",
+      "comments": 0,
+      "checked_at": "2026-07-13T22:13:15+08:00",
+      "artifact": "bugs/bug_e8fe6ce27924de08",
+      "native_reproducer": "new_issue/datafusion_order_by_offset_subquery_groupby_reproducer.py",
+      "native_reproducer_sha256": "b1a8b3ccbae059457257cd4192eb7f4ea573df7d528d4e8bd174130e9f08e112",
+      "notes": "Submitted from the independent 500-case paired holdout evidence against datafusion==54.0.0. The public issue is open and self-labeled `bug` by the submitter/template, with no maintainer comment, assignment, PR, or independent label event as of the checked_at time. Keep it excluded from confirmed-root counts until independent upstream acknowledgement, triage, assignment, fix, or release evidence appears."
     }
   ]
 }

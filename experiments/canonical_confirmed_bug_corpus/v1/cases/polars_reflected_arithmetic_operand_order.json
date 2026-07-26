@@ -1,0 +1,39 @@
+{
+  "case_id": "canonical-polars-reflected-arithmetic-operand-order-001",
+  "seed": 135,
+  "tables": [
+    {
+      "name": "t0",
+      "columns": [
+        {"name": "divisor_value", "type": "int", "nullable": false},
+        {"name": "numerator_value", "type": "int", "nullable": false},
+        {"name": "group_code", "type": "int", "nullable": false}
+      ],
+      "rows": [
+        {"divisor_value": 1, "numerator_value": 2, "group_code": 0},
+        {"divisor_value": 2, "numerator_value": 3, "group_code": 1},
+        {"divisor_value": 3, "numerator_value": 4, "group_code": 1}
+      ]
+    }
+  ],
+  "program": {
+    "program_id": "canonical-polars-reflected-arithmetic-operand-order-001",
+    "seed": 135,
+    "operations": [
+      {
+        "op": "mutate",
+        "column": "ratio_value",
+        "expr": {
+          "kind": "reverse_division_columns",
+          "numerator": "numerator_value",
+          "source": "divisor_value"
+        }
+      },
+      {"op": "select", "columns": ["group_code", "ratio_value"]}
+    ]
+  },
+  "metadata": {
+    "canonical_root_id": "polars-reflected-arithmetic-operand-order-001",
+    "fault_model": "reflected_series_operator_reverses_operands"
+  }
+}

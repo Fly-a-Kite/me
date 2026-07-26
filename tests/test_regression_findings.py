@@ -223,7 +223,7 @@ def test_datafusion_grouped_topk_null_sort_key_is_candidate_bug():
     any(importlib.util.find_spec(name) is None for name in DATAFUSION_BACKENDS),
     reason="datafusion comparison backends are not installed",
 )
-def test_datafusion_groupby_limit_offset_is_candidate_bug():
+def test_datafusion_groupby_limit_offset_tracks_regression_or_upstream_fix():
     case = Case(
         "case-datafusion-groupby-limit-offset",
         22234,
@@ -280,9 +280,15 @@ def test_datafusion_groupby_limit_offset_is_candidate_bug():
         save_artifact=False,
     )
 
+    expected_rows = [[1, 0, 0]]
+    assert result["normalized"]["pandas"]["rows"] == expected_rows
+    assert result["normalized"]["duckdb"]["rows"] == expected_rows
+    if result["status"] == "ok":
+        assert result["findings"] == []
+        assert result["normalized"]["datafusion"]["rows"] == expected_rows
+        return
+
     assert result["status"] == "bug"
-    assert result["normalized"]["pandas"]["rows"] == [[1, 0, 0]]
-    assert result["normalized"]["duckdb"]["rows"] == [[1, 0, 0]]
     assert result["normalized"]["datafusion"]["rows"] == []
     assert result["findings"][0]["root_cause"] == "joined_order_offset_projection"
     assert result["findings"][0]["suspicious_backends"] == ["datafusion"]
@@ -295,6 +301,49 @@ def test_datafusion_groupby_limit_offset_is_candidate_bug():
         backends=DATAFUSION_BACKENDS,
     )
     assert report["verdict"] == "candidate_implementation_bug"
+
+
+@pytest.mark.skipif(
+    any(importlib.util.find_spec(name) is None for name in DATAFUSION_BACKENDS),
+    reason="datafusion comparison backends are not installed",
+)
+def test_datafusion_order_by_offset_subquery_groupby_tracks_upstream_fix():
+    import pyarrow as pa
+    from datafusion import SessionContext
+
+    query = """
+        SELECT grp, COUNT(*) AS n
+        FROM (
+          SELECT grp, sort_key
+          FROM t0
+          ORDER BY sort_key ASC NULLS LAST
+          OFFSET 1
+        ) q
+        GROUP BY grp
+        ORDER BY grp
+    """
+    schema = pa.schema(
+        [
+            pa.field("grp", pa.string(), nullable=False),
+            pa.field("sort_key", pa.int64(), nullable=False),
+        ]
+    )
+    rows = [
+        {"grp": "physical_second", "sort_key": 2},
+        {"grp": "sorted_first", "sort_key": 1},
+    ]
+    context = SessionContext()
+    context.register_record_batches(
+        "t0",
+        [[pa.RecordBatch.from_pylist(rows, schema=schema)]],
+    )
+
+    observed = context.sql(query).to_pydict()
+    expected = {"grp": ["physical_second"], "n": [1]}
+
+    if observed == expected:
+        return
+    assert observed == {"grp": ["sorted_first"], "n": [1]}
 
 
 @pytest.mark.skipif(

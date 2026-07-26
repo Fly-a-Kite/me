@@ -1,0 +1,42 @@
+{
+  "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001",
+  "seed": 940278,
+  "tables": [
+    {
+      "name": "t0",
+      "columns": [
+        {"name": "grp", "type": "str", "nullable": false},
+        {"name": "sort_key", "type": "int", "nullable": false}
+      ],
+      "rows": [
+        {"grp": "physical_second", "sort_key": 2},
+        {"grp": "sorted_first", "sort_key": 1}
+      ]
+    }
+  ],
+  "program": {
+    "program_id": "canonical-datafusion-order-by-offset-subquery-groupby-001",
+    "seed": 940278,
+    "operations": [
+      {
+        "op": "sort",
+        "keys": [{"column": "sort_key", "ascending": true, "nulls": "last"}]
+      },
+      {"op": "offset", "n": 1},
+      {
+        "op": "groupby",
+        "keys": ["grp"],
+        "aggs": [{"column": "sort_key", "func": "count", "as": "n"}]
+      },
+      {
+        "op": "sort",
+        "keys": [{"column": "grp", "ascending": true, "nulls": "last"}]
+      }
+    ]
+  },
+  "metadata": {
+    "canonical_root_id": "datafusion-order-by-offset-subquery-groupby-001",
+    "fault_model": "sort_removed_below_observable_offset",
+    "evidence_level": "submitted_pending_independent_confirmation"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "case_id": "canonical-datafusion-distinct-null-topk-001",
+  "seed": 22554,
+  "tables": [
+    {
+      "name": "t0",
+      "columns": [
+        {"name": "v", "type": "str", "nullable": true}
+      ],
+      "rows": [
+        {"v": null},
+        {"v": ""},
+        {"v": "a"}
+      ]
+    }
+  ],
+  "program": {
+    "program_id": "canonical-datafusion-distinct-null-topk-001",
+    "seed": 22554,
+    "operations": [
+      {"op": "distinct", "columns": ["v"]},
+      {
+        "op": "sort",
+        "keys": [{"column": "v", "ascending": true, "nulls": "first"}]
+      },
+      {"op": "limit", "n": 1}
+    ]
+  },
+  "metadata": {
+    "canonical_root_id": "datafusion-distinct-null-topk-001",
+    "fault_model": "distinct_topk_null_key_loss"
+  }
+}

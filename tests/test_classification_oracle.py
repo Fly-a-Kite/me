@@ -1,8 +1,11 @@
+import math
+
 from datadiff.classification_oracle import annotate_findings, classify_finding, validate_case_program
 from datadiff.datagen import generate_case
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.normalizer import NormalizedResult
 from datadiff.oracle import Finding
+from datadiff.semantic_values import encode_semantic_rows
 
 
 def _case(ops):
@@ -809,6 +812,78 @@ def test_classification_marks_order_insensitive_order_only_mismatch_false_positi
     assert classification.false_positive_reason == "order_only_normalization_mismatch"
 
 
+def test_classification_excludes_join_order_after_internal_running_sum():
+    case = Case(
+        "case-running-join-order",
+        1,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("x", "int")],
+                [{"id": 1, "x": 1}],
+            ),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("tag", "str")],
+                [{"id": 1, "tag": "alpha"}, {"id": 1, "tag": "beta"}],
+            ),
+        ],
+        Program(
+            "prog-running-join-order",
+            1,
+            [
+                {
+                    "op": "running_sum",
+                    "source": "x",
+                    "column": "run_x",
+                    "order_by": [{"column": "x", "ascending": True, "nulls": "last"}],
+                },
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "running_sum_precision",
+        "confidence": "high",
+        "suspicious_backends": ["duckdb", "pyarrow"],
+    }
+    normalized = {
+        "pandas": NormalizedResult(
+            "pandas",
+            "ok",
+            ["id", "run_x", "tag", "x"],
+            [[1, 1, "alpha", 1], [1, 1, "beta", 1]],
+        ),
+        "duckdb": NormalizedResult(
+            "duckdb",
+            "ok",
+            ["id", "run_x", "tag", "x"],
+            [[1, 1, "beta", 1], [1, 1, "alpha", 1]],
+        ),
+        "pyarrow": NormalizedResult(
+            "pyarrow",
+            "ok",
+            ["id", "run_x", "tag", "x"],
+            [[1, 1, "beta", 1], [1, 1, "alpha", 1]],
+        ),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "common"},
+        ["pandas", "duckdb", "pyarrow"],
+    )
+
+    assert case.program.order_sensitive is True
+    assert case.program.output_order_sensitive is False
+    assert classification.verdict == "normalizer_false_positive"
+    assert classification.false_positive_reason == "order_only_normalization_mismatch"
+
+
 def test_classification_uses_ordered_reference_for_order_sensitive_mismatch():
     case = Case(
         "case-order-sensitive",
@@ -1295,8 +1370,207 @@ def test_classification_marks_float_precision_order_boundary_not_candidate_bug()
     classification = classify_finding(case, finding, normalized, {}, {"generator_profile": "discovery"}, ["pandas", "duckdb"])
 
     assert classification.verdict == "expected_semantic_divergence"
+
+
+def test_classification_propagates_float_precision_boundary_through_string_cast():
+    case = Case(
+        "case-float-sum-string-cast",
+        6,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("g", "str"), ColumnSpec("x", "float")],
+                [{"g": "a", "x": 0.1}, {"g": "a", "x": 0.2}],
+            )
+        ],
+        Program(
+            "prog-float-sum-string-cast",
+            6,
+            [
+                {
+                    "op": "groupby",
+                    "keys": ["g"],
+                    "aggs": [{"column": "x", "func": "sum", "as": "sum_x"}],
+                },
+                {
+                    "op": "sort",
+                    "keys": [{"column": "sum_x", "ascending": True, "nulls": "last"}],
+                },
+                {
+                    "op": "mutate",
+                    "column": "label",
+                    "expr": {"kind": "cast", "source": "sum_x", "to": "str"},
+                },
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "float_aggregation",
+        "mismatch_class": "value",
+        "confidence": "high",
+        "suspicious_backends": ["datafusion"],
+    }
+    normalized = {
+        "pandas": NormalizedResult(
+            "pandas",
+            "ok",
+            ["g", "label", "sum_x"],
+            [["a", "0.30000000000000004", 0.30000000000000004]],
+        ),
+        "datafusion": NormalizedResult(
+            "datafusion",
+            "ok",
+            ["g", "label", "sum_x"],
+            [["a", "0.3", 0.3]],
+        ),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "common"},
+        ["pandas", "datafusion"],
+    )
+
+    assert classification.verdict == "expected_semantic_divergence"
+    assert classification.adjudication["boundary_rule_ids"] == [
+        "boundary:float_precision_relaxed_match"
+    ]
+
+
+def test_classification_treats_integer_mean_string_format_as_precision_boundary():
+    case = Case(
+        "case-int-mean-string-cast",
+        7,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("g", "str"), ColumnSpec("x", "int")],
+                [{"g": "a", "x": 0}, {"g": "a", "x": 1}, {"g": "a", "x": 1}],
+            )
+        ],
+        Program(
+            "prog-int-mean-string-cast",
+            7,
+            [
+                {
+                    "op": "groupby",
+                    "keys": ["g"],
+                    "aggs": [{"column": "x", "func": "mean", "as": "mean_x"}],
+                },
+                {
+                    "op": "mutate",
+                    "column": "label",
+                    "expr": {"kind": "cast", "source": "mean_x", "to": "str"},
+                },
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "groupby_aggregation",
+        "mismatch_class": "value",
+        "confidence": "high",
+        "suspicious_backends": ["sqlite"],
+    }
+    normalized = {
+        "pandas": NormalizedResult(
+            "pandas",
+            "ok",
+            ["g", "label", "mean_x"],
+            [["a", "0.6666666666666666", 0.6666666667]],
+        ),
+        "sqlite": NormalizedResult(
+            "sqlite",
+            "ok",
+            ["g", "label", "mean_x"],
+            [["a", "0.666666666666667", 0.6666666667]],
+        ),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "common"},
+        ["pandas", "sqlite"],
+    )
+
+    assert classification.verdict == "expected_semantic_divergence"
+    assert classification.adjudication["boundary_rule_ids"] == [
+        "boundary:float_precision_relaxed_match"
+    ]
     assert classification.paper_status == "valid_finding_not_bug"
     assert classification.false_positive is False
+
+
+def test_classification_uses_lossless_rows_for_float_precision_boundary():
+    case = Case(
+        "case-lossless-float-precision",
+        135031,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int"), ColumnSpec("value", "float")],
+                [{"id": 23, "value": -0.5}],
+            )
+        ],
+        Program(
+            "prog-lossless-float-precision",
+            135031,
+            [
+                {"op": "distinct", "columns": ["id", "value"]},
+                {
+                    "op": "mutate",
+                    "column": "ratio",
+                    "expr": {"kind": "arith_const", "op": "div", "source": "id", "value": 3},
+                },
+            ],
+        ),
+    )
+    rounded_rows = [[23, 7.6666666667, -0.5]]
+    exact = 23 / 3
+    adjacent = math.nextafter(exact, 0.0)
+    normalized = {
+        "pandas": NormalizedResult(
+            "pandas",
+            "ok",
+            ["id", "ratio", "value"],
+            rounded_rows,
+            lossless_rows=encode_semantic_rows([[23, exact, -0.5]]),
+        ),
+        "polars": NormalizedResult(
+            "polars",
+            "ok",
+            ["id", "ratio", "value"],
+            rounded_rows,
+            lossless_rows=encode_semantic_rows([[23, adjacent, -0.5]]),
+        ),
+    }
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "distinct_duplicate_elimination",
+        "confidence": "high",
+        "suspicious_backends": ["polars"],
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "typed_grammar"},
+        ["pandas", "polars"],
+    )
+
+    assert classification.verdict == "expected_semantic_divergence"
+    assert classification.adjudication["boundary_rule_ids"] == [
+        "boundary:float_precision_relaxed_match"
+    ]
 
 
 def test_classification_excludes_groupby_limit_without_order():
@@ -1470,6 +1744,297 @@ def test_classification_marks_unicode_upper_as_semantic_boundary():
     classification = classify_finding(case, finding, {}, {}, {"generator_profile": "common"}, ["pandas", "sqlite"])
 
     assert classification.verdict == "expected_semantic_divergence"
+
+
+def test_classification_reference_majority_precedes_potential_contract_boundary():
+    case = Case(
+        "case-contract-boundary-reference",
+        5,
+        [TableData("t0", [ColumnSpec("id", "int", nullable=False), ColumnSpec("dt", "str")], [{"id": 3, "dt": ""}])],
+        Program(
+            "prog-contract-boundary-reference",
+            5,
+            [
+                {"op": "mutate", "column": "year", "expr": {"kind": "date_part", "part": "year", "source": "dt"}},
+                {
+                    "op": "aggregate",
+                    "aggs": [
+                        {"as": "count_id_empty", "column": "id", "func": "count"},
+                        {"as": "sum_id_empty", "column": "id", "func": "sum"},
+                    ],
+                },
+            ],
+        ),
+    )
+    finding = {
+        "kind": "accept_reject_mismatch",
+        "root_cause": "groupby_aggregation",
+        "mismatch_class": "accept_reject",
+        "confidence": "high",
+        "suspicious_backends": ["pyarrow"],
+    }
+    normalized = {
+        "duckdb": NormalizedResult("duckdb", "ok", ["count_id_empty", "sum_id_empty"], [[1, 3]]),
+        "pandas": NormalizedResult("pandas", "ok", ["count_id_empty", "sum_id_empty"], [[1, 3]]),
+        "pyarrow": NormalizedResult(
+            "pyarrow",
+            "error",
+            [],
+            [],
+            "ArrowInvalid",
+            "Failed to parse string: '' as a scalar of type int64",
+        ),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "common"},
+        ["duckdb", "pandas", "pyarrow"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["pyarrow"]
+    assert classification.adjudication["reference_support"] == "reference_majority_support"
+
+
+def test_special_float_aggregate_contract_boundary_precedes_reference_majority():
+    case = Case(
+        "case-special-float-aggregate-reference",
+        760183,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("g", "str"), ColumnSpec("x", "float")],
+                [{"g": "b", "x": float("inf")}, {"g": "b", "x": float("nan")}],
+            )
+        ],
+        Program(
+            "prog-special-float-aggregate-reference",
+            760183,
+            [
+                {
+                    "op": "groupby",
+                    "keys": ["g"],
+                    "aggs": [
+                        {"column": "x", "func": "mean", "as": "mean_x"},
+                        {"column": "x", "func": "min", "as": "min_x"},
+                    ],
+                }
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "nan_inf_semantics",
+        "mismatch_class": "value",
+        "confidence": "high",
+        "suspicious_backends": ["datafusion"],
+    }
+    columns = ["g", "mean_x", "min_x"]
+    normalized = {
+        "pandas": NormalizedResult("pandas", "ok", columns, [["b", None, {"kind": "inf", "sign": 1}]]),
+        "duckdb": NormalizedResult("duckdb", "ok", columns, [["b", None, {"kind": "inf", "sign": 1}]]),
+        "datafusion": NormalizedResult("datafusion", "ok", columns, [["b", None, None]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "common"},
+        ["pandas", "duckdb", "datafusion"],
+    )
+
+    assert classification.verdict == "expected_semantic_divergence"
+    assert classification.adjudication["countable_as_bug_evidence"] is False
+    assert "boundary:semantic_contract_lattice" in classification.adjudication["boundary_rule_ids"]
+
+
+def test_classification_propagates_null_join_boundary_to_downstream_conditional():
+    case = Case(
+        "case-conditional-null-join-reference",
+        760180,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("x", "int", nullable=True)],
+                [{"id": 4, "x": None}],
+            ),
+            TableData(
+                "t1",
+                [
+                    ColumnSpec("id", "int", nullable=False),
+                    ColumnSpec("x", "int", nullable=True),
+                    ColumnSpec("flag", "bool", nullable=True),
+                ],
+                [{"id": 4, "x": None, "flag": True}],
+            ),
+        ],
+        Program(
+            "prog-conditional-null-join-reference",
+            760180,
+            [
+                {"op": "join", "table": "t1", "left_on": ["id", "x"], "right_on": ["id", "x"], "how": "left"},
+                {"op": "mutate", "column": "m_0", "expr": {"kind": "bool_not", "source": "flag"}},
+                {
+                    "op": "case_when",
+                    "as": "cw_0",
+                    "condition": {"column": "m_0", "cmp": "!=", "value": False},
+                    "then": True,
+                    "else": False,
+                },
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "conditional_expression",
+        "mismatch_class": "value",
+        "confidence": "high",
+        "suspicious_backends": ["pandas"],
+    }
+    columns = ["cw_0", "flag", "id", "m_0", "x"]
+    normalized = {
+        "datafusion": NormalizedResult("datafusion", "ok", columns, [[False, None, 4, None, None]]),
+        "duckdb": NormalizedResult("duckdb", "ok", columns, [[False, None, 4, None, None]]),
+        "pandas": NormalizedResult("pandas", "ok", columns, [[True, True, 4, False, None]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "common"},
+        ["datafusion", "duckdb", "pandas"],
+    )
+
+    assert classification.verdict == "expected_semantic_divergence"
+    assert classification.adjudication["countable_as_bug_evidence"] is False
+    assert "boundary:join_null_keys" in classification.adjudication["boundary_rule_ids"]
+
+
+def test_classification_downgrades_null_join_boundary_before_reference_majority():
+    case = Case(
+        "case-null-join-order-offset-reference",
+        760181,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("k", "int", nullable=True), ColumnSpec("x", "int")],
+                [{"id": 1, "k": None, "x": 10}, {"id": 2, "k": 2, "x": 20}],
+            ),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("k", "int", nullable=True), ColumnSpec("j", "int")],
+                [{"id": 1, "k": None, "j": 30}, {"id": 2, "k": 2, "j": 40}],
+            ),
+        ],
+        Program(
+            "prog-null-join-order-offset-reference",
+            760181,
+            [
+                {"op": "join", "table": "t1", "left_on": ["id", "k"], "right_on": ["id", "k"], "how": "left"},
+                {"op": "groupby", "keys": ["id"], "aggs": [{"column": "j", "func": "max", "as": "max_j"}]},
+                {"op": "sort", "columns": ["max_j", "id"], "ascending": False},
+                {"op": "select", "columns": ["id"]},
+                {"op": "offset", "n": 1},
+            ],
+        ),
+    )
+    finding = {
+        "kind": "semantic_output_mismatch",
+        "root_cause": "joined_order_offset_projection",
+        "mismatch_class": "row_count",
+        "confidence": "medium",
+        "suspicious_backends": ["pandas"],
+    }
+    normalized = {
+        "reference": NormalizedResult("reference", "ok", ["id"], [[1]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["id"], [[1]]),
+        "pandas": NormalizedResult("pandas", "ok", ["id"], [[2], [1]]),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "common"},
+        ["reference", "duckdb", "pandas"],
+    )
+
+    assert classification.verdict == "expected_semantic_divergence"
+    assert classification.adjudication["countable_as_bug_evidence"] is False
+    assert "boundary:join_null_keys" in classification.adjudication["boundary_rule_ids"]
+
+
+def test_classification_does_not_mask_accept_reject_error_as_null_join_boundary():
+    case = Case(
+        "case-null-join-accept-reject",
+        760182,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("k", "int")],
+                [{"id": 1, "k": None}],
+            ),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("k", "int"), ColumnSpec("j", "int")],
+                [{"id": 1, "k": None, "j": 30}],
+            ),
+        ],
+        Program(
+            "prog-null-join-accept-reject",
+            760182,
+            [
+                {
+                    "op": "join",
+                    "table": "t1",
+                    "left_on": ["id", "k"],
+                    "right_on": ["id", "k"],
+                    "how": "left",
+                }
+            ],
+        ),
+    )
+    finding = {
+        "kind": "accept_reject_mismatch",
+        "root_cause": "join_execution",
+        "mismatch_class": "accept_reject",
+        "confidence": "high",
+        "suspicious_backends": ["pandas"],
+    }
+    normalized = {
+        "datafusion": NormalizedResult("datafusion", "ok", ["id", "j", "k"], [[1, None, None]]),
+        "duckdb": NormalizedResult("duckdb", "ok", ["id", "j", "k"], [[1, None, None]]),
+        "pandas": NormalizedResult(
+            "pandas",
+            "error",
+            [],
+            [],
+            "AttributeError",
+            "Can only use .str accessor with string values",
+        ),
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        {},
+        {"generator_profile": "common"},
+        ["datafusion", "duckdb", "pandas"],
+    )
+
+    assert classification.verdict == "candidate_implementation_bug"
+    assert classification.implicated_backends == ["pandas"]
+    assert classification.adjudication["reference_support"] == "reference_majority_support"
 
 
 def test_classification_uses_dsl_reference_to_identify_mismatching_backend():
@@ -2482,7 +3047,7 @@ def test_classification_reference_understands_setop_all_duplicate_probe():
     )
 
     assert classification.verdict == "candidate_implementation_bug"
-    assert classification.implicated_backends == ["datafusion"]
+    assert classification.false_positive is False
 
 
 def test_validate_case_accepts_json_predicate_order_probe():
@@ -3779,6 +4344,57 @@ def test_classification_excludes_stale_pyarrow_empty_global_bool_aggregate_adapt
     assert classification.verdict == "normalizer_false_positive"
     assert classification.false_positive is True
     assert classification.false_positive_reason == "pyarrow_empty_global_bool_aggregate_adapter_error"
+
+
+def test_classification_downgrades_backend_resource_limit_accept_reject():
+    case = Case(
+        "case-resource-limit",
+        51,
+        [TableData("t0", [ColumnSpec("x", "int")], [{"x": 1}])],
+        Program("prog-resource-limit", 51, [{"op": "select", "columns": ["x"]}]),
+    )
+    finding = {
+        "kind": "accept_reject_mismatch",
+        "root_cause": "conditional_expression",
+        "mismatch_class": "accept_reject",
+        "confidence": "high",
+        "suspicious_backends": ["datafusion"],
+    }
+    normalized = {
+        "datafusion": NormalizedResult(
+            "datafusion",
+            "error",
+            [],
+            [],
+            "ValueError",
+            "SQL error: RecursionLimitExceeded (current limit: 50)",
+        ),
+        "duckdb": NormalizedResult("duckdb", "ok", ["x"], [[1]]),
+        "pandas": NormalizedResult("pandas", "ok", ["x"], [[1]]),
+    }
+    raw_results = {
+        "datafusion": {
+            "status": "error",
+            "error_type": "ValueError",
+            "error": "SQL error: RecursionLimitExceeded (current limit: 50)",
+        },
+        "duckdb": {"status": "ok", "error_type": "", "error": ""},
+        "pandas": {"status": "ok", "error_type": "", "error": ""},
+    }
+
+    classification = classify_finding(
+        case,
+        finding,
+        normalized,
+        raw_results,
+        {"generator_profile": "common"},
+        ["datafusion", "duckdb", "pandas"],
+    )
+
+    assert classification.verdict == "expected_semantic_divergence"
+    assert classification.adjudication["countable_as_bug_evidence"] is False
+    assert classification.adjudication["attribution_gate"] == "backend_resource_limit"
+    assert "boundary:backend_resource_limit" in classification.adjudication["boundary_rule_ids"]
 
 
 def test_validate_case_rejects_reserved_output_aliases():

@@ -1,11 +1,14 @@
 # Confirmed Bug Quality And 20+ Plan
 
-Last updated: 2026-06-14 CST.
+Last updated: 2026-07-04 CST.
 
 ## Current Confirmed Count
 
 `experiments/latest_confirmations.json` currently records 9 confirmed
-latest-version bug families.
+latest-version bug families. A family is countable only when it was found or
+submitted by this project and then labeled, acknowledged, or fixed upstream.
+Pre-existing upstream issues found by someone else are similar/dedup evidence,
+not confirmed bugs for the 20+ target.
 
 | Family | Backend | Evidence status | Quality |
 | --- | --- | --- | --- |
@@ -30,14 +33,53 @@ Quality summary:
 Do not count:
 
 - `polars_vector_division_rounding@polars` / `pola-rs/polars#27753`: closed as
-  duplicate/invalid, so it is not a confirmed latest-version bug.
+  duplicate/invalid, so it is not a confirmed latest-version bug. The
+  2026-07-04 deterministic audit still reproduces it on Polars 1.42.1, but it
+  remains non-countable unless upstream changes the disposition or accepts a
+  distinct issue.
+- `pandas_arrow_timestamp_index_attr_semantics@pandas` /
+  `pandas-dev/pandas#63527`: DataDiffFuzz independently redetected a possible
+  latest-version issue on pandas 3.0.3 + pyarrow 24.0.0, but the upstream issue
+  was already opened by another reporter. Treat it as similar known issue /
+  dedup evidence only unless maintainers ask for a separate issue or confirm a
+  distinct root cause. Local note:
+  `reports/pandas-arrow-timestamp-index-attr-similar-known-issue-20260704.md`.
 
 ## Path From 9 To 20+
 
 The target is at least 20 confirmed or fixed latest-version bug families. That
 means 11 more confirmations are needed.
 
-The latest machine-ranked triage queue is:
+The current machine-ranked triage queue can be regenerated from the local
+`bug-status` evidence even when the older final-readiness manifest is not
+present:
+
+```bash
+.venv/bin/datadiff bug-status --json --write-report > tmp/latest-bug-status.json
+.venv/bin/python scripts/plan_20plus_bug_triage.py \
+  --bug-status tmp/latest-bug-status.json \
+  --latest-confirmations experiments/latest_confirmations.json \
+  --candidate-outcomes reports/candidate-family-outcomes-current.json \
+  --candidate-source auto \
+  --limit 40 \
+  --output-base reports/bug-20plus-triage-plan-current
+```
+
+Current local output:
+
+- `reports/bug-20plus-triage-plan-current.json`;
+- `reports/bug-20plus-triage-plan-current.md`.
+
+The triage script first uses `final-readiness` rewardable live families when
+available, and otherwise falls back to `bug-status` recorded fresh candidate
+families from `new_issue/generated/*fresh-candidates.json`. Each row now
+includes source-manifest hints so the next triage step can locate candidate
+rows without relying on stale `runs/` paths.
+The optional candidate-outcome ledger records latest recheck, dedup, and local
+adapter false-positive outcomes as data, so these families are downgraded by
+structured evidence rather than by hardcoded family names in the ranking code.
+
+Older machine-ranked triage queue:
 
 - `reports/bug-20plus-triage-plan-20260614.json`;
 - `reports/bug-20plus-triage-plan-20260614.md`.
@@ -110,8 +152,24 @@ reproducer, the strict native-match status, and DataDiffFuzz artifact links.
 
 ### Highest-Yield Triage Buckets
 
-Start from the 277 rewardable live candidate families in
-`reports/final-readiness-20260614T103547.json`.
+Start from either:
+
+- the rewardable live candidate families in a current final-readiness manifest;
+  or
+- the `bug-status` fallback queue generated from `new_issue/generated/*fresh-candidates.json`
+  when no current final-readiness manifest is available.
+
+On 2026-07-04, the fallback queue ranked these as the top single-backend P0
+families to inspect first:
+
+- `ordering_or_limit@duckdb`
+- `groupby_aggregation@duckdb`
+- `union_all_row_append@duckdb`
+- `grouped_topk_null_sort_key@duckdb`
+- `path_projection_keyed_pick@duckdb`
+- `metamorphic_groupby_neutral_mutation@duckdb`
+- `pandas_arrow_timestamp_index_attr_semantics@pandas`
+- `distinct_duplicate_elimination@duckdb`
 
 Prioritize candidates using this order:
 
@@ -120,6 +178,15 @@ Prioritize candidates using this order:
 2. Reproducibility: prefer families already present in `new_issue/` or
    `new_issue/generated/issue-bundles/manifest.json` with executable
    reproducers.
+3. New boundary-combo profiles added on 2026-07-06:
+   `case_when_join_key_membership`,
+   `coalesce_union_distinct_type_boundary`,
+   `multi_key_anti_join_null_guard`,
+   `empty_then_union_groupby`,
+   `boolean_coalesce_case_membership`, and
+   `numeric_text_cast_membership_aggregation`. These are discovery-pressure
+   profiles only; candidates from them still need latest-version recheck,
+   minimization, dedup review, and upstream confirmation before counting.
 3. Novelty: exclude `old_issue/` duplicates and any issue closed as invalid or
    duplicate unless maintainers identify a separate accepted root cause.
 4. Root-cause clarity: prefer candidates that reduce to one backend and one
@@ -171,8 +238,10 @@ or tolerance analysis before upstream will accept them.
 3. For each queue item, produce one native minimal reproducer and one DataDiff
    artifact link.
 4. Submit no more than 3-5 polished issues per upstream project at a time.
-5. After upstream labels/fixes an issue, add it to
-   `experiments/latest_confirmations.json` and rerun final readiness.
+5. After upstream labels/fixes an issue that this project found or submitted,
+   add it to `experiments/latest_confirmations.json` with
+   `discovery_credit: datadiff_submitted` or another owned credit, then rerun
+   final readiness. Similar pre-existing issues must not be added as confirmed.
 
 ## Reporting Guidance
 
@@ -185,5 +254,6 @@ Do not yet claim:
 
 > We found 20+ confirmed bugs.
 
-That claim needs at least 11 more upstream-labeled, maintainer-acknowledged, or
-fixed latest-version families.
+That claim needs at least 11 more latest-version families that were found or
+submitted by this project and then upstream-labeled, maintainer-acknowledged, or
+fixed.

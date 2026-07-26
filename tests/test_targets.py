@@ -11,6 +11,7 @@ from datadiff.targets import (
     list_target_suites,
     resolve_target_backends,
     target_capability_matrix,
+    target_context,
     validate_target_registry,
 )
 
@@ -19,6 +20,12 @@ def test_resolve_target_suite_to_backends():
     assert resolve_target_backends(target_suite="dataframe") == ["pandas", "polars"]
     assert resolve_target_backends(target_suite="dataframe_lazy") == ["polars", "polars_lazy"]
     assert resolve_target_backends(target_suite="polars_cross") == ["pandas", "polars", "polars_lazy"]
+    assert resolve_target_backends(target_suite="polars_full_cross") == [
+        "pandas",
+        "polars",
+        "polars_lazy",
+        "polars_streaming",
+    ]
     assert resolve_target_backends(target_suite="polars_streaming_cross") == ["polars_lazy", "polars_streaming"]
     assert resolve_target_backends(target_suite="embedded_sql") == ["duckdb", "sqlite"]
     assert resolve_target_backends(target_suite="embedded_sql_cross") == ["pandas", "duckdb", "sqlite"]
@@ -27,6 +34,7 @@ def test_resolve_target_suite_to_backends():
     assert resolve_target_backends(target_suite="lazy_cross_family") == ["pandas", "polars_lazy", "duckdb"]
     assert resolve_target_backends(target_suite="core_lazy") == ["pandas", "polars", "polars_lazy", "duckdb", "sqlite"]
     assert resolve_target_backends(target_suite="datafusion_cross") == ["pandas", "duckdb", "datafusion"]
+    assert resolve_target_backends(target_suite="pandas_pyarrow") == ["pandas", "pyarrow"]
     assert resolve_target_backends(target_suite="arrow_cross") == ["pandas", "duckdb", "pyarrow"]
     assert resolve_target_backends(target_suite="latest_all_engines") == [
         "pandas",
@@ -110,6 +118,7 @@ def test_target_descriptions_capture_methodology_axes():
     assert "op:list_flatten_parent_indices_probe" in specs[0]["capabilities"]
     assert "op:rolling_mean_by_null_count_probe" in specs[0]["capabilities"]
     assert "op:csv_long_numeric_roundtrip_probe" in specs[0]["capabilities"]
+    assert "op:confirmed_root_witness_probe" in specs[0]["capabilities"]
     assert "expr:string_basename" in specs[0]["capabilities"]
     assert "expr:string_upper" in specs[0]["capabilities"]
     assert "expr:string_strip" in specs[0]["capabilities"]
@@ -240,6 +249,17 @@ def test_target_registry_validation_accepts_current_registry():
     validate_target_registry()
 
 
+def test_duckdb_does_not_advertise_foreign_arrow_or_polars_probes():
+    unsupported = {
+        "op:arrow_string_contains_na_probe",
+        "op:polars_timezone_filter_probe",
+    }
+    duckdb = set(describe_targets(["duckdb"])[0]["capabilities"])
+    shared = set(target_context(["sqlite", "duckdb"]).common_capabilities)
+    assert not (duckdb & unsupported)
+    assert not (shared & unsupported)
+
+
 def test_backend_factory_is_registry_driven_for_core_and_seeded_targets():
     pandas_backend = make_backend("pandas")
     seeded_backend = make_backend("buggy_join")
@@ -272,6 +292,7 @@ def test_environment_records_latest_target_backend_packages():
     for package in ("pandas", "polars", "duckdb", "pyarrow", "datafusion", "chdb"):
         assert package in env
         assert env[package]
+    assert len(env["source_tree_sha256"]) == 64
 
 
 def test_seeded_fault_targets_are_described():

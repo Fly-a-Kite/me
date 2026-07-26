@@ -16,6 +16,12 @@ DEFAULT_SQLANCER_NOREC_PILOT = PROJECT_ROOT / "reports" / "external-baselines" /
 DEFAULT_SQLANCER_STRICT_GLOB = "reports/external-baselines/sqlancer-fair-duckdb153-2h-3seed-20260615-*.json"
 DEFAULT_LATEST_CONFIRMATIONS = PROJECT_ROOT / "experiments" / "latest_confirmations.json"
 DEFAULT_OUTPUT_BASE = PROJECT_ROOT / "reports" / "external-baselines" / "sota-gap-snapshot-20260615"
+OWNED_DISCOVERY_CREDITS = {
+    "datadiff_found",
+    "datadiff_submitted",
+    "user_found",
+    "user_submitted",
+}
 
 
 def main() -> int:
@@ -45,8 +51,9 @@ def run_with_args(args: argparse.Namespace) -> int:
             "sqlancer_strict_manifests": [project_relative(path) for path in strict_paths],
         },
         "counting_policy": (
-            "Primary comparison count is independently confirmed latest-version bug families. "
-            "Throughput, queries, cases, candidates, and issue-ready bundles are support metrics."
+            "Primary comparison count is latest-version bug families found/submitted by this project "
+            "and independently confirmed by upstream. Similar pre-existing upstream issues are support/dedup "
+            "evidence only. Throughput, queries, cases, candidates, and issue-ready bundles are support metrics."
         ),
         "sqlancer_pqs_historical": {
             "reports": 121,
@@ -148,7 +155,11 @@ def count_latest_confirmations(latest_confirmations: dict[str, Any]) -> int:
     families = {
         str(item.get("family"))
         for item in confirmations
-        if isinstance(item, dict) and item.get("family")
+        if (
+            isinstance(item, dict)
+            and item.get("family")
+            and str(item.get("discovery_credit", "")).strip() in OWNED_DISCOVERY_CREDITS
+        )
     }
     return len(families)
 

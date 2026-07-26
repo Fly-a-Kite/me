@@ -124,12 +124,16 @@ def test_process_reducer_and_artifacts_runs_reducer_with_minimal_config_and_reex
         calls["run_loaded_case"] = {"case": case, "kwargs": dict(kwargs)}
         return {
             "stage_profile": {"backend_execution_ms": 3.0},
+            "execution_profile": {"backend_reported_total_ms": 7.0},
             "findings": [_countable_finding("reduced_root")],
             "bug_dir": "/tmp/reduced-bug",
         }
 
+    original_row = _row(findings=[_countable_finding("original_root")])
+    original_row["backend_sampling"] = {"mode": "coverage_sample"}
+    original_row["execution_profile"] = {"combined_backend_reported_total_ms": 5.0}
     result = process_reducer_and_artifacts(
-        row=_row(findings=[_countable_finding("original_root")]),
+        row=original_row,
         case=original,
         backends=["pandas", "duckdb"],
         config=ExperimentConfig(enable_reducer=True, enable_artifact=True, artifact_limit=1),
@@ -186,6 +190,12 @@ def test_process_reducer_and_artifacts_runs_reducer_with_minimal_config_and_reex
     assert result.row["artifact_saved"] is True
     assert result.saved_artifact_delta == 1
     assert result.row_stage_profile["generate_mutate_ms"] == 4.0
+    assert result.row_stage_profile["backend_execution_ms"] == 4.0
+    assert result.row_stage_profile["total_case_wall_ms"] == 8.0
+    assert result.row["backend_sampling"] == {"mode": "coverage_sample"}
+    assert result.row["execution_profile"]["original_candidate_backend_reported_total_ms"] == 5.0
+    assert result.row["execution_profile"]["combined_backend_reported_total_ms"] == 12.0
+    assert result.row["duration_ms"] == 8.0
     assert result.scheduler_elapsed_ms >= 0.0
 
 

@@ -14,6 +14,17 @@ def _descriptor() -> dict[str, str]:
     }
 
 
+def _semantic_plan_descriptor() -> dict[str, str]:
+    return {
+        **_descriptor(),
+        "descriptor_mode": "semantic_plan_qd",
+        "interaction_axis": "interaction:nullable_join",
+        "plan_axis": "plan:logical_to_hash_join",
+        "layout_axis": "layout:chunked_dictionary",
+        "cold_stratum_axis": "cold:nullable_join_chunked",
+    }
+
+
 def test_quality_archive_tracks_elites_by_utility_and_reward():
     archive = QualityDiversityArchive(max_elites_per_cluster=2)
     cluster = "profile=generic|targets=semantic_family_null|ops=filter"
@@ -159,3 +170,41 @@ def test_quality_archive_retains_only_live_seed_indexes_and_round_trips():
     assert restored.max_elites_per_cluster == 1
     assert restored.elite_indexes(first_cluster) == [1]
     assert restored.elite_indexes(second_cluster) == []
+
+
+def test_quality_archive_tracks_and_repayments_cold_stratum_debt():
+    archive = QualityDiversityArchive(cold_min_exposures=2)
+    cluster = "profile=common|targets=semantic_family_join|ops=join"
+    descriptor = _semantic_plan_descriptor()
+    archive.record_seed_multi(cluster, descriptor, 0, 2.0)
+
+    initial = archive.cold_stratum_status(descriptor)
+    archive.record_pull_multi(cluster, descriptor, 0)
+    after_one = archive.cold_stratum_status(descriptor)
+    archive.record_pull_multi(cluster, descriptor, 0)
+    repaid = archive.cold_stratum_status(descriptor)
+
+    assert initial["cold_stratum_count"] == 4
+    assert initial["total_cold_debt"] == 8
+    assert after_one["total_cold_debt"] == 4
+    assert repaid["total_cold_debt"] == 0
+    assert archive.cold_protection_bonus(descriptor) == 0.0
+
+    restored = QualityDiversityArchive.from_state_dict(archive.to_state_dict())
+    assert restored.cold_stratum_status(descriptor) == repaid
+
+
+def test_quality_archive_saturated_family_keeps_nonzero_audit_floor():
+    archive = QualityDiversityArchive(cold_min_exposures=2)
+    cluster = "profile=common|targets=semantic_family_join|ops=join"
+    descriptor = _semantic_plan_descriptor()
+    archive.record_seed_multi(cluster, descriptor, 0, 2.0)
+    archive.record_pull_multi(cluster, descriptor, 0)
+    archive.record_pull_multi(cluster, descriptor, 0)
+
+    trace = archive.energy_decision_trace(descriptor, saturated_family=True)
+
+    assert trace["cold_debt"] == 0
+    assert 0.0 < trace["effective_energy_multiplier"] < 1.0
+    assert trace["effective_energy_multiplier"] >= trace["audit_floor"]
+    assert trace["audit_floor_preserved"] is True

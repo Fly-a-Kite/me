@@ -6,9 +6,20 @@ import sys
 from argparse import Namespace
 from pathlib import Path
 
-from datadiff.backends.duckdb_backend import DuckDBBackend
+from datadiff.backends.duckdb_backend import DuckDBBackend, _duckdb_threads
 from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.duckdb_sql_export import render_duckdb_case_sql
+
+
+def test_duckdb_thread_limit_defaults_and_environment_override(monkeypatch):
+    monkeypatch.delenv("DATADIFF_DUCKDB_THREADS", raising=False)
+    assert _duckdb_threads() == 1
+
+    monkeypatch.setenv("DATADIFF_DUCKDB_THREADS", "4")
+    assert _duckdb_threads() == 4
+
+    monkeypatch.setenv("DATADIFF_DUCKDB_THREADS", "invalid")
+    assert _duckdb_threads() == 1
 
 
 def test_render_duckdb_case_sql_executes_like_duckdb_backend():
@@ -60,7 +71,7 @@ def test_render_duckdb_case_sql_executes_like_duckdb_backend():
     exported_rows = _execute_duckdb_sql(sql)
 
     assert direct.status == "ok"
-    direct_rows = [tuple(_normalize_cell(cell) for cell in row) for row in direct.data.itertuples(index=False, name=None)]
+    direct_rows = _backend_result_rows(direct.data)
     exported_rows = [tuple(_normalize_cell(cell) for cell in row) for row in exported_rows]
     assert exported_rows == direct_rows
     assert "WITH" in sql
@@ -122,6 +133,28 @@ def test_export_duckdb_queue_sql_reproducers_writes_one_passing_row_per_family(t
     assert "-- witness: kind=aggregate_value" in text
 
 
+def test_validate_duckdb_sql_export_treats_empty_stored_rows_as_reproducible(tmp_path):
+    module = _validate_module()
+    sql_path = tmp_path / "empty.sql"
+    sql_path.write_text("SELECT 1 AS x WHERE FALSE;\n", encoding="utf-8")
+    export = {
+        "family": "grouped_topk_null_sort_key@duckdb",
+        "case_id": "case-empty-duckdb-output",
+        "sql_path": str(sql_path),
+        "output_columns": ["x"],
+        "duckdb_rows": [],
+        "reference_rows": {"sqlite": [[1]]},
+    }
+
+    result = module.validate_export(export)
+
+    assert result["status"] == "ok"
+    assert result["has_stored_suspicious_rows"] is True
+    assert result["current_matches_stored_suspicious"] is True
+    assert result["current_differs_from_reference"] is True
+    assert result["verdict"] == "current_reproduces_stored_suspicious_output"
+
+
 def _queue_case() -> Case:
     return Case(
         "case-1",
@@ -171,9 +204,25 @@ def _normalize_cell(value):
     return value
 
 
+def _backend_result_rows(data):
+    if hasattr(data, "row_values"):
+        return [tuple(_normalize_cell(cell) for cell in row) for row in data.row_values]
+    return [tuple(_normalize_cell(cell) for cell in row) for row in data.itertuples(index=False, name=None)]
+
+
 def _script_module():
     path = Path(__file__).resolve().parents[1] / "scripts" / "export_duckdb_queue_sql_reproducers.py"
     spec = importlib.util.spec_from_file_location("export_duckdb_queue_sql_reproducers", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _validate_module():
+    path = Path(__file__).resolve().parents[1] / "scripts" / "validate_duckdb_sql_exports.py"
+    spec = importlib.util.spec_from_file_location("validate_duckdb_sql_exports", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module

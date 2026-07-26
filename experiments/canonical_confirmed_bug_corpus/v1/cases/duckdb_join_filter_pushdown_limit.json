@@ -1,0 +1,81 @@
+{
+  "case_id": "canonical-duckdb-join-filter-pushdown-limit-001",
+  "seed": 22924,
+  "tables": [
+    {
+      "name": "t0",
+      "columns": [
+        {"name": "id", "type": "int", "nullable": false},
+        {"name": "flag", "type": "bool", "nullable": true}
+      ],
+      "rows": [
+        {"id": 1, "flag": false},
+        {"id": 1, "flag": true},
+        {"id": 1, "flag": false},
+        {"id": 0, "flag": true},
+        {"id": 1, "flag": true},
+        {"id": 0, "flag": null},
+        {"id": 0, "flag": true},
+        {"id": 2, "flag": false},
+        {"id": 1, "flag": false},
+        {"id": 0, "flag": true},
+        {"id": 1, "flag": true},
+        {"id": 24, "flag": false},
+        {"id": 1, "flag": true},
+        {"id": 2, "flag": false}
+      ]
+    },
+    {
+      "name": "t1",
+      "columns": [
+        {"name": "id", "type": "int", "nullable": false},
+        {"name": "z", "type": "float", "nullable": true},
+        {"name": "tag", "type": "str", "nullable": true}
+      ],
+      "rows": [
+        {"id": 0, "z": 1.0, "tag": "BkcDeJw"},
+        {"id": 24, "z": 24.0, "tag": "tag_24"}
+      ]
+    },
+    {
+      "name": "keys",
+      "columns": [
+        {"name": "flag_key", "type": "bool", "nullable": false}
+      ],
+      "rows": [
+        {"flag_key": false}
+      ]
+    }
+  ],
+  "program": {
+    "program_id": "canonical-duckdb-join-filter-pushdown-limit-001",
+    "seed": 22924,
+    "operations": [
+      {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "inner"},
+      {
+        "op": "groupby",
+        "keys": ["flag"],
+        "aggs": [
+          {"column": "flag", "func": "min", "as": "min_flag"},
+          {"column": "z", "func": "max", "as": "max_z"}
+        ]
+      },
+      {
+        "op": "sort",
+        "keys": [
+          {"column": "max_z", "ascending": true, "nulls": "last"},
+          {"column": "flag", "ascending": true, "nulls": "last"},
+          {"column": "min_flag", "ascending": true, "nulls": "last"}
+        ]
+      },
+      {"op": "offset", "n": 2},
+      {"op": "select", "columns": ["flag", "min_flag"]},
+      {"op": "semi_join", "table": "keys", "left_on": "flag", "right_on": "flag_key"}
+    ]
+  },
+  "metadata": {
+    "canonical_root_id": "duckdb-join-filter-pushdown-limit-001",
+    "fault_model": "runtime_join_filter_crosses_limit_or_offset",
+    "native_execution_shape": "cte_then_inner_join_vs_materialized_control"
+  }
+}

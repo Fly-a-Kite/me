@@ -7,11 +7,19 @@ __pycache__/
 
 runs/
 bugs/
-reports/
+reports/*
+!reports/
+!reports/candidate-family-outcomes-current.json
+!reports/bug-20plus-triage-plan-owned-confirmed-20260704.json
+!reports/bug-20plus-triage-plan-owned-confirmed-20260704.md
+!reports/bug-20plus-triage-plan-owned-confirmed-20260705.json
+!reports/bug-20plus-triage-plan-owned-confirmed-20260705.md
+!reports/progress-20260704-pyarrow-adapter-false-positive-burn-down.md
 corpus/
 study/
 logs/
 plan/
+tmp/
 experiments/external_tools/
 
 FINAL_GOAL.md

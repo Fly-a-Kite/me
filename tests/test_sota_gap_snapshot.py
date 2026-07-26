@@ -121,9 +121,10 @@ def test_snapshot_counts_confirmation_artifact_when_readiness_summary_lacks_coun
         json.dumps(
             {
                 "confirmations": [
-                    {"family": "a@duckdb"},
-                    {"family": "b@datafusion"},
-                    {"family": "a@duckdb"},
+                    {"family": "a@duckdb", "discovery_credit": "datadiff_submitted"},
+                    {"family": "b@datafusion", "discovery_credit": "datadiff_submitted"},
+                    {"family": "a@duckdb", "discovery_credit": "datadiff_submitted"},
+                    {"family": "similar@pandas", "discovery_credit": "similar_existing"},
                 ]
             }
         ),

@@ -3,11 +3,13 @@ from datadiff.dsl import Case, ColumnSpec, Program, TableData
 from datadiff.metamorphic import (
     all_metamorphic_variants,
     build_metamorphic_variants,
+    build_metamorphic_variants_for_relations,
     evaluate_metamorphic_variants,
     ir_rewrite_metamorphic_rule_registry,
     select_metamorphic_variants,
 )
 from datadiff.normalizer import NormalizedResult
+from datadiff.semantic_values import LOSSLESS_VALUE_SCHEMA_VERSION, encode_semantic_value
 
 
 def test_metamorphic_builds_row_permutation_without_limit():
@@ -41,8 +43,46 @@ def test_metamorphic_exposes_semantics_preserving_ir_rewrite_rule_registry():
     assert registry["relations"]["filter_pushdown"]["operator"] == "ir_pushdown_filter"
 
 
-def test_metamorphic_ignores_float_precision_only_differences():
+def test_semi_anti_rewrite_compares_bag_semantics_not_physical_order():
+    case = Case(
+        "case-rewrite-order",
+        1,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("x", "int")],
+                [{"x": 1}, {"x": 2}],
+            )
+        ],
+        Program(
+            "prog-rewrite-order",
+            1,
+            [{"op": "sort", "columns": ["x"], "ascending": True}],
+        ),
+    )
+    base = {"backend": NormalizedResult("backend", "ok", ["x"], [[1], [2]])}
+    variants = {
+        "semi_anti_join_rewrite:semi_join-op-0": {
+            "backend": NormalizedResult(
+                "backend",
+                "ok",
+                ["x"],
+                [[2], [1]],
+            )
+        }
+    }
+
+    findings = evaluate_metamorphic_variants(case, base, variants)
+
+    assert findings == []
+
+
+def test_metamorphic_ignores_float_precision_only_with_explicit_tolerance():
     case = generate_case(9)
+    case.metadata["semantic_comparison"] = {
+        "view": "numeric_tolerant",
+        "numeric_decimals": 10,
+    }
     base = {"polars_lazy": NormalizedResult("polars_lazy", "ok", ["x"], [[0.11111111111111109]])}
     variants = {
         "join_inner_left_equivalence:0": {
@@ -69,6 +109,48 @@ def test_metamorphic_finding_records_status_mismatch_class():
     assert len(findings) == 1
     assert findings[0].mismatch_class == "status"
     assert "mismatch_class=status" in findings[0].evidence
+
+
+def test_metamorphic_method_arm_can_replay_legacy_lossy_comparison():
+    case = Case(
+        "case-mr-method-comparison",
+        1,
+        [TableData("t0", [ColumnSpec("x", "float")], [{"x": float("nan")}])],
+        Program("prog-mr-method-comparison", 1, [{"op": "select", "columns": ["x"]}]),
+    )
+    base_result = NormalizedResult(
+        "engine",
+        "ok",
+        ["x"],
+        [[None]],
+        lossless_rows=[[encode_semantic_value(None)]],
+        lossless_schema_version=LOSSLESS_VALUE_SCHEMA_VERSION,
+    )
+    variant_result = NormalizedResult(
+        "engine",
+        "ok",
+        ["x"],
+        [[None]],
+        lossless_rows=[[encode_semantic_value(float("nan"))]],
+        lossless_schema_version=LOSSLESS_VALUE_SCHEMA_VERSION,
+    )
+    variants = {"filter_idempotence:duplicate-0": {"engine": variant_result}}
+
+    assert evaluate_metamorphic_variants(
+        case,
+        {"engine": base_result},
+        variants,
+        comparison_mode="legacy",
+    ) == []
+    findings = evaluate_metamorphic_variants(
+        case,
+        {"engine": base_result},
+        variants,
+        comparison_mode="contract",
+    )
+    assert len(findings) == 1
+    assert "contract" not in findings[0].oracle
+    assert "view=" in findings[0].evidence
 
 
 def test_metamorphic_skips_row_permutation_with_limit():
@@ -528,6 +610,51 @@ def test_metamorphic_builds_multi_key_semi_anti_join_right_duplicate_injection()
     variant = next(v for v in variants if v.relation == "semi_anti_join_right_duplicate_injection")
     assert variant.case.tables[1].rows[-1] == {"rid": 1, "rg": "a", "tag": "one"}
     assert variant.case.program.operations == case.program.operations
+
+
+def test_metamorphic_skips_right_duplicate_when_table_is_reused_elsewhere():
+    case = Case(
+        "case-reused-semi-right",
+        11,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int")],
+                [{"id": 1}],
+            ),
+            TableData(
+                "lookup",
+                [ColumnSpec("id", "int")],
+                [{"id": 1}],
+            ),
+        ],
+        Program(
+            "prog-reused-semi-right",
+            11,
+            [
+                {
+                    "op": "join",
+                    "table": "lookup",
+                    "left_on": "id",
+                    "right_on": "id",
+                    "how": "inner",
+                },
+                {
+                    "op": "semi_join",
+                    "table": "lookup",
+                    "left_on": "id",
+                    "right_on": "id",
+                },
+            ],
+        ),
+    )
+
+    variants = build_metamorphic_variants_for_relations(
+        case,
+        ["semi_anti_join_right_duplicate_injection"],
+    )
+
+    assert variants == []
 
 
 def test_metamorphic_builds_semi_anti_join_unmatched_right_injection():
@@ -1115,6 +1242,34 @@ def test_metamorphic_builds_join_inner_left_equivalence_when_keys_are_covered():
     assert variant.case.program.operations[0]["how"] == "inner"
 
 
+def test_metamorphic_skips_join_inner_left_equivalence_for_null_left_keys():
+    case = Case(
+        "case-join-null-left-key",
+        1901,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int", nullable=True), ColumnSpec("x", "int")],
+                [{"id": 1, "x": 10}, {"id": None, "x": 20}],
+            ),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int", nullable=True), ColumnSpec("j", "int")],
+                [{"id": 1, "j": 100}, {"id": None, "j": 200}],
+            ),
+        ],
+        Program(
+            "prog-join-null-left-key",
+            1901,
+            [{"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"}],
+        ),
+    )
+
+    variants = build_metamorphic_variants(case, limit=20)
+
+    assert not any(variant.relation == "join_inner_left_equivalence" for variant in variants)
+
+
 def test_metamorphic_builds_join_filter_pushdown_for_left_column():
     case = Case(
         "case-join-filter-pushdown",
@@ -1442,6 +1597,37 @@ def test_domain_metamorphic_injects_unmatched_dimension_row():
     assert variant.case.tables[0].rows == case.tables[0].rows
     assert variant.case.tables[1].rows[-1]["id"] not in {1, 2}
     assert variant.case.tables[1].rows[-1]["tag"] == ""
+
+
+def test_domain_metamorphic_skips_unmatched_dimension_row_when_right_table_is_reused():
+    case = Case(
+        "case-enrichment-reused-right",
+        1902,
+        [
+            TableData(
+                "t0",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("x", "int")],
+                [{"id": 1, "x": 10}, {"id": 2, "x": 20}],
+            ),
+            TableData(
+                "t1",
+                [ColumnSpec("id", "int", nullable=False), ColumnSpec("tag", "str")],
+                [{"id": 1, "tag": "gold"}, {"id": 2, "tag": "silver"}],
+            ),
+        ],
+        Program(
+            "prog-enrichment-reused-right",
+            1902,
+            [
+                {"op": "join", "table": "t1", "left_on": "id", "right_on": "id", "how": "left"},
+                {"op": "semi_join", "table": "t1", "left_on": "id", "right_on": "id"},
+            ],
+        ),
+    )
+
+    variants = build_metamorphic_variants(case, limit=20)
+
+    assert not any(variant.relation == "join_unmatched_dimension_injection" for variant in variants)
 
 
 def test_domain_metamorphic_repeats_string_lower_normalization():

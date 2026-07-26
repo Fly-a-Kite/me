@@ -1,0 +1,36 @@
+{
+  "case_id": "canonical-datafusion-grouped-null-topk-001",
+  "seed": 917531,
+  "tables": [
+    {
+      "name": "t0",
+      "columns": [
+        {"name": "g", "type": "str", "nullable": true},
+        {"name": "x", "type": "int", "nullable": true}
+      ],
+      "rows": [
+        {"g": "a", "x": null}
+      ]
+    }
+  ],
+  "program": {
+    "program_id": "canonical-datafusion-grouped-null-topk-001",
+    "seed": 917531,
+    "operations": [
+      {
+        "op": "groupby",
+        "keys": ["g"],
+        "aggs": [{"column": "x", "func": "min", "as": "min_x"}]
+      },
+      {
+        "op": "sort",
+        "keys": [{"column": "min_x", "ascending": true, "nulls": "last"}]
+      },
+      {"op": "limit", "n": 20}
+    ]
+  },
+  "metadata": {
+    "canonical_root_id": "datafusion-grouped-null-topk-001",
+    "fault_model": "topk_null_group_loss"
+  }
+}

@@ -67,3 +67,95 @@ def test_behavioral_descriptor_uses_pairwise_backend_disagreement_axis():
 
     assert axes["bd_backend_disagreement"] == "pair:duckdb_pandas"
     assert descriptor.to_dict()["backend_disagreement_axis"] == "pair:duckdb_pandas"
+
+
+def test_semantic_plan_descriptor_adds_interaction_plan_layout_and_cold_axes():
+    case = _case(4)
+    case.metadata["interaction_descriptor"] = {
+        "tokens": [
+            {
+                "category": "semantic_physical",
+                "components": ["backend=datafusion", "operator=sort", "op=limit"],
+            },
+            {
+                "category": "plan_state",
+                "components": [
+                    "backend=datafusion",
+                    "mode=query_engine",
+                    "kind=physical",
+                    "operators=limit",
+                ],
+            },
+            {
+                "category": "plan_edge",
+                "components": [
+                    "backend=datafusion",
+                    "edge=optimized_logical->physical",
+                    "changed=true",
+                    "added=none",
+                    "removed=sort",
+                ],
+            },
+            {
+                "category": "order_required_plan_sort_loss",
+                "components": ["backend=datafusion", "logical_sort_count=1"],
+            },
+        ]
+    }
+    case.metadata["input_layouts"] = {
+        "t0": {
+            "representation": "chunked",
+            "chunk_count": 3,
+            "dictionary_columns": ["g"],
+            "attributes": {"slice_offset": 1},
+        }
+    }
+
+    legacy = compute_behavioral_descriptor(case, mode="legacy_qd")
+    semantic_plan = compute_behavioral_descriptor(case, mode="semantic_plan_qd")
+    axes = dict(semantic_plan.axis_tuples())
+
+    assert "bd_interaction" not in dict(legacy.axis_tuples())
+    assert axes["bd_interaction"].startswith("interaction:")
+    assert axes["bd_plan"].startswith("plan:")
+    assert axes["bd_layout"].startswith("layout:")
+    assert axes["bd_cold_stratum"].startswith("cold:")
+    assert BehavioralDescriptor.from_dict(semantic_plan.to_dict()) == semantic_plan
+
+
+def test_plan_axis_distinguishes_logical_to_physical_edge_changes():
+    first = _case(5)
+    second = _case(6)
+    first.metadata["interaction_descriptor"] = {
+        "tokens": [
+            {
+                "category": "plan_edge",
+                "components": [
+                    "backend=datafusion",
+                    "edge=optimized_logical->physical",
+                    "changed=true",
+                    "added=none",
+                    "removed=sort",
+                ],
+            }
+        ]
+    }
+    second.metadata["interaction_descriptor"] = {
+        "tokens": [
+            {
+                "category": "plan_edge",
+                "components": [
+                    "backend=datafusion",
+                    "edge=optimized_logical->physical",
+                    "changed=false",
+                    "added=none",
+                    "removed=none",
+                ],
+            }
+        ]
+    }
+
+    first_axis = compute_behavioral_descriptor(first, mode="semantic_plan_qd").plan_axis
+    second_axis = compute_behavioral_descriptor(second, mode="semantic_plan_qd").plan_axis
+
+    assert first_axis != second_axis

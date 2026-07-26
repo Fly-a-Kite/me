@@ -3690,8 +3690,16 @@ def test_final_readiness_counts_external_upstream_confirmation_without_rewarding
                 {
                     "family": "grouped_topk_null_sort_key@datafusion",
                     "issue_url": "https://github.com/apache/datafusion/issues/22190",
+                    "discovery_credit": "datadiff_submitted",
                     "upstream_status": "upstream_labeled_bug",
                     "labels": ["bug"],
+                },
+                {
+                    "family": "similar_existing@pandas",
+                    "issue_url": "https://github.com/pandas-dev/pandas/issues/63527",
+                    "discovery_credit": "similar_existing",
+                    "upstream_status": "upstream_labeled_bug",
+                    "labels": ["Bug"],
                 }
             ],
         },

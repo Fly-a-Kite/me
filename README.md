@@ -25,17 +25,40 @@
 - ablation experiment matrix
 - pytest 自动测试
 
+当前 live 默认方法为 `p8_candidate_v1`。它以冻结的 `p5_promoted_method` 为 parent，
+screening 只持久化物理计划 fingerprint；finding 的完整计划复用 fresh recheck，不增加
+plan-only backend call。P2/P4/P5 等历史消融通过 `--research-control-arm` 显式选择，P7
+RLCMF 只保留 shadow/replay 证据，不进入 live import path。
+
+semantic-witness arm 只改变 generation mode，不使用 LLM/RAG。最新
+`p8_semantic_witness_global_v4` 在 global-v3 的 22 族/306 cells 上增加 cross-backend
+issue-risk、exact-dtype 与 PyArrow layout-interaction 三族，形成 25 族/376 个精确 cells、
+69 个 required backend pairs；新增 70 cells 的 350 个后端结果全部为 `ok`。最终 3×376
+paired screening 中 treatment activation 为 1128/1128，preflight repair/invalid/fallback
+均为 0，canonical recall 为 9/9。process-CPU、wall 与 evidence-byte ratio 分别为
+0.8417（95% CI [0.8257, 0.8520]）、0.8258（[0.8164, 0.8322]）和
+1.1260（[1.1216, 1.1284]），三项 CI 上界均通过 1.25 门。fresh survivor 与 fresh
+candidate family 均为 0，因此不能声明缺陷产出提升。global-v4 已晋级为默认
+coverage/regression screening arm，而 `p8_candidate_v1` 继续作为开放式 discovery 默认，
+避免用有限 376-cell 循环替代持续探索。
+设计、审计结果和最终实验 gate 见
+`docs/semantic_activation_witness_final_experiment.md`。
+
 快速开始：
 
 ```bash
-cd /Users/fly/datadiff_fuzz_lab
+cd datadiff_fuzz_lab
 python3 -m venv .venv
-.venv/bin/python -m pip install -e '.[test]'
+.venv/bin/python -m pip install --require-hashes -r requirements-final.lock
+.venv/bin/python -m pip install --no-deps -e .
 .venv/bin/pytest -q
 .venv/bin/datadiff fuzz --cases 100 --seed 1 --backends pandas,polars,duckdb,sqlite
 .venv/bin/datadiff report
 .venv/bin/datadiff show-bugs
 ```
+
+固定环境也可由 `Dockerfile.final` 构建。`requirements-final.lock` 固定 Python 3.12
+环境中的直接与传递依赖，并校验对应 Linux wheel 的 SHA-256。
 
 自动化最新版本 bug 审计：
 
@@ -100,6 +123,18 @@ classification 单独分离，不会自动计入 fresh。每个 lane 使用对�
 evidence 聚合成一个 `new_issue/generated/discovery-campaign-manifest.json`。这比直接跑一个 all-engine
 长任务更容易定位是哪类深层语义空间产出了候选，也方便后续增加新的 lane。`--list-lanes --json`
 会输出机器可读 lane catalog，便于实验脚本选择目标。
+
+另外可显式选择 `pandas_targeted_boundaries`、`polars_targeted_boundaries` 和
+`datafusion_targeted_boundaries` 三个非默认 lane。它们均使用 differential-only、fresh-generation
+配置，按 seed 精确轮转 bitmap/vector batch 边界、宽 schema projection、skewed join、UTF-8
+slice/length 和带唯一 tie-breaker 的 window 场景，不读取 champion corpus，也不执行 metamorphic
+variant。建议先用多个独立短 run 验证新鲜度，再按产出率扩大预算，例如：
+
+```bash
+.venv/bin/datadiff discovery-campaign --lanes pandas_targeted_boundaries --cases 250 --seeds 11001,11002 --watch-health --output-manifest new_issue/generated/discovery-campaign-pandas-targeted.json
+.venv/bin/datadiff discovery-campaign --lanes polars_targeted_boundaries --cases 350 --seeds 12001,12002 --watch-health --output-manifest new_issue/generated/discovery-campaign-polars-targeted.json
+.venv/bin/datadiff discovery-campaign --lanes datafusion_targeted_boundaries --cases 400 --seeds 13001,13002 --watch-health --output-manifest new_issue/generated/discovery-campaign-datafusion-targeted.json
+```
 
 `discovery-campaign` 现在会根据最近 lane 的产出率、novelty 和 false-positive 惩罚动态重排下一轮 lane，
 并把 score、budget multiplier、yield/novelty/fp 摘要写入 manifest，便于后续自动调预算。
@@ -357,6 +392,39 @@ mixed group cardinality、null/Unicode/string-case 边界等。`contribution pru
 backend implementation bug。可用
 `--disable-preflight-validation` 或 `--disable-preflight-repair` 做消融。
 
+目标无关的探索/吞吐联合优化：
+
+```bash
+.venv/bin/datadiff discovery-run \
+  --preset coverage_throughput \
+  --target-suite latest_all_engines \
+  --duration 2h
+```
+
+`coverage_throughput` 不包含任何 backend 名称或特例。它从当前 target registry 读取目标集合，
+先用 full suite 做校准，再在长期无 candidate 的平台期按“最少覆盖 backend / backend-pair”选择
+小型差分子集；每隔固定 case 数执行 full sweep。任何 sampled 或 full candidate 都会触发一段
+full-suite burst，sampled candidate 还会在保存 artifact 前立即用完整目标集合确认。因此优化对象是
+`可复验新 candidate / 时间`，不是单纯把 cases/s 做高。可独立控制：
+
+- `--backend-sample-size`: 每个筛选 case 的目标数，至少为 2。
+- `--backend-full-sweep-interval`: 周期性完整目标检查间隔。
+- `--backend-sampling-calibration-cases`: 开始采样前的完整目标校准数。
+- `--backend-sampling-candidate-burst-cases`: 发现信号后连续执行完整目标的 case 数。
+- `--no-backend-sample-confirm-candidates`: 只用于消融；正式发现不建议关闭全目标确认。
+
+运行时同时复用单个 backend worker pool；同一 case 的 MR variants 按 backend 分组，每个 backend
+在自己的 worker 内串行处理，既减少逐 variant barrier，又不并发访问同一 backend 实例。MR variant、
+candidate recheck 和 reducer 复验保留完整 stage cost。`runs/*.meta.json` 的 `discovery_efficiency` 报告 signal/s、candidate/s、recheck-survival/s、
+backend CPU-hour proxy 和 sampled-confirmation survival，`execution.backend_sampling.coverage` 报告每个
+目标及目标对的最小/最大覆盖次数。采样感知 signature 会抽象掉“本轮恰好选择了哪些一致后端”，
+避免把目标集合轮换误计成新行为；真正的 mismatch root 和 suspicious backend 仍保留在 signature 中。
+其中 backend CPU-hour proxy 累计 base、MR variants、candidate recheck、sampled/full confirmation 和
+reducer 复验的全部 backend-reported 时间，不能用只含 base case 的旧 run 做跨版本效率比较。
+feedback planner 还会在一个 seed-energy batch 内复用 parent 选择时的 frontier 快照，并分别缓存
+只依赖学习 outcome 的 operator/value/behavioral-axis 分数；recent-use penalty 仍逐次更新，因此该优化
+只消除重复评分，不缩小 candidate pool 或探索空间。
+
 自动分类 finding：
 
 ```bash
@@ -410,6 +478,21 @@ metamorphic oracle 的单后端关系违例也会被提升为候选实现 bug。
 .venv/bin/datadiff analyze-experiment --refresh
 .venv/bin/datadiff methodology-report --refresh
 ```
+
+静态并行 `experiment` 默认让每个 child process 最多连续执行 4 个 matrix runs，并在每个
+run 后记录 RSS；达到 2048 MiB 时会完成当前 run 后回收 child，worker/job 失败默认重试一次：
+
+```bash
+.venv/bin/datadiff experiment ... \
+  --jobs 4 \
+  --worker-batch-size 4 \
+  --worker-max-rss-mib 2048 \
+  --worker-retry-limit 1
+```
+
+manifest 的 `worker_batching` 区块记录 batch、PID、逐 run RSS、回收和 replay。设
+`--worker-batch-size 0` 可恢复旧的无上限 process-pool 复用；串行和 adaptive schedule 保持
+原有执行路径。
 
 消融和 related-scope/baseline 对比应使用 `ablation` / `comparison` evidence mode，
 避免被 final-readiness 或 run journal 误计入最新版本 live bug evidence。

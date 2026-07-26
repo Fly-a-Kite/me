@@ -1,6 +1,10 @@
+from copy import deepcopy
+
 from datadiff import runner
 from datadiff.run_signatures import (
     behavior_signature,
+    coverage_discovery_signature,
+    coverage_signal_signature,
     discovery_signature,
     row_count_bucket,
     signal_signature,
@@ -74,3 +78,14 @@ def test_discovery_signature_tracks_row_count_bucket_and_root_bucket():
     assert discovery_signature(base) != discovery_signature(same_bucket)
     assert discovery_signature(base) != discovery_signature(different_bucket)
     assert discovery_signature(base) != discovery_signature(different_root)
+
+
+def test_coverage_signatures_do_not_treat_backend_rotation_as_new_behavior():
+    subset = _row()
+    full = deepcopy(subset)
+    full["normalized"]["sqlite"] = deepcopy(full["normalized"]["pandas"])
+
+    assert discovery_signature(subset) != discovery_signature(full)
+    assert signal_signature(subset) != signal_signature(full)
+    assert coverage_discovery_signature(subset) == coverage_discovery_signature(full)
+    assert coverage_signal_signature(subset) == coverage_signal_signature(full)
