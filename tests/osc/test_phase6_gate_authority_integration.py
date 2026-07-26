@@ -1874,3 +1874,305 @@ def test_builder_does_not_accept_manifest_claims_or_authority_flags():
     assert "claimed_metrics" not in parameters
     assert "thresholds" not in parameters
     assert "twenty_four_hour_run_authorized" not in parameters
+
+
+def _repository_test_receipt_for_provenance(
+    *,
+    source_digest: str,
+    config_digest: str | None = None,
+):
+    from datadiff_osc.runtime._private_receipts import (
+        RepositoryTestNodeBinding,
+        RepositoryTestReceipt,
+        repository_test_collection_digest,
+    )
+
+    node_ids = ("tests/a.py::test_a", "tests/b.py::test_b")
+    nodes = tuple(
+        RepositoryTestNodeBinding(
+            node_id=node_id,
+            outcome="passed",
+            result_digest=stable_digest(
+                "test-root-repository-provenance-node",
+                {"source_digest": source_digest, "node_id": node_id},
+            ),
+        )
+        for node_id in node_ids
+    )
+    return RepositoryTestReceipt(
+        source_digest=source_digest,
+        test_plan_digest=stable_digest("test-root-repository-provenance", "plan"),
+        collection_digest=repository_test_collection_digest(node_ids),
+        config_digest=config_digest
+        or stable_digest("test-root-repository-provenance", "config"),
+        environment_digest=stable_digest("test-root-repository-provenance", "env"),
+        command_digest=stable_digest("test-root-repository-provenance", "command"),
+        junit_sha256=_sha256(b"repository-provenance-junit"),
+        log_sha256=_sha256(b"repository-provenance-log"),
+        exit_code=0,
+        nodes=nodes,
+    )
+
+
+def _repository_test_provenance_index(
+    tmp_path: Path,
+    *,
+    include_provenance: bool = True,
+):
+    from datadiff_osc.runtime._phase6_repository_test_provenance import (
+        REPOSITORY_TEST_PRODUCTION_PROVENANCE_ENVELOPE_TYPE,
+        REPOSITORY_TEST_PRODUCTION_PROVENANCE_SCHEMA_VERSION,
+        build_repository_test_production_provenance,
+        canonical_repository_test_production_provenance_envelope,
+    )
+
+    source_digest = stable_digest("test-root-repository-provenance", "source")
+    provenance = build_repository_test_production_provenance(
+        receipt=_repository_test_receipt_for_provenance(source_digest=source_digest),
+        collection_sha256=_sha256(b"repository-provenance-collection"),
+    )
+    receipt_path = tmp_path / "repository-provenance-receipt.json"
+    receipt_text = canonical_envelope(
+        "RepositoryTestReceipt",
+        provenance.receipt.schema_version,
+        provenance.receipt,
+    )
+    receipt_path.write_text(receipt_text, encoding="utf-8")
+    provenance_path = tmp_path / "repository-production-proof.json"
+    provenance_text = canonical_repository_test_production_provenance_envelope(
+        provenance
+    )
+    provenance_path.write_text(provenance_text, encoding="utf-8")
+    producer: dict[str, object] = {
+        "schema_version": authority_module.TYPED_PRODUCER_RECEIPT_SCHEMA_VERSION,
+        "receipt_id": "repository-provenance-producer",
+        "producer_kind": "repository_test_replay",
+        "artifact_id": "repository-provenance-artifact",
+        "admissions": [
+            {
+                "admission_id": "repository-admission-001",
+                "subject_kind": "repository_tests",
+                "subject_ids": list(provenance.receipt.node_ids),
+                "envelope_path": receipt_path.name,
+                "envelope_sha256": _sha256(receipt_text.encode()),
+                "envelope_type": "RepositoryTestReceipt",
+                "envelope_schema_version": provenance.receipt.schema_version,
+            }
+        ],
+    }
+    if include_provenance:
+        producer["repository_test_provenance"] = [
+            {
+                "admission_id": "repository-admission-001",
+                "provenance_path": provenance_path.name,
+                "provenance_sha256": _sha256(provenance_text.encode()),
+                "provenance_type": (
+                    REPOSITORY_TEST_PRODUCTION_PROVENANCE_ENVELOPE_TYPE
+                ),
+                "provenance_schema_version": (
+                    REPOSITORY_TEST_PRODUCTION_PROVENANCE_SCHEMA_VERSION
+                ),
+            }
+        ]
+    payload: dict[str, object] = {
+        "schema_version": ARTIFACT_RECEIPT_SCHEMA_VERSION,
+        "source_digest": source_digest,
+        "dynamic_plan_sha256": _sha256(b"repository-provenance-dynamic-plan"),
+        "producer_receipts": [producer],
+        "artifacts": [],
+    }
+    return provenance, receipt_path, provenance_path, payload
+
+
+def _verify_repository_test_provenance_index(
+    tmp_path: Path,
+    payload: dict[str, object],
+    *,
+    expected_source_digest: str | None = None,
+):
+    index_path = tmp_path / "repository-provenance-index.json"
+    raw = canonical_json(payload).encode()
+    index_path.write_bytes(raw)
+    return verify_artifact_receipt_index(
+        index_path=index_path,
+        expected_index_sha256=_sha256(raw),
+        expected_source_digest=(
+            expected_source_digest
+            if expected_source_digest is not None
+            else str(payload["source_digest"])
+        ),
+        expected_dynamic_plan_sha256=str(payload["dynamic_plan_sha256"]),
+    )
+
+
+def test_repository_test_replay_without_provenance_still_waits_for_root_provenance(
+    tmp_path,
+):
+    receipt = _repository_test_receipt_for_provenance(
+        source_digest=stable_digest("test-root-repository-provenance", "source")
+    )
+    verified, errors = _verify_single_admission(
+        tmp_path,
+        producer_kind="repository_test_replay",
+        envelope_type="RepositoryTestReceipt",
+        schema_version=receipt.schema_version,
+        payload=receipt,
+        subject_kind="repository_tests",
+        subject_ids=list(receipt.node_ids),
+    )
+
+    assert verified is None
+    assert errors == (
+        "typed_admission_root_provenance_pending_phase6:single-admission",
+    )
+
+
+def test_repository_admission_without_provenance_entry_fails_closed_in_index(
+    tmp_path,
+):
+    _, _, _, payload = _repository_test_provenance_index(
+        tmp_path, include_provenance=False
+    )
+
+    verified = _verify_repository_test_provenance_index(tmp_path, payload)
+
+    assert not verified.valid
+    producer = verified.producer_map()["repository_test_replay"]
+    assert producer.repository_test_provenance == ()
+    assert not any(
+        admission.envelope_type == "RepositoryTestReceipt"
+        for admission in producer.admissions
+    )
+    assert (
+        "typed_admission_root_provenance_pending_phase6:repository-admission-001"
+        in verified.verification_errors
+    )
+
+
+def test_repository_admission_with_verified_provenance_is_retained(tmp_path):
+    provenance, _, _, payload = _repository_test_provenance_index(tmp_path)
+
+    verified = _verify_repository_test_provenance_index(tmp_path, payload)
+
+    producer = verified.producer_map()["repository_test_replay"]
+    assert tuple(item.admission_id for item in producer.admissions) == (
+        "repository-admission-001",
+    )
+    assert tuple(
+        item.admission_id for item in producer.repository_test_provenance
+    ) == ("repository-admission-001",)
+    binding = producer.repository_test_provenance[0]
+    assert binding.receipt_digest == provenance.receipt.digest
+    assert binding.provenance_id == provenance.provenance_id
+    assert binding.provenance_digest == provenance.digest
+    assert binding.collection_digest == provenance.receipt.collection_digest
+    assert binding.source_snapshot_digest == provenance.receipt.source_digest
+    assert not any(
+        error.startswith("repository_test_provenance_")
+        or error.startswith("typed_admission_")
+        for error in verified.verification_errors
+    )
+    assert not verified.valid  # The 9 other producers are still missing.
+
+
+@pytest.mark.parametrize(
+    ("case", "expected_error"),
+    (
+        (
+            "wrong_hash",
+            "repository_test_provenance_hash_mismatch:repository-admission-001",
+        ),
+        (
+            "wrong_source",
+            "repository_test_provenance_source_mismatch:repository-admission-001",
+        ),
+        (
+            "receipt_mismatch",
+            "repository_test_provenance_receipt_mismatch:repository-admission-001",
+        ),
+        (
+            "synthetic_marker",
+            "repository_test_provenance_synthetic_rejected:repository-admission-001",
+        ),
+        (
+            "path_escape",
+            "repository_test_provenance_path_escape:repository-admission-001",
+        ),
+        (
+            "type_mismatch",
+            "repository_test_provenance_type_mismatch:repository-admission-001",
+        ),
+        (
+            "missing_admission",
+            "repository_test_provenance_admission_missing:other-admission",
+        ),
+    ),
+)
+def test_repository_provenance_binding_forgeries_fail_closed(
+    tmp_path, case, expected_error
+):
+    from datadiff_osc.runtime._phase6_repository_test_provenance import (
+        build_repository_test_production_provenance,
+        canonical_repository_test_production_provenance_envelope,
+    )
+
+    provenance, _, provenance_path, payload = _repository_test_provenance_index(
+        tmp_path
+    )
+    producer = payload["producer_receipts"][0]
+    assert isinstance(producer, dict)
+    proof = producer["repository_test_provenance"]
+    assert isinstance(proof, list) and isinstance(proof[0], dict)
+    expected_source_digest = None
+
+    if case == "wrong_hash":
+        proof[0]["provenance_sha256"] = "0" * 64
+    elif case == "wrong_source":
+        expected_source_digest = stable_digest(
+            "test-root-repository-provenance", "other-source"
+        )
+        payload["source_digest"] = expected_source_digest
+    elif case == "receipt_mismatch":
+        other = build_repository_test_production_provenance(
+            receipt=_repository_test_receipt_for_provenance(
+                source_digest=provenance.receipt.source_digest,
+                config_digest=stable_digest(
+                    "test-root-repository-provenance", "other-config"
+                ),
+            ),
+            collection_sha256=_sha256(b"repository-provenance-collection"),
+        )
+        other_text = canonical_repository_test_production_provenance_envelope(other)
+        provenance_path.write_text(other_text, encoding="utf-8")
+        proof[0]["provenance_sha256"] = _sha256(other_text.encode())
+    elif case == "synthetic_marker":
+        renamed = provenance_path.with_name("repository-synthetic-proof.json")
+        provenance_path.rename(renamed)
+        proof[0]["provenance_path"] = renamed.name
+    elif case == "path_escape":
+        outside = tmp_path.parent / "repository-provenance-outside"
+        outside.mkdir(exist_ok=True)
+        moved = outside / provenance_path.name
+        shutil.move(str(provenance_path), str(moved))
+        link = tmp_path / "escape-link"
+        link.symlink_to(outside, target_is_directory=True)
+        proof[0]["provenance_path"] = f"{link.name}/{moved.name}"
+    elif case == "type_mismatch":
+        proof[0]["provenance_type"] = "ParallelScalingProductionProvenance"
+    elif case == "missing_admission":
+        proof[0]["admission_id"] = "other-admission"
+    else:  # pragma: no cover - protects the parametrized case list.
+        raise AssertionError(case)
+
+    verified = _verify_repository_test_provenance_index(
+        tmp_path, payload, expected_source_digest=expected_source_digest
+    )
+
+    assert not verified.valid
+    assert expected_error in verified.verification_errors
+    producer_result = verified.producer_map()["repository_test_replay"]
+    assert producer_result.repository_test_provenance == ()
+    assert not any(
+        admission.envelope_type == "RepositoryTestReceipt"
+        for admission in producer_result.admissions
+    )
