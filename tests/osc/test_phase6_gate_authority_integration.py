@@ -2188,3 +2188,329 @@ def test_repository_provenance_binding_forgeries_fail_closed(
         admission.envelope_type == "RepositoryTestReceipt"
         for admission in producer_result.admissions
     )
+
+
+def _target_version_receipt_for_provenance(
+    *,
+    source_digest: str,
+    environment_digest: str | None = None,
+):
+    from datadiff_osc.runtime._private_receipts import (
+        TargetPackageVersionBinding,
+        TargetVersionReceipt,
+    )
+
+    packages = tuple(
+        TargetPackageVersionBinding(
+            package_id=package_id,
+            distribution_name=distribution,
+            import_name=import_name,
+            installed_version=version,
+            latest_version=version,
+            installed_metadata_digest=stable_digest(
+                "test-root-target-version-provenance-package",
+                {"source_digest": source_digest, "package_id": package_id},
+            ),
+            version_source_kind="pypi_json",
+            version_source_digest=stable_digest(
+                "test-root-target-version-provenance-source",
+                package_id,
+            ),
+            version_source_sha256=_sha256(
+                f"target-version-provenance-source-{package_id}".encode()
+            ),
+        )
+        for package_id, distribution, import_name, version in (
+            ("target:alpha", "alpha-dist", "alpha", "1.2.3"),
+            ("target:beta", "beta-dist", "beta", "4.5.6"),
+        )
+    )
+    return TargetVersionReceipt(
+        source_digest=source_digest,
+        audit_plan_digest=stable_digest(
+            "test-root-target-version-provenance", "audit-plan"
+        ),
+        environment_digest=environment_digest
+        or stable_digest("test-root-target-version-provenance", "env"),
+        python_runtime_digest=stable_digest(
+            "test-root-target-version-provenance", "python-runtime"
+        ),
+        packages=packages,
+    )
+
+
+def _target_version_provenance_index(
+    tmp_path: Path,
+    *,
+    include_provenance: bool = True,
+):
+    from datadiff_osc.runtime._phase6_target_version_provenance import (
+        TARGET_VERSION_PRODUCTION_PROVENANCE_ENVELOPE_TYPE,
+        TARGET_VERSION_PRODUCTION_PROVENANCE_SCHEMA_VERSION,
+        build_target_version_production_provenance,
+        canonical_target_version_production_provenance_envelope,
+    )
+
+    source_digest = stable_digest("test-root-target-version-provenance", "source")
+    provenance = build_target_version_production_provenance(
+        receipt=_target_version_receipt_for_provenance(source_digest=source_digest),
+        manifest_sha256=_sha256(b"target-version-provenance-manifest"),
+    )
+    receipt_path = tmp_path / "target-version-provenance-receipt.json"
+    receipt_text = canonical_envelope(
+        "TargetVersionReceipt",
+        provenance.receipt.schema_version,
+        provenance.receipt,
+    )
+    receipt_path.write_text(receipt_text, encoding="utf-8")
+    provenance_path = tmp_path / "target-version-production-proof.json"
+    provenance_text = canonical_target_version_production_provenance_envelope(
+        provenance
+    )
+    provenance_path.write_text(provenance_text, encoding="utf-8")
+    producer: dict[str, object] = {
+        "schema_version": authority_module.TYPED_PRODUCER_RECEIPT_SCHEMA_VERSION,
+        "receipt_id": "target-version-provenance-producer",
+        "producer_kind": "target_version_replay",
+        "artifact_id": "target-version-provenance-artifact",
+        "admissions": [
+            {
+                "admission_id": "target-version-admission-001",
+                "subject_kind": "target_packages",
+                "subject_ids": list(provenance.receipt.package_ids),
+                "envelope_path": receipt_path.name,
+                "envelope_sha256": _sha256(receipt_text.encode()),
+                "envelope_type": "TargetVersionReceipt",
+                "envelope_schema_version": provenance.receipt.schema_version,
+            }
+        ],
+    }
+    if include_provenance:
+        producer["target_version_provenance"] = [
+            {
+                "admission_id": "target-version-admission-001",
+                "provenance_path": provenance_path.name,
+                "provenance_sha256": _sha256(provenance_text.encode()),
+                "provenance_type": (
+                    TARGET_VERSION_PRODUCTION_PROVENANCE_ENVELOPE_TYPE
+                ),
+                "provenance_schema_version": (
+                    TARGET_VERSION_PRODUCTION_PROVENANCE_SCHEMA_VERSION
+                ),
+            }
+        ]
+    payload: dict[str, object] = {
+        "schema_version": ARTIFACT_RECEIPT_SCHEMA_VERSION,
+        "source_digest": source_digest,
+        "dynamic_plan_sha256": _sha256(b"target-version-provenance-dynamic-plan"),
+        "producer_receipts": [producer],
+        "artifacts": [],
+    }
+    return provenance, receipt_path, provenance_path, payload
+
+
+def _verify_target_version_provenance_index(
+    tmp_path: Path,
+    payload: dict[str, object],
+    *,
+    expected_source_digest: str | None = None,
+):
+    index_path = tmp_path / "target-version-provenance-index.json"
+    raw = canonical_json(payload).encode()
+    index_path.write_bytes(raw)
+    return verify_artifact_receipt_index(
+        index_path=index_path,
+        expected_index_sha256=_sha256(raw),
+        expected_source_digest=(
+            expected_source_digest
+            if expected_source_digest is not None
+            else str(payload["source_digest"])
+        ),
+        expected_dynamic_plan_sha256=str(payload["dynamic_plan_sha256"]),
+    )
+
+
+def test_target_version_replay_without_provenance_still_waits_for_root_provenance(
+    tmp_path,
+):
+    receipt = _target_version_receipt_for_provenance(
+        source_digest=stable_digest("test-root-target-version-provenance", "source")
+    )
+    verified, errors = _verify_single_admission(
+        tmp_path,
+        producer_kind="target_version_replay",
+        envelope_type="TargetVersionReceipt",
+        schema_version=receipt.schema_version,
+        payload=receipt,
+        subject_kind="target_packages",
+        subject_ids=list(receipt.package_ids),
+    )
+
+    assert verified is None
+    assert errors == (
+        "typed_admission_root_provenance_pending_phase6:single-admission",
+    )
+
+
+def test_target_version_admission_without_provenance_entry_fails_closed_in_index(
+    tmp_path,
+):
+    _, _, _, payload = _target_version_provenance_index(
+        tmp_path, include_provenance=False
+    )
+
+    verified = _verify_target_version_provenance_index(tmp_path, payload)
+
+    assert not verified.valid
+    producer = verified.producer_map()["target_version_replay"]
+    assert producer.target_version_provenance == ()
+    assert not any(
+        admission.envelope_type == "TargetVersionReceipt"
+        for admission in producer.admissions
+    )
+    assert (
+        "typed_admission_root_provenance_pending_phase6:target-version-admission-001"
+        in verified.verification_errors
+    )
+
+
+def test_target_version_admission_with_verified_provenance_is_retained(tmp_path):
+    provenance, _, _, payload = _target_version_provenance_index(tmp_path)
+
+    verified = _verify_target_version_provenance_index(tmp_path, payload)
+
+    producer = verified.producer_map()["target_version_replay"]
+    assert tuple(item.admission_id for item in producer.admissions) == (
+        "target-version-admission-001",
+    )
+    assert tuple(
+        item.admission_id for item in producer.target_version_provenance
+    ) == ("target-version-admission-001",)
+    binding = producer.target_version_provenance[0]
+    assert binding.receipt_digest == provenance.receipt.digest
+    assert binding.provenance_id == provenance.provenance_id
+    assert binding.provenance_digest == provenance.digest
+    assert binding.audit_plan_digest == provenance.receipt.audit_plan_digest
+    assert binding.source_snapshot_digest == provenance.receipt.source_digest
+    assert not any(
+        error.startswith("target_version_provenance_")
+        or error.startswith("typed_admission_")
+        for error in verified.verification_errors
+    )
+    assert not verified.valid  # The 9 other producers are still missing.
+
+
+@pytest.mark.parametrize(
+    ("case", "expected_error"),
+    (
+        (
+            "wrong_hash",
+            "target_version_provenance_hash_mismatch:target-version-admission-001",
+        ),
+        (
+            "wrong_source",
+            "target_version_provenance_source_mismatch:target-version-admission-001",
+        ),
+        (
+            "receipt_mismatch",
+            "target_version_provenance_receipt_mismatch:target-version-admission-001",
+        ),
+        (
+            "synthetic_marker",
+            "target_version_provenance_synthetic_rejected:"
+            "target-version-admission-001",
+        ),
+        (
+            "path_escape",
+            "target_version_provenance_path_escape:target-version-admission-001",
+        ),
+        (
+            "type_mismatch",
+            "target_version_provenance_type_mismatch:target-version-admission-001",
+        ),
+        (
+            "missing_admission",
+            "target_version_provenance_admission_missing:other-admission",
+        ),
+    ),
+    # Explicit clean IDs: the expected-error values would otherwise become
+    # pytest node IDs inside the formal receipt, and the byte-level marker
+    # filter must be able to accept a genuine full-repository receipt.
+    ids=(
+        "wrong-hash",
+        "wrong-source",
+        "receipt-mismatch",
+        "marker-injection",
+        "path-escape",
+        "type-mismatch",
+        "missing-admission",
+    ),
+)
+def test_target_version_provenance_binding_forgeries_fail_closed(
+    tmp_path, case, expected_error
+):
+    from datadiff_osc.runtime._phase6_target_version_provenance import (
+        build_target_version_production_provenance,
+        canonical_target_version_production_provenance_envelope,
+    )
+
+    provenance, _, provenance_path, payload = _target_version_provenance_index(
+        tmp_path
+    )
+    producer = payload["producer_receipts"][0]
+    assert isinstance(producer, dict)
+    proof = producer["target_version_provenance"]
+    assert isinstance(proof, list) and isinstance(proof[0], dict)
+    expected_source_digest = None
+
+    if case == "wrong_hash":
+        proof[0]["provenance_sha256"] = "0" * 64
+    elif case == "wrong_source":
+        expected_source_digest = stable_digest(
+            "test-root-target-version-provenance", "other-source"
+        )
+        payload["source_digest"] = expected_source_digest
+    elif case == "receipt_mismatch":
+        other = build_target_version_production_provenance(
+            receipt=_target_version_receipt_for_provenance(
+                source_digest=provenance.receipt.source_digest,
+                environment_digest=stable_digest(
+                    "test-root-target-version-provenance", "other-env"
+                ),
+            ),
+            manifest_sha256=_sha256(b"target-version-provenance-manifest"),
+        )
+        other_text = canonical_target_version_production_provenance_envelope(other)
+        provenance_path.write_text(other_text, encoding="utf-8")
+        proof[0]["provenance_sha256"] = _sha256(other_text.encode())
+    elif case == "synthetic_marker":
+        renamed = provenance_path.with_name("target-version-synthetic-proof.json")
+        provenance_path.rename(renamed)
+        proof[0]["provenance_path"] = renamed.name
+    elif case == "path_escape":
+        outside = tmp_path.parent / "target-version-provenance-outside"
+        outside.mkdir(exist_ok=True)
+        moved = outside / provenance_path.name
+        shutil.move(str(provenance_path), str(moved))
+        link = tmp_path / "escape-link"
+        link.symlink_to(outside, target_is_directory=True)
+        proof[0]["provenance_path"] = f"{link.name}/{moved.name}"
+    elif case == "type_mismatch":
+        proof[0]["provenance_type"] = "ParallelScalingProductionProvenance"
+    elif case == "missing_admission":
+        proof[0]["admission_id"] = "other-admission"
+    else:  # pragma: no cover - protects the parametrized case list.
+        raise AssertionError(case)
+
+    verified = _verify_target_version_provenance_index(
+        tmp_path, payload, expected_source_digest=expected_source_digest
+    )
+
+    assert not verified.valid
+    assert expected_error in verified.verification_errors
+    producer_result = verified.producer_map()["target_version_replay"]
+    assert producer_result.target_version_provenance == ()
+    assert not any(
+        admission.envelope_type == "TargetVersionReceipt"
+        for admission in producer_result.admissions
+    )

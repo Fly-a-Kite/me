@@ -70,9 +70,17 @@ from datadiff_osc.runtime._phase6_repository_test_provenance import (
     reconstruct_repository_test_production_provenance_payload,
     reconstruct_repository_test_receipt_payload,
 )
+from datadiff_osc.runtime._phase6_target_version_provenance import (
+    TARGET_VERSION_PRODUCTION_PROVENANCE_ENVELOPE_TYPE,
+    TARGET_VERSION_PRODUCTION_PROVENANCE_SCHEMA_VERSION,
+    reconstruct_target_version_production_provenance_payload,
+    reconstruct_target_version_receipt_payload,
+)
 from datadiff_osc.runtime._private_receipts import (
     REPOSITORY_TEST_RECEIPT_SCHEMA_VERSION,
+    TARGET_VERSION_RECEIPT_SCHEMA_VERSION,
     RepositoryTestReceipt,
+    TargetVersionReceipt,
 )
 from datadiff_osc.runtime._semantic_replay import (
     _reconstruct_contract_performance_evidence_receipt_payload,
@@ -1698,6 +1706,22 @@ class VerifiedRepositoryTestProvenance:
 
 
 @dataclass(frozen=True, slots=True)
+class VerifiedTargetVersionProvenance:
+    """Root's compact, re-verified binding for one target-version admission."""
+
+    admission_id: str
+    provenance_path: str
+    byte_sha256: str
+    provenance_digest: str
+    provenance_id: str
+    receipt_digest: str
+    audit_plan_digest: str
+    source_snapshot_digest: str
+    producer_module_sha256: str
+    bridge_module_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
 class VerifiedContractPerformanceProvenance:
     """Root's compact, re-verified binding for one Contract raw-pair admission."""
 
@@ -1742,6 +1766,7 @@ class VerifiedProducerReceipt:
         VerifiedContractPerformanceProvenance, ...
     ] = ()
     repository_test_provenance: tuple[VerifiedRepositoryTestProvenance, ...] = ()
+    target_version_provenance: tuple[VerifiedTargetVersionProvenance, ...] = ()
     schema_version: str = TYPED_PRODUCER_RECEIPT_SCHEMA_VERSION
 
     @property
@@ -1880,6 +1905,7 @@ def _verify_typed_admission(
     allow_parallel_scaling_provenance: bool = False,
     allow_contract_performance_provenance: bool = False,
     allow_repository_test_provenance: bool = False,
+    allow_target_version_provenance: bool = False,
 ) -> VerifiedTypedAdmission | None:
     expected_fields = {
         "admission_id",
@@ -2029,10 +2055,19 @@ def _verify_typed_admission(
                     == REPOSITORY_TEST_RECEIPT_SCHEMA_VERSION
                     and subject_kind == "repository_tests"
                 )
+                is_target_version_bridge_candidate = (
+                    allow_target_version_provenance
+                    and producer_kind == "target_version_replay"
+                    and envelope_type == "TargetVersionReceipt"
+                    and envelope_version
+                    == TARGET_VERSION_RECEIPT_SCHEMA_VERSION
+                    and subject_kind == "target_packages"
+                )
                 if not (
                     is_parallel_bridge_candidate
                     or is_contract_performance_bridge_candidate
                     or is_repository_test_bridge_candidate
+                    or is_target_version_bridge_candidate
                 ):
                     admission_errors.append(
                         f"typed_admission_root_provenance_pending_phase6:{admission_id}"
@@ -2309,6 +2344,134 @@ def _verify_repository_test_provenance_binding(
         provenance_id=provenance.provenance_id,
         receipt_digest=provenance.receipt.digest,
         collection_digest=provenance.receipt.collection_digest,
+        source_snapshot_digest=provenance.receipt.source_digest,
+        producer_module_sha256=provenance.producer_module_sha256,
+        bridge_module_sha256=provenance.bridge_module_sha256,
+    )
+
+
+def _verify_target_version_provenance_binding(
+    *,
+    root: Path,
+    value: object,
+    index: int,
+    admissions_by_id: dict[str, VerifiedTypedAdmission],
+    expected_source_digest: str,
+    errors: list[str],
+) -> VerifiedTargetVersionProvenance | None:
+    """Retain a target-version Runtime admission only after exact re-reading."""
+
+    expected_fields = {
+        "admission_id",
+        "provenance_path",
+        "provenance_sha256",
+        "provenance_type",
+        "provenance_schema_version",
+    }
+    if not isinstance(value, dict) or set(value) != expected_fields:
+        errors.append(f"target_version_provenance_schema:{index}")
+        return None
+    try:
+        admission_id = _string(value["admission_id"], "provenance admission ID")
+        relative = _safe_relative(value["provenance_path"])
+        expected_sha = _require_sha256(
+            value["provenance_sha256"], "target version provenance SHA-256"
+        )
+        provenance_type = _string(value["provenance_type"], "provenance type")
+        provenance_schema_version = _string(
+            value["provenance_schema_version"], "provenance schema version"
+        )
+    except ValueError as exc:
+        errors.append(f"target_version_provenance_invalid:{index}:{exc}")
+        return None
+    if (
+        provenance_type != TARGET_VERSION_PRODUCTION_PROVENANCE_ENVELOPE_TYPE
+        or provenance_schema_version
+        != TARGET_VERSION_PRODUCTION_PROVENANCE_SCHEMA_VERSION
+    ):
+        errors.append(f"target_version_provenance_type_mismatch:{admission_id}")
+        return None
+    admission = admissions_by_id.get(admission_id)
+    if admission is None:
+        errors.append(f"target_version_provenance_admission_missing:{admission_id}")
+        return None
+    if (
+        admission.envelope_type != "TargetVersionReceipt"
+        or admission.envelope_schema_version
+        != TARGET_VERSION_RECEIPT_SCHEMA_VERSION
+        or admission.subject_kind != "target_packages"
+    ):
+        errors.append(
+            f"target_version_provenance_admission_shape_mismatch:{admission_id}"
+        )
+        return None
+    if "synthetic" in "\0".join(
+        (admission_id, relative, provenance_type, provenance_schema_version)
+    ).lower():
+        errors.append(f"target_version_provenance_synthetic_rejected:{admission_id}")
+        return None
+    provenance_path = (root / relative).resolve()
+    try:
+        provenance_path.relative_to(root)
+    except ValueError:
+        errors.append(f"target_version_provenance_path_escape:{admission_id}")
+        return None
+    try:
+        raw = provenance_path.read_bytes()
+    except OSError as exc:
+        errors.append(
+            f"target_version_provenance_load_failed:{admission_id}:"
+            f"{type(exc).__name__}:{exc}"
+        )
+        return None
+    actual_sha = _sha256_bytes(raw)
+    if actual_sha != expected_sha:
+        errors.append(f"target_version_provenance_hash_mismatch:{admission_id}")
+        return None
+    if b"synthetic" in raw.lower():
+        errors.append(f"target_version_provenance_synthetic_rejected:{admission_id}")
+        return None
+    try:
+        decoded = decode_canonical_envelope(raw.decode())
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        errors.append(
+            f"target_version_provenance_envelope_invalid:{admission_id}:"
+            f"{type(exc).__name__}:{exc}"
+        )
+        return None
+    if (
+        decoded.get("type") != provenance_type
+        or decoded.get("schema_version") != provenance_schema_version
+    ):
+        errors.append(f"target_version_provenance_envelope_mismatch:{admission_id}")
+        return None
+    try:
+        provenance = reconstruct_target_version_production_provenance_payload(
+            decoded["payload"]
+        )
+    except Exception as exc:  # Root must reject malformed private evidence.
+        errors.append(
+            f"target_version_provenance_reconstruction_failed:{admission_id}:"
+            f"{type(exc).__name__}"
+        )
+        return None
+    if provenance.receipt.source_digest != expected_source_digest:
+        errors.append(f"target_version_provenance_source_mismatch:{admission_id}")
+        return None
+    admitted = _reconstruct_target_version_admission(admission, errors=errors)
+    if admitted is None:
+        return None
+    if admitted != provenance.receipt:
+        errors.append(f"target_version_provenance_receipt_mismatch:{admission_id}")
+        return None
+    return VerifiedTargetVersionProvenance(
+        admission_id=admission_id,
+        provenance_path=str(provenance_path),
+        byte_sha256=actual_sha,
+        provenance_digest=provenance.digest,
+        provenance_id=provenance.provenance_id,
+        receipt_digest=provenance.receipt.digest,
+        audit_plan_digest=provenance.receipt.audit_plan_digest,
         source_snapshot_digest=provenance.receipt.source_digest,
         producer_module_sha256=provenance.producer_module_sha256,
         bridge_module_sha256=provenance.bridge_module_sha256,
@@ -2761,6 +2924,7 @@ def verify_artifact_receipt_index(
                 "parallel_scaling_provenance",
                 "contract_performance_provenance",
                 "repository_test_provenance",
+                "target_version_provenance",
             }
             if (
                 not isinstance(item, dict)
@@ -2789,6 +2953,9 @@ def verify_artifact_receipt_index(
             has_repository_test_provenance = (
                 "repository_test_provenance" in item
             )
+            has_target_version_provenance = (
+                "target_version_provenance" in item
+            )
             if (
                 has_parallel_scaling_provenance
                 and producer_kind != "performance_paired_replay"
@@ -2811,6 +2978,14 @@ def verify_artifact_receipt_index(
             ):
                 errors.append(
                     "repository_test_provenance_producer_kind_mismatch:"
+                    f"{producer_kind}"
+                )
+            if (
+                has_target_version_provenance
+                and producer_kind != "target_version_replay"
+            ):
+                errors.append(
+                    "target_version_provenance_producer_kind_mismatch:"
                     f"{producer_kind}"
                 )
             admission_values = item["admissions"]
@@ -2838,6 +3013,10 @@ def verify_artifact_receipt_index(
                         allow_repository_test_provenance=(
                             has_repository_test_provenance
                             and producer_kind == "repository_test_replay"
+                        ),
+                        allow_target_version_provenance=(
+                            has_target_version_provenance
+                            and producer_kind == "target_version_replay"
                         ),
                     )
                 )
@@ -3157,6 +3336,107 @@ def verify_artifact_receipt_index(
                         or admission.admission_id in verified_repository_ids
                     )
                 )
+            target_version_provenance: tuple[
+                VerifiedTargetVersionProvenance, ...
+            ] = ()
+            target_version_admissions = tuple(
+                admission
+                for admission in admissions
+                if (
+                    admission.envelope_type == "TargetVersionReceipt"
+                    and admission.envelope_schema_version
+                    == TARGET_VERSION_RECEIPT_SCHEMA_VERSION
+                    and admission.subject_kind == "target_packages"
+                )
+            )
+            target_provenance_error_count = len(errors)
+            if has_target_version_provenance:
+                provenance_values = item["target_version_provenance"]
+                if not isinstance(provenance_values, list) or not provenance_values:
+                    errors.append(
+                        "target_version_provenance_bindings_missing:"
+                        f"{producer_kind}"
+                    )
+                    provenance_values = []
+                parsed_provenance = tuple(
+                    binding
+                    for provenance_index, provenance_value in enumerate(
+                        provenance_values
+                    )
+                    if (
+                        binding := _verify_target_version_provenance_binding(
+                            root=root,
+                            value=provenance_value,
+                            index=provenance_index,
+                            admissions_by_id={
+                                admission.admission_id: admission
+                                for admission in admissions
+                            },
+                            expected_source_digest=expected_source_digest,
+                            errors=errors,
+                        )
+                    )
+                    is not None
+                )
+                provenance_ids = tuple(
+                    binding.admission_id for binding in parsed_provenance
+                )
+                if provenance_ids != tuple(sorted(provenance_ids)) or len(
+                    provenance_ids
+                ) != len(set(provenance_ids)):
+                    errors.append(
+                        "target_version_provenance_bindings_not_unique_sorted:"
+                        f"{producer_kind}"
+                    )
+                if len(errors) == target_provenance_error_count:
+                    target_version_provenance = parsed_provenance
+            if target_version_admissions and not has_target_version_provenance:
+                errors.append(
+                    "target_version_provenance_bindings_missing:"
+                    f"{producer_kind}"
+                )
+            if has_target_version_provenance and not target_version_admissions:
+                errors.append(
+                    "target_version_provenance_bindings_unexpected:"
+                    f"{producer_kind}"
+                )
+            expected_target_ids = tuple(
+                admission.admission_id for admission in target_version_admissions
+            )
+            observed_target_ids = tuple(
+                binding.admission_id for binding in target_version_provenance
+            )
+            if (
+                target_version_admissions
+                and observed_target_ids != expected_target_ids
+            ):
+                if has_target_version_provenance:
+                    errors.append(
+                        "target_version_provenance_bijection_mismatch:"
+                        f"{producer_kind}"
+                    )
+                target_version_provenance = ()
+            verified_target_ids = {
+                binding.admission_id for binding in target_version_provenance
+            }
+            for admission in target_version_admissions:
+                if admission.admission_id not in verified_target_ids:
+                    errors.append(
+                        "target_version_provenance_not_verified:"
+                        f"{admission.admission_id}"
+                    )
+            if target_version_admissions:
+                admissions = tuple(
+                    admission
+                    for admission in admissions
+                    if (
+                        admission.envelope_type != "TargetVersionReceipt"
+                        or admission.envelope_schema_version
+                        != TARGET_VERSION_RECEIPT_SCHEMA_VERSION
+                        or admission.subject_kind != "target_packages"
+                        or admission.admission_id in verified_target_ids
+                    )
+                )
             observed_types = {
                 (admission.envelope_type, admission.envelope_schema_version)
                 for admission in admissions
@@ -3179,6 +3459,7 @@ def verify_artifact_receipt_index(
                     parallel_provenance,
                     contract_performance_provenance,
                     repository_test_provenance,
+                    target_version_provenance,
                 )
             )
 
@@ -3791,6 +4072,73 @@ def _reconstruct_repository_test_admission(
         return None
     if admission.subject_ids != receipt.node_ids:
         errors.append(f"repository_test_admission_subject_mismatch:{admission_id}")
+        return None
+    return receipt
+
+
+def _reconstruct_target_version_admission(
+    admission: VerifiedTypedAdmission,
+    *,
+    errors: list[str],
+) -> TargetVersionReceipt | None:
+    """Re-read one retained target-version receipt before Root uses its context."""
+
+    admission_id = admission.admission_id
+    if (
+        admission.envelope_type != "TargetVersionReceipt"
+        or admission.envelope_schema_version
+        != TARGET_VERSION_RECEIPT_SCHEMA_VERSION
+        or admission.subject_kind != "target_packages"
+    ):
+        errors.append(f"target_version_admission_shape_mismatch:{admission_id}")
+        return None
+    try:
+        raw = Path(admission.envelope_path).read_bytes()
+    except OSError as exc:
+        errors.append(
+            f"target_version_admission_load_failed:{admission_id}:"
+            f"{type(exc).__name__}:{exc}"
+        )
+        return None
+    if _sha256_bytes(raw) != admission.byte_sha256:
+        errors.append(f"target_version_admission_hash_mismatch:{admission_id}")
+        return None
+    try:
+        decoded = decode_canonical_envelope(raw.decode())
+    except (
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        errors.append(
+            f"target_version_admission_envelope_invalid:{admission_id}:"
+            f"{type(exc).__name__}:{exc}"
+        )
+        return None
+    if (
+        decoded.get("type") != admission.envelope_type
+        or decoded.get("schema_version") != admission.envelope_schema_version
+    ):
+        errors.append(f"target_version_admission_envelope_mismatch:{admission_id}")
+        return None
+    if (
+        stable_digest("osc-root-typed-admission-envelope", decoded)
+        != admission.envelope_digest
+    ):
+        errors.append(f"target_version_admission_digest_mismatch:{admission_id}")
+        return None
+    try:
+        receipt = reconstruct_target_version_receipt_payload(decoded["payload"])
+    except Exception as exc:  # Root must fail closed, not propagate bad evidence.
+        errors.append(
+            f"target_version_admission_reconstruction_failed:{admission_id}:"
+            f"{type(exc).__name__}"
+        )
+        return None
+    if admission.subject_ids != receipt.package_ids:
+        errors.append(f"target_version_admission_subject_mismatch:{admission_id}")
         return None
     return receipt
 
