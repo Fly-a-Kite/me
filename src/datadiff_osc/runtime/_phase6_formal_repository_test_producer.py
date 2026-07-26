@@ -214,6 +214,93 @@ def _normalized_targets(value: object, *, name: str) -> tuple[str, ...]:
     return targets
 
 
+def _is_test_tree_path(value: str) -> bool:
+    path = PurePosixPath(value)
+    return bool(path.parts) and path.parts[0] == "tests" and len(path.parts) > 1
+
+
+def _is_test_module_path(value: str) -> bool:
+    path = PurePosixPath(value)
+    return _is_test_tree_path(value) and path.name.startswith("test_") and path.suffix == ".py"
+
+
+def _current_test_tree_paths(source_root: Path) -> tuple[str, ...]:
+    """Return the exact regular test-tree surface for formal execution checks."""
+
+    root = _resolved_directory(source_root, name="repository-test source root")
+    test_root = root / "tests"
+    if test_root.is_symlink():
+        raise ValueError("repository-test test tree must not be a symlink")
+    if not test_root.is_dir():
+        raise ValueError("repository-test test tree is unavailable")
+    paths: list[str] = []
+    for candidate in test_root.rglob("*"):
+        if candidate.is_symlink():
+            raise ValueError("repository-test test tree contains a symlink")
+        if not candidate.is_file():
+            continue
+        relative = candidate.relative_to(root).as_posix()
+        if "__pycache__" in candidate.parts or candidate.suffix in {".pyc", ".pyo"}:
+            continue
+        paths.append(relative)
+    result = tuple(sorted(paths))
+    if not result:
+        raise ValueError("repository-test test tree has no regular files")
+    if len(result) != len(set(result)):
+        raise ValueError("repository-test test tree paths are not unique")
+    return result
+
+
+def _snapshot_test_tree_paths(snapshot: object) -> tuple[str, ...]:
+    bindings = getattr(snapshot, "file_bindings", None)
+    if not isinstance(bindings, tuple):
+        raise ValueError("repository-test source snapshot bindings are invalid")
+    paths: list[str] = []
+    for binding in bindings:
+        relative = getattr(binding, "relative_path", None)
+        if not isinstance(relative, str):
+            raise ValueError("repository-test source snapshot test binding is invalid")
+        if _is_test_tree_path(relative):
+            paths.append(relative)
+    result = tuple(sorted(paths))
+    if not result:
+        raise ValueError("repository-test source snapshot has no test-tree bindings")
+    if len(result) != len(set(result)):
+        raise ValueError("repository-test source snapshot test bindings are not unique")
+    return result
+
+
+def _require_full_test_snapshot_closure(
+    *, source_root: Path, snapshot: object, test_targets: tuple[str, ...]
+) -> None:
+    """Fail closed unless the formal plan covers exactly the bound test tree."""
+
+    expected_paths = _snapshot_test_tree_paths(snapshot)
+    actual_paths = _current_test_tree_paths(source_root)
+    if actual_paths != expected_paths:
+        missing = tuple(sorted(set(expected_paths) - set(actual_paths)))
+        extra = tuple(sorted(set(actual_paths) - set(expected_paths)))
+        raise ValueError(
+            "repository-test test-tree snapshot closure mismatch:"
+            f"missing={','.join(missing)};extra={','.join(extra)}"
+        )
+    expected_targets = tuple(
+        path for path in expected_paths if _is_test_module_path(path)
+    )
+    if not expected_targets:
+        raise ValueError("repository-test source snapshot has no test-module bindings")
+    targets = _normalized_targets(
+        test_targets, name="repository-test authority targets"
+    )
+    if targets != expected_targets:
+        missing = tuple(sorted(set(expected_targets) - set(targets)))
+        extra = tuple(sorted(set(targets) - set(expected_targets)))
+        raise ValueError(
+            "repository-test authority targets do not exactly cover the snapshot "
+            f"test modules:missing={','.join(missing)};extra={','.join(extra)}"
+        )
+
+
 def _normalized_environment(value: object, *, source_root: Path) -> tuple[tuple[str, str], ...]:
     if not isinstance(value, tuple) or not value:
         raise ValueError("repository-test environment must be a non-empty immutable tuple")
@@ -1186,6 +1273,11 @@ def execute_formal_repository_test(
     )
     if not snapshot.valid or snapshot.source_digest != authority.source_digest:
         raise ValueError("repository-test source snapshot binding is not valid")
+    _require_full_test_snapshot_closure(
+        source_root=root,
+        snapshot=snapshot,
+        test_targets=authority.test_targets,
+    )
     expected_interpreter_binding = _ExecutableBinding(
         declared_path=authority.interpreter_path,
         resolved_path=authority.interpreter_resolved_path,
@@ -1203,6 +1295,21 @@ def execute_formal_repository_test(
         timeout_seconds=authority.timeout_seconds,
         test_only=False,
         expected_interpreter_binding=expected_interpreter_binding,
+    )
+    post_capture_snapshot = verify_source_snapshot(
+        repo_root=root,
+        snapshot_path=Path(authority.source_snapshot_path),
+        expected_snapshot_sha256=authority.source_snapshot_sha256,
+    )
+    if (
+        not post_capture_snapshot.valid
+        or post_capture_snapshot.source_digest != authority.source_digest
+    ):
+        raise ValueError("repository-test source snapshot binding changed during capture")
+    _require_full_test_snapshot_closure(
+        source_root=root,
+        snapshot=post_capture_snapshot,
+        test_targets=authority.test_targets,
     )
     return verify_repository_test_capture(
         result=result,
