@@ -221,7 +221,7 @@ def test_output_source_and_exact_typed_binding_fail_closed(tmp_path):
         replace(binding, expected_execution_outcome_digest="wrong-outcome")
 
 
-def test_nonzero_synthetic_and_escaped_context_are_rejected(tmp_path):
+def test_nonzero_fabricated_and_escaped_context_are_rejected(tmp_path):
     transcript = _capture(
         tmp_path,
         "import sys; sys.stdout.buffer.write(b'x'); raise SystemExit(7)",

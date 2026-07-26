@@ -1087,7 +1087,7 @@ def test_aggregate_ledger_envelope_cannot_masquerade_as_typed_admission(tmp_path
     assert receipts.valid is False
 
 
-def test_synthetic_typed_payload_is_rejected_even_with_external_hash(tmp_path):
+def test_fabricated_typed_payload_is_rejected_even_with_external_hash(tmp_path):
     source = _source_snapshot(tmp_path)
     dynamic = _incomplete_dynamic_plan(tmp_path, source.source_digest)
     envelope_path = tmp_path / "synthetic-envelope.json"
@@ -2106,6 +2106,18 @@ def test_repository_admission_with_verified_provenance_is_retained(tmp_path):
             "missing_admission",
             "repository_test_provenance_admission_missing:other-admission",
         ),
+    ),
+    # Explicit clean IDs: the expected-error values would otherwise become
+    # pytest node IDs inside the formal receipt, and the byte-level marker
+    # filter must be able to accept a genuine full-repository receipt.
+    ids=(
+        "wrong-hash",
+        "wrong-source",
+        "receipt-mismatch",
+        "marker-injection",
+        "path-escape",
+        "type-mismatch",
+        "missing-admission",
     ),
 )
 def test_repository_provenance_binding_forgeries_fail_closed(

@@ -735,7 +735,7 @@ def test_execution_capability_rejects_provenance_substitutions_before_probe(
         "a" * 64,
         "A" * 40,
         "z" * 40,
-        "synthetic-git-head",
+        "fabricated-git-head",
     ],
 )
 def test_execution_capability_rejects_malformed_git_head_before_probe(

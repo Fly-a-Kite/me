@@ -637,7 +637,7 @@ def test_interpreter_link_binding_is_exact_and_fails_closed(tmp_path: Path):
         )
 
 
-def test_negative_review_rejects_synthetic_escape_reuse_and_symlink(tmp_path: Path):
+def test_negative_review_rejects_fabricated_escape_reuse_and_symlink(tmp_path: Path):
     project = _project(tmp_path)
     output = project / "formal-output"
     with pytest.raises(ValueError, match="synthetic marker"):
