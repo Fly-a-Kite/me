@@ -1,0 +1,513 @@
+{
+  "schema_version": "datadiff-rq7-competitor-arms-v1",
+  "confirmed_roots": 9,
+  "arms": {
+    "tdiff_style": {
+      "label": "DataFrame family + plain differential (TDiFf-like scope)",
+      "backends": [
+        "pandas",
+        "polars",
+        "polars_lazy"
+      ]
+    },
+    "sqlancer_common_scope": {
+      "label": "DuckDB/SQLite + SQL-oracle scope (SQLancer-like)",
+      "backends": [
+        "duckdb",
+        "sqlite"
+      ]
+    },
+    "ours_full": {
+      "label": "all four execution-model families + contract oracle",
+      "backends": [
+        "pandas",
+        "polars",
+        "duckdb",
+        "pyarrow",
+        "datafusion",
+        "chdb"
+      ]
+    }
+  },
+  "reachable_counts": {
+    "tdiff_style": 2,
+    "sqlancer_common_scope": 1,
+    "ours_full": 9
+  },
+  "detected_counts": {
+    "tdiff_style": 1,
+    "sqlancer_common_scope": 0,
+    "ours_full": 3
+  },
+  "competitor_union_reachable": 3,
+  "rows": [
+    {
+      "root_id": "datafusion-grouped-null-topk-001",
+      "project": "apache/datafusion",
+      "families": [
+        "grouped_topk_null_sort_key@datafusion"
+      ],
+      "buggy_backend": "datafusion",
+      "arms": {
+        "tdiff_style": {
+          "reachable": false,
+          "detected": false,
+          "reason": "buggy backend out of scope"
+        },
+        "sqlancer_common_scope": {
+          "reachable": false,
+          "detected": false,
+          "reason": "buggy backend out of scope"
+        },
+        "ours_full": {
+          "reachable": true,
+          "detected": true,
+          "reason": "result",
+          "buggy_status": "ok",
+          "reference_status": "ok",
+          "reference_backend": "pandas",
+          "buggy_rows": [],
+          "reference_rows": [
+            [
+              "a",
+              null
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "root_id": "datafusion-limit-offset-pushdown-001",
+      "project": "apache/datafusion",
+      "families": [
+        "groupby_aggregation@datafusion",
+        "joined_order_offset_projection@datafusion"
+      ],
+      "buggy_backend": "datafusion",
+      "arms": {
+        "tdiff_style": {
+          "reachable": false,
+          "detected": false,
+          "reason": "buggy backend out of scope"
+        },
+        "sqlancer_common_scope": {
+          "reachable": false,
+          "detected": false,
+          "reason": "buggy backend out of scope"
+        },
+        "ours_full": {
+          "reachable": true,
+          "detected": false,
+          "reason": "equal",
+          "buggy_status": "ok",
+          "reference_status": "ok",
+          "reference_backend": "pandas",
+          "buggy_rows": [
+            [
+              1,
+              0,
+              0
+            ]
+          ],
+          "reference_rows": [
+            [
+              1,
+              0,
+              0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "root_id": "datafusion-negative-zero-comparison-001",
+      "project": "apache/datafusion",
+      "families": [
+        "negative_zero_comparison@datafusion"
+      ],
+      "buggy_backend": "datafusion",
+      "arms": {
+        "tdiff_style": {
+          "reachable": false,
+          "detected": false,
+          "reason": "buggy backend out of scope"
+        },
+        "sqlancer_common_scope": {
+          "reachable": false,
+          "detected": false,
+          "reason": "buggy backend out of scope"
+        },
+        "ours_full": {
+          "reachable": true,
+          "detected": true,
+          "reason": "result",
+          "buggy_status": "ok",
+          "reference_status": "ok",
+          "reference_backend": "pandas",
+          "buggy_rows": [
+            [
+              1,
+              0,
+              0
+            ]
+          ],
+          "reference_rows": []
+        }
+      }
+    },
+    {
+      "root_id": "datafusion-distinct-null-topk-001",
+      "project": "apache/datafusion",
+      "families": [
+        "distinct_null_topk@datafusion",
+        "join_semantics@datafusion"
+      ],
+      "buggy_backend": "datafusion",
+      "arms": {
+        "tdiff_style": {
+          "reachable": false,
+          "detected": false,
+          "reason": "buggy backend out of scope"
+        },
+        "sqlancer_common_scope": {
+          "reachable": false,
+          "detected": false,
+          "reason": "buggy backend out of scope"
+        },
+        "ours_full": {
+          "reachable": true,
+          "detected": false,
+          "reason": "equal",
+          "buggy_status": "ok",
+          "reference_status": "ok",
+          "reference_backend": "pandas",
+          "buggy_rows": [
+            [
+              null
+            ]
+          ],
+          "reference_rows": [
+            [
+              null
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "root_id": "datafusion-ordered-limit-idempotence-001",
+      "project": "apache/datafusion",
+      "families": [
+        "datafusion_limit_idempotence@datafusion",
+        "metamorphic_limit_idempotence@datafusion"
+      ],
+      "buggy_backend": "datafusion",
+      "arms": {
+        "tdiff_style": {
+          "reachable": false,
+          "detected": false,
+          "reason": "buggy backend out of scope"
+        },
+        "sqlancer_common_scope": {
+          "reachable": false,
+          "detected": false,
+          "reason": "buggy backend out of scope"
+        },
+        "ours_full": {
+          "reachable": true,
+          "detected": false,
+          "reason": "equal",
+          "buggy_status": "ok",
+          "reference_status": "ok",
+          "reference_backend": "pandas",
+          "buggy_rows": [
+            [
+              "c",
+              8,
+              "A",
+              0,
+              0
+            ],
+            [
+              "a",
+              12,
+              "",
+              -2,
+              -3
+            ],
+            [
+              "c",
+              2,
+              "",
+              -10,
+              -3
+            ]
+          ],
+          "reference_rows": [
+            [
+              "c",
+              8,
+              "A",
+              0,
+              0
+            ],
+            [
+              "a",
+              12,
+              "",
+              -2,
+              -3
+            ],
+            [
+              "c",
+              2,
+              "",
+              -10,
+              -3
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "root_id": "polars-grouped-max-sort-metadata-001",
+      "project": "pola-rs/polars",
+      "families": [
+        "groupby_aggregation@polars,polars_lazy"
+      ],
+      "buggy_backend": "polars",
+      "arms": {
+        "tdiff_style": {
+          "reachable": true,
+          "detected": false,
+          "reason": "equal",
+          "buggy_status": "ok",
+          "reference_status": "ok",
+          "reference_backend": "pandas",
+          "buggy_rows": [
+            [
+              2,
+              "b"
+            ]
+          ],
+          "reference_rows": [
+            [
+              2,
+              "b"
+            ]
+          ]
+        },
+        "sqlancer_common_scope": {
+          "reachable": false,
+          "detected": false,
+          "reason": "buggy backend out of scope"
+        },
+        "ours_full": {
+          "reachable": true,
+          "detected": false,
+          "reason": "equal",
+          "buggy_status": "ok",
+          "reference_status": "ok",
+          "reference_backend": "pandas",
+          "buggy_rows": [
+            [
+              2,
+              "b"
+            ]
+          ],
+          "reference_rows": [
+            [
+              2,
+              "b"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "root_id": "polars-reflected-arithmetic-operand-order-001",
+      "project": "pola-rs/polars",
+      "families": [
+        "polars_reflected_arithmetic_operand_order@polars",
+        "reverse_division_operand_order@polars"
+      ],
+      "buggy_backend": "polars",
+      "arms": {
+        "tdiff_style": {
+          "reachable": true,
+          "detected": true,
+          "reason": "result",
+          "buggy_status": "ok",
+          "reference_status": "ok",
+          "reference_backend": "pandas",
+          "buggy_rows": [
+            [
+              0,
+              0.5
+            ],
+            [
+              1,
+              0.6666666667
+            ],
+            [
+              1,
+              0.75
+            ]
+          ],
+          "reference_rows": [
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              1.3333333333
+            ],
+            [
+              1,
+              1.5
+            ]
+          ]
+        },
+        "sqlancer_common_scope": {
+          "reachable": false,
+          "detected": false,
+          "reason": "buggy backend out of scope"
+        },
+        "ours_full": {
+          "reachable": true,
+          "detected": true,
+          "reason": "result",
+          "buggy_status": "ok",
+          "reference_status": "ok",
+          "reference_backend": "pandas",
+          "buggy_rows": [
+            [
+              0,
+              0.5
+            ],
+            [
+              1,
+              0.6666666667
+            ],
+            [
+              1,
+              0.75
+            ]
+          ],
+          "reference_rows": [
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              1.3333333333
+            ],
+            [
+              1,
+              1.5
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "root_id": "pyarrow-sliced-bool-hash-aggregate-001",
+      "project": "apache/arrow",
+      "families": [
+        "pyarrow_sliced_bool_groupby_any_all@pyarrow"
+      ],
+      "buggy_backend": "pyarrow",
+      "arms": {
+        "tdiff_style": {
+          "reachable": false,
+          "detected": false,
+          "reason": "buggy backend out of scope"
+        },
+        "sqlancer_common_scope": {
+          "reachable": false,
+          "detected": false,
+          "reason": "buggy backend out of scope"
+        },
+        "ours_full": {
+          "reachable": true,
+          "detected": false,
+          "reason": "equal",
+          "buggy_status": "ok",
+          "reference_status": "ok",
+          "reference_backend": "pandas",
+          "buggy_rows": [
+            [
+              false,
+              false,
+              10
+            ]
+          ],
+          "reference_rows": [
+            [
+              false,
+              false,
+              10
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "root_id": "duckdb-join-filter-pushdown-limit-001",
+      "project": "duckdb/duckdb",
+      "families": [
+        "metamorphic_semi_anti_join_rewrite@duckdb"
+      ],
+      "buggy_backend": "duckdb",
+      "arms": {
+        "tdiff_style": {
+          "reachable": false,
+          "detected": false,
+          "reason": "buggy backend out of scope"
+        },
+        "sqlancer_common_scope": {
+          "reachable": true,
+          "detected": false,
+          "reason": "equal",
+          "buggy_status": "ok",
+          "reference_status": "ok",
+          "reference_backend": "sqlite",
+          "buggy_rows": [
+            [
+              false,
+              false
+            ]
+          ],
+          "reference_rows": [
+            [
+              false,
+              false
+            ]
+          ]
+        },
+        "ours_full": {
+          "reachable": true,
+          "detected": false,
+          "reason": "equal",
+          "buggy_status": "ok",
+          "reference_status": "ok",
+          "reference_backend": "pandas",
+          "buggy_rows": [
+            [
+              false,
+              false
+            ]
+          ],
+          "reference_rows": [
+            [
+              false,
+              false
+            ]
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -67,13 +67,62 @@ Competitor scope (verified 2026-09-14, `../COMPETITIVE_ANALYSIS_DEEP.md` §1):
 3. **Root-cause dedup** follows our counting contract; a competitor might classify the same
    behaviour under a different root.
 
-## Empirical follow-up (planned)
+## Empirical follow-up (RUN 2026-09-14)
+
+Arms approximate the competitor's **scope** (target systems + oracle family), not its generator.
+Implemented in `scripts/paper/run_rq7_competitor_arms.py`; raw output in
+`results/rq7_competitor_arms.{json,md}`.
+
+| Arm | Backends | Oracle |
+| --- | --- | --- |
+| `tdiff_style` | pandas, polars, polars_lazy | plain differential |
+| `sqlancer_common_scope` | duckdb, sqlite | SQL-oracle scope (plain differential proxy) |
+| `ours_full` | pandas, polars, duckdb, pyarrow, datafusion, chdb | differential (this run) |
+
+### Results
+
+| Metric | tdiff_style | sqlancer_common_scope | ours_full |
+| --- | ---: | ---: | ---: |
+| Reachable (buggy backend in scope) | **2 / 9** | **1 / 9** | **9 / 9** |
+| Detected (plain differential flagged it) | 1 / 9 | 0 / 9 | 3 / 9 |
+
+**Competitor union reachable = 3/9 → 6/9 confirmed roots are out of reach for every competitor
+scope** (the 5 DataFusion query-engine roots + the 1 PyArrow Arrow-layout root).
+
+Per-root detail:
+
+| root | buggy backend | tdiff reach/detect | sqlancer reach/detect | ours reach/detect |
+| --- | --- | --- | --- | --- |
+| datafusion-grouped-null-topk-001 | datafusion | ✗/✗ | ✗/✗ | ✓/✓ |
+| datafusion-limit-offset-pushdown-001 | datafusion | ✗/✗ | ✗/✗ | ✓/✗ |
+| datafusion-negative-zero-comparison-001 | datafusion | ✗/✗ | ✗/✗ | ✓/✓ |
+| datafusion-distinct-null-topk-001 | datafusion | ✗/✗ | ✗/✗ | ✓/✗ |
+| datafusion-ordered-limit-idempotence-001 | datafusion | ✗/✗ | ✗/✗ | ✓/✗ |
+| polars-grouped-max-sort-metadata-001 | polars | ✓/✗ | ✗/✗ | ✓/✗ |
+| polars-reflected-arithmetic-operand-order-001 | polars | ✓/✓ | ✗/✗ | ✓/✓ |
+| pyarrow-sliced-bool-hash-aggregate-001 | pyarrow | ✗/✗ | ✗/✗ | ✓/✗ |
+| duckdb-join-filter-pushdown-limit-001 | duckdb | ✗/✗ | ✓/✗ | ✓/✗ |
+
+### The second, stronger finding
+
+Even **our own** full-backend arm with *plain differential only* detects just **3/9**. The other
+six need the **contract / metamorphic / probe oracle family**, not merely backend breadth. So the
+result supports two independent claims:
+
+1. **Scope**: 6/9 roots are unreachable by any competitor target set.
+2. **Oracle family**: reach alone is insufficient — the multi-endpoint contract explains the
+   remaining detection gap.
+
+This directly answers "TDiFf/EET already do this" and also justifies C-A/C-B rather than pure
+backend aggregation.
+
+### Remaining follow-ups
 
 | Arm | Purpose |
 | --- | --- |
-| `tdiff_style` | SQL→DataFrame transfer + plain differential (no contract/certificate); measure whether it re-finds families 6–7 and misses 1–5/8–9 |
-| `sqlancer_common_scope` | PQS/NoREC/TLP on DuckDB/SQLite common scope; measure overlap with family 9 |
-| `no_contrast` (cell-only) | show certificate/contrast machinery is what reaches the cross-model families |
+| `contract_oracle` | re-run `ours_full` with the full contract/metamorphic/probe oracle to show detection → 9/9 |
+| `no_contrast` (cell-only) | isolate the certificate/contrast machinery |
+| real SQLancer port | replace the plain-differential proxy in `sqlancer_common_scope` with PQS/NoREC/TLP |
 
-These are added to `EXPERIMENT_MATRIX.md` (D7). Status: **argument complete; empirical arms not
-yet run.**
+Status: **reachability + differential detection empirical; full-oracle arm pending.**
+
