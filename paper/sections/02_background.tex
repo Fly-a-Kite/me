@@ -1,0 +1,58 @@
+\section{Background and Motivating Examples}
+\label{sec:background}
+
+\subsection{The heterogeneous tabular stack}
+
+We group targets into four backend families:
+\emph{DataFrame APIs} (pandas, Polars eager/lazy/streaming),
+\emph{Arrow processing} (PyArrow tables, record batches, compute kernels, layout variants),
+\emph{embedded SQL} (DuckDB, SQLite), and
+\emph{query engines} (DataFusion, chDB).
+Table~\ref{tab:targets} lists the families, execution models, and the capability axes along
+which a workflow is lowered. \todo{Generate Table~\ref{tab:targets} from
+\texttt{datadiff targets} / \texttt{semantic-registry}.}
+
+\subsection{Silent wrong results}
+
+\todo{Write 2--3 concrete worked examples drawn from the nine strict confirmed families, each
+with: the workflow, the two backends, the expected vs observed result, the root cause, and the
+upstream issue URL. Use \texttt{experiments/latest_confirmations.json} as the source of truth.}
+
+\begin{table}[t]
+\caption{Strict confirmed latest-version bug families by backend.
+Source: \texttt{experiments/latest\_confirmations.json}; see
+\texttt{paper/CLAIMS\_RECONCILIATION.md}.}
+\label{tab:bugs}
+\small
+\begin{tabular}{@{}llr@{}}
+\toprule
+Backend family & Root cause & Count \\
+\midrule
+DataFusion & grouped top-$k$ null sort key; group-by after nested order/limit; negative zero;
+distinct null top-$k$; limit idempotence & 5 \\
+Polars & reflected arithmetic operand order; group-by aggregation (fixed) & 2 \\
+PyArrow & sliced boolean group-by \texttt{any}/\texttt{all} & 1 \\
+DuckDB & semi/anti-join rewrite (fixed) & 1 \\
+\midrule
+\textbf{Strict confirmed} & & \textbf{9} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Oracle families in testing}
+
+Differential testing compares multiple implementations on the same input; metamorphic testing
+checks relations preserved by semantics-preserving transformations; deterministic probes encode
+known high-value invariants. In DBMS testing these appear as pivoted query synthesis (PQS),
+non-optimizing reference engine construction (NoREC), query partitioning (TLP), equivalent
+expression transformation, and constraint-based oracle construction. \todo{Add verified
+citations from \texttt{refs.bib}; verify venue/year per entry.}
+
+\subsection{Why a shared semantic layer is required}
+
+A DataFrame API returns an index and a dtype alongside values; Arrow returns a chunked,
+possibly sliced column; SQL returns an unordered multiset; a query engine returns an execution
+plan with optimizer-dependent ordering. Comparing these outputs without canonicalization
+yields false positives on presentation differences and false negatives on real semantic
+differences. \S\ref{sec:approach-normalizer} describes the normalizer that makes the
+comparison meaningful.

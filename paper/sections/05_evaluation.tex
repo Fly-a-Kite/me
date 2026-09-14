@@ -1,0 +1,71 @@
+\section{Evaluation}
+\label{sec:eval}
+
+\subsection{Experimental setup}
+
+\todo{State machine (CPU/RAM), frozen environment with package hashes, source commit, backend
+versions, seed policy (excluded blocks; fresh pair 30700001/30700102), lane specification,
+case budget, timeouts, and the counting contract. Reference
+\texttt{paper/EXPERIMENT\_MATRIX.md}.}
+
+\subsection{RQ1: Can \sys{} find confirmed latest-version bug families?}
+
+\todo{Fill Table~\ref{tab:rq1} from regenerated campaign manifests. Report strict survivors per
+10k cases, unique candidate families, time-to-first, and per-backend strict confirmed families.
+State the frozen 9-family baseline (Table~\ref{tab:bugs}) and any new families separately.}
+
+\begin{table}[t]
+\caption{RQ1 — fresh discovery per seed block. \todo{regenerate}.}
+\label{tab:rq1}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Seed block & Executed & Findings & Survivors & New families \\
+\midrule
+30700001/30700102 & \todo{} & \todo{} & \todo{} & \todo{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{RQ2: Does normalization control noise?}
+
+\todo{Report raw findings vs post-classification survivors, FP rate, expected-divergence rate,
+and normalization before/after counts for \texttt{legacy\_cartesian} vs
+\texttt{contract\_cartesian} vs \texttt{contract\_lattice\_static}.}
+
+\subsection{RQ3: Are the oracle families complementary?}
+
+\todo{Report the union/intersection of families per oracle source, pairwise Jaccard, and the
+recounted probe/relation counts.}
+
+\subsection{RQ4: Does typed generation and guidance improve yield?}
+
+\todo{Report valid-program ratio, executed cases/s, candidate families/hour, time-to-first, and
+novelty-weighted yield across the adaptive and control arms, with paired bootstrap CIs.}
+
+\subsection{RQ5: Is the evidence pipeline actionable?}
+
+\todo{Report reduction ratio, reproducer success, bundle completeness, readiness, and
+flaky/timeout rates over all RQ1 candidates.}
+
+\subsection{RQ6: Is the testing surface transferable?}
+
+\todo{Report workflow reuse rate, capability coverage per family, adapter LOC and
+time-to-add-a-target, and per-family confirmed families.}
+
+\subsection{RQ-C7: Does the HyperContract oracle satisfy its gates?}
+
+\todo{Report contract, granularity/reachability, and runtime-correctness gates separately.
+Until W2 completes, state clearly that these gates are not yet green and report the current
+producer-kind completion count. Do not report partial gate credit.}
+
+\subsection{Baselines}
+
+\todo{Report SQLancer-family and random/unguided comparisons under equal budget and the strict
+counting contract; report incompatible baselines separately and never as a win.}
+
+\subsection{Threats to validity}
+
+\todo{Construct, internal, external, conclusion validity; cross-backend divergence is not
+automatically a bug; version drift; seed sensitivity; engine coverage imbalance; lost
+historical manifests.}

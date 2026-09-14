@@ -1,0 +1,32 @@
+\section{Implementation and Reproducibility Discipline}
+\label{sec:implementation}
+
+\subsection{Targets, adapters, and capability matrix}
+
+\todo{List implementations and LOC for the target registry, adapters per family, and the
+capability matrix; report adapter LOC and time-to-add-a-target as RQ6 evidence.}
+
+\subsection{Determinism and parallel execution}
+
+\todo{Describe deterministic seed substreams, worker-count invariance, retry/completion-order
+invariance, and the cache-key boundary that includes evidence tier. Point to
+\texttt{execution\_core}, \texttt{parallel}, and the parallel-scaling producers.}
+
+\subsection{Authority-bound evidence}
+\label{sec:impl-authority}
+
+The phase-6 work adds an explicit evidence-authority layer: a dynamic plan with frozen seed
+blocks, work units, denominators, resource limits, and command digests; an append-only typed
+artifact--receipt index in which every receipt binds source snapshot, authority, task/result
+identity, seeds, outcomes, raw artifact hashes, and transcript; and fail-closed admission in
+which wrong source, substituted identity, duplicate digest, stale authority, malformed raw
+artifact, or diagnostic-only reference is rejected as \texttt{not\_evaluated}. This layer is
+itself an engineering contribution: it makes each reported number replayable from durable raw
+bytes and prevents diagnostic artifacts from earning gate credit. \todo{Describe the ten
+producer kinds and the plan/index verifiers; report current completion status honestly, since
+the gates are not yet green (\texttt{paper/research/CODE\_GAP\_REPORT.md}).}
+
+\subsection{Reproduction package}
+
+\todo{Specify: pinned source commit, environment lock with hashes, the single reproduction
+script, expected wall time, and the exact commands for every table and figure.}

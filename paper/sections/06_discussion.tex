@@ -1,0 +1,25 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{What transfers across execution models}
+
+\todo{Discuss which parts of the IR, normalizer, and oracle were reusable unchanged across
+DataFrame, Arrow, SQL, and query-engine families, and which required family-specific work.
+This is the empirical core of the C1 claim.}
+
+\subsection{Engineering lessons}
+
+\todo{Discuss the authority/receipt discipline: what broke when historical manifests were lost,
+why physical fresh/replay separation mattered, and what a minimal reproducible evidence layer
+requires. Frame honestly; the phase-6 gates are heavy and partly unproven.}
+
+\subsection{Limitations}
+
+\todo{DataFusion-heavy family distribution; confirmation latency and dependence on upstream
+maintainers; deterministic probes are manual-knowledge-bound; the HyperContract gates are not
+yet green; some claimed mechanisms lack isolating ablations.}
+
+\subsection{Ethics and responsible disclosure}
+
+All reported bugs were submitted upstream through the projects' public trackers; no exploit,
+denial-of-service, or data-exfiltration payloads are involved.

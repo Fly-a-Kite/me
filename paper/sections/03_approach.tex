@@ -1,0 +1,67 @@
+\section{Approach}
+\label{sec:approach}
+
+\subsection{Overview}
+
+Figure~\ref{fig:overview} shows the pipeline:
+typed workflow generation $\rightarrow$ capability-aware lowering $\rightarrow$ parallel
+execution over backend families $\rightarrow$ semantic normalization $\rightarrow$
+compositional oracle evaluation $\rightarrow$ triage/classification $\rightarrow$ evidence
+pipeline. \todo{Create Figure~\ref{fig:overview} (TikZ or PDF) showing the six stages and the
+fresh/replay separation boundary.}
+
+\subsection{Unified testing surface}
+\label{sec:approach-surface}
+
+\todo{Describe: (i) the typed workflow IR and small expression AST; (ii) the target registry
+that declares each backend's family and capabilities; (iii) capability-aware lowering that
+maps one workflow onto pandas/Polars APIs, Arrow compute, SQL, and query-engine execution;
+(iv) the shared operation- and case-level semantics that keep generator, scheduler, oracle and
+triage from drifting. Point to \texttt{src/datadiff/ccs_ir.py}, \texttt{dsl.py},
+\texttt{targets.py}, \texttt{adapters/}, \texttt{backends/}.}
+
+\subsection{Semantic normalization}
+\label{sec:approach-normalizer}
+
+\todo{Describe the canonical form: dtype promotion and canonical dtype names, null/NaN/negative
+zero equivalence rules, index and column-order erasure where semantics allow, row ordering and
+tie determinism, Arrow layout erasure (slice offset, chunking, dictionary encoding), numeric
+tolerance policy, and error/timing classification. State explicitly which differences are
+\emph{semantic} and which are \emph{presentational}. Point to \texttt{normalizer.py} and
+\texttt{canonicalization.py}.}
+
+\subsection{Compositional multi-endpoint oracle}
+\label{sec:approach-oracle}
+
+\todo{Describe: differential oracle across backend families; metamorphic relations on
+semantics-preserving transformations (sort, filter/take, rebuild, pagination, string
+normalization idempotence, coalesce idempotence, semi/anti join with duplicate keys); and
+deterministic latest-version probes. Explain per-case fusion and confidence, the four verdicts,
+and root-cause classification. \textbf{Recount probes and relations from the live registry
+before publishing any number} (see \texttt{paper/CLAIMS\_RECONCILIATION.md} \S3).}
+
+\subsection{Compositional semantic HyperContract (oracle core)}
+\label{sec:approach-hypercontract}
+
+\todo{Describe the phase-6 design: finite multi-endpoint contracts; forward semantic-property
+inference and backward observability analysis; derivation / applicability / observation
+certificates per observed obligation; staged planner vs authority exact comparator with
+escalation; the declared target lattice (16 fresh families / 232 cells, 384 single-axis
+contrast edges, 502 target-control pair obligations, 9 regression families / 144 cells); and
+the coverage-debt scheduler with deterministic seed substreams. This is the paper's
+software-engineering depth; keep it factual and separate unrun gates from completed ones.}
+
+\subsection{Search and scheduling}
+
+\todo{Describe typed generation profiles, mutation operators, the multi-scope adaptive
+selection across case/profile/target/backend dimensions, the quality-diversity seed archive,
+and lane scheduling. Frame as the mechanism behind RQ4; do not claim priority.}
+
+\subsection{Evidence pipeline and counting contract}
+\label{sec:approach-evidence}
+
+\todo{Describe the five counting tiers (finding, recheck survivor, native candidate,
+issue-ready root, strict confirmed family), family key = root cause + suspicious backends,
+fresh/replay physical separation, reduction, issue bundling, and confirmation tracking. Point
+to \texttt{triage.py}, \texttt{family\_novelty.py}, \texttt{reducer.py},
+\texttt{issue\_bundle.py}, \texttt{final\_readiness.py}.}

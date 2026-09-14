@@ -1,0 +1,83 @@
+\section{Introduction}
+\label{sec:intro}
+
+\subsection{Setting}
+
+Data-processing pipelines rarely stay inside one engine. A single analyst workflow may read
+Parquet through PyArrow, reshape it with pandas or Polars, push an aggregation into DuckDB or
+SQLite, and execute a larger relational plan in DataFusion or chDB. These systems are commonly
+treated as interchangeable executors of the same table semantics, and in the common case they
+behave as such. At the boundaries, however, they disagree: null and NaN propagation,
+negative-zero comparisons, ordering and top-$k$ tie-breaking, group-by with null keys, join
+semantics under duplicate keys, integer/float casting, string collation, and Arrow layout
+details such as slice offsets and chunking. When such a disagreement occurs, both engines
+return a plausible result and no error is raised. The pipeline continues with silently wrong
+data.
+
+\subsection{Problem}
+
+Detecting these \emph{silent wrong-result} bugs in this ecosystem is hard for four reasons.
+First, the testing surface is heterogeneous: one workflow must be lowered into DataFrame API
+calls, Arrow compute kernels, SQL, and query-engine plans, each with its own type system and
+capability set. Second, directly comparing raw outputs is dominated by false positives, because
+legitimate differences in dtype, index, ordering, and presentation are ubiquitous; a canonical
+representation and a classification layer are prerequisites, not refinements. Third,
+techniques developed for SQL DBMSs assume a single language and a single query planner and do
+not transfer to lazy/eager DataFrame execution or Arrow in-memory layout. Fourth, a fuzzing
+finding is not a bug: it becomes a contribution only after it is re-checked, minimized,
+deduplicated by root cause, and independently confirmed upstream.
+
+\subsection{Gap}
+
+Prior work has advanced three strands separately. DBMS logic-bug testing provides powerful
+oracle families---pivoted query synthesis, non-optimizing reference engines, query
+partitioning, cardinality and metamorphic oracles---but targets SQL engines. DataFrame and
+workload-generation work targets Python data-processing libraries, but emphasizes workload
+realism and replay rather than a cross-model semantic oracle. Specialized data-system testing
+targets graph, spatial, or time-series engines. To our knowledge no prior published system
+unifies DataFrame APIs, Arrow processing, embedded SQL, and analytical query engines under one
+typed testing surface with one normalizer, one compositional oracle, and one evidence
+pipeline; we deliberately do not claim priority for differential, metamorphic, or DataFrame
+testing as techniques.
+
+\subsection{Thesis}
+
+A single typed workflow IR with capability-aware lowering, a shared semantic normalizer, a
+compositional multi-endpoint oracle complex, and an end-to-end evidence pipeline can find,
+reproduce, and substantiate latest-version silent wrong-result bugs across the whole tabular
+data-processing ecosystem, and can do so with controlled noise and auditable provenance.
+
+\subsection{Contributions}
+
+\begin{itemize}[leftmargin=*,itemsep=2pt]
+  \item \textbf{C1 (unified testing surface).} A typed workflow IR and capability-aware
+  lowering that place Python DataFrame APIs, Arrow compute, embedded SQL, and query engines on
+  one testing surface (\S\ref{sec:approach-surface}), evaluated for reuse and per-family
+  coverage in RQ6.
+  \item \textbf{C2 (normalizer + compositional oracle).} A semantic normalizer and a
+  multi-endpoint oracle complex that fuses differential checking, metamorphic relations, and
+  deterministic latest-version probes, with derivation, applicability, and observation
+  certificates and separate \textsc{satisfied}/\textsc{violated}/\textsc{inapplicable}/
+  \textsc{inconclusive} verdicts (\S\ref{sec:approach-oracle}); evaluated for noise control
+  (RQ2) and oracle complementarity (RQ3).
+  \item \textbf{C6 (evidence pipeline).} An end-to-end pipeline from candidate to
+  issue-ready root to independently confirmed family, with fresh/replay physical separation
+  and a strict counting contract (\S\ref{sec:approach-evidence}); evaluated in RQ5.
+  \item \textbf{Oracle core (C7).} A finite compositional semantic HyperContract compiled by
+  forward-property inference and backward-observability analysis, driving a coverage-debt
+  scheduler over a declared target lattice, with authority-bound replayable evidence
+  (\S\ref{sec:approach-hypercontract}, \S\ref{sec:impl-authority}); evaluated in RQ-C7.
+\end{itemize}
+
+\subsection{Results preview}
+
+Using \sys{} across DataFusion, Polars, DuckDB, and PyArrow, we report \textbf{nine strict
+confirmed latest-version bug families} (seven upstream-labeled, two fixed upstream), with one
+further finding pending independent confirmation and one matching a pre-existing upstream
+issue reported separately (Table~\ref{tab:bugs}). \todo{Add regenerated RQ2/RQ3/RQ5/RQ6
+summary sentences once W3 completes.}
+
+\subsection{Artifact availability}
+
+\todo{Describe the artifact package: frozen source commit, exact environment lock, seed
+policy, raw journals, receipts, and the single reproduction script.}

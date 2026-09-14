@@ -1,0 +1,71 @@
+% DataDiffFuzz — ICSE/FSE submission skeleton.
+% Build: pdflatex main && bibtex main && pdflatex main && pdflatex main
+% Requires the ACM acmart class (TeX Live `acmart`, or Overleaf).
+% NOTE: no LaTeX toolchain is installed in the working environment; verify on Overleaf/TL.
+\documentclass[sigconf,review,anonymous]{acmart}
+
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{xspace}
+\usepackage{enumitem}
+
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\newcommand{\sys}{\textsc{DataDiffFuzz}\xspace}
+\newcommand{\osc}{\textsc{Osc}\xspace}
+
+\settopmatter{printacmref=false}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\pagestyle{fancy}
+\fancyhf{}
+
+\begin{document}
+
+\title{\sys{}: Unified Semantic Differential Fuzzing for Heterogeneous
+Tabular Data-Processing Systems}
+
+\author{Anonymous}
+\affiliation{\institution{Under review}\country{}}
+
+\begin{abstract}
+Modern tabular data-processing stacks combine Python DataFrame APIs, Arrow-based in-memory
+processing, embedded SQL engines, and analytical query engines. These systems are routinely
+treated as interchangeable executors of the same table semantics, yet they silently diverge on
+null and negative-zero handling, ordering and top-$k$ ties, group-by and join semantics, type
+casts, Arrow memory layout, and optimizer rewrites. Existing wrong-result testing techniques
+target SQL DBMSs or a single data model, leaving this heterogeneous ecosystem without a common
+testing surface. We present \sys{}, a unified semantic differential fuzzing framework for
+tabular data-processing systems. \sys{} uses a typed workflow IR with capability-aware lowering
+to multiple backend families, a shared semantic normalizer for cross-backend canonicalization,
+and a compositional oracle complex that fuses differential checking, metamorphic relations, and
+deterministic latest-version probes under a single finite multi-endpoint contract. An end-to-end
+evidence pipeline carries each finding through candidate triage, recheck, reduction,
+family-level deduplication, issue bundling, and confirmation tracking, keeping fresh discovery
+physically separate from replayed and already-known roots. Across DataFusion, Polars, DuckDB,
+and PyArrow we report nine upstream-confirmed latest-version bug families (plus one pending and
+one non-original match shown separately), and we evaluate noise control, oracle complementarity,
+scheduling efficiency, evidence actionability, and cross-family transferability. \todo{replace
+with the regenerated result sentence after RQ1--RQ6}.
+\end{abstract}
+
+\keywords{differential testing, metamorphic testing, fuzzing, DataFrame systems, query engines,
+silent wrong-result bugs}
+
+\maketitle
+
+\input{sections/01_introduction}
+\input{sections/02_background}
+\input{sections/03_approach}
+\input{sections/04_implementation}
+\input{sections/05_evaluation}
+\input{sections/06_discussion}
+\input{sections/07_related_work}
+\input{sections/08_conclusion}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{refs}
+
+\appendix
+\input{sections/09_appendix}
+
+\end{document}

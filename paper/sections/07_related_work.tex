@@ -1,0 +1,43 @@
+\section{Related Work}
+\label{sec:related}
+
+\todo{Write four subsections and a comparison table. Verify every citation in \texttt{refs.bib}
+before submission.}
+
+\subsection{Testing database engines for logic bugs}
+Pivoted query synthesis \cite{rigger2020pqs}, non-optimizing reference engines
+\cite{rigger2020norec}, query partitioning \cite{rigger2020tlp}, and the SQLancer tool family
+\cite{rigger2020sqlancer}. These provide the oracle vocabulary we adopt, but target SQL DBMSs.
+
+\subsection{Differential and metamorphic testing of data systems}
+NEZHA \cite{rui2017nezha} for domain-independent differential testing; SparkFuzz
+\cite{sparkfuzz2020} for query-engine correctness regressions; BigFuzz \cite{bigfuzz2020} for
+data-analytics framework abstraction; Csmith \cite{yang2011csmith} as the classical
+differential-fuzzing reference. \todo{Add metamorphic DB testing (e.g., QTRAN) and recent
+equivalent-expression / constraint-based oracles with verified metadata.}
+
+\subsection{DataFrame and workload testing}
+FuzzyData and DataFrame workload generation/replay. \todo{Verify metadata; position as workload
+generation + replay vs our cross-model semantic oracle.}
+
+\subsection{Search, scheduling, and diversity}
+Multi-scope adaptive selection, mutation scheduling (MOPT \cite{mopt2019}), and quality-diversity
+archives (MAP-Elites \cite{mouret2015mapelites}). \todo{Position as borrowed mechanisms with
+new scope unification, not as primary novelty.}
+
+\begin{table}[t]
+\caption{Positioning. \todo{Complete from verified related work:
+system, target models, oracle families, evidence pipeline, cross-model reuse.}}
+\label{tab:related}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+System & Models & Oracles & Evidence pipeline & Cross-model reuse \\
+\midrule
+PQS/NoREC/TLP & SQL & 1 & partial & no \\
+FuzzyData & DataFrame & \todo{} & \todo{} & no \\
+SparkFuzz & query engine & differential & no & no \\
+\sys{} & DataFrame+Arrow+SQL+QE & multi-endpoint & yes & yes \\
+\bottomrule
+\end{tabular}
+\end{table}
