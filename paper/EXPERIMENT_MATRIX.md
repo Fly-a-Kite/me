@@ -130,6 +130,16 @@ $V -m datadiff.cli run-health --manifest <...>
 | Budget | compute ≈8–20 h once built; engineering ≈4–6 weeks |
 | Status | unrun; this is the phase6 software-engineering contribution |
 
+## RQ7 — Competitor reachability of our confirmed bugs
+
+| | |
+| --- | --- |
+| Hypothesis | Most of our strict confirmed families are unreachable by the strongest competitors' published target sets and oracle families. |
+| Method | Per-bug scope+oracle coverage judgment from the competitors' own papers; then an empirical `tdiff_style` / `sqlancer_common_scope` arm. |
+| Primary metric | number of strict confirmed families inside each competitor's (target systems × oracle family) box |
+| Artifacts | `experiments/rq7_competitor_coverage.md` (argument), plus arm manifests |
+| Status | scope argument complete (7/9 outside TDiFf scope; 9/9 outside SQL-only oracle scope); empirical arms pending |
+
 ## Baselines
 
 | Baseline | Source | Fairness rule |

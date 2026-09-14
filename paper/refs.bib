@@ -77,29 +77,92 @@
   year    = {2015},
 }
 
-% --- Provisional / must be verified or replaced -----------------------------------------
-@misc{fuzzydata,
-  title = {{FuzzyData}: A Fuzzing Framework for {DataFrame} Libraries},
-  year  = {2025},
-  note  = {VERIFY: authors, venue, year},
+% --- Verified 2026-09-14 via curl/Crossref (see COMPETITIVE_ANALYSIS_DEEP.md) -----------
+@inproceedings{eet2024,
+  author    = {Zu-Ming Jiang and Zhendong Su},
+  title     = {Detecting Logic Bugs in Database Engines via Equivalent Expression Transformation},
+  booktitle = {18th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+  year      = {2024},
+  note      = {66 unique bugs, 35 logic; MySQL, PostgreSQL, SQLite, ClickHouse, TiDB},
+  url       = {https://www.usenix.org/conference/osdi24/presentation/jiang},
 }
 
-@misc{eet,
-  title = {{EET}: Testing Database Engines via Equivalent Expression Transformation},
+@article{coddtest2025,
+  title   = {Constant Optimization Driven Database System Testing},
+  journal = {Proceedings of the ACM on Management of Data (PACMMOD)},
+  year    = {2025},
+  doi     = {10.1145/3709674},
+  note    = {45 unique bugs, 24 logic; SQLite, MySQL, CockroachDB, DuckDB, TiDB},
+}
+
+@article{diffqueryplans2024,
+  title   = {Keep It Simple: Testing Databases via Differential Query Plans},
+  journal = {Proceedings of the ACM on Management of Data (PACMMOD)},
+  year    = {2024},
+  doi     = {10.1145/3654991},
+}
+
+@article{qtran2025,
+  title   = {{QTRAN}: Extending Metamorphic-Oracle Based Logical Bug Detection Techniques for Multiple-{DBMS} Dialect Support},
+  journal = {Proceedings of the ACM on Software Engineering (PACMSE)},
+  year    = {2025},
+  doi     = {10.1145/3728908},
+  note    = {ISSTA 2025; LLM-powered transfer of metamorphic oracles across DBMS dialects},
+}
+
+@article{spatter2024,
+  title   = {Finding Logic Bugs in Spatial Database Engines via Affine Equivalent Inputs},
+  journal = {Proceedings of the ACM on Management of Data (PACMMOD)},
+  year    = {2024},
+  doi     = {10.1145/3698810},
+  note    = {34 unique / 30 confirmed / 18 fixed; PostGIS, DuckDB Spatial, MySQL, SQL Server},
+}
+
+@article{graphcutting2025,
+  title   = {Finding Logic Bugs in Graph-processing Systems via Graph-cutting},
+  journal = {Proceedings of the ACM on Management of Data (PACMMOD)},
+  year    = {2025},
+  doi     = {10.1145/3725300},
+}
+
+@inproceedings{dqe2023,
+  author    = {Jiansen Song and Wensheng Dou and Ziyu Cui and Qianwang Dai and Wei Wang and Jun Wei},
+  title     = {Testing Database Systems via Differential Query Execution},
+  booktitle = {45th IEEE/ACM International Conference on Software Engineering (ICSE)},
+  year      = {2023},
+  doi       = {10.1109/icse48619.2023.00175},
+  note      = {50 found / 41 confirmed / 11 fixed},
+}
+
+@inproceedings{qpg2023,
+  title     = {Testing Database Engines via Query Plan Guidance},
+  booktitle = {45th IEEE/ACM International Conference on Software Engineering (ICSE)},
+  year      = {2023},
+  doi       = {10.1109/icse48619.2023.00174},
+  note      = {53 unique bugs; SQLite, TiDB, CockroachDB},
+}
+
+@inproceedings{thanos2025,
+  author    = {Ying Fu and Zhiyong Wu and Yuanliang Zhang and Jie Liang and Jingzhou Fu and Yu Jiang},
+  title     = {Thanos: {DBMS} Bug Detection via Storage Engine Rotation Based Differential Testing},
+  booktitle = {47th IEEE/ACM International Conference on Software Engineering (ICSE)},
+  year      = {2025},
+  doi       = {10.1109/icse55347.2025.00257},
+  note      = {32 confirmed, 29 Critical},
+}
+
+@inproceedings{graphgenie2024,
+  title     = {Detecting Logic Bugs in Graph Database Management Systems via Injective and Surjective Graph Query Transformation},
+  booktitle = {46th IEEE/ACM International Conference on Software Engineering (ICSE)},
+  year      = {2024},
+  doi       = {10.1145/3597503.3623307},
+  note      = {25 unknown / 12 fixed / 9 confirmed; 6 GDBMS},
+}
+
+@misc{pinolo2023,
+  title = {Pinolo: Detecting Logical Bugs in Database Management Systems with Approximate Query Synthesis},
   year  = {2023},
-  note  = {VERIFY: authors, venue, year},
-}
-
-@misc{coddtest,
-  title = {{CODDTest}: Constraint-Based Oracle Construction for Database Engines},
-  year  = {2024},
-  note  = {VERIFY: authors, venue, year},
-}
-
-@misc{qtran,
-  title = {{QTRAN}: Metamorphic Testing for Database Engines},
-  year  = {2024},
-  note  = {VERIFY: authors, venue, year},
+  note  = {USENIX ATC 2023; VERIFY authors and pages},
 }
 
 @misc{noether,
