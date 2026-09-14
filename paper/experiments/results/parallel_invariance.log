@@ -1,0 +1,3 @@
+cases=10 findings=1 real_findings=0
+json=/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/paper/experiments/results/parallel_invariance/parallel_invariance.json
+EXIT=0

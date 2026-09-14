@@ -1,0 +1,676 @@
+{
+  "schema_version": "datadiff-parallel-invariance-v1",
+  "profile": "discovery_fresh",
+  "rows": 4000,
+  "left_backend": "datafusion",
+  "right_backend": "datafusion_parallel",
+  "cases": 10,
+  "findings": 1,
+  "real_findings": 0,
+  "results": [
+    {
+      "seed": 31200101,
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "kind": "match",
+      "left_rows": [
+        [
+          null,
+          false
+        ]
+      ],
+      "right_rows": [
+        [
+          null,
+          false
+        ]
+      ]
+    },
+    {
+      "seed": 31200102,
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "kind": "match",
+      "left_rows": [
+        [
+          1,
+          10,
+          null,
+          -10
+        ],
+        [
+          3,
+          -1,
+          48,
+          -10
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          10,
+          null,
+          -10
+        ],
+        [
+          3,
+          -1,
+          48,
+          -10
+        ]
+      ]
+    },
+    {
+      "seed": 31200103,
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": false,
+      "reason": "result",
+      "kind": "expected_float_reduction_order",
+      "left_rows": [
+        [
+          0,
+          0.35676998922641584,
+          2,
+          0
+        ],
+        [
+          1,
+          2.2866034816247542,
+          2,
+          1259
+        ],
+        [
+          14,
+          0,
+          1,
+          2660
+        ],
+        [
+          3,
+          1,
+          1,
+          424263
+        ],
+        [
+          4,
+          0.5,
+          1,
+          603576
+        ],
+        [
+          6,
+          -16.366000000014154,
+          1,
+          371490
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          0.35676998922641434,
+          2,
+          0
+        ],
+        [
+          1,
+          2.2866034816247582,
+          2,
+          1259
+        ],
+        [
+          14,
+          0,
+          1,
+          2660
+        ],
+        [
+          3,
+          1,
+          1,
+          424263
+        ],
+        [
+          4,
+          0.5,
+          1,
+          603576
+        ],
+        [
+          6,
+          -16.3659999999986,
+          1,
+          371490
+        ]
+      ]
+    },
+    {
+      "seed": 31200104,
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "kind": "match",
+      "left_rows": [
+        [
+          true,
+          1,
+          "",
+          -1,
+          745534
+        ],
+        [
+          true,
+          11,
+          "δelta",
+          -1,
+          100674
+        ],
+        [
+          true,
+          0,
+          "中文",
+          -0.5,
+          -488280
+        ],
+        [
+          true,
+          1,
+          "A",
+          0,
+          42195
+        ],
+        [
+          true,
+          9,
+          "中文",
+          0,
+          -810238
+        ],
+        [
+          true,
+          1,
+          "qFbEs",
+          0.5,
+          -436600
+        ],
+        [
+          true,
+          2,
+          "BrOIK",
+          0.5,
+          null
+        ],
+        [
+          true,
+          1,
+          "btxMOMN",
+          1,
+          -44850
+        ],
+        [
+          true,
+          6,
+          "δelta",
+          1,
+          424500
+        ],
+        [
+          true,
+          1,
+          "δelta",
+          null,
+          100650
+        ],
+        [
+          true,
+          1,
+          "中文",
+          null,
+          -1144556
+        ],
+        [
+          true,
+          2,
+          "δelta",
+          null,
+          427780
+        ],
+        [
+          true,
+          3,
+          "space value",
+          null,
+          451500
+        ]
+      ],
+      "right_rows": [
+        [
+          true,
+          1,
+          "",
+          -1,
+          745534
+        ],
+        [
+          true,
+          11,
+          "δelta",
+          -1,
+          100674
+        ],
+        [
+          true,
+          0,
+          "中文",
+          -0.5,
+          -488280
+        ],
+        [
+          true,
+          1,
+          "A",
+          0,
+          42195
+        ],
+        [
+          true,
+          9,
+          "中文",
+          0,
+          -810238
+        ],
+        [
+          true,
+          1,
+          "qFbEs",
+          0.5,
+          -436600
+        ],
+        [
+          true,
+          2,
+          "BrOIK",
+          0.5,
+          null
+        ],
+        [
+          true,
+          1,
+          "btxMOMN",
+          1,
+          -44850
+        ],
+        [
+          true,
+          6,
+          "δelta",
+          1,
+          424500
+        ],
+        [
+          true,
+          1,
+          "δelta",
+          null,
+          100650
+        ],
+        [
+          true,
+          1,
+          "中文",
+          null,
+          -1144556
+        ],
+        [
+          true,
+          2,
+          "δelta",
+          null,
+          427780
+        ],
+        [
+          true,
+          3,
+          "space value",
+          null,
+          451500
+        ]
+      ]
+    },
+    {
+      "seed": 31200105,
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "kind": "match",
+      "left_rows": [
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ]
+    },
+    {
+      "seed": 31200106,
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "kind": "match",
+      "left_rows": [],
+      "right_rows": []
+    },
+    {
+      "seed": 31200107,
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "kind": "match",
+      "left_rows": [
+        [
+          1,
+          "alpha"
+        ],
+        [
+          1,
+          "blyhoP"
+        ],
+        [
+          1,
+          "space value"
+        ],
+        [
+          1,
+          "tag_14"
+        ],
+        [
+          1,
+          "tag_27"
+        ],
+        [
+          1,
+          "tag_9"
+        ],
+        [
+          2,
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          "alpha"
+        ],
+        [
+          1,
+          "blyhoP"
+        ],
+        [
+          1,
+          "space value"
+        ],
+        [
+          1,
+          "tag_14"
+        ],
+        [
+          1,
+          "tag_27"
+        ],
+        [
+          1,
+          "tag_9"
+        ],
+        [
+          2,
+          null
+        ]
+      ]
+    },
+    {
+      "seed": 31200108,
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "kind": "match",
+      "left_rows": [
+        [
+          0,
+          true,
+          2
+        ],
+        [
+          2,
+          false,
+          2
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          true,
+          2
+        ],
+        [
+          2,
+          false,
+          2
+        ]
+      ]
+    },
+    {
+      "seed": 31200109,
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "kind": "match",
+      "left_rows": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          12
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          15
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          12
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          15
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          1
+        ]
+      ]
+    },
+    {
+      "seed": 31200110,
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "kind": "match",
+      "left_rows": [
+        [
+          "",
+          null,
+          -10.5
+        ],
+        [
+          "A",
+          null,
+          -9
+        ],
+        [
+          "Ucq",
+          null,
+          -9.5
+        ],
+        [
+          "alpha",
+          null,
+          -10
+        ],
+        [
+          "beta",
+          -1,
+          -9
+        ],
+        [
+          "gamma",
+          null,
+          -2.314
+        ],
+        [
+          "iSWUa",
+          null,
+          -9
+        ],
+        [
+          "space value",
+          null,
+          -33.748999999999995
+        ],
+        [
+          "wH",
+          10,
+          -11
+        ],
+        [
+          "δelta",
+          null,
+          -10.5
+        ],
+        [
+          "中文",
+          null,
+          -11
+        ],
+        [
+          null,
+          1,
+          -9
+        ]
+      ],
+      "right_rows": [
+        [
+          "",
+          null,
+          -10.5
+        ],
+        [
+          "A",
+          null,
+          -9
+        ],
+        [
+          "Ucq",
+          null,
+          -9.5
+        ],
+        [
+          "alpha",
+          null,
+          -10
+        ],
+        [
+          "beta",
+          -1,
+          -9
+        ],
+        [
+          "gamma",
+          null,
+          -2.314
+        ],
+        [
+          "iSWUa",
+          null,
+          -9
+        ],
+        [
+          "space value",
+          null,
+          -33.748999999999995
+        ],
+        [
+          "wH",
+          10,
+          -11
+        ],
+        [
+          "δelta",
+          null,
+          -10.5
+        ],
+        [
+          "中文",
+          null,
+          -11
+        ],
+        [
+          null,
+          1,
+          -9
+        ]
+      ]
+    }
+  ]
+}
