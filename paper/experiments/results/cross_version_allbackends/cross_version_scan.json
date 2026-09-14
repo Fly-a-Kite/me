@@ -1,0 +1,5115 @@
+{
+  "schema_version": "datadiff-cross-version-scan-v1",
+  "env_pairs": [
+    [
+      "mirror-20260724",
+      "frozen-target"
+    ]
+  ],
+  "backends": [
+    "pandas",
+    "polars",
+    "duckdb"
+  ],
+  "cases": [
+    "datafusion_distinct_null_topk.json",
+    "canonical-datafusion-distinct-null-topk-001-v0",
+    "canonical-datafusion-distinct-null-topk-001-v1",
+    "canonical-datafusion-distinct-null-topk-001-v2",
+    "canonical-datafusion-distinct-null-topk-001-v3",
+    "canonical-datafusion-distinct-null-topk-001-v4",
+    "datafusion_groupby_limit_offset.json",
+    "canonical-datafusion-groupby-limit-offset-001-v0",
+    "canonical-datafusion-groupby-limit-offset-001-v1",
+    "canonical-datafusion-groupby-limit-offset-001-v2",
+    "canonical-datafusion-groupby-limit-offset-001-v3",
+    "canonical-datafusion-groupby-limit-offset-001-v4",
+    "datafusion_grouped_null_topk.json",
+    "canonical-datafusion-grouped-null-topk-001-v0",
+    "canonical-datafusion-grouped-null-topk-001-v1",
+    "canonical-datafusion-grouped-null-topk-001-v2",
+    "canonical-datafusion-grouped-null-topk-001-v3",
+    "canonical-datafusion-grouped-null-topk-001-v4",
+    "datafusion_limit_idempotence.json",
+    "canonical-datafusion-limit-idempotence-001-v0",
+    "canonical-datafusion-limit-idempotence-001-v1",
+    "canonical-datafusion-limit-idempotence-001-v2",
+    "canonical-datafusion-limit-idempotence-001-v3",
+    "canonical-datafusion-limit-idempotence-001-v4",
+    "datafusion_negative_zero_comparison.json",
+    "canonical-datafusion-negative-zero-comparison-001-v0",
+    "canonical-datafusion-negative-zero-comparison-001-v1",
+    "canonical-datafusion-negative-zero-comparison-001-v2",
+    "canonical-datafusion-negative-zero-comparison-001-v3",
+    "canonical-datafusion-negative-zero-comparison-001-v4",
+    "datafusion_order_by_offset_subquery_groupby.json",
+    "canonical-datafusion-order-by-offset-subquery-groupby-001-v0",
+    "canonical-datafusion-order-by-offset-subquery-groupby-001-v1",
+    "canonical-datafusion-order-by-offset-subquery-groupby-001-v2",
+    "canonical-datafusion-order-by-offset-subquery-groupby-001-v3",
+    "canonical-datafusion-order-by-offset-subquery-groupby-001-v4",
+    "duckdb_join_filter_pushdown_limit.json",
+    "canonical-duckdb-join-filter-pushdown-limit-001-v0",
+    "canonical-duckdb-join-filter-pushdown-limit-001-v1",
+    "canonical-duckdb-join-filter-pushdown-limit-001-v2",
+    "canonical-duckdb-join-filter-pushdown-limit-001-v3",
+    "canonical-duckdb-join-filter-pushdown-limit-001-v4",
+    "polars_grouped_max_sort_metadata.json",
+    "canonical-polars-grouped-max-sort-metadata-001-v0",
+    "canonical-polars-grouped-max-sort-metadata-001-v1",
+    "canonical-polars-grouped-max-sort-metadata-001-v2",
+    "canonical-polars-grouped-max-sort-metadata-001-v3",
+    "canonical-polars-grouped-max-sort-metadata-001-v4",
+    "polars_reflected_arithmetic_operand_order.json",
+    "canonical-polars-reflected-arithmetic-operand-order-001-v0",
+    "canonical-polars-reflected-arithmetic-operand-order-001-v1",
+    "canonical-polars-reflected-arithmetic-operand-order-001-v2",
+    "canonical-polars-reflected-arithmetic-operand-order-001-v3",
+    "canonical-polars-reflected-arithmetic-operand-order-001-v4",
+    "pyarrow_sliced_bool_groupby.json",
+    "canonical-pyarrow-sliced-bool-groupby-001-v0",
+    "canonical-pyarrow-sliced-bool-groupby-001-v1",
+    "canonical-pyarrow-sliced-bool-groupby-001-v2",
+    "canonical-pyarrow-sliced-bool-groupby-001-v3",
+    "canonical-pyarrow-sliced-bool-groupby-001-v4"
+  ],
+  "result_count": 180,
+  "finding_count": 0,
+  "results": [
+    {
+      "case": "datafusion_distinct_null_topk.json",
+      "case_id": "canonical-datafusion-distinct-null-topk-001",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_distinct_null_topk.json",
+      "case_id": "canonical-datafusion-distinct-null-topk-001",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_distinct_null_topk.json",
+      "case_id": "canonical-datafusion-distinct-null-topk-001",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-distinct-null-topk-001-v0",
+      "case_id": "canonical-datafusion-distinct-null-topk-001-v0",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-distinct-null-topk-001-v0",
+      "case_id": "canonical-datafusion-distinct-null-topk-001-v0",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-distinct-null-topk-001-v0",
+      "case_id": "canonical-datafusion-distinct-null-topk-001-v0",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-distinct-null-topk-001-v1",
+      "case_id": "canonical-datafusion-distinct-null-topk-001-v1",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-distinct-null-topk-001-v1",
+      "case_id": "canonical-datafusion-distinct-null-topk-001-v1",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-distinct-null-topk-001-v1",
+      "case_id": "canonical-datafusion-distinct-null-topk-001-v1",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-distinct-null-topk-001-v2",
+      "case_id": "canonical-datafusion-distinct-null-topk-001-v2",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          ""
+        ]
+      ],
+      "right_rows": [
+        [
+          ""
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-distinct-null-topk-001-v2",
+      "case_id": "canonical-datafusion-distinct-null-topk-001-v2",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          ""
+        ]
+      ],
+      "right_rows": [
+        [
+          ""
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-distinct-null-topk-001-v2",
+      "case_id": "canonical-datafusion-distinct-null-topk-001-v2",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          ""
+        ]
+      ],
+      "right_rows": [
+        [
+          ""
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-distinct-null-topk-001-v3",
+      "case_id": "canonical-datafusion-distinct-null-topk-001-v3",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-distinct-null-topk-001-v3",
+      "case_id": "canonical-datafusion-distinct-null-topk-001-v3",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-distinct-null-topk-001-v3",
+      "case_id": "canonical-datafusion-distinct-null-topk-001-v3",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-distinct-null-topk-001-v4",
+      "case_id": "canonical-datafusion-distinct-null-topk-001-v4",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          ""
+        ]
+      ],
+      "right_rows": [
+        [
+          ""
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-distinct-null-topk-001-v4",
+      "case_id": "canonical-datafusion-distinct-null-topk-001-v4",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          ""
+        ]
+      ],
+      "right_rows": [
+        [
+          ""
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-distinct-null-topk-001-v4",
+      "case_id": "canonical-datafusion-distinct-null-topk-001-v4",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          ""
+        ]
+      ],
+      "right_rows": [
+        [
+          ""
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_groupby_limit_offset.json",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_groupby_limit_offset.json",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_groupby_limit_offset.json",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-groupby-limit-offset-001-v0",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001-v0",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-groupby-limit-offset-001-v0",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001-v0",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-groupby-limit-offset-001-v0",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001-v0",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-groupby-limit-offset-001-v1",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001-v1",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-groupby-limit-offset-001-v1",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001-v1",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-groupby-limit-offset-001-v1",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001-v1",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-groupby-limit-offset-001-v2",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001-v2",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-groupby-limit-offset-001-v2",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001-v2",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-groupby-limit-offset-001-v2",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001-v2",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-groupby-limit-offset-001-v3",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001-v3",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-groupby-limit-offset-001-v3",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001-v3",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-groupby-limit-offset-001-v3",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001-v3",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-groupby-limit-offset-001-v4",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001-v4",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-groupby-limit-offset-001-v4",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001-v4",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-groupby-limit-offset-001-v4",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001-v4",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_grouped_null_topk.json",
+      "case_id": "canonical-datafusion-grouped-null-topk-001",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_grouped_null_topk.json",
+      "case_id": "canonical-datafusion-grouped-null-topk-001",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_grouped_null_topk.json",
+      "case_id": "canonical-datafusion-grouped-null-topk-001",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-grouped-null-topk-001-v0",
+      "case_id": "canonical-datafusion-grouped-null-topk-001-v0",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-grouped-null-topk-001-v0",
+      "case_id": "canonical-datafusion-grouped-null-topk-001-v0",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-grouped-null-topk-001-v0",
+      "case_id": "canonical-datafusion-grouped-null-topk-001-v0",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-grouped-null-topk-001-v1",
+      "case_id": "canonical-datafusion-grouped-null-topk-001-v1",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-grouped-null-topk-001-v1",
+      "case_id": "canonical-datafusion-grouped-null-topk-001-v1",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-grouped-null-topk-001-v1",
+      "case_id": "canonical-datafusion-grouped-null-topk-001-v1",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-grouped-null-topk-001-v2",
+      "case_id": "canonical-datafusion-grouped-null-topk-001-v2",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-grouped-null-topk-001-v2",
+      "case_id": "canonical-datafusion-grouped-null-topk-001-v2",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-grouped-null-topk-001-v2",
+      "case_id": "canonical-datafusion-grouped-null-topk-001-v2",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-grouped-null-topk-001-v3",
+      "case_id": "canonical-datafusion-grouped-null-topk-001-v3",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-grouped-null-topk-001-v3",
+      "case_id": "canonical-datafusion-grouped-null-topk-001-v3",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-grouped-null-topk-001-v3",
+      "case_id": "canonical-datafusion-grouped-null-topk-001-v3",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-grouped-null-topk-001-v4",
+      "case_id": "canonical-datafusion-grouped-null-topk-001-v4",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-grouped-null-topk-001-v4",
+      "case_id": "canonical-datafusion-grouped-null-topk-001-v4",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-grouped-null-topk-001-v4",
+      "case_id": "canonical-datafusion-grouped-null-topk-001-v4",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_limit_idempotence.json",
+      "case_id": "canonical-datafusion-limit-idempotence-001",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "c",
+          8,
+          "A",
+          0,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "c",
+          8,
+          "A",
+          0,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",8,\\\\\\\"A\\\\\\\",0,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",8,\\\\\\\"A\\\\\\\",0,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_limit_idempotence.json",
+      "case_id": "canonical-datafusion-limit-idempotence-001",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "c",
+          8,
+          "A",
+          0,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "c",
+          8,
+          "A",
+          0,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",8,\\\\\\\"A\\\\\\\",0,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",8,\\\\\\\"A\\\\\\\",0,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_limit_idempotence.json",
+      "case_id": "canonical-datafusion-limit-idempotence-001",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "c",
+          8,
+          "A",
+          0,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "c",
+          8,
+          "A",
+          0,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",8,\\\\\\\"A\\\\\\\",0,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",8,\\\\\\\"A\\\\\\\",0,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-limit-idempotence-001-v0",
+      "case_id": "canonical-datafusion-limit-idempotence-001-v0",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-limit-idempotence-001-v0",
+      "case_id": "canonical-datafusion-limit-idempotence-001-v0",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-limit-idempotence-001-v0",
+      "case_id": "canonical-datafusion-limit-idempotence-001-v0",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-limit-idempotence-001-v1",
+      "case_id": "canonical-datafusion-limit-idempotence-001-v1",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          9,
+          "A",
+          -10,
+          8
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          9,
+          "A",
+          -10,
+          8
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",9,\\\\\\\"A\\\\\\\",-10,8]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",9,\\\\\\\"A\\\\\\\",-10,8]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-limit-idempotence-001-v1",
+      "case_id": "canonical-datafusion-limit-idempotence-001-v1",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          9,
+          "A",
+          -10,
+          8
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          9,
+          "A",
+          -10,
+          8
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",9,\\\\\\\"A\\\\\\\",-10,8]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",9,\\\\\\\"A\\\\\\\",-10,8]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-limit-idempotence-001-v1",
+      "case_id": "canonical-datafusion-limit-idempotence-001-v1",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          9,
+          "A",
+          -10,
+          8
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          9,
+          "A",
+          -10,
+          8
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",9,\\\\\\\"A\\\\\\\",-10,8]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",9,\\\\\\\"A\\\\\\\",-10,8]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-limit-idempotence-001-v2",
+      "case_id": "canonical-datafusion-limit-idempotence-001-v2",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-limit-idempotence-001-v2",
+      "case_id": "canonical-datafusion-limit-idempotence-001-v2",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-limit-idempotence-001-v2",
+      "case_id": "canonical-datafusion-limit-idempotence-001-v2",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-limit-idempotence-001-v3",
+      "case_id": "canonical-datafusion-limit-idempotence-001-v3",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-limit-idempotence-001-v3",
+      "case_id": "canonical-datafusion-limit-idempotence-001-v3",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-limit-idempotence-001-v3",
+      "case_id": "canonical-datafusion-limit-idempotence-001-v3",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-limit-idempotence-001-v4",
+      "case_id": "canonical-datafusion-limit-idempotence-001-v4",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          5,
+          "",
+          null,
+          0
+        ],
+        [
+          "a",
+          5,
+          "",
+          null,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          5,
+          "",
+          null,
+          0
+        ],
+        [
+          "a",
+          5,
+          "",
+          null,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",5,\\\\\\\"\\\\\\\",null,0]\\\",\\\"[\\\\\\\"a\\\\\\\",5,\\\\\\\"\\\\\\\",null,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",5,\\\\\\\"\\\\\\\",null,0]\\\",\\\"[\\\\\\\"a\\\\\\\",5,\\\\\\\"\\\\\\\",null,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-limit-idempotence-001-v4",
+      "case_id": "canonical-datafusion-limit-idempotence-001-v4",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          5,
+          "",
+          null,
+          0
+        ],
+        [
+          "a",
+          5,
+          "",
+          null,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          5,
+          "",
+          null,
+          0
+        ],
+        [
+          "a",
+          5,
+          "",
+          null,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",5,\\\\\\\"\\\\\\\",null,0]\\\",\\\"[\\\\\\\"a\\\\\\\",5,\\\\\\\"\\\\\\\",null,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",5,\\\\\\\"\\\\\\\",null,0]\\\",\\\"[\\\\\\\"a\\\\\\\",5,\\\\\\\"\\\\\\\",null,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-limit-idempotence-001-v4",
+      "case_id": "canonical-datafusion-limit-idempotence-001-v4",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "a",
+          5,
+          "",
+          null,
+          0
+        ],
+        [
+          "a",
+          5,
+          "",
+          null,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          5,
+          "",
+          null,
+          0
+        ],
+        [
+          "a",
+          5,
+          "",
+          null,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",5,\\\\\\\"\\\\\\\",null,0]\\\",\\\"[\\\\\\\"a\\\\\\\",5,\\\\\\\"\\\\\\\",null,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",5,\\\\\\\"\\\\\\\",null,0]\\\",\\\"[\\\\\\\"a\\\\\\\",5,\\\\\\\"\\\\\\\",null,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_negative_zero_comparison.json",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_negative_zero_comparison.json",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_negative_zero_comparison.json",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-negative-zero-comparison-001-v0",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001-v0",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-negative-zero-comparison-001-v0",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001-v0",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-negative-zero-comparison-001-v0",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001-v0",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-negative-zero-comparison-001-v1",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001-v1",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-negative-zero-comparison-001-v1",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001-v1",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-negative-zero-comparison-001-v1",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001-v1",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-negative-zero-comparison-001-v2",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001-v2",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-negative-zero-comparison-001-v2",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001-v2",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-negative-zero-comparison-001-v2",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001-v2",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-negative-zero-comparison-001-v3",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001-v3",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-negative-zero-comparison-001-v3",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001-v3",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-negative-zero-comparison-001-v3",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001-v3",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-negative-zero-comparison-001-v4",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001-v4",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-negative-zero-comparison-001-v4",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001-v4",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-negative-zero-comparison-001-v4",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001-v4",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_order_by_offset_subquery_groupby.json",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_order_by_offset_subquery_groupby.json",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_order_by_offset_subquery_groupby.json",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-order-by-offset-subquery-groupby-001-v0",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001-v0",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-order-by-offset-subquery-groupby-001-v0",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001-v0",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-order-by-offset-subquery-groupby-001-v0",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001-v0",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-order-by-offset-subquery-groupby-001-v1",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001-v1",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-order-by-offset-subquery-groupby-001-v1",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001-v1",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-order-by-offset-subquery-groupby-001-v1",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001-v1",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-order-by-offset-subquery-groupby-001-v2",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001-v2",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "sorted_first",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "sorted_first",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"sorted_first\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"sorted_first\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-order-by-offset-subquery-groupby-001-v2",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001-v2",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "sorted_first",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "sorted_first",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"sorted_first\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"sorted_first\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-order-by-offset-subquery-groupby-001-v2",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001-v2",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "sorted_first",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "sorted_first",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"sorted_first\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"sorted_first\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-order-by-offset-subquery-groupby-001-v3",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001-v3",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-order-by-offset-subquery-groupby-001-v3",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001-v3",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-order-by-offset-subquery-groupby-001-v3",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001-v3",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-order-by-offset-subquery-groupby-001-v4",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001-v4",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "sorted_first",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "sorted_first",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"sorted_first\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"sorted_first\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-order-by-offset-subquery-groupby-001-v4",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001-v4",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "sorted_first",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "sorted_first",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"sorted_first\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"sorted_first\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-datafusion-order-by-offset-subquery-groupby-001-v4",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001-v4",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "sorted_first",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "sorted_first",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"sorted_first\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"sorted_first\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "duckdb_join_filter_pushdown_limit.json",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "duckdb_join_filter_pushdown_limit.json",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "duckdb_join_filter_pushdown_limit.json",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-duckdb-join-filter-pushdown-limit-001-v0",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001-v0",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-duckdb-join-filter-pushdown-limit-001-v0",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001-v0",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-duckdb-join-filter-pushdown-limit-001-v0",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001-v0",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-duckdb-join-filter-pushdown-limit-001-v1",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001-v1",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-duckdb-join-filter-pushdown-limit-001-v1",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001-v1",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-duckdb-join-filter-pushdown-limit-001-v1",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001-v1",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-duckdb-join-filter-pushdown-limit-001-v2",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001-v2",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-duckdb-join-filter-pushdown-limit-001-v2",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001-v2",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-duckdb-join-filter-pushdown-limit-001-v2",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001-v2",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-duckdb-join-filter-pushdown-limit-001-v3",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001-v3",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-duckdb-join-filter-pushdown-limit-001-v3",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001-v3",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-duckdb-join-filter-pushdown-limit-001-v3",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001-v3",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-duckdb-join-filter-pushdown-limit-001-v4",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001-v4",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-duckdb-join-filter-pushdown-limit-001-v4",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001-v4",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-duckdb-join-filter-pushdown-limit-001-v4",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001-v4",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "polars_grouped_max_sort_metadata.json",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "polars_grouped_max_sort_metadata.json",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "polars_grouped_max_sort_metadata.json",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-grouped-max-sort-metadata-001-v0",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001-v0",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-grouped-max-sort-metadata-001-v0",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001-v0",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-grouped-max-sort-metadata-001-v0",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001-v0",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-grouped-max-sort-metadata-001-v1",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001-v1",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-grouped-max-sort-metadata-001-v1",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001-v1",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-grouped-max-sort-metadata-001-v1",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001-v1",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-grouped-max-sort-metadata-001-v2",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001-v2",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-grouped-max-sort-metadata-001-v2",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001-v2",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-grouped-max-sort-metadata-001-v2",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001-v2",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-grouped-max-sort-metadata-001-v3",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001-v3",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-grouped-max-sort-metadata-001-v3",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001-v3",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-grouped-max-sort-metadata-001-v3",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001-v3",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-grouped-max-sort-metadata-001-v4",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001-v4",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-grouped-max-sort-metadata-001-v4",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001-v4",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-grouped-max-sort-metadata-001-v4",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001-v4",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "polars_reflected_arithmetic_operand_order.json",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.3333333333
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.3333333333
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[1,1.3333333333]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[1,1.3333333333]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "polars_reflected_arithmetic_operand_order.json",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          0.5
+        ],
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.75
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          0.5
+        ],
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.75
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,0.5]\\\",\\\"[1,0.6666666667]\\\",\\\"[1,0.75]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,0.5]\\\",\\\"[1,0.6666666667]\\\",\\\"[1,0.75]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "polars_reflected_arithmetic_operand_order.json",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.3333333333
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.3333333333
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[1,1.3333333333]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[1,1.3333333333]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-reflected-arithmetic-operand-order-001-v0",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001-v0",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[1,1.5]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[1,1.5]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-reflected-arithmetic-operand-order-001-v0",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001-v0",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          0.5
+        ],
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.6666666667
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          0.5
+        ],
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.6666666667
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,0.5]\\\",\\\"[1,0.6666666667]\\\",\\\"[1,0.6666666667]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,0.5]\\\",\\\"[1,0.6666666667]\\\",\\\"[1,0.6666666667]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-reflected-arithmetic-operand-order-001-v0",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001-v0",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[1,1.5]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[1,1.5]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-reflected-arithmetic-operand-order-001-v1",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001-v1",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[0,2]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[0,2]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-reflected-arithmetic-operand-order-001-v1",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001-v1",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          0.5
+        ],
+        [
+          0,
+          0.5
+        ],
+        [
+          1,
+          0.6666666667
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          0.5
+        ],
+        [
+          0,
+          0.5
+        ],
+        [
+          1,
+          0.6666666667
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,0.5]\\\",\\\"[0,0.5]\\\",\\\"[1,0.6666666667]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,0.5]\\\",\\\"[0,0.5]\\\",\\\"[1,0.6666666667]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-reflected-arithmetic-operand-order-001-v1",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001-v1",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[0,2]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[0,2]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-reflected-arithmetic-operand-order-001-v2",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001-v2",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,1.5]\\\",\\\"[1,1.5]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,1.5]\\\",\\\"[1,1.5]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-reflected-arithmetic-operand-order-001-v2",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001-v2",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.6666666667
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.6666666667
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0.6666666667]\\\",\\\"[1,0.6666666667]\\\",\\\"[1,0.6666666667]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0.6666666667]\\\",\\\"[1,0.6666666667]\\\",\\\"[1,0.6666666667]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-reflected-arithmetic-operand-order-001-v2",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001-v2",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,1.5]\\\",\\\"[1,1.5]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,1.5]\\\",\\\"[1,1.5]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-reflected-arithmetic-operand-order-001-v3",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001-v3",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.3333333333
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.3333333333
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[1,1.3333333333]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[1,1.3333333333]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-reflected-arithmetic-operand-order-001-v3",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001-v3",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          0.5
+        ],
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.75
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          0.5
+        ],
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.75
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,0.5]\\\",\\\"[1,0.6666666667]\\\",\\\"[1,0.75]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,0.5]\\\",\\\"[1,0.6666666667]\\\",\\\"[1,0.75]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-reflected-arithmetic-operand-order-001-v3",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001-v3",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.3333333333
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.3333333333
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[1,1.3333333333]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[1,1.3333333333]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-reflected-arithmetic-operand-order-001-v4",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001-v4",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          1.3333333333
+        ],
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          1.3333333333
+        ],
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,1.3333333333]\\\",\\\"[1,1.5]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,1.3333333333]\\\",\\\"[1,1.5]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-reflected-arithmetic-operand-order-001-v4",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001-v4",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.75
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.75
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0.6666666667]\\\",\\\"[1,0.6666666667]\\\",\\\"[1,0.75]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0.6666666667]\\\",\\\"[1,0.6666666667]\\\",\\\"[1,0.75]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-polars-reflected-arithmetic-operand-order-001-v4",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001-v4",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          1.3333333333
+        ],
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          1.3333333333
+        ],
+        [
+          1,
+          1.5
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,1.3333333333]\\\",\\\"[1,1.5]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,1.3333333333]\\\",\\\"[1,1.5]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "pyarrow_sliced_bool_groupby.json",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "pyarrow_sliced_bool_groupby.json",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "pyarrow_sliced_bool_groupby.json",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-pyarrow-sliced-bool-groupby-001-v0",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001-v0",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-pyarrow-sliced-bool-groupby-001-v0",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001-v0",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-pyarrow-sliced-bool-groupby-001-v0",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001-v0",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-pyarrow-sliced-bool-groupby-001-v1",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001-v1",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-pyarrow-sliced-bool-groupby-001-v1",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001-v1",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-pyarrow-sliced-bool-groupby-001-v1",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001-v1",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-pyarrow-sliced-bool-groupby-001-v2",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001-v2",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null,
+          null,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          null,
+          null,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null,null,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null,null,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-pyarrow-sliced-bool-groupby-001-v2",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001-v2",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null,
+          null,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          null,
+          null,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null,null,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null,null,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-pyarrow-sliced-bool-groupby-001-v2",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001-v2",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null,
+          null,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          null,
+          null,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null,null,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null,null,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-pyarrow-sliced-bool-groupby-001-v3",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001-v3",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-pyarrow-sliced-bool-groupby-001-v3",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001-v3",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-pyarrow-sliced-bool-groupby-001-v3",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001-v3",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-pyarrow-sliced-bool-groupby-001-v4",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001-v4",
+      "backend": "pandas",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null,
+          null,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          null,
+          null,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null,null,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null,null,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-pyarrow-sliced-bool-groupby-001-v4",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001-v4",
+      "backend": "polars",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null,
+          null,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          null,
+          null,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null,null,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null,null,10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "canonical-pyarrow-sliced-bool-groupby-001-v4",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001-v4",
+      "backend": "duckdb",
+      "left_env_id": "mirror-20260724",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          null,
+          null,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          null,
+          null,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null,null,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null,null,10]\\\"]\",\"status\":\"ok\"}"
+    }
+  ],
+  "findings": []
+}
