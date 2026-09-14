@@ -50,6 +50,7 @@ from datadiff.commands.artifact_handlers import (
     cmd_validate_artifact_impl,
 )
 from datadiff.commands.core import CoreCommandHandlers, register as register_core_commands
+from datadiff.commands.cross_version import register as register_cross_version_commands
 from datadiff.commands.core_handlers import (
     cmd_init_impl,
     cmd_prune_corpus_impl,
@@ -1392,6 +1393,8 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         add_target_suite_flags=add_target_suite_flags,
     )
+
+    register_cross_version_commands(sub)
 
     register_fuzzing_commands(
         sub,

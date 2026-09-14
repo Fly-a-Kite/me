@@ -1,0 +1,358 @@
+{
+  "schema_version": "datadiff-cross-version-scan-v1",
+  "env_pairs": [
+    [
+      "datafusion-53.0.0--pyarrow-24.0.0",
+      "frozen-target"
+    ]
+  ],
+  "backends": [
+    "datafusion"
+  ],
+  "cases": [
+    "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_distinct_null_topk.json",
+    "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_groupby_limit_offset.json",
+    "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_grouped_null_topk.json",
+    "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_limit_idempotence.json",
+    "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_negative_zero_comparison.json",
+    "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_order_by_offset_subquery_groupby.json",
+    "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/duckdb_join_filter_pushdown_limit.json",
+    "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/polars_grouped_max_sort_metadata.json",
+    "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/polars_reflected_arithmetic_operand_order.json",
+    "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/pyarrow_sliced_bool_groupby.json"
+  ],
+  "result_count": 10,
+  "finding_count": 1,
+  "results": [
+    {
+      "case": "datafusion_distinct_null_topk.json",
+      "case_id": "canonical-datafusion-distinct-null-topk-001",
+      "case_path": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_distinct_null_topk.json",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": false,
+      "reason": "result",
+      "left_rows": [
+        [
+          ""
+        ]
+      ],
+      "right_rows": [
+        [
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_groupby_limit_offset.json",
+      "case_id": "canonical-datafusion-groupby-limit-offset-001",
+      "case_path": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_groupby_limit_offset.json",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_grouped_null_topk.json",
+      "case_id": "canonical-datafusion-grouped-null-topk-001",
+      "case_path": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_grouped_null_topk.json",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_limit_idempotence.json",
+      "case_id": "canonical-datafusion-limit-idempotence-001",
+      "case_path": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_limit_idempotence.json",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "c",
+          8,
+          "A",
+          0,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "c",
+          8,
+          "A",
+          0,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",8,\\\\\\\"A\\\\\\\",0,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",8,\\\\\\\"A\\\\\\\",0,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_negative_zero_comparison.json",
+      "case_id": "canonical-datafusion-negative-zero-comparison-001",
+      "case_path": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_negative_zero_comparison.json",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "datafusion_order_by_offset_subquery_groupby.json",
+      "case_id": "canonical-datafusion-order-by-offset-subquery-groupby-001",
+      "case_path": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_order_by_offset_subquery_groupby.json",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "duckdb_join_filter_pushdown_limit.json",
+      "case_id": "canonical-duckdb-join-filter-pushdown-limit-001",
+      "case_path": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/duckdb_join_filter_pushdown_limit.json",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "polars_grouped_max_sort_metadata.json",
+      "case_id": "canonical-polars-grouped-max-sort-metadata-001",
+      "case_path": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/polars_grouped_max_sort_metadata.json",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "right_rows": [
+        [
+          2,
+          "b"
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "polars_reflected_arithmetic_operand_order.json",
+      "case_id": "canonical-polars-reflected-arithmetic-operand-order-001",
+      "case_path": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/polars_reflected_arithmetic_operand_order.json",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.3333333333
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          1.3333333333
+        ],
+        [
+          1,
+          1.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[1,1.3333333333]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,2]\\\",\\\"[1,1.3333333333]\\\",\\\"[1,1.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "pyarrow_sliced_bool_groupby.json",
+      "case_id": "canonical-pyarrow-sliced-bool-groupby-001",
+      "case_path": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/pyarrow_sliced_bool_groupby.json",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}"
+    }
+  ],
+  "findings": [
+    {
+      "case": "datafusion_distinct_null_topk.json",
+      "case_id": "canonical-datafusion-distinct-null-topk-001",
+      "case_path": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_distinct_null_topk.json",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": false,
+      "reason": "result",
+      "left_rows": [
+        [
+          ""
+        ]
+      ],
+      "right_rows": [
+        [
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}"
+    }
+  ]
+}
