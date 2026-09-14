@@ -69,6 +69,24 @@ ICSE/FSE 审稿人会从七个维度检查一个发现能否算 bug（缺一即�
 - [ ] **A5 上游去重证据**：保存提交前 issue 搜索记录，证明非 duplicate。
 - [ ] **A6 严重度加权指标**：论文报告 `severity-weighted confirmed roots`，不只看数量。
 
+## 5b. 自动生成物（A1–A3 已落实）
+
+| 文件 | 作用 |
+| --- | --- |
+| `experiments/bug_audit_metadata.json` | 人工审定的 `severity` / `impact_class` / `root_cause_group` / `first_violated_component` / 独立性说明 |
+| `scripts/paper/build_bug_audit.py` | 合并 confirmation ledger + canonical corpus v2 + metadata，生成论文表格 |
+| `paper/experiments/results/bug_audit.json` / `bug_audit.md` | 论文可直接引用的审计数据与表格 |
+| `tests/test_paper_bug_audit.py` | 回归测试（2 passed），锁定上述不变量 |
+
+**实测汇总（2026-09-14）**：
+- 严格确认 **9**；**仍 affected on latest = 4**；有修复引用 = 7（其中 2 条仅有 main commit、发布版仍 affected）；
+- **severity-weighted score = 25**（high 7、medium 2）；
+- 后端族：query engine 5 / DataFrame API 2 / Arrow compute 1 / embedded SQL 1；
+- 粗粒度根因组 **7**（`datafusion-topk-null-sortkey` 与 `datafusion-limit-offset-pushdown` 各含 2 个 root，但 fault model 与 first-violated component 不同）；
+- pending 1、upstream-invalid 1（均不计入 confirmed）。
+
+复现：`python3 scripts/paper/build_bug_audit.py`。
+
 ## 6. 一句话结论
 
 > 这 9 个是**真 bug**（上游确认或已修复），但作为论文效果证据，必须补上
