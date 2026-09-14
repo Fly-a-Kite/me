@@ -1,0 +1,401 @@
+{
+  "summary": {
+    "schema_version": "datadiff-bug-audit-v1",
+    "confirmed_roots": 9,
+    "still_affected_on_latest": 4,
+    "fixed_upstream": 7,
+    "severity_weighted_score": 25,
+    "distinct_root_cause_groups": 7,
+    "by_backend_family": {
+      "query engine": 5,
+      "embedded SQL": 1,
+      "DataFrame API": 2,
+      "Arrow compute": 1
+    },
+    "by_project": {
+      "apache/datafusion": 5,
+      "duckdb/duckdb": 1,
+      "pola-rs/polars": 2,
+      "apache/arrow": 1
+    },
+    "by_severity": {
+      "high": 7,
+      "medium": 2
+    },
+    "by_root_cause_group": {
+      "datafusion-topk-null-sortkey": 2,
+      "datafusion-numeric-comparison": 1,
+      "duckdb-join-filter-pushdown": 1,
+      "polars-operator-dispatch": 1,
+      "arrow-layout-slice-offset": 1,
+      "datafusion-limit-offset-pushdown": 2,
+      "polars-groupby-sort-metadata": 1
+    },
+    "pending_roots": 1,
+    "excluded_records": 1
+  },
+  "roots": [
+    {
+      "root_id": "datafusion-grouped-null-topk-001",
+      "families": [
+        "grouped_topk_null_sort_key@datafusion"
+      ],
+      "project": "apache/datafusion",
+      "backend_family": "query engine",
+      "issue_url": "https://github.com/apache/datafusion/issues/22190",
+      "upstream_status": "upstream_labeled_bug",
+      "state": "open",
+      "labels": [
+        "bug"
+      ],
+      "severity": "high",
+      "severity_weight": 3,
+      "impact_class": "row_loss",
+      "root_cause_group": "datafusion-topk-null-sortkey",
+      "first_violated_component": "TopK aggregation NULL sort-key handling",
+      "shared_subsystem_with": [
+        "datafusion-distinct-null-topk-001"
+      ],
+      "independence_note": "Distinct mechanism from the DISTINCT variant: here a plain grouped MIN/MAX drops the whole NULL-key group; the DISTINCT root fails to retain a NULL group key outside the non-NULL heap.",
+      "affected_versions": [
+        "datafusion==53.0.0",
+        "datafusion==54.0.0"
+      ],
+      "fixed_versions": [],
+      "fixed_by": null,
+      "still_affected_on_latest": true,
+      "fault_model": "TopK aggregation drops a group whose aggregate sort key is NULL.",
+      "expected_signature": "grouped MIN(NULL) row must survive ORDER BY aggregate + LIMIT",
+      "dsl_case": {
+        "path": "experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_grouped_null_topk.json",
+        "sha256": "cd8fb8dafe009f0f06644e131ba7c362e620762822a78f20d7ef35a953e17f7e"
+      }
+    },
+    {
+      "root_id": "datafusion-negative-zero-comparison-001",
+      "families": [
+        "negative_zero_comparison@datafusion"
+      ],
+      "project": "apache/datafusion",
+      "backend_family": "query engine",
+      "issue_url": "https://github.com/apache/datafusion/issues/22490",
+      "upstream_status": "upstream_labeled_bug",
+      "state": "closed",
+      "labels": [
+        "bug"
+      ],
+      "severity": "high",
+      "severity_weight": 3,
+      "impact_class": "predicate_error",
+      "root_cause_group": "datafusion-numeric-comparison",
+      "first_violated_component": "SQL comparison boundary signed-zero normalization",
+      "shared_subsystem_with": [],
+      "independence_note": "Unique numeric-semantics root; no shared subsystem with any other confirmed family.",
+      "affected_versions": [
+        "datafusion==53.0.0",
+        "datafusion==54.0.0"
+      ],
+      "fixed_versions": [
+        "apache/datafusion@7dd1c6a2c68072eb7cacd3c56adf53a21a448863"
+      ],
+      "fixed_by": "https://github.com/apache/datafusion/pull/22835",
+      "still_affected_on_latest": true,
+      "fault_model": "Arrow total-order comparison is used without normalizing signed zero at SQL comparison boundaries.",
+      "expected_signature": "-0.0 >= 0.0 must be true under SQL numeric comparison semantics",
+      "dsl_case": {
+        "path": "experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_negative_zero_comparison.json",
+        "sha256": "b9a2ac6e54ccde9d375a9e8a7a388d0bbe35e0abb1f5dc9aa32a120cb47bf3cf"
+      }
+    },
+    {
+      "root_id": "duckdb-join-filter-pushdown-limit-001",
+      "families": [
+        "metamorphic_semi_anti_join_rewrite@duckdb"
+      ],
+      "project": "duckdb/duckdb",
+      "backend_family": "embedded SQL",
+      "issue_url": "https://github.com/duckdb/duckdb/issues/22924",
+      "upstream_status": "fixed_upstream",
+      "state": "closed",
+      "labels": [
+        "PR submitted"
+      ],
+      "severity": "high",
+      "severity_weight": 3,
+      "impact_class": "row_loss",
+      "root_cause_group": "duckdb-join-filter-pushdown",
+      "first_violated_component": "runtime join filter pushdown across ORDER BY/OFFSET/LIMIT",
+      "shared_subsystem_with": [],
+      "independence_note": "Discovered only through a metamorphic semi/anti-join rewrite relation, not a SQL value oracle.",
+      "affected_versions": [
+        "duckdb==1.5.4"
+      ],
+      "fixed_versions": [
+        "duckdb/duckdb@4c8c90db44fbfcee96ee299d1c5940781b73210a"
+      ],
+      "fixed_by": "https://github.com/duckdb/duckdb/pull/22963",
+      "still_affected_on_latest": true,
+      "fault_model": "Runtime join filter pushdown crosses ORDER BY/OFFSET or LIMIT and removes probe-side rows before row selection is complete.",
+      "expected_signature": "join filter pushdown must not cross ORDER BY/OFFSET or LIMIT",
+      "dsl_case": {
+        "path": "experiments/canonical_confirmed_bug_corpus/v1/cases/duckdb_join_filter_pushdown_limit.json",
+        "sha256": "f80f5681c3f2b74adbb62a6778587baacd2476388efcd79e2658c5e5500ef0e5"
+      }
+    },
+    {
+      "root_id": "polars-reflected-arithmetic-operand-order-001",
+      "families": [
+        "polars_reflected_arithmetic_operand_order@polars",
+        "reverse_division_operand_order@polars"
+      ],
+      "project": "pola-rs/polars",
+      "backend_family": "DataFrame API",
+      "issue_url": "https://github.com/pola-rs/polars/issues/27752",
+      "upstream_status": "upstream_labeled_bug",
+      "state": "open",
+      "labels": [
+        "bug",
+        "python",
+        "P-medium"
+      ],
+      "severity": "medium",
+      "severity_weight": 2,
+      "impact_class": "wrong_value",
+      "root_cause_group": "polars-operator-dispatch",
+      "first_violated_component": "reflected non-commutative Series dunder dispatch",
+      "shared_subsystem_with": [],
+      "independence_note": "Upstream P-medium; Python-dispatch semantics, not a query-planning root.",
+      "affected_versions": [
+        "polars==1.40.1",
+        "polars==1.42.1"
+      ],
+      "fixed_versions": [],
+      "fixed_by": null,
+      "still_affected_on_latest": true,
+      "fault_model": "Reflected non-commutative Series dunder methods execute self op other instead of other op self; reflected power also resolves the wrong column context.",
+      "expected_signature": "reflected non-commutative Series operators must preserve operand order",
+      "dsl_case": {
+        "path": "experiments/canonical_confirmed_bug_corpus/v1/cases/polars_reflected_arithmetic_operand_order.json",
+        "sha256": "f2561da8e00c7c093208e9047b9adb3f783bf9e9158d213e295f00b16504e43e"
+      }
+    },
+    {
+      "root_id": "pyarrow-sliced-bool-hash-aggregate-001",
+      "families": [
+        "pyarrow_sliced_bool_groupby_any_all@pyarrow"
+      ],
+      "project": "apache/arrow",
+      "backend_family": "Arrow compute",
+      "issue_url": "https://github.com/apache/arrow/issues/50043",
+      "upstream_status": "upstream_labeled_bug",
+      "state": "closed",
+      "labels": [
+        "Type: bug",
+        "Component: C++",
+        "Component: Python"
+      ],
+      "severity": "high",
+      "severity_weight": 3,
+      "impact_class": "wrong_aggregate",
+      "root_cause_group": "arrow-layout-slice-offset",
+      "first_violated_component": "hash_any/hash_all Boolean values-bitmap offset handling",
+      "shared_subsystem_with": [],
+      "independence_note": "Arrow in-memory layout root; unreachable by SQL-only or DataFrame-API-only techniques.",
+      "affected_versions": [
+        "pyarrow==24.0.0"
+      ],
+      "fixed_versions": [
+        "apache/arrow@95cb5d084506f97a16df006053642e9690ab731d",
+        "pyarrow==25.0.0"
+      ],
+      "fixed_by": "https://github.com/apache/arrow/pull/50094",
+      "still_affected_on_latest": false,
+      "fault_model": "hash_any/hash_all applies the validity bitmap offset but reads Boolean values without the slice offset.",
+      "expected_signature": "sliced Boolean hash_any/hash_all must honor the values bitmap offset",
+      "dsl_case": {
+        "path": "experiments/canonical_confirmed_bug_corpus/v1/cases/pyarrow_sliced_bool_groupby.json",
+        "sha256": "4462a30f8a37f6c8168bb3706817189fc3890ed6a3935d0f21dd86c0a5840c07"
+      }
+    },
+    {
+      "root_id": "datafusion-distinct-null-topk-001",
+      "families": [
+        "distinct_null_topk@datafusion",
+        "join_semantics@datafusion"
+      ],
+      "project": "apache/datafusion",
+      "backend_family": "query engine",
+      "issue_url": "https://github.com/apache/datafusion/issues/22554",
+      "upstream_status": "upstream_labeled_bug",
+      "state": "closed",
+      "labels": [
+        "bug",
+        "regression"
+      ],
+      "severity": "high",
+      "severity_weight": 3,
+      "impact_class": "wrong_row",
+      "root_cause_group": "datafusion-topk-null-sortkey",
+      "first_violated_component": "DISTINCT TopK NULL group-key retention",
+      "shared_subsystem_with": [
+        "datafusion-grouped-null-topk-001"
+      ],
+      "independence_note": "Same subsystem (TopK NULL handling) but a distinct fault model (DISTINCT retention vs grouped drop).",
+      "affected_versions": [
+        "datafusion==53.0.0"
+      ],
+      "fixed_versions": [
+        "datafusion==54.0.0",
+        "apache/datafusion@e7a2e052c319de23db36a3e209640413dccf7f0c"
+      ],
+      "fixed_by": "https://github.com/apache/datafusion/pull/22571",
+      "still_affected_on_latest": false,
+      "fault_model": "DISTINCT TopK fails to retain a NULL group key outside the non-NULL heap.",
+      "expected_signature": "ordered DISTINCT top-1 must equal the first full ordered row",
+      "dsl_case": {
+        "path": "experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_distinct_null_topk.json",
+        "sha256": "b6b81735db0079c7fa7233b151a6e89ee6efa6b66e01467fb78462e116f1b9a1"
+      }
+    },
+    {
+      "root_id": "datafusion-limit-offset-pushdown-001",
+      "families": [
+        "groupby_aggregation@datafusion",
+        "joined_order_offset_projection@datafusion"
+      ],
+      "project": "apache/datafusion",
+      "backend_family": "query engine",
+      "issue_url": "https://github.com/apache/datafusion/issues/22489",
+      "upstream_status": "upstream_labeled_bug",
+      "state": "closed",
+      "labels": [
+        "bug",
+        "regression"
+      ],
+      "severity": "high",
+      "severity_weight": 3,
+      "impact_class": "row_loss",
+      "root_cause_group": "datafusion-limit-offset-pushdown",
+      "first_violated_component": "LimitPushdown optimizer (outer OFFSET propagated into child subtree)",
+      "shared_subsystem_with": [
+        "datafusion-ordered-limit-idempotence-001"
+      ],
+      "independence_note": "Differs from the idempotence root: this one shrinks an inner LIMIT using a handled outer OFFSET; the idempotence root merges a repeated LIMIT with stale OFFSET state.",
+      "affected_versions": [
+        "datafusion==53.0.0"
+      ],
+      "fixed_versions": [
+        "datafusion==54.0.0",
+        "apache/datafusion@f22007717a9f874020b6e1d0c994ec22325a0257"
+      ],
+      "fixed_by": "https://github.com/apache/datafusion/pull/22525",
+      "still_affected_on_latest": false,
+      "fault_model": "LimitPushdown carries a handled outer OFFSET into a child subtree and incorrectly shrinks an inner LIMIT.",
+      "expected_signature": "inner ordered LIMIT must not inherit a handled outer OFFSET",
+      "dsl_case": {
+        "path": "experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_groupby_limit_offset.json",
+        "sha256": "bacfb86d671ac851ca4a23876650cf3e85e9cdefa84ef406a8bb8b7f17933800"
+      }
+    },
+    {
+      "root_id": "polars-grouped-max-sort-metadata-001",
+      "families": [
+        "groupby_aggregation@polars,polars_lazy"
+      ],
+      "project": "pola-rs/polars",
+      "backend_family": "DataFrame API",
+      "issue_url": "https://github.com/pola-rs/polars/issues/27672",
+      "upstream_status": "fixed_upstream",
+      "state": "closed",
+      "labels": [
+        "bug",
+        "python",
+        "accepted",
+        "P-high"
+      ],
+      "severity": "high",
+      "severity_weight": 3,
+      "impact_class": "wrong_order",
+      "root_cause_group": "polars-groupby-sort-metadata",
+      "first_violated_component": "maintain_order grouped-max metadata propagation",
+      "shared_subsystem_with": [],
+      "independence_note": "Upstream P-high/accepted; independent of all DataFusion families.",
+      "affected_versions": [
+        "polars==1.40.1"
+      ],
+      "fixed_versions": [
+        "polars==1.42.1",
+        "pola-rs/polars@d598e30e15f5d0ef722a35854291e57354214b4a"
+      ],
+      "fixed_by": "https://github.com/pola-rs/polars/pull/27684",
+      "still_affected_on_latest": false,
+      "fault_model": "Non-contiguous maintain-order groups propagate an invalid ascending flag to a grouped max result.",
+      "expected_signature": "grouped max output must not carry stale ascending metadata",
+      "dsl_case": {
+        "path": "experiments/canonical_confirmed_bug_corpus/v1/cases/polars_grouped_max_sort_metadata.json",
+        "sha256": "9c29a0ca9f135995bc2ef7ba16ff5ca33e24bc0234533f0583098a3a089ac6e2"
+      }
+    },
+    {
+      "root_id": "datafusion-ordered-limit-idempotence-001",
+      "families": [
+        "datafusion_limit_idempotence@datafusion",
+        "metamorphic_limit_idempotence@datafusion"
+      ],
+      "project": "apache/datafusion",
+      "backend_family": "query engine",
+      "issue_url": "https://github.com/apache/datafusion/issues/22541",
+      "upstream_status": "upstream_labeled_bug",
+      "state": "closed",
+      "labels": [
+        "bug"
+      ],
+      "severity": "medium",
+      "severity_weight": 2,
+      "impact_class": "non_idempotent_limit",
+      "root_cause_group": "datafusion-limit-offset-pushdown",
+      "first_violated_component": "Repeated ordered LIMIT merge with stale OFFSET state",
+      "shared_subsystem_with": [
+        "datafusion-limit-offset-pushdown-001"
+      ],
+      "independence_note": "Same subsystem (LIMIT/OFFSET planning) but a distinct fault model (idempotence vs pushdown shrink).",
+      "affected_versions": [
+        "datafusion==53.0.0"
+      ],
+      "fixed_versions": [
+        "datafusion==54.0.0",
+        "apache/datafusion@f22007717a9f874020b6e1d0c994ec22325a0257"
+      ],
+      "fixed_by": "https://github.com/apache/datafusion/pull/22525",
+      "still_affected_on_latest": false,
+      "fault_model": "A repeated ordered LIMIT is merged with stale OFFSET state and changes the selected rows.",
+      "expected_signature": "repeating an identical ordered LIMIT must be idempotent",
+      "dsl_case": {
+        "path": "experiments/canonical_confirmed_bug_corpus/v1/cases/datafusion_limit_idempotence.json",
+        "sha256": "76fd9dcaf3c68731eb1de537eccfddbc9c7c4bb70d9974b75f7fc2b30e71cc07"
+      }
+    }
+  ],
+  "pending": [
+    {
+      "root_id": "datafusion-order-by-offset-subquery-groupby-001",
+      "families": [
+        "path_projection_keyed_pick@datafusion",
+        "groupby_aggregation@datafusion"
+      ],
+      "project": "apache/datafusion",
+      "issue_url": "https://github.com/apache/datafusion/issues/23534",
+      "upstream_status": "submitted_pending_independent_confirmation",
+      "state": "open",
+      "counts_as_confirmed": false
+    }
+  ],
+  "excluded": [
+    {
+      "family": "polars_vector_division_rounding@polars",
+      "issue_url": "https://github.com/pola-rs/polars/issues/27753",
+      "reason": "upstream closed as invalid / duplicate of #23741",
+      "counts_as_confirmed": false
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "schema_version": "datadiff-bug-audit-metadata-v1",
+  "curated_at": "2026-09-14",
+  "curated_by": "Fly-a-Kite (manual adjudication from upstream labels, fault_model, and issue threads)",
+  "purpose": "Paper-facing impact/severity classification and root-cause independence analysis (A1/A3). Does not change upstream confirmation status or the confirmed count.",
+  "roots": {
+    "datafusion-grouped-null-topk-001": {
+      "impact_class": "row_loss",
+      "severity": "high",
+      "root_cause_group": "datafusion-topk-null-sortkey",
+      "first_violated_component": "TopK aggregation NULL sort-key handling",
+      "shared_subsystem_with": ["datafusion-distinct-null-topk-001"],
+      "independence_note": "Distinct mechanism from the DISTINCT variant: here a plain grouped MIN/MAX drops the whole NULL-key group; the DISTINCT root fails to retain a NULL group key outside the non-NULL heap."
+    },
+    "datafusion-limit-offset-pushdown-001": {
+      "impact_class": "row_loss",
+      "severity": "high",
+      "root_cause_group": "datafusion-limit-offset-pushdown",
+      "first_violated_component": "LimitPushdown optimizer (outer OFFSET propagated into child subtree)",
+      "shared_subsystem_with": ["datafusion-ordered-limit-idempotence-001"],
+      "independence_note": "Differs from the idempotence root: this one shrinks an inner LIMIT using a handled outer OFFSET; the idempotence root merges a repeated LIMIT with stale OFFSET state."
+    },
+    "datafusion-negative-zero-comparison-001": {
+      "impact_class": "predicate_error",
+      "severity": "high",
+      "root_cause_group": "datafusion-numeric-comparison",
+      "first_violated_component": "SQL comparison boundary signed-zero normalization",
+      "shared_subsystem_with": [],
+      "independence_note": "Unique numeric-semantics root; no shared subsystem with any other confirmed family."
+    },
+    "datafusion-distinct-null-topk-001": {
+      "impact_class": "wrong_row",
+      "severity": "high",
+      "root_cause_group": "datafusion-topk-null-sortkey",
+      "first_violated_component": "DISTINCT TopK NULL group-key retention",
+      "shared_subsystem_with": ["datafusion-grouped-null-topk-001"],
+      "independence_note": "Same subsystem (TopK NULL handling) but a distinct fault model (DISTINCT retention vs grouped drop)."
+    },
+    "datafusion-ordered-limit-idempotence-001": {
+      "impact_class": "non_idempotent_limit",
+      "severity": "medium",
+      "root_cause_group": "datafusion-limit-offset-pushdown",
+      "first_violated_component": "Repeated ordered LIMIT merge with stale OFFSET state",
+      "shared_subsystem_with": ["datafusion-limit-offset-pushdown-001"],
+      "independence_note": "Same subsystem (LIMIT/OFFSET planning) but a distinct fault model (idempotence vs pushdown shrink)."
+    },
+    "polars-grouped-max-sort-metadata-001": {
+      "impact_class": "wrong_order",
+      "severity": "high",
+      "root_cause_group": "polars-groupby-sort-metadata",
+      "first_violated_component": "maintain_order grouped-max metadata propagation",
+      "shared_subsystem_with": [],
+      "independence_note": "Upstream P-high/accepted; independent of all DataFusion families."
+    },
+    "polars-reflected-arithmetic-operand-order-001": {
+      "impact_class": "wrong_value",
+      "severity": "medium",
+      "root_cause_group": "polars-operator-dispatch",
+      "first_violated_component": "reflected non-commutative Series dunder dispatch",
+      "shared_subsystem_with": [],
+      "independence_note": "Upstream P-medium; Python-dispatch semantics, not a query-planning root."
+    },
+    "pyarrow-sliced-bool-hash-aggregate-001": {
+      "impact_class": "wrong_aggregate",
+      "severity": "high",
+      "root_cause_group": "arrow-layout-slice-offset",
+      "first_violated_component": "hash_any/hash_all Boolean values-bitmap offset handling",
+      "shared_subsystem_with": [],
+      "independence_note": "Arrow in-memory layout root; unreachable by SQL-only or DataFrame-API-only techniques."
+    },
+    "duckdb-join-filter-pushdown-limit-001": {
+      "impact_class": "row_loss",
+      "severity": "high",
+      "root_cause_group": "duckdb-join-filter-pushdown",
+      "first_violated_component": "runtime join filter pushdown across ORDER BY/OFFSET/LIMIT",
+      "shared_subsystem_with": [],
+      "independence_note": "Discovered only through a metamorphic semi/anti-join rewrite relation, not a SQL value oracle."
+    }
+  },
+  "excluded": {
+    "polars_vector_division_rounding@polars": {
+      "reason": "upstream closed as invalid / duplicate of #23741",
+      "issue_url": "https://github.com/pola-rs/polars/issues/27753",
+      "counts_as_confirmed": false
+    }
+  },
+  "pending": {
+    "datafusion-order-by-offset-subquery-groupby-001": {
+      "reason": "open, self-labeled, no maintainer acknowledgement / assignment / PR / independent label event",
+      "issue_url": "https://github.com/apache/datafusion/issues/23534",
+      "counts_as_confirmed": false
+    }
+  },
+  "dedup_summary": {
+    "confirmed_findings": 9,
+    "distinct_root_cause_groups": 7,
+    "groups_with_two_roots": ["datafusion-topk-null-sortkey", "datafusion-limit-offset-pushdown"],
+    "note": "The two paired groups share a subsystem but have distinct fault models and first-violated components; the paper reports both 9 roots and 7 coarse groups."
+  }
+}
