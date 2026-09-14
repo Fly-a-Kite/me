@@ -28,6 +28,20 @@
       },
       "label": "mirror 20260724",
       "repository_root": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper"
+    },
+    {
+      "env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "interpreter": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/version_envs/df53-pyarrow24/venv/bin/python",
+      "packages": {
+        "chdb": "",
+        "datafusion": "53.0.0",
+        "duckdb": "1.5.4",
+        "pandas": "3.0.0",
+        "polars": "",
+        "pyarrow": "24.0.0"
+      },
+      "label": "historical df53/pyarrow24",
+      "repository_root": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper"
     }
   ]
 }
