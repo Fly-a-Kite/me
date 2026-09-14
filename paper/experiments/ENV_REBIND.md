@@ -18,22 +18,44 @@ materials from the immutable archive:
 With these in place the file collects cleanly (was: `FileNotFoundError` at import). These are
 local test-environment links only; they do **not** modify any frozen artifact.
 
-## 2. Interpreter drift (real blocker)
+## 2. Interpreter drift (real blocker) — **two layers**
 
+### Layer 1 — SHA
 | Binding | Value |
 | --- | --- |
 | Frozen authority `interpreter_sha256` | `1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118` |
 | Current `/usr/bin/python3.12` | `e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f` |
 | Resolved path (frozen) | `/usr/bin/python3.12` |
 
-The host Python was patched after the phase-6 runs, so authority-bound execution fails closed
-with `target-version target interpreter SHA-256 mismatch`
-(`_phase6_formal_target_version_producer.py:2063`). This affects the six
-`test_runtime_phase6_formal_target_version_producer.py` executor/capability tests.
+### Layer 2 — build/version (discovered 2026-09-14)
+The environment audit records
+`interpreter.version = 3.12.3 (main, Jun 19 2026, 12:46:00) [GCC 13.3.0]`, but the current
+interpreter reports `3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]`. The metadata probe
+emits `sys.executable` + `version`, and
+`_phase6_formal_target_version_producer.py:2222-2226` compares both against the audit. So even
+after rebinding the SHA, 4 tests still fail with
+`target-version metadata probe interpreter binding mismatch`.
 
-**This must not be "fixed" by editing the frozen SHA.** The correct fix is a W1 rebind round
-that publishes a new authority document binding the current interpreter hash and keeps the old
-documents as immutable history.
+**Cause:** the host Python was rebuilt/patched between the 2026-07-24 run and now; the
+historical binary is unrecoverable.
+
+### What was done this round (safe, partial)
+- Replaced the mirror venv's `bin/python3.12` **symlink** with a **frozen real copy** of the
+  current interpreter (sha `e50d468e…`), so future host patches cannot drift the bytes again.
+  Verified the venv still imports pandas/polars/duckdb/pyarrow/datafusion/chDB.
+- This alone does **not** fix the tests and is not committed as a test change.
+
+### What the full rebind still requires
+Regenerate a consistent chain under a **new** root (never edit the historical audit in place):
+1. new `venv/` with the frozen interpreter + `pip-install-report.json`;
+2. new `environment-audit.json` recording the current `interpreter.executable` and
+   `interpreter.version`, plus correct `source_snapshot`/`pip_install_report` paths;
+3. new `target-version-revalidation.json` whose `environment_audit.path` points at (2);
+4. a new authority document binding the new audit/revalidation hashes;
+5. update the test fixture (`_TARGET_*` constants) to the new root/hashes.
+
+Failing tests before rebind: 6; after SHA-only rebind: 4 (all `metadata probe interpreter
+binding mismatch`). Full suite baseline is otherwise clean (3044 passed / 1 skipped).
 
 ## 3. Python environments present
 
@@ -54,8 +76,8 @@ Verified: `import datadiff` / `import datadiff_osc` resolve to `worktrees/wt-pap
 ## 4. Open W1 actions
 
 1. Freeze a durable environment descriptor (package versions + wheel hashes + interpreter hash)
-   for the current host.
-2. Decide whether to pin a copy of the interpreter binary inside the archive or to rebind to
-   the host hash with an explicit drift note.
-3. Regenerate the six failing executor/capability tests' expected bindings in the new round.
-4. Locate or regenerate the missing `runs/experiment-*.json` manifests.
+   for the current host. *(partially done: `ENVIRONMENT.md`; interpreter already frozen)*
+2. Build the new rebind root and regenerate `environment-audit.json` +
+   `target-version-revalidation.json` (see §2) so the 4 remaining tests pass honestly.
+3. Bind the new authority document to the new hashes and update the test fixture constants.
+4. Locate or regenerate the missing `runs/experiment-*.json` manifests (W3).

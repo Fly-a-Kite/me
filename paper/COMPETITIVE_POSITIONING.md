@@ -20,7 +20,7 @@ Status: draft v1 (2026-09-14). 待 3 路文献检索 agent 返回后补充/校�
 
 | 论文 | Venue/年 | 被测系统 | 核心方法 | 与我们的重叠 | 重叠度 | 威胁 | 我们的差异化 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **TDiFf** | **ASE 2026** | DataFrame systems | 把 DBMS test cases 迁移到 DataFrame 系统查 bug | DBMS oracle/测试用例 → DataFrame；DataFrame bug detection | **高** | **高** | 我们跨 4 类执行模型（DataFrame+Arrow+embedded SQL+query engine）；单位是带证书的 semantic contrast；有 observed coverage 与 family 证据链。**待取摘要确认其是否 differential / 是否跨后端** |
+| **TDiFf** | **ASE 2026** | 6 个 DataFrame 系统：Pandas, Dask, CuDF, Modin, PySpark, Polars | **LLM 驱动**：把 SQL query 翻译成 Python DataFrame 测试用例做 **differential testing**；用 SQL/DataFrame API 文档提取 feature knowledge；用 SQL query plan 的 data flow graph 引导生成合法且语义一致的 API 序列 | 跨多个 DataFrame 系统差分测试；DBMS/SQL 语义→DataFrame；找 silent defects | **极高** | **极高（S+）** | ① **执行模型数**：TDiFf 的 6 个后端全是 DataFrame API 族（含分布式）；我们覆盖 DataFrame API + **Arrow compute（布局/chunk/slice）** + **embedded SQL（DuckDB/SQLite/chDB）** + **query engine（DataFusion）**，这是 TDiFf 未覆盖的边界。② **oracle 形式化**：TDiFf 是 LLM 生成 + 差分；我们是 typed 生成 + **带三证书的有限多端点 HyperContract**，并显式区分适用性/观察。③ **覆盖与证据**：我们有 `constructed→activated→executed→observed` 语义覆盖漏斗与 family 级上游确认证据链。④ **诚实边界**：TDiFf 报 **35 个开发者确认 bug**（>99% 合法用例，超 SOTA 2.5–14×），**我们 9 个严格确认**，因此**绝不能在 bug 数上对拼**，必须主打方法学/跨执行模型/可证成性 |
 | FuzzyData | DBTest 2022 | DataFrame workflow systems (pandas/modin/SQLite) | 抽象 workflow 生成 + 跨后端 replay，做 stress/perf | 抽象 workflow 表示 + 跨后端 replay | 中 | 中 | 我们是 correctness oracle + evidence pipeline，不是 workload/benchmark；目标是最新版本 confirmed family |
 | EET | OSDI 2024 | SQL DBMS | 等价表达式变换检测 wrong-result | semantic-preserving transformation + logic-bug oracle | 高（方法） | 高 | SQL-only、单执行模型；我们面对 API lowering / Arrow layout / dtype-null / lazy-eager 等异构边界 |
 | CODDTest | SIGMOD 2025 | DBMS | constant optimization 驱动的等价测试 | 等价变换 + silent wrong-result | 高（方法） | 高 | 同上；我们在跨执行模型的语义对齐上创新 |
@@ -41,9 +41,30 @@ Status: draft v1 (2026-09-14). 待 3 路文献检索 agent 返回后补充/校�
 | Datalog metamorphic | FSE 2021 | Datalog engines | metamorphic relations 做 oracle | MR as core oracle | 中 | 中 | Datalog 语义域窄，无 layout/lazy/API lowering |
 | DBMS fuzzing survey | ACM CSUR 2026 | DBMS | 技术、分类与评估综述 | 证明该方向成熟，但覆盖偏 SQL | 低 | 低 | 用来说明 cross-ecosystem 仍是空白；引用即可 |
 
-> TDiFf 的链接：<https://conf.researchr.org/details/ase-2026/ase-2026-research-track/252/TDiFf-Detecting-Bugs-in-DataFrame-Systems-via-Transferred-DBMS-Test-Cases>
-> （该站点在当前网络环境不可抓取，摘要细节待补。）
+> 取证方式说明：本机所有域名都被透明出口代理解析到保留网段 `198.18.0.0/15`，导致
+> `web_fetch` 的 SSRF 保护拒绝抓取；改用 `curl` 可直接取到页面。以上 DQE/QPG/Thanos/
+> QTRAN/GraphGenie/TDiFf 摘要均已用 curl 实际取回并核对。
 > DBMS fuzzing survey：<https://dl.acm.org/doi/10.1145/3799227>（ACM Computing Surveys）。
+
+### 1.1 已核实的竞争对手事实（curl 取回，2026-09-14）
+
+| 工作 | 目标 | 生成/方法 | 已报告 bug 数 | 对我们的含义 |
+| --- | --- | --- | --- | --- |
+| **TDiFf** (ASE'26) | Pandas, Dask, CuDF, Modin, PySpark, Polars | **LLM** 把 SQL 翻成 DataFrame 用例 + query-plan data-flow graph 引导 + differential testing；>99% 合法 | **35 开发者确认**，超 SOTA 2.5–14× | **最危险**：直接占据 "DBMS→DataFrame 差分测试"。但其后端全在 DataFrame API 族，无 Arrow layout / embedded SQL / query engine |
+| DQE (ICSE'23) | MySQL, MariaDB, TiDB, CockroachDB, SQLite | 同 predicate 跨 SELECT/UPDATE/DELETE 一致性 | 50 发现 / 41 确认 / 11 修复 | SQL-only，intra-DBMS |
+| QPG (ICSE'23) | SQLite, TiDB, CockroachDB | query plan diversity 引导 mutation | 53 unique bugs | SQL-only，plan 引导 |
+| Thanos (ICSE'25) | MySQL, MariaDB, Percona | storage engine rotation 差分 | 32 确认（29 Critical） | SQL-only，同 DBMS 多存储引擎 |
+| QTRAN (ISSTA'25) | 多 DBMS dialect | **LLM** 把 MOLT 变形 oracle 迁移到新 dialect | 论文未在摘要给数 | 迁移的是 SQL dialect，不是执行模型 |
+| GraphGenie (ICSE'24) | 6 个 GDBMS | injective/surjective graph pattern transformation | 25 未知 / 12 修复 / 9 确认 | 图语义，非 tabular |
+
+**关键战略事实**：该方向的头部工作报告的确认 bug 数是 **30–53**（DQE 41、QPG 53、Thanos 32、
+TDiFf 35）。我们目前是 **9 个严格确认**。因此：
+
+- **绝不能**把论文胜负押在 bug 数上；
+- 要么用长时间/更多 fresh seeds 把确认数显著抬高（长跑已获授权），
+- 要么明确走 **方法学 + 现象测量 + 跨执行模型** 的定位（`../INNOVATION_ANALYSIS.md` 的 C-A/C-B/C-E），
+  并把 bug 表作为支撑而非头条。
+- 两者并行最稳：继续 discovery 提高确认数，同时把 RQ0/RQ2/RQ3/RQ5/RQ6 做扎实。
 
 ## 2. 重叠威胁分级
 
