@@ -42,6 +42,20 @@
       },
       "label": "historical df53/pyarrow24",
       "repository_root": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper"
+    },
+    {
+      "env_id": "polars-1.40.1",
+      "interpreter": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/version_envs/polars-1.40.1/venv/bin/python",
+      "packages": {
+        "chdb": "",
+        "datafusion": "",
+        "duckdb": "",
+        "pandas": "3.0.3",
+        "polars": "1.40.1",
+        "pyarrow": "25.0.0"
+      },
+      "label": "historical polars 1.40.1",
+      "repository_root": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper"
     }
   ]
 }

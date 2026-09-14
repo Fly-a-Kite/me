@@ -1,0 +1,327 @@
+{
+  "schema_version": "datadiff-cross-version-smoke-v1",
+  "left_env_id": "polars-1.40.1",
+  "right_env_id": "frozen-target",
+  "left_packages": {
+    "chdb": "",
+    "datafusion": "",
+    "duckdb": "",
+    "pandas": "3.0.3",
+    "polars": "1.40.1",
+    "pyarrow": "25.0.0"
+  },
+  "right_packages": {
+    "chdb": "4.2.1",
+    "datafusion": "54.0.0",
+    "duckdb": "1.5.4",
+    "pandas": "3.0.3",
+    "polars": "1.42.1",
+    "pyarrow": "25.0.0"
+  },
+  "cases": 10,
+  "mismatches": 1,
+  "results": [
+    {
+      "case": "datafusion_distinct_null_topk.json",
+      "backend": "polars",
+      "left_status": "ok",
+      "right_status": "ok",
+      "comparison": {
+        "match": true,
+        "reason": "equal",
+        "left_status": "ok",
+        "right_status": "ok",
+        "left_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}",
+        "right_comparison_key": "{\"columns\":[\"v\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[null]\\\"]\",\"status\":\"ok\"}"
+      },
+      "left_rows": [
+        [
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          null
+        ]
+      ]
+    },
+    {
+      "case": "datafusion_groupby_limit_offset.json",
+      "backend": "polars",
+      "left_status": "ok",
+      "right_status": "ok",
+      "comparison": {
+        "match": true,
+        "reason": "equal",
+        "left_status": "ok",
+        "right_status": "ok",
+        "left_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}",
+        "right_comparison_key": "{\"columns\":[\"count_id\",\"id\",\"nunique_j\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,0,0]\\\"]\",\"status\":\"ok\"}"
+      },
+      "left_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "datafusion_grouped_null_topk.json",
+      "backend": "polars",
+      "left_status": "ok",
+      "right_status": "ok",
+      "comparison": {
+        "match": true,
+        "reason": "equal",
+        "left_status": "ok",
+        "right_status": "ok",
+        "left_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}",
+        "right_comparison_key": "{\"columns\":[\"g\",\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"a\\\\\\\",null]\\\"]\",\"status\":\"ok\"}"
+      },
+      "left_rows": [
+        [
+          "a",
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          "a",
+          null
+        ]
+      ]
+    },
+    {
+      "case": "datafusion_limit_idempotence.json",
+      "backend": "polars",
+      "left_status": "ok",
+      "right_status": "ok",
+      "comparison": {
+        "match": true,
+        "reason": "equal",
+        "left_status": "ok",
+        "right_status": "ok",
+        "left_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",8,\\\\\\\"A\\\\\\\",0,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}",
+        "right_comparison_key": "{\"columns\":[\"g\",\"id\",\"s\",\"x\",\"z\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"c\\\\\\\",8,\\\\\\\"A\\\\\\\",0,0]\\\",\\\"[\\\\\\\"a\\\\\\\",12,\\\\\\\"\\\\\\\",-2,-3]\\\",\\\"[\\\\\\\"c\\\\\\\",2,\\\\\\\"\\\\\\\",-10,-3]\\\"]\",\"status\":\"ok\"}"
+      },
+      "left_rows": [
+        [
+          "c",
+          8,
+          "A",
+          0,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ],
+      "right_rows": [
+        [
+          "c",
+          8,
+          "A",
+          0,
+          0
+        ],
+        [
+          "a",
+          12,
+          "",
+          -2,
+          -3
+        ],
+        [
+          "c",
+          2,
+          "",
+          -10,
+          -3
+        ]
+      ]
+    },
+    {
+      "case": "datafusion_negative_zero_comparison.json",
+      "backend": "polars",
+      "left_status": "ok",
+      "right_status": "ok",
+      "comparison": {
+        "match": true,
+        "reason": "equal",
+        "left_status": "ok",
+        "right_status": "ok",
+        "left_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+        "right_comparison_key": "{\"columns\":[\"id\",\"m_0\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+      },
+      "left_rows": [],
+      "right_rows": []
+    },
+    {
+      "case": "datafusion_order_by_offset_subquery_groupby.json",
+      "backend": "polars",
+      "left_status": "ok",
+      "right_status": "ok",
+      "comparison": {
+        "match": true,
+        "reason": "equal",
+        "left_status": "ok",
+        "right_status": "ok",
+        "left_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}",
+        "right_comparison_key": "{\"columns\":[\"grp\",\"n\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"physical_second\\\\\\\",1]\\\"]\",\"status\":\"ok\"}"
+      },
+      "left_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          "physical_second",
+          1
+        ]
+      ]
+    },
+    {
+      "case": "duckdb_join_filter_pushdown_limit.json",
+      "backend": "polars",
+      "left_status": "ok",
+      "right_status": "ok",
+      "comparison": {
+        "match": true,
+        "reason": "equal",
+        "left_status": "ok",
+        "right_status": "ok",
+        "left_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false]\\\"]\",\"status\":\"ok\"}",
+        "right_comparison_key": "{\"columns\":[\"flag\",\"min_flag\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false]\\\"]\",\"status\":\"ok\"}"
+      },
+      "left_rows": [
+        [
+          false,
+          false
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false
+        ]
+      ]
+    },
+    {
+      "case": "polars_grouped_max_sort_metadata.json",
+      "backend": "polars",
+      "left_status": "ok",
+      "right_status": "ok",
+      "comparison": {
+        "match": false,
+        "reason": "result",
+        "left_status": "ok",
+        "right_status": "ok",
+        "left_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,\\\\\\\"a\\\\\\\"]\\\"]\",\"status\":\"ok\"}",
+        "right_comparison_key": "{\"columns\":[\"max_z\",\"s\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2,\\\\\\\"b\\\\\\\"]\\\"]\",\"status\":\"ok\"}"
+      },
+      "left_rows": [
+        [
+          1,
+          "a"
+        ]
+      ],
+      "right_rows": [
+        [
+          2,
+          "b"
+        ]
+      ]
+    },
+    {
+      "case": "polars_reflected_arithmetic_operand_order.json",
+      "backend": "polars",
+      "left_status": "ok",
+      "right_status": "ok",
+      "comparison": {
+        "match": true,
+        "reason": "equal",
+        "left_status": "ok",
+        "right_status": "ok",
+        "left_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,0.5]\\\",\\\"[1,0.6666666667]\\\",\\\"[1,0.75]\\\"]\",\"status\":\"ok\"}",
+        "right_comparison_key": "{\"columns\":[\"group_code\",\"ratio_value\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0,0.5]\\\",\\\"[1,0.6666666667]\\\",\\\"[1,0.75]\\\"]\",\"status\":\"ok\"}"
+      },
+      "left_rows": [
+        [
+          0,
+          0.5
+        ],
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.75
+        ]
+      ],
+      "right_rows": [
+        [
+          0,
+          0.5
+        ],
+        [
+          1,
+          0.6666666667
+        ],
+        [
+          1,
+          0.75
+        ]
+      ]
+    },
+    {
+      "case": "pyarrow_sliced_bool_groupby.json",
+      "backend": "polars",
+      "left_status": "ok",
+      "right_status": "ok",
+      "comparison": {
+        "match": true,
+        "reason": "equal",
+        "left_status": "ok",
+        "right_status": "ok",
+        "left_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}",
+        "right_comparison_key": "{\"columns\":[\"flag_all\",\"flag_any\",\"g\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,false,10]\\\"]\",\"status\":\"ok\"}"
+      },
+      "left_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          false,
+          10
+        ]
+      ]
+    }
+  ]
+}
