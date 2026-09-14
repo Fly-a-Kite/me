@@ -1,0 +1,33 @@
+{
+  "schema_version": "datadiff-version-environments-v1",
+  "environments": [
+    {
+      "env_id": "frozen-target",
+      "interpreter": "/data1/lbw/xjx/datadiff_fuzz_lab/.venv/bin/python",
+      "packages": {
+        "chdb": "4.2.1",
+        "datafusion": "54.0.0",
+        "duckdb": "1.5.4",
+        "pandas": "3.0.3",
+        "polars": "1.42.1",
+        "pyarrow": "25.0.0"
+      },
+      "label": "frozen target",
+      "repository_root": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper"
+    },
+    {
+      "env_id": "mirror-20260724",
+      "interpreter": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/tmp_evidence_mirror_20260726/phase6_formal_latest_target_remediation_r1.20260724/venv/bin/python",
+      "packages": {
+        "chdb": "4.2.1",
+        "datafusion": "54.0.0",
+        "duckdb": "1.5.5",
+        "pandas": "3.0.5",
+        "polars": "1.43.0",
+        "pyarrow": "25.0.0"
+      },
+      "label": "mirror 20260724",
+      "repository_root": "/data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper"
+    }
+  ]
+}
