@@ -27,8 +27,18 @@ reproduce.py). Reproducer prints `bug` and the finding dict.
 `filter sum_x <= NaN` with comparator **`le_is_not_false`**.
 
 Five backends plus the DSL reference return `[[6, 0, "true_key"]]`; pyarrow returns zero rows.
-The divergence localises to the final NaN/`le_is_not_false` boundary (or the `case_when`
-selection feeding it).
+
+### Localisation (bisection, 2026-09-14)
+
+| Program prefix | pyarrow | pandas |
+| --- | --- | --- |
+| first 6 ops (… `sort`) | `[[6, 0, "true_key"]]` | `[[6, 0, "true_key"]]` |
+| all 7 ops (+ final `filter sum_x <= NaN`, `le_is_not_false`) | **`[]`** | `[[6, 0, "true_key"]]` |
+
+The fault is isolated to the final NaN boundary filter: `le_is_not_false` on
+`sum_x <= NaN`. PyArrow evaluates the comparison as `False` (IEEE NaN ordering) and drops the
+row, while the other five backends and the DSL reference treat it as **not-False**
+(unknown/NULL) and keep it.
 
 ## Why this matters
 
