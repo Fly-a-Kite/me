@@ -70,6 +70,25 @@ def _generated_cases(seeds: Sequence[int], profile: str) -> list[tuple[str, dict
     ]
 
 
+def _case_variants(case: dict[str, Any], count: int, seed: int) -> list[tuple[str, dict[str, Any]]]:
+    """Bootstrap-resample a case's rows while keeping its program shape and schema."""
+    import copy
+    import random
+
+    base = str(case.get("case_id", "case"))
+    variants: list[tuple[str, dict[str, Any]]] = []
+    for index in range(count):
+        rnd = random.Random(seed + index)
+        variant = copy.deepcopy(case)
+        variant["case_id"] = f"{base}-v{index}"
+        for table in variant.get("tables", []) or []:
+            rows = table.get("rows") or []
+            if rows:
+                table["rows"] = [dict(rnd.choice(rows)) for _ in rows]
+        variants.append((f"{base}-v{index}", variant))
+    return variants
+
+
 def scan_cross_version(
     environments: Mapping[str, VersionEnvironment],
     env_pairs: Sequence[tuple[str, str]],
@@ -78,10 +97,17 @@ def scan_cross_version(
     backends: Sequence[str] = DEFAULT_BACKENDS,
     seeds: Sequence[int] = (),
     profile: str = "common",
+    case_variants: int = 0,
+    variant_seed: int = 0,
     timeout_s: float = 30.0,
     repository_root_path: str | Path | None = None,
 ) -> dict[str, Any]:
-    items = _load_cases(_case_files(cases)) + _generated_cases(seeds, profile)
+    expanded: list[tuple[str, dict[str, Any]]] = []
+    for name, case in _load_cases(_case_files(cases)):
+        expanded.append((name, case))
+        if case and case_variants > 0:
+            expanded.extend(_case_variants(case, case_variants, variant_seed))
+    items = expanded + _generated_cases(seeds, profile)
     results: list[dict[str, Any]] = []
     findings: list[dict[str, Any]] = []
 

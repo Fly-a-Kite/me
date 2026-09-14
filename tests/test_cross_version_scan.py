@@ -78,6 +78,21 @@ def test_scan_with_generated_seeds() -> None:
     assert payload["cases"][0].startswith("seed-")
 
 
+def test_scan_case_variants_expand_a_corpus_case() -> None:
+    registry = {"a": _environment("a"), "b": _environment("b")}
+    payload = scan_cross_version(
+        registry,
+        [("a", "b")],
+        cases=[POLARS_CASE],
+        backends=["polars"],
+        case_variants=3,
+        timeout_s=30.0,
+    )
+    assert payload["result_count"] == 4  # original + 3 variants
+    assert payload["finding_count"] == 0
+    assert any(name.endswith("-v2") for name in payload["cases"])
+
+
 def test_cli_registers_cross_version_scan() -> None:
     parser = build_parser()
     args = parser.parse_args(

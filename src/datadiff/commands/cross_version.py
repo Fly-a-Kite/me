@@ -54,6 +54,8 @@ def cmd_cross_version_scan(args: argparse.Namespace) -> int:
         backends=backends,
         seeds=seeds,
         profile=str(getattr(args, "profile", "common") or "common"),
+        case_variants=int(getattr(args, "case_variants", 0) or 0),
+        variant_seed=int(getattr(args, "variant_seed", 0) or 0),
         timeout_s=float(getattr(args, "timeout_s", 30.0)),
     )
     out_dir = str(getattr(args, "output_dir", "") or "").strip() or str(
@@ -99,6 +101,13 @@ def register(subparsers: Any) -> None:
     parser.add_argument("--cases", default="", help="case JSON file or directory; defaults to the canonical corpus")
     parser.add_argument("--seeds", default="", help="comma-separated seeds for freshly generated cases")
     parser.add_argument("--profile", default="common", help="generator profile for --seeds cases")
+    parser.add_argument(
+        "--case-variants",
+        type=int,
+        default=0,
+        help="row-resampled variants per corpus case (keeps the program shape)",
+    )
+    parser.add_argument("--variant-seed", type=int, default=0, help="seed for --case-variants")
     parser.add_argument("--registry", default="", help="version environment registry JSON path")
     parser.add_argument("--output-dir", default="", help="output directory for the scan report")
     parser.add_argument("--timeout-s", type=float, default=30.0, help="per-execution timeout")
