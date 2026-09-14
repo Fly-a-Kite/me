@@ -1,0 +1,1009 @@
+{
+  "schema_version": "datadiff-cross-version-scan-v1",
+  "env_pairs": [
+    [
+      "datafusion-53.0.0--pyarrow-24.0.0",
+      "frozen-target"
+    ]
+  ],
+  "backends": [
+    "datafusion"
+  ],
+  "cases": [
+    "seed-30900101",
+    "seed-30900102",
+    "seed-30900103",
+    "seed-30900104",
+    "seed-30900105",
+    "seed-30900106",
+    "seed-30900107",
+    "seed-30900108",
+    "seed-30900109",
+    "seed-30900110",
+    "seed-30900111",
+    "seed-30900112",
+    "seed-30900113",
+    "seed-30900114",
+    "seed-30900115",
+    "seed-30900116",
+    "seed-30900117",
+    "seed-30900118",
+    "seed-30900119",
+    "seed-30900120",
+    "seed-30900121",
+    "seed-30900122",
+    "seed-30900123",
+    "seed-30900124",
+    "seed-30900125",
+    "seed-30900126",
+    "seed-30900127",
+    "seed-30900128",
+    "seed-30900129",
+    "seed-30900130"
+  ],
+  "result_count": 30,
+  "finding_count": 0,
+  "results": [
+    {
+      "case": "seed-30900101",
+      "case_id": "case-30900101-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          -1
+        ]
+      ],
+      "right_rows": [
+        [
+          -1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900102",
+      "case_id": "case-30900102-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          10
+        ],
+        [
+          10
+        ],
+        [
+          5
+        ]
+      ],
+      "right_rows": [
+        [
+          10
+        ],
+        [
+          10
+        ],
+        [
+          5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[10]\\\",\\\"[10]\\\",\\\"[5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[10]\\\",\\\"[10]\\\",\\\"[5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900103",
+      "case_id": "case-30900103-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          5
+        ],
+        [
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          5
+        ],
+        [
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[5]\\\",\\\"[1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[5]\\\",\\\"[1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900104",
+      "case_id": "case-30900104-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900105",
+      "case_id": "case-30900105-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          -1
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ]
+      ],
+      "right_rows": [
+        [
+          -1
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\",\\\"[1]\\\",\\\"[2]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\",\\\"[1]\\\",\\\"[2]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900106",
+      "case_id": "case-30900106-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          -1
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          -1
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\",\\\"[1]\\\",\\\"[1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\",\\\"[1]\\\",\\\"[1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900107",
+      "case_id": "case-30900107-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          -1
+        ],
+        [
+          -10
+        ]
+      ],
+      "right_rows": [
+        [
+          -1
+        ],
+        [
+          -10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\",\\\"[-10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\",\\\"[-10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900108",
+      "case_id": "case-30900108-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900109",
+      "case_id": "case-30900109-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          10
+        ],
+        [
+          -1
+        ]
+      ],
+      "right_rows": [
+        [
+          10
+        ],
+        [
+          -1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[10]\\\",\\\"[-1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[10]\\\",\\\"[-1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900110",
+      "case_id": "case-30900110-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          10
+        ],
+        [
+          5
+        ],
+        [
+          5
+        ],
+        [
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          10
+        ],
+        [
+          5
+        ],
+        [
+          5
+        ],
+        [
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[10]\\\",\\\"[5]\\\",\\\"[5]\\\",\\\"[0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[10]\\\",\\\"[5]\\\",\\\"[5]\\\",\\\"[0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900111",
+      "case_id": "case-30900111-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          -1
+        ],
+        [
+          -1
+        ]
+      ],
+      "right_rows": [
+        [
+          -1
+        ],
+        [
+          -1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\",\\\"[-1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\",\\\"[-1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900112",
+      "case_id": "case-30900112-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1
+        ],
+        [
+          0
+        ],
+        [
+          -10
+        ]
+      ],
+      "right_rows": [
+        [
+          1
+        ],
+        [
+          0
+        ],
+        [
+          -10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1]\\\",\\\"[0]\\\",\\\"[-10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1]\\\",\\\"[0]\\\",\\\"[-10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900113",
+      "case_id": "case-30900113-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900114",
+      "case_id": "case-30900114-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          -10
+        ],
+        [
+          -10
+        ],
+        [
+          1
+        ],
+        [
+          5
+        ]
+      ],
+      "right_rows": [
+        [
+          -10
+        ],
+        [
+          -10
+        ],
+        [
+          1
+        ],
+        [
+          5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-10]\\\",\\\"[-10]\\\",\\\"[1]\\\",\\\"[5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-10]\\\",\\\"[-10]\\\",\\\"[1]\\\",\\\"[5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900115",
+      "case_id": "case-30900115-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          5
+        ]
+      ],
+      "right_rows": [
+        [
+          5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900116",
+      "case_id": "case-30900116-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0
+        ],
+        [
+          5
+        ],
+        [
+          5
+        ],
+        [
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          0
+        ],
+        [
+          5
+        ],
+        [
+          5
+        ],
+        [
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0]\\\",\\\"[5]\\\",\\\"[5]\\\",\\\"[10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0]\\\",\\\"[5]\\\",\\\"[5]\\\",\\\"[10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900117",
+      "case_id": "case-30900117-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          -10
+        ],
+        [
+          -1
+        ],
+        [
+          2
+        ],
+        [
+          2
+        ]
+      ],
+      "right_rows": [
+        [
+          -10
+        ],
+        [
+          -1
+        ],
+        [
+          2
+        ],
+        [
+          2
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-10]\\\",\\\"[-1]\\\",\\\"[2]\\\",\\\"[2]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-10]\\\",\\\"[-1]\\\",\\\"[2]\\\",\\\"[2]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900118",
+      "case_id": "case-30900118-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0
+        ],
+        [
+          5
+        ],
+        [
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          0
+        ],
+        [
+          5
+        ],
+        [
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0]\\\",\\\"[5]\\\",\\\"[10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0]\\\",\\\"[5]\\\",\\\"[10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900119",
+      "case_id": "case-30900119-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          -1
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          10
+        ]
+      ],
+      "right_rows": [
+        [
+          -1
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          10
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\",\\\"[1]\\\",\\\"[2]\\\",\\\"[10]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\",\\\"[1]\\\",\\\"[2]\\\",\\\"[10]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900120",
+      "case_id": "case-30900120-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          -1
+        ],
+        [
+          0
+        ],
+        [
+          2
+        ]
+      ],
+      "right_rows": [
+        [
+          -1
+        ],
+        [
+          0
+        ],
+        [
+          2
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\",\\\"[0]\\\",\\\"[2]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\",\\\"[0]\\\",\\\"[2]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900121",
+      "case_id": "case-30900121-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          1
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ],
+        [
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1]\\\",\\\"[1]\\\",\\\"[1]\\\",\\\"[1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1]\\\",\\\"[1]\\\",\\\"[1]\\\",\\\"[1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900122",
+      "case_id": "case-30900122-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900123",
+      "case_id": "case-30900123-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          10
+        ],
+        [
+          2
+        ],
+        [
+          2
+        ],
+        [
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          10
+        ],
+        [
+          2
+        ],
+        [
+          2
+        ],
+        [
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[10]\\\",\\\"[2]\\\",\\\"[2]\\\",\\\"[1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[10]\\\",\\\"[2]\\\",\\\"[2]\\\",\\\"[1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900124",
+      "case_id": "case-30900124-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900125",
+      "case_id": "case-30900125-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          2
+        ],
+        [
+          2
+        ],
+        [
+          0
+        ],
+        [
+          -1
+        ]
+      ],
+      "right_rows": [
+        [
+          2
+        ],
+        [
+          2
+        ],
+        [
+          0
+        ],
+        [
+          -1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2]\\\",\\\"[2]\\\",\\\"[0]\\\",\\\"[-1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[2]\\\",\\\"[2]\\\",\\\"[0]\\\",\\\"[-1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900126",
+      "case_id": "case-30900126-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          10
+        ],
+        [
+          10
+        ],
+        [
+          5
+        ],
+        [
+          -1
+        ]
+      ],
+      "right_rows": [
+        [
+          10
+        ],
+        [
+          10
+        ],
+        [
+          5
+        ],
+        [
+          -1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[10]\\\",\\\"[10]\\\",\\\"[5]\\\",\\\"[-1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[10]\\\",\\\"[10]\\\",\\\"[5]\\\",\\\"[-1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900127",
+      "case_id": "case-30900127-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          -1
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          5
+        ]
+      ],
+      "right_rows": [
+        [
+          -1
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\",\\\"[1]\\\",\\\"[2]\\\",\\\"[5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-1]\\\",\\\"[1]\\\",\\\"[2]\\\",\\\"[5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900128",
+      "case_id": "case-30900128-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0
+        ],
+        [
+          -1
+        ]
+      ],
+      "right_rows": [
+        [
+          0
+        ],
+        [
+          -1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0]\\\",\\\"[-1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0]\\\",\\\"[-1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900129",
+      "case_id": "case-30900129-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1
+        ]
+      ],
+      "right_rows": [
+        [
+          1
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"max_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30900130",
+      "case_id": "case-30900130-null-agg-topk",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1
+        ],
+        [
+          5
+        ],
+        [
+          5
+        ]
+      ],
+      "right_rows": [
+        [
+          1
+        ],
+        [
+          5
+        ],
+        [
+          5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1]\\\",\\\"[5]\\\",\\\"[5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"min_x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1]\\\",\\\"[5]\\\",\\\"[5]\\\"]\",\"status\":\"ok\"}"
+    }
+  ],
+  "findings": []
+}

@@ -1,0 +1,1143 @@
+{
+  "schema_version": "datadiff-cross-version-scan-v1",
+  "env_pairs": [
+    [
+      "datafusion-53.0.0--pyarrow-24.0.0",
+      "frozen-target"
+    ]
+  ],
+  "backends": [
+    "datafusion"
+  ],
+  "cases": [
+    "seed-30700001",
+    "seed-30700002",
+    "seed-30700003",
+    "seed-30700004",
+    "seed-30700005",
+    "seed-30700006",
+    "seed-30700007",
+    "seed-30700008",
+    "seed-30700009",
+    "seed-30700010"
+  ],
+  "result_count": 10,
+  "finding_count": 0,
+  "results": [
+    {
+      "case": "seed-30700001",
+      "case_id": "case-30700001",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1
+        ],
+        [
+          0
+        ],
+        [
+          1
+        ],
+        [
+          0
+        ],
+        [
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          1
+        ],
+        [
+          0
+        ],
+        [
+          1
+        ],
+        [
+          0
+        ],
+        [
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"id\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1]\\\",\\\"[0]\\\",\\\"[1]\\\",\\\"[0]\\\",\\\"[0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1]\\\",\\\"[0]\\\",\\\"[1]\\\",\\\"[0]\\\",\\\"[0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30700002",
+      "case_id": "case-30700002",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          -10,
+          false,
+          "WxLx",
+          2,
+          -20,
+          "alpha",
+          -10,
+          0.5
+        ],
+        [
+          0,
+          false,
+          "",
+          1,
+          -10,
+          "beta",
+          0,
+          -0.5
+        ],
+        [
+          2,
+          true,
+          "alpha",
+          0,
+          -8,
+          "alpha",
+          2,
+          -0.5
+        ]
+      ],
+      "right_rows": [
+        [
+          -10,
+          false,
+          "WxLx",
+          2,
+          -20,
+          "alpha",
+          -10,
+          0.5
+        ],
+        [
+          0,
+          false,
+          "",
+          1,
+          -10,
+          "beta",
+          0,
+          -0.5
+        ],
+        [
+          2,
+          true,
+          "alpha",
+          0,
+          -8,
+          "alpha",
+          2,
+          -0.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"co_x\",\"flag\",\"g\",\"id\",\"m_0\",\"s\",\"x\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-10,false,\\\\\\\"WxLx\\\\\\\",2,-20,\\\\\\\"alpha\\\\\\\",-10,0.5]\\\",\\\"[0,false,\\\\\\\"\\\\\\\",1,-10,\\\\\\\"beta\\\\\\\",0,-0.5]\\\",\\\"[2,true,\\\\\\\"alpha\\\\\\\",0,-8,\\\\\\\"alpha\\\\\\\",2,-0.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"co_x\",\"flag\",\"g\",\"id\",\"m_0\",\"s\",\"x\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-10,false,\\\\\\\"WxLx\\\\\\\",2,-20,\\\\\\\"alpha\\\\\\\",-10,0.5]\\\",\\\"[0,false,\\\\\\\"\\\\\\\",1,-10,\\\\\\\"beta\\\\\\\",0,-0.5]\\\",\\\"[2,true,\\\\\\\"alpha\\\\\\\",0,-8,\\\\\\\"alpha\\\\\\\",2,-0.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30700003",
+      "case_id": "case-30700003",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "low",
+          -1,
+          1
+        ],
+        [
+          "low",
+          -1,
+          1
+        ],
+        [
+          "low",
+          -10,
+          null
+        ],
+        [
+          "low",
+          -2,
+          -0.5
+        ],
+        [
+          "low",
+          -2,
+          0
+        ],
+        [
+          "low",
+          1,
+          -1
+        ],
+        [
+          "low",
+          10,
+          0
+        ],
+        [
+          "low",
+          2,
+          0
+        ],
+        [
+          "low",
+          null,
+          -36.333
+        ],
+        [
+          "yes",
+          2,
+          0.5
+        ]
+      ],
+      "right_rows": [
+        [
+          "low",
+          -1,
+          1
+        ],
+        [
+          "low",
+          -1,
+          1
+        ],
+        [
+          "low",
+          -10,
+          null
+        ],
+        [
+          "low",
+          -2,
+          -0.5
+        ],
+        [
+          "low",
+          -2,
+          0
+        ],
+        [
+          "low",
+          1,
+          -1
+        ],
+        [
+          "low",
+          10,
+          0
+        ],
+        [
+          "low",
+          2,
+          0
+        ],
+        [
+          "low",
+          null,
+          -36.333
+        ],
+        [
+          "yes",
+          2,
+          0.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"cw_0\",\"x\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"low\\\\\\\",-1,1]\\\",\\\"[\\\\\\\"low\\\\\\\",-1,1]\\\",\\\"[\\\\\\\"low\\\\\\\",-10,null]\\\",\\\"[\\\\\\\"low\\\\\\\",-2,-0.5]\\\",\\\"[\\\\\\\"low\\\\\\\",-2,0]\\\",\\\"[\\\\\\\"low\\\\\\\",1,-1]\\\",\\\"[\\\\\\\"low\\\\\\\",10,0]\\\",\\\"[\\\\\\\"low\\\\\\\",2,0]\\\",\\\"[\\\\\\\"low\\\\\\\",null,-36.333]\\\",\\\"[\\\\\\\"yes\\\\\\\",2,0.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"cw_0\",\"x\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"low\\\\\\\",-1,1]\\\",\\\"[\\\\\\\"low\\\\\\\",-1,1]\\\",\\\"[\\\\\\\"low\\\\\\\",-10,null]\\\",\\\"[\\\\\\\"low\\\\\\\",-2,-0.5]\\\",\\\"[\\\\\\\"low\\\\\\\",-2,0]\\\",\\\"[\\\\\\\"low\\\\\\\",1,-1]\\\",\\\"[\\\\\\\"low\\\\\\\",10,0]\\\",\\\"[\\\\\\\"low\\\\\\\",2,0]\\\",\\\"[\\\\\\\"low\\\\\\\",null,-36.333]\\\",\\\"[\\\\\\\"yes\\\\\\\",2,0.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30700004",
+      "case_id": "case-30700004",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [],
+      "right_rows": [],
+      "left_comparison_key": "{\"columns\":[\"co_cw_0\",\"cw_0\",\"g\",\"id\",\"m_0\",\"x\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"co_cw_0\",\"cw_0\",\"g\",\"id\",\"m_0\",\"x\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30700005",
+      "case_id": "case-30700005",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          "Cx",
+          1,
+          "space value",
+          -10,
+          41.802
+        ],
+        [
+          false,
+          "UcLRj",
+          0,
+          "中文",
+          -2,
+          0.5
+        ],
+        [
+          false,
+          "a",
+          0,
+          "beta",
+          10,
+          -0.5
+        ],
+        [
+          false,
+          "alpha",
+          1,
+          null,
+          1,
+          -1
+        ],
+        [
+          false,
+          "beta",
+          1,
+          null,
+          null,
+          1
+        ],
+        [
+          false,
+          "δelta",
+          0,
+          "gamma",
+          null,
+          null
+        ],
+        [
+          false,
+          "δelta",
+          1,
+          "GPU",
+          -2,
+          36.101
+        ],
+        [
+          null,
+          "Hac",
+          6,
+          "PIdkTwtl",
+          -2,
+          1
+        ],
+        [
+          null,
+          "bFUl",
+          1,
+          "A",
+          2,
+          1
+        ],
+        [
+          null,
+          "space value",
+          7,
+          "QrISItEx",
+          -4,
+          -0.5
+        ],
+        [
+          true,
+          "AqwMw",
+          3,
+          "A",
+          0,
+          -46.584
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          "Cx",
+          1,
+          "space value",
+          -10,
+          41.802
+        ],
+        [
+          false,
+          "UcLRj",
+          0,
+          "中文",
+          -2,
+          0.5
+        ],
+        [
+          false,
+          "a",
+          0,
+          "beta",
+          10,
+          -0.5
+        ],
+        [
+          false,
+          "alpha",
+          1,
+          null,
+          1,
+          -1
+        ],
+        [
+          false,
+          "beta",
+          1,
+          null,
+          null,
+          1
+        ],
+        [
+          false,
+          "δelta",
+          0,
+          "gamma",
+          null,
+          null
+        ],
+        [
+          false,
+          "δelta",
+          1,
+          "GPU",
+          -2,
+          36.101
+        ],
+        [
+          null,
+          "Hac",
+          6,
+          "PIdkTwtl",
+          -2,
+          1
+        ],
+        [
+          null,
+          "bFUl",
+          1,
+          "A",
+          2,
+          1
+        ],
+        [
+          null,
+          "space value",
+          7,
+          "QrISItEx",
+          -4,
+          -0.5
+        ],
+        [
+          true,
+          "AqwMw",
+          3,
+          "A",
+          0,
+          -46.584
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"g\",\"id\",\"s\",\"x\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,\\\\\\\"Cx\\\\\\\",1,\\\\\\\"space value\\\\\\\",-10,41.802]\\\",\\\"[false,\\\\\\\"UcLRj\\\\\\\",0,\\\\\\\"中文\\\\\\\",-2,0.5]\\\",\\\"[false,\\\\\\\"a\\\\\\\",0,\\\\\\\"beta\\\\\\\",10,-0.5]\\\",\\\"[false,\\\\\\\"alpha\\\\\\\",1,null,1,-1]\\\",\\\"[false,\\\\\\\"beta\\\\\\\",1,null,null,1]\\\",\\\"[false,\\\\\\\"δelta\\\\\\\",0,\\\\\\\"gamma\\\\\\\",null,null]\\\",\\\"[false,\\\\\\\"δelta\\\\\\\",1,\\\\\\\"GPU\\\\\\\",-2,36.101]\\\",\\\"[null,\\\\\\\"Hac\\\\\\\",6,\\\\\\\"PIdkTwtl\\\\\\\",-2,1]\\\",\\\"[null,\\\\\\\"bFUl\\\\\\\",1,\\\\\\\"A\\\\\\\",2,1]\\\",\\\"[null,\\\\\\\"space value\\\\\\\",7,\\\\\\\"QrISItEx\\\\\\\",-4,-0.5]\\\",\\\"[true,\\\\\\\"AqwMw\\\\\\\",3,\\\\\\\"A\\\\\\\",0,-46.584]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"g\",\"id\",\"s\",\"x\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,\\\\\\\"Cx\\\\\\\",1,\\\\\\\"space value\\\\\\\",-10,41.802]\\\",\\\"[false,\\\\\\\"UcLRj\\\\\\\",0,\\\\\\\"中文\\\\\\\",-2,0.5]\\\",\\\"[false,\\\\\\\"a\\\\\\\",0,\\\\\\\"beta\\\\\\\",10,-0.5]\\\",\\\"[false,\\\\\\\"alpha\\\\\\\",1,null,1,-1]\\\",\\\"[false,\\\\\\\"beta\\\\\\\",1,null,null,1]\\\",\\\"[false,\\\\\\\"δelta\\\\\\\",0,\\\\\\\"gamma\\\\\\\",null,null]\\\",\\\"[false,\\\\\\\"δelta\\\\\\\",1,\\\\\\\"GPU\\\\\\\",-2,36.101]\\\",\\\"[null,\\\\\\\"Hac\\\\\\\",6,\\\\\\\"PIdkTwtl\\\\\\\",-2,1]\\\",\\\"[null,\\\\\\\"bFUl\\\\\\\",1,\\\\\\\"A\\\\\\\",2,1]\\\",\\\"[null,\\\\\\\"space value\\\\\\\",7,\\\\\\\"QrISItEx\\\\\\\",-4,-0.5]\\\",\\\"[true,\\\\\\\"AqwMw\\\\\\\",3,\\\\\\\"A\\\\\\\",0,-46.584]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30700006",
+      "case_id": "case-30700006",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          false,
+          "",
+          1,
+          "alpha",
+          0,
+          23.749
+        ],
+        [
+          false,
+          "JFsb",
+          1,
+          null,
+          null,
+          0
+        ],
+        [
+          false,
+          "LyDeCYRu",
+          7,
+          "alpha",
+          -2,
+          -1
+        ],
+        [
+          false,
+          "beta",
+          3,
+          "ZLhemXX",
+          -44,
+          0
+        ],
+        [
+          false,
+          "gamma",
+          0,
+          "a",
+          null,
+          -0.5
+        ],
+        [
+          false,
+          "uUywEOO",
+          4,
+          "δelta",
+          0,
+          0.5
+        ],
+        [
+          false,
+          "中文",
+          1,
+          "",
+          0,
+          0
+        ],
+        [
+          false,
+          "中文",
+          1,
+          "beta",
+          -1,
+          0
+        ],
+        [
+          false,
+          "中文",
+          3,
+          "A",
+          null,
+          1
+        ],
+        [
+          null,
+          "eSCHNGMf",
+          1,
+          null,
+          2,
+          -0.5
+        ],
+        [
+          null,
+          "中文",
+          9,
+          "space value",
+          -10,
+          1
+        ],
+        [
+          true,
+          "RtF",
+          0,
+          "gamma",
+          -2,
+          -0.5
+        ],
+        [
+          true,
+          "δelta",
+          6,
+          "beta",
+          null,
+          -1
+        ],
+        [
+          true,
+          "中文",
+          0,
+          "gamma",
+          -1,
+          0
+        ],
+        [
+          true,
+          "中文",
+          5,
+          "V",
+          null,
+          0.5
+        ]
+      ],
+      "right_rows": [
+        [
+          false,
+          "",
+          1,
+          "alpha",
+          0,
+          23.749
+        ],
+        [
+          false,
+          "JFsb",
+          1,
+          null,
+          null,
+          0
+        ],
+        [
+          false,
+          "LyDeCYRu",
+          7,
+          "alpha",
+          -2,
+          -1
+        ],
+        [
+          false,
+          "beta",
+          3,
+          "ZLhemXX",
+          -44,
+          0
+        ],
+        [
+          false,
+          "gamma",
+          0,
+          "a",
+          null,
+          -0.5
+        ],
+        [
+          false,
+          "uUywEOO",
+          4,
+          "δelta",
+          0,
+          0.5
+        ],
+        [
+          false,
+          "中文",
+          1,
+          "",
+          0,
+          0
+        ],
+        [
+          false,
+          "中文",
+          1,
+          "beta",
+          -1,
+          0
+        ],
+        [
+          false,
+          "中文",
+          3,
+          "A",
+          null,
+          1
+        ],
+        [
+          null,
+          "eSCHNGMf",
+          1,
+          null,
+          2,
+          -0.5
+        ],
+        [
+          null,
+          "中文",
+          9,
+          "space value",
+          -10,
+          1
+        ],
+        [
+          true,
+          "RtF",
+          0,
+          "gamma",
+          -2,
+          -0.5
+        ],
+        [
+          true,
+          "δelta",
+          6,
+          "beta",
+          null,
+          -1
+        ],
+        [
+          true,
+          "中文",
+          0,
+          "gamma",
+          -1,
+          0
+        ],
+        [
+          true,
+          "中文",
+          5,
+          "V",
+          null,
+          0.5
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"flag\",\"g\",\"id\",\"s\",\"x\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,\\\\\\\"\\\\\\\",1,\\\\\\\"alpha\\\\\\\",0,23.749]\\\",\\\"[false,\\\\\\\"JFsb\\\\\\\",1,null,null,0]\\\",\\\"[false,\\\\\\\"LyDeCYRu\\\\\\\",7,\\\\\\\"alpha\\\\\\\",-2,-1]\\\",\\\"[false,\\\\\\\"beta\\\\\\\",3,\\\\\\\"ZLhemXX\\\\\\\",-44,0]\\\",\\\"[false,\\\\\\\"gamma\\\\\\\",0,\\\\\\\"a\\\\\\\",null,-0.5]\\\",\\\"[false,\\\\\\\"uUywEOO\\\\\\\",4,\\\\\\\"δelta\\\\\\\",0,0.5]\\\",\\\"[false,\\\\\\\"中文\\\\\\\",1,\\\\\\\"\\\\\\\",0,0]\\\",\\\"[false,\\\\\\\"中文\\\\\\\",1,\\\\\\\"beta\\\\\\\",-1,0]\\\",\\\"[false,\\\\\\\"中文\\\\\\\",3,\\\\\\\"A\\\\\\\",null,1]\\\",\\\"[null,\\\\\\\"eSCHNGMf\\\\\\\",1,null,2,-0.5]\\\",\\\"[null,\\\\\\\"中文\\\\\\\",9,\\\\\\\"space value\\\\\\\",-10,1]\\\",\\\"[true,\\\\\\\"RtF\\\\\\\",0,\\\\\\\"gamma\\\\\\\",-2,-0.5]\\\",\\\"[true,\\\\\\\"δelta\\\\\\\",6,\\\\\\\"beta\\\\\\\",null,-1]\\\",\\\"[true,\\\\\\\"中文\\\\\\\",0,\\\\\\\"gamma\\\\\\\",-1,0]\\\",\\\"[true,\\\\\\\"中文\\\\\\\",5,\\\\\\\"V\\\\\\\",null,0.5]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"flag\",\"g\",\"id\",\"s\",\"x\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[false,\\\\\\\"\\\\\\\",1,\\\\\\\"alpha\\\\\\\",0,23.749]\\\",\\\"[false,\\\\\\\"JFsb\\\\\\\",1,null,null,0]\\\",\\\"[false,\\\\\\\"LyDeCYRu\\\\\\\",7,\\\\\\\"alpha\\\\\\\",-2,-1]\\\",\\\"[false,\\\\\\\"beta\\\\\\\",3,\\\\\\\"ZLhemXX\\\\\\\",-44,0]\\\",\\\"[false,\\\\\\\"gamma\\\\\\\",0,\\\\\\\"a\\\\\\\",null,-0.5]\\\",\\\"[false,\\\\\\\"uUywEOO\\\\\\\",4,\\\\\\\"δelta\\\\\\\",0,0.5]\\\",\\\"[false,\\\\\\\"中文\\\\\\\",1,\\\\\\\"\\\\\\\",0,0]\\\",\\\"[false,\\\\\\\"中文\\\\\\\",1,\\\\\\\"beta\\\\\\\",-1,0]\\\",\\\"[false,\\\\\\\"中文\\\\\\\",3,\\\\\\\"A\\\\\\\",null,1]\\\",\\\"[null,\\\\\\\"eSCHNGMf\\\\\\\",1,null,2,-0.5]\\\",\\\"[null,\\\\\\\"中文\\\\\\\",9,\\\\\\\"space value\\\\\\\",-10,1]\\\",\\\"[true,\\\\\\\"RtF\\\\\\\",0,\\\\\\\"gamma\\\\\\\",-2,-0.5]\\\",\\\"[true,\\\\\\\"δelta\\\\\\\",6,\\\\\\\"beta\\\\\\\",null,-1]\\\",\\\"[true,\\\\\\\"中文\\\\\\\",0,\\\\\\\"gamma\\\\\\\",-1,0]\\\",\\\"[true,\\\\\\\"中文\\\\\\\",5,\\\\\\\"V\\\\\\\",null,0.5]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30700007",
+      "case_id": "case-30700007",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          -23,
+          null,
+          1,
+          -23,
+          -19.512
+        ],
+        [
+          -10,
+          "A",
+          1,
+          -10,
+          1
+        ],
+        [
+          -10,
+          "DklspON",
+          1,
+          -10,
+          0.5
+        ],
+        [
+          -10,
+          "中文",
+          0,
+          -10,
+          0.5
+        ],
+        [
+          -2,
+          "beta",
+          6,
+          -2,
+          -1
+        ],
+        [
+          -1,
+          "eJtZu",
+          1,
+          -1,
+          0
+        ],
+        [
+          -1,
+          "δelta",
+          4,
+          -1,
+          -34.402
+        ],
+        [
+          -1,
+          null,
+          1,
+          -1,
+          1
+        ],
+        [
+          10,
+          "NWICtHqp",
+          3,
+          10,
+          -25.286
+        ],
+        [
+          10,
+          "中文",
+          1,
+          10,
+          -1
+        ],
+        [
+          0,
+          "alpha",
+          0,
+          null,
+          0
+        ],
+        [
+          0,
+          "gamma",
+          0,
+          null,
+          0
+        ],
+        [
+          2,
+          "中文",
+          2,
+          null,
+          -17.328
+        ]
+      ],
+      "right_rows": [
+        [
+          -23,
+          null,
+          1,
+          -23,
+          -19.512
+        ],
+        [
+          -10,
+          "A",
+          1,
+          -10,
+          1
+        ],
+        [
+          -10,
+          "DklspON",
+          1,
+          -10,
+          0.5
+        ],
+        [
+          -10,
+          "中文",
+          0,
+          -10,
+          0.5
+        ],
+        [
+          -2,
+          "beta",
+          6,
+          -2,
+          -1
+        ],
+        [
+          -1,
+          "eJtZu",
+          1,
+          -1,
+          0
+        ],
+        [
+          -1,
+          "δelta",
+          4,
+          -1,
+          -34.402
+        ],
+        [
+          -1,
+          null,
+          1,
+          -1,
+          1
+        ],
+        [
+          10,
+          "NWICtHqp",
+          3,
+          10,
+          -25.286
+        ],
+        [
+          10,
+          "中文",
+          1,
+          10,
+          -1
+        ],
+        [
+          0,
+          "alpha",
+          0,
+          null,
+          0
+        ],
+        [
+          0,
+          "gamma",
+          0,
+          null,
+          0
+        ],
+        [
+          2,
+          "中文",
+          2,
+          null,
+          -17.328
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"co_x\",\"g\",\"id\",\"x\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-23,null,1,-23,-19.512]\\\",\\\"[-10,\\\\\\\"A\\\\\\\",1,-10,1]\\\",\\\"[-10,\\\\\\\"DklspON\\\\\\\",1,-10,0.5]\\\",\\\"[-10,\\\\\\\"中文\\\\\\\",0,-10,0.5]\\\",\\\"[-2,\\\\\\\"beta\\\\\\\",6,-2,-1]\\\",\\\"[-1,\\\\\\\"eJtZu\\\\\\\",1,-1,0]\\\",\\\"[-1,\\\\\\\"δelta\\\\\\\",4,-1,-34.402]\\\",\\\"[-1,null,1,-1,1]\\\",\\\"[10,\\\\\\\"NWICtHqp\\\\\\\",3,10,-25.286]\\\",\\\"[10,\\\\\\\"中文\\\\\\\",1,10,-1]\\\",\\\"[0,\\\\\\\"alpha\\\\\\\",0,null,0]\\\",\\\"[0,\\\\\\\"gamma\\\\\\\",0,null,0]\\\",\\\"[2,\\\\\\\"中文\\\\\\\",2,null,-17.328]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"co_x\",\"g\",\"id\",\"x\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[-23,null,1,-23,-19.512]\\\",\\\"[-10,\\\\\\\"A\\\\\\\",1,-10,1]\\\",\\\"[-10,\\\\\\\"DklspON\\\\\\\",1,-10,0.5]\\\",\\\"[-10,\\\\\\\"中文\\\\\\\",0,-10,0.5]\\\",\\\"[-2,\\\\\\\"beta\\\\\\\",6,-2,-1]\\\",\\\"[-1,\\\\\\\"eJtZu\\\\\\\",1,-1,0]\\\",\\\"[-1,\\\\\\\"δelta\\\\\\\",4,-1,-34.402]\\\",\\\"[-1,null,1,-1,1]\\\",\\\"[10,\\\\\\\"NWICtHqp\\\\\\\",3,10,-25.286]\\\",\\\"[10,\\\\\\\"中文\\\\\\\",1,10,-1]\\\",\\\"[0,\\\\\\\"alpha\\\\\\\",0,null,0]\\\",\\\"[0,\\\\\\\"gamma\\\\\\\",0,null,0]\\\",\\\"[2,\\\\\\\"中文\\\\\\\",2,null,-17.328]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30700008",
+      "case_id": "case-30700008",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          "alpha",
+          null,
+          -1
+        ],
+        [
+          "alpha",
+          null,
+          0.5
+        ],
+        [
+          "space value",
+          -10,
+          0.5
+        ],
+        [
+          "中文",
+          -1,
+          0.5
+        ],
+        [
+          null,
+          -56,
+          1
+        ],
+        [
+          null,
+          52,
+          0
+        ]
+      ],
+      "right_rows": [
+        [
+          "alpha",
+          null,
+          -1
+        ],
+        [
+          "alpha",
+          null,
+          0.5
+        ],
+        [
+          "space value",
+          -10,
+          0.5
+        ],
+        [
+          "中文",
+          -1,
+          0.5
+        ],
+        [
+          null,
+          -56,
+          1
+        ],
+        [
+          null,
+          52,
+          0
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"s\",\"x\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"alpha\\\\\\\",null,-1]\\\",\\\"[\\\\\\\"alpha\\\\\\\",null,0.5]\\\",\\\"[\\\\\\\"space value\\\\\\\",-10,0.5]\\\",\\\"[\\\\\\\"中文\\\\\\\",-1,0.5]\\\",\\\"[null,-56,1]\\\",\\\"[null,52,0]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"s\",\"x\",\"y\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[\\\\\\\"alpha\\\\\\\",null,-1]\\\",\\\"[\\\\\\\"alpha\\\\\\\",null,0.5]\\\",\\\"[\\\\\\\"space value\\\\\\\",-10,0.5]\\\",\\\"[\\\\\\\"中文\\\\\\\",-1,0.5]\\\",\\\"[null,-56,1]\\\",\\\"[null,52,0]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30700009",
+      "case_id": "case-30700009",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          0
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ]
+      ],
+      "right_rows": [
+        [
+          0
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"id\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0]\\\",\\\"[2]\\\",\\\"[3]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"id\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[0]\\\",\\\"[2]\\\",\\\"[3]\\\"]\",\"status\":\"ok\"}"
+    },
+    {
+      "case": "seed-30700010",
+      "case_id": "case-30700010",
+      "backend": "datafusion",
+      "left_env_id": "datafusion-53.0.0--pyarrow-24.0.0",
+      "right_env_id": "frozen-target",
+      "left_status": "ok",
+      "right_status": "ok",
+      "match": true,
+      "reason": "equal",
+      "left_rows": [
+        [
+          1,
+          39.193,
+          -86
+        ],
+        [
+          1,
+          -0.5,
+          -58
+        ],
+        [
+          1,
+          21.004,
+          -2
+        ],
+        [
+          2,
+          8.189,
+          -1
+        ],
+        [
+          4,
+          -2,
+          1
+        ],
+        [
+          2,
+          -1.5,
+          2
+        ],
+        [
+          1,
+          0.5,
+          10
+        ],
+        [
+          0,
+          -1.5,
+          null
+        ]
+      ],
+      "right_rows": [
+        [
+          1,
+          39.193,
+          -86
+        ],
+        [
+          1,
+          -0.5,
+          -58
+        ],
+        [
+          1,
+          21.004,
+          -2
+        ],
+        [
+          2,
+          8.189,
+          -1
+        ],
+        [
+          4,
+          -2,
+          1
+        ],
+        [
+          2,
+          -1.5,
+          2
+        ],
+        [
+          1,
+          0.5,
+          10
+        ],
+        [
+          0,
+          -1.5,
+          null
+        ]
+      ],
+      "left_comparison_key": "{\"columns\":[\"count_m_0\",\"sum_y\",\"x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,39.193,-86]\\\",\\\"[1,-0.5,-58]\\\",\\\"[1,21.004,-2]\\\",\\\"[2,8.189,-1]\\\",\\\"[4,-2,1]\\\",\\\"[2,-1.5,2]\\\",\\\"[1,0.5,10]\\\",\\\"[0,-1.5,null]\\\"]\",\"status\":\"ok\"}",
+      "right_comparison_key": "{\"columns\":[\"count_m_0\",\"sum_y\",\"x\"],\"error_type\":\"\",\"row_signature\":\"[\\\"[1,39.193,-86]\\\",\\\"[1,-0.5,-58]\\\",\\\"[1,21.004,-2]\\\",\\\"[2,8.189,-1]\\\",\\\"[4,-2,1]\\\",\\\"[2,-1.5,2]\\\",\\\"[1,0.5,10]\\\",\\\"[0,-1.5,null]\\\"]\",\"status\":\"ok\"}"
+    }
+  ],
+  "findings": []
+}
