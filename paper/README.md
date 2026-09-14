@@ -10,6 +10,8 @@ phase-6 authority archive.
 | `EXPERIMENT_MATRIX.md` | Per-RQ protocols, arms, seeds, metrics, artifacts, execution order |
 | `research/CONTRIBUTION_REVIEW.md` | Independent review of the claims and their evidence |
 | `research/CODE_GAP_REPORT.md` | Verified phase-6 gate code gaps and task list T1–T12 |
+| `RELATED_WORK_DOSSIER.md` | Per-paper detailed analysis of all competing published work (verified abstracts) |
+| `COMPETITIVE_ANALYSIS_DEEP.md` | Synthesis: overlap verdict, moat, adjustment directions D1–D9 |
 | `experiments/ENV_REBIND.md` | Frozen-environment reconstruction and interpreter drift |
 | `experiments/results/` | Regenerated results and manifests (W3) |
 | `main.tex`, `sections/`, `refs.bib` | English paper skeleton (acmart, ICSE/FSE format) |
