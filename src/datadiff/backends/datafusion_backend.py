@@ -672,6 +672,24 @@ class DataFusionBackend(Backend):
             )
 
 
+class DataFusionParallelBackend(DataFusionBackend):
+    """DataFusion with multi-partition execution.
+
+    The default ``datafusion`` target runs single-partition (deterministic).
+    This target keeps everything else identical but raises the partition count,
+    exposing parallelism-sensitive semantics (partitioned aggregation, sort
+    merging, join repartitioning).
+    """
+
+    name = "datafusion_parallel"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._target_partitions = max(
+            2, int(os.environ.get("DATADIFF_DATAFUSION_PARALLEL_PARTITIONS", "8"))
+        )
+
+
 def _arrow_type(pa, kind: str):
     if kind == "int":
         return pa.int64()
