@@ -1,0 +1,14 @@
+discovery run manifest: paper/experiments/results/smoke/discovery-run-30700001.json
+run log written:   /data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/runs/run-20260914T064219-1789368139609548066.jsonl.gz
+markdown report:   /data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/reports/report-run-20260914T064219-1789368139609548066.md
+csv findings:      /data1/lbw/xjx/phase6_execution_authority_artifacts_20260726/worktrees/wt-paper/reports/findings-run-20260914T064219-1789368139609548066.csv
+audit candidate families:
+- polars_reflected_arithmetic_operand_order@polars
+- polars_vector_division_rounding@polars
+fresh fuzz candidate families:
+- none
+issue-inspired unsaturated candidate families:
+- none
+known saturated fuzz candidate families:
+- none
+EXIT=0

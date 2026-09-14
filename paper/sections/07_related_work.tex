@@ -17,8 +17,12 @@ differential-fuzzing reference. \todo{Add metamorphic DB testing (e.g., QTRAN) a
 equivalent-expression / constraint-based oracles with verified metadata.}
 
 \subsection{DataFrame and workload testing}
-FuzzyData and DataFrame workload generation/replay. \todo{Verify metadata; position as workload
-generation + replay vs our cross-model semantic oracle.}
+FuzzyData \cite{rehman2022fuzzydata} generates and replays abstract DataFrame workflows for
+stress testing and performance analysis. TDiFf \cite{tdiff2026} transfers DBMS test cases to
+DataFrame systems to detect bugs. \todo{Retrieve the TDiFf abstract and position precisely: our
+scope spans four execution-model families, and our unit is a certified semantic contrast with an
+observed-coverage funnel and an upstream confirmation pipeline, rather than transferred DBMS
+cases within the DataFrame family.}
 
 \subsection{Search, scheduling, and diversity}
 Multi-scope adaptive selection, mutation scheduling (MOPT \cite{mopt2019}), and quality-diversity
@@ -35,7 +39,8 @@ system, target models, oracle families, evidence pipeline, cross-model reuse.}}
 System & Models & Oracles & Evidence pipeline & Cross-model reuse \\
 \midrule
 PQS/NoREC/TLP & SQL & 1 & partial & no \\
-FuzzyData & DataFrame & \todo{} & \todo{} & no \\
+FuzzyData & DataFrame & none (workload) & no & replay only \\
+TDiFf & DataFrame & transferred DBMS & \todo{} & no \\
 SparkFuzz & query engine & differential & no & no \\
 \sys{} & DataFrame+Arrow+SQL+QE & multi-endpoint & yes & yes \\
 \bottomrule
