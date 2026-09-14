@@ -394,7 +394,7 @@ PYARROW_CAPABILITY_MODEL = _structured_capabilities(
     order_semantics=("kernel_input_order",),
     plan_kinds=(),
     execution_modes=("arrow_compute",),
-    physical_layouts=("chunked", "contiguous", "dictionary", "sliced"),
+    physical_layouts=("chunked", "contiguous", "dictionary", "sliced", "large_string", "run_end"),
 )
 SQLITE_CAPABILITY_MODEL = _structured_capabilities(
     COMMON_DSL_CAPABILITIES,

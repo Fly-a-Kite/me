@@ -87,6 +87,16 @@ def _layout_array(
         if logical_type != "str":
             return pa.array(values, type=arrow_type)
         return pa.array(values, type=arrow_type).dictionary_encode()
+    if resolved_layout == "large_string":
+        if logical_type != "str":
+            return pa.array(values, type=arrow_type)
+        return pa.array(values, type=pa.large_string())
+    if resolved_layout == "run_end":
+        if logical_type != "str":
+            return pa.array(values, type=arrow_type)
+        import pyarrow.compute as pc
+
+        return pc.run_end_encode(pa.array(values, type=arrow_type))
     raise ValueError(f"unsupported pyarrow physical layout: {resolved_layout}")
 
 
@@ -109,6 +119,8 @@ class PyArrowBackend(Backend):
         "sliced",
         "chunked",
         "dictionary",
+        "large_string",
+        "run_end",
     )
 
     def _to_table(self, table: TableData | PreparedTable):
