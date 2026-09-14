@@ -42,17 +42,19 @@ def cmd_cross_version_scan(args: argparse.Namespace) -> int:
     backends = [
         item.strip() for item in str(getattr(args, "backends", "") or "").split(",") if item.strip()
     ] or list(DEFAULT_BACKENDS)
+    seeds = [int(item) for item in str(getattr(args, "seeds", "") or "").replace(" ", "").split(",") if item]
     cases = str(getattr(args, "cases", "") or "").strip()
-    if not cases:
+    if not cases and not seeds:
         cases = str(repository_root() / "experiments/canonical_confirmed_bug_corpus/v1/cases")
-    timeout_s = float(getattr(args, "timeout_s", 30.0))
 
     payload = scan_cross_version(
         registry,
         pairs,
         cases=cases,
         backends=backends,
-        timeout_s=timeout_s,
+        seeds=seeds,
+        profile=str(getattr(args, "profile", "common") or "common"),
+        timeout_s=float(getattr(args, "timeout_s", 30.0)),
     )
     out_dir = str(getattr(args, "output_dir", "") or "").strip() or str(
         repository_root() / "paper/experiments/results/cross_version_scan"
@@ -95,6 +97,8 @@ def register(subparsers: Any) -> None:
         help="comma-separated backends; defaults to datafusion,polars,duckdb,pyarrow,pandas",
     )
     parser.add_argument("--cases", default="", help="case JSON file or directory; defaults to the canonical corpus")
+    parser.add_argument("--seeds", default="", help="comma-separated seeds for freshly generated cases")
+    parser.add_argument("--profile", default="common", help="generator profile for --seeds cases")
     parser.add_argument("--registry", default="", help="version environment registry JSON path")
     parser.add_argument("--output-dir", default="", help="output directory for the scan report")
     parser.add_argument("--timeout-s", type=float, default=30.0, help="per-execution timeout")

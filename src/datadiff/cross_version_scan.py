@@ -50,33 +50,46 @@ def _comparable_backends(
     return backends
 
 
+def _load_cases(case_files: Sequence[Path]) -> list[tuple[str, dict[str, Any]]]:
+    items: list[tuple[str, dict[str, Any]]] = []
+    for path in case_files:
+        try:
+            items.append((path.name, json.loads(path.read_text(encoding="utf-8"))))
+        except (OSError, json.JSONDecodeError):
+            items.append((path.name, {}))
+    return items
+
+
+def _generated_cases(seeds: Sequence[int], profile: str) -> list[tuple[str, dict[str, Any]]]:
+    if not seeds:
+        return []
+    from datadiff.datagen import generate_case
+
+    return [
+        (f"seed-{seed}", generate_case(int(seed), profile=profile).to_dict()) for seed in seeds
+    ]
+
+
 def scan_cross_version(
     environments: Mapping[str, VersionEnvironment],
     env_pairs: Sequence[tuple[str, str]],
     *,
-    cases: str | Path | Iterable[str | Path],
+    cases: str | Path | Iterable[str | Path] = (),
     backends: Sequence[str] = DEFAULT_BACKENDS,
+    seeds: Sequence[int] = (),
+    profile: str = "common",
     timeout_s: float = 30.0,
     repository_root_path: str | Path | None = None,
 ) -> dict[str, Any]:
-    case_files = _case_files(cases)
+    items = _load_cases(_case_files(cases)) + _generated_cases(seeds, profile)
     results: list[dict[str, Any]] = []
     findings: list[dict[str, Any]] = []
 
-    for case_path in case_files:
-        try:
-            case = json.loads(case_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            results.append(
-                {
-                    "case": case_path.name,
-                    "case_path": str(case_path),
-                    "status": "case_load_error",
-                    "error": str(exc),
-                }
-            )
+    for case_name, case in items:
+        if not case:
+            results.append({"case": case_name, "status": "case_load_error"})
             continue
-        case_id = str(case.get("case_id", case_path.stem))
+        case_id = str(case.get("case_id", case_name.rsplit(".", 1)[0]))
         for left_id, right_id in env_pairs:
             if left_id not in environments or right_id not in environments:
                 raise ValueError(f"unknown version environment in pair {left_id!r}->{right_id!r}")
@@ -94,9 +107,8 @@ def scan_cross_version(
                 )
                 comparison = outcome["comparison"]
                 record = {
-                    "case": case_path.name,
+                    "case": case_name,
                     "case_id": case_id,
-                    "case_path": str(case_path),
                     "backend": backend,
                     "left_env_id": left_id,
                     "right_env_id": right_id,
@@ -117,7 +129,7 @@ def scan_cross_version(
         "schema_version": SCHEMA_VERSION,
         "env_pairs": [list(pair) for pair in env_pairs],
         "backends": list(backends),
-        "cases": [str(path) for path in case_files],
+        "cases": [name for name, _ in items],
         "result_count": len(results),
         "finding_count": len(findings),
         "results": results,

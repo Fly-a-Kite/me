@@ -68,8 +68,21 @@ def test_write_scan_emits_json_and_markdown(tmp_path: Path) -> None:
     assert "Cross-version scan" in md_path.read_text(encoding="utf-8")
 
 
+def test_scan_with_generated_seeds() -> None:
+    registry = {"a": _environment("a"), "b": _environment("b")}
+    payload = scan_cross_version(
+        registry, [("a", "b")], cases=(), seeds=[30700001], backends=["polars"], timeout_s=30.0
+    )
+    assert payload["result_count"] >= 1
+    assert payload["finding_count"] == 0  # same interpreter, so statuses and results agree
+    assert payload["cases"][0].startswith("seed-")
+
+
 def test_cli_registers_cross_version_scan() -> None:
     parser = build_parser()
-    args = parser.parse_args(["cross-version-scan", "--env-pair", "a->b", "--json"])
+    args = parser.parse_args(
+        ["cross-version-scan", "--env-pair", "a->b", "--seeds", "1,2", "--json"]
+    )
     assert callable(args.func)
     assert args.env_pair == ["a->b"]
+    assert args.seeds == "1,2"
