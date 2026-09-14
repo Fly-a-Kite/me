@@ -4,15 +4,10 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections.abc import Callable
-from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from datadiff.cross_version_scan import DEFAULT_BACKENDS, scan_cross_version, write_scan
 from datadiff.version_environments import load_registry, repository_root
-
-CommandHandler = Callable[[argparse.Namespace], int]
 
 
 def _parse_pairs(args: argparse.Namespace) -> list[tuple[str, str]]:
@@ -81,17 +76,7 @@ def cmd_cross_version_scan(args: argparse.Namespace) -> int:
     return 0
 
 
-@dataclass(frozen=True, slots=True)
-class CrossVersionCommandHandlers:
-    scan: CommandHandler
-
-
-def register(
-    subparsers: Any,
-    *,
-    handlers: CrossVersionCommandHandlers | None = None,
-) -> None:
-    scan_handler = handlers.scan if handlers is not None else cmd_cross_version_scan
+def register(subparsers: Any) -> None:
     parser = subparsers.add_parser(
         "cross-version-scan",
         help="run the same cases across pinned version environments and report divergences",
@@ -114,4 +99,4 @@ def register(
     parser.add_argument("--output-dir", default="", help="output directory for the scan report")
     parser.add_argument("--timeout-s", type=float, default=30.0, help="per-execution timeout")
     parser.add_argument("--json", action="store_true", help="emit the scan payload as JSON")
-    parser.set_defaults(func=scan_handler)
+    parser.set_defaults(func=cmd_cross_version_scan)

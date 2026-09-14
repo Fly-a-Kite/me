@@ -195,35 +195,6 @@ def write_registry(
     return target
 
 
-def resolve_environment(
-    env_id: str,
-    registry: Mapping[str, VersionEnvironment] | None = None,
-) -> VersionEnvironment:
-    registry = registry if registry is not None else load_registry()
-    try:
-        return registry[env_id]
-    except KeyError as exc:
-        raise VersionEnvironmentError(
-            f"unknown version environment {env_id!r}; known: {sorted(registry)}"
-        ) from exc
-
-
-def find_environment_for_packages(
-    requires: Mapping[str, str],
-    registry: Mapping[str, VersionEnvironment] | None = None,
-) -> VersionEnvironment:
-    """Return the first environment whose package versions satisfy ``requires``."""
-
-    registry = registry if registry is not None else load_registry()
-    for environment in registry.values():
-        if all(environment.packages.get(name) == version for name, version in requires.items()):
-            return environment
-    raise VersionEnvironmentError(
-        f"no version environment satisfies {dict(requires)}; known: "
-        f"{ {e.env_id: dict(e.packages) for e in registry.values()} }"
-    )
-
-
 def _main(argv: Sequence[str] | None = None) -> int:
     import argparse
 

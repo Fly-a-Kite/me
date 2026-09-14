@@ -116,30 +116,18 @@ def compare_normalized(left: Mapping[str, Any], right: Mapping[str, Any]) -> dic
     right_status = str(right.get("status", ""))
     left_key = _comparison_key(left)
     right_key = _comparison_key(right)
-
     if left_status != "ok" or right_status != "ok":
-        match = left_status == right_status
-        return {
-            "match": match,
-            "reason": "status" if not match else "status_equal_non_ok",
-            "left_status": left_status,
-            "right_status": right_status,
-            "left_comparison_key": left_key,
-            "right_comparison_key": right_key,
-        }
-    if not left_key or not right_key:
-        return {
-            "match": False,
-            "reason": "missing_comparison_key",
-            "left_status": left_status,
-            "right_status": right_status,
-            "left_comparison_key": left_key,
-            "right_comparison_key": right_key,
-        }
-    match = left_key == right_key
+        match, reason = left_status == right_status, "status"
+        if match:
+            reason = "status_equal_non_ok"
+    elif not left_key or not right_key:
+        match, reason = False, "missing_comparison_key"
+    else:
+        match = left_key == right_key
+        reason = "equal" if match else "result"
     return {
         "match": match,
-        "reason": "result" if not match else "equal",
+        "reason": reason,
         "left_status": left_status,
         "right_status": right_status,
         "left_comparison_key": left_key,
