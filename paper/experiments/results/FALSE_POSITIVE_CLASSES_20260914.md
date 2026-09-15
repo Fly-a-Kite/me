@@ -48,3 +48,16 @@ The pipeline's **detection** works (it found real divergences), but its **adjudi
 the two boundary classes above before any of these can be called bugs. Both are already
 described in the capability models, which is exactly the "declared boundary vs bug" discipline
 the paper claims.
+
+## Scale and effect of FP-2 (measured)
+
+- Our run produced **516 candidate artifact directories** and the aggregate reported
+  **17 distinct "fresh families"** (all `@sqlite`).
+- A random sample of **60/60** candidates shares the *same* sqlite error
+  (`the query contains a null character`). The 17 labels are the same adapter defect surfacing
+  under different finding root causes — a **1-defect / 17-labels / 516-artifacts** inflation.
+- After the `HarnessLoweringError` fix, batches **0704–0710 report zero fresh families**, while
+  the pre-fix batches 0702–0703 still do.
+
+This is the paper's cleanest noise-control anecdote: raw candidate counts are dominated by a
+harness defect until the boundary is declared, after which the same workload reports nothing.
