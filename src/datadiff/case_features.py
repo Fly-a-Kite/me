@@ -144,6 +144,17 @@ def case_has_null_filter_literal(case: Case) -> bool:
     return False
 
 
+def case_has_special_float_filter_literal(case: Case) -> bool:
+    """True when a filter compares against NaN or Infinity."""
+    for op in case.program.operations:
+        if op_kind(op) != "filter":
+            continue
+        value = condition_value(op)
+        if isinstance(value, float) and not math.isfinite(value):
+            return True
+    return False
+
+
 def case_has_outer_join_truth_filter(case: Case) -> bool:
     after_left_join = False
     for op in case.program.operations:

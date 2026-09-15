@@ -15,6 +15,7 @@ PRE_REFERENCE_SEMANTIC_BOUNDARY_RULE_IDS = frozenset(
         "boundary:join_null_keys",
         "boundary:modulo_semantics",
         "boundary:unicode_case_mapping",
+        "boundary:special_float_filter_literal",
     }
 )
 SEMANTIC_CONTRACT_BOUNDARY_RULE_ID = "boundary:semantic_contract_lattice"
@@ -81,6 +82,7 @@ def build_semantic_boundary_rules(
     case_contains_special_float: Callable[[Case], bool],
     join_null_semantics_boundary: BoundaryPredicate,
     null_filter_literal_boundary: BoundaryPredicate,
+    special_float_filter_literal_boundary: BoundaryPredicate,
     modulo_boundary: BoundaryPredicate,
     unicode_case_mapping_boundary: BoundaryPredicate,
     semantic_contract_lattice_boundary: BoundaryPredicate | None = None,
@@ -118,6 +120,14 @@ def build_semantic_boundary_rules(
             rule_id="boundary:null_filter_literal",
             reason="filter compares against NULL; engines intentionally differ on NULL predicate semantics",
             predicate=null_filter_literal_boundary,
+        ),
+        SemanticBoundaryRule(
+            rule_id="boundary:special_float_filter_literal",
+            reason=(
+                "filter compares against NaN/Infinity; engines intentionally differ on "
+                "special-float predicate semantics (NaN-as-value vs NaN-as-null)"
+            ),
+            predicate=special_float_filter_literal_boundary,
         ),
         SemanticBoundaryRule(
             rule_id="boundary:modulo_semantics",

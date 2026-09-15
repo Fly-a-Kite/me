@@ -7,6 +7,7 @@ from datadiff.case_features import (
     case_contains_non_ascii_string as _case_contains_non_ascii_string,
     case_contains_special_float as _case_contains_special_float,
     case_has_null_filter_literal as _case_has_null_filter_literal,
+    case_has_special_float_filter_literal as _case_has_special_float_filter_literal,
     case_uses_modulo as _case_uses_modulo,
     case_uses_unicode_case_mapping as _case_uses_unicode_case_mapping,
 )
@@ -711,6 +712,12 @@ def _null_filter_literal_boundary(case: Case, finding: Finding | dict[str, Any],
     return _case_has_null_filter_literal(case)
 
 
+def _special_float_filter_literal_boundary(
+    case: Case, finding: Finding | dict[str, Any], config: dict[str, Any]
+) -> bool:
+    return _case_has_special_float_filter_literal(case)
+
+
 def _modulo_boundary(case: Case, finding: Finding | dict[str, Any], config: dict[str, Any]) -> bool:
     return _case_uses_modulo(case)
 
@@ -729,6 +736,7 @@ SEMANTIC_BOUNDARY_RULES = build_semantic_boundary_rules(
     case_contains_special_float=_case_contains_special_float,
     join_null_semantics_boundary=_join_null_semantics_boundary,
     null_filter_literal_boundary=_null_filter_literal_boundary,
+    special_float_filter_literal_boundary=_special_float_filter_literal_boundary,
     modulo_boundary=_modulo_boundary,
     unicode_case_mapping_boundary=_unicode_case_mapping_boundary,
     semantic_contract_lattice_boundary=_finding_matches_contract_boundary,
