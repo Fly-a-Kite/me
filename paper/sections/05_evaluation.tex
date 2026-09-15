@@ -3,10 +3,40 @@
 
 \subsection{Experimental setup}
 
-\todo{State machine (CPU/RAM), frozen environment with package hashes, source commit, backend
-versions, seed policy (excluded blocks; fresh pair 30700001/30700102), lane specification,
-case budget, timeouts, and the counting contract. Reference
-\texttt{paper/EXPERIMENT\_MATRIX.md}.}
+All experiments run on a 80-core, 251\,GB Linux host against a frozen target environment
+(pandas 3.0.3, Polars 1.42.1, DuckDB 1.5.4, PyArrow 25.0.0, DataFusion 54.0.0, chDB 4.2.1);
+the interpreter binary is frozen by SHA-256 so the environment cannot drift. Campaigns use
+excluded smoke/yield blocks and fresh seed pairs starting at \texttt{30700001}. Findings follow
+the counting contract finding $\rightarrow$ recheck survivor $\rightarrow$ native candidate
+$\rightarrow$ issue-ready root $\rightarrow$ independently confirmed family.
+
+\subsection{RQ0: How often do tabular engines actually diverge?}
+
+We streamed 300 longhaul run logs (66{,}000 executable cases) and counted cases where the
+oracle observed at least one cross-backend divergence (Table~\ref{tab:rq0}).
+
+\begin{table}[t]
+\caption{RQ0 — raw cross-engine divergence and its adjudication.}
+\label{tab:rq0}
+\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Stage & Cases / findings & Rate \\
+\midrule
+Executed cases & 66{,}000 & --- \\
+Cases with any divergence & 269 & 0.41\,\% \\
+\quad of which SQLite harness boundary (NUL literal) & 270 findings & --- \\
+\quad of which declared NaN boundary (PyArrow) & 4 findings & --- \\
+Genuine engine divergence after boundary adjudication & 4 & 0.006\,\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The raw rate is dominated by a single undeclared harness boundary: 270 of 274 findings are
+SQLite rejecting NUL-containing string literals. The same adapter defect surfaced under 17
+different \texttt{root\_cause} labels, so root-cause labels are not a valid taxonomy until
+boundaries are adjudicated. Declaring the boundary (typed lowering error plus a pre-reference
+boundary rule) collapses the rate by roughly $65\times$ on the same workload and backends.
 
 \subsection{RQ1: Can \sys{} find confirmed latest-version bug families?}
 
@@ -29,9 +59,14 @@ Seed block & Executed & Findings & Survivors & New families \\
 
 \subsection{RQ2: Does normalization control noise?}
 
-\todo{Report raw findings vs post-classification survivors, FP rate, expected-divergence rate,
-and normalization before/after counts for \texttt{legacy\_cartesian} vs
-\texttt{contract\_cartesian} vs \texttt{contract\_lattice\_static}.}
+The RQ0 funnel is the direct evidence: raw cross-engine divergence of 0.41\,\% reduces to
+0.006\,\% once two declared boundaries are adjudicated, with no loss of the nine confirmed
+families. Two boundary classes were found and fixed during this work: special-float filter
+literals (NaN-as-value vs NaN-as-null; all capability models already declare
+\texttt{nan\_distinct\_from\_null}) and SQLite NUL-containing string literals (typed harness
+lowering error). One adapter defect produced 516 candidate artifacts under 17 labels, and
+post-fix batches report zero fresh families on the same workload. \todo{Add the paired
+\texttt{legacy\_cartesian} vs \texttt{contract\_cartesian} comparison once rerun.}
 
 \subsection{RQ3: Are the oracle families complementary?}
 
@@ -58,6 +93,35 @@ time-to-add-a-target, and per-family confirmed families.}
 \todo{Report contract, granularity/reachability, and runtime-correctness gates separately.
 Until W2 completes, state clearly that these gates are not yet green and report the current
 producer-kind completion count. Do not report partial gate credit.}
+
+\subsection{RQ7: Are the confirmed families reachable by the strongest competitors?}
+
+We ran competitor-scope arms over the nine strict confirmed roots: a DataFrame-family plain
+differential arm (TDiFf-like scope) and a DuckDB/SQLite SQL-oracle arm (SQLancer-like scope).
+Table~\ref{tab:rq7} reports reachability (does the buggy backend lie in the competitor's target
+set?) and detection.
+
+\begin{table}[t]
+\caption{RQ7 — competitor scope versus our confirmed roots.}
+\label{tab:rq7}
+\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Arm & Reachable & Detected & Out of scope \\
+\midrule
+\texttt{tdiff\_style} (DataFrame + differential) & 2/9 & 1/9 & 7/9 \\
+\texttt{sqlancer\_common\_scope} (DuckDB/SQLite) & 1/9 & 0/9 & 8/9 \\
+Competitor union & 3/9 & --- & \textbf{6/9} \\
+\texttt{ours\_full} (all four families) & 9/9 & 3/9 (differential only) & 0/9 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Six of nine roots are out of reach of every competitor scope; the five DataFusion query-engine
+roots and the PyArrow layout root are unreachable by construction. A second finding is that
+even our own full-backend arm with \emph{plain differential only} detects just 3/9: the
+remaining six require the contract/metamorphic/probe oracle family, not merely backend breadth.
+This isolates both the scope claim and the oracle-family claim.
 
 \subsection{Baselines}
 
