@@ -54,4 +54,33 @@ row, while the other five backends and the DSL reference treat it as **not-False
 3. Search upstream for duplicates (Apache Arrow issues).
 4. File upstream; track confirmation.
 
-Status: **candidate only** — `candidate_confirmed=false`, `bug_claimed=false`.
+## Verdict (corrected 2026-09-14) — expected semantic boundary, **not a PyArrow bug**
+
+Manual adjudication of the localised filter shows the divergence is the documented
+**NaN-as-value vs NaN-as-null** boundary, not an implementation defect:
+
+| Engine | `sum_x <= NaN` | `is_not_false` outcome |
+| --- | --- | --- |
+| reference (`filtering.py`) | `_compare_three_valued` treats NaN as nullish → **unknown (None)** | `None is not False` → **keep** |
+| pandas / polars / duckdb / sqlite | NaN treated as nullish in this comparator | **keep** |
+| **pyarrow** | `pc.less_equal(0, NaN)` → **False** (IEEE) | `fill_null(False, True)` stays False → **drop** |
+
+Every target's capability model already declares `nan_distinct_from_null`
+(`targets.py:337-417`), so this cross-engine difference is a **declared semantic boundary**.
+The candidate is therefore a **triage false positive**, not a new root.
+
+### Why the classifier missed it (actionable RQ2 finding)
+
+`semantic_boundaries.py` only routes NaN/Inf cases to a boundary when the finding's
+`root_cause` is `nan_inf_semantics` or `null_semantics` (rules
+`boundary:root_nan_inf_semantics`, `boundary:special_float_values`,
+`boundary:null_filter_literal`). This finding's `root_cause` is `conditional_expression`
+(the NaN is a **filter literal**, not table data), so no boundary rule matched and the
+pipeline emitted `candidate_implementation_bug`.
+
+**Fix:** add a boundary rule for **special-float filter literals** (NaN/Inf compared via
+`*_is_not_false`/`*_is_not_true`), so this class is classified as expected divergence. That
+directly improves false-positive control (RQ2).
+
+Status: **expected semantic divergence** — `candidate_confirmed=false`, `bug_claimed=false`,
+and it must not be counted as a bug or submitted upstream.
