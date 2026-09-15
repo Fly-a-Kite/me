@@ -1,0 +1,44 @@
+{
+  "schema_version": "datadiff-rq0-phenomenon-v1",
+  "run_logs_scanned": 300,
+  "cases": 66000,
+  "cases_with_divergence": 269,
+  "divergence_rate": 0.0040757575757575755,
+  "findings": 274,
+  "by_root_cause": {
+    "running_sum_precision": 80,
+    "conditional_expression": 70,
+    "semi_join_membership": 33,
+    "anti_join_exclusion": 28,
+    "coalesce_null_semantics": 18,
+    "filter_predicate": 17,
+    "arithmetic_expression": 9,
+    "metamorphic_filter_input_materialization": 5,
+    "tuple_absence_null_filter": 5,
+    "topk_filter_pushdown": 4,
+    "unicode_case_mapping": 2,
+    "groupby_aggregation": 1,
+    "union_all_row_append": 1,
+    "joined_order_offset_projection": 1
+  },
+  "by_mismatch_class": {
+    "accept_reject": 265,
+    "status": 5,
+    "row_count": 4
+  },
+  "by_oracle": {
+    "differential": 269,
+    "metamorphic": 5
+  },
+  "by_suspicious_backend": {
+    "sqlite": 270,
+    "pyarrow": 4
+  },
+  "per_lane": {
+    "": {
+      "cases": 66000,
+      "divergent": 269,
+      "rate": 0.0040757575757575755
+    }
+  }
+}
