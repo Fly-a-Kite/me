@@ -23,23 +23,24 @@ implementation bugs yet**; two are clean false-positive classes. This is direct 
 - Files: `case_features.py`, `classification_oracle.py`, `semantic_boundaries.py`;
   test `tests/test_special_float_filter_literal_boundary.py` (4 passed); 158 related tests pass.
 
-## Class FP-2: NUL-character string literal on SQLite — **open**
+## Class FP-2: NUL-character string literal on SQLite — **fixed**
 
 - Cause: `value_catalog.py:310` contains `"a\x00z"`. The DuckDB adapter escapes NUL via
-  `CHR(0)` (`duckdb_backend.py:91-99`); the SQLite adapter does not, so `sqlite3` raises
+  `CHR(0)` (`duckdb_backend.py:91-99`); the SQLite adapter did not, so `sqlite3` raised
   `ValueError: the query contains a null character`. Result: `accept_reject` mismatch with
   sqlite as the "suspicious minority", even though the other five backends simply have an
   adapter that can carry NUL.
-- This is a **framework/adapter limitation**, not a SQLite engine bug.
-- Recommended fix (pick one):
-  1. Capability-gate NUL strings: declare the token unsupported for the SQLite target and skip
-     such cases (cleanest; SQLite TEXT cannot represent NUL at all).
-  2. Mirror the DuckDB `CHR(0)` handling in `sqlite_backend._lit`; note SQLite's `char(0)`
-     yields an empty string, so this converts the error into a boundary value mismatch rather
-     than removing the noise.
-  3. Classify a suspicious backend whose status is `error` with an adapter/lowering
-     `ValueError` as `adapter_error`, not a candidate bug.
-- Deferred: choosing between (1) and (3) is a design decision; no risky catalog edit was made.
+- This was a **framework/adapter limitation**, not a SQLite engine bug.
+- Fix applied: `sqlite_backend._lit` now raises the existing typed
+  `HarnessLoweringError("sqlite cannot represent NUL characters in string literals")`. The
+  pipeline's existing `harness_lowering_errors` path then excludes the case, so no new
+  classification code was needed.
+- Verified with a fresh re-execution: `classify_finding` now returns
+  `verdict=harness_lowering_error`, `paper_status=exclude_harness_lowering_failure`,
+  `false_positive=True` (`shared_sql_lowering_failure`).
+- Tests: `tests/test_sqlite_nul_literal.py` (2) plus 152 classification/triage tests pass;
+  broader sqlite-related run is 397 passed / 6 known W1 interpreter-drift failures.
+- Files: `sqlite_backend.py`.
 
 ## Implication
 

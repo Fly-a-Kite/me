@@ -7,6 +7,7 @@ from datadiff.backends.base import Backend, BackendResult, PreparedTable, prepar
 from datadiff.backends.dataframe_semantics import running_sum_plan, tuple_absence_plan
 from datadiff.backends.probe_semantics import EXTENDED_FALSE_PROBE_KINDS
 from datadiff.backends.sql_lowering import (
+    HarnessLoweringError,
     SqlDialect,
     cast_logical_expression,
     render_aggregate_sql,
@@ -66,7 +67,12 @@ def _lit(value: Any) -> str:
         if math.isinf(value):
             return "1e999" if value > 0 else "-1e999"
         return repr(value)
-    return "'" + str(value).replace("'", "''") + "'"
+    text = str(value)
+    if "\x00" in text:
+        # SQLite TEXT cannot represent NUL; raising the harness's typed lowering
+        # error keeps this a classified harness failure rather than a fake bug.
+        raise HarnessLoweringError("sqlite cannot represent NUL characters in string literals")
+    return "'" + text.replace("'", "''") + "'"
 
 
 def _sql_type(kind: str) -> str:
